@@ -1,0 +1,23 @@
+{
+  "id": "claude_code",
+  "version": "0.1.0",
+  "title": "Claude Code",
+  "description": "Claude Code's workspace half: what a map says to a Claude Code session, beside the server's hooks and setup (pack.json).",
+  "styles": [
+    {
+      "id": "core.setup_behind",
+      "type": "instruction",
+      "title": "Bring the folder up to date",
+      "body": "This folder's Archipelago files (hooks, working rules, the bump skill) are older than the server's. Tell the owner in your first reply, and with their yes bring them up to date by running this in the folder (it holds no secret, and with nobody at a terminal it renews only what Archipelago wrote there before):{command} . What it changes takes effect in the next session.",
+      "props": {
+        "for": [
+          "setup_behind"
+        ],
+        "order": 10
+      }
+    }
+  ],
+  "moved_from": [
+    "practice"
+  ]
+}
