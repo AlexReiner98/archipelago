@@ -1,47 +1,26 @@
 // Standing views a pack declares as data (a view with `lens` in its pack.json), each answered by its own read, in
-// the form it has always had: the flat lens (src/query-flat.ts), the graph (src/view-graph.ts), the tree
-// (src/view-tree.ts), the hubs, attention and the brief. Any other answer is the service answer.<name> a pack provides
-// (src/services.ts), asked with the view's params and answering for itself.
+// the form it has always had: the flat lens (src/query-flat.ts), the hubs and the frontier. Any other answer is the
+// service answer.<name> a pack provides (src/services.ts), asked with the view's params and answering for itself:
+// the graph, the tree and the brief (packs/views), attention (packs/attention).
 
-import { attention, type Input } from './attention.ts';
-import { brief, briefRead } from './brief.ts';
 import type { LENS_ANSWERS, ViewDef } from './declared.ts';
 import type { FrontierInput } from './frontier.ts';
 import { HUB_AT, hubs } from './query-kept.ts';
-import { callService } from './services.ts';
+import { callAs } from './kernel-context.ts';
 import { flatRead } from './query-flat.ts';
 import type { Archipelago } from './pelago.ts';
-import { graph } from './view-graph.ts';
-import { tree } from './view-tree.ts';
 
 type Reading = (l: Archipelago, def: ViewDef, params: Record<string, unknown>) => Promise<unknown>;
 
 /** The hubs (src/query-kept.ts), with the size at which an item counts as one where its project does not say. */
 const hubsOf: Reading = async (l, _def, params) => ({ at: HUB_AT, within: params.within ?? null, hubs: await hubs(l, params.within === undefined ? undefined : String(params.within)) });
 
-/**
- * What deserves attention: what is the person's, or inside what it is asked within, weighed by its reasons
- * (src/attention.ts). Every lens item's needs_you is read from the same reasons.
- */
-const attend: Reading = async (l, _def, params) => attention(l, params as Input);
-
-/** Everything a session needs to start on a task: what is read around the task by the links the preset names, with what holds the task and what it needs. */
-const briefOf: Reading = async (l, def, params) => {
-  if (!params.task) throw new Error('brief needs "task": the id of the entity to work on');
-  const read = await briefRead(l, String(params.task), (def.lens?.over as string[] | undefined) ?? []);
-  return brief(l, { task: String(params.task) }, read);
-};
-
 /** Where a session stands, and what there needs it (src/frontier.ts). */
 const frontierOf: Reading = async (l, _def, params) => (await import('./frontier.ts')).frontier(l, params as FrontierInput);
 
 const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
   flat: (l, _def, params) => flatRead(l, params),
-  graph,
-  tree: (l, _def, params) => tree(l, params),
   hubs: hubsOf,
-  attention: attend,
-  brief: briefOf,
   frontier: frontierOf,
 };
 
@@ -49,5 +28,6 @@ const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
 export function answerPreset(l: Archipelago, def: ViewDef, params: Record<string, unknown>): Promise<unknown> {
   const answer = def.answer ?? 'flat';
   if (Object.hasOwn(READINGS, answer)) return READINGS[answer as keyof typeof READINGS](l, def, params);
-  return callService(l.registry, `answer.${answer}`, { ...params, ...(def.lens && { lens: def.lens }) });
+  // As the map that asks (a person's view): the provider reads as they do (src/kernel-context.ts, callAs).
+  return callAs(l, `answer.${answer}`, { ...params, ...(def.lens && { lens: def.lens }), ...(def.choices && { choices: def.choices }) });
 }

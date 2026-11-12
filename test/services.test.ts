@@ -59,9 +59,9 @@ test('a shape is a JSON sketch, and a value is checked against it', () => {
 });
 
 test('what the kernel still answers is its own: a pack may not provide it, and a setting says who reads it', () => {
-  const p = pack('x', { kernel: { provides: { 'answer.attention': ATTENTION, 'term.held': {}, 'setting.zone': { out: 'string' }, 'sort.of': {}, 'piece.chart': { read: 'member' } } } });
+  const p = pack('x', { kernel: { provides: { 'answer.frontier': ATTENTION, 'term.held': {}, 'setting.zone': { out: 'string' }, 'sort.of': {}, 'piece.chart': { read: 'member' } } } });
   const problems = checkServices(p, KERNEL_OWNS);
-  assert.ok(problems.some((m) => /answers answer "attention" itself/.test(m)));
+  assert.ok(problems.some((m) => /answers answer "frontier" itself/.test(m)));
   assert.ok(problems.some((m) => /answers term "held" itself/.test(m)));
   assert.ok(problems.some((m) => /"setting.zone": a setting says .* who reads it/.test(m)));
   assert.ok(problems.some((m) => /"sort.of" is no service name/.test(m)));

@@ -105,7 +105,7 @@ export interface ViewDef {
 }
 
 /** The reads a view the kernel answers itself may name, each kept to the form its view had (src/query-presets.ts). Others are the family answer.<name>. */
-export const LENS_ANSWERS = ['flat', 'graph', 'tree', 'hubs', 'attention', 'brief', 'frontier'] as const;
+export const LENS_ANSWERS = ['flat', 'hubs', 'frontier'] as const;
 
 /**
  * A tree a pack declares over "is part of": a roadmap, for one. The `tree`
@@ -321,12 +321,13 @@ export const toolName = (id: string) => id.replaceAll('.', '_');
 const isObjectSchema = (s: unknown) => Boolean(s) && typeof s === 'object' && (s as { type?: unknown }).type === 'object';
 
 /** Problems with what a pack declares, given the types loaded and whether it has a handler. Empty means it loads. */
-export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, verbs: string[], handler: boolean): string[] {
+export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, verbs: string[], handler: boolean, always: readonly string[] = []): string[] {
   const problems: string[] = [];
   const own = (id: string) => ownsId(pack, id); // or a name kept by a pack it took declarations from
   const seen = new Set<string>();
   problems.push(...checkServices(pack, KERNEL_OWNS));
-  const answers = [...LENS_ANSWERS, ...openedTo(pack, 'answer')];
+  // The answers the server's internal packs provide are always there (packs/views, packs/attention): any view names them.
+  const answers = [...LENS_ANSWERS, ...always, ...openedTo(pack, 'answer')];
   const pieces: Record<string, readonly string[]> = { ...PIECES, ...Object.fromEntries(openedTo(pack, 'piece').map((p) => [p, []])) };
   const pages = [...PAGES, ...openedTo(pack, 'page')];
   for (const [what, list] of [['action', parts(pack).actions], ['view', parts(pack).views]] as const) {
@@ -339,7 +340,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (preset) {
         const view = def as ViewDef;
         if (typeof view.lens !== 'object' || view.lens === null || Array.isArray(view.lens)) problems.push(`${at}: lens is the fields of a lens`);
-        if (view.answer !== undefined && !(answers as string[]).includes(view.answer)) problems.push(`${at}: answer is one of ${LENS_ANSWERS.join(', ')}, or one its pack provides or requires as service:answer.<name>`);
+        if (view.answer !== undefined && !(answers as string[]).includes(view.answer)) problems.push(`${at}: answer is one of ${[...LENS_ANSWERS, ...always].join(', ')}, or one its pack provides or requires as service:answer.<name>`);
       } else if (!handler) problems.push(`${at} needs the pack's handler.js: a verb with nothing to compute is a generic op`);
       if (!(preset && def.input === undefined) && !isObjectSchema(def.input)) problems.push(`${at}: input is the JSON Schema of an object`);
       if (def.limit_ms !== undefined && !(def.limit_ms > 0 && def.limit_ms <= 30_000)) problems.push(`${at}: limit_ms is at most 30000`);
