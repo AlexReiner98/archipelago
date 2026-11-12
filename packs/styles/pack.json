@@ -6,6 +6,18 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "answer.view_style": {
+        "in": {
+          "own?": "any",
+          "have?": "any"
+        },
+        "out": {
+          "style": "any"
+        },
+        "run": "view-style.ts#viewStyle"
+      }
+    }
   }
 }
