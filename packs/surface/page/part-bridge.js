@@ -16,8 +16,8 @@ import { goingOut } from './part-going.js';
 const pressLasts = 2000;
 
 /**
- * Bridge one pack version's port. `partOf(id)` is the part mounted under that id ({ id, title, sends, hash }); a part
- * on an island that pins its pack's version names that island in its params (`island`), as the action takes it. Send
+ * Bridge one pack version's port. `partOf(id)` is the part mounted under that id ({ id, title, sends, hash, island? }):
+ * the island it is drawn on goes with the part, so the server checks its code there (a version the island pins). Send
  * the parts everything through `send`, so a press is counted; hand each message from the port to `heard`, which
  * answers true when it was an action it took.
  */
@@ -42,7 +42,7 @@ export function partBridge(port, { partOf } = {}) {
     busy.add(id);
     try {
       // Called by its tool's name, as the kernel makes it of the action's id (toolName in packs/loader/kernel/declared.ts).
-      const made = await api(action.replaceAll('.', '_'), { ...params, part: { id: part.id, hash: part.hash } });
+      const made = await api(action.replaceAll('.', '_'), { ...params, part: { id: part.id, hash: part.hash, ...(part.island && { island: part.island }) } });
       const result = { status: made?.status, created: made?.created ?? {}, ...(made?.proposal && { proposal: made.proposal, held: made.held_by?.say ?? '' }), ...(made?.answer !== undefined && { answer: made.answer }) };
       shown?.done(result);
       answer(asked, result);

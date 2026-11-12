@@ -14,6 +14,9 @@ import { partsFor } from '../packs/loader/kernel/ui-parts.ts';
 import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
 
+/** The test pack's own parts: the repository's packs ship parts beside them (findings's). */
+const shelfs = <T extends { pack: string }>(parts: T[]) => parts.filter((p) => p.pack === 'shelf');
+
 const input = { type: 'object', properties: { title: { type: 'string' } }, additionalProperties: false };
 /** A map pack with an action its part sends, one it does not, and one only a person may call. */
 const shelf = (sends = ['shelf.put']) => ({
@@ -42,7 +45,7 @@ test('a part’s action goes out as the person’s, its change naming the part a
   const dir = folder(shelf());
   const l = await freshWith(new Registry(dir));
   try {
-    const [row] = partsFor(l.registry);
+    const [row] = shelfs(partsFor(l.registry));
     const part = { id: row.id, hash: row.hash };
     const done = (await callTool(l, human, 'shelf_put', { title: 'From the row', part })) as { status: string; changeset: string; created: Record<string, string> };
     assert.equal(done.status, 'applied');
@@ -57,7 +60,7 @@ test('a part’s action goes out as the person’s, its change naming the part a
     // The owner's open version of the part is drawn too: its code's hash is let through.
     const mine = { is_open: true, props: { preset: 'shelf.row', code: { 'index.js': "export default () => ({ marks: ['text', {}, 'mine'] });\n" } } };
     await make(l, [{ op: 'create', type: 'part', title: 'Row, mine', props: { ...mine.props, pack: 'shelf', slot: 'sheet' } }]);
-    const theirs = partsFor(l.registry, [mine])[0];
+    const theirs = shelfs(partsFor(l.registry, [mine]))[0];
     assert.notEqual(theirs.hash, row.hash);
     assert.equal(((await callTool(l, human, 'shelf_put', { part: { id: row.id, hash: theirs.hash } })) as { status: string }).status, 'applied');
   } finally {
@@ -70,7 +73,7 @@ test('a part’s call is refused: from an agent, at code not drawn, an action it
   const dir = folder(shelf());
   const l = await freshWith(new Registry(dir));
   try {
-    const [row] = partsFor(l.registry);
+    const [row] = shelfs(partsFor(l.registry));
     const part = { id: row.id, hash: row.hash };
     await assert.rejects(callTool(l, agent, 'shelf_put', { part }), /sent by the page, as the person looking/);
     await assert.rejects(callTool(l, human, 'shelf_put', { part: { id: row.id, hash: 'f'.repeat(64) } }), /no part "shelf.row" with that code is drawn here/);

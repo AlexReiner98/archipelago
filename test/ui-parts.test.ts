@@ -18,6 +18,9 @@ import { partsBy, partsFor } from '../packs/loader/kernel/ui-parts.ts';
 import { parts } from '../packs/loader/kernel/parts-read.ts';
 import { freshWith, human, make, packsWith } from './map.ts';
 
+/** The test pack's own parts: the repository's packs ship parts beside them (findings's). */
+const shelfs = <T extends { pack: string }>(parts: T[]) => parts.filter((p) => p.pack === 'shelf');
+
 /** A pack of words another reads: a type of its own. */
 const bin = {
   id: 'bin', version: '1.0.0', title: 'Bin', description: 'A type to be read.', requires: ['core'],
@@ -105,17 +108,19 @@ test('a part goes to the page by its hash: the owner’s version over it, an isl
   const dir = folder(shelf());
   const l = await freshWith(new Registry(dir));
   try {
-    const [row] = partsFor(l.registry);
+    const [row] = shelfs(partsFor(l.registry));
     assert.deepEqual([row.id, row.pack, row.slot, row.sends, row.opens], ['shelf.row', 'shelf', 'sheet', ['shelf.put'], ['shelf.end']]);
     assert.match(row.modules!['index.js'], /look/);
-    assert.equal(partsFor(l.registry, [], [row.hash])[0].modules, undefined, 'a page that has them is sent the hash alone');
+    assert.equal(shelfs(partsFor(l.registry, [], [row.hash]))[0].modules, undefined, 'a page that has them is sent the hash alone');
     // The owner's version stands in module by module; retired, the part is not drawn.
     const mine = { is_open: true, props: { preset: 'shelf.row', code: { 'look.js': "export const look = 'bold';\n" } } };
-    const changed = partsFor(l.registry, [mine])[0];
+    const changed = shelfs(partsFor(l.registry, [mine]))[0];
     assert.notEqual(changed.hash, row.hash);
     assert.equal(changed.modules!['index.js'], row.modules!['index.js']);
-    assert.deepEqual([...partsBy(l.registry, [mine]).keys()].sort(), [row.hash, changed.hash].sort());
-    assert.deepEqual(partsFor(l.registry, [{ ...mine, is_open: false }]), []);
+    const by = partsBy(l.registry, [mine]);
+    assert.ok(by.has(row.hash) && by.has(changed.hash), 'served by hash: the pack’s and the owner’s');
+    assert.equal(by.size, partsBy(l.registry).size + 1, 'the owner’s version adds its own');
+    assert.deepEqual(shelfs(partsFor(l.registry, [{ ...mine, is_open: false }])), []);
     // Kept on the map, a part is an item of core's part type, its pack and slot as fields.
     await make(l, [{ op: 'create', type: 'part', title: 'Row, bolder', props: { preset: 'shelf.row', pack: 'shelf', slot: 'sheet', reads: { task: ['title'] }, code: mine.props.code } }]);
 
@@ -128,10 +133,10 @@ test('a part goes to the page by its hash: the owner’s version over it, an isl
     ]);
     const { v } = await make(l, [{ op: 'create', ref: 'v', type: 'pack', title: 'Shelf, bolder', props: { version_of: 'shelf', manifest: {}, code: { 'parts/row/look.js': "export const look = 'island';\n" } } }]);
     await make(l, [{ op: 'update', id: trial, props: { pack_version: v } }]);
-    const there = partsFor(await islandRegistry(l, trial))[0];
+    const there = shelfs(partsFor(await islandRegistry(l, trial)))[0];
     assert.match(there.modules!['look.js'], /island/);
-    assert.equal(partsFor(await islandRegistry(l, rest))[0].hash, partsFor(l.registry)[0].hash);
-    assert.notEqual(there.hash, partsFor(l.registry)[0].hash);
+    assert.equal(shelfs(partsFor(await islandRegistry(l, rest)))[0].hash, shelfs(partsFor(l.registry))[0].hash);
+    assert.notEqual(there.hash, shelfs(partsFor(l.registry))[0].hash);
 
     // The page asks the same through root.parts (the view parts): the island's, what it refines, or as they ship.
     const asked = await parts({ caller: 'query', map: l }, { island: trial, have: [there.hash, 'not a hash'] });
@@ -139,8 +144,8 @@ test('a part goes to the page by its hash: the owner’s version over it, an isl
     assert.deepEqual(asked.refined?.parts, ['shelf.row']);
     const shipped = await parts({ caller: 'query', map: l }, { island: trial, shipped: true });
     assert.equal(shipped.shipped, true);
-    assert.equal(shipped.parts[0].hash, partsFor(l.registry)[0].hash, 'as the pack ships it: no island version, no owner’s version');
-    assert.ok(shipped.parts[0].modules, 'its modules come with it when the page has not got them');
+    assert.equal(shelfs(shipped.parts)[0].hash, shelfs(partsFor(l.registry))[0].hash, 'as the pack ships it: no island version, no owner’s version');
+    assert.ok(shelfs(shipped.parts)[0].modules, 'its modules come with it when the page has not got them');
     assert.equal((await parts({ caller: 'query', map: l }, {})).refined, undefined, 'with no island, nothing is said of one');
   } finally {
     hostFor(l.registry).stop();

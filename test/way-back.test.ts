@@ -15,6 +15,9 @@ import { partsFor } from '../packs/loader/kernel/ui-parts.ts';
 import { refinedOn, shippedFolder, shippedParts, wayBackOps } from '../packs/loader/kernel/way-back.ts';
 import { freshWith, human, make, packsWith } from './map.ts';
 
+/** The test pack's own parts: the repository's packs ship parts beside them (findings's). */
+const shelfs = <T extends { pack: string }>(parts: T[]) => parts.filter((p) => p.pack === 'shelf');
+
 /** A map pack with one part, its look a module of its own. */
 const shelf = {
   id: 'shelf', version: '1.0.0', title: 'Shelf', description: 'A part of the page.', requires: ['core'],
@@ -33,9 +36,9 @@ test('the shipped read gives git’s code, whatever an island pins or the owner 
   const dir = folder();
   const l = await freshWith(new Registry(dir));
   try {
-    const [row] = shippedParts(l);
+    const [row] = shelfs(shippedParts(l));
     assert.match(row.modules!['look.js'], /shipped/);
-    assert.equal(shippedParts(l, [row.hash])[0].modules, undefined, 'a page that has them is sent the hash alone');
+    assert.equal(shelfs(shippedParts(l, [row.hash]))[0].modules, undefined, 'a page that has them is sent the hash alone');
 
     await setIslands(l, human, true);
     await setPack(l, human, { pack: 'shelf', on: true });
@@ -49,17 +52,17 @@ test('the shipped read gives git’s code, whatever an island pins or the owner 
     const { v } = await make(l, [{ op: 'create', ref: 'v', type: 'pack', title: 'Shelf, broken', props: { version_of: 'shelf', manifest: {}, code: { 'parts/row/look.js': "export const look = 'refined';\n" } } }]);
     await make(l, [{ op: 'update', id: trial, props: { pack_version: v } }]);
     const there = await islandRegistry(l, trial);
-    assert.match(partsFor(there)[0].modules!['look.js'], /refined/);
+    assert.match(shelfs(partsFor(there))[0].modules!['look.js'], /refined/);
     assert.equal(shippedFolder(there.folderOf('shelf')), false, 'a version’s code is laid out, not shipped');
     // ...and the shipped read, from the map or handed the island's registry, gives git's.
-    assert.match(shippedParts(l)[0].modules!['look.js'], /shipped/);
-    assert.deepEqual(shippedParts({ registry: there }), [], 'handed a version’s registry, the read draws nothing rather than its code');
+    assert.match(shelfs(shippedParts(l))[0].modules!['look.js'], /shipped/);
+    assert.deepEqual(shelfs(shippedParts({ registry: there })), [], 'handed a version’s registry, the read draws nothing rather than its code');
 
     const mine = { is_open: true, props: { preset: 'shelf.row', code: { 'look.js': "export const look = 'kept';\n" } } };
     assert.deepEqual(await refinedOn(l, trial), { pinned: v, parts: ['shelf.row'] });
     assert.deepEqual(await refinedOn(l, plain, [mine]), { parts: ['shelf.row'] }, 'the owner’s version is a refinement too');
     assert.deepEqual(await refinedOn(l, plain, [{ ...mine, is_open: false }]), { parts: ['shelf.row'] }, 'a retired part draws otherwise than it ships');
-    assert.match(shippedParts(l)[0].modules!['look.js'], /shipped/);
+    assert.match(shelfs(shippedParts(l))[0].modules!['look.js'], /shipped/);
 
     // The way back unpins the island; then it draws what ships again.
     const island = (await l.entity(trial))!;

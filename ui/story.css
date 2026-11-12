@@ -29,14 +29,3 @@
 #catch-up .cu-who { color: var(--trace-hue, var(--accent)); max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
 #catch-up .cu-who:empty, #catch-up:not(.playing) .cu-skip, #catch-up.playing > button:not(.cu-skip) { display: none; }
 #catch-up .cu-shut { border: 0; background: none; color: var(--muted); }
-/* An island's findings on its page (ui/findings.js): one line each, the claim, its value, how sure, how old, how many read it. */
-.findings { list-style: none; margin: 0; padding: var(--space-3) 0 var(--space-5); display: grid; grid-template-columns: minmax(0, 1fr) fit-content(30%) auto auto auto; column-gap: var(--space-6); }
-.findings > li:not(.finding-row) { grid-column: 1 / -1; }
-.finding-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: baseline; padding: var(--space-4) var(--space-8); white-space: nowrap; }
-.finding-row:hover { background: var(--accent-soft); }
-.finding-row .find-claim, .finding-row .find-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.finding-row .find-value { font-variant-numeric: tabular-nums; }
-.finding-row .find-readers, .finding-row .ago { color: var(--muted); font-size: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
-.find-working > summary { display: flex; align-items: baseline; gap: var(--space-5); padding: var(--space-4) var(--space-8); color: var(--muted); font-size: var(--text-2); cursor: pointer; }
-.find-working > summary .n { font-weight: normal; }
-.find-none { margin: 0; padding: var(--space-4) var(--space-8); }

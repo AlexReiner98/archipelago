@@ -17,7 +17,6 @@ import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { turnsPiece } from './turns.js';
-import { findingsPiece } from './findings.js';
 import { drawPart } from './part-host.js';
 import { pageIsA, pageSchema } from './page-schema.js';
 import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
@@ -209,11 +208,6 @@ const PIECES = {
   turns: (ctx) => {
     const node = h('div');
     return ctx.e && { node, later: () => turnsPiece(node, ctx.e, section) };
-  },
-  // An island's findings, one line each (ui/findings.js): a section of the bare page, as the turns are.
-  findings: (ctx) => {
-    const node = h('div');
-    return ctx.e && { node, later: () => findingsPiece(node, ctx.e, section) };
   },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,

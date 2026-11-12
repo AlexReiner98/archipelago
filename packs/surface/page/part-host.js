@@ -115,12 +115,14 @@ async function mount(node, part, parts, item) {
   const version = versionOf(parts, part.pack);
   const one = await workerOf(version, parts, part.pack);
   const id = `m${++mounts}`;
-  const body = h('div', { class: 'part-body', 'data-part-id': part.id });
+  // A mark that stands for an item opens that item's page when pressed: the host's, so a part names items, never addresses.
+  const body = h('div', { class: 'part-body', 'data-part-id': part.id, onclick: (ev) => { const el = ev.target.closest?.('[data-item]'); if (el && body.contains(el) && !el.closest('button, input, textarea')) location.hash = `#/e/${el.dataset.item}`; } });
   node.replaceChildren(body);
   const failed = (message) => node.isConnected && node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
   const render = mountPart(body, { style: state.style, tell: (event) => one.bridge.send({ type: 'event', id, event }) });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await inputOf(part, item) });
-  one.mounted.set(id, { part, node, render, failed, refresh });
+  // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
+  one.mounted.set(id, { part: { ...part, island: islandOf(item) }, node, render, failed, refresh });
   one.bridge.send({ type: 'mount', id, part: part.id, input: await inputOf(part, item) });
 }
 

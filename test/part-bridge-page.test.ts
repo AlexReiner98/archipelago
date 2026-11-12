@@ -38,7 +38,8 @@ test('in a browser, a part’s own change is shown going out, a pressed one is n
   mkdirSync(join(dir, 'shelf', 'parts', 'row'), { recursive: true });
   writeFileSync(join(dir, 'shelf', 'parts', 'row', 'index.js'), PART);
   const reg = new Registry(dir);
-  const [row] = partsFor(reg);
+  // The test pack's part: the repository's packs ship parts beside it (findings's).
+  const row = partsFor(reg).find((p) => p.pack === 'shelf')!;
   hostFor(reg).stop();
   const { base } = await serve('off', undefined, undefined, dir);
   const page = await open(`${base}/`);

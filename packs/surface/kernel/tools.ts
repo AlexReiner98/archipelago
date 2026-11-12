@@ -147,7 +147,9 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   // A part of the page names itself on its pack's action: checked, then named on the change (packs/loader/kernel/part-calls.ts).
   const named = pack && !TOOLS[name] && !('part' in pack.input) && input && typeof input === 'object' && 'part' in input ? (input as Record<string, unknown>) : undefined;
   const { part: partAsked, ...unnamed } = named ?? {};
-  const part = named ? await partCall(l, actor, name, unnamed.island, partAsked) : undefined;
+  // Where the part is drawn is said with the part (its `island`): the action's own input need not take it.
+  const drawnOn = partAsked && typeof partAsked === 'object' && 'island' in partAsked ? (partAsked as { island?: unknown }).island : unnamed.island;
+  const part = named ? await partCall(l, actor, name, drawnOn, partAsked) : undefined;
   if (part && inProcess) throw new Error(`A part may not send this: "${name}" runs inside the server, where its change cannot name the part.`);
   const tool: Tool | undefined = TOOLS[name] ?? surface ?? pack;
   if (!tool) throw new Error(`No tool "${name}". Tools: ${(actor.kind === 'human' ? toolsFor(l.registry) : surfaceFor(l.registry)).map(([t]) => t).join(', ')}`);

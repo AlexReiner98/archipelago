@@ -26,6 +26,8 @@
 
 textarea.pm-input { font: inherit; color: var(--text); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); padding: var(--space-4) var(--space-6); resize: vertical; }
 .pm-input { min-width: 0; }
+/* A press is a few words on one line: it keeps its width, and what is beside it gives way (a row never wraps). */
+.pm-button { white-space: nowrap; flex: none; }
 .pm-button-main { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
 .pm-button-quiet { border-color: transparent; background: none; color: var(--muted); }
 
