@@ -105,7 +105,7 @@ export interface ViewDef {
 }
 
 /** The reads a view the kernel answers itself may name, each kept to the form its view had (src/query-presets.ts). Others are the family answer.<name>. */
-export const LENS_ANSWERS = ['flat', 'hubs', 'frontier'] as const;
+export const LENS_ANSWERS = ['hubs', 'frontier'] as const;
 
 /**
  * A tree a pack declares over "is part of": a roadmap, for one. The `tree`

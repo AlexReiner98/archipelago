@@ -6,6 +6,8 @@ import type { KernelContext } from '#pelago/kernel';
 import { hubs, keptOf, pictureOf } from './query-kept.ts';
 import { renamedQuery } from './query-names.ts';
 import { twinsOf } from './view-twins.ts';
+import { moveLives } from './view-life.ts';
+import { termQueries, viewQuery } from './query-saved.ts';
 
 type Item = { id: string; type: string; title: string; is_open: boolean; updated_at: string; archived_at: string | null; props: Record<string, unknown> };
 const item = (id: string, type: string, title: string, updated: string, props: Record<string, unknown> = {}, open = true): Item => ({ id, type, title, is_open: open, updated_at: `2026-11-0${updated}T00:00:00Z`, archived_at: null, props });
@@ -69,4 +71,26 @@ test('a renamed type or link is renamed in the views that name it', () => {
   assert.deepEqual(renamedQuery({ filter: { find: ['type old', 'id e_x'] } }, 'old', 'new', 'entity'), { filter: { find: ['type new', 'id e_x'] } });
   assert.deepEqual(renamedQuery({ filter: { find: ['old e_x'] }, walk: { over: ['old>'], steps: 1 } }, 'old', 'new', 'relation'), { walk: { over: ['new>'], steps: 1 }, filter: { find: ['new e_x'] } });
   assert.deepEqual(renamedQuery({ filter: { find: ['type other'] } }, 'old', 'new', 'entity'), {});
+});
+
+test('views and layouts still current take their life once, in one move: pinned or a layout kept, about what closed retired', async () => {
+  const marked = [{ id: 'e_v1', type: 'lens', props: { pinned: true } }, { id: 'e_v2', type: 'lens', props: {} }, { id: 'e_v3', type: 'lens', props: {} }, { id: 'e_l1', type: 'layout', props: {} }];
+  const moves: unknown[] = [];
+  const base = context([item('e_done', 'task', 'Done', '1', {}, false), item('e_open', 'task', 'Open', '1')], [{ type: 'about', from_id: 'e_v2', to_id: 'e_done' }, { type: 'about', from_id: 'e_v3', to_id: 'e_open' }]);
+  const ctx = {
+    ...base,
+    reads: async (q: Record<string, unknown>) => (q.marked ? marked : base.reads(q as never)),
+    move: async (action: string, _reason: string, facts: unknown[]) => void moves.push([action, facts]),
+  } as unknown as KernelContext;
+  assert.deepEqual(await moveLives(ctx), { kept: 2, retired: 1, working: 1 });
+  assert.deepEqual(moves, [['lens.lived', [['+', 'e_v1', 'status', 'kept'], ['+', 'e_v2', 'status', 'retired'], ['+', 'e_v3', 'status', 'working'], ['+', 'e_l1', 'status', 'kept']]]]);
+});
+
+test('a view kept in the words before its three lists is said in them, and a kept view draws what its steps name too', async () => {
+  const moves: unknown[][] = [];
+  const views = [{ id: 'e_old', type: 'lens', props: { filter: { ids: ['e_t'], exclude: ['closed'] } } }, { id: 'e_new', type: 'lens', props: { filter: { find: ['id e_t'] } } }];
+  const ctx = { registry: { family: (t: string) => [t] }, reads: async (q: { marked: { types: string[] } }) => (q.marked.types[0] === 'lens' ? views : []), move: async (...a: unknown[]) => void moves.push(a) } as unknown as KernelContext;
+  assert.equal(await termQueries(ctx), 1);
+  assert.deepEqual(moves[0][2], [['+', 'e_old', 'filter', { find: ['id e_t'], only: [], not: ['done'] }]]);
+  assert.deepEqual(viewQuery({ filter: { find: ['type task'] }, steps: [{ add: ['e_x'] }] }).filter, { find: ['type task', 'id e_x'] });
 });

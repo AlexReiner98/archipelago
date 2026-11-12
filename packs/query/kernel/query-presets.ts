@@ -18,7 +18,8 @@ const hubsOf: Reading = async (l, _def, params) => ({ at: HUB_AT, within: params
 /** Where a session stands, and what there needs it (src/frontier.ts). */
 const frontierOf: Reading = async (l, _def, params) => (await import('../../../src/frontier.ts')).frontier(l, params as FrontierInput);
 
-const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
+// The flat lens stays read here for a view that names it (core.flat); a pack asks for it by name, answer.flat (packs/query, answers.ts).
+const READINGS: Record<(typeof LENS_ANSWERS)[number] | 'flat', Reading> = {
   flat: (l, _def, params) => flatRead(l, params),
   hubs: hubsOf,
   frontier: frontierOf,

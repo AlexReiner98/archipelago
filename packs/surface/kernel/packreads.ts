@@ -13,9 +13,10 @@ import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './p
 import type { Pin } from './packreads-pin.ts';
 import { filled, kernelRead, type KernelRead } from './packreads-kernel.ts';
 import { serviceRead, type ServiceRead } from './packreads-service.ts';
+import { viewsRead, type ViewsRead } from './packreads-views.ts';
 import { fillReads } from '../../loader/kernel/packhost.ts'; import { trail } from './map-reads.ts';
 
-export type Read = KernelRead & ServiceRead & {
+export type Read = KernelRead & ServiceRead & ViewsRead & {
   get?: string;
   /** Items of a type (flavours included): with a status or one of several, fields equal to where's, and a field between two values. */
   items?: { type: string; status?: string | string[]; where?: Record<string, unknown>; between?: { field: string; from?: string; to?: string } };
@@ -42,8 +43,6 @@ export type Read = KernelRead & ServiceRead & {
   placed?: { types: string[]; from: string; to: string; by?: ('when' | 'bound')[] };
   /** Which of these items have a picture kept for them. */
   pictures?: string[];
-  /** Events of a kind, about one item, since a moment, newest first. */
-  events?: { action: string; target?: string; since?: string; limit?: number };
   /** For each item: whether it is blocked, whether it waits on someone's answer, and what has to move first. */
   blocked?: string[];
   /** The runs whose changes wrote these items (made them or changed them), as the log keeps each change's run: one row per item and run, with the run's title and the packs it ran under. */
@@ -89,6 +88,8 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   if (kernel !== undefined) return kernel;
   const service = await serviceRead(l, q, pack);
   if (service !== undefined) return service;
+  const views = await viewsRead(l, q);
+  if (views !== undefined) return views;
   if (q.fields && (!Array.isArray(q.fields) || q.fields.some((f) => !NAME.test(f)))) throw new Error('fields is a list of field names');
   // An item's columns as the asker may read them: anyone with no login reads no note, no owner, no link's id, and of the
   // props only the few public ones, and may not filter by props at all.
@@ -170,7 +171,6 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
     };
   }
   if (q.placed !== undefined) return filled(l, 'placed', q, pack);
-  if (q.events) return filled(l, 'events', q, pack);
   if (q.pictures) {
     const { rows } = await l.db.query<{ entity_id: string }>(`select entity_id from picture where entity_id = any($1::text[])`, [q.pictures]);
     return rows.map((r) => r.entity_id);
@@ -219,5 +219,5 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, shared, picture, counts, corrections.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, view_lives, in_projects, mentioned, marked, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, shared, picture, counts, corrections.');
 }

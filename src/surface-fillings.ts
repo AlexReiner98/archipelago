@@ -19,7 +19,6 @@ export const KERNEL_FILLINGS: KernelFillings = {
   'surface.read': {},
   'surface.route': { backupFile },
   'surface.reads': {
-    events: async (l, q) => (await reads()).events(l, q), // to views, with eventlog
     view: async (l, q) => (await reads()).view(l, q), // to query, with views and askview
     placed: async (l, q) => (await reads()).placed(l, q), // to query, with timeaxis
   },

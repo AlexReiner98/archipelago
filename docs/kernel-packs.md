@@ -251,7 +251,7 @@ are slots of the write and log packs; the others:
 | `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
 | `open.<phase>` | identity (`src/lifecycle.ts`) | each root, by its `kernel/open.ts` (`OPEN`, and `LEADING` for what runs while the server leads), read in roots.json's order; an internal pack by `kernel.hooks`; what a service module still does there, `src/open-steps.ts` until its pack takes it | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
-| `surface.reads` | surface | agents (`instructions`), usage (`told`); the kernel until their packs hold their modules: eventlog (`events`), views and askview (`view`), timeaxis (`placed`) | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
+| `surface.reads` | surface | agents (`instructions`), usage (`told`); the kernel until their packs hold their modules: views and askview (`view`), timeaxis (`placed`). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 
 This is also the fix for bug e_wpww27fm (trusted modules import services):
 each import it names becomes a slot, cut by the step that moves the
@@ -334,7 +334,7 @@ moves with a shim to the pack named.
 |---|---|
 | database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), deploy, move, leader |
 | seal | seal, opseal, vault, secrets, backup-seal |
-| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage) |
+| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage), eventlog (wave 6: backup's dump and the surface's reads read events with a database or a transaction) |
 | identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
 | walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail, drawing-box, drawing-runner, look-pass |
 | loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
@@ -348,7 +348,7 @@ moves with a shim to the pack named.
 |---|---|
 | query | query-flat, query-terms, query-steps, query-only, query-held, query-presets, askview, views, altitude, timeaxis, summary |
 | lenses | query-kept, query-saved, saved-views, view-life, view-twins, query-names |
-| views | view-graph, view-tree, inside, brief, eventlog, moved, timelanes, documents, plan-note |
+| views | view-graph, view-tree, inside, brief, moved, timelanes, documents, plan-note |
 | attention | attention, bounds, confirm |
 | findings (exists) | findings |
 | styles | styles, style-move, layout-move, screens, colours |
@@ -555,8 +555,8 @@ read with several keys answers as it did): an internal pack names it in its mani
 (`"hooks": { "surface.reads": "reads.ts#instructions" }`, agents) and is handed its context of the
 map that asks, any map, opened or not (`hostAt`, `src/kernel-context.ts`); a module still in
 `src/` fills it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`, through
-`src/service-reads.ts`), until its pack holds it: `events`, `view` (with its pin) and
-`placed`. As built (wave 6): `told` is the usage pack's (`reads.ts#told`), and what a run touched
+`src/service-reads.ts`), until its pack holds it: `view` (with its pin) and `placed`; `events` left in wave 6, answered by
+the reads API from the log root's eventlog (`packreads-views`). As built (wave 6): `told` is the usage pack's (`reads.ts#told`), and what a run touched
 is the reads API's own, read from the transient store in `runsOf` (`src/packreads-log.ts`), since
 sessions is optional and an optional pack fills only `write.*`. The query step (wave 6, e_5euvh74f) moved query-flat, query-terms, query-only, query-held, query-presets,
 askview, views and timeaxis into `packs/query/kernel` behind pure shims, still on the map (`l`) and naming the kernel

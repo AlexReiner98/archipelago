@@ -41,9 +41,9 @@ test('the kernel names no pack', () => {
 // verb's action): no new one may be added. SQL strings count too (`type = 'run'`); run, works_on, notification, about are core's.
 const NAMES_PACK_TYPES: Record<string, number> = {
   'src/altitude.ts': 1, 'src/capabilities.ts': 2, 'src/declared.ts': 3,
-  'src/eventlog.ts': 1, 'src/query-saved.ts': 1, 'src/look-pass.ts': 1,
+  'src/look-pass.ts': 1,
   'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
-  'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/saved-views.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
+  'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
   'src/session-hook.ts': 1, 'src/surface.ts': 2, 'src/tail.ts': 1, 'src/tool-reads.ts': 1, 'src/ui-files.ts': 1,
   'ui/canvas.js': 1, 'ui/doc.js': 5, 'ui/draft.js': 2, 'ui/item-doc.js': 1, 'ui/item.js': 2, 'ui/screens.js': 1, 'ui/workspace-cards.js': 1,
 };

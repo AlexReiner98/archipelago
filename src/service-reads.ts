@@ -1,25 +1,17 @@
 // The reads of the reads API (src/packreads.ts) that kernel modules of service rows still answer, as fillings of the
-// surface's slot surface.reads (src/surface-fillings.ts): the activity log's events (the views pack's eventlog), a view by
-// its name (the query pack's views and askview) and what falls in a window of time (the query pack's timeaxis and its
-// limit). Each is what packreads answered itself before, moved whole; the step that moves its module into its pack
-// moves its filling there too, named in the pack's manifest. An instruction counted as said is the usage pack's
-// filling (reads.ts#told), and what a run touched the reads API's own (src/packreads-log.ts, runsOf).
+// surface's slot surface.reads (src/surface-fillings.ts): a view by its name (the query pack's views and askview) and what
+// falls in a window of time (the query pack's timeaxis and its limit). Each is what packreads answered itself before,
+// moved whole; the step that moves its module into its pack moves its filling there too, named in the pack's manifest.
+// An instruction counted as said is the usage pack's filling (reads.ts#told), what a run touched the reads API's own
+// (src/packreads-log.ts, runsOf), and the activity log's events the reads API's own (packreads-views.ts, wave 6).
 
-import { readEvents } from './eventlog.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import type { Read } from './packreads.ts';
 import { pinned } from './packreads-pin.ts';
-import { READ_LIMIT, shapes } from './packreads-rows.ts';
+import { shapes } from './packreads-rows.ts';
 import { LENS_LIMIT } from './query-flat.ts';
 import { placeAll, readAxis, zoneOf } from './timeaxis.ts';
 import { askPackView, VIEWS } from './views.ts';
-
-/** Events of a kind, about one item, since a moment, newest first. */
-export async function events(l: Archipelago, q: Read & { events: NonNullable<Read['events']> }): Promise<unknown> {
-  const { action, target, since, limit } = q.events;
-  const rows = await readEvents(l.db, { action, target, since, limit: Math.min(limit ?? 50, READ_LIMIT) });
-  return rows.filter((r) => !since || new Date(r.ts) > new Date(since)).map(({ seq, ts, actor, action, target_id, reason, detail }) => ({ seq, ts, actor, action, target_id, reason, detail }));
-}
 
 /** A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work); refused when pinned to another. */
 export async function view(l: Archipelago, q: Read & { view: string }): Promise<unknown> {

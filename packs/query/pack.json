@@ -6,6 +6,29 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "answer.flat": {
+        "in": {},
+        "out": {
+          "items": [
+            {
+              "id": "id"
+            }
+          ],
+          "links": [
+            "any"
+          ]
+        },
+        "run": "answers.ts#flat"
+      },
+      "answer.flat_check": {
+        "in": {},
+        "out": {
+          "problem?": "string"
+        },
+        "run": "answers.ts#flatCheck"
+      }
+    }
   }
 }
