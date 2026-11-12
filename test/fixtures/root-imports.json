@@ -91,7 +91,7 @@
   "src/packstate.ts -> src/pelago.ts",
   "src/packtools.ts -> src/notify.ts",
   "src/passwords.ts -> src/transient.ts",
-  "src/pelago.ts -> src/search.ts",
+  "src/pelago.ts -> src/map-reads.ts",
   "src/public-document.ts -> src/documents.ts",
   "src/public-document.ts -> src/reply.ts",
   "src/public-view-store.ts -> src/layouts.ts",

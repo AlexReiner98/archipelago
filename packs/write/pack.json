@@ -1,0 +1,11 @@
+{
+  "id": "write",
+  "version": "0.1.0",
+  "title": "Write",
+  "description": "The one write path and the shape of an item: change, apply and plan, proposals (decide, withdraw, undo), merge and forget, the ops, an item's head and fields, link ends, the owner's link and who may write within a scope. Opens the write path's hook points. Started after rules.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
