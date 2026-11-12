@@ -10,7 +10,7 @@ kept on the map as a version of `core.map`, an island pin) reads as before.
 ## Every map starts with it
 
 A map that had core before the move is given canvas once, as any pack that
-holds what another declared is (`movedPacks`, `src/pack-moved.ts`). A new map
+holds what another declared is (`movedPacks`, `packs/loader/kernel/pack-moved.ts`). A new map
 starts with it as it starts with core, since it keeps core's ids
 (`keepsKernel`). The page reads its own numbers off the house style, so take
 canvas out and the page cannot draw: it says which number it lacks until the

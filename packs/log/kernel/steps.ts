@@ -1,4 +1,4 @@
-// The log root's parts of the schema's numbered steps (src/migrate.ts): the log, its streams, partitions, snapshots and
+// The log root's parts of the schema's numbered steps (packs/database/kernel/migrate.ts): the log, its streams, partitions, snapshots and
 // the projections it makes; and what the log does to a database each time it is opened, once its steps are in.
 
 import type { Database } from '../../database/kernel/db.ts';
@@ -29,5 +29,5 @@ export const STEPS: StepPart[] = [
   { version: 38, name: 'what the compacted streams say about an item, found by its index under the row policy', sql: OP_ABOUT },
 ];
 
-/** Each time a database is opened, once its steps are in: the log's partitions, made ahead of need (src/partitions.ts). */
+/** Each time a database is opened, once its steps are in: the log's partitions, made ahead of need (packs/log/kernel/partitions.ts). */
 export const OPENED: ((db: Database) => Promise<unknown>)[] = [(db) => makePartitions(db)];

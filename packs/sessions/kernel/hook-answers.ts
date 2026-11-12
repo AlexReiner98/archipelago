@@ -1,8 +1,8 @@
-// What a session's hooks are answered, in no surface's shape (src/server-adapter.ts puts it in one): a session started,
+// What a session's hooks are answered, in no surface's shape (packs/loader/kernel/server-adapter.ts puts it in one): a session started,
 // was prompted, ended a turn, ended.
 // Where a session last heard up to is kept in the workspace's database (the transient store, root.transient), so its
 // next prompt is answered as well by a server it has not spoken to before. On the pack's context of the map the hook's
-// token reads (src/hook-answers.ts makes it): what the server holds (whether a setup is behind, the actions offered,
+// token reads (packs/sessions/kernel/hook-answers.ts makes it): what the server holds (whether a setup is behind, the actions offered,
 // what people did) is asked of root.sessions, the rest by the names of the packs that answer it.
 
 import type { KernelContext } from '#pelago/kernel';
@@ -20,15 +20,15 @@ export interface HookBody {
   remote?: string;
   reason?: string;
   tokens?: number;
-  /** The items the session's calls to the map have named so far, read from its transcript (src/touched.ts). */
+  /** The items the session's calls to the map have named so far, read from its transcript (packs/sessions/kernel/touched.ts). */
   touched?: unknown;
   /** What Claude Code calls the session, read from its transcript: the title the owner gave it, else the one it made. */
   title?: unknown;
   /** At the start: why Claude Code started it (startup, resume, clear, compact). */
   source?: unknown;
-  /** At a prompt: what was typed, as Claude Code passes it (src/frontier-prompt.ts narrows the session's start by the first). */
+  /** At a prompt: what was typed, as Claude Code passes it (packs/runs/kernel/frontier-prompt.ts narrows the session's start by the first). */
   prompt?: unknown;
-  /** At a turn's end: what the reply did since the owner's last message (src/reply-rules.ts), and that message's id. */
+  /** At a turn's end: what the reply did since the owner's last message (packs/sessions/kernel/reply-rules.ts), and that message's id. */
   reply?: unknown;
   turn?: unknown;
   /** Claude Code's: the agent is going on because a Stop hook asked it to. */
@@ -37,15 +37,15 @@ export interface HookBody {
   /** At the file-used event: the file read or changed, and the instructions the session has been told about files already. */
   path?: unknown;
   said?: unknown;
-  /** At a turn's end and at the end: where the session's place stands, a small flat object its pack reads (src/stands.ts). */
+  /** At a turn's end and at the end: where the session's place stands, a small flat object its pack reads (packs/sessions/kernel/stands.ts). */
   stands?: unknown;
   /** What stands was called until 10 Nov 2026, still sent by hooks set up before then: read as stands. */
   git?: unknown;
-  /** At the events route: the adapter's batch of raw events, in the vocabulary of docs/sessions.md (src/session-events.ts). */
+  /** At the events route: the adapter's batch of raw events, in the vocabulary of docs/sessions.md (packs/sessions/kernel/session-events.ts). */
   events?: unknown;
 }
 
-/** What a hook is answered from, but the map: the adapter at src/hook-answers.ts hands the map as the pack's context. */
+/** What a hook is answered from, but the map: the adapter at packs/sessions/kernel/hook-answers.ts hands the map as the pack's context. */
 export interface HookAsk {
   /** The items the token writes within; none for everything. */
   within: string[];
@@ -86,7 +86,7 @@ const restarted = async (ctx: KernelContext, { started, commit }: HookAsk['runni
 /**
  * What a session is told at a hook, the same for any surface: told, words added to what it reads next; go_on, why it
  * is asked to go on at a reply's end; said, the ids told beside the words. Anything else (the events route's count)
- * is passed as it is. A surface's adapter puts it in that surface's shape (src/server-adapter.ts).
+ * is passed as it is. A surface's adapter puts it in that surface's shape (packs/loader/kernel/server-adapter.ts).
  */
 export interface Neutral {
   told?: string;
@@ -124,7 +124,7 @@ export async function sessionAnswer(ctx: KernelContext, event: string, call: Hoo
   if (within.length && !(await hookWithin(ctx, within, body, event === 'session-start'))) {
     return event === 'session-start' ? told(LIMITED) : {};
   }
-  // A file read or changed: what bites there, said once (src/file-said.ts). The ids it said go back beside the answer, for the hook to keep.
+  // A file read or changed: what bites there, said once (packs/sessions/kernel/file-said.ts). The ids it said go back beside the answer, for the hook to keep.
   if (event === 'file-used') {
     const said = await fileSaid(ctx, body).catch((err) => void console.error(`hook file: ${(err as Error).message}`));
     return said ? told(said.text, { said: said.ids }) : {};
@@ -167,12 +167,12 @@ export async function sessionAnswer(ctx: KernelContext, event: string, call: Hoo
     // How many of each, and the newest few: the rest is one query away.
     const counts = changes.length > NEWEST ? countBy(changes, (c) => c.action) : undefined;
     const tally = counts ? `${changes.length} changes (${Object.entries(counts).map(([action, n]) => `${n} ${action}`).join(', ')}); the newest ${NEWEST}, the rest with query events:\n` : '';
-    // And what the owner is looking at now, so "this" in their message has a referent (src/seeing.ts).
+    // And what the owner is looking at now, so "this" in their message has a referent (packs/presence/kernel/seeing.ts).
     const asking = body.session_id ? await resolveRun(ctx, body.session_id, true) : undefined;
     const looking = (await ctx.call<object, { line: string | null }>('answer.seeing_line', { whose: await ctx.reads({ whose: true }), ...(asking && { run: asking.id }) }).catch(() => undefined))?.line;
     if (looking) lines.push(looking);
     if (changes.length) lines.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${described}`);
-    // The first thing the owner asks a session narrows where it stands: what the map has settled on it (src/frontier-prompt.ts).
+    // The first thing the owner asks a session narrows where it stands: what the map has settled on it (packs/runs/kernel/frontier-prompt.ts).
     const asked = askedBy(body.prompt);
     const narrowKey = `narrowed:${body.session_id ?? ''}`;
     if (asked && body.session_id && !(await kept(ctx, narrowKey))) {

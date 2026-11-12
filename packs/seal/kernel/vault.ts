@@ -1,8 +1,8 @@
 // The key vault (docs/log.md, section 5): one AES-256-GCM key for each item, each link with fields and each change set
 // with free text, kept outside the log in the workspace's own database, so a forget is one transaction (the owner,
-// e_98cdhgn6). Each key is stored wrapped with the server's sealing key (src/secrets.ts), which is never in a database
+// e_98cdhgn6). Each key is stored wrapped with the server's sealing key (packs/seal/kernel/secrets.ts), which is never in a database
 // or a backup. A key is deleted only by a forget, and deleted for real: what it sealed is never read again. The vault
-// is backed up apart from the log, and those backups are kept 30 days. Secrets are sealed settings (src/secrets.ts).
+// is backed up apart from the log, and those backups are kept 30 days. Secrets are sealed settings (packs/seal/kernel/secrets.ts).
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import type { Q } from '../../database/kernel/db.ts';
@@ -12,7 +12,7 @@ import { sealingKey } from './secrets.ts';
 export const VAULT_BACKUP_DAYS = 30;
 
 /**
- * Step 20, with the forget's own (src/forget.ts). It also makes vault_secret, a store of secrets by name that nothing
+ * Step 20, with the forget's own (packs/write/kernel/forget.ts). It also makes vault_secret, a store of secrets by name that nothing
  * has written (bug e_27zw6jt3): nothing reads it now, and a later step drops it once no app before reads it. A member may read and add keys, never change one; deleting goes
  * through the one function a forget calls.
  */

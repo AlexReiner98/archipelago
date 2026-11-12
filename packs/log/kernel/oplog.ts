@@ -1,4 +1,4 @@
-// The table the compacted streams (src/streams.ts) are kept in, made by step 21 of the schema (src/migrate.ts). Kept
+// The table the compacted streams (packs/log/kernel/streams.ts) are kept in, made by step 21 of the schema (packs/database/kernel/migrate.ts). Kept
 // apart from the streams' code so the schema imports nothing that opens a database.
 
 /** Step 21: the compacted streams' entries, append-only but for the compaction role. */
@@ -39,7 +39,7 @@ alter table transient set unlogged;
  * Step 24: the streams keep the fact stream's guarantees. A member reads an entry only when they may see every item
  * and link it names, and finds the next position through a function that sees them all. The compaction role reads
  * everything, and besides dropping entries may do the one thing a forget asks of it: put a sealed value, or a sealed
- * reason, as its digest (src/forget.ts), computed here so that nothing else can take its place. The entries that
+ * reason, as its digest (packs/write/kernel/forget.ts), computed here so that nothing else can take its place. The entries that
  * say a link are indexed, so a forget finds a claim's links without reading every entry.
  */
 export const OPLOG_GUARDED = `

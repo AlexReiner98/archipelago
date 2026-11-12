@@ -1,7 +1,7 @@
 // Islands on a map that has work on it, and on a new map from its start (the owner, 10 Nov 2026, decision e_44rbfwxp:
 // islands always on). A new workspace is made with one island, named after it and speaking core, so an agent's first
 // change has somewhere to go. A map with items turns islands on only if no pack in use would be switched off by the
-// island rules (src/islands.ts), which would leave its work dormant; then every item that lives on an island and is on
+// island rules (packs/loader/kernel/islands.ts), which would leave its work dormant; then every item that lives on an island and is on
 // none is moved onto a new one, in one change, so it is in the log and undone as one.
 //
 // Moved from src/island-start.ts into the placement pack (docs/kernel-packs.md, "Where each module goes"). What it
@@ -12,12 +12,12 @@ import type { KernelContext } from '#pelago/kernel';
 
 /** Core's type of an island. */
 const ISLAND = 'island';
-/** The packs whose shared set any island speaks: core's (KERNEL_PACKS, src/packorder.ts). */
+/** The packs whose shared set any island speaks: core's (KERNEL_PACKS, packs/loader/kernel/packorder.ts). */
 const KERNEL_PACKS = ['core'];
-/** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors (src/island-items.ts). */
+/** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors (packs/loader/kernel/island-items.ts). */
 const livesOnIsland = (t: { system: boolean; lineage: string[] }) => !t.system && !t.lineage.includes('actor');
 
-/** How many items one read takes when moving a map's work onto islands (UNPLACED, src/packreads-service.ts). */
+/** How many items one read takes when moving a map's work onto islands (UNPLACED, packs/surface/kernel/packreads-service.ts). */
 const PAGE = 500;
 
 /** An op this module makes. */

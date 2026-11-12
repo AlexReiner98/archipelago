@@ -1,6 +1,6 @@
 // The email channel: told by the kernel that a notification was made, it reads the email channels of the person it is
 // for (items of email.channel, part of their person item) and, when one is on, answers one mail about it. The kernel
-// sends that to the address the person signs in with (src/notify-mail.ts): the pack never names an address.
+// sends that to the address the person signs in with (packs/walls/kernel/notify-mail.ts): the pack never names an address.
 
 import { mailFor } from './channel.js';
 

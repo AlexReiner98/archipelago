@@ -1,4 +1,4 @@
-// A server pack hands out files of its files/ folder (src/server-files.ts): each filled with only the values it
+// A server pack hands out files of its files/ folder (packs/surface/kernel/server-files.ts): each filled with only the values it
 // names, sent public and kept by nobody, under a version that moves when any of its files does; a session's folder is
 // behind when its hook says another version than the setup pack's, and the kernel's own setup counts only while no
 // pack takes the setup mount.

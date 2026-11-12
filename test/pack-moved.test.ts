@@ -1,4 +1,4 @@
-// Packs moved out of the kernel (src/pack-moved.ts): a map that had core while core declared what a pack declares now
+// Packs moved out of the kernel (packs/loader/kernel/pack-moved.ts): a map that had core while core declared what a pack declares now
 // is given that pack, once; a map made after the move, or one whose owner took the pack out, is not.
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';

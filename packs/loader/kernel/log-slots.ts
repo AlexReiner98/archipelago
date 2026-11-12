@@ -1,6 +1,6 @@
 // The log's slot log.appended (docs/kernel-packs.md, "Slots"), filled by the loader: each internal pack that declares
 // `kernel.hooks["log.appended"]` is handed every append's stored facts, in its transaction, with a context that
-// reaches nothing outside it (as a log.project projector's, src/log-project.ts) and a writer of the database's
+// reaches nothing outside it (as a log.project projector's, packs/log/kernel/log-project.ts) and a writer of the database's
 // functions. Filled from a map's registry when the map is made, so it is there before anything is appended; the
 // internal packs are the server's own, never turned off, so a filling holds for the process.
 

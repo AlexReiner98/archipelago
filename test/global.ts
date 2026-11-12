@@ -1,4 +1,4 @@
-// Run once before the test files start (npm test): the blank database image they all start from (src/db.ts), made
+// Run once before the test files start (npm test): the blank database image they all start from (packs/database/kernel/db.ts), made
 // here once rather than in each of a dozen processes at once.
 import { blankImageFile } from '../packs/database/kernel/db.ts';
 

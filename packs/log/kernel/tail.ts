@@ -3,7 +3,7 @@
 // a link brought that was made with it. What
 // the viewer may see is what today's tables show them (row-level security): facts on anything else are left out,
 // and what they held and can no longer see is named as gone. Sealed values are opened for the viewer. The page
-// projects the facts itself, with the projector the server runs (src/project.ts), so a change reaches it without a
+// projects the facts itself, with the projector the server runs (packs/log/kernel/project.ts), so a change reaches it without a
 // lens read.
 
 import type { Q } from '../../database/kernel/db.ts';

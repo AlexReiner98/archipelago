@@ -1,4 +1,4 @@
-// A view drawn inline in a chat (src/mcp-view.ts, the MCP Apps extension): what a client is offered through the MCP
+// A view drawn inline in a chat (packs/mcp_apps/kernel/mcp-view.ts, the MCP Apps extension): what a client is offered through the MCP
 // endpoint. The page itself, in a browser under a host of a test's own, is test/mcp-view-host.test.ts.
 
 import assert from 'node:assert/strict';

@@ -11,7 +11,7 @@
 //     pack. None is left in the server's own code; a test may register one.
 //   - an internal pack's, declared in its manifest: `kernel.hooks["open.<phase>"]` and `kernel.timers`, in pack order,
 //     each called with its pack's KernelContext. The loader fills the slot (fillOpen) when it opens a map's packs
-//     (openKernel, src/kernel-context.ts): the registry is made in the `packs` phase, so a pack's manifest can fill
+//     (openKernel, packs/loader/kernel/kernel-context.ts): the registry is made in the `packs` phase, so a pack's manifest can fill
 //     only the phases after it: types (once its host is open), begin, islands and ready.
 
 import { OPEN_PHASES } from './open-phases.ts';
@@ -97,7 +97,7 @@ function rootFillings(): Promise<{ steps: Step[]; duties: Duty[] }> {
 }
 
 /**
- * The slot the loader fills at a map's open (openKernel, src/kernel-context.ts): its internal packs' fillings of a
+ * The slot the loader fills at a map's open (openKernel, packs/loader/kernel/kernel-context.ts): its internal packs' fillings of a
  * point and their timers, each bound to its pack's context. Identity sits below the loader and never imports it.
  */
 export interface PackOpen {

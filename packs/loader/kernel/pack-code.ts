@@ -3,9 +3,9 @@
 // A pack fact names them beside its manifest: `code`, the hash of the whole, and `files`, each path's hash; `texts`
 // holds a file's text the first time the log meets its hash, so a server that changes one file adds that file alone.
 //
-// Code read back from the log, or a version's own code over its pack's (src/pack-items.ts), is laid out in a folder
+// Code read back from the log, or a version's own code over its pack's (packs/loader/kernel/pack-items.ts), is laid out in a folder
 // kept by the hash of the whole, so a handler runs from it under the same walls as from the pack's own folder
-// (src/packhost.ts: read access to that folder alone) and a layout's modules are read from it as from the pack's.
+// (packs/loader/kernel/packhost.ts: read access to that folder alone) and a layout's modules are read from it as from the pack's.
 
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';

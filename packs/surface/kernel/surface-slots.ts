@@ -1,6 +1,6 @@
 // The surface's slots (docs/kernel-packs.md, "Slots"): what the tool surface asks of the packs above it, as lists the
 // loader fills, empty by default. The surface keeps the ten verbs, each action's words (its description and input)
-// and who may call it (src/tools.ts, callTool); what an action does, a read answers or an HTTP route serves is a
+// and who may call it (packs/surface/kernel/tools.ts, callTool); what an action does, a read answers or an HTTP route serves is a
 // filling.
 //
 // - `surface.act`, `surface.read`: an action's or a read's behaviour, by its name. An internal pack fills one with a
@@ -89,7 +89,7 @@ export async function packAct(l: Archipelago, tool: string): Promise<ToolRun | u
   const filled = (await host.fillings(l, 'surface.act')).find((f) => f.pack === found.pack && f.ref.slice(f.ref.indexOf('#') + 1) === name);
   if (!filled) return undefined;
   return async (_l, actor, input) => {
-    // Who may call it, as the sandbox's runner checks (src/packtools.ts).
+    // Who may call it, as the sandbox's runner checks (packs/loader/kernel/packtools.ts).
     if (def.humanOnly && actor.kind !== 'human') throw new Error(`"${def.id}" is for humans only.`);
     if (def.admin && !(actor.kind === 'human' && actor.admin)) throw new Error(`"${def.id}" is for a workspace's admins only: what it starts is paid for by the workspace.`);
     return filled.run(input, { kind: actor.kind, name: actorId(actor) } satisfies Caller);

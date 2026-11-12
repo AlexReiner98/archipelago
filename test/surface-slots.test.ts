@@ -1,6 +1,6 @@
 // The surface's slots (docs/kernel-packs.md, "Slots"): the surface keeps each action's words, its verb and who may
-// call it; what it does is a filling, an internal pack's hook. The surface's own act (rechecked, src/recheck.ts) and
-// route (the backup file, src/backup-route.ts) fill nothing: they are its own code.
+// call it; what it does is a filling, an internal pack's hook. The surface's own act (rechecked, packs/surface/kernel/recheck.ts) and
+// route (the backup file, packs/surface/kernel/backup-route.ts) fill nothing: they are its own code.
 import assert from 'node:assert/strict';
 import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

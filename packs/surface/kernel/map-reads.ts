@@ -2,15 +2,15 @@
 // `proposals` are surface's). The write root's Archipelago class keeps only writes; its callers ask these here. Only what
 // the asker may see: every read here is the map's own, under its viewer's row-level security.
 //
-// - search is surface's own read (searchMap, src/search.ts).
-// - events is the activity log as read (readEvents, src/eventlog.ts), the views pack's: the surface asks it where an
-//   answer needs it (the tool events, and get's recent events, src/tool-reads.ts), not here, which would owe a service.
-// - proposals is the write root's (proposalsOf, src/proposals.ts): the write path reads its own queue (withdraw).
+// - search is surface's own read (searchMap, packs/surface/kernel/search.ts).
+// - events is the activity log as read (readEvents, packs/log/kernel/eventlog.ts), the views pack's: the surface asks it where an
+//   answer needs it (the tool events, and get's recent events, packs/surface/kernel/tool-reads.ts), not here, which would owe a service.
+// - proposals is the write root's (proposalsOf, packs/write/kernel/proposals.ts): the write path reads its own queue (withdraw).
 
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { proposalsOf } from '../../write/kernel/proposals.ts';
 
-/** Whether an item is there though the reader may not see it (pelago_item_hidden, src/schema.ts). */
+/** Whether an item is there though the reader may not see it (pelago_item_hidden, packs/database/kernel/schema.ts). */
 export async function hidden(l: Archipelago, id: string): Promise<boolean> {
   if (!/^e_[a-z0-9]{8}$/.test(id)) return false;
   return Boolean((await l.db.query<{ h: boolean }>(`select pelago_item_hidden($1) as h`, [id])).rows[0]?.h);

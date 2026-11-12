@@ -1,5 +1,5 @@
 // The compacted streams sealed as the fact stream is (docs/log.md, section 5). A fact's value about an item or a link
-// is sealed with that item's key, what is structure (CLEAR in src/seal.ts) stays clear; an entry's reason is sealed with
+// is sealed with that item's key, what is structure (CLEAR in packs/seal/kernel/seal.ts) stays clear; an entry's reason is sealed with
 // the key of the first item it names, or with its stream's own key when it names none, so a forget takes an
 // operational entry's words with its item. A segment is hashed with each sealed value as its digest, so its hash
 // verifies with no key and still does once a forget has put the digest in the value's place.

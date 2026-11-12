@@ -3,12 +3,12 @@
 // capability's behaviour, a workspace setting, a piece or page the screen draws, an action whose code is in-process.
 //
 // - One owner. A name the kernel still answers itself (KERNEL_SERVICES) is the kernel's; two active packs providing
-//   one name are refused as two declaring one type are (src/packorder.ts, orderPacks).
+//   one name are refused as two declaring one type are (packs/loader/kernel/packorder.ts, orderPacks).
 // - Checked by shape. A provider's `in` may require no field the caller's declared `in` lacks, and its `out` must hold
 //   every field the caller's declared `out` reads: more, never less, as `field:` is checked (meets).
 //
 // A pack declares what it provides and what it calls under its manifest's `kernel` key, read here loosely: the
-// manifest's own check of the key is src/manifest.ts's. What fills a name at run time is the loader's: it binds each
+// manifest's own check of the key is packs/loader/kernel/manifest.ts's. What fills a name at run time is the loader's: it binds each
 // provider's function to the pack's context and hands the table to fillServices when the registry loads.
 
 import type { PackFile } from './packs.ts';
@@ -20,7 +20,7 @@ export type Shape = 'string' | 'number' | 'boolean' | 'id' | 'any' | Shape[] | {
 export interface Signature {
   in?: Shape;
   out?: Shape;
-  /** For a setting: whether every member reads it (it is then kept as `member.<key>`, src/schema.ts), or only an admin. */
+  /** For a setting: whether every member reads it (it is then kept as `member.<key>`, packs/database/kernel/schema.ts), or only an admin. */
   read?: 'member' | 'admin';
 }
 
@@ -34,10 +34,10 @@ export interface KernelNames {
 export const FAMILIES = ['answer', 'term', 'capability', 'setting', 'piece', 'page', 'act'] as const;
 export type Family = (typeof FAMILIES)[number];
 
-/** The lens terms the kernel still reads itself (src/query-terms.ts): frontier, worked, moved, island, held. */
+/** The lens terms the kernel still reads itself (packs/query/kernel/query-terms.ts): frontier, worked, moved, island, held. */
 export const KERNEL_TERMS = ['held', 'moved', 'frontier', 'worked', 'island'] as const;
 
-/** The settings the kernel keeps itself (src/workspace-tools.ts), beside the lifts of core's rules (src/rules.ts, LIFTS): a pack's setting names none of them. */
+/** The settings the kernel keeps itself (packs/surface/kernel/workspace-tools.ts), beside the lifts of core's rules (packs/rules/kernel/rules.ts, LIFTS): a pack's setting names none of them. */
 export const KERNEL_SETTINGS = ['me', 'name', 'default_visibility', 'drawings_open', 'holds_off', 'islands', 'lifted', 'asks_at'];
 
 /** A pack's `kernel` names, or none. */
@@ -133,7 +133,7 @@ export const providedOf = (packs: Iterable<object>, family: Family): string[] =>
 
 /**
  * The entries of a family a pack may name: those it provides itself, and those it requires or uses as a service
- * (whose provider is then active wherever the pack is: src/packorder.ts).
+ * (whose provider is then active wherever the pack is: packs/loader/kernel/packorder.ts).
  */
 export function openedTo(pack: PackFile, family: Family): string[] {
   const asked = [...(pack.requires ?? []), ...(pack.uses ?? [])].flatMap((n) => (n.startsWith('service:') ? [n.slice('service:'.length)] : []));
@@ -147,7 +147,7 @@ export function checkServices(pack: object, kernelOwns: Record<Family, readonly 
   for (const [what, list] of Object.entries({ provides, calls })) {
     for (const [name, sig] of Object.entries(list ?? {})) {
       const at = `kernel.${what} "${name}"`;
-      // A root service (src/root-calls.ts) is no family's: who provides one is the manifest's check, who calls one roots.json's.
+      // A root service (packs/loader/kernel/root-calls.ts) is no family's: who provides one is the manifest's check, who calls one roots.json's.
       if (name.startsWith('root.')) { if (!/^root\.[a-z][a-z0-9_]*$/.test(name)) problems.push(`${at} is no root service: root.<name>`); continue; }
       const s = serviceName(name);
       if (!s) { problems.push(`${at} is no service name: <family>.<name>, its family one of ${FAMILIES.join(', ')}`); continue; }
@@ -181,6 +181,6 @@ export const servicesOf = (registry: object, family?: Family): string[] =>
 
 /**
  * What fills a service name under a registry, when anything does. A kernel caller asks a name with callAs
- * (src/kernel-context.ts), which answers it as the map that asks; this is where callAs finds a name no internal pack provides.
+ * (packs/loader/kernel/kernel-context.ts), which answers it as the map that asks; this is where callAs finds a name no internal pack provides.
  */
 export const serviceOf = (registry: object, name: string): ServiceFn | undefined => tables.get(registry)?.get(name);

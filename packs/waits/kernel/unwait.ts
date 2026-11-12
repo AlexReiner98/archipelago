@@ -35,7 +35,7 @@ export async function waitsOn(q: Q, reg: Reg, items: string[], person: string): 
   return rows;
 }
 
-/** What the write path hands a filling of write.follow.rides, as this reads it (src/write-hooks.ts, Ride). */
+/** What the write path hands a filling of write.follow.rides, as this reads it (packs/write/kernel/write-hooks.ts, Ride). */
 export interface Ride { q: Q; at: number; place: string; word: string | null; registry: Reg }
 
 /**

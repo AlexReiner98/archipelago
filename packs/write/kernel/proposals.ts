@@ -48,7 +48,7 @@ export async function overtakenFields(l: Archipelago, base: number, ops: Op[]): 
 }
 
 /**
- * An entry with no facts, for a held change that was declined, withdrawn by its proposer (src/withdraw.ts), or made moot by a change that did what it asked; the
+ * An entry with no facts, for a held change that was declined, withdrawn by its proposer (packs/write/kernel/withdraw.ts), or made moot by a change that did what it asked; the
  * queue's row says so from it. Only while it is pending: false when something else decided it first.
  */
 export async function rejection(tx: Q, ws: string, proposal: string, d: { outcome: 'rejected' | 'superseded' | 'withdrawn'; actor: string; by: string; reason: string; note?: string }): Promise<boolean> {

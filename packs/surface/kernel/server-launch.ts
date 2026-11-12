@@ -2,7 +2,7 @@
 // (reach.server.launchers, argv with {prompt}, {mcp_config}, {tools}, {model}, {mode}, {session_id}) and reads each
 // line it prints (read); the server's launch setting names the pack that may launch. The kernel registers the run,
 // mints the token the process is given (the pack never sees it), spawns with no shell and an environment of the token
-// and the system's own, records what read answers, and on exit ends the run and revokes the token (src/launcher.ts).
+// and the system's own, records what read answers, and on exit ends the run and revokes the token (packs/surface/kernel/launcher.ts).
 // Only a person launches.
 //
 // The setting is PELAGO_LAUNCH_PACK (or pack, given): "<pack>" or "<pack>:<launcher>". With none named it is the

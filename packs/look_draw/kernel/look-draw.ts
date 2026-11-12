@@ -1,5 +1,5 @@
-// A view drawn for an agent's look, in the server's headless Chrome (src/chrome.ts): the app's own page, opened in
-// look mode with a pass that reads as the agent (src/looks.ts), so the drawing, its sandboxed frame and a style's own
+// A view drawn for an agent's look, in the server's headless Chrome (packs/look_draw/kernel/chrome.ts): the app's own page, opened in
+// look mode with a pass that reads as the agent (packs/look_draw/kernel/looks.ts), so the drawing, its sandboxed frame and a style's own
 // code run exactly as they do for any reader. The page says when it has drawn (`data-look` on its root: ui/look.js);
 // then the picture is taken twice, a moment apart, to say whether it had settled, and the faces its text was drawn in
 // are read off Chrome, to say which fell back to another (decision e_vr5vyrhr: said, never installed). Up to AT_ONCE

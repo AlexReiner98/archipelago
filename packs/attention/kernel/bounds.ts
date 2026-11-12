@@ -1,6 +1,6 @@
 // Bounds: a field against a limit, declared by a type as its bound capability. A date due by a day, a quantity
 // under its reorder level. What crosses one is at risk, whatever the field is called. The crossing is read as the
-// database reckons dates and numbers (the read bounds, src/packreads-kernel.ts), so a day ends where the map's does.
+// database reckons dates and numbers (the read bounds, packs/surface/kernel/packreads-kernel.ts), so a day ends where the map's does.
 import type { KernelContext } from '#pelago/kernel';
 
 interface Crossed {

@@ -8,12 +8,12 @@
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** A piece of a screen, as a pack declares it (src/declared.ts, PieceDef): what is drawn, and what it is told. */
+/** A piece of a screen, as a pack declares it (packs/loader/kernel/declared.ts, PieceDef): what is drawn, and what it is told. */
 export interface PieceDef {
   piece: string;
 }
 
-/** A screen a pack ships (src/declared.ts, ScreenDef). */
+/** A screen a pack ships (packs/loader/kernel/declared.ts, ScreenDef). */
 export interface ScreenDef {
   id: string;
   title: string;

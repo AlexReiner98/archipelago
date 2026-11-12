@@ -1,6 +1,6 @@
 // The filling of write.validate (docs/kernel-packs.md, "Write-path hooks"): an automation's trigger and conditions,
 // checked as written (./automation-rules.ts), by the types of the version its island runs. Moved out of the write
-// path's own fillings (src/write-fillings.ts), counting the same.
+// path's own fillings (packs/write/kernel/write-fillings.ts), counting the same.
 
 import type { KernelContext } from '#pelago/kernel';
 import { checkUpdated, checkWritten, type Types } from './automation-rules.ts';
@@ -9,7 +9,7 @@ import { acting } from './due-on.ts';
 type Props = Record<string, unknown>;
 type Op = { op: string; id?: string; type?: string; props?: Props };
 
-/** The registry an island runs, as the write path hands it (src/write-hooks.ts, Judged): read only for its types. */
+/** The registry an island runs, as the write path hands it (packs/write/kernel/write-hooks.ts, Judged): read only for its types. */
 interface Judged { islandRegistry(island: unknown): Promise<Types & { type(id: string): unknown }> }
 
 /** Each automation written in these ops whose trigger or conditions are wrong, as refusals naming the op; none where the automations pack is off. */

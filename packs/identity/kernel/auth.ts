@@ -34,7 +34,7 @@ export interface TokenInfo {
   may: May;
   /** The addresses it has been used from, each cut to its network. */
   seen: string[] | null;
-  /** The client a person allowed, for a token made by signing in through the browser (src/oauth.ts). */
+  /** The client a person allowed, for a token made by signing in through the browser (packs/identity/kernel/oauth.ts). */
   client: string | null;
 }
 
@@ -84,7 +84,7 @@ export async function createToken(db: Q, workspace: string, input: { kind: 'huma
      values ($1, $2, $3, $4, $5, $6, $7, case when $8::int is null then null else now() + ($8::int || ' minutes')::interval end, $9::jsonb, $9::jsonb, $10, $11::jsonb)`,
     [id, hash(token), `…${token.slice(-6)}`, input.kind, input.name.trim(), input.entity ?? null, Boolean(input.admin) && !agent, input.expires_minutes ?? (input.expires_days === undefined ? null : input.expires_days * 1440), within, agent ? (input.may ?? 'change') : 'change', input.granted ? JSON.stringify(input.granted) : null],
   );
-  // Noted beside the workspaces, so a token nobody made is refused before its workspace is opened (src/control-index.ts).
+  // Noted beside the workspaces, so a token nobody made is refused before its workspace is opened (packs/identity/kernel/control-index.ts).
   await indexToken(hash(token), workspace);
   return { id, token, kind: input.kind, name: input.name.trim(), note: 'Keep this token now: it is not stored and cannot be shown again.' };
 }
@@ -102,7 +102,7 @@ interface Grant {
 const newRefresh = (workspace: string) => workspaceSecret('per', workspace);
 const grantUntil = () => new Date(Date.now() + GRANT_DAYS * 86_400_000).toISOString();
 
-/** Which workspace a code or a refresh token is for (src/oauth.ts). Says nothing about whether it is good. */
+/** Which workspace a code or a refresh token is for (packs/identity/kernel/oauth.ts). Says nothing about whether it is good. */
 export const workspaceOfGrant = (secret: string) => /^(?:oac|per)_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}$/.exec(secret)?.[1];
 
 /** The token a person's Allow makes: an agent's acting for them, short-lived, with a refresh token to rotate it by. */
@@ -153,7 +153,7 @@ export async function verifyToken(db: Db, token: string, from?: string, ws = 'de
     `select id, hash, kind, name, coalesce((select f.value #>> '{}' from log_fact f join entity e on e.id = f.id and e.archived_at is not null
        where f.stream = 'facts' and f.id = t.entity_id and f.field = 'merged_into' order by f.pos desc limit 1 -- index log_fact_history
      ), entity_id) as entity_id, admin, within, coalesce(may, 'change') as may, seen, last_used, granted is not null as hosted,
-       -- A member who only reads: every token tied to them reads, their agents' too (src/members.ts).
+       -- A member who only reads: every token tied to them reads, their agents' too (packs/identity/kernel/members.ts).
        exists (select 1 from member m where m.person_id = t.entity_id and m.removed_at is null and m.read_only) as read_only
      from token t where hash = $1 and revoked_at is null and (expires_at is null or expires_at > now())`,
     [hash(token)],

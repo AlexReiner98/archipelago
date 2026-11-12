@@ -1,8 +1,8 @@
 // What an agent is offered (Rule 7 of the target model): it reads with query, writes with change, takes back with
 // undo, and calls every other action under one of the six verbs the core pack declares (capture, assign, report, ask,
 // settle, revise), naming the action. One tool stands apart, draw: a client opens a page for a tool, not for a call, so
-// a view drawn in a chat has a tool of its own (src/mcp-view.ts). The named operations beneath stay one table
-// (src/tools.ts) for the human's CLI and the web UI; for agents, query and the verbs are routed onto them here. An old
+// a view drawn in a chat has a tool of its own (packs/mcp_apps/kernel/mcp-view.ts). The named operations beneath stay one table
+// (packs/surface/kernel/tools.ts) for the human's CLI and the web UI; for agents, query and the verbs are routed onto them here. An old
 // name still answers for one release, as POST /agent/<name>, with the call that replaces it (movedTo).
 
 import { z } from 'zod';

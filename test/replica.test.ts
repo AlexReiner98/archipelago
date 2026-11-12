@@ -1,4 +1,4 @@
-// The page as a replica of the log: the projector the page runs (src/project.ts, as the server serves it, its types
+// The page as a replica of the log: the projector the page runs (packs/log/kernel/project.ts, as the server serves it, its types
 // stripped) makes the same rows from the log as the server's tables hold, row for row; the server reads the facts
 // after a position only on what the caller holds and the islands it follows, as the viewer may see them; and the
 // page's one store (ui/replica.js), shared by every view, folds an agent's change in once, tells every view holding

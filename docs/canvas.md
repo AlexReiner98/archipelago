@@ -32,7 +32,7 @@ never structure. Containment is a projection the server keeps (the
 ### 3. The query is a filter, a walk and a limit, and the only bound
 Its parts have one name each, on the page and in an agent's answer: Find,
 Only, Not, Walk and Limit (e_drt4g872, `docs/glossary.md`). Find, Only and Not
-take one list of terms (`src/query-terms.ts`, e_4y5x454z), each a set of items
+take one list of terms (`packs/query/kernel/query-terms.ts`, e_4y5x454z), each a set of items
 written as words: `text <words>`, `type <t>`, `kind <k>`, `id <item>`,
 `in <item>` (all that is part of it at any depth, from the part_of closure,
 e_tvsdqjeq), `related <item>` (any link to it, either way), `<link> <item>`
@@ -42,7 +42,7 @@ words that can only be checked of what is found: `done`, `blocked`,
 `status <s>`, `no owner`, `over estimate`, `changed since 7d`,
 `made since <date>`, `made before <date>` (a since and a before are a range;
 a date is its day in the workspace's zone), `by owner`, `by agent`
-(`src/query-only.ts`, e_xe5dx55e).
+(`packs/query/kernel/query-only.ts`, e_xe5dx55e).
 The part says what is done with a set: Find adds it (a union; neither `kind`
 nor a word finds, since each would read the map), Only keeps what is in it
 (an AND; an item is of one type, so its types are one set), and Not takes it
@@ -110,8 +110,8 @@ item kept on the map, core's `layout` type), a style how it looks, and the view 
 a query and a layout with its settings, which it holds itself (`style` on the
 item): nothing reaches into it by a link, and a style is about nothing. Looks
 stack in one line: the packs', the workspace's, the view's, then a person's own
-colours. What moved from the styles made for one view is `src/style-move.ts`;
-how the styles with code became layouts is `src/layout-move.ts`.
+colours. What moved from the styles made for one view is `packs/styles/kernel/style-move.ts`;
+how the styles with code became layouts is `packs/styles/kernel/layout-move.ts`.
 A layout is the pane's: editing the query keeps it, opening a saved view
 brings its own. The view band switches it (`ui/look-switch.js`), which lists
 layouts and nothing else. A change in a pane is a draft: Save is marked and
@@ -202,12 +202,12 @@ measure it reads at), shipped by the house style and a pack's presets.
 ### In `src/` and `packs/`
 | Module | What it is |
 | --- | --- |
-| `src/query-flat.ts` | the flat query (core view `flat`) |
-| `src/query-saved.ts` | kept views: their picture, `shown_in`, the move from old views |
-| `src/styles.ts` | the style a page or view is drawn in (core view `style`) |
-| `src/layouts.ts` | which drawing a style names, and the owner's version of it (a layout with its `preset`) |
-| `src/tail.ts`, `src/project.ts` | facts after a position; the pure projector (served as `/project.js`) |
-| `src/pelago.ts`, `src/rules.ts` | the one write path, and what decides it |
+| `packs/query/kernel/query-flat.ts` | the flat query (core view `flat`) |
+| `packs/lenses/kernel/query-saved.ts` | kept views: their picture, `shown_in`, the move from old views |
+| `packs/styles/kernel/styles.ts` | the style a page or view is drawn in (core view `style`) |
+| `packs/loader/kernel/layouts.ts` | which drawing a style names, and the owner's version of it (a layout with its `preset`) |
+| `packs/log/kernel/tail.ts`, `packs/log/kernel/project.ts` | facts after a position; the pure projector (served as `/project.js`) |
+| `packs/write/kernel/pelago.ts`, `packs/rules/kernel/rules.ts` | the one write path, and what decides it |
 | `packs/canvas/layouts/flow/` | the flow drawing: `graph.js` flattens, `layout.js` orders, `free.js` keeps places, `index.js` answers marks |
 
 ## How a canvas is read
@@ -343,7 +343,7 @@ its tab; `alone` closes the others only in a tab that follows the session;
 that is not a canvas (a screen) opens in the sheet only in a tab that follows
 the session, and is otherwise offered. A session
 is its run: a step carries the run it names (show, tell, session_update), or
-the one its agent last named (`src/presence.ts`). A popped-out window follows
+the one its agent last named (`packs/presence/kernel/presence.ts`). A popped-out window follows
 no agent: the main page does, and draws a show for its tab in the window's
 pane in focus when that tab follows the session.
 

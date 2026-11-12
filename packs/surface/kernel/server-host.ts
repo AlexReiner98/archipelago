@@ -1,4 +1,4 @@
-// The server packs of one server, loaded once, each run in a sandboxed process of its own (src/packhost.ts). While
+// The server packs of one server, loaded once, each run in a sandboxed process of its own (packs/loader/kernel/packhost.ts). While
 // a call runs, the handler may ask for a server act it declared (ctx.act), for its keys (ctx.store), or for a request
 // to a host it declared (ctx.request), which the kernel makes with the secret it holds: nothing else. It reads no map.
 
@@ -20,7 +20,7 @@ const MOST_MS = 30_000;
 const KEY = /^[A-Za-z0-9_.:-]{1,200}$/;
 /** The most keys one list of a pack's store answers. */
 const LIST_MOST = 1000;
-/** The acts done in src/server-connect.ts, on a workspace that connected the pack. */
+/** The acts done in packs/surface/kernel/server-connect.ts, on a workspace that connected the pack. */
 const CONNECT_ACTS = ['begun.get', 'begun.take', 'connection.make', 'connection.get', 'connection.drop', 'workspace.add', 'workspace.deliver'];
 
 export class ServerPacks {
@@ -29,7 +29,7 @@ export class ServerPacks {
   /** The address this server is reached at from outside, which a pack is told (ctx.origin). */
   origin = '';
   private boxes = new Map<string, Sandbox>();
-  /** The calls each pack is in the middle of: a gate is not asked of a pack while it is (src/server-gates.ts). */
+  /** The calls each pack is in the middle of: a gate is not asked of a pack while it is (packs/surface/kernel/server-gates.ts). */
   private inCall = new Map<string, number>();
   private readonly at: ActPlaces;
 

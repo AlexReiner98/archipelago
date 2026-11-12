@@ -37,7 +37,7 @@ grant execute on function pelago_search_ids(text, boolean) to pelago_member;
 
 // Any of the words: each word of q, in the form the index keeps, looked up in the index on its own, and each item
 // found counted once for every word it has. Like pelago_search_ids, it finds through the index as one that sees
-// everything and gives ids (with their counts) only. Step 30 of src/migrate.ts.
+// everything and gives ids (with their counts) only. Step 30 of packs/database/kernel/migrate.ts.
 export const SEARCH_ANY = `
 create or replace function pelago_search_any(q text) returns table (id text, hits int)
 language sql stable security definer set search_path = public as $fn$

@@ -1,10 +1,10 @@
 // What a server pack counts on a site's workspace, per key per day (the acts count.add and count.read,
-// src/server-acts.ts): only how many, never of whom. A count is held in memory and written down each minute as one
+// packs/surface/kernel/server-acts.ts): only how many, never of whom. A count is held in memory and written down each minute as one
 // entry of the pack's stream on that workspace, adding to the day, and read back as what was added after a position.
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** A fact of an operational stream (src/streams.ts), as a count is written: a key's day and how many were added. */
+/** A fact of an operational stream (packs/log/kernel/streams.ts), as a count is written: a key's day and how many were added. */
 type OpFact = ['+', string, string, unknown] | ['-', string, string];
 
 /** A key a count may be kept under: a short word of letters, digits, _ and -. */
@@ -65,7 +65,7 @@ export function keepCounts(open: (workspace: string) => Promise<Opened>, everyMs
  * since `after`. At most COUNT_ROWS rows, whole entries only; `pos` is the last entry read, to ask from next.
  */
 export async function countsSince(ctx: KernelContext, stream: string, after = 0): Promise<{ counts: { key: string; day: string; n: number }[]; pos: number }> {
-  // At most COUNT_ROWS entries, as the read answers (src/packreads-service.ts, counts).
+  // At most COUNT_ROWS entries, as the read answers (packs/surface/kernel/packreads-service.ts, counts).
   const entries = (await ctx.reads({ counts: { stream, after } })) as { pos: number; facts: OpFact[] }[];
   const sum = new Map<string, number>();
   let pos = after;

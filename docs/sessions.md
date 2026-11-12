@@ -100,10 +100,10 @@ resort).
 
 | task | files it owns |
 |---|---|
-| 1. Raw session events (e_7frke95h) | `src/session-events.ts`, the `/hooks/events` route, `src/operational.ts`, the stream's retention in `packs/core/pack.json` `rules` |
+| 1. Raw session events (e_7frke95h) | `packs/sessions/kernel/session-events.ts`, the `/hooks/events` route, `packs/log/kernel/operational.ts`, the stream's retention in `packs/core/pack.json` `rules` |
 | 2. Turns from events (e_xhvdjnj8) | `packs/core/sessions/turns.js` and its test |
 | 3. Claude Code's adapter (e_4n6kxmd9) | `scripts/pelago-hook.mjs`, the setup that registers hooks, `src/claude-code.ts` (the shape of a hook's answer), core's instructions for `server_restarted` and `setup_behind` |
-| 4. A session's parent (e_ghdxec3h) | the link type in `packs/core/pack.json` `relations`, `src/sessions.ts` |
+| 4. A session's parent (e_ghdxec3h) | the link type in `packs/core/pack.json` `relations`, `packs/sessions/kernel/sessions.ts` |
 | 5. States (e_ees7hr6q) | `packs/core/sessions/states.js` and its test |
 
 A change to this vocabulary is made here first, and said to every task that
@@ -173,10 +173,10 @@ for the harness to grow from (e_k3g5c8yh).
 
 ## Wired: what the server gives
 
-Phase 2 builds against these shapes; the wiring (`src/session-state.ts`)
+Phase 2 builds against these shapes; the wiring (`packs/runs/kernel/session-state.ts`)
 makes them true.
 
-- `sessionState(l, run, now?)`, in `src/session-state.ts`: reads the run's
+- `sessionState(l, run, now?)`, in `packs/runs/kernel/session-state.ts`: reads the run's
   events (`sessionEvents`), works out its turns (`turnsOf`) and its state
   (`stateOf`, with its latest beat from `story`, the title of what it works
   on, its open `depends_on`, and `quiet_after` from the house style's
@@ -188,7 +188,7 @@ makes them true.
   since }` and `turn` (its latest turn), and the open ones are ordered by the
   states' order of attention: `waiting`, `your_move`, `blocked`, `quiet`,
   `working`, `idle`, each oldest `since` first.
-- The flat answer (`query` `flat`, `src/query-flat.ts`): an item that is a run
+- The flat answer (`query` `flat`, `packs/query/kernel/query-flat.ts`): an item that is a run
   has `session: { state, for?, line, since }` beside `status` and `phase`.
 - A new read `turns` (`query` name `turns`, params `run`, `limit?`): the run's
   turns, newest first, as "A turn"; built by task 10.
@@ -199,12 +199,12 @@ makes them true.
 
 | task | files it owns |
 |---|---|
-| Wiring (part of e_ees7hr6q) | `src/session-state.ts`, `src/views.ts` (the `sessions` view only), `src/query-flat.ts`, the two numbers in the house style |
-| 7. Ended leave; quiet dim, then end (e_9jduzn9c) | the stale sweep in `src/session-quiet.ts`, `src/sessions.ts` if ending needs it |
+| Wiring (part of e_ees7hr6q) | `packs/runs/kernel/session-state.ts`, `packs/query/kernel/views.ts` (the `sessions` view only), `packs/query/kernel/query-flat.ts`, the two numbers in the house style |
+| 7. Ended leave; quiet dim, then end (e_9jduzn9c) | the stale sweep in `packs/sessions/kernel/session-quiet.ts`, `packs/sessions/kernel/sessions.ts` if ending needs it |
 | 8. A Sessions view (e_htwjh45d) | a lens preset and style preset in `packs/core/pack.json` (`views`, `styles`), `packs/canvas/layouts/flow/state.js` and the flow's marks for a session |
 | 9. The tab bar's count (e_82rggead) | `ui/tab-bar.js`, `ui/tab-life.js` |
-| 10. A session's page shows its turns (e_ezyzr7ms) | `src/session-turns.ts` (the `turns` read), a screen piece in `src/declared.ts` and its `ui/` module |
-| 11. What turns tell (e_ys9d9n25) | `src/session-measures.ts` and its view's one line in `src/views.ts` |
+| 10. A session's page shows its turns (e_ezyzr7ms) | `packs/sessions/kernel/session-turns.ts` (the `turns` read), a screen piece in `packs/loader/kernel/declared.ts` and its `ui/` module |
+| 11. What turns tell (e_ys9d9n25) | `packs/runs/kernel/session-measures.ts` and its view's one line in `packs/query/kernel/views.ts` |
 | 12. An SDK adapter (e_bu29txug) | `scripts/pelago-sdk-runner.mjs`, `scripts/pelago-events.mjs` if it shares the posting |
 
 Tasks 8 to 11 build against the shapes above, not the wiring's code: where

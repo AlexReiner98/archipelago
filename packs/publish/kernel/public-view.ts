@@ -1,7 +1,7 @@
 // A public view (decision e_nwdn7ce6): a view or an item made public by a person, frozen as they saw it when they
 // shared it, at /p/<workspace>/<id> for anyone and search engines, and at its address word on its site's domain. It
 // replaces links with a secret, guests' frozen links and, in time, publishing. Kept and read by
-// src/public-view-store.ts.
+// packs/database/kernel/public-view-store.ts.
 //
 // Making a view public and taking it down: the rows and the event that says it are written by the root that keeps
 // them (root.publish, the database's). What it would hold, its plan and where it stands are ./public-view-freeze.ts,

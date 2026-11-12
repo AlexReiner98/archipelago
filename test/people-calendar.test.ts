@@ -1,6 +1,6 @@
 // Core's company, works_at and event moved to two vocabulary packs, people and calendar (task e_wrdg6udh, hub
 // e_9hkt86s7), keeping their ids. A map that had core gets both, once, by the types it had (takenOver in
-// src/packstate.ts), and its companies, events and works_at links keep their types.
+// packs/loader/kernel/packstate.ts), and its companies, events and works_at links keep their types.
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -16,7 +16,7 @@ import { make, packsWith } from './map.ts';
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
 
-/** A map on these packs, opened as a workspace is (src/workspaces.ts): the packs synced on the log, then its types. */
+/** A map on these packs, opened as a workspace is (packs/identity/kernel/workspaces.ts): the packs synced on the log, then its types. */
 async function mapOn(dir: string, db?: Archipelago['db']) {
   const reg = new Registry(dir);
   registries.push(reg);

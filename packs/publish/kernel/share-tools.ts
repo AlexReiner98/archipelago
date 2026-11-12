@@ -3,7 +3,7 @@
 //
 // On the publish pack's context, as the rest of it: each tool's input is a JSON shape the surface builds its schema
 // from (packs/surface/kernel/tool-input.ts), its run is handed the pack's context of the map it is called on (the
-// adapter at src/share-tools.ts), and an agent's ask (share_ask, publish_ask) is a notification made as that agent, by
+// adapter at packs/publish/kernel/share-tools.ts), and an agent's ask (share_ask, publish_ask) is a notification made as that agent, by
 // the notifications pack's name (act.report.notify).
 
 import type { KernelContext } from '#pelago/kernel';

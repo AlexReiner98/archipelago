@@ -89,12 +89,12 @@ export { lenient } from './mcp.ts';
 export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean; draw?: DrawHostOptions; roots?: Record<string, string> } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
-  // The server's own Chrome may reach it by another name, from a container beside it (src/looks.ts).
+  // The server's own Chrome may reach it by another name, from a container beside it (packs/look_draw/kernel/looks.ts).
   const lookAt = new URL(process.env.PELAGO_LOOK_ORIGIN ?? `http://127.0.0.1:${port}`);
   void onServer<{ setOrigin(url: string): void }>('surface.looks').then((looks) => looks.setOrigin(lookAt.origin), (err: Error) => console.error(`looks: ${err.message}`));
   const [named, sites] = [options.publicHosts ?? [], options.sites ?? {}], hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...named, lookAt.host];
   const origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...named.map((name) => `https://${name}`), lookAt.origin];
-  const tokens = options.auth === 'tokens', drawing = drawHosts(port, origins, options.draw); // where the page frames its drawings (src/draw-host.ts)
+  const tokens = options.auth === 'tokens', drawing = drawHosts(port, origins, options.draw); // where the page frames its drawings (packs/walls/kernel/draw-host.ts)
   configureOutbox(async (id) => ((await workspaces.has(id)) ? (await workspaces.get(id)).pelago : undefined));
   // The address this server is reached at from outside: what a mailed link and the server packs (ctx.origin) name, never the look's.
   const serverPacks = serverPacksOf(workspaces);
@@ -112,11 +112,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const deliveries = limiter(options.limits?.deliveries ?? DELIVERY_LIMIT), signIn = limiter(options.limits?.signIn ?? SIGN_IN_LIMIT);
   // A token that is refused is counted too: finding one wrong can mean opening a workspace's database first.
   const refusedTokens = limiter(options.limits?.refused ?? REFUSED_LIMIT);
-  /** Where a request came from: what the proxies we trust say, not what the caller wrote ahead of them (src/address.ts). */
+  /** Where a request came from: what the proxies we trust say, not what the caller wrote ahead of them (packs/walls/kernel/address.ts). */
   const trusted = trustedProxies(options.proxies);
   const addressOf = (req: IncomingMessage) => clientAddress(req.headers['x-forwarded-for'], req.socket.remoteAddress, trusted);
   /** True, and the request answered, when its address has asked too often. */
-  const counted = new WeakMap<IncomingMessage, Set<unknown>>(); // a request counts once against a limit, though a pack passes it back (src/server-mounts.ts)
+  const counted = new WeakMap<IncomingMessage, Set<unknown>>(); // a request counts once against a limit, though a pack passes it back (packs/surface/kernel/server-mounts.ts)
   const tooOften = (req: IncomingMessage, res: ServerResponse, count: ReturnType<typeof limiter>) => {
     if (counted.get(req)?.has(count)) return false; counted.set(req, (counted.get(req) ?? new Set()).add(count));
     const wait = count.take(addressOf(req)); if (wait) send(res, 429, { error: `Asked too often. Try again in ${wait} seconds.` }, { 'retry-after': String(wait) });
@@ -162,7 +162,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       return { ws, pelago: ws.pelago.as(as.person ?? '', false, as.may === 'read'), actor: (label) => (label ? { ...as, name: `${as.name}/${label}` } : as) };
     }
     if (!token || !id || !(await workspaces.has(id))) throw deny();
-    // A token nobody made for that workspace is refused before its database is opened (src/control-index.ts).
+    // A token nobody made for that workspace is refused before its database is opened (packs/identity/kernel/control-index.ts).
     const control = await workspaces.control(), every = async () => (await workspaces.list()).map((w) => ({ id: w.id, db: async () => (await workspaces.get(w.id)).pelago.db }));
     if (!(await tokenKnown(control, hashSecret(token), id, every))) throw deny();
     // The workspace stays open for as long as this request lasts, however long that is.
@@ -212,10 +212,10 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (drawing.only(host) && !(req.method === 'GET' && drawHostServes(url.pathname))) return send(res, 404, { error: 'Not found' }); // the drawing host serves drawings only
       if (req.method === 'GET' && url.pathname === '/health') return send(res, 200, { ok: true, name: 'pelago', ...running, data: devMode() ? (workspaces.config.dataDir ?? undefined) : undefined, leading: options.leading?.() ?? true });
       // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
-      const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (src/server-mounts.ts)
+      const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (packs/surface/kernel/server-mounts.ts)
       if (mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, workspaces, named, sites, host, from: addressOf(req), tooOften: () => tooOften(req, res, open) }))) return;
       if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || serveIcon(res, await onMap<Buffer | null>((await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago, 'surface.icon'));
-      // The routes the packs above the surface fill (src/surface-slots.ts, surface.route): each counts its own requests.
+      // The routes the packs above the surface fill (packs/surface/kernel/surface-slots.ts, surface.route): each counts its own requests.
       if (await serveFilled(req, res, url.pathname, { workspaces, tooOften: (limit) => tooOften(req, res, { open, deliveries, signIn }[limit]) })) return;
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
@@ -256,13 +256,13 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         }
       }
 
-      if (req.method === 'GET' && url.pathname.startsWith('/drawing/')) return await serveDrawingFile(res, url.pathname, { tooOften: () => tooOften(req, res, open), reader: async () => ((ws) => (tokens ? ws.pelago.as('') : ws.pelago))(await workspaces.get(DEFAULT_WORKSPACE)) }); // a drawing's files by hash (src/drawing-files.ts), asked with no token: read as no one
+      if (req.method === 'GET' && url.pathname.startsWith('/drawing/')) return await serveDrawingFile(res, url.pathname, { tooOften: () => tooOften(req, res, open), reader: async () => ((ws) => (tokens ? ws.pelago.as('') : ws.pelago))(await workspaces.get(DEFAULT_WORKSPACE)) }); // a drawing's files by hash (packs/publish/kernel/drawing-files.ts), asked with no token: read as no one
       if (req.method === 'GET' && UI_FILES[url.pathname]) {
         const file = UI_FILES[url.pathname], framedBy = file === 'draw.html' ? drawing.framedBy(host, String(req.headers['sec-fetch-site'] ?? '')) : undefined;
         const page = file.endsWith('.html'), open = file === 'draw.html' && !framedBy && url.searchParams.get('open') === '1', frame = file === 'draw.html' ? await drawPage() : null;
         const served = page || file === 'layout.css' ? null : await uiFile(file, url.searchParams.get('v'));
         // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.
-        // A file named by the UI's current version is kept for good (src/ui-files.ts); the pages, and the rest, never. The drawing frame has its scripts written in (drawPage).
+        // A file named by the UI's current version is kept for good (packs/surface/kernel/ui-files.ts); the pages, and the rest, never. The drawing frame has its scripts written in (drawPage).
         res.writeHead(200, {
           'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
           'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
@@ -278,7 +278,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
 
       if (req.method === 'GET' && url.pathname === '/whoami') {
         if (!local(req, false)) return send(res, 403, { error: 'Local requests only.' });
-        const { ws, actor, look } = await resolve(req, res, 'human'), me = actor(); // what it may do draws the page's controls (src/may.ts)
+        const { ws, actor, look } = await resolve(req, res, 'human'), me = actor(); // what it may do draws the page's controls (packs/surface/kernel/may.ts)
         return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: me, may: pageMay(me, Boolean(look), devMode() ? url.searchParams.get('may') : null) });
       }
 
@@ -304,7 +304,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           if (surface === 'api') return send(res, 200, { result: await callTool(pelago, actor(), name, body) });
           // Scripts say which one they are in the body, as MCP callers do in their arguments.
           const { actor: label, ...input } = body;
-          // An old name answers for one release, saying the call that replaces it (src/surface.ts).
+          // An old name answers for one release, saying the call that replaces it (packs/surface/kernel/surface.ts).
           const moved_to = replacementOf(pelago.registry, name);
           return send(res, 200, { result: await callTool(pelago, actor((label as string) || 'script'), name, input), ...(moved_to && { moved_to }) });
         } catch (err) {
@@ -442,7 +442,7 @@ If that process is not a pelago server, delete ${lock}.`);
     console.log(`packs: ${main.pelago.registry.packs.map((p) => `${p.id}@${p.version}`).join(', ')}`);
     console.log(`auth: ${config.auth}`);
     if (config.dev) console.log('dev mode: agent changes are not reviewed, and agents can restart the server');
-    // Several servers may share a Postgres server: the one holding its lock runs the clocks (src/leader.ts).
+    // Several servers may share a Postgres server: the one holding its lock runs the clocks (packs/database/kernel/leader.ts).
     leader = config.databaseUrl ? await pgLeader(config.databaseUrl) : soleLeader();
     if (config.databaseUrl) console.log(leader.leading ? 'leading: this server runs the clocks' : 'following: another server runs the clocks');
     leader.onChange((on) => void workspaces.lead(on));
@@ -459,7 +459,7 @@ If that process is not a pelago server, delete ${lock}.`);
       configureBackup(async () => (await backups()).all(dir, keep, upload));
     }
     if (config.auth !== 'tokens') return;
-    await firstStart(workspaces, main, join(config.dataDir, '..')); // the two everything is made from, given once (src/first-start.ts)
+    await firstStart(workspaces, main, join(config.dataDir, '..')); // the two everything is made from, given once (packs/surface/kernel/first-start.ts)
   });
   let idle: ReturnType<typeof setInterval> | undefined;
   let leader: Leader | undefined;
@@ -470,7 +470,7 @@ If that process is not a pelago server, delete ${lock}.`);
     clearInterval(idle);
     await leader?.stop();
     stopAllLaunched();
-    await drained(server, config.dev ? 1_000 : undefined); // the requests in hand answered before their databases close (src/drain.ts)
+    await drained(server, config.dev ? 1_000 : undefined); // the requests in hand answered before their databases close (packs/surface/kernel/drain.ts)
     await (await counting)();
     await workspaces.closeAll();
     await booted.stop(); // the root packs, in reverse order

@@ -1,4 +1,4 @@
-// Rules decided by an island's pack version (src/island-rules.ts, decide in src/rules.ts; task e_tykp9yfc): each op is
+// Rules decided by an island's pack version (packs/loader/kernel/island-rules.ts, decide in packs/rules/kernel/rules.ts; task e_tykp9yfc): each op is
 // judged by the rules of the version its island runs, an op on no island or the map's pack by the map's; a change
 // across islands is held or refused if any op is, and a held change names the rule and the version that held it.
 // Core's own rules are never a version's. Beside the table of every change (test/approvals.ts), which has no islands.

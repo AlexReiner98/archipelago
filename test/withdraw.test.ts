@@ -1,4 +1,4 @@
-// A held change taken back by its proposer, and a newer one that says which older one it covers (src/withdraw.ts).
+// A held change taken back by its proposer, and a newer one that says which older one it covers (packs/write/kernel/withdraw.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Op } from '../packs/write/kernel/pelago.ts';

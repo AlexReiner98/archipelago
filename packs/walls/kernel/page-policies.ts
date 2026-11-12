@@ -17,14 +17,14 @@ export const SIGNED_IN_READER_POLICY = READER_POLICY.replace("img-src 'self'", "
 // It does not say who may frame it: sandboxed, it has no origin for 'self' to match, and framed by a stranger it is an empty page that can reach nothing.
 const DRAW_POLICY = "sandbox allow-scripts; default-src 'none'; script-src 'self' blob: data:; worker-src blob: data:; style-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; webrtc 'block'; base-uri 'none'; form-action 'none'";
 // The same frame opened (draw.html?open=1), asked for by the page only where the owner turned the sandbox off for drawings
-// (drawings_open, src/workspace-tools.ts): no wall, the network, fonts, files and links, and the page's own origin. Only this
+// (drawings_open, packs/surface/kernel/workspace-tools.ts): no wall, the network, fonts, files and links, and the page's own origin. Only this
 // server's page may frame it, so a stranger's page cannot hand it code to run as the person signed in here.
 const OPEN_DRAW_POLICY = "frame-ancestors 'self'";
 
 /**
  * The policy draw.html is served with: opened, or sandboxed (and on a dev server started PELAGO_UNSANDBOXED=1, without
- * the sandbox but with the rest). Its own scripts, written into it (src/ui-files.ts drawPage), are allowed by their
- * hashes, and no other script written in a page is. At the drawing host (src/draw-host.ts), framed by the pages it names.
+ * the sandbox but with the rest). Its own scripts, written into it (packs/surface/kernel/ui-files.ts drawPage), are allowed by their
+ * hashes, and no other script written in a page is. At the drawing host (packs/walls/kernel/draw-host.ts), framed by the pages it names.
  */
 export function drawPolicy(open: boolean, unsandboxed: boolean, hashes: string[] = [], framedBy?: string[]): string {
   if (open) return OPEN_DRAW_POLICY;

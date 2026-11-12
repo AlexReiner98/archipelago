@@ -2,7 +2,7 @@
 // the authorization server and the resource, on the sign-in it already has. /mcp answers 401 with where to look; the
 // client reads that, opens /oauth/authorize, and the page (ui/authorize.js) has a signed-in person say Allow or Deny.
 // Allow is a code, traded once with PKCE for an agent token acting for that person, as Connect an agent makes one
-// (grantToken in src/auth.ts). At /mcp, which workspace is whichever that person signed in to, so one address serves
+// (grantToken in packs/identity/kernel/auth.ts). At /mcp, which workspace is whichever that person signed in to, so one address serves
 // everyone. A client that keeps one connection to an address (Claude's connectors do) cannot hold two workspaces at it,
 // so each also has an address of its own, /mcp/<workspace>, which takes only that workspace's sign-ins and tokens.
 

@@ -29,7 +29,7 @@ export interface Reg {
   relationFamily(...roots: string[]): string[];
 }
 
-/** What the write path hands a rewrite beside the ops (src/write-hooks.ts, Judged): the registry the change is judged by, and the island it was given. */
+/** What the write path hands a rewrite beside the ops (packs/write/kernel/write-hooks.ts, Judged): the registry the change is judged by, and the island it was given. */
 export interface Judged { registry: Reg; island?: string }
 
 /** An item as the reads answer it (`ids`). */

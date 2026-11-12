@@ -6,7 +6,7 @@
 
 import type { Q } from './db.ts';
 
-/** The table, made by step 3 of the schema (src/migrate.ts). */
+/** The table, made by step 3 of the schema (packs/database/kernel/migrate.ts). */
 export const TRANSIENT = `
 create table if not exists transient (
   key   text primary key,

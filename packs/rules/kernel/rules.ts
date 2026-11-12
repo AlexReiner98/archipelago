@@ -71,9 +71,9 @@ export interface RuleDef {
     held?: boolean;
     /** Whether a pack's action or handler makes the change. */
     pack?: boolean;
-    /** Whether a drawing asked for the change, which the page sends as the person (src/layout-changes.ts). */
+    /** Whether a drawing asked for the change, which the page sends as the person (packs/rules/kernel/layout-changes.ts). */
     drawing?: boolean;
-    /** "outside": it writes a type, a link type or a field outside the reach of the pack that makes it (src/manifest.ts), or of a drawing, the types its style declares (writes). */
+    /** "outside": it writes a type, a link type or a field outside the reach of the pack that makes it (packs/loader/kernel/manifest.ts), or of a drawing, the types its style declares (writes). */
     reach?: 'outside';
     /** Fields of the item as it will be (or what an act names), any of which names a root pack: core, or an internal pack whose manifest says kernel.trust root. */
     root?: string[];
@@ -98,7 +98,7 @@ export interface RuleDef {
   readings?: boolean;
   /** A retention rule: the compacted stream its facts go to (docs/log.md, section 4), with keep in place of then. */
   stream?: string;
-  /** What compaction leaves of them (src/retention.ts). */
+  /** What compaction leaves of them (packs/log/kernel/retention.ts). */
   keep?: Keep;
 }
 
@@ -112,7 +112,7 @@ export interface Ruled {
   say: string;
   /** Of a rule that did not hold it: what let it through, a setting (agent_code), the server's policy (server) or holds being off (holds_off). */
   lifted_by?: string;
-  /** The version of its pack the rule is of (its pack item), where an island runs one (src/island-pin.ts). */
+  /** The version of its pack the rule is of (its pack item), where an island runs one (packs/loader/kernel/island-pin.ts). */
   version?: string;
 }
 
@@ -161,7 +161,7 @@ export interface Who {
   bookkeeping?: string;
 }
 
-/** The settings an owner lifts a rule by: each one an agent's token may read (src/schema.ts, AGENT_CODE_READ). On is true, or "apply". */
+/** The settings an owner lifts a rule by: each one an agent's token may read (packs/database/kernel/schema.ts, AGENT_CODE_READ). On is true, or "apply". */
 export const LIFTS = ['agent_changes', 'agent_code', 'agent_publish', 'agent_backups'];
 // The loader's slot loader.lifts: a pack's rule is checked against these as it loads (packs/loader/kernel/rule-check.ts).
 fillLifts(LIFTS);
@@ -171,7 +171,7 @@ export const AGENT_CHANGES = 'agent_changes';
 /**
  * The setting by which the owner turns holds off: every change applies as it is made, whatever rule would hold it,
  * forget included (the owner, 3 Nov 2026, decision e_66mwta3w). A wait the change or its token asked for still holds.
- * Off unless set. An agent's token reads it (src/schema.ts, HOLDS_OFF_READ).
+ * Off unless set. An agent's token reads it (packs/database/kernel/schema.ts, HOLDS_OFF_READ).
  */
 export const HOLDS_OFF = 'holds_off';
 
@@ -405,7 +405,7 @@ function rulesUnder(base: Rule[], run: IslandRun): Rule[] {
 
 /**
  * What the rules make of a change: whether it applies, waits or is refused, and the rule that decided it. `runs` says,
- * for each op, the versions of packs its islands run (src/island-rules.ts), undefined for an island on the map's: the
+ * for each op, the versions of packs its islands run (packs/loader/kernel/island-rules.ts), undefined for an island on the map's: the
  * op is judged under each, and held or refused if it is under any. Left out, every op is judged by the map's rules.
  */
 export async function decide(q: Q, reg: Registry, who: Who, given: { op: string }[], policy: Partial<Policy> = {}, runs: (IslandRun | undefined)[][] = []): Promise<Verdict> {

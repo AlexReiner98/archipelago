@@ -5,7 +5,7 @@ import { bookkeep } from './bookkeeping.ts';
 import { livesInFor } from './places.ts';
 import { actorId, type Actor, type Item } from './types.ts';
 
-/** Who started a run, as the launcher says it (src/launch-brief.ts): kept on the run as it is. */
+/** Who started a run, as the launcher says it (packs/agents/kernel/launch-brief.ts): kept on the run as it is. */
 export type StartedBy = Record<string, unknown>;
 
 /**

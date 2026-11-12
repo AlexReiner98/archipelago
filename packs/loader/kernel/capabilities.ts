@@ -1,6 +1,6 @@
 // Capabilities: what the kernel computes from a type, declared by the type with the field each reads. The kernel
 // knows the ones listed in CAPABILITIES; a pack adds another by providing its behaviour as the service
-// `capability.<name>` (src/services.ts), and a type may then carry it where its pack provides or requires that name.
+// `capability.<name>` (packs/loader/kernel/services.ts), and a type may then carry it where its pack provides or requires that name.
 // A flavour inherits its parent's; a sibling does not. Each the kernel knows is checked against the type's own fields
 // when its pack loads, so a capability naming a field the type lacks stops the pack; one a pack provides is checked by
 // its provider. The check of the list stays here; what each one does moves to its provider.
@@ -38,7 +38,7 @@ export interface When {
 
 /**
  * Is somewhere: by a field (an address, a name) or by a link to a place. A place says what it is known by instead:
- * an address (a remote, a URL) and a folder on a machine, the keys a session finds it by (src/places.ts).
+ * an address (a remote, a URL) and a folder on a machine, the keys a session finds it by (packs/runs/kernel/places.ts).
  */
 export interface Where {
   field?: string;
@@ -81,7 +81,7 @@ export interface Watch {
 
 /**
  * A promise to whatever reads it (a link of a type that crosses, as core's reads): these fields are kept current,
- * and when one moves after a reader last changed or checked itself, attention says so on the reader (src/moved.ts).
+ * and when one moves after a reader last changed or checked itself, attention says so on the reader (packs/attention/kernel/moved.ts).
  */
 export interface Promised {
   fields: string[];
@@ -89,7 +89,7 @@ export interface Promised {
   published?: string;
 }
 
-/** It lives with what it is about (src/subject.ts): made with a link of this type to its subject, on its island and as visible as it. */
+/** It lives with what it is about (packs/placement/kernel/subject.ts): made with a link of this type to its subject, on its island and as visible as it. */
 export interface Subject {
   link: string;
 }
@@ -103,7 +103,7 @@ export interface Capabilities {
   settles?: Settles;
   watch?: Watch;
   promised?: Promised;
-  /** Someone answers for it: it has an owner, kept in its row (src/head.ts, ownHead). */
+  /** Someone answers for it: it has an owner, kept in its row (packs/loader/kernel/head.ts, ownHead). */
   owned?: true;
   /** Something to do or answer: what attention counts as ready, holding up or unowned. */
   actionable?: true;

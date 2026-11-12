@@ -1,7 +1,7 @@
 // A slot a root opens and the roots above it fill (docs/kernel-packs.md, "Slots"): each root declares what it fills
 // as a named export of a module of its kernel/, read in the order packs/roots.json starts the roots. A root asks no
 // root above it by name: it reads what each declares, as the stub reads their start and the identity root their open
-// (src/lifecycle.ts). What is read is read once, when first asked, never while a module is still being loaded.
+// (packs/identity/kernel/lifecycle.ts). What is read is read once, when first asked, never while a module is still being loaded.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';

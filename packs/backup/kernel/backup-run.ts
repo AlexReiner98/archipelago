@@ -12,7 +12,7 @@ import { basename, join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import type { KernelContext } from '#pelago/kernel';
 
-/** How long a vault's backup is kept: the seal's VAULT_BACKUP_DAYS (src/vault.ts), the owner's 30 days (e_98cdhgn6). */
+/** How long a vault's backup is kept: the seal's VAULT_BACKUP_DAYS (packs/seal/kernel/vault.ts), the owner's 30 days (e_98cdhgn6). */
 export const VAULT_DAYS = 30;
 
 /** A backup as root.dump answers it: its rows, and when and of what it was taken. */

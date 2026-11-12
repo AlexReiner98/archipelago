@@ -1,8 +1,8 @@
 // Packs in time (Rule 8 of the target model, docs/log.md section 8): a pack's presence in a workspace is a fact on its
 // log, kept forever: ["+", "pack:<id>", "pack", { version, manifest, text?, code?, files?, texts? }] when it is added (the manifest is the SHA-256
 // of its pack.json as read, and its text the first time the log meets that hash; one said before texts were kept is
-// said again with it; its code, src/pack-code.ts, the same way by file), and only the owner adds one; ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
-// and everything a pack registers is derived from the set (src/packs.ts), so taking one out unwinds it at once: its
+// said again with it; its code, packs/loader/kernel/pack-code.ts, the same way by file), and only the owner adds one; ["-", "pack:<id>", "pack"] when it is taken out. Which packs are off is read from those facts,
+// and everything a pack registers is derived from the set (packs/loader/kernel/packs.ts), so taking one out unwinds it at once: its
 // types turn dormant in the type table, its tools leave the tool list, its process stops, and connected agents are
 // told the list changed. What it made stays, as dormant items a person can still edit. Adding it back brings it all
 // back. It is the owner's: a pack carries rules and code.
@@ -63,7 +63,7 @@ export async function packsOff(l: Archipelago): Promise<string[]> {
   return [...(Array.isArray(rows[0]?.value) ? (rows[0].value as string[]) : []), ...l.registry.made.keys()];
 }
 
-/** Whether this workspace holds its packs to the island rules (src/islands.ts): off unless the owner set it. */
+/** Whether this workspace holds its packs to the island rules (packs/loader/kernel/islands.ts): off unless the owner set it. */
 export async function islandsOn(l: Archipelago): Promise<boolean> {
   const { rows } = await l.db.query<{ value: unknown }>(`select value from setting where key = $1`, [ISLANDS]);
   return rows[0]?.value === true;
@@ -72,7 +72,7 @@ export async function islandsOn(l: Archipelago): Promise<boolean> {
 /**
  * Hold this workspace's packs to the island rules, or let them go (`actor` 'system' for a new workspace, as the server
  * makes it). On a map with work it is turned on only if no pack in use would be switched off, and what is on no island
- * is moved onto islands (src/island-start.ts); if that move is refused, the setting is put back. Set on again while
+ * is moved onto islands (packs/placement/kernel/island-start.ts); if that move is refused, the setting is put back. Set on again while
  * it is on, what is on no island since is moved the same way.
  */
 export async function setIslands(l: Archipelago, actor: Actor | 'system', on: boolean) {
@@ -111,14 +111,14 @@ const appendPacks = (l: Archipelago, by: string, action: string, reason: string,
 
 /**
  * The packs a new workspace starts with beside the kernel's: none, unless the server says (PELAGO_START_PACKS, a list or
- * "all"). A name in the list may be a bundle's (src/bundles.ts): it stands for its packs.
+ * "all"). A name in the list may be a bundle's (packs/loader/kernel/bundles.ts): it stands for its packs.
  */
 const startPacks = (bundles: Bundle[]): string[] | 'all' => {
   const said = env('START_PACKS')?.trim();
   return said === 'all' ? 'all' : expandBundles(said?.split(',').map((p) => p.trim()).filter(Boolean) ?? [], bundles);
 };
 
-/** Whether the server's list offers a pack to this workspace (src/pack-allow.ts). */
+/** Whether the server's list offers a pack to this workspace (packs/loader/kernel/pack-allow.ts). */
 const offeredHere = (l: Archipelago) => (id: string) => !l.registry.only || l.registry.only.includes(id) || id === LOCAL_PACK || l.registry.made.has(id);
 
 /** The bundles this workspace is offered: each found beside the packs whose every pack the server's list offers here. */
@@ -134,7 +134,7 @@ async function keptManifests(l: Archipelago): Promise<Set<string>> {
   return new Set(rows.map((r) => r.manifest));
 }
 
-/** What is kept on this log already: the manifests whose text it keeps, and the files of packs' code (src/pack-code.ts), by hash. */
+/** What is kept on this log already: the manifests whose text it keeps, and the files of packs' code (packs/loader/kernel/pack-code.ts), by hash. */
 type Kept = { manifests: Set<string>; files: Set<string> };
 const keptHere = async (l: Archipelago): Promise<Kept> => ({ manifests: await keptManifests(l), files: await keptHashes(l.db) });
 
@@ -143,7 +143,7 @@ const codeNow = (l: Archipelago, id: string) => (l.registry.made.has(id) ? undef
 
 /**
  * A pack's presence as a fact: its version and manifest hash, and the manifest's text the first time this log meets
- * that hash; its code's hash and its files' (src/pack-code.ts), with the text of each file this log has not met yet.
+ * that hash; its code's hash and its files' (packs/loader/kernel/pack-code.ts), with the text of each file this log has not met yet.
  */
 function present(l: Archipelago, pack: { id: string; version: string }, k: Kept): Fact {
   const kept = k.manifests;
@@ -202,7 +202,7 @@ async function takenOver(l: Archipelago, said: Map<string, Said>): Promise<Set<s
  * Bring the log in line with the packs this server has, when a workspace opens. The kernel's packs are asserted, and a
  * pack the log has added is asserted again when its version or manifest changed. A pack the log never added is not
  * added: that is the owner's, unless it is one the owner added under its old name (renamedPacks), which takes its
- * place once, or one that took over words a pack the owner added held (takenOver), or what a pack on it declared once (movedPacks, src/pack-moved.ts). A new workspace starts with the kernel's packs, those that keep the kernel's ids (keepsKernel), and those the server starts with; one
+ * place once, or one that took over words a pack the owner added held (takenOver), or what a pack on it declared once (movedPacks, packs/loader/kernel/pack-moved.ts). A new workspace starts with the kernel's packs, those that keep the kernel's ids (keepsKernel), and those the server starts with; one
  * made before packs were facts is said to have what it had (and one the old setting turned off is retracted once). A
  * pack the server does not enable is not said either way. One system change set.
  */
@@ -250,7 +250,7 @@ export async function syncPacks(l: Archipelago): Promise<Fact[]> {
 
 /**
  * Every pack this workspace may have, with its state here and why, what it needs, and what it touches. A pack the
- * server's list does not offer it (src/pack-allow.ts) is left out: it cannot be added here, so it is not shown.
+ * server's list does not offer it (packs/loader/kernel/pack-allow.ts) is left out: it cannot be added here, so it is not shown.
  */
 export function packStates(l: Archipelago) {
   const made = (id: string) => l.registry.made.get(id)?.item;
@@ -273,14 +273,14 @@ export function packStates(l: Archipelago) {
 }
 
 /**
- * Turn a pack off or on in this workspace, or a bundle (src/bundles.ts): a bundle's id, or any of its packs' ids,
+ * Turn a pack off or on in this workspace, or a bundle (packs/loader/kernel/bundles.ts): a bundle's id, or any of its packs' ids,
  * turns all its packs together, in one change set.
  */
 export async function setPack(l: Archipelago, actor: Actor, input: { pack: string; on: boolean }) {
   needHuman(actor, 'Turning a pack on or off is the owner’s.');
   const { packs: named, bundle } = packsNamed(bundlesHere(l), input.pack);
   if (!bundle && !l.registry.states.has(input.pack)) throw new Error(`No pack "${input.pack}" on this server. Packs: ${[...l.registry.states.keys()].join(', ')}`);
-  // A pack the server's list leaves out here (src/pack-allow.ts) is not the owner's to add: the server's configuration lets it in.
+  // A pack the server's list leaves out here (packs/loader/kernel/pack-allow.ts) is not the owner's to add: the server's configuration lets it in.
   if (input.on && !named.every(offeredHere(l))) throw new Error(`The ${input.pack} pack is not offered to this workspace on this server.`);
   const kernel = named.find((id) => KERNEL_PACKS.includes(id));
   if (!input.on && kernel) throw new Error(`The ${kernel} pack is the kernel's own: it is never taken out.`);

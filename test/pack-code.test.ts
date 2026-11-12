@@ -1,4 +1,4 @@
-// A pack's code on the log (src/pack-code.ts, task e_7vezatrt): a pack fact names its code by the hashes of its files,
+// A pack's code on the log (packs/loader/kernel/pack-code.ts, task e_7vezatrt): a pack fact names its code by the hashes of its files,
 // the log keeps each file's text once, a read as of before a handler changed runs the old handler, and a version of a
 // map pack with code of its own runs it on the islands that run the version alone, after the owner allowed it.
 

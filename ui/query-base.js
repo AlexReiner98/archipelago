@@ -39,7 +39,7 @@ export function dress(host, style) {
 const named = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 /**
  * Styles laid one over another, the nearest last. A field that names things (sizes, numbers, colours) is merged name
- * by name, as the server lays the styles kept on the map (src/styles.ts): a view that sets one size keeps the house's rest.
+ * by name, as the server lays the styles kept on the map (packs/styles/kernel/styles.ts): a view that sets one size keeps the house's rest.
  */
 export const layered = (...styles) => {
   const out = {};

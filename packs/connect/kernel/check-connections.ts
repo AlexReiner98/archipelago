@@ -28,7 +28,7 @@ export async function checkConnections(ctx: KernelContext, by: string) {
   for (const conn of await connections(ctx)) {
     const url = conn.props?.url as string | undefined;
     if (!url) continue;
-    // Any HTTP answer, even an error status, means something is listening; asked through the walls (src/outbound.ts).
+    // Any HTTP answer, even an error status, means something is listening; asked through the walls (packs/walls/kernel/outbound.ts).
     const reachable = await Promise.resolve().then(() => ctx.fetch(url, { signal: AbortSignal.timeout(2000) })).then(() => true, () => false);
     const status = reachable ? 'available' : 'unavailable';
     await ctx.call('root.observe', { id: conn.id, status, by });

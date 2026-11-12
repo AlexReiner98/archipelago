@@ -89,7 +89,7 @@ export async function syncTypes(given: Archipelago): Promise<{ activated: string
   const { rows } = await l.db.query<Row>(`select id, what, pack, state, def from type_def`);
   const kept = new Map(rows.map((r) => [r.id, r]));
   const live: Row[] = [
-    // Stored with `kind`, its starter: what the database fills an item's kind column from (src/head.ts, ITEM_KIND).
+    // Stored with `kind`, its starter: what the database fills an item's kind column from (packs/loader/kernel/head.ts, ITEM_KIND).
     ...[...reg.types.values()].filter((t) => !t.dormant).map((def) => ({ id: def.id, what: 'type' as const, pack: def.pack, state: 'active' as const, def: { ...def, kind: def.starter } })),
     ...[...reg.relations.values()].filter((r) => !r.dormant).map((def) => ({ id: def.id, what: 'relation' as const, pack: def.pack, state: 'active' as const, def })),
   ];

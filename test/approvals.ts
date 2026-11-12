@@ -69,7 +69,7 @@ const style = (ref = 's'): Op => ({ op: 'create', ref, type: 'style', title: `St
 const layout = (ref = 's'): Op => ({ op: 'create', ref, type: 'layout', title: `Layout ${ref}` });
 const doc: Op = { op: 'create', ref: 'doc', type: 'page', title: 'Guide' };
 const automation: Op = { op: 'create', ref: 'a', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } };
-/** An automation lives with what it is about (src/subject.ts): given with a task, linked by ref. */
+/** An automation lives with what it is about (packs/placement/kernel/subject.ts): given with a task, linked by ref. */
 const about: Op = { op: 'link', type: 'about', from: 'a', to: 't' };
 
 const CASES: Record<string, Case> = {

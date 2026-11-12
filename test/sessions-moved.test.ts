@@ -1,4 +1,4 @@
-// The sessions pack, moved out of core with its ids (decision e_3v6x2u2m; src/pack-moved.ts): a map that had core
+// The sessions pack, moved out of core with its ids (decision e_3v6x2u2m; packs/loader/kernel/pack-moved.ts): a map that had core
 // while core declared a session's screens, view and instructions is given the pack, once, and a session there is
 // still told to report in; a view or preset keeps its core id (ownsId), so what names it still finds it.
 import assert from 'node:assert/strict';

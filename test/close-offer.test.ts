@@ -1,4 +1,4 @@
-// Closing work offers to close what it addresses, still open (src/close-offer.ts): the change's answer names each
+// Closing work offers to close what it addresses, still open (packs/sessions/kernel/close-offer.ts): the change's answer names each
 // with the op that closes it, and the line a commit closes its task by names them too. Nothing is closed unasked.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

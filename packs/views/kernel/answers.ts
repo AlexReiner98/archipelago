@@ -1,6 +1,6 @@
 // The answers this pack provides (pack.json, kernel.provides): what a lens preset that names graph, tree or brief is
 // answered with. Each is handed the view's params, with its lens and its choices as the preset declares them
-// (src/query-presets.ts, answerPreset), and a context of the map that asks.
+// (packs/query/kernel/query-presets.ts, answerPreset), and a context of the map that asks.
 
 import type { KernelContext } from '#pelago/kernel';
 import { brief as briefOf, briefRead } from './brief.ts';

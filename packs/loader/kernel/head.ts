@@ -5,7 +5,7 @@
 //
 // Four of those fields are kept in columns of their own, not in props: status (with is_open, which the store keeps
 // beside it), owner, confidence and source. The store indexes them, row-level security and the foreign keys read
-// them, and the app before this one reads them during a switch (src/migrate.ts). They are fields all the same: a starter
+// them, and the app before this one reads them during a switch (packs/database/kernel/migrate.ts). They are fields all the same: a starter
 // type declares them (core's in the core pack ("column": true), or is given them, ownHead), a flavour inherits them, and a write that sets one its type does
 // not declare is refused like any other undeclared field.
 
@@ -16,7 +16,7 @@ export const SYSTEM = 'system';
 /** The field that marked a document made to give a view or an item as a link, before public views: still left out of views. */
 export const WRAPS = 'wraps';
 
-/** The kernel's own types: those carrying the kernel flag (src/capabilities.ts), kept types included. Views of the work leave their items out. */
+/** The kernel's own types: those carrying the kernel flag (packs/loader/kernel/capabilities.ts), kept types included. Views of the work leave their items out. */
 export const kernelTypes = (reg: { types: Map<string, ResolvedType> }) => [...reg.types.values()].filter((t) => t.system).map((t) => t.id);
 
 /** SQL that holds of an item whose type (in `column`) is not the kernel's own. Type ids are a pack's or `local.` names. */
@@ -90,9 +90,9 @@ export function undeclaredColumns(type: ResolvedType | undefined, op: Partial<Re
 }
 
 /**
- * Step 15 (src/migrate.ts): the kind as a column of the item's row: its type's starter. The app writes it with the item;
+ * Step 15 (packs/database/kernel/migrate.ts): the kind as a column of the item's row: its type's starter. The app writes it with the item;
  * the database fills it from the type table for a row written without one (the app before this one, a backup restored) or whose
- * type changes; rows made before the column are filled when the workspace opens (fillKinds, in src/pelago.ts).
+ * type changes; rows made before the column are filled when the workspace opens (fillKinds, in packs/write/kernel/pelago.ts).
  */
 export const ITEM_KIND = `
 alter table entity add column if not exists kind text;

@@ -2,7 +2,7 @@
 // its own locally defined types and its own automation runner, so one
 // customer's map cannot leak into another's by a missed filter: there is no
 // shared table to filter. Which workspaces there are is kept in the default
-// workspace's database (src/control.ts), so every server on it agrees.
+// workspace's database (packs/identity/kernel/control.ts), so every server on it agrees.
 
 import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -32,16 +32,16 @@ export interface WorkspacesConfig {
   dataDir: string | null;
   /**
    * A Postgres server holding every workspace's database instead of folders: the default workspace's is the
-   * database this names, another's that name and _<id> (src/pg.ts). Carries a password: from the environment only.
+   * database this names, another's that name and _<id> (packs/database/kernel/pg.ts). Carries a password: from the environment only.
    */
   databaseUrl?: string;
   /** Where other workspaces' folders are kept, and the files the server kept before its database held them. */
   rootDir: string;
   packsDir: string;
-  /** The folders packs are read from, packsDir first (src/config.ts); packsDir alone when left out. */
+  /** The folders packs are read from, packsDir first (packs/database/kernel/config.ts); packsDir alone when left out. */
   packDirs?: string[];
   packs?: string[];
-  /** Packs one workspace may have beyond packs, by its id (src/pack-allow.ts). */
+  /** Packs one workspace may have beyond packs, by its id (packs/loader/kernel/pack-allow.ts). */
   workspacePacks?: Record<string, string[]>;
   policy?: Partial<Policy>;
   /** Start each workspace's automation runner and schedules when it opens: while this process leads (lead). */
@@ -75,7 +75,7 @@ export class Workspaces {
   private known = new Map<string, string>();
   private leading: boolean;
   private deleting: ReturnType<typeof setTimeout> | undefined;
-  /** The ended workspaces whose day to be deleted has come, as their server packs say (src/server-gates.ts): none unless the server says where to ask. */
+  /** The ended workspaces whose day to be deleted has come, as their server packs say (packs/surface/kernel/server-gates.ts): none unless the server says where to ask. */
   dueForDeletion: (now: Date) => Promise<string[]> = async () => [];
 
   constructor(config: WorkspacesConfig) {
@@ -217,7 +217,7 @@ export class Workspaces {
   }
 
   /**
-   * Open a workspace (src/lifecycle.ts): its database, then each root pack's open (src/boot.ts), then the phases
+   * Open a workspace (packs/identity/kernel/lifecycle.ts): its database, then each root pack's open (src/boot.ts), then the phases
    * restore, packs, types, begin, islands and ready as the packs fill them, then, while this server leads, its duties.
    */
   private async load(id: string, backup?: Dump): Promise<Workspace> {
@@ -252,7 +252,7 @@ export class Workspaces {
   /** What runs in each open workspace while this server leads, by what stops it. */
   private readonly duties = new WeakMap<Workspace, () => void>();
 
-  /** Start or stop what runs while this server leads in one workspace: the duties its packs declare (src/lifecycle.ts), the clock among them. */
+  /** Start or stop what runs while this server leads in one workspace: the duties its packs declare (packs/identity/kernel/lifecycle.ts), the clock among them. */
   private clocks(ws: Workspace, on: boolean): void {
     this.duties.get(ws)?.();
     this.duties.delete(ws);
@@ -267,7 +267,7 @@ export class Workspaces {
   }
 
   /**
-   * Become the server that runs the clocks (src/leader.ts), or stop being it. On a Postgres server every workspace is
+   * Become the server that runs the clocks (packs/database/kernel/leader.ts), or stop being it. On a Postgres server every workspace is
    * opened as this one takes the lead, since a request may never come here to open one whose automations are due.
    */
   async lead(on: boolean): Promise<void> {

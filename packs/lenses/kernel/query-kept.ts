@@ -6,7 +6,7 @@ import type { KernelContext } from '#pelago/kernel';
 
 export interface Kept {
   id: string;
-  /** Its type: a layout's fields draw as its code and settings (src/styles.ts). Left out, a style or a view. */
+  /** Its type: a layout's fields draw as its code and settings (packs/styles/kernel/styles.ts). Left out, a style or a view. */
   type?: string;
   title: string;
   props: Record<string, unknown>;
@@ -50,7 +50,7 @@ export async function keptOf(ctx: KernelContext, type: Looks | Looks[], named: u
 /** How many open things an item holds before it is a hub, unless its project says otherwise (hub_at). */
 export const HUB_AT = 12;
 
-/** Whether an item of this type is the kernel's own (src/head.ts, isKernel). */
+/** Whether an item of this type is the kernel's own (packs/loader/kernel/head.ts, isKernel). */
 const isKernel = (ctx: KernelContext, type: string) => (ctx.registry.types.get(type) as { system?: boolean } | undefined)?.system === true;
 
 /**

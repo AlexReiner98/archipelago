@@ -16,7 +16,7 @@ create index if not exists log_fact_kept on log_fact (field, id, pos desc) where
 `;
 
 // Row-level security that asks of each row whether the reader may see its ends, by the key, as rows are read: the
-// policies before this (src/schema.ts, migration 1) read every visible item into a set first, on every query of
+// policies before this (packs/database/kernel/schema.ts, migration 1) read every visible item into a set first, on every query of
 // links or events, which at a million items is half a second before the query starts.
 export const ROW_POLICIES = `
 drop policy if exists member_relation on relation;

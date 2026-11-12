@@ -5,7 +5,7 @@
 //   node packs/claude_code/sync.mjs
 //
 // The pack's test fails while files/setup.mjs is not what this makes. The kernel fills {origin}, {tokens}, {version}
-// and {rules} when it serves the file (src/server-files.ts); the hook is given the address and the version here, in
+// and {rules} when it serves the file (packs/surface/kernel/server-files.ts); the hook is given the address and the version here, in
 // the project's folder, as the kernel's own setup did on the server before.
 
 import { readFileSync, writeFileSync } from 'node:fs';

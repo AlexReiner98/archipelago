@@ -1,9 +1,9 @@
 // The addresses a server pack takes from the kernel's closed list (task e_p2e8d9er, decision e_wptrr6tf): public
 // (GET /p/<workspace>/<id>[/<what>[/<extra>]]), site (any GET on a domain PELAGO_SITES names) and setup
-// (/connect/setup.mjs). Each is taken by at most one pack (src/server-packs.ts refuses a second); the kernel parses
+// (/connect/setup.mjs). Each is taken by at most one pack (packs/loader/kernel/server-packs.ts refuses a second); the kernel parses
 // the address and hands the parts to the pack's entry or file. With no pack mounted, the kernel answers as before.
 //
-// What a mounted entry answers is one of a closed list, each sent with headers the kernel sets alone (src/reply.ts):
+// What a mounted entry answers is one of a closed list, each sent with headers the kernel sets alone (packs/identity/kernel/reply.ts):
 // a page ({ html }: the UI's files it names versioned as the kernel's own pages name them, and framed by this server's
 // own page on /p/ alone), JSON ({ json }), a picture ({ picture: { content_type, base64 } }, under a policy that runs nothing), text of a type from a short list
 // ({ text, type }), a redirect on this server ({ redirect }), the kernel's own stream of a published document

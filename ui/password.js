@@ -1,4 +1,4 @@
-// A person's password, kept for their address beside the emailed link (src/passwords.ts): set, changed or taken away.
+// A person's password, kept for their address beside the emailed link (packs/identity/kernel/passwords.ts): set, changed or taken away.
 // Reached from the menu under the workspace's name; a forgotten one is replaced after signing in by email.
 
 import { authHeaders, gate, gateRow, h, postJson, route, ungate } from './base.js';

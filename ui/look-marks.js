@@ -1,4 +1,4 @@
-// A drawing as marks, for a view drawn inline in a chat (src/mcp-view.ts, ui/mcp-view.html). The scene is the one the
+// A drawing as marks, for a view drawn inline in a chat (packs/mcp_apps/kernel/mcp-view.ts, ui/mcp-view.html). The scene is the one the
 // sandbox answered with, and it is made here as every scene is, checked by ui/marks.js, into markup and its stylesheet
 // with the values it reads; so what leaves the page holds no code of the drawing's and nothing a mark may not say, and
 // a host's frame needs no worker and no drawing to show it. It is the still frame a published page shows: all of it,

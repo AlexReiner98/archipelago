@@ -1,5 +1,5 @@
 // Who is asking, and who may do what, said once: an actor as the log names it, a workspace's admin, or a person and
-// not an agent. A tool marked humanOnly is refused to an agent before it runs (src/tools.ts); a function reached some
+// not an agent. A tool marked humanOnly is refused to an agent before it runs (packs/surface/kernel/tools.ts); a function reached some
 // other way checks for itself, with these. The identity root's (who is asking), so every root above it names an actor
 // the same way.
 
@@ -21,7 +21,7 @@ export interface StartedBy {
   kind: 'person' | 'automation' | 'webhook' | 'pack';
   id?: string;
   name: string;
-  /** A pack's action that started it (src/pack-action-launch.ts): the pack, and what else the pack says of the run. */
+  /** A pack's action that started it (packs/loader/kernel/pack-action-launch.ts): the pack, and what else the pack says of the run. */
   pack?: string;
   [field: string]: unknown;
 }

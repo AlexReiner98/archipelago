@@ -3,7 +3,7 @@
 // with a preset's id (preset) is the owner's version of it, laid over the pack's manifest before the registry reads
 // it: its title and note over the preset's, its fields added, and retired, no new item or link made of it. One with a
 // name and no preset is the workspace's own, in the local pack. The registry checks the result as it checks any pack;
-// what reads the items from the map is src/type-items.ts.
+// what reads the items from the map is packs/loader/kernel/type-items.ts.
 
 import type { FieldDef, PackFile, RelationDef, TypeDef } from './packs.ts';
 

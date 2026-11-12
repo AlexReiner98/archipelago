@@ -1,4 +1,4 @@
-// How a pack's read (src/packreads.ts) gives an item back, and how it pages: shared by every read that answers rows.
+// How a pack's read (packs/surface/kernel/packreads.ts) gives an item back, and how it pages: shared by every read that answers rows.
 // An item comes with what it is (is: its type and those it extends); a read that asks for some fields is given those
 // of its props and no note. A read past one page is given a cursor (next) to ask for the rest with, opaque to the asker.
 

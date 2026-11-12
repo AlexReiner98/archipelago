@@ -20,7 +20,7 @@ export function tokenRow(t, { me, personName, then, fail }) {
   return line(
     h('span', { class: 'grow', title: tip.filter(Boolean).join('\n') }, h('strong', {}, t.name), ' ', h('span', { class: 'muted small' }, t.last_used ? ['used ', ago(t.last_used)] : 'never used')),
     t.admin && h('span', { class: 'muted small' }, 'admin'),
-    // A person token (src/person-tokens.ts): one for every workspace its person is a member of, by these addresses.
+    // A person token (packs/identity/kernel/person-tokens.ts): one for every workspace its person is a member of, by these addresses.
     t.everywhere && h('span', { class: 'muted small', title: `Acts as you in every workspace you are a member of, as ${t.emails.join(', ')}; at home in ${t.home}. Revoking it ends it in all of them.` }, 'all workspaces'),
     mine && h('span', { class: 'muted small', title: 'The token this browser is signed in with' }, 'this browser'),
     scopePills(t),

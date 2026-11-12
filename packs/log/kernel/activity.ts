@@ -2,7 +2,7 @@
 // turned on, an act made outside (docs/log.md, section 4). It is the activity stream of log_op, kept forever, one entry
 // for each thing done: one fact, about the item it was done to (or the workspace), its field the action, its value
 // what else was said. Every entry of log_op is numbered from the sequence the fact stream's facts are, so the activity
-// log (src/eventlog.ts) reads change sets, this stream and what the other streams say worth showing in one order.
+// log (packs/log/kernel/eventlog.ts) reads change sets, this stream and what the other streams say worth showing in one order.
 //
 // Before 9 Nov 2026 these were rows of the event table. Each was carried into the stream, keeping its number and its
 // time (carryRows), and schema step 34 carried the last and dropped the table; a backup from before is carried the
@@ -208,7 +208,7 @@ export async function doneEvents(db: Q, input: EventQuery, limit: number): Promi
   if (input.since) add(`o.at >= ?::timestamptz`, input.since);
   if (input.before) add(`o.seq < ?`, input.before);
   if (input.after !== undefined) add(`o.seq > ?`, input.after);
-  // By number (pelago_op_about, src/activity-steps.ts): the reader's row policy keeps log_op_about from serving `facts->0->>1` itself.
+  // By number (pelago_op_about, packs/log/kernel/activity-steps.ts): the reader's row policy keeps log_op_about from serving `facts->0->>1` itself.
   if (input.target) add(`(o.seq = any(array(select pelago_op_about(array[?::text]))) or (o.stream = 'claims' and (o.facts->0->3->>2 = ? or o.facts->0->>1 in (select r.id from relation r where r.to_id = ?))))`, input.target);
   if (input.actor) add(`o.head->'actor'->>'id' = ?`, input.actor);
   if (input.actorLike) add(`o.head->'actor'->>'id' like ?`, input.actorLike);

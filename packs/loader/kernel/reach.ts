@@ -1,7 +1,7 @@
 // What a pack's code may write (Rule 8 of the target model, packs in space): the types, link types and fields of
 // the pack itself, of the packs that provide a type it requires (type:<id>, or a pack by the old form) and what they
 // require, of those it uses while they are active, and core's. Requiring a capability or an event lets it read and
-// hear, not write another pack's types. Core's rule pack_reach refuses a change a pack's action or handler makes outside it (src/rules.ts).
+// hear, not write another pack's types. Core's rule pack_reach refuses a change a pack's action or handler makes outside it (packs/rules/kernel/rules.ts).
 
 import { needOf, providersOf } from './packorder.ts';
 import type { Registry } from './packs.ts';

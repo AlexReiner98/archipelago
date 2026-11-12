@@ -1,4 +1,4 @@
-// A version of a pack tried on one island (src/island-pin.ts, task e_j4bzhegb): an island that names a version in
+// A version of a pack tried on one island (packs/loader/kernel/island-pin.ts, task e_j4bzhegb): an island that names a version in
 // pack_version runs it, its types, fields and instructions; every other island keeps the pack as the map has it, and
 // unsetting the island's version brings the old back.
 import assert from 'node:assert/strict';

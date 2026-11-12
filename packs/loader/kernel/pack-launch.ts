@@ -1,5 +1,5 @@
 // A session started as a pack's answer. A pack that hears the kernel's clock tell it an item came due (item.due,
-// src/due.ts) may answer with one launch, and the kernel starts it (src/launcher.ts) only when what came due is an
+// packs/clocks/kernel/due.ts) may answer with one launch, and the kernel starts it (packs/surface/kernel/launcher.ts) only when what came due is an
 // enabled automation that says to launch just that: its own task, mode and instructions, checked as on write (the
 // automation_triggers pack's answer.automation_problems). An automation is made, changed or brought back by an agent
 // only with a human's approval (core's rule agent_automations, which nothing lifts), so the launch is on that human's authority, as the automation:
@@ -11,7 +11,7 @@ import type { LaunchInput, LaunchMode, StartedBy } from '../../agents/kernel/lau
 import { bypassingRls } from '../../identity/kernel/outbox.ts';
 import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 
-/** How a session is started: src/launcher.ts hands it in when it loads, since what it reads reaches back to the pack host. */
+/** How a session is started: packs/surface/kernel/launcher.ts hands it in when it loads, since what it reads reaches back to the pack host. */
 type Launch = (l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy) => Promise<{ run: string; mode: LaunchMode }>;
 let launch: Launch | undefined;
 export const setPackLaunch = (fn: Launch) => void (launch = fn);

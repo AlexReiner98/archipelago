@@ -1,4 +1,4 @@
-// A client that signs in through the browser (src/oauth.ts). The first test is the whole path as a client walks it, by
+// A client that signs in through the browser (packs/identity/kernel/oauth.ts). The first test is the whole path as a client walks it, by
 // the MCP SDK's own OAuth client and nothing of ours; the rest are what must be refused.
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';

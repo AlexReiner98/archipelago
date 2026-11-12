@@ -1,5 +1,5 @@
 // What a session touched: the items it read, showed or changed, as a set kept with its run. Each read is presence
-// (src/presence.ts), kept nowhere; only the set is kept, in the transient store (src/transient.ts) under the run, for
+// (packs/presence/kernel/presence.ts), kept nowhere; only the set is kept, in the transient store (packs/database/kernel/transient.ts) under the run, for
 // a week after the session was last heard from, and a week after it ends. Every agent session may share one token, so
 // the server cannot tell from a call whose session made it: the session's own hook says, at each prompt, turn and
 // end, which items its calls to the map named (scripts/pelago-hook.mjs reads them from the session's transcript).

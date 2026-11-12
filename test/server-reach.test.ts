@@ -1,4 +1,4 @@
-// The keys a server pack declares for the second round (src/server-reach.ts): each is checked on load, so a pack that
+// The keys a server pack declares for the second round (packs/loader/kernel/server-reach.ts): each is checked on load, so a pack that
 // takes an address off the list, fills a file or a command with what the kernel does not give, or names a function
 // twice is left out and said why.
 

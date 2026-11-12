@@ -21,7 +21,7 @@ const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
 // Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in;
 // made public (/p/<workspace>/<id>), as anyone. A preview (/preview/<id>) is drawn as the published page would be, from
-// what publishing it would give now (src/published-preview.ts), read with the reader's sign-in.
+// what publishing it would give now (packs/publish/kernel/published-preview.ts), read with the reader's sign-in.
 const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
 const preview = /^\/preview\/e_[a-z0-9]{8}$/.test(here);
 const published = here.startsWith('/p/');
@@ -181,7 +181,7 @@ function startLink(words) {
   return link;
 }
 
-/** The address word of a site's front page (src/site.ts). */
+/** The address word of a site's front page (packs/publish/kernel/site.ts). */
 const FRONT = 'home';
 // A link followed takes what the page's data says it carries (data.carry), set as it is followed so every link drawn has it.
 let carryOn;
@@ -260,7 +260,7 @@ function draw(d) {
     d.site && siteHead(d.site),
     head ? head.draw(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at, 'long')}` : `Updated ${day(d.updated_at, 'long')}`)),
     parts(),
-    // A site's pages each end with what its footer page says (src/site.ts).
+    // A site's pages each end with what its footer page says (packs/publish/kernel/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
     // A public page is read on the web: only an invoice's has a way to print it. One read with no login, not on its
     // site's own domain, ends with a quiet way to start a map of one's own, in the style's words.
@@ -293,10 +293,10 @@ if (!given) warmLayouts();
     })
 )
   .then(draw)
-  // Opened for an agent's look (src/looks.ts), it says when the page is drawn.
+  // Opened for an agent's look (packs/look_draw/kernel/looks.ts), it says when the page is drawn.
   .then(() => sayLook('drawn'), (err) => (main.replaceChildren(h('p', { class: 'error' }, err.message)), sayLook('error', err.message)));
 
-// Opened with ?live, a published page is drawn anew each time its document is published again (src/published-live.ts).
+// Opened with ?live, a published page is drawn anew each time its document is published again (packs/publish/kernel/published-live.ts).
 // It reads again once its stream is open too: a publish between the first read and the stream is not missed.
 if (given && new URLSearchParams(location.search).has('live')) {
   const fresh = () => fetch(`${here}/data`).then((res) => res.json()).then(draw, () => null);

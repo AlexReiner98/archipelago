@@ -1,4 +1,4 @@
-// The drawing host (src/draw-host.ts): a second name that serves the frame a drawing runs in and nothing else, so the
+// The drawing host (packs/walls/kernel/draw-host.ts): a second name that serves the frame a drawing runs in and nothing else, so the
 // frame has an origin of its own, never the page's; its policy, and the page marked with where to frame it.
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
@@ -115,7 +115,7 @@ test('the page frames its drawings at the drawing host, and its own host serves 
 });
 
 test('a drawing by hash at the drawing host goes on to its own route', async () => {
-  // It by hash goes on to its own route (src/drawing-files.ts): it answers what it has not with an empty 404.
+  // It by hash goes on to its own route (packs/publish/kernel/drawing-files.ts): it answers what it has not with an empty 404.
   const none = await get('/drawing/not-a-hash/index.js', 'draw.example.com');
   assert.equal(none.status, 404);
   assert.equal(none.body, '', 'answered by the drawing route, not refused by the host');

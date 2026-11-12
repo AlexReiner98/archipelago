@@ -26,7 +26,7 @@ export function secretBox(label, token, workspace) {
 export function connectBox(made, workspace = state.workspace) {
   // One command, copied and run in the project's folder on the machine the agent will work on. It carries the
   // address and the token in, the setup script keeps them for that machine, and the same script sets the project up.
-  // The same command the server gives a session whose project is behind (setupCommand in src/connect.ts).
+  // The same command the server gives a session whose project is behind (setupCommand in packs/connect/kernel/connect.ts).
   const fetchIt = `node -e "fetch('${location.origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
   const first = {
     windows: `$env:PELAGO_URL='${location.origin}'; $env:PELAGO_AGENT_TOKEN='${made.token}'; $env:PELAGO_SETUP_SAVE='1'; ${fetchIt}`,
@@ -202,7 +202,7 @@ export function visibilityRow(info, redraw, fail) {
 /**
  * Joining the island rules (workspace_set islands), for a map made before them: a row of the Map section, shown only
  * while the map is off them. One way: once on, it stays on, and the row goes (the owner, 10 Nov 2026). What is on no
- * island moves onto islands (src/island-start.ts).
+ * island moves onto islands (packs/placement/kernel/island-start.ts).
  */
 export function islandsRow(info, redraw, fail) {
   if (!may('admin') || info.islands) return null;

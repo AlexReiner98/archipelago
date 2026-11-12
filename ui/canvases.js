@@ -28,7 +28,7 @@ export function savedCanvases(fresh = false) {
   if (fresh || !known)
     known = firstDrawn.then(() => Promise.all([api('search', { type: TYPE, open: true, limit: 200 }).catch(() => []), api('view', { name: 'saved_views', params: { limit: 200 } }).catch(() => null)])).then(([rows, views]) => {
       const said = new Map((views?.pictures ?? []).map((p) => [p.lens, p]));
-      // A working view about what has closed is retired with it (src/saved-views.ts).
+      // A working view about what has closed is retired with it (packs/lenses/kernel/saved-views.ts).
       const ended = new Set(views?.ended ?? []);
       const marked = rows.filter((r) => !ended.has(r.id)).map((r) => ({ ...r, note: said.get(r.id)?.note ?? null, cannot: said.get(r.id)?.cannot ?? null, inDocument: Boolean(said.get(r.id)?.document) }));
       const kept = new Set(rows.map((r) => r.props?.preset).filter(Boolean));

@@ -1,5 +1,5 @@
 // The model an item's page is drawn by. The map's, or, for an item on an island that runs a version of its pack
-// (src/island-pin.ts), that version's: its screens, the views it ships of an item and its types' fields, so a person on
+// (packs/loader/kernel/island-pin.ts), that version's: its screens, the views it ships of an item and its types' fields, so a person on
 // a trial island sees what agents work under there. Asked each time the page draws an item on an island, with the
 // same read an agent has (schema, with island); anywhere else the page keeps the map's.
 

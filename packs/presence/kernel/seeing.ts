@@ -17,7 +17,7 @@ export interface Seen {
   page: string;
   /** When the address was last said, in ms. */
   said: number;
-  /** The chat whose tab is in sight (src/sessions.ts), and whether it is that chat's own tab or one of the owner's following it. */
+  /** The chat whose tab is in sight (packs/sessions/kernel/sessions.ts), and whether it is that chat's own tab or one of the owner's following it. */
   tab?: { chat: string; own: boolean };
   /** The sessions whose next show lands in the tab in sight (ui/tabs.js, landsIn). */
   lands?: string[];

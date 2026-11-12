@@ -4,7 +4,7 @@
 //
 // What is held stays here, whoever names the command: the run, the token the process is given (and revoked when it
 // ends), the MCP config, the spawn, and what is recorded of each line it prints. The command and how its lines are
-// read come from a server pack's launcher (src/server-launch.ts, decision e_885ztqkv): the kernel names no agent's CLI.
+// read come from a server pack's launcher (packs/surface/kernel/server-launch.ts, decision e_885ztqkv): the kernel names no agent's CLI.
 // The surface's since wave 6b (the owner, 12 Nov 2026, e_wuqn82rf): it writes runs as launched:<pack> past the rules,
 // spawns processes and holds tokens, which only a root may. The brief is the agents pack's (answer.launch_brief and
 // answer.launch_prompt, asked by name); the run's writes are the sessions pack's, handed in by the surface's session
@@ -84,7 +84,7 @@ export interface LauncherConfig {
   auth?: boolean;
   /** The model a launcher's {model} is filled with. */
   model?: string;
-  /** The server pack's launcher the launch setting names (src/server-launch.ts). */
+  /** The server pack's launcher the launch setting names (packs/surface/kernel/server-launch.ts). */
   via: Launcher;
 }
 
@@ -209,7 +209,7 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
   return { run, session_id: sessionId, mode, cwd, transcript, claimed: ('claimed' in begun ? begun.claimed : undefined) ?? [] };
 }
 
-// A pack's answer launches through this (src/pack-launch.ts).
+// A pack's answer launches through this (packs/loader/kernel/pack-launch.ts).
 setPackLaunch(launch);
 setActionLaunch(launch);
 

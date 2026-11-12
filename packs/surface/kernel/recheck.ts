@@ -1,5 +1,5 @@
 // What `report rechecked` does: the scheduled re-check of a repository said done, so each project waiting for one
-// starts its interval again: the surface's own act (src/tool-acts.ts), since the pack that keeps the recheck view is
+// starts its interval again: the surface's own act (packs/surface/kernel/tool-acts.ts), since the pack that keeps the recheck view is
 // a hosted one, a plain pack with no code in the server.
 // The view is asked through the surface's slot surface.reads (`view`), which the pack that answers views fills: the
 // surface asks no module above it.

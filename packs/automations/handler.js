@@ -1,6 +1,6 @@
-// Automations. Told by the kernel's clock that an item came due (src/due.ts), it reads the item and, when it is an
+// Automations. Told by the kernel's clock that an item came due (packs/clocks/kernel/due.ts), it reads the item and, when it is an
 // enabled automation, what it is about, and answers what it does: a notification, or a launch the kernel starts
-// (src/pack-launch.ts), with the fact of its firing (firing.js). The kernel only keeps time; this pack acts.
+// (packs/loader/kernel/pack-launch.ts), with the fact of its firing (firing.js). The kernel only keeps time; this pack acts.
 // It also answers the rows automations are drawn as: those about an item, or all of them, where each falls next by
 // the kernel's clock, and its last firing; rows.js makes the rows.
 

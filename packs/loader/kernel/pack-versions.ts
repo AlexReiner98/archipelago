@@ -35,7 +35,7 @@ export const packVersions = (registry: Registry): PackVersion[] => {
   return [...rest, { id: INTERNAL_PACKS, version: String(internal.length), manifest }];
 };
 
-/** The packs work on an item runs under: those of the registry its island runs (src/island-pin.ts), so a run or a firing
+/** The packs work on an item runs under: those of the registry its island runs (packs/loader/kernel/island-pin.ts), so a run or a firing
  *  on an island that tries a version of its pack records that version's manifest. No item, or one on no pinned island, is the map's. */
 export const packVersionsFor = async (map: Archipelago, item?: { props: Record<string, unknown> } | null): Promise<PackVersion[]> =>
   packVersions(await islandRegistry(map, item?.props.island));

@@ -15,7 +15,7 @@ import { FOCUS, addressOf, flatView } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
-/** The levels a type may stand at (four, highest first: src/altitude.ts) other than a project's: the map's own, and those under a project. */
+/** The levels a type may stand at (four, highest first: packs/loader/kernel/altitude.ts) other than a project's: the map's own, and those under a project. */
 const UNDER_OR_OVER = ['workspace', 'stream', 'step'];
 /**
  * Home: what agents' recent work reaches that needs attention now (the frontier, the same answer a session starts

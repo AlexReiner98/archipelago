@@ -49,7 +49,7 @@ type FactRow = { pos: number; id: string; n: number; op: '+' | '-'; field: strin
 type Group = { seq: number; pos: number; id: string };
 
 const READ_MOST = 500;
-/** Entries that seal or compact a day of the compacted streams (src/streams.ts): no item or link moved. */
+/** Entries that seal or compact a day of the compacted streams (packs/log/kernel/streams.ts): no item or link moved. */
 const SEALS = ['segment.seal', 'segment.compact'];
 
 /**
@@ -63,7 +63,7 @@ async function groups(db: Q, input: EventQuery, limit: number): Promise<Group[]>
   const add = (sql: string, value: unknown) => where.push(sql.replaceAll('?', `$${params.push(value)}`));
   if (input.since) add(`e.at >= ?::timestamptz`, input.since);
   if (input.actor) add(`e.head->'actor'->>'id' = ?`, input.actor);
-  // An approval is the approver's: the entry's actor is the proposer, its rule says who applied it (src/proposals.ts).
+  // An approval is the approver's: the entry's actor is the proposer, its rule says who applied it (packs/write/kernel/proposals.ts).
   if (input.actorLike) add(input.approvedToo ? `(e.head->'actor'->>'id' like ? or (e.head #>> '{rule,outcome}' = 'approved' and e.head #>> '{rule,by}' like ?))` : `e.head->'actor'->>'id' like ?`, input.actorLike);
   if (input.before) add(`e.pos <= coalesce((select f.pos from log_fact f where f.stream = 'facts' and f.seq < ? order by f.seq desc limit 1), 0)`, input.before);
   if (input.after !== undefined) add(`e.pos >= coalesce((select f.pos from log_fact f where f.stream = 'facts' and f.seq > ? order by f.seq limit 1), 1e18)`, input.after);
@@ -109,7 +109,7 @@ async function expand(db: Q, found: Group[]): Promise<Omit<LoggedEvent, 'target_
      from log_entry e where e.stream = 'facts' and e.pos = any($1::bigint[])`,
     [[...new Set(found.map((g) => g.pos))]],
   );
-  // What someone said is sealed in the log (src/seal.ts): opened here, before anything reads it.
+  // What someone said is sealed in the log (packs/seal/kernel/seal.ts): opened here, before anything reads it.
   const values = await openSaid(db, facts.flatMap((f, i) => [
     { id: f.id, field: f.field, value: f.value, i, was: false },
     ...(f.was ? [{ id: f.id, field: f.field, value: f.was[1], i, was: true }] : []),
@@ -221,7 +221,7 @@ export async function factEvents(db: Q, input: EventQuery, limit: number): Promi
   return rows.filter((r) => (!r.target_id || known.has(r.target_id)) && (!toOf(r) || known.has(toOf(r)!))).map((r) => ({ ...r, ...session(r), target_title: r.target_id ? known.get(r.target_id)!.title : null, target_type: r.target_id ? known.get(r.target_id)!.type : null }));
 }
 
-/** The activity log: what change sets did and what was done outside them (src/activity.ts), in one order. */
+/** The activity log: what change sets did and what was done outside them (packs/log/kernel/activity.ts), in one order. */
 export async function readEvents(db: Q, input: EventQuery): Promise<LoggedEvent[]> {
   const limit = Math.min(input.limit ?? 50, READ_MOST);
   const [facts, rows] = await Promise.all([factEvents(db, input, limit), doneEvents(db, input, limit)]);

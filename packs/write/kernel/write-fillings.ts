@@ -1,4 +1,4 @@
-// What the write path called inline, as fillings of its hook points (src/write-hooks.ts): the code is left where it
+// What the write path called inline, as fillings of its hook points (packs/write/kernel/write-hooks.ts): the code is left where it
 // is, and each filling is named for the pack it moves to in the next wave (docs/kernel-packs.md, "The order of the
 // wave"), which then takes it with its filling and never opens the write path again.
 //

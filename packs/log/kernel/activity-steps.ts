@@ -1,4 +1,4 @@
-// The schema steps of the activity log (src/migrate.ts), apart from the code that reads it, so the steps import
+// The schema steps of the activity log (packs/database/kernel/migrate.ts), apart from the code that reads it, so the steps import
 // nothing: the log read from the fact stream (19), the activity from before the log gone (27), and every entry of the
 // compacted streams numbered in the same order (33). A released step is never edited.
 
@@ -47,7 +47,7 @@ create index if not exists log_op_action on log_op ((facts->0->>2), seq) where s
 
 /**
  * Step 34. The event table, gone: its rows are in the activity stream (carried as the step began: carryEventTable in
- * src/activity.ts), so it and where the carrying reached go. Its sequence stays, under its name: it numbers the fact
+ * packs/log/kernel/activity.ts), so it and where the carrying reached go. Its sequence stays, under its name: it numbers the fact
  * stream's facts and log_op's entries, and the app before draws from it by that name while the new one takes over.
  * The app before also still read the table, to back it up and to carry from it; for that minute a backup it takes
  * fails and is taken again, and its carrying says it found no table.

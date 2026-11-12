@@ -25,8 +25,8 @@ export interface FieldDef {
   system?: boolean;
   /** Sent with the item in a lens answer, so a style can draw by it (a type to colour, an amount, a date). */
   shown?: boolean;
-  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (src/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (src/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
-  /** Of type json, holding a value of the simple type another field of the item names (src/fields.ts SIMPLE_TYPES): checked on write with the two together. */ typed_by?: string;
+  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (packs/loader/kernel/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (packs/walls/kernel/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
+  /** Of type json, holding a value of the simple type another field of the item names (packs/loader/kernel/fields.ts SIMPLE_TYPES): checked on write with the two together. */ typed_by?: string;
 }
 
 export interface Statuses {
@@ -52,7 +52,7 @@ export interface TypeDef {
   capabilities?: Capabilities;
   /** How long its note may grow by an agent's hand, and what to tell one that goes over: a note every session reads whole is kept short. A flavour inherits it. */
   note_max?: NoteMax;
-  moved_from?: string[]; retired?: boolean; // Types whose items are this one's now, moved once no pack defines them (cost became cost); retired: the owner's version is (src/type-overlay.ts).
+  moved_from?: string[]; retired?: boolean; // Types whose items are this one's now, moved once no pack defines them (cost became cost); retired: the owner's version is (packs/loader/kernel/type-overlay.ts).
   /** By a type it was moved from, what each of that type's statuses is here, when the two lists differ: said once, as the items move (part's works is component's up). */
   moved_statuses?: Record<string, Record<string, string>>;
 }
@@ -70,10 +70,10 @@ export interface RelationDef {
   inverse: string;
   from: string[];
   to: string[];
-  description: string; /** May join items on two islands: the one kind of tie that crosses (a reading of a finding). */ crosses?: boolean; /** Kept by the kernel (a claim, a session's work, a tie between actors), never an island's vocabulary. Only the kernel's packs say it. */ kernel?: boolean; offers_close?: boolean; /* closing its source offers to close its target (src/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
+  description: string; /** May join items on two islands: the one kind of tie that crosses (a reading of a finding). */ crosses?: boolean; /** Kept by the kernel (a claim, a session's work, a tie between actors), never an island's vocabulary. Only the kernel's packs say it. */ kernel?: boolean; offers_close?: boolean; /* closing its source offers to close its target (packs/sessions/kernel/close-offer.ts) */ moved_from?: string[]; retired?: boolean; // Relations whose links are this one's now, moved once no pack defines them; retired, as a type is.
 }
 
-/** A pack file as the registry reads it: the manifest (src/manifest.ts). */
+/** A pack file as the registry reads it: the manifest (packs/loader/kernel/manifest.ts). */
 export type PackFile = Manifest;
 
 export interface ResolvedType {
@@ -87,7 +87,7 @@ export interface ResolvedType {
   starter: string;
   /** The type nearest its starter: what it is, said without the starter (task for an experiment). */
   base: string;
-  /** The kernel's own (the kernel flag, src/capabilities.ts): the app's configuration, which views of the work leave out. */
+  /** The kernel's own (the kernel flag, packs/loader/kernel/capabilities.ts): the app's configuration, which views of the work leave out. */
   system: boolean;
   statuses: Statuses;
   /** The fields kept in props, and those kept in the item's row (status and the rest its starter declares). */
@@ -114,8 +114,8 @@ export class Registry {
   /** The folder each pack was found in. */
   private where = new Map<string, string>();
   readonly only: string[] | undefined;
-  /** The types this workspace defined for itself (define_type), in order: its database keeps them (src/control.ts). */
-  private local: TypeDef[]; /** The types and link types kept on the map (src/type-items.ts). */ items: TypeItem[] = [];
+  /** The types this workspace defined for itself (define_type), in order: its database keeps them (packs/identity/kernel/control.ts). */
+  private local: TypeDef[]; /** The types and link types kept on the map (packs/loader/kernel/type-items.ts). */ items: TypeItem[] = [];
   /** Where a type defined here is kept once the registry has taken it: the workspace's database. None keeps it in memory. */
   keepLocal: (def: TypeDef) => Promise<void> = async () => {};
   packs: PackFile[] = [];
@@ -131,17 +131,17 @@ export class Registry {
   found: PackFile[] = [];
   /** Each pack's manifest as it was read: the SHA-256 of its pack.json, which its fact on the log names. */
   hashes = new Map<string, string>();
-  /** The fields a pack adds to another pack's type, by type and field: the pack that added each (src/reach.ts). */
+  /** The fields a pack adds to another pack's type, by type and field: the pack that added each (packs/loader/kernel/reach.ts). */
   added = new Map<string, Map<string, string>>();
   /** A name a type or link type had before (its moved_from), by the one it is now: what an old name still reads as. */ renamed = new Map<string, string>();
   /** Packs the owner turned off in this workspace. */
-  private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (src/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (src/island-items.ts). */ get onIslands() { return this.islands; }
-  /** The packs kept as items (src/pack-items.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, ItemPack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>(); /** The versions of packs kept as items, by item (src/island-pin.ts), and the one this registry runs in its pack's place. */ versions = new Map<string, PackVersion>(); private swap?: PackVersion;
+  private turnedOff: string[] = []; /** Whether this workspace holds its packs to the island rules (packs/loader/kernel/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (packs/loader/kernel/island-items.ts). */ get onIslands() { return this.islands; }
+  /** The packs kept as items (packs/loader/kernel/pack-items.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, ItemPack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>(); /** The versions of packs kept as items, by item (packs/loader/kernel/island-pin.ts), and the one this registry runs in its pack's place. */ versions = new Map<string, PackVersion>(); private swap?: PackVersion;
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
-  /** The manifests this registry was given in place of folders: the packs as the log said them at a past position (src/registry-at.ts). Their code is read from `where` (src/pack-code.ts), as the log kept it, and a handler they declare is taken as it was said. */ private given?: { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string> };
-  constructor(dirs: string | string[] | { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string> }, only?: string[], local: TypeDef[] = []) {
+  /** The manifests this registry was given in place of folders: the packs as the log said them at a past position (packs/loader/kernel/registry-at.ts). Their code is read from `where` (packs/loader/kernel/pack-code.ts), as the log kept it, and a handler they declare is taken as it was said. */ private given?: { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string>; answers?: string[] }; // answers: what the server's internal packs answer today, always there whatever the log said then
+  constructor(dirs: string | string[] | { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string>; answers?: string[] }, only?: string[], local: TypeDef[] = []) {
     if (typeof dirs === 'object' && !Array.isArray(dirs)) (this.given = dirs), (dirs = []);
     this.dirs = [dirs].flat(); this.dir = this.dirs[0] ?? '';
     this.only = only;
@@ -163,7 +163,7 @@ export class Registry {
     for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
     if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why); const refused = new Map(kernelRefused(found.values(), (id) => !this.made.has(id) && this.swap?.of !== id && (!!this.given || this.where.get(id) === this.dir || this.where.get(id) === OWN_PACKS))); for (const p of found.values()) if (isRequired(p)) off.delete(p.id); for (const [id, why] of refused) off.set(id, why); this.internal = new Set([...found.values()].filter((p) => isInternal(p) && !refused.has(p.id)).map((p) => p.id)); // a required internal pack is always on, an optional one off where the map turned it off (kernel.optional); kernel code from anywhere but the server's own folder never runs
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
-    // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses); a name it uses is read as the pack that provides it.
+    // What a pack names of a pack it uses is registered only while that one is active (packs/loader/kernel/manifest.ts, uses); a name it uses is read as the pack that provides it.
     const declaredBy = new Map([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((t) => [t.id, p.id] as const)));
     const usesPacks = (pack: PackFile) => (pack.uses?.length ? { ...pack, uses: pack.uses.flatMap((u) => { const by = providersOf(u, found.values()); return by.length ? by : [u]; }) } : pack); const ordered = withVersions(loaded.map((pack) => { const read = usesPacks(pack), kept = withoutAbsent(read, (id) => states.get(id)?.state === 'active', (name) => declaredBy.get(name)); return kept === read ? pack : kept; }), this.items);
 
@@ -214,7 +214,7 @@ export class Registry {
         base: !parent || parent.id === parent.starter ? id : parent.base,
         system: kernel,
         statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
-        // A type that extends nothing keeps in its row the columns it declares, or the common ones (src/head.ts, ownHead).
+        // A type that extends nothing keeps in its row the columns it declares, or the common ones (packs/loader/kernel/head.ts, ownHead).
         ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD }) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false,
@@ -276,7 +276,7 @@ export class Registry {
     const verbs = ordered.flatMap((pack) => parts(pack).verbs);
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
-      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), !!this.given || (pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js'))), providedOf(ordered.filter(isInternal), 'answer')); // an internal pack's answers, always on: any view names them
+      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), !!this.given || (pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js'))), [...providedOf(ordered.filter(isInternal), 'answer'), ...(this.given?.answers ?? [])]); // an internal pack's answers, always on: any view names them
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
       for (const def of parts(pack).actions) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.
@@ -295,7 +295,7 @@ export class Registry {
     this.relations = relations; this.renamed = new Map([...[...types.values()].flatMap((t) => (t.movedFrom ?? []).map((o) => [o, t.id] as const)), ...[...relations.values()].flatMap((r) => (r.moved_from ?? []).map((o) => [o, r.id] as const))]);
     this.trees = trees; this.verbs = verbs;
     this.tools = tools;
-    this.keep(this.kept); if (!this.swap) keepVersionTypes(this); // what versions add, dormant and retired here (src/version-types.ts)
+    this.keep(this.kept); if (!this.swap) keepVersionTypes(this); // what versions add, dormant and retired here (packs/loader/kernel/version-types.ts)
   }
 
   /**
@@ -469,7 +469,7 @@ export class Registry {
 
   describe() {
     const kernel = sharedOf(this.packs.filter((p) => KERNEL_PACKS.includes(p.id))), shared = { ...kernel, actors: actorsOf(this.packs, kernel.actors) };
-    return { // each pack with its kind (src/islands.ts): an island pack speaks on an island, a map pack brings the rest to the whole map
+    return { // each pack with its kind (packs/loader/kernel/islands.ts): an island pack speaks on an island, a map pack brings the rest to the whole map
       packs: this.packs.map((p) => ({ id: p.id, version: p.version, title: p.title, description: p.description, kind: packKind(p, shared) })),
       // The head every item has; status, owner, confidence and source are each type's columns, as its starter declares them.
       common_fields: { title: 'Required. A short name.', body: 'Free-form markdown detail.', visibility: 'private (default) or shared.' },

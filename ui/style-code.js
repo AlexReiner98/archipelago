@@ -16,7 +16,7 @@ const mostOps = 50;
  * nothing sent anywhere), or opened where the owner turned that off, hands it the lens answer, the style's fields and the
  * page's colours, and listens for three things: open this item, change the map
  * (sent here as the person, naming the layout whose code asked, `coder`, for the
- * rules to judge: src/layout-changes.ts), and what went wrong. A new frame for
+ * rules to judge: packs/rules/kernel/layout-changes.ts), and what went wrong. A new frame for
  * each picture, so nothing of the last is left running; a new answer for the same
  * code and fields goes to the frame already running, when its code listens for one.
  */

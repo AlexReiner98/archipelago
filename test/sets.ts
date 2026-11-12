@@ -230,7 +230,7 @@ export function reads(test: string, file: string, wide = false): boolean {
 
 /**
  * The test files a change to these files can reach: each test that reads one (reads), and the structure test always.
- * Nearly every test imports the kernel's core (src/pelago.ts), so a change there reaches nearly all of them; this
+ * Nearly every test imports the kernel's core (packs/write/kernel/pelago.ts), so a change there reaches nearly all of them; this
  * mode saves most for a change to a pack's code, a page, a script, the docs or a test. What every test reads (shared),
  * and a file under src/, ui/ or packs/ no test is seen to read (a handler the server loads by its path), could be read
  * by any test, so it runs the fast set with them. CI runs every file before main deploys, so what this misses is

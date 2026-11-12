@@ -1,4 +1,4 @@
-// A server pack launches an agent (src/server-launch.ts, task e_ukp2mqys): the pack names the command and reads its
+// A server pack launches an agent (packs/surface/kernel/server-launch.ts, task e_ukp2mqys): the pack names the command and reads its
 // lines; the kernel holds the run, the token and the spawn. The pack here (test/server-packs/launch/agent) starts a
 // stand-in agent, node printing JSON lines, as the claude_code pack will start Claude Code.
 

@@ -1,4 +1,4 @@
-// A headless Chrome the server draws a view in for an agent's look (src/looks.ts), driven over the DevTools protocol
+// A headless Chrome the server draws a view in for an agent's look (packs/look_draw/kernel/looks.ts), driven over the DevTools protocol
 // with nothing but Node's own WebSocket. Either the Chrome of another container, named by PELAGO_CHROME (its DevTools
 // address, http://renderer:9222), or one this process starts from where Chrome is installed (CHROME, or the usual
 // places), as the tests do. Each look gets a browser context of its own: no storage, no cookies, nothing of the last.

@@ -1,6 +1,6 @@
-// The usage view (src/usage.ts): a member and their agents read how much of each limit their workspace uses and what
+// The usage view (packs/usage/kernel/usage.ts): a member and their agents read how much of each limit their workspace uses and what
 // it is made of, the same answer through the page's call and an agent's; what they cannot see is summed with no
-// title; members and where the plan is managed are an admin's. And the counts it rests on (src/bytes.ts): each
+// title; members and where the plan is managed are an admin's. And the counts it rests on (packs/log/kernel/bytes.ts): each
 // append adds what it stores, and a count made again from the log agrees with them.
 
 import assert from 'node:assert/strict';

@@ -1,10 +1,10 @@
-// The gates: where the kernel asks a server pack before it goes ahead (src/server-packs.ts, reach.server.gates). The
+// The gates: where the kernel asks a server pack before it goes ahead (packs/loader/kernel/server-packs.ts, reach.server.gates). The
 // kernel keeps none of what they answer from; each pack keeps its own, in its store.
 //
 // - signin: what a person agrees to before they are signed in (a service's terms, its privacy policy), each at a
 //   version, and what an address has not yet agreed to. A person who owes a document is shown it before a sign-in
 //   link or code is traded for a token, and agrees by ticking a box, which the pack records.
-// - standing: what a workspace the pack made may do (src/standing.ts), asked of that pack alone.
+// - standing: what a workspace the pack made may do (packs/identity/kernel/standing.ts), asked of that pack alone.
 //
 // A server with no gate asks nothing: nobody owes anything, and nothing is limited.
 
@@ -28,7 +28,7 @@ const DOCUMENTS_MS = 60_000;
 const ID = /^[a-z][a-z0-9_]{0,39}$/;
 const titled = (t: unknown): t is string => typeof t === 'string' && t.length > 0 && t.length <= 80;
 const linked = (u: unknown): u is string => typeof u === 'string' && /^(\/(?!\/)|https:\/\/)[^\s"<>]{0,500}$/.test(u);
-/** The workspace a pack made, as src/server-acts.ts keeps it. */
+/** The workspace a pack made, as packs/surface/kernel/server-acts.ts keeps it. */
 export const madeKey = (workspace: string) => `server_pack_made:${workspace}`;
 
 /** The documents a gate's answer names, those that are well formed; anything else in it is left out. */

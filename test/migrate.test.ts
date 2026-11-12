@@ -7,7 +7,7 @@ import { createToken, verifyToken } from '../packs/identity/kernel/auth.ts';
 import { openDb, type Database } from '../packs/database/kernel/db.ts';
 import { latest, migrations, versionOf } from '../packs/database/kernel/migrate.ts';
 
-// Each root's parts of the steps, read from the roots (src/migrate.ts): the same array migrate runs.
+// Each root's parts of the steps, read from the roots (packs/database/kernel/migrate.ts): the same array migrate runs.
 const MIGRATIONS = await migrations();
 const LATEST = await latest();
 

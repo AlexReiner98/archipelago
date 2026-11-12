@@ -11,10 +11,10 @@
 // What a pack reads of a type it does not own is named too (task e_f9x7ddeh): a field (`field:due@task`), a status
 // (`status:done@task`) or a phase some status stands in (`phase:finished@task`). It is checked by shape, as a record
 // type's width is: the type as its provider declares it (its lineage, and fields other packs add to it) may have more,
-// never less. A version in its provider's place is checked the same way (src/island-pin.ts).
+// never less. A version in its provider's place is checked the same way (packs/loader/kernel/island-pin.ts).
 //
 // A service (`service:answer.attention`, docs/kernel-packs.md) is a function an in-process pack provides under its
-// manifest's `kernel` key (src/services.ts). One pack owns a name, and a caller's declared shape is met by its provider
+// manifest's `kernel` key (packs/loader/kernel/services.ts). One pack owns a name, and a caller's declared shape is met by its provider
 // or the caller waits, saying which field.
 
 import { phasesOf } from '../../../src/phases.ts';
@@ -26,14 +26,14 @@ export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 /**
  * The pack of words every map starts with: the kinds, root relations and the shared set. Never off. Which packs run in
  * the server's process (root and service) is not listed here: each says so in its manifest's `kernel` (isInternal,
- * src/manifest.ts), and is always on too (src/packs.ts).
+ * packs/loader/kernel/manifest.ts), and is always on too (packs/loader/kernel/packs.ts).
  */
 export const KERNEL_PACKS = ['core'];
 
 /**
  * The packs a pack took declarations from, keeping their ids (task e_qhtt4phv): those its manifest names in
  * `moved_from`, and the kernel's, from which every pack may take (the core audit, e_sjhbyf52). Which maps are given the
- * pack that took them is src/pack-moved.ts's.
+ * pack that took them is packs/loader/kernel/pack-moved.ts's.
  */
 export const movedFrom = (pack: { id: string; moved_from?: string[] }): string[] => [...KERNEL_PACKS, ...(pack.moved_from ?? [])].filter((p) => p !== pack.id);
 
@@ -47,7 +47,7 @@ export const ownsId = (pack: { id: string; moved_from?: string[] }, id: string):
   [pack.id, ...movedFrom(pack)].some((p) => id.startsWith(`${p}.`)) ||
   (!id.includes('.') && (pack.moved_from ?? []).some((p) => KERNEL_PACKS.includes(p)));
 
-/** The kernel's own kinds of event (src/due.ts, src/notify.ts): always provided, by core. */
+/** The kernel's own kinds of event (packs/clocks/kernel/due.ts, packs/notifications/kernel/notify.ts): always provided, by core. */
 export const KERNEL_EVENTS = ['item.due', 'notification.made'];
 
 /** A name a pack requires or uses, read: what it asks for, and of what. A bare id is a pack: the old form. */
@@ -83,7 +83,7 @@ function lineageOf(d: Decl, all: PackFile[]): Decl[] {
   for (let up = parent(d); up && !chain.some((c) => c.def.id === up!.def.id); up = parent(up)) chain.push(up);
   return chain;
 }
-/** The head every type has (src/head.ts, ownHead): a need of one is met wherever the type is. */
+/** The head every type has (packs/loader/kernel/head.ts, ownHead): a need of one is met wherever the type is. */
 const HEAD = ['status', 'confidence', 'source', 'owner'];
 
 /** The packs that give a type, as each declares it, what a shaped need names: its declarer, or the pack adding the field. */

@@ -1,4 +1,4 @@
-// The types and link types kept on the map, read for the registry (src/type-overlay.ts lays them over the packs), and
+// The types and link types kept on the map, read for the registry (packs/loader/kernel/type-overlay.ts lays them over the packs), and
 // the registry a change is checked and applied against when it makes or changes one.
 
 import type { Registry, TypeDef } from './packs.ts';
@@ -8,13 +8,13 @@ import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 import { followMade } from './packstate.ts';
 import { syncTypes } from './typetable.ts';
 
-/** What the registry reads from the map: types, link types, and packs made there (src/pack-items.ts). */
+/** What the registry reads from the map: types, link types, and packs made there (packs/loader/kernel/pack-items.ts). */
 const KINDS = [TYPE_ITEM, LINK_ITEM, PACK_ITEM];
 
-/** Told when the types kept on the map changed, so the type table follows (src/typetable.ts); a test may set another. */
+/** Told when the types kept on the map changed, so the type table follows (packs/loader/kernel/typetable.ts); a test may set another. */
 let typesChanged: (l: Archipelago) => Promise<unknown> = (l) => syncTypes(l);
 export const onTypesChanged = (fn: (l: Archipelago) => Promise<unknown>) => (typesChanged = fn);
-/** Told when a pack kept as an item was made or changed, so the log and the packs on follow (src/packstate.ts). */
+/** Told when a pack kept as an item was made or changed, so the log and the packs on follow (packs/loader/kernel/packstate.ts). */
 let packsChanged: (l: Archipelago) => Promise<unknown> = (l) => followMade(l);
 export const onPacksChanged = (fn: (l: Archipelago) => Promise<unknown>) => (packsChanged = fn);
 

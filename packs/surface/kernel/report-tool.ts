@@ -40,5 +40,5 @@ export const REPORT_TOOLS: Record<string, Tool> = {
 };
 
 /** Names a tool had before it was folded into another: Kuma's webhook still posts to health_report until it is moved. The report verb with no action
- * is health too (src/surface.ts), so POST /agent/report goes on answering as it did. */
+ * is health too (packs/surface/kernel/surface.ts), so POST /agent/report goes on answering as it did. */
 export const FORMER_NAMES: Record<string, string> = { health_report: 'health' };

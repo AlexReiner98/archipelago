@@ -7,7 +7,7 @@ import { BlockGraph, type Edge } from './blocks.ts';
 import { findingLine, islandFindings } from './findings.ts';
 import { byId as byIdOf } from './rows.ts';
 
-/** What the brief's lens reads of an item (src/region.ts, Row): its note only where the lens starts. */
+/** What the brief's lens reads of an item (packs/surface/kernel/region.ts, Row): its note only where the lens starts. */
 export interface Row {
   id: string;
   type: string;
@@ -21,19 +21,19 @@ export interface Row {
   body?: string | null;
 }
 
-/** The type of an island, core's (src/island-items.ts). */
+/** The type of an island, core's (packs/loader/kernel/island-items.ts). */
 const ISLAND = 'island';
-/** Where an instruction is said for files: `file:` and a glob (src/instructions.ts). */
+/** Where an instruction is said for files: `file:` and a glob (packs/agents/kernel/instructions.ts). */
 const FILE = 'file:';
 /** A path as globs read it: forward slashes, no leading ./ */
 const slashed = (path: string) => path.replace(/\\/g, '/').replace(/^(\.\/)+/, '');
 /** A glob as a pattern: ** any folders, * any name within one, ? one character, the rest as written. */
 const globRe = (glob: string) =>
   slashed(glob).replace(/[.+^${}()|[\]]/g, '\\$&').replace(/\*\*\/|\*\*|\*|\?/g, (m) => (m === '**/' ? '(?:.*/)?' : m === '**' ? '.*' : m === '*' ? '[^/]*' : '[^/]'));
-/** Whether a glob names a path: the whole of it, or its end from a folder on (src/instructions.ts, globNames). */
+/** Whether a glob names a path: the whole of it, or its end from a folder on (packs/agents/kernel/instructions.ts, globNames). */
 const globNames = (glob: string, path: string) => new RegExp(`(^|/)${globRe(glob)}$`, 'i').test(slashed(path));
 
-/** What a place is known by, as its own fields give it (address, folder): undefined for anything not known by either (src/places.ts, whereOf). */
+/** What a place is known by, as its own fields give it (address, folder): undefined for anything not known by either (packs/runs/kernel/places.ts, whereOf). */
 function whereOf(ctx: KernelContext, e: Row): { address?: string; folder?: string } | undefined {
   const where = ctx.registry.type(e.type)?.capabilities.where;
   if (!where?.address && !where?.folder) return undefined;
@@ -41,7 +41,7 @@ function whereOf(ctx: KernelContext, e: Row): { address?: string; folder?: strin
   return { address: field(where.address), folder: field(where.folder) };
 }
 
-/** An instruction as it is said (src/instructions.ts, Said): the files it names, its title and its way round. */
+/** An instruction as it is said (packs/agents/kernel/instructions.ts, Said): the files it names, its title and its way round. */
 interface Trap { id: string; title: string; text: string; files?: string[] }
 
 interface Brief {
@@ -63,7 +63,7 @@ export interface BriefRead {
 export const BRIEF_UP = 6;
 
 /**
- * What a brief reads around its task (src/region.ts): what holds it, BRIEF_UP steps up; what it and those link to
+ * What a brief reads around its task (packs/surface/kernel/region.ts): what holds it, BRIEF_UP steps up; what it and those link to
  * by the links named (over); what it needs, with what that is tied to; and nothing linked to them.
  */
 export async function briefRead(ctx: KernelContext, task: string, over: string[]): Promise<BriefRead> {

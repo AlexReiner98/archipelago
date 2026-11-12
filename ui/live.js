@@ -11,7 +11,7 @@ import { relations, starterOf, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
 
-// The page reads the log forward (`tail`, src/tail.ts): the facts after where it stands on
+// The page reads the log forward (`tail`, packs/log/kernel/tail.ts): the facts after where it stands on
 // what it holds. The page's one store (ui/replica.js), shared by every view open on it, projects
 // them itself; the sheet learns which of its items they touched. The page is drawn again, in place,
 // only when one of them is on it, unless that would throw away something half done
@@ -39,7 +39,7 @@ main.addEventListener('input', (e) => {
 const pageId = Math.random().toString(36).slice(2, 14);
 // A page the server draws for an agent's look is no page of the owner's: it is not counted. Any other takes a show: a
 // chat with no tab here is opened one. Where it stands goes with it: the address of the pane in focus, and the chat whose
-// tab is in sight, so an agent knows what the owner is looking at and whether it is its own tab (src/seeing.ts). A
+// tab is in sight, so an agent knows what the owner is looking at and whether it is its own tab (packs/presence/kernel/seeing.ts). A
 // popped-out tab is the main page's too.
 const thisPage = () => {
   if (still) return undefined;

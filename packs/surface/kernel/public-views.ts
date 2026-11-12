@@ -1,4 +1,4 @@
-// The public views as anyone reads them (src/public-schema.ts, PUBLIC_VIEW), kept by the database root
+// The public views as anyone reads them (packs/database/kernel/public-schema.ts, PUBLIC_VIEW), kept by the database root
 // (packs/database/kernel/public-view-store.ts, keepPublicView): read through the database's narrow functions alone, so
 // a reader is given the frozen copy and nothing of the map as it is now. Each picture is given the drawing it is drawn
 // by (the loader's layouts), and an item's public address is the one this server answers at (/p/<workspace>/<id>).

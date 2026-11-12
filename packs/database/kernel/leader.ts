@@ -84,7 +84,7 @@ export async function pgLeader(url: string, { everyMs = 10_000, key = 'pelago.le
 
 /**
  * What runs for the whole server while `leader` leads, not per workspace (each workspace's duties are its packs',
- * src/lifecycle.ts): each start answers what stops it, all started on taking the lead and stopped on losing it. One
+ * packs/identity/kernel/lifecycle.ts): each start answers what stops it, all started on taking the lead and stopped on losing it. One
  * that fails to start is said and the rest still start. Answers what stops them all.
  */
 export function whileLeads(leader: Leader, starts: (() => () => void)[]): () => void {

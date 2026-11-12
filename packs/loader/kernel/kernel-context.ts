@@ -5,8 +5,8 @@
 // the secrets and hosts of its reach. Its changes go through `change` and the rules like any other: nothing here
 // decides one.
 //
-// The plain tier is the sandbox's (src/packhost.ts): a pack with no `kernel` never runs here, and one with `kernel`
-// never runs there. Which packs may carry `kernel` at all is the registry's (kernelRefused, src/manifest.ts).
+// The plain tier is the sandbox's (packs/loader/kernel/packhost.ts): a pack with no `kernel` never runs here, and one with `kernel`
+// never runs there. Which packs may carry `kernel` at all is the registry's (kernelRefused, packs/loader/kernel/manifest.ts).
 
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -38,7 +38,7 @@ export type RegistryRead = Readonly<Pick<Registry, 'types' | 'relations' | 'rule
 export interface KernelContext {
   pack: { id: string; version: string; hash: string };
   workspace: string;
-  /** The reads a sandboxed pack has (src/packreads.ts, through the loader's slot loader.reads), answered in-process under row-level security. */
+  /** The reads a sandboxed pack has (packs/surface/kernel/packreads.ts, through the loader's slot loader.reads), answered in-process under row-level security. */
   reads: (read: Read) => Promise<unknown>;
   registry: RegistryRead;
   /** A service name this pack requires or uses (or of a family its manifest's kernel.families opens), answered by the one active pack that provides it. */
@@ -60,7 +60,7 @@ export interface KernelContext {
   record(stream: string, facts: OpFact[]): Promise<void>;
   /** A secret its reach names, only. */
   secret(key: string): Promise<string | undefined>;
-  /** A call out to a host its reach names, only, through the walls (src/outbound.ts). */
+  /** A call out to a host its reach names, only, through the walls (packs/walls/kernel/outbound.ts). */
   fetch(url: string, init?: RequestInit): Promise<Response>;
   now(): Date;
   /** Said on the server's error stream, named with its pack. */
@@ -113,7 +113,7 @@ export class KernelHost {
     return out;
   }
 
-  /** Each service name the active internal packs provide, bound to its provider's context: what the loader hands fillServices (src/services.ts). */
+  /** Each service name the active internal packs provide, bound to its provider's context: what the loader hands fillServices (packs/loader/kernel/services.ts). */
   services(l: Archipelago): Map<string, (input: unknown) => Promise<unknown>> {
     return new Map(this.packs(l).flatMap((pack) => Object.entries(pack.kernel?.provides ?? {}).filter(([name]) => !isRootName(name)).map(([name, p]) => [name, async (input: unknown) => (await this.fn(pack, p.run))(contextFor(l, pack, this), input)] as const)));
   }
@@ -122,7 +122,7 @@ export class KernelHost {
   async call<O>(l: Archipelago, from: Manifest, name: string, input: unknown): Promise<O> {
     const want = `service:${name}`;
     if (![...(from.requires ?? []), ...(from.uses ?? [])].includes(want) && !opens(from, serviceName(name)?.family)) throw new Error(`The ${from.id} pack calls ${want}, which it neither requires nor uses`);
-    // A root service: only a pack packs/roots.json names for it, answered by its root (src/root-calls.ts).
+    // A root service: only a pack packs/roots.json names for it, answered by its root (packs/loader/kernel/root-calls.ts).
     if (isRootName(name)) return callRoot<O>(from.id, name, input, { map: l });
     return this.answer<O>(l, name, input);
   }
@@ -158,12 +158,12 @@ const opens = (pack: Manifest, family: Family | undefined) => family !== undefin
 /** The kernel host of each opened workspace's registry. */
 const hosts = new WeakMap<object, KernelHost>();
 
-/** At a workspace's open: a host for its internal packs, and their service names filled (src/services.ts). Internal packs are never turned off, so what they provide holds until the server restarts. */
+/** At a workspace's open: a host for its internal packs, and their service names filled (packs/loader/kernel/services.ts). Internal packs are never turned off, so what they provide holds until the server restarts. */
 export function openKernel(l: Archipelago): KernelHost {
   const host = new KernelHost((p) => l.registry.folderOf(p));
   hosts.set(l.registry, host);
   fillServices(l.registry, host.services(l));
-  // The open phases' and the lead's slot (src/lifecycle.ts): what the internal packs fill of each phase, and their timers.
+  // The open phases' and the lead's slot (packs/identity/kernel/lifecycle.ts): what the internal packs fill of each phase, and their timers.
   fillOpen(l.registry, { fillings: (point) => host.fillings(l, point), timers: () => host.timers(l) });
   return host;
 }

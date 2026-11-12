@@ -1,4 +1,4 @@
-// The surface root's parts of the schema's numbered steps (src/migrate.ts): what one request leaves for the next, and
+// The surface root's parts of the schema's numbered steps (packs/database/kernel/migrate.ts): what one request leaves for the next, and
 // search.
 
 import type { StepPart } from '../../database/kernel/migrate.ts';

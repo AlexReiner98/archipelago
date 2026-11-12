@@ -1,5 +1,5 @@
 // The schema in numbered steps, each applied once to a database and recorded in schema_version. Opening a database
-// applies the steps it lacks, one opener at a time (a server's opener holds a lock: src/pg.ts); once it has them all,
+// applies the steps it lacks, one opener at a time (a server's opener holds a lock: packs/database/kernel/pg.ts); once it has them all,
 // opening it is a check of its version, not the whole schema run again. `npm run migrate` (src/deploy.ts) applies them to the databases on a
 // Postgres server as the deploy step, before the new app starts, so no app serving requests runs DDL under another.
 //
@@ -9,7 +9,7 @@
 //
 // Each root declares its own parts of the steps in its kernel/steps.ts (STEPS), and what it does to a database each
 // time it is opened, once the steps are in (OPENED); they are read in the order packs/roots.json starts the roots
-// (src/root-fills.ts), when a database is first opened. A step is numbered once for all the roots: its parts, where
+// (packs/database/kernel/root-fills.ts), when a database is first opened. A step is numbered once for all the roots: its parts, where
 // more than one root has one, are joined in the order each names (`part`), so its SQL is what it was when released.
 
 import { createHash } from 'node:crypto';

@@ -1,5 +1,5 @@
-// The identity root's parts of the schema's numbered steps (src/migrate.ts): what the server kept on its disk, kept in
-// the default database (src/control.ts).
+// The identity root's parts of the schema's numbered steps (packs/database/kernel/migrate.ts): what the server kept on its disk, kept in
+// the default database (packs/identity/kernel/control.ts).
 
 import type { StepPart } from '../../database/kernel/migrate.ts';
 import { ADOPT_APP, CONTROL, PACK_STORE } from './control.ts';

@@ -1,4 +1,4 @@
-// What the rules root fills of a workspace's open (src/lifecycle.ts): in the begin phase, what a new workspace begins
+// What the rules root fills of a workspace's open (packs/identity/kernel/lifecycle.ts): in the begin phase, what a new workspace begins
 // with, one entry on its settings stream: which of core's rules apply, and what is shared by default.
 
 import type { Q } from '../../database/kernel/db.ts';

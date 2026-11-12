@@ -1,4 +1,4 @@
-// What a lens on a time axis is filed by (src/timeaxis.ts places it): a lane for whose it is, and a colour for what it
+// What a lens on a time axis is filed by (packs/query/kernel/timeaxis.ts places it): a lane for whose it is, and a colour for what it
 // counts toward. A person's lane holds what they hold (what no one holds is the workspace owner's: it is their
 // calendar), and each session a lane of its own. What a block counts toward is the group its work sits in (a
 // session's stretch, the work it was on then; anything else, itself): the item just under the outermost one, a
@@ -8,13 +8,13 @@
 import type { KernelContext } from '#pelago/kernel';
 import { byId } from './rows.ts';
 
-/** Where one item was at work, or falls, on a time axis (src/timeaxis.ts, Span). */
+/** Where one item was at work, or falls, on a time axis (packs/query/kernel/timeaxis.ts, Span). */
 export interface Span {
   start: string;
   end: string;
   /** What placed it: when, bound, or a repeat's day. */
   by: 'when' | 'bound' | 'repeat';
-  /** For a session: the work it was on then, or the place it ran in (src/sessiontime.ts). */
+  /** For a session: the work it was on then, or the place it ran in (packs/runs/kernel/sessiontime.ts). */
   on?: string | null;
 }
 

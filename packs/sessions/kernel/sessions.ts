@@ -1,6 +1,6 @@
 // Sessions as the map calls them, on the pack's context (./session-life.ts): each step a call shows is shown on the
 // owner's page at once, by the presence pack's name (act.report.took), for the screen the map is read for (the read
-// `whose`). The kernel reaches these through the adapter at src/sessions.ts, which makes the context of the map that
+// `whose`). The kernel reaches these through the adapter at packs/sessions/kernel/sessions.ts, which makes the context of the map that
 // asks; the story view is the query pack's (`story`, answered by the runs pack's answer.story).
 
 import type { KernelContext } from '#pelago/kernel';

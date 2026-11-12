@@ -1,4 +1,4 @@
-// A style's colours worked out from a few (src/colours.ts): run without a database. The themes pack's own checks (each
+// A style's colours worked out from a few (packs/styles/kernel/colours.ts): run without a database. The themes pack's own checks (each
 // theme's contrast and emblem) went with it to the hosted service (9 Nov 2026).
 
 import assert from 'node:assert/strict';

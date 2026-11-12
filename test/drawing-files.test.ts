@@ -1,4 +1,4 @@
-// A drawing's modules as files by its hash (src/drawing-files.ts, GET /drawing/<hash>/<module>.js): the same hash and
+// A drawing's modules as files by its hash (packs/publish/kernel/drawing-files.ts, GET /drawing/<hash>/<module>.js): the same hash and
 // text the page is sent, a pack's and the owner's version of it, only as the reader may see it. No browser: that a
 // worker imports them is checked by hand (task e_ug3fe57t).
 

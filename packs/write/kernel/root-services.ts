@@ -1,5 +1,5 @@
 // The write root's root services (docs/kernel-packs.md, "Root services"): what only the write path may do, asked by
-// the internal packs packs/roots.json names for each (src/root-calls.ts).
+// the internal packs packs/roots.json names for each (packs/loader/kernel/root-calls.ts).
 
 import type { RootCall } from '../../loader/kernel/root-calls.ts';
 

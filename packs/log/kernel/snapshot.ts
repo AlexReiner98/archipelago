@@ -119,7 +119,7 @@ const SELECT = `select id, projection, projection_version, code, positions, enco
 /**
  * What is wrong with a snapshot, for this code and a chain whose fact entry at its position has the hash `anchor`
  * (undefined when there is no such entry): nothing when it can be built on. `anyCode`: whichever projector made it, as
- * for a backup's, which is the map's rows as they stood and not a projection to build on (src/backup-log.ts).
+ * for a backup's, which is the map's rows as they stood and not a projection to build on (packs/log/kernel/backup-log.ts).
  */
 export function check(ws: string, s: Stored, anchor: string | undefined, anyCode = false): string[] {
   const out: string[] = [];

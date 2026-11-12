@@ -1,8 +1,8 @@
-// What the loader root fills of a workspace's open (src/lifecycle.ts, read in the order packs/roots.json starts the
+// What the loader root fills of a workspace's open (packs/identity/kernel/lifecycle.ts, read in the order packs/roots.json starts the
 // roots). In the packs phase, the types a workspace defines for itself (those kept in a folder before taken in once) and
 // the registry, before the write root makes the map on it. In the types phase, which packs are present, as which
 // manifests, and which the owner turned off (what they made is dormant), the types kept on the map, the type table, and
-// the internal packs' code opened (src/kernel-context.ts), so a pack's manifest fills the phases after it. In the islands
+// the internal packs' code opened (packs/loader/kernel/kernel-context.ts), so a pack's manifest fills the phases after it. In the islands
 // phase, a new map is put on islands with one to start on (e_44rbfwxp), the island as placement makes it
 // (answer.first_island). While this server leads, the beat of the slot loader.leading (LEADING). An open workspace follows what other servers changed in it (FOLLOW), and its packs' processes stop as it closes (CLOSE).
 

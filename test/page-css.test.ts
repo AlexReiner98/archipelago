@@ -1,6 +1,6 @@
-// A style's page_css (src/css-check.ts): checked when it is written by the rules the page reads it by (ui/marks.js,
+// A style's page_css (packs/walls/kernel/css-check.ts): checked when it is written by the rules the page reads it by (ui/marks.js,
 // checkedCss, imports the same file), refused there with what is wrong; and a published page keeps the look it was
-// published in until it is published again (src/published.ts, src/styles.ts pageLook).
+// published in until it is published again (packs/publish/kernel/published.ts, packs/styles/kernel/styles.ts pageLook).
 
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';

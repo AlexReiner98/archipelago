@@ -2,7 +2,7 @@
 // itself through packs", e_e9526ead). Each op is judged by the rules of the island its items live on: a create by the
 // island it is made on, an update, archive or forget by its item's, a link or unlink by both ends', a merge by both
 // items'. An op on no island, or on one that runs the map's pack, is judged by the map's rules. What the rules then
-// make of it is decide's alone (src/rules.ts): this only says which version each op runs under.
+// make of it is decide's alone (packs/rules/kernel/rules.ts): this only says which version each op runs under.
 
 import { islandVersion } from './island-pin.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';

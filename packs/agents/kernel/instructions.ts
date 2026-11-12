@@ -1,5 +1,5 @@
 // What agents are told: the instructions the packs ship as presets, under those the map keeps, as styles are for
-// looks (src/styles.ts). Where each is said is its field `for`: session_start, working_rules, tool:<name>, or
+// looks (packs/styles/kernel/styles.ts). Where each is said is its field `for`: session_start, working_rules, tool:<name>, or
 // file:<glob>, said to a session about to read or change a file the glob names (what bites there).
 //
 // Layers, the nearest last, each over one of the same name (its preset, or else its own id):
@@ -11,7 +11,7 @@
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** A preset a pack ships, as the registry gives it (src/declared.ts, StyleDef): an instruction's words and fields. */
+/** A preset a pack ships, as the registry gives it (packs/loader/kernel/declared.ts, StyleDef): an instruction's words and fields. */
 export interface StyleDef {
   id: string;
   type?: string;
@@ -86,12 +86,12 @@ export function said(presets: StyleDef[], kept: KeptInstruction[], where: string
 /** A name in braces filled in from `fill`; one it does not have is left as it is. */
 export const filled = (text: string, fill: Record<string, string>) => text.replace(/\{([a-z_]+)\}/g, (all, name: string) => fill[name] ?? all);
 
-/** What agents are told where (`for`), to a session about `about`, with the names in braces filled in; on an island, the presets of the version of its pack it runs (src/island-pin.ts). */
+/** What agents are told where (`for`), to a session about `about`, with the names in braces filled in; on an island, the presets of the version of its pack it runs (packs/loader/kernel/island-pin.ts). */
 export async function instructionsFor(ctx: KernelContext, where: string, input: { about?: string; island?: string; fill?: Record<string, string> } = {}): Promise<Said[]> {
   // The presets (of the island's version of each pack, on an island) and every instruction kept, open or retired, with what each is about.
   const { presets, kept } = (await ctx.reads({ told_from: { ...(input.island !== undefined && { island: input.island }) } })) as { presets: StyleDef[]; kept: KeptInstruction[] };
   const told = said(presets, kept, where, input.about);
-  // Each one said is counted as a use of it (src/uses.ts).
+  // Each one said is counted as a use of it (packs/usage/kernel/uses.ts).
   if (told.length) await ctx.reads({ told: told.map((one) => one.preset ?? one.id) });
   return told.map((one) => ({ ...one, text: filled(one.text, input.fill ?? {}) }));
 }

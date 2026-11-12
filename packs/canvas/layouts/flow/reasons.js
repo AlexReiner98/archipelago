@@ -1,4 +1,4 @@
-// Why a step needs attention now, where the answer says (the frontier term, src/frontier.ts: `reasons`, the strongest
+// Why a step needs attention now, where the answer says (the frontier term, packs/runs/kernel/frontier.ts: `reasons`, the strongest
 // first, each { why, said }). No word is drawn on the step: where it stands is its dot and its tint alone (the owner,
 // 10 Nov 2026), so a reason only adds to its state (./state.js: the person's to act on, blocked, under way), and every
 // reason's few words are in the step's tip. Layer: marks. Pure: an item in, its state and lines out.

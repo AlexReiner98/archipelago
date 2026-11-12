@@ -1,7 +1,7 @@
 // Where a session's place stood when it was last heard from, as its hook says it at each turn's end and at the end.
 // What the facts are is the pack's whose place it is: the kernel keeps them as said, a small flat object, on the run as
 // its stands field, by operational and in no stream, as its heartbeat is (the newest is all that matters). It reads
-// one key of them itself, branch, to tell two sessions in one folder apart (src/chat-run.ts).
+// one key of them itself, branch, to tell two sessions in one folder apart (packs/sessions/kernel/chat-run.ts).
 
 import type { KernelContext } from '#pelago/kernel';
 import { operational } from './bookkeeping.ts';

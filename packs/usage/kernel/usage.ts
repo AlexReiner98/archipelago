@@ -7,13 +7,13 @@
 // Whoever reads it is told only what they may see: an item they cannot read is summed into one part with no title
 // or type of its own. Members are an admin's (the owner, 29 Oct 2026). Nothing
 // is read row by row: storage is the database's count of each table's size and the counts kept beside the log
-// (src/bytes.ts), sessions the open runs heard from in the hour, requests and looks the server's own counts.
+// (packs/log/kernel/bytes.ts), sessions the open runs heard from in the hour, requests and looks the server's own counts.
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** A limit the server sets a workspace (src/standing.ts). */
+/** A limit the server sets a workspace (packs/identity/kernel/standing.ts). */
 type LimitName = 'members' | 'storage' | 'requests' | 'sessions' | 'looks';
-/** What one limit allows and how near it is, as the server says it (useOf, src/standing.ts). */
+/** What one limit allows and how near it is, as the server says it (useOf, packs/identity/kernel/standing.ts). */
 interface Allowed { name: LimitName; of: string; near: boolean; over: boolean }
 /** What the server counts of a workspace (root.counters, packs/surface/kernel/workspace-tools.ts). */
 interface Counters {
@@ -33,7 +33,7 @@ interface Counters {
   members?: string[];
 }
 
-/** A number of bytes as a person reads it (as src/workspace-use.ts says it). */
+/** A number of bytes as a person reads it (as packs/surface/kernel/workspace-use.ts says it). */
 const bytes = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} kB` : `${n} bytes`);
 
 /** How many of the largest items are named, and how many types. */
@@ -46,7 +46,7 @@ const STORED: Record<string, string> = { log_fact: 'What was said: facts', log_e
 
 /** One measured thing, as the drawing reads it (`use`). */
 interface Use {
-  /** limit: a limit the server sets (src/standing.ts); share: a share of its limit, drawn in its bar; row: a line under it, in its list. */
+  /** limit: a limit the server sets (packs/identity/kernel/standing.ts); share: a share of its limit, drawn in its bar; row: a line under it, in its list. */
   as: 'limit' | 'share' | 'row';
   used: number;
   /** The words for used: "212 MB", "3". */

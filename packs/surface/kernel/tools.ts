@@ -1,7 +1,7 @@
 // One table of named tools serves the human's surfaces, the CLI and the local API: same names, same inputs, same
-// write path. Agents are offered a small surface over it (src/surface.ts): query, change, undo and the six verbs,
-// each routed here onto the tool that runs it. The tools themselves live by what they do: reads (src/tool-reads.ts),
-// the write path (src/tool-change.ts), the kernel's actions (src/tool-acts.ts) and the human's own (src/tool-human.ts);
+// write path. Agents are offered a small surface over it (packs/surface/kernel/surface.ts): query, change, undo and the six verbs,
+// each routed here onto the tool that runs it. The tools themselves live by what they do: reads (packs/surface/kernel/tool-reads.ts),
+// the write path (packs/surface/kernel/tool-change.ts), the kernel's actions (packs/surface/kernel/tool-acts.ts) and the human's own (packs/surface/kernel/tool-human.ts);
 // those an internal pack declares come through the slot surface.tools (./server-fillings.ts).
 
 import { z } from 'zod';
@@ -52,7 +52,7 @@ export interface Tool {
   ends?: boolean;
   /** It reads an item whole, as its reader meets it: the read the page draws such an item by. */
   whole?: boolean;
-  /** For a token limited to some items: the inputs that name the items it acts on, with what it would do to them (src/scope.ts). */
+  /** For a token limited to some items: the inputs that name the items it acts on, with what it would do to them (packs/surface/kernel/scope.ts). */
   within?: Record<string, string>;
   run(l: Archipelago, actor: Actor, input: any): Promise<unknown>;
 }
@@ -61,7 +61,7 @@ export interface Tool {
 /** Tools that are no step of their own: those that point the screen themselves, and the one that only waits. */
 const UNWATCHED = new Set(['show', 'change', 'tell', 'watch', 'hook']);
 const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
-/** What a member who only reads may call (src/members.ts): the reads a canvas makes, the page's feed of the log, query, and the workspace's settings. Their database writes nothing besides (src/db.ts). */
+/** What a member who only reads may call (packs/identity/kernel/members.ts): the reads a canvas makes, the page's feed of the log, query, and the workspace's settings. Their database writes nothing besides (packs/database/kernel/db.ts). */
 const MEMBER_READS = new Set([...LOOK_READS, 'tail', 'query', 'workspace_info']);
 async function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>, tool?: Tool): Promise<void> {
   const params = (input.params ?? {}) as Record<string, unknown>;
@@ -129,7 +129,7 @@ const CHANGE = listedChange(TOOLS.change);
 /** What an agent is offered, in order: query, change, undo, the six verbs, any verb a pack declares, and draw. */
 export const surfaceFor = (reg: Registry): [string, Tool][] => surfaceNames(reg).map((name) => [name, name === 'change' ? CHANGE : (TOOLS[name] ?? surfaceOf(reg)[name])]);
 
-/** The call that replaces a tool's old name, for one release (src/surface.ts); undefined for a name that stays. */
+/** The call that replaces a tool's old name, for one release (packs/surface/kernel/surface.ts); undefined for a name that stays. */
 export const replacementOf = (reg: Registry, name: string) => movedTo(reg, TOOLS, FORMER_NAMES[name] ?? name);
 
 /** Validate input and run a tool: a named one, or query or a verb, run as the named tool beneath it. */
@@ -141,7 +141,7 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   const surface = routed ? undefined : surfaceOf(l.registry)[asked];
   const name = TOOLS[asked] || surface || l.registry.tools.has(asked) ? asked : (packActionByShort(l.registry, asked) ?? asked);
   const pack = packTool(l.registry, name);
-  // An internal pack's action whose code is in-process (src/surface-slots.ts, packAct) runs there, not in the sandbox.
+  // An internal pack's action whose code is in-process (packs/surface/kernel/surface-slots.ts, packAct) runs there, not in the sandbox.
   const inProcess = pack && !TOOLS[name] ? await packAct(l, name) : undefined;
   const tool: Tool | undefined = TOOLS[name] ?? surface ?? pack;
   if (!tool) throw new Error(`No tool "${name}". Tools: ${(actor.kind === 'human' ? toolsFor(l.registry) : surfaceFor(l.registry)).map(([t]) => t).join(', ')}`);

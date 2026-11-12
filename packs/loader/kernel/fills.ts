@@ -1,5 +1,5 @@
 // What the loader root fills of the slots the roots below it open (docs/kernel-packs.md, "Slots"; read by
-// src/root-fills.ts), apart from a workspace's open (kernel/open.ts). Of the log's reads of the past (src/rebuild.ts,
+// packs/database/kernel/root-fills.ts), apart from a workspace's open (kernel/open.ts). Of the log's reads of the past (packs/log/kernel/rebuild.ts,
 // asOf): a map's registry as it stood at a fact position.
 
 import type { RootPast } from '../../log/kernel/rebuild.ts';

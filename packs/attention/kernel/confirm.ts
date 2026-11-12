@@ -1,7 +1,7 @@
 // What agents settled that the owner has not confirmed: put to the owner by the next session they talk to.
 import type { KernelContext } from '#pelago/kernel';
 
-/** One question an agent settled, as the log keeps it (the read confirm, src/packreads-log.ts). */
+/** One question an agent settled, as the log keeps it (the read confirm, packs/surface/kernel/packreads-log.ts). */
 export interface Settled { id: string; title: string; answer: string; settled: Date; seq: number; by: string; on: string; basis?: string }
 
 /** What the next session tells the owner to do with them. */

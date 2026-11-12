@@ -1,4 +1,4 @@
-// Packs authored on the map (src/pack-items.ts): an item of core's pack type is a pack of data alone, read beside the
+// Packs authored on the map (packs/loader/kernel/pack-items.ts): an item of core's pack type is a pack of data alone, read beside the
 // server's, off until the owner adds it, checked whole when it is written, and on the log as any pack is.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -123,7 +123,7 @@ test('a pack kept as an item may bring a look; on an island map a pack of looks 
   assert.equal(isl.registry.states.get('recipes')?.state, 'active', 'a pack of looks alone is a map pack');
 });
 
-test('a pack kept as an item is the owner’s to add on a server that lists its packs (src/pack-allow.ts)', async () => {
+test('a pack kept as an item is the owner’s to add on a server that lists its packs (packs/loader/kernel/pack-allow.ts)', async () => {
   const l = await freshWith(new Registry(packsWith(), ['core', 'themes']));
   await make(l, [recipes()]);
   assert.equal(l.registry.states.get('recipes')?.state, 'off', 'off until the owner adds it, as on any server');

@@ -1,4 +1,4 @@
-// What a server pack counts on a public site's map (count.add, count.read, src/pack-counts.ts): held in memory,
+// What a server pack counts on a public site's map (count.add, count.read, packs/publish/kernel/pack-counts.ts): held in memory,
 // written down each minute in the stream the pack names, read back as what was added after a position; and the
 // reader's tagged page load counted that way, end to end. site.visits reads the same, for one release.
 

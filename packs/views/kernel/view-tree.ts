@@ -1,5 +1,5 @@
 // The tree view: a tree a pack declares over "is part of" (software.roadmap), read on its own. What is part of the
-// root, of the kinds the tree names, each placed inside the nearest of those that holds it (src/inside.ts); or,
+// root, of the kinds the tree names, each placed inside the nearest of those that holds it (packs/views/kernel/inside.ts); or,
 // without a root, the roots to choose from. No lens.
 
 import type { KernelContext } from '#pelago/kernel';

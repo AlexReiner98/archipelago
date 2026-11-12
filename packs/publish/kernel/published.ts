@@ -1,5 +1,5 @@
 // Publishing a document: what anyone reads at /p/<workspace>/<id> is the document as it was when a person last
-// published it, frozen (src/public-schema.ts, PUBLISHED). The draft is edited on the map, privately or not; nothing
+// published it, frozen (packs/database/kernel/public-schema.ts, PUBLISHED). The draft is edited on the map, privately or not; nothing
 // public changes until it is published again. A human publishes; an agent only where the workspace's owner has
 // allowed it (agent_publish, a rule of the core pack the owner lifts on the Workspace page), each time logged with the
 // authority it said it acted on. Taking a document down stays the human's.

@@ -1,4 +1,4 @@
-// The published acts a server pack may ask for (src/server-published.ts): a document as it was last published, the
+// The published acts a server pack may ask for (packs/surface/kernel/server-published.ts): a document as it was last published, the
 // one at a site's path, a section's picture, a drawing's code by its hash and a site's pages, each read as anyone
 // reads it. What is not published, or no longer public, is not there to be found.
 

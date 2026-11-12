@@ -1,6 +1,6 @@
 // A backup's rows sealed as the log's values are (docs/log.md, section 5): what an item says, in a row of today's
 // tables, goes into the file sealed with that item's key, and comes out only where the vault still holds it. The vault
-// is backed up apart (src/vault.ts), so a backup taken before a forget cannot bring the forgotten item back: restored
+// is backed up apart (packs/seal/kernel/vault.ts), so a backup taken before a forget cannot bring the forgotten item back: restored
 // with the vault as it is now, its rows have no key and are left out.
 
 import type { Q } from '../../database/kernel/db.ts';

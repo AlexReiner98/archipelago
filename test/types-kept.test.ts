@@ -88,7 +88,7 @@ test('a type the workspace defined before types were items is read as of when it
   const l = await freshWith(new Registry(packsWith(), undefined, [chore]));
   await syncPacks(l);
   const before = (await headOf(l.db, 'facts')).pos;
-  // As the log said it then: a type_def fact (src/change-apply.ts).
+  // As the log said it then: a type_def fact (packs/write/kernel/change-apply.ts).
   await l.db.transaction((tx) => append(tx, l.workspace, 'facts', { id: newId('c'), actor: { id: 'test' }, authority: null, rule: { outcome: 'apply', spared: [] }, reason: 'An old define_type', source: null, action: null, undoes: null, keys: [] }, [['+', chore.id, 'type_def', chore]]));
   const after = (await headOf(l.db, 'facts')).pos;
   assert.equal(l.registry.type('local.chore')?.pack, 'local');

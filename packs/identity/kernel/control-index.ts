@@ -1,5 +1,5 @@
 // What a request with no workspace open yet may be answered from: which workspaces an email address is a member of,
-// and which workspace a token was made for, kept in the control values (src/control.ts). So a sign-in opens only the
+// and which workspace a token was made for, kept in the control values (packs/identity/kernel/control.ts). So a sign-in opens only the
 // workspaces of its address, and a token nobody made opens none (the audit of 29 Oct 2026).
 //
 // These are indexes, not the record: a workspace's member and token tables say who belongs and who may act, and are
@@ -14,7 +14,7 @@ let control: (() => Promise<Q>) | undefined;
 export function configureIndex(given: () => Promise<Q>) {
   control = given;
 }
-/** The server's own database, for what else is kept beside the workspaces (src/person-tokens.ts). */
+/** The server's own database, for what else is kept beside the workspaces (packs/identity/kernel/person-tokens.ts). */
 export const controlDb = async (): Promise<Q | undefined> => control?.();
 
 const memberKey = (email: string) => `member_in:${email}`;

@@ -66,7 +66,7 @@ function fromFile(create: boolean): Buffer | undefined {
  */
 export const canSeal = (): boolean => mayMake || !!(fromEnv() ?? fromFile(false));
 
-/** The key secrets and the key vault (src/vault.ts) are sealed with. `make` false: none is made where there is none. */
+/** The key secrets and the key vault (packs/seal/kernel/vault.ts) are sealed with. `make` false: none is made where there is none. */
 export function sealingKey(make = true): Buffer {
   const key = fromEnv() ?? fromFile(make);
   if (!key) throw new Error('This server has no sealing key: what was sealed elsewhere cannot be opened here.');

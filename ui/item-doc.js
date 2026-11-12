@@ -1,5 +1,5 @@
 // An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and its public view: the item
-// made public by a person, frozen as they saw it, at an address anyone may open (src/public-view.ts).
+// made public by a person, frozen as they saw it, at an address anyone may open (packs/publish/kernel/public-view.ts).
 
 import { api, ask, h, may, state, tell } from './base.js';
 import { menu, when } from './words.js';

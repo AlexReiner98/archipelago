@@ -2,9 +2,9 @@
 // held or undone, each entry with the light header (v, ws, stream, pos, at, actor, rule, facts, reason). They live in
 // log_op, beside the fact stream's tables, cut into one segment per day per stream. A day closed is sealed by a system
 // entry in the fact stream carrying the segment's hash, so the chain commits to every operational day; compaction
-// drops whole entries a retention rule (src/retention.ts) no longer keeps and records the compacted segment the same
+// drops whole entries a retention rule (packs/log/kernel/retention.ts) no longer keeps and records the compacted segment the same
 // way. Deleting from log_op is refused by its trigger to everyone but the compaction role. What is someone's words is
-// sealed with its item's key (src/opseal.ts), and a member reads only the entries about what they may see.
+// sealed with its item's key (packs/seal/kernel/opseal.ts), and a member reads only the entries about what they may see.
 
 import { createHash } from 'node:crypto';
 import { jcs } from '../../../src/jcs.ts';
@@ -16,7 +16,7 @@ import { makePartitions, partitionMade } from './partitions.ts';
 import { hashed, openOps, sealOp } from '../../seal/kernel/opseal.ts';
 
 export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | 'places' | 'activity' | 'uses' | `pack:${string}` | CountStream;
-/** A stream a server pack keeps its counts in, by the word its manifest names (src/pack-counts.ts). */
+/** A stream a server pack keeps its counts in, by the word its manifest names (packs/publish/kernel/pack-counts.ts). */
 export type CountStream = string & { readonly counts: true };
 export type OpFact = ['+', string, string, unknown] | ['-', string, string];
 
@@ -54,7 +54,7 @@ export async function record(tx: Q, ws: string, stream: OpStream, actor: string,
      from (select 1) one left join lateral pelago_log_op_last($1) l on true`,
     [stream],
   );
-  // An entry carried in from before (src/activity.ts) keeps its own time, when no later entry is there before it; its
+  // An entry carried in from before (packs/log/kernel/activity.ts) keeps its own time, when no later entry is there before it; its
   // carrier makes the partitions of the years it reaches first.
   const given = opts.at ? new Date(opts.at).getTime() : undefined;
   if (!rows[0].made) await makePartitions(tx);
@@ -79,7 +79,7 @@ const toLight = (r: Row): Light => ({ ...r.head, stream: r.stream, pos: r.pos, a
 
 /**
  * A compacted stream's entries as stored, sealed, in order: all of them, or those in a range of positions. A
- * segment's range names its days too, so only the partition that holds them is read (src/partitions.ts). `field`
+ * segment's range names its days too, so only the partition that holds them is read (packs/log/kernel/partitions.ts). `field`
  * keeps only the entries with a fact about that field (a canvas's places).
  */
 export async function opEntries(q: Q, stream: OpStream, range: { from?: number; to?: number; days?: [string, string]; field?: string; limit?: number } = {}): Promise<Light[]> {
@@ -92,7 +92,7 @@ export async function opEntries(q: Q, stream: OpStream, range: { from?: number; 
   return rows.map(toLight);
 }
 
-/** The entries as their reader reads them: opened with the keys the vault holds (src/opseal.ts). */
+/** The entries as their reader reads them: opened with the keys the vault holds (packs/seal/kernel/opseal.ts). */
 export const readOps = async (q: Q, stream: OpStream, range: Parameters<typeof opEntries>[2] = {}) => openOps(q, await opEntries(q, stream, range));
 
 /** SHA-256 of "pelago-segment\n" and each entry's canonical form, its sealed values as their digests, one per line. */
@@ -181,7 +181,7 @@ export async function compact(db: Db, ws: string, rules: Retention[], now = new 
       const keep = kept(all as OpEntry[], rules, now, (id) => ended.get(id));
       const inside = (s: Segment) => all.filter((e) => e.pos >= s.from && e.pos <= s.to);
       // Runs of neighbouring segments that each lose an entry become one segment, within a year: a segment lives in
-      // the partition that holds its days (src/partitions.ts).
+      // the partition that holds its days (packs/log/kernel/partitions.ts).
       const runs: Segment[][] = [];
       for (const s of standing) {
         if (!inside(s).some((e) => !keep.has(e.pos))) continue;

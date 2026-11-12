@@ -1,5 +1,5 @@
-// Where public views are kept (src/public-schema.ts, PUBLIC_VIEW): written when a person shares a view or an item, or
-// publishes a document (src/public-view.ts, src/published.ts). They are read by anyone through the database's narrow
+// Where public views are kept (packs/database/kernel/public-schema.ts, PUBLIC_VIEW): written when a person shares a view or an item, or
+// publishes a document (packs/publish/kernel/public-view.ts, packs/publish/kernel/published.ts). They are read by anyone through the database's narrow
 // functions alone (the surface's packs/surface/kernel/public-views.ts), so a reader is given the frozen copy and
 // nothing of the map as it is now.
 

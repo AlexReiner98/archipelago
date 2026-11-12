@@ -1,6 +1,6 @@
 // What a watched query's edge meets (decision e_esqevwkf; the shape e_52e35bft): given the items an automation's
 // query matches now and what its edge met before, which firings that makes and what to remember. Pure: the clock
-// (src/due-on.ts) reads the query, keeps the memory and writes item.due; this says only what came due.
+// (packs/automation_triggers/kernel/due-on.ts) reads the query, keeps the memory and writes item.due; this says only what came due.
 //
 // The first pass over an `on` only learns what already matches: a query starts to match after it is set, never before.
 

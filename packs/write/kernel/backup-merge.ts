@@ -1,6 +1,6 @@
 // root.merge (docs/kernel-packs.md, "Root services"): a backup merged into a map, called only by the packs
 // packs/roots.json names for it (the backup pack), values in and values out. It is the write root's: what it writes of
-// the map's rows goes through the restore path the write root keeps (restoreRows, src/pelago.ts); the backup is opened,
+// the map's rows goes through the restore path the write root keeps (restoreRows, packs/write/kernel/pelago.ts); the backup is opened,
 // and what the log makes of the rows made again, by the log root below it (src/backup.ts).
 
 import { opened, type Dump } from '../../log/kernel/backup.ts';
@@ -67,7 +67,7 @@ export async function mergeOf(call: RootCall, input: { dump: Dump; session_types
          returning (xmax = 0) as added`,
         [JSON.stringify(here(backup.tables.proposal))],
       );
-      // Its events go in the activity stream, after this map's own (src/activity.ts): each once.
+      // Its events go in the activity stream, after this map's own (packs/log/kernel/activity.ts): each once.
       const events = await bringIn(tx, workspace, [], backup.tables.event ?? []);
       // The file's owner, if this map has none and the person is on it: read by the id, as only an id names an item.
       const { rows: owner } = await tx.query(

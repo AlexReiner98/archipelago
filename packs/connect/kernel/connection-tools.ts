@@ -1,14 +1,14 @@
-// What a workspace's admin sees and does of the server packs it may connect (src/server-connect.ts): whether each is
+// What a workspace's admin sees and does of the server packs it may connect (packs/surface/kernel/server-connect.ts): whether each is
 // ready to be connected and whether this workspace has, where to go to connect it, and disconnecting. Readying one
 // for the whole server (setup) is the default workspace admin's, once.
 //
 // On the connect pack's context: the server's packs and its control database are the surface's, asked through
 // root.connections (packs/roots.json lets this pack call it); the tool checks who may act before it asks. Its input is a
-// JSON shape the surface builds its schema from; the adapter at src/connection-tools.ts hands its run the context.
+// JSON shape the surface builds its schema from; the adapter at packs/connect/kernel/connection-tools.ts hands its run the context.
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** Who acts, as the kernel hands it (src/pelago-types.ts, Actor): only what is read of it here. */
+/** Who acts, as the kernel hands it (packs/write/kernel/pelago-types.ts, Actor): only what is read of it here. */
 export interface Admin {
   kind: 'human' | 'agent';
   name: string;

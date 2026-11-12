@@ -102,7 +102,7 @@ export interface ViewDef {
   /** rows: one-line rows the kernel draws, each with an item; data: for agents only. */
   shape: 'rows' | 'data';
   limit_ms?: number;
-  /** A view the kernel answers, never the pack's code: by the read its answer names (src/query-presets.ts), with these fields (the brief's links, over). */
+  /** A view the kernel answers, never the pack's code: by the read its answer names (packs/query/kernel/query-presets.ts), with these fields (the brief's links, over). */
   lens?: Record<string, unknown>;
   /** With lens: which read answers it (one of LENS_ANSWERS, or an answer its pack provides or requires as service:answer.<name>); the flat lens when left out. */
   answer?: string;
@@ -110,7 +110,7 @@ export interface ViewDef {
   choices?: Record<string, Record<string, Record<string, unknown>>>;
 }
 
-/** The reads a view the kernel answers itself may name, each kept to the form its view had (src/query-presets.ts). Others are the family answer.<name>. */
+/** The reads a view the kernel answers itself may name, each kept to the form its view had (packs/query/kernel/query-presets.ts). Others are the family answer.<name>. */
 export const LENS_ANSWERS = ['hubs'] as const;
 
 /**
@@ -227,7 +227,7 @@ export interface StyleDef {
 
 /**
  * The code a picture of one shape is drawn by, as a pack ships it: its modules by name, each a file in the pack's
- * folder, entered at index.js (src/layouts.ts). The owner changes it by keeping their own version on the map.
+ * folder, entered at index.js (packs/loader/kernel/layouts.ts). The owner changes it by keeping their own version on the map.
  */
 export interface LayoutDef {
   id: string;
@@ -276,7 +276,7 @@ export const stylesOf = (packs: PackFile[]) => presetsOf(packs);
 
 /**
  * The kernel's own actions, each under one of the six verbs: an agent calls one as the verb's tool with its name
- * (src/surface.ts). change, the generic op, stays beneath them all, as do the tools that only read.
+ * (packs/surface/kernel/surface.ts). change, the generic op, stays beneath them all, as do the tools that only read.
  */
 export const KERNEL_VERBS: Record<string, string> = {
   session_start: 'capture',
@@ -308,7 +308,7 @@ export const KERNEL_VERBS: Record<string, string> = {
 };
 
 /**
- * What the kernel still answers itself of each service family (src/services.ts): a pack may not provide one of these
+ * What the kernel still answers itself of each service family (packs/loader/kernel/services.ts): a pack may not provide one of these
  * (one name, one owner). The step that moves one into a pack takes it off this list in the same change.
  */
 export const KERNEL_OWNS: Record<Family, readonly string[]> = {

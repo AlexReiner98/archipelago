@@ -1,5 +1,5 @@
-// Where the server runs a drawing's code to have its first frame (src/published-frames.ts, src/public-bake.ts): never
-// in its own process, but in one of the drawing's own, as the pack host runs a pack's handler (src/packhost.ts): under
+// Where the server runs a drawing's code to have its first frame (packs/publish/kernel/published-frames.ts, packs/publish/kernel/public-bake.ts): never
+// in its own process, but in one of the drawing's own, as the pack host runs a pack's handler (packs/loader/kernel/packhost.ts): under
 // node --permission, with an empty environment, read access to the drawing's folder and its runner only, no network
 // (./drawing-runner.ts, in this folder), and limits on memory and time. One process a frame, stopped when it answers or overruns.
 

@@ -86,7 +86,7 @@ export async function viewAddress(l: Archipelago, asked: ViewAsked): Promise<str
   return input.entity ? `e/${input.entity}` : input.screen!;
 }
 
-/** The address of a document's preview, for a look of it as it would publish (src/published-preview.ts). */
+/** The address of a document's preview, for a look of it as it would publish (packs/publish/kernel/published-preview.ts). */
 export async function previewAddress(l: Archipelago, id: string | undefined): Promise<string> {
   if (!id) throw new Error('A look with published needs "entity": the document.');
   if (!(await l.entity(id))) throw new Error(`No item "${id}"`);

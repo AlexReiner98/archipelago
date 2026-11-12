@@ -1,6 +1,6 @@
 // What a workspace uses: the bytes its log and pictures take, its agent sessions at work, and its signed-in requests
 // a minute. Measured alike on every server, whatever limits it: the usage view shows them, and where a server pack
-// sets a workspace limits (src/standing.ts), they are what each limit is held against.
+// sets a workspace limits (packs/identity/kernel/standing.ts), they are what each limit is held against.
 
 import type { Q } from '../../database/kernel/db.ts';
 import { limiter, TOKEN_LIMIT, type Limit } from './limit.ts';
@@ -103,5 +103,5 @@ export function takeRequest(workspace: string, token: string, most: number | und
 /** The requests a workspace has made this minute. */
 export const requestsThisMinute = (workspace: string) => byWorkspace.count(workspace);
 
-// The identity slot identity.use: a workspace's limits are held against what is measured here (src/standing.ts).
+// The identity slot identity.use: a workspace's limits are held against what is measured here (packs/identity/kernel/standing.ts).
 fillUse({ storageOf: (workspace) => storageOf(workspace), takeRequest, tokenEach });

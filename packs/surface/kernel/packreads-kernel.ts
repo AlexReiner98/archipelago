@@ -1,4 +1,4 @@
-// The reads the kernel's views need from src/packreads.ts once they are service packs (task e_8f8m2xtf,
+// The reads the kernel's views need from packs/surface/kernel/packreads.ts once they are service packs (task e_8f8m2xtf,
 // docs/kernel-packs.md): items by id, the open links touching some items, the log's history of some items, what each
 // item sits in at the top, a place's scope, the block graph and who holds what, the region a lens reads, and the
 // workspace's owner. Each is bounded by the ids it is given, a limit, or an index it names, and answered as the asker
@@ -34,17 +34,17 @@ export type KernelRead = {
   history?: { ids: string[]; fields?: string[]; last?: boolean };
   /** For each item, the outermost thing it is part of: the ancestor in the part_of closure that is part of nothing. */
   tops?: string[];
-  /** The ids of what is a place's or an item's (src/places.ts, scopeOf): open, only what is open and not the system's. */
+  /** The ids of what is a place's or an item's (packs/runs/kernel/places.ts, scopeOf): open, only what is open and not the system's. */
   within?: { id: string; open?: boolean; among?: string[] };
   /** What blocks what, for some items: each edge (x waits on y, and why), read as far as what they wait on reaches. */
   blocks?: string[];
   /** Who holds each resource now (of some, when they are named). */
   holds?: true | string[];
-  /** The region a lens reads around some items (src/region.ts), its rows as the lens reads them. */
+  /** The region a lens reads around some items (packs/surface/kernel/region.ts), its rows as the lens reads them. */
   region?: Around;
-  /** The items of some kinds across the map a lens of the whole map reads (src/region.ts, scanKinds). */
+  /** The items of some kinds across the map a lens of the whole map reads (packs/surface/kernel/region.ts, scanKinds). */
   kinds?: { types: string[]; fold: string[]; by: string; over: string[] | null };
-  /** What agents are told where (`file:`...), to a session about an item (src/instructions.ts). */
+  /** What agents are told where (`file:`...), to a session about an item (packs/agents/kernel/instructions.ts). */
   instructions?: { where: string; about?: string };
   /** The workspace's owner, as its setting names them. */
   owner?: boolean;
@@ -60,15 +60,15 @@ export type KernelRead = {
   // What the styles and agents packs read (packs/styles, packs/agents): the looks and the words the map keeps.
   /** The instruction presets the packs ship (of the island's version of each, on an island), and every instruction kept, open or retired, with what each is about. */
   told_from?: { island?: string };
-  /** Count each of these instructions (a preset's id, or a kept one's) as said once (src/uses.ts): answered true. */
+  /** Count each of these instructions (a preset's id, or a kept one's) as said once (packs/usage/kernel/uses.ts): answered true. */
   told?: string[];
   /** The owner's versions of presets, open or retired: of the packs' style presets, or of their drawings (layout). */
   versions?: 'style' | 'layout';
   /** Every style or layout (of these types) kept on the map, with what each is about; and one named outright, retired or not. */
   looks?: { types: ('style' | 'layout')[]; named?: string };
-  /** The styles kept, and the owner's versions of presets, as the map stood at a fact position (src/rebuild.ts, asOf). */
+  /** The styles kept, and the owner's versions of presets, as the map stood at a fact position (packs/log/kernel/rebuild.ts, asOf). */
   styles_at?: number;
-  /** The drawing a style is drawn by, if a pack draws its shape, its modules left out when the page has them (src/layouts.ts). */
+  /** The drawing a style is drawn by, if a pack draws its shape, its modules left out when the page has them (packs/loader/kernel/layouts.ts). */
   drawing?: { style: Record<string, unknown>; have?: string[] };
   /** The person a page is drawn for: the one signed in, or on a map nobody signs in to, its owner; none for anyone. */
   drawn_for?: true;
@@ -76,9 +76,9 @@ export type KernelRead = {
   screens?: true;
   /** Which of these types hold anything not archived: one look each, by the index on type. */
   held_types?: string[];
-  /** What the move of styles made for one view reads (src/style-move.ts): none when nothing is to move. */
+  /** What the move of styles made for one view reads (packs/styles/kernel/style-move.ts): none when nothing is to move. */
   style_moves?: true;
-  /** The styles that are layouts by their fields: code, modules, or a version of one of these drawings (src/layout-move.ts). */
+  /** The styles that are layouts by their fields: code, modules, or a version of one of these drawings (packs/styles/kernel/layout-move.ts). */
   layout_moves?: string[];
 };
 

@@ -26,8 +26,8 @@ import { kernelOf, serviceName, valueProblem } from '../../loader/kernel/service
 export const DRAWINGS_OPEN = 'drawings_open';
 
 /**
- * The settings the packs here provide (setting.<key>, src/services.ts), each with its value's shape, who reads it and
- * the key it is kept under: `member.<key>` where every member reads it (the row policy, src/schema.ts step 45),
+ * The settings the packs here provide (setting.<key>, packs/loader/kernel/services.ts), each with its value's shape, who reads it and
+ * the key it is kept under: `member.<key>` where every member reads it (the row policy, packs/database/kernel/schema.ts step 45),
  * `admin.<key>` where only an admin does. The prefix keeps a pack's key apart from the kernel's own.
  */
 export const packSettings = (l: Archipelago) =>
@@ -80,7 +80,7 @@ async function replyRules(l: Archipelago, lifted: Record<string, boolean>, set: 
   });
 }
 
-/** How much of what its limits cap the workspace uses now (src/standing.ts), each said as the Limits card shows it. */
+/** How much of what its limits cap the workspace uses now (packs/identity/kernel/standing.ts), each said as the Limits card shows it. */
 async function limitUse(l: Archipelago, limits: Limits) {
   const { db } = await bypassingRls(l);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);

@@ -1,6 +1,6 @@
 // A view kept on the map names types and link types in its flat lens (its filter's terms,
 // its walk). When a pack takes a type or a link type over (moved_from), the views that named the old one name the new
-// one (src/pelago.ts, retype, asking answer.renamed_query): this says what changes in one view's fields, nothing when
+// one (packs/write/kernel/pelago.ts, retype, asking answer.renamed_query): this says what changes in one view's fields, nothing when
 // nothing does.
 
 import type { KernelContext } from '#pelago/kernel';

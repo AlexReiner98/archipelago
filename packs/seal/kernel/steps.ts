@@ -1,4 +1,4 @@
-// The seal root's parts of the schema's numbered steps (src/migrate.ts): the vault of per-item keys.
+// The seal root's parts of the schema's numbered steps (packs/database/kernel/migrate.ts): the vault of per-item keys.
 
 import type { StepPart } from '../../database/kernel/migrate.ts';
 import { VAULT } from './vault.ts';

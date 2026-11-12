@@ -1,4 +1,4 @@
-// A moved finding tells its readers (src/moved.ts, task e_svdkhdey): what reads a finding by a link that crosses is
+// A moved finding tells its readers (packs/attention/kernel/moved.ts, task e_svdkhdey): what reads a finding by a link that crosses is
 // in attention as `moved` once the finding's value or as of changes after the reader last changed or was said still
 // true, with what moved, from what to what, and when; until whoever tends it changes it or says it still holds.
 // Read from the log and the links: nothing runs when the finding moves.

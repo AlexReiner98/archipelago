@@ -3,7 +3,7 @@
 // no way of working is named here: what waits on someone (waits_on), what holds others up and what is blocked
 // (depends_on, waits_on, needs), what is due (bound), what is unsettled (settles), what nobody has touched, what is
 // under way (a session on it), what is ready to take up, what an agent settled that the owner has not confirmed, and
-// what reads a finding that has moved since (a link that crosses, to a type that promises fields: src/moved.ts).
+// what reads a finding that has moved since (a link that crosses, to a type that promises fields: packs/attention/kernel/moved.ts).
 // A pack adds reasons of its own as data (a view of form "attention"): items of a type whose fields hold some values.
 
 import type { KernelContext } from '#pelago/kernel';
@@ -64,7 +64,7 @@ export interface Input {
 }
 
 /**
- * What a lens read, handed to attention as its state stage (src/region.ts): the items, with their fields, and the
+ * What a lens read, handed to attention as its state stage (packs/surface/kernel/region.ts): the items, with their fields, and the
  * links among them. Attention then reads no items or links of its own: what it answers is the state of what was read.
  */
 export interface Read {

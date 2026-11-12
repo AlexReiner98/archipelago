@@ -14,7 +14,7 @@ export async function resolveRun(ctx: KernelContext, key: string, openOnly = fal
 }
 
 /**
- * A run that is a chat's: a surface named it and keeps it, where a run this server launched (src/launcher.ts) is the
+ * A run that is a chat's: a surface named it and keeps it, where a run this server launched (packs/surface/kernel/launcher.ts) is the
  * server's to end: its surface is pack:<the launcher's pack>, or <client>-headless as launches were named before that.
  */
 export const isChat = (run: Pick<Item, 'props'>) => Boolean(run.props.session_id && run.props.surface) && !/-headless$/.test(String(run.props.surface)) && !String(run.props.surface).startsWith('pack:');

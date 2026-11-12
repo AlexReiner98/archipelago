@@ -1,4 +1,4 @@
-// The view drawn inline (src/mcp-view.ts, ui/mcp-view.html), in a real browser under a host of this test's own: an
+// The view drawn inline (packs/mcp_apps/kernel/mcp-view.ts, ui/mcp-view.html), in a real browser under a host of this test's own: an
 // iframe with no origin of its own, given the page as the MCP endpoint serves it, spoken to over postMessage as the
 // extension says, with the host's own token kept on the host's side. Not a real client: what one does is on the task.
 // Skipped where there is no Chrome.

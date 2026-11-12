@@ -1,4 +1,4 @@
-// The write root's parts of the schema's numbered steps (src/migrate.ts): an item's kind in its row, and what a forget
+// The write root's parts of the schema's numbered steps (packs/database/kernel/migrate.ts): an item's kind in its row, and what a forget
 // reaches.
 
 import type { StepPart } from '../../database/kernel/migrate.ts';

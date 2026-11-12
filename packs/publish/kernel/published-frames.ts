@@ -1,5 +1,5 @@
 // A published picture's first frame, kept with it: at publish the server runs the picture's drawing once, in a
-// sandboxed process of its own (root.scene, the loader's: src/drawing-box.ts runs it), and keeps the scene it opens on,
+// sandboxed process of its own (root.scene, the loader's: packs/walls/kernel/drawing-box.ts runs it), and keeps the scene it opens on,
 // so a reader's page mounts it with the page's text, before the sandbox has started. Only a drawing whose code is the
 // pack's own is run (the loader finds it by its id among what the packs ship, and its hash must be the pack's): a
 // version changed on the map is code anyone who may change the map wrote, and runs only in the reader's sandbox. The

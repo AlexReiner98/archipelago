@@ -22,7 +22,7 @@ export type ServiceRead = {
   log_head?: true;
   /** The asking pack's own memory, one key of it kept in the workspace's settings: read, or with value written (null clears it). */
   memory?: { key: string; value?: unknown };
-  /** What the island rules would switch off here (src/islands.ts), each pack with why, and the pack approved types go to. */
+  /** What the island rules would switch off here (packs/loader/kernel/islands.ts), each pack with why, and the pack approved types go to. */
   islands_off?: true;
   /** Every public view, as anyone reads them: id, title as shared, path, place and when. */
   public_views?: true;

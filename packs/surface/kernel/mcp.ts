@@ -3,7 +3,7 @@
 // deploy, or from one server to another, with the session it has (an id it was given before is not looked at). Every
 // request is checked on its own: its token says whose it is.
 //
-// The tools are the small surface (src/surface.ts); a verb's description lists the actions a workspace's packs add,
+// The tools are the small surface (packs/surface/kernel/surface.ts); a verb's description lists the actions a workspace's packs add,
 // so a client that opens the GET stream is told there when its workspace's tools change (a pack turned off or on), so
 // it asks again rather than holding the list it was given when it connected. The stream is this process's: after a
 // restart the client opens it again, on whichever server answers, and is told at once, since nothing here knows what
@@ -63,7 +63,7 @@ export interface Caller {
   actor: (label?: string) => Actor;
 }
 
-/** What an agent is offered: query, change, undo, the six verbs, a pack's own verbs, and draw (src/surface.ts). */
+/** What an agent is offered: query, change, undo, the six verbs, a pack's own verbs, and draw (packs/surface/kernel/surface.ts). */
 const offered = (registry: Archipelago['registry']) => surfaceFor(registry);
 
 /** A tool's inputs as MCP is given them, made once per tool rather than for every request. */

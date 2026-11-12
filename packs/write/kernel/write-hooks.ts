@@ -1,20 +1,20 @@
 // The write path's hook points (docs/kernel-packs.md, "Write-path hooks"): where change() and its apply loop ask what
 // other code has to say of a change, instead of calling it by name. Each point is filled first by what the write path
-// still did inline (src/write-fillings.ts, each named for the pack it moves to), then by the internal packs that
+// still did inline (packs/write/kernel/write-fillings.ts, each named for the pack it moves to), then by the internal packs that
 // declare it under `kernel.hooks`, in pack order and each pack's own order. With none filled, the write path works
 // as it does on a map with only core.
 //
 //   write.rewrite   ops in, ops out: same ops, same order, same op, id, type and ends; only the fields its pack fills;
 //                   a stated visibility may narrow, never widen. Checked here, and the change refused naming the pack.
-//   write.validate  ops in, refusals and warnings out: reads only. Run where a change is planned (src/change-plan.ts).
+//   write.validate  ops in, refusals and warnings out: reads only. Run where a change is planned (packs/write/kernel/change-plan.ts).
 //   write.follow    ops in, more ops out: judged with the change, and run again before it applies.
 //   write.follow.rides  what rides the change: ops no rule judges, applied in its change set with its verdict and its
 //                   authority (held with it, applied when it is), asked op by op inside the apply's transaction.
-//   log.project    facts in, rows of its own tables out (src/log-project.ts).
+//   log.project    facts in, rows of its own tables out (packs/log/kernel/log-project.ts).
 //   write.after     the change set in, nothing out: a failure is a warning, never an error.
 //   write.retype    a type or link type renamed, ops out, made as the pack through change.
 //
-// What follows an op at the level of facts (the owner's link, src/owner-link.ts) stays in the write path.
+// What follows an op at the level of facts (the owner's link, packs/write/kernel/owner-link.ts) stays in the write path.
 
 import { BUILT_IN } from './write-fillings.ts';
 import { islandRegistry } from '../../loader/kernel/island-pin.ts';
@@ -56,7 +56,7 @@ const rejected = (lines: string[]) => new Error(`Change rejected:\n${lines.map((
 
 /**
  * The internal packs' fillings of a point, each bound to its pack's context, and a change made as a pack: the loader's
- * (src/kernel-context.ts), which the write path sits above. A map a workspace opened is answered by the host its open
+ * (packs/loader/kernel/kernel-context.ts), which the write path sits above. A map a workspace opened is answered by the host its open
  * made; a map no workspace opened (a test's, a registry read at a past version) by a loose one, as their code runs for it
  * anywhere else.
  */
