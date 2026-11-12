@@ -21,7 +21,7 @@
 import { isSealed, seal, SECRET_SETTINGS } from '../../../src/secrets.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { resolve } from 'node:path';
+
 import { isServer, openDb, type Db, type Q } from '../../../src/db.ts';
 import { rootFills } from '../../database/kernel/root-fills.ts';
 import type { Registry } from '../../../src/packs.ts';
@@ -252,10 +252,9 @@ export async function dumpOf(call: RootCall, input: { workspace: string; name: s
   }
 }
 
-// Run as `node src/backup.ts restore ...` too, through the shim the wave leaves there.
-const ranAs = process.argv[1] ? resolve(process.argv[1]) : '';
-if (import.meta.main || ranAs === resolve(import.meta.dirname, '../../../src/backup.ts')) {
-  const [command, file, target, vault] = process.argv.slice(2);
+/** `node src/backup.ts restore <backup file> <target> [vault backup file]`: the command line's restore (src/backup.ts runs it). */
+export async function restoreCommand(argv: string[]): Promise<void> {
+  const [command, file, target, vault] = argv;
   if (command !== 'restore' || !file || !target) {
     console.error('Usage: node src/backup.ts restore <backup file> <new data folder | postgres://...> [vault backup file]');
     process.exit(1);
@@ -269,3 +268,5 @@ if (import.meta.main || ranAs === resolve(import.meta.dirname, '../../../src/bac
   console.log(Object.entries(done.counts).map(([table, n]) => `${table}: ${n}`).join(', '));
   if (backup.workspace.id !== 'default' && !isServer(target)) console.log(`A server finds it once it is listed: create the workspace from this backup through the operator instead (POST /operator/workspaces).`);
 }
+
+if (import.meta.main) await restoreCommand(process.argv.slice(2));

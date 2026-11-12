@@ -11,9 +11,16 @@
 // a service name most of these functions are not, and answer as another provider would). The kernel (src/ and the root
 // packs' code) may never import a service pack's code: a kernel caller of a service module is a wave-7 cut, left as it
 // is, and its shim is kept and listed (test/fixtures/gather-kept.json) until wave 7 cuts it.
+//
+// Nothing is inlined into a service pack's code, which reaches the kernel through its context alone: what it imports
+// through a shim is named, to be put on its context by hand. A script run by path (`node src/<m>.ts`: server, deploy,
+// backup, cli) keeps a tiny entry there that only runs the moved module (ENTRIES). The contract's history
+// (docs/kernel-packs.md) is left as written. An entry of test/bypassing-rls.test.ts whose count went down is lowered.
+// Last, every root's hash is pinned again (`npm run roots`).
 
 import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const ROOT = join(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -191,12 +198,13 @@ function inline(a: Adapted, alias: string, args: string[]): string | undefined {
 
 // --- The importers. ---
 const IMPORTER_DIRS = ['src', 'packs', 'test', 'scripts', 'examples'];
+const isService = (f: string) => { const p = packOf(f); return !!p && !ROOTS.has(p) && /^packs\/[\w-]+\/kernel\//.test(f) && !f.endsWith('.test.ts'); };
 const isKernel = (f: string, shims: Map<string, Shim>) =>
   (f.startsWith('src/') && !shims.has(f)) || (ROOTS.has(packOf(f) ?? '') && /^packs\/[\w-]+\/kernel\//.test(f) && !f.endsWith('.test.ts'));
 /** Each place a file names a module: `import`/`export ... from`, bare and dynamic imports, `new URL(...)`. */
 const SPEC = /((?:^|[;\n])[ \t]*(?:import|export)(\s+type\b)?[^;'"]*?\bfrom\s*)(['"])([^'"]+)\3|(\bimport\s*\(\s*)(['"])([^'"]+)\6|((?:^|[;\n])[ \t]*import\s*)(['"])([^'"]+)\9|(\bnew URL\(\s*)(['"])([^'"]+)\12/g;
 
-interface Found { cuts: string[]; manual: string[]; rewritten: Map<string, number>; inlined: number; removed: string[]; kept: Record<string, string[]>; rekeyed: number; dropped: string[]; runs: string[] }
+interface Found { cuts: string[]; manual: string[]; rewritten: Map<string, number>; inlined: number; removed: string[]; kept: Record<string, string[]>; rekeyed: number; dropped: string[]; runs: string[]; lowered: string[] }
 
 function plan(shims: Map<string, Shim>, found: Found) {
   // A kernel file that imports a service module as a value keeps that shim: a wave-7 cut. Repeat until no new one.
@@ -220,9 +228,12 @@ function plan(shims: Map<string, Shim>, found: Found) {
 function rewriteFile(f: string, shims: Map<string, Shim>, kept: Map<string, Set<string>>, found: Found): string | undefined {
   const before = raw(f);
   const kernel = isKernel(f, shims) || kept.has(f);
+  // A service pack's code calls the kernel through its context alone (rule 4): nothing is inlined there, and what it
+  // still imports through a shim is named to be put on its context by hand.
+  const service = isService(f);
   let n = 0, needsContext = false;
   const aliases: { local: string; s: Shim; ns: boolean }[] = [];
-  const adapterAt = (spec: string) => { const s = spec.startsWith('.') ? shims.get(resolveSpec(f, spec)) : undefined; return s?.adapter && s.adapted.size && !(kernel && !s.root) ? s : undefined; };
+  const adapterAt = (spec: string) => { const s = spec.startsWith('.') ? shims.get(resolveSpec(f, spec)) : undefined; return s?.adapter && s.adapted.size && !(kernel && !s.root) && !service ? s : undefined; };
   // A dynamic import of an adapter: `const { a } = await import(...)` takes the module whole beside what it keeps, and
   // `(await import(...)).a(...)` is inlined where it stands.
   let text = before.replace(/\b(const|let)\s*\{([^}]*)\}\s*=\s*await import\(\s*'([^']+)'\s*\)/g, (all, decl: string, names: string, spec: string) => {
@@ -257,6 +268,7 @@ function rewriteFile(f: string, shims: Map<string, Shim>, kept: Map<string, Set<
     if (kernel && !s.root && !type && !uHead) { found.cuts.push(`${f} -> ${s.path}`); return all; }
     const to = rel(f, s.to);
     n++;
+    if (service && !type) { found.manual.push(`${f}: a service pack's code imports ${s.path}: put it on its context`); return `${head}${q}${to}${q}`; }
     if (!s.adapter || !s.adapted.size || type) return `${head}${q}${to}${q}`;
     if (dHead || bHead || uHead) { found.manual.push(`${f}: a dynamic import of adapter ${s.path}`); return `${head}${q}${to}${q}`; }
     const binding = head.replace(/^[;\n]?[ \t]*(?:import|export)\s*/, '').replace(/\s*from\s*$/, '').trim();
@@ -342,12 +354,24 @@ function runsByPath(text: string, removed: Map<string, string>, where: string, f
   });
 }
 
+// --- Scripts run by path. A person or a deploy runs these as `node src/<m>.ts`; each keeps a tiny entry there whose
+// only job is to run the moved module (its importers still name the module at its own place). ---
+const ENTRY_HEAD = '// Run by path: `node src/%s.ts` (%s). Its only job is to run %s.\n';
+const ENTRIES: Record<string, string> = {
+  'src/server.ts': `${ENTRY_HEAD.replace('%s', 'server').replace('%s', "the hosted image's command until it runs src/boot.ts").replace('%s', 'the server as `node src/boot.ts` does')}\nimport { run } from './boot.ts';\n\nawait run();\n`,
+  'src/deploy.ts': `${ENTRY_HEAD.replace('%s', 'deploy').replace('%s', 'npm run migrate, and the hosted deploy and staging scripts').replace('%s', 'the deploy, packs/identity/kernel/deploy.ts')}\nimport { deploy } from '../packs/identity/kernel/deploy.ts';\n\nawait deploy();\n`,
+  'src/backup.ts': `${ENTRY_HEAD.replace('%s', 'backup').replace('%s', 'a restore, as docs/reference.md says').replace('%s', 'the restore command of packs/log/kernel/backup.ts')}\nimport { restoreCommand } from '../packs/log/kernel/backup.ts';\n\nawait restoreCommand(process.argv.slice(2));\n`,
+  'src/cli.ts': `${ENTRY_HEAD.replace('%s', 'cli').replace('%s', 'npm run pelago, and the operator, as docs/reference.md and the Workspaces card say').replace('%s', 'the command line, packs/surface/kernel/cli.ts')}\nimport '../packs/surface/kernel/cli.ts';\n`,
+};
+/** The contract's history is not rewritten: it says what each wave did with the paths of its day (docs are edited by hand). */
+const UNTOUCHED = new Set(['docs/kernel-packs.md']);
+
 // --- Run. ---
 const shims = findShims();
-const found: Found = { cuts: [], manual: [], rewritten: new Map(), inlined: 0, removed: [], kept: {}, rekeyed: 0, dropped: [], runs: [] };
+const found: Found = { cuts: [], manual: [], rewritten: new Map(), inlined: 0, removed: [], kept: {}, rekeyed: 0, dropped: [], runs: [], lowered: [] };
 const kept = plan(shims, found);
 const moved = new Map([...shims].map(([p, s]) => [p, s.to]));
-const removable = new Map([...moved].filter(([p]) => !kept.has(p)));
+const removable = new Map([...moved].filter(([p]) => !kept.has(p) && !(p in ENTRIES)));
 const writes = new Map<string, string>();
 for (const f of IMPORTER_DIRS.flatMap(walk).filter((x) => /\.(ts|mjs|js)$/.test(x) && !removable.has(x))) {
   const text = rewriteFile(f, shims, kept, found);
@@ -364,30 +388,53 @@ if (existsSync(join(ROOT, ROOT_IMPORTS))) {
   if (next.replace(/\r\n/g, '\n') !== raw(ROOT_IMPORTS).replace(/\r\n/g, '\n')) writes.set(ROOT_IMPORTS, next);
 }
 const keptJson = `${JSON.stringify(Object.fromEntries(Object.entries(found.kept).sort()), null, 2)}\n`;
-if (!existsSync(join(ROOT, KEPT_FILE)) || raw(KEPT_FILE).replace(/\r\n/g, '\n') !== keptJson) writes.set(KEPT_FILE, keptJson);
+const noneKept = !Object.keys(found.kept).length; // with none kept, the list goes
+if (!noneKept && (!existsSync(join(ROOT, KEPT_FILE)) || raw(KEPT_FILE).replace(/\r\n/g, '\n') !== keptJson)) writes.set(KEPT_FILE, keptJson);
 const TEXT = ['package.json', 'CLAUDE.md', 'README.md', ...walk('.github'), ...walk('docs'), ...walk('ui'), ...walk('packs'), ...walk('scripts'), ...walk('test')]
-  .filter((f) => /\.(md|json|ya?ml|ts|js|mjs|html)$/.test(f) && f !== 'scripts/gather.ts' && existsSync(join(ROOT, f)));
+  .filter((f) => /\.(md|json|ya?ml|ts|js|mjs|html)$/.test(f) && f !== 'scripts/gather.ts' && !UNTOUCHED.has(f) && existsSync(join(ROOT, f)));
 for (const f of TEXT) {
   const text = writes.get(f) ?? raw(f), next = runsByPath(text, removable, f, found);
   if (next !== text) writes.set(f, next);
 }
+for (const [f, text] of Object.entries(ENTRIES)) if (!existsSync(join(ROOT, f)) || raw(f) !== text) writes.set(f, text);
 found.removed = [...removable.keys()];
+
+// The reads past row-level security (test/bypassing-rls.test.ts), each file counted as it will be: an entry whose
+// count went down with the gather is lowered (a call an adapter made for nothing), never raised.
+const RLS = 'test/bypassing-rls.test.ts';
+if (existsSync(join(ROOT, RLS))) {
+  const final = (f: string) => (removable.has(f) ? '' : writes.get(f) ?? (existsSync(join(ROOT, f)) ? raw(f) : ''));
+  const lower = (text: string, list: string, re: RegExp) => text.replace(new RegExp(`(const ${list}\\b[^=]*=\\s*\\{)([\\s\\S]*?)(\\};)`), (_a, a: string, body: string, z: string) =>
+    a + body.replace(/(\n?[ \t]*)'([^']+)': (\d+),?([^\n]*)/g, (e: string, lead: string, path: string, n: string, rest: string) => {
+      const now = final(path).match(re)?.length ?? 0;
+      if (now >= Number(n)) return e;
+      found.lowered.push(`${list} ${path}: ${n} -> ${now}`);
+      return now ? `${lead}'${path}': ${now},${rest}` : '';
+    }) + z);
+  const text = writes.get(RLS) ?? raw(RLS);
+  const next = lower(lower(text, 'CALLERS', /(?<!function )\bbypassingRls\(/g), 'WHOLE_DB', /\bdb\.whole\b/g);
+  if (next !== text) writes.set(RLS, next);
+}
 
 const crlf = (f: string, text: string) => (existsSync(join(ROOT, f)) && disk(f).includes('\r\n') ? text.replace(/\n/g, '\r\n') : text);
 if (!DRY) {
   for (const [f, text] of writes) writeFileSync(join(ROOT, f), crlf(f, text));
   for (const f of removable.keys()) unlinkSync(join(ROOT, f));
+  if (noneKept && existsSync(join(ROOT, KEPT_FILE))) unlinkSync(join(ROOT, KEPT_FILE));
+  // Every root's folder changed: pin the new hashes (packs/roots.json), as any change under a root's folder needs.
+  const pinned = spawnSync('npm', ['run', 'roots'], { cwd: ROOT, shell: true, encoding: 'utf8' });
+  if (pinned.status !== 0) { console.error(pinned.stderr || pinned.stdout); process.exitCode = 1; }
 }
 const adapters = [...shims.values()].filter((s) => s.adapter);
 const summary = {
   shims: shims.size, pure: shims.size - adapters.length, adapters: adapters.length,
   removed: removable.size, kept: kept.size, files_changed: writes.size, importers: found.rewritten.size,
   specifiers: [...found.rewritten.values()].reduce((a, b) => a + b, 0), calls_inlined: found.inlined,
-  cuts: found.cuts.length, manual: found.manual.length, rekeyed: found.rekeyed, dropped: found.dropped.length, runs: found.runs.length,
+  cuts: found.cuts.length, manual: found.manual.length, rekeyed: found.rekeyed, dropped: found.dropped.length, runs: found.runs.length, lowered: found.lowered.length,
 };
 console.log(`${DRY ? 'would gather' : 'gathered'}: ${JSON.stringify(summary)}`);
 if (VERBOSE || DRY) {
-  for (const [title, list] of [['wave-7 cuts (kernel -> service module, shim kept)', [...new Set(found.cuts)]], ['by hand', found.manual], ['dropped', found.dropped], ['run by path', found.runs]] as const) {
+  for (const [title, list] of [['wave-7 cuts (kernel -> service module, shim kept)', [...new Set(found.cuts)]], ['by hand', found.manual], ['dropped', found.dropped], ['run by path', found.runs], ['bypassing-rls lowered', found.lowered]] as const) {
     console.log(`\n${title} (${list.length}):`);
     for (const l of list) console.log(`  ${l}`);
   }

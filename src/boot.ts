@@ -273,8 +273,8 @@ export async function boot(options: { home?: string; load?: (path: string, id: s
   };
 }
 
-if (import.meta.main) {
-  const arg = process.argv[2];
+/** The command line: `--check` the pinned roots, `--pin` them, or boot and serve (`node src/boot.ts`; `node src/server.ts` runs it too). */
+export async function run(arg = process.argv[2]): Promise<void> {
   if (arg === '--check') {
     const wrong = checkRoots();
     if (wrong.length) {
@@ -296,3 +296,5 @@ if (import.meta.main) {
     serve(booted);
   }
 }
+
+if (import.meta.main) await run();
