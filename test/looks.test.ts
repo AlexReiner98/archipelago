@@ -9,7 +9,7 @@ import { setIslands } from '../src/packstate.ts';
 import { after, test } from 'node:test';
 import { createToken } from '../src/auth.ts';
 import { askedFace, fellBack, stopLayout } from '../src/look-draw.ts';
-import { passFor } from '../src/looks.ts';
+import { passFor } from '../src/look-pass.ts';
 import { contentOf } from '../src/mcp.ts';
 import { chrome, open } from './browser.ts';
 import { packsWith } from './map.ts';

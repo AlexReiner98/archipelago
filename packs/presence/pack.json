@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "title": "Presence",
   "description": "Where agents have pointed the owner's screen and the steps they took, what each screen is seeing, and the agents waiting in watch. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "uses": [
+    "service:root.transient"
+  ],
   "kernel": {
     "trust": "service",
     "internal": true,

@@ -6,7 +6,7 @@
 
 import { setControlValue, controlValue } from '../../../src/control.ts';
 import { normalEmail, sendMail } from '../../../src/mail.ts';
-import '../../../src/member-mail.ts'; // a workspace is made only where members' notices go out as mail
+import '../../loader/kernel/server-slots.ts'; // a workspace is made only where members' notices go out as mail
 import { admitMember, linkFor, memberOf, ownerEmail } from '../../../src/members.ts';
 import { madeKey } from './server-gates.ts';
 import type { ServerAct, ServerPackFile } from '../../../src/server-packs.ts';

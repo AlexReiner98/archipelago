@@ -11,8 +11,10 @@
 
 import { createHash, createSign, randomBytes } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
-import { env } from '../../../src/env.ts';
 import { deliver, mxRoutes, relay, type Route } from './smtp.ts';
+
+/** A setting from the environment, PELAGO_ and the name (as src/env.ts reads one). */
+const env = (name: string): string | undefined => process.env[`PELAGO_${name}`];
 
 export interface Mail {
   to: string;

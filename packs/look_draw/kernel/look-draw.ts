@@ -8,7 +8,12 @@
 // stopped when none has come for IDLE_MS.
 
 import { openBrowser, type Browser, type Tab } from './chrome.ts';
-import { logged } from '../../../src/logged.ts';
+
+/** A catch that says what failed and answers `fallback` (as src/logged.ts does): a drawing's extras never fail it. */
+const logged = <T = undefined>(what: string, fallback?: T) => (err: unknown): T => {
+  console.error(`${what}: ${err instanceof Error ? err.message : String(err)}`);
+  return fallback as T;
+};
 
 /** How long Chrome is kept after the last look. */
 const IDLE_MS = 5 * 60_000;

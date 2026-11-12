@@ -333,7 +333,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       const until = Date.now() + (input.wait_seconds ?? 0) * 1000;
       // Counted on every server, so the web UI can say whether anyone will hear a decision the moment it is made.
       const { db } = await bypassingRls(l);
-      await listening(db, l.workspace, 1);
+      await listening(db, l, 1);
       try {
         for (;;) {
           // A token revoked while it waits (its person removed, say) is told nothing more.
@@ -345,7 +345,7 @@ export const READ_TOOLS: Record<string, Tool> = {
           await new Promise((r) => setTimeout(r, 1000));
         }
       } finally {
-        await listening(db, l.workspace, -1).catch(() => {});
+        await listening(db, l, -1).catch(() => {});
       }
     },
   },

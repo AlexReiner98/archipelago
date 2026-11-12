@@ -9,7 +9,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { hasHumanToken } from '../../../src/auth.ts';
 import { env } from '../../../src/env.ts';
-import '../../../src/member-mail.ts'; // the owner's sign-in code goes out as mail
+import '../../loader/kernel/server-slots.ts'; // the owner's sign-in code goes out as mail (identity.invited, filled by the mailer pack)
 import { adminEmails, admitMember, ownerEmail, requestSignIn } from '../../../src/members.ts';
 import type { Workspace, Workspaces } from '../../../src/workspaces.ts';
 

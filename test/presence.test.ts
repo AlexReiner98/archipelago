@@ -1,16 +1,18 @@
 // Where an agent points the screen, and the steps it takes, reach a page that polls another server.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import * as one from '../src/presence.ts';
+import { kernelContext } from '../src/kernel-context.ts';
+import * as one from '../packs/presence/kernel/presence.ts';
+import { fresh } from './map.ts';
 
-// The module loaded a second time is a second server: its own process, the same database. Loaded where it now lives
-// (packs/presence), since its shim at src/presence.ts loaded again would hand back the same module.
+// The module loaded a second time is a second server: its own process, the same database. Both are the pack's own
+// module, handed the pack's context of one map, which keeps in that map's transient store (root.transient).
 const other: typeof one = await import(`${new URL('../packs/presence/kernel/presence.ts', import.meta.url).href}?other`);
+const opened = async () => kernelContext(await fresh(), 'presence');
 
 test('a show on one server moves a page polling another; read steps follow within a flush', async () => {
-  const db = await openDb();
-  const w = { workspace: 'default', viewer: 'e_owner000' };
+  const db = await opened();
+  const w = { workspace: db.workspace, viewer: 'e_owner000' };
   assert.deepEqual(await other.presence(db, w), { focus: undefined, steps: [], told: 0, listening: 0 });
 
   await one.point(db, w, { at: 1, hash: 'e/e_x', actor: 'robot', note: 'Look' });
@@ -27,34 +29,34 @@ test('a show on one server moves a page polling another; read steps follow withi
 
   await other.took(db, w, { kind: 'search', actor: 'robot' }, true);
   assert.deepEqual((await one.presence(db, w)).steps.map((s) => s.kind), ['show', 'read', 'search'], 'both servers\' steps, in order');
-  assert.deepEqual((await one.presence(db, { workspace: 'default', viewer: 'e_someone' })).steps, [], 'another person\'s screen is not this one');
+  assert.deepEqual((await one.presence(db, { workspace: db.workspace, viewer: 'e_someone' })).steps, [], 'another person\'s screen is not this one');
 
-  await other.tellStamp(db, 'default');
+  await other.tellStamp(db);
   assert.ok((await one.presence(db, w)).told > 0, 'a beat told on one server moves the stamp on the other');
 });
 
 test('agents listening on two servers are counted on both', async () => {
-  const db = await openDb();
-  const w = { workspace: 'default' };
-  await one.listening(db, 'default', 1);
-  await other.listening(db, 'default', 1);
-  await other.listening(db, 'default', 1);
+  const db = await opened();
+  const w = { workspace: db.workspace };
+  await one.listening(db, 1);
+  await other.listening(db, 1);
+  await other.listening(db, 1);
   assert.equal((await one.presence(db, w)).listening, 3);
   assert.equal((await other.presence(db, { workspace: 'elsewhere' })).listening, 0, 'another workspace hears none of them');
-  await other.listening(db, 'default', -1);
-  await one.listening(db, 'default', -1);
+  await other.listening(db, -1);
+  await one.listening(db, -1);
   assert.equal((await other.presence(db, w)).listening, 1);
-  await other.listening(db, 'default', -1);
+  await other.listening(db, -1);
   assert.equal((await one.presence(db, w)).listening, 0);
 });
 
 test('a show says how many of the owner\'s pages are open and how many follow it, on any server', async () => {
-  const db = await openDb();
-  const w = { workspace: 'default', viewer: 'e_owner111' };
+  const db = await opened();
+  const w = { workspace: db.workspace, viewer: 'e_owner111' };
   assert.deepEqual(await one.watching(db, w), { open: 0, following: 0 });
   await one.looked(db, w, { page: 'p1', on: false });
   assert.deepEqual(await one.watching(db, w), { open: 1, following: 0 }, 'a page whose tabs follow nobody is open, and takes no show');
   await other.looked(db, w, { page: 'p2', on: true });
   assert.deepEqual(await one.watching(db, w), { open: 2, following: 1 }, 'a page on another server counts');
-  assert.deepEqual(await one.watching(db, { workspace: 'default', viewer: 'e_someone' }), { open: 0, following: 0 }, 'another person\'s pages are not these');
+  assert.deepEqual(await one.watching(db, { workspace: db.workspace, viewer: 'e_someone' }), { open: 0, following: 0 }, 'another person\'s pages are not these');
 });

@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "656f97971a11ad45d22e9119bf7624404b9196b527bcc070dc216f2f1abecb48"
+      "hash": "e9bd3e5e79e6957956717eef5b1df8f75dc6e00bf3dc9fb8a22620f37d98b7e7"
     },
     {
       "id": "rules",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "85613e909249ed7b347bf3116f7e355347bc0d340e424a8c577ffa3fb212a185"
+      "hash": "01721f5c85ae5a7979db4339786b5374e3d45545a66d13d7904e8f5001a5b0d5"
     }
   ],
   "calls": {
@@ -83,6 +83,14 @@
     ],
     "root.public_product": [
       "publish"
+    ],
+    "root.transient": [
+      "look_draw",
+      "mailer",
+      "presence"
+    ],
+    "root.look": [
+      "look_draw"
     ]
   }
 }

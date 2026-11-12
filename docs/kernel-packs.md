@@ -198,6 +198,8 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.scene` | loader | publish | a pack's own drawing's first frame, run in its sandboxed process (bug e_mjuwqk4a: never code kept on the map), and whether its stylesheet passes |
 | `root.drawing` | surface | publish | a drawing's module or service worker by its hash, as the reader may see the map, or whether the packs ship it |
 | `root.public_product` | surface | publish | a product's public page, data or result's picture as anyone reads them, with the headers every public answer carries |
+| `root.transient` | surface | looks, presence, mail | the transient store, kept and read (a key, a key with its bytes, keys and prefixes at once) as the whole workspace of the calling map |
+| `root.look` | surface | looks | the UI's version, a look pass for the calling map's screen (walls), the room for another look this hour (rules) |
 
 ## Write-path hooks
 
@@ -257,7 +259,7 @@ are slots of the write and log packs; the others:
 | `rules.reply_ended` | rules | sessions | `rules.ts` importing `reply-rules.ts` |
 | `walls.pass_store` | walls | surface (`transient`) | `look-pass.ts` importing `transient.ts` (a look pass kept in the transient store) |
 | `loader.reads` | loader | surface | `packhost.ts` and `kernel-context.ts` importing `packreads.ts` (the sandbox's reads, and a kernel pack's `ctx.reads`, which names the pack asking); the surface root's `open.ts` loads it before any workspace opens |
-| `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
+| `identity.invited` | identity | mail (`member-mail.ts#invited`, in `kernel.hooks`), filled when the server starts (`packs/loader/kernel/server-slots.ts`, loaded by the surface's server start) | `members.ts` importing `mail.ts` |
 | `open.<phase>` | identity (`src/lifecycle.ts`) | each root, by its `kernel/open.ts` (`OPEN`, and `LEADING` for what runs while the server leads), read in roots.json's order; an internal pack by `kernel.hooks`; what a service module still does there, `src/open-steps.ts` until its pack takes it | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
 | `surface.reads` | surface | agents (`instructions`), usage (`told`); the kernel until their packs hold their modules: views and askview (`view`), timeaxis (`placed`). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
@@ -374,13 +376,13 @@ moves with a shim to the pack named.
 | backup | backup's backupAll, upload and merge (through root services), and the server duty that asks every five minutes whether a backup is due (`backupDuty`, serverContext) |
 | usage | usage (through root.counters), pack-touches, pack-use (reads `type_counts`, `uses_lately`; root.uses), uses (root.uses) |
 | notifications | notify |
-| mail | mail, smtp, bounces |
+| mail (`packs/mailer`) | mail, smtp, bounces, member-mail |
 | alerts | alert |
 | looks | chrome, look-draw, icon, looks (`passFor` stays in walls) |
 | launch | launcher (the token stays in identity) |
 | connect | install, connect, token-ask, connection-tools, server-pack-tools (as built, wave 6b: install and server-pack-tools import nothing of the kernel, the latter through `root.server_packs`; the rest still do) |
 | presence | presence, seeing |
-| monitoring | report |
+| monitoring | report (the health tool stays the surface's, `report-tool.ts`, applying what `act.report.reading` says) |
 | devtools | dev, pull |
 
 Frontier goes to sessions, the pack whose types (`run`, `works_on`) it names,
@@ -612,6 +614,12 @@ At the old path, `src/<m>.ts`:
   The import is dynamic: `kernel-context.ts` reaches `packreads.ts`, which
   imports the query modules, which import shims, and a static import would be a
   cycle.
+
+As built (wave 6b, looks, presence, mail, monitoring): a function that took the whole database and a screen
+(presence, seeing, looks, bounces) is adapted to take the screen's map, and the database it is still handed is not
+read: the pack's context of that map reaches the transient store through `root.transient`, which reads it as the
+whole workspace, as its callers did. Notifications and alerts still import the kernel: a notification is applied past
+the rules as the asker's actor, and an alert mails, which no context does yet (the report of e_jxdxg89p).
 
 ### Tests
 

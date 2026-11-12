@@ -67,6 +67,16 @@
           "guard": "any"
         },
         "run": "publish-services.ts#publicProduct"
+      },
+      "root.transient": {
+        "in": "any",
+        "out": "any",
+        "run": "root-transient.ts#transientOf"
+      },
+      "root.look": {
+        "in": "any",
+        "out": "any",
+        "run": "root-looks.ts#lookOf"
       }
     }
   }
