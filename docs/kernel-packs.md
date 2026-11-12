@@ -54,6 +54,8 @@ trusted).
 - **`modules`**: its code, TypeScript under the pack's folder
   (`packs/<id>/kernel/`), loaded with `import()` by the loader. Never a file
   a pack item or a version carries: `pack_code` stays the sandbox's alone.
+- **`fills`**: the fields of an item its `write.rewrite` fillings may set
+  (placement: `["island"]`); none unless said. Only a service pack.
 - **`provides`**, **`hooks`**, **`tables`**, **`timers`**: below.
 
 Every root and service pack lives in this repository's `packs/`, as
@@ -159,8 +161,8 @@ change(actor, input)
 
 | Point | Signature | Bounds |
 |---|---|---|
-| `write.rewrite` | `(ctx, ops) => ops` | Same ops, same order, same op, id, type and ends. It sets only the props its pack names in `fills`. Visibility may narrow, never widen. The write pack checks each answer and refuses the change, naming the pack, if any bound is broken. |
-| `write.validate` | `(ctx, ops, who) => { refusals, warnings }` | Pure: reads only, records nothing. Run before decide and again when a held change is approved. |
+| `write.rewrite` | `(ctx, ops, judged) => ops` | Same ops, same order, same op, id, type and ends. It sets only the props its pack names in `fills`. Visibility may narrow, never widen. The write pack checks each answer and refuses the change, naming the pack, if any bound is broken. `judged` is the registry the change is judged by (`registry`), the island it was given (`island`) and the registry an island runs (`islandRegistry(island)`). |
+| `write.validate` | `(ctx, ops, who, judged) => { refusals, warnings }` | Pure: reads only, records nothing. Run before decide and again when a held change is approved. |
 | `write.follow` | `(ctx, ops) => Op[]` | Extra ops, refs allowed, tagged with the pack in the entry's header. Run before decide, so the verdict covers them, and again inside the apply transaction: if the second run differs, the new ops are judged there, and a change they would hold is refused as "the map moved, send again". |
 | `log.project` | `(ctx, facts, rows) => void` | Writes only the rows of its own `tables`, which the database pack makes with row-level security read from the item each row names. Run in the transaction, after the root projection, and in every rebuild. The snapshot keeps each projector's hash; a new hash rebuilds its table from the log at open. |
 | `write.after` | `(ctx, entry) => void` | After the entry is on the log. A failure is a warning, never an error (`afterLog`). |

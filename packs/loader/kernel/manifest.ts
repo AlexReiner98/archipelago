@@ -86,18 +86,20 @@ export interface KernelSpec {
   calls?: Record<string, { in?: unknown; out?: unknown }>;
   /** The hook points and slots it fills, each with its function (or several, in order). */
   hooks?: Record<string, ModuleRef | ModuleRef[]>;
+  /** The fields of an item its write.rewrite fillings may set (src/write-hooks.ts): none unless said. */
+  fills?: string[];
   /** The tables of its own that a log.project filling writes, each a column by its shape. */
   tables?: Record<string, Record<string, string>>;
   /** What it runs on a clock, on the server that leads. */
   timers?: { run: ModuleRef; every_ms: number; leading?: boolean }[];
 }
-export const KERNEL_KEYS: readonly string[] = 'trust internal modules provides calls hooks tables timers'.split(' ');
+export const KERNEL_KEYS: readonly string[] = 'trust internal modules provides calls hooks fills tables timers'.split(' ');
 const MODULE_REF = /^[\w./-]+\.ts#[A-Za-z_$][\w$]*$/;
 
 /** Problems with a manifest's `kernel`, as sentences. Where a pack may carry it is the registry's (kernelRefused). */
 export function kernelProblems(k: unknown): string[] {
   if (k === undefined) return [];
-  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, calls?, hooks?, tables?, timers? }'];
+  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, calls?, hooks?, fills?, tables?, timers? }'];
   const s = k as Raw, problems: string[] = [];
   for (const key of Object.keys(s)) if (!(KERNEL_KEYS as readonly string[]).includes(key)) problems.push(`"kernel.${key}" is not a key of a manifest: in kernel, one of ${KERNEL_KEYS.join(', ')}`);
   if (s.trust !== 'root' && s.trust !== 'service') problems.push('kernel.trust is root or service');
@@ -106,8 +108,9 @@ export function kernelProblems(k: unknown): string[] {
   const ref = (where: string, r: unknown) => { if (typeof r !== 'string' || !MODULE_REF.test(r) || r.includes('..')) problems.push(`${where} names a function of the pack's modules, <file>.ts#<export>: ${JSON.stringify(r)}`); };
   for (const [name, p] of Object.entries((s.provides ?? {}) as Record<string, Raw>)) ref(`kernel.provides.${name}`, p?.run);
   for (const [point, r] of Object.entries((s.hooks ?? {}) as Record<string, unknown>)) for (const one of [r].flat()) ref(`kernel.hooks.${point}`, one);
+  if (s.fills !== undefined && (!Array.isArray(s.fills) || s.fills.some((f) => typeof f !== 'string' || !f))) problems.push('kernel.fills is a list of the fields its rewrite may set');
   for (const [i, t] of arr<Raw>(s.timers).entries()) { ref(`kernel.timers[${i}]`, t.run); if (typeof t.every_ms !== 'number' || t.every_ms < 1000) problems.push(`kernel.timers[${i}].every_ms is a number of milliseconds, 1000 or more`); }
-  if (s.trust === 'root' && (s.provides !== undefined || s.hooks !== undefined)) problems.push('a root pack opens hook points and slots; it fills none and provides no service name');
+  if (s.trust === 'root' && (s.provides !== undefined || s.hooks !== undefined || s.fills !== undefined)) problems.push('a root pack opens hook points and slots; it fills none and provides no service name');
   return problems;
 }
 

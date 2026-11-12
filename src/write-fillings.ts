@@ -5,18 +5,10 @@
 // Unwait and sources stay inline for now: both act at the level of facts inside the apply loop, and as a
 // write.follow their ops would be judged by the rules, which is the owner's to see first (task e_mhqvdzj6).
 
-import { placeOnIslands } from './island-place.ts'; import { placeWithSubject } from './subject.ts';
 import { checkUpdated, checkWritten } from './automation-rules.ts'; import { islandRegistry } from './island-pin.ts';
 import { typesApplied } from './type-items.ts'; import { supersede } from './proposals.ts';
 import type { Op } from './pelago-types.ts';
 import type { AfterEntry, BuiltIn, Checked, Point, WriteEnv } from './write-hooks.ts';
-
-/** A placement that moves ops in the list it is given, as a rewrite: a list in, the list it left out. */
-const placing = (place: (env: WriteEnv, ops: Op[]) => Promise<void>) => async (env: WriteEnv, ops: Op[]) => {
-  const out = ops.slice();
-  await place(env, out);
-  return out;
-};
 
 /** An automation's trigger and conditions, checked as written (src/automation-rules.ts), by the version its island runs. */
 async function automations(env: WriteEnv, ops: Op[]): Promise<Checked> {
@@ -37,10 +29,6 @@ async function automations(env: WriteEnv, ops: Op[]): Promise<Checked> {
 }
 
 export const BUILT_IN: { [P in Point]?: BuiltIn[] } = {
-  'write.rewrite': [
-    { pack: 'placement', fills: ['island'], run: placing((env, ops) => placeWithSubject(env.map, env.reg, ops)) },
-    { pack: 'placement', fills: ['island'], run: placing((env, ops) => placeOnIslands(env.map, env.reg, ops, env.island)) },
-  ],
   'write.validate': [
     { pack: 'automations', run: automations },
   ],

@@ -15,6 +15,7 @@
 // What follows an op at the level of facts (the owner's link, src/owner-link.ts) stays in the write path.
 
 import { BUILT_IN } from './write-fillings.ts';
+import { islandRegistry } from './island-pin.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Op } from './pelago-types.ts';
 import type { Registry } from './packs.ts';
@@ -28,6 +29,13 @@ export interface Who { human: boolean; pack?: string }
 
 /** What the write path hands its own fillings: the map, the types the change is judged by, and what the change says. */
 export interface WriteEnv { map: Archipelago; reg: Registry; island?: string; who?: Who }
+
+/**
+ * What a rewrite or a validator of a pack is handed beside the ops: the registry the change is judged by (an island's
+ * version, where that differs from the map's), the island the change was given, and the registry an island runs.
+ */
+export interface Judged { registry: Registry; island?: string; islandRegistry(island: unknown): Promise<Registry> }
+const judgedOf = (env: WriteEnv): Judged => ({ registry: env.reg, island: env.island, islandRegistry: (island) => islandRegistry(env.map, island, env.reg) });
 
 /** What a validator answers. */
 export interface Checked { refusals: string[]; warnings?: string[] }
@@ -112,7 +120,7 @@ export function rewriteProblem(before: Op[], after: unknown, fills: string[]): s
 /** write.rewrite: each filling's answer checked against its bounds and put in the ops' place, in the list given. */
 export async function rewrite(env: WriteEnv, ops: Op[]): Promise<void> {
   for (const f of await fillings(env, 'write.rewrite')) {
-    const out = await f.run(structuredClone(ops));
+    const out = await f.run(structuredClone(ops), judgedOf(env));
     const problem = rewriteProblem(ops, out, f.fills);
     if (problem) throw rejected([`the ${f.pack} pack's rewrite ${problem}`]);
     // An op it left as it was stays the same object: the apply loop knows each op by it (change-apply.ts, `at`).
@@ -124,7 +132,7 @@ export async function rewrite(env: WriteEnv, ops: Op[]): Promise<void> {
 export async function validate(env: WriteEnv, ops: Op[]): Promise<{ refusals: string[]; warnings: string[] }> {
   const refusals: string[] = [], warnings: string[] = [];
   for (const f of await fillings(env, 'write.validate')) {
-    const out = (await f.run(structuredClone(ops), env.who)) as Checked | undefined;
+    const out = (await f.run(structuredClone(ops), env.who, judgedOf(env))) as Checked | undefined;
     refusals.push(...(out?.refusals ?? []));
     warnings.push(...(out?.warnings ?? []));
   }
