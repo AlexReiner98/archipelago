@@ -4,7 +4,8 @@
 // takes the map rather than its context (moved with a shim in src/), split off a root so the root no longer holds it.
 // It is named here, through its shim, until it runs on its context and its manifest names it.
 // - check_connections: the connect pack's (wave 5, bug e_wpww27fm), out of the write root's class.
-// reads API's own imports of their modules, which a root may not make: each is loaded when first asked.
+// - surface.reads: the reads came here in wave 5 in place of the reads API's own imports of their modules, which a
+//   root may not make; each is loaded when first asked.
 
 import { backupFile } from './backup-route.ts';
 import { check_connections } from './check-connections.ts';
