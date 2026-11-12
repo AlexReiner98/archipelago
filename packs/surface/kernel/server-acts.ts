@@ -12,7 +12,8 @@ import { madeKey } from './server-gates.ts';
 import type { ServerAct, ServerPackFile } from '../../../src/server-packs.ts';
 import { env } from '../../../src/env.ts';
 import { readSites } from '../../../src/site.ts';
-import { addCount, COUNT_KEY, countsSince } from '../../../src/pack-counts.ts';
+import { addCount, COUNT_KEY, countsSince, heldCounts } from '../../../src/pack-counts.ts';
+import type { RootCall } from '../../../src/root-calls.ts';
 import { freeId } from '../../../src/workspace-id.ts';
 import type { Workspaces } from '../../../src/workspaces.ts';
 
@@ -154,4 +155,24 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       return { sent: true };
     }
   }
+}
+
+/** The kernel's stream of uses (core's rule uses): what the Packs screen counts. */
+const USES = 'uses';
+
+/**
+ * root.uses (docs/kernel-packs.md, "Root services"): the uses of a workspace's declarations, counted in the server's
+ * memory until they are written down each minute with the rest of the counts (keepCounts). `add` adds to them; `held`
+ * answers what is not yet written, as rows of key, day and n. The workspace is the caller's map's; a caller with no map
+ * (the kernel's, which names only a workspace) names it.
+ */
+export function usesOf(call: RootCall, input: { workspace?: string; add?: { key: string; n?: number }[]; held?: boolean }) {
+  const workspace = call.map?.workspace ?? input.workspace;
+  if (typeof workspace !== 'string' || !workspace) throw new Error('root.uses counts a workspace: call it from its map, or name it');
+  if (call.map && input.workspace !== undefined && input.workspace !== workspace) throw new Error('root.uses counts only the map that calls it');
+  for (const { key, n = 1 } of input.add ?? []) {
+    if (typeof key !== 'string' || !key || !(Number.isInteger(n) && n >= 1)) throw new Error('root.uses adds a key and a whole number');
+    addCount(workspace, USES, key, undefined, n);
+  }
+  return input.held ? heldCounts(workspace, USES) : { counted: (input.add ?? []).length };
 }

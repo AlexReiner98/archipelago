@@ -39,10 +39,14 @@ export type ServiceRead = {
   counts?: { stream: string; after?: number };
   /** Of some items, the fields a person said after any agent last did (an item a person made counts whole), with who and when. */
   corrections?: string[];
+  /** The uses stream's entries written in these days (UTC, first and last; at most USE_ENTRIES), each its facts: what the Packs screen counts. */
+  uses_lately?: { days: [string, string] };
+  /** Of some types and link types, the items and open links standing, and how many of them were made since a time. */
+  type_counts?: { types: string[]; links: string[]; since: string };
 };
 
 /** The reads of this module, by name. */
-const SERVICE_READS = ['link', 'log_head', 'memory', 'islands_off', 'public_views', 'public_view_at', 'public_document', 'published_row', 'shared', 'picture', 'counts', 'corrections'] as const satisfies readonly (keyof ServiceRead)[];
+const SERVICE_READS = ['link', 'log_head', 'memory', 'islands_off', 'public_views', 'public_view_at', 'public_document', 'published_row', 'shared', 'picture', 'counts', 'corrections', 'uses_lately', 'type_counts'] as const satisfies readonly (keyof ServiceRead)[];
 /** The most entries one read of a count stream answers. */
 export const COUNT_ENTRIES = 1000;
 /** A key of a pack's memory: a short word of letters, digits, _, -, : and . */
@@ -137,5 +141,29 @@ export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string)
     );
     return rows;
   }
+  if (q.uses_lately !== undefined || q.type_counts !== undefined) return usageRead(l, q);
   return undefined;
+}
+
+// The usage pack's reads (wave 5, e_knnqyhn7): what pack-use.ts read of the map itself, the same SQL, as the asker.
+
+/** The most entries of the uses stream one read answers: a minute's counts are one entry, so this is weeks of steady use. */
+export const USE_ENTRIES = 50_000;
+const DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+async function usageRead(l: Archipelago, q: ServiceRead): Promise<unknown> {
+  if (q.uses_lately !== undefined) {
+    const days = q.uses_lately.days;
+    if (!Array.isArray(days) || days.length !== 2 || !days.every((d) => typeof d === 'string' && DAY.test(d))) throw new Error('uses_lately.days is the first and last day, YYYY-MM-DD');
+    const entries = await opEntries(l.db, 'uses' as OpStream, { days, limit: USE_ENTRIES });
+    return entries.map((e) => ({ facts: e.facts }));
+  }
+  const types = list(q.type_counts!.types, 'type_counts.types'), links = list(q.type_counts!.links, 'type_counts.links'), since = q.type_counts!.since;
+  const at = String(since);
+  if (Number.isNaN(Date.parse(at))) throw new Error('type_counts.since is a time');
+  const [items, ties] = await Promise.all([
+    types.length ? l.db.query<{ type: string; n: number; lately: number }>(`select type, count(*)::int as n, count(*) filter (where created_at >= $2)::int as lately from entity where type = any($1::text[]) and archived_at is null group by type -- index entity_type_created`, [types, at]) : { rows: [] },
+    links.length ? l.db.query<{ type: string; n: number; lately: number }>(`select type, count(*)::int as n, count(*) filter (where valid_from >= $2)::int as lately from relation where type = any($1::text[]) and valid_to is null group by type -- index relation_open_type`, [links, at]) : { rows: [] },
+  ]);
+  return { items: items.rows, links: ties.rows };
 }

@@ -37,6 +37,15 @@
           ]
         },
         "run": "workspace-tools.ts#countersOf"
+      },
+      "root.uses": {
+        "in": {
+          "workspace?": "string",
+          "add?": "any",
+          "held?": "boolean"
+        },
+        "out": "any",
+        "run": "server-acts.ts#usesOf"
       }
     }
   }
