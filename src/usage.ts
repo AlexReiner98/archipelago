@@ -12,7 +12,7 @@
 import { bytesByType, largestItems } from './bytes.ts';
 import { looksBy, looksThisHour } from './looks.ts';
 import { limitOf } from './members.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { LIMITS, NEAR, useOf, type LimitName } from './standing.ts'; import { awakeSessions, bytes, requestsBy, requestsThisMinute, SESSION_AWAKE_MS, storageOf, storageParts } from './workspace-use.ts';
 
@@ -60,7 +60,7 @@ const ratio = (n: number, of: number) => (of > 0 ? Math.min(n / of, 1) : 0);
 export async function usage(l: Archipelago, _input: Record<string, unknown>, actor?: Actor) {
   const limits = await limitOf(l.workspace);
   const admin = Boolean(actor?.admin);
-  const whole = await wholeMap(l);
+  const whole = await bypassingRls(l);
   const items: Item[] = [];
   const links: { id: string; type: string; from: string; to: string; props: Record<string, unknown> }[] = [];
   let n = 0;

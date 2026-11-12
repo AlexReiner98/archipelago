@@ -45,8 +45,8 @@ export const HOOK_TOOLS: Record<string, Tool> = {
       const { packs, running } = reach;
       const { answerAt } = await import('./server-adapter.ts');
       const { resolveRun } = await import('./chat-run.ts');
-      const { wholeMap } = await import('./outbox.ts');
-      const { db } = await wholeMap(l);
+      const { bypassingRls } = await import('./outbox.ts');
+      const { db } = await bypassingRls(l);
       // A plugin keeps no files in the project, so none can be behind: it says it has the server's own.
       const setup = (await import('./server-files.ts')).setupVersion();
       const body = {

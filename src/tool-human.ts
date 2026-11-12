@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { merge, parseBackup, parseVault, readable } from './backup.ts';
 import { launch } from './launcher.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { TypeDef } from './packs.ts';
 import { actorId } from './pelago.ts';
 import { looked, presence } from './presence.ts';
@@ -40,9 +40,9 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
         .describe('The page asking, whether a show can land in it, and where it stands (its address after "#/"): an agent’s show says how many pages can take it, and an agent is told what the owner is looking at, and whether its show lands in the tab in sight (lands: the sessions whose shows go there).'),
     },
     run: async (l, _actor, { after, seq, ids = [], islands = [], page, was }) => {
-      if (page) await looked((await wholeMap(l)).db, l, { page: page.page, on: page.on });
-      if (page?.where !== undefined) await standsAt((await wholeMap(l)).db, l, page.page, page.where, page.tab, page.lands);
-      const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), presence((await wholeMap(l)).db, l), headPos(l.db)]);
+      if (page) await looked((await bypassingRls(l)).db, l, { page: page.page, on: page.on });
+      if (page?.where !== undefined) await standsAt((await bypassingRls(l)).db, l, page.page, page.where, page.tab, page.lands);
+      const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), presence((await bypassingRls(l)).db, l), headPos(l.db)]);
       const stand = { queue: `${queue.rows[0].n}.${told}`, ...seen, ui: uiStamp() };
       const events = await eventsAfter(l.db, { seq, ids });
       const then = was === undefined ? {} : { was: await factsUpTo(l.db, { pos: was, ids }) };
@@ -69,7 +69,7 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       needAdmin(actor, 'import a backup');
-      const whole = await wholeMap(l); // everything in the file goes in, whoever it is private to: this is the map as a whole, as a backup is
+      const whole = await bypassingRls(l); // everything in the file goes in, whoever it is private to: this is the map as a whole, as a backup is
       const file = await readable(whole.db, { ...parseBackup(Buffer.from(input.backup, 'base64')), ...(input.vault && { vault: parseVault(Buffer.from(input.vault, 'base64')) }) });
       const defined = ((file.local_pack as { types?: TypeDef[] } | null)?.types ?? []).filter((t) => !whole.registry.types.has(t.id));
       // Its own types, kept as type items, are taken in with it.

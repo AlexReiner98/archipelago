@@ -16,7 +16,7 @@ import type { Q } from './db.ts';
 import { mailConfigured, normalEmail, sendMail } from './mail.ts';
 import { configureStanding, limitOf, stillWritable, type Limits, type Standing } from './standing.ts';
 import { indexMember } from './control-index.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import type { Tool } from './tools.ts';
 import { keep, kept, take } from './transient.ts';
@@ -110,7 +110,7 @@ export async function adminEmails(whole: Archipelago): Promise<string[]> {
 /** On a workspace with a member limit a person signs in as a member: a human token for anyone else would be a seat unpaid for. */
 export async function humanTokenAllowed(l: Archipelago, person: string | undefined): Promise<void> {
   if (!(await limitOf(l.workspace))) return;
-  const { rows } = await (await wholeMap(l)).db.query(`select 1 from member where person_id = $1 and removed_at is null`, [person ?? '']);
+  const { rows } = await (await bypassingRls(l)).db.query(`select 1 from member where person_id = $1 and removed_at is null`, [person ?? '']);
   if (!rows.length) throw new Error('On this workspace a person signs in as a member: add them under Members first.');
 }
 
@@ -242,7 +242,7 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
       if (input.admin && input.read_only) throw new Error('A member who only reads cannot be an admin.');
       const email = normalEmail(input.email);
       if (!email) throw new Error(`"${input.email}" is not an email address.`);
-      const whole = await wholeMap(l);
+      const whole = await bypassingRls(l);
       if (await memberOf(whole.db, email)) throw new Error(`${email} is a member already.`);
       await stillWritable(l.workspace);
       await roomForOneMore(whole.db, l.workspace);
@@ -294,7 +294,7 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
     input: {},
     run: async (l, actor) => {
       needAdmin(actor, 'list members');
-      const { rows } = await (await wholeMap(l)).db.query<Member & { name: string | null; last_used: string | null }>(
+      const { rows } = await (await bypassingRls(l)).db.query<Member & { name: string | null; last_used: string | null }>(
         `select m.email, m.person_id, m.admin, m.read_only, m.added_at, e.title as name,
                 (select max(t.last_used) from token t where t.entity_id = m.person_id and t.kind = 'human') as last_used
          from member m left join entity e on e.id = m.person_id where m.removed_at is null order by m.added_at`,
@@ -308,7 +308,7 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
     input: { email: z.string(), admin: z.boolean().optional(), read_only: z.boolean().optional(), remove: z.boolean().optional() },
     run: async (l, actor, input) => {
       needAdmin(actor, 'change members');
-      const whole = await wholeMap(l);
+      const whole = await bypassingRls(l);
       const member = await memberOf(whole.db, normalEmail(input.email) ?? '');
       if (!member) throw new Error(`${input.email} is not a member.`);
       const live = `entity_id = $1 and kind = 'human' and revoked_at is null`;

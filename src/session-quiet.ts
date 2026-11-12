@@ -5,7 +5,7 @@
 
 import type { Archipelago } from './pelago.ts';
 import { notify } from './notify.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import { took } from './presence.ts';
 import { alertOwner } from './alert.ts';
 import { sessionEvents } from './session-events.ts';
@@ -74,7 +74,7 @@ export class QuietSessions {
       if (entity?.props.stale_flagged) continue;
       await this.l.operational(run.id, { props: { stale_flagged: true } }, { actor: 'agent:pelago', action: 'run.stale', reason: `No report for over ${view.stale_after_minutes} minutes` });
       // Its tab on the owner's page goes until it next shows something (ui/tab-life.js); not while a turn is under way.
-      if (!run.busy) await took((await wholeMap(this.l)).db, this.l, { kind: 'other', actor: 'agent:pelago', did: 'quiet', rests: true, run: run.id }, true).catch(() => {});
+      if (!run.busy) await took((await bypassingRls(this.l)).db, this.l, { kind: 'other', actor: 'agent:pelago', did: 'quiet', rests: true, run: run.id }, true).catch(() => {});
       // Worth a person's attention only when it keeps something from everyone else: the rest end by themselves.
       if (!run.holds.length || !this.l.registry.type('notification')) continue;
       await notify(

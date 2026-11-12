@@ -7,7 +7,7 @@
 
 import type { Archipelago, Entity } from './pelago.ts';
 import { pageStyle } from './styles.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import { took } from './presence.ts';
 
 /** The words a session may be named, in the order their marks take the style's hues. */
@@ -40,7 +40,7 @@ export async function sessionPromptNamed(l: Archipelago, run: Entity, prompt: un
   const title = promptTitle(prompt);
   if (!title || run.props.label || !run.title.startsWith(PLACED)) return;
   await l.apply(actor, { ops: [{ op: 'update', id: run.id, title }], reason: 'Session named by its first prompt' });
-  await took((await wholeMap(l)).db, l, { kind: 'other', actor, did: 'titled', run: run.id }, true).catch(() => {});
+  await took((await bypassingRls(l)).db, l, { kind: 'other', actor, did: 'titled', run: run.id }, true).catch(() => {});
 }
 /** A title as a client said it: its words, trimmed, or nothing. */
 export const saidTitle = (label: unknown) => (typeof label === 'string' ? label.trim().replace(/\s+/g, ' ').slice(0, 200) : '');
@@ -51,7 +51,7 @@ export async function sessionLabelled(l: Archipelago, run: Entity, label: unknow
   if (!said || (said === run.props.label && run.title === cutTitle(said))) return;
   await l.apply(actor, { ops: [{ op: 'update', id: run.id, title: cutTitle(said), props: { label: said } }], reason: 'Session titled' });
   // Every page open hears it at once: its tab is named anew (ui/pane-route.js reads the title off the step).
-  await took((await wholeMap(l)).db, l, { kind: 'other', actor, did: 'titled', run: run.id }, true).catch(() => {});
+  await took((await bypassingRls(l)).db, l, { kind: 'other', actor, did: 'titled', run: run.id }, true).catch(() => {});
 }
 
 /** How many hues the workspace's style tells things apart by. */

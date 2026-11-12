@@ -8,7 +8,7 @@ import { listening } from './presence.ts';
 import { askView, viewList, viewsSaid } from './askview.ts';
 import { shownIn } from './query-saved.ts';
 import { showingIn } from './public-view-store.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
 import { lookAt, takeLook } from './looks.ts';
 import { getPicture } from './pictures.ts';
@@ -330,7 +330,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       if (input.after === undefined) return { latest: await latestSeq(l), changes: [] };
       const until = Date.now() + (input.wait_seconds ?? 0) * 1000;
       // Counted on every server, so the web UI can say whether anyone will hear a decision the moment it is made.
-      const { db } = await wholeMap(l);
+      const { db } = await bypassingRls(l);
       await listening(db, l.workspace, 1);
       try {
         for (;;) {
@@ -351,7 +351,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     description: 'The image kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; query document, which sections have a figure). Or, with look, a look taken in the last 30 minutes, again, as an image.',
     input: { result: z.string().optional().describe('The id of the test result, note or file.'), look: z.string().optional().describe('A look query look or show answered with.') },
     run: async (l, _actor, input) => {
-      if (input.look) return lookAt((await wholeMap(l)).db, l, input.look);
+      if (input.look) return lookAt((await bypassingRls(l)).db, l, input.look);
       if (!input.result) throw new Error('picture needs "result" or "look".');
       return getPicture(l, { result: input.result });
     },
@@ -369,7 +369,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       published: z.boolean().optional().describe('With entity a document: draw the page publishing it now would give, as its preview does, not the app.'),
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
     },
-    run: async (l, actor, input) => takeLook((await wholeMap(l)).db, l.db, l, actor.name, input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), input),
+    run: async (l, actor, input) => takeLook((await bypassingRls(l)).db, l.db, l, actor.name, input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), input),
   },
   seeing: {
     description:
@@ -378,7 +378,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       'With run, tab says whether the tab in sight is that session’s (yours), another chat’s, or one of the owner’s following a chat (own false).',
     input: { run: z.string().optional().describe('Your run id, to be told whether the tab in sight is yours.') },
     run: async (l, _actor, input) => {
-      const s = await seenNow((await wholeMap(l)).db, l);
+      const s = await seenNow((await bypassingRls(l)).db, l);
       return s && Date.now() - s.said <= NOW_MS ? { ...(await seeing(l, s, input.run)), address: s.at } : null;
     },
   },

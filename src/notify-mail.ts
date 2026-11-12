@@ -7,7 +7,7 @@
 
 import { normalEmail, sendMail } from './mail.ts';
 import { itemLink } from './members.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Archipelago } from './pelago.ts';
 
 /** The event the kernel tells packs when a notification is made. */
@@ -56,7 +56,7 @@ export async function subjectOf(whole: Archipelago, notification: string): Promi
 
 /** The address a notification's person signs in with, if they are a member who does. */
 export async function addressFor(l: Archipelago, notification: string): Promise<string | undefined> {
-  const whole = await wholeMap(l);
+  const whole = await bypassingRls(l);
   const person = await personFor(whole, notification);
   if (!person) return undefined;
   const { rows } = await whole.db.query<{ email: string }>(`select email from member where person_id = $1 and removed_at is null order by added_at limit 1`, [person]);
@@ -77,7 +77,7 @@ export async function mailHeard(l: Archipelago, pack: string, input: unknown, as
   const to = await addressFor(l, heard.target);
   if (!to) return { sent: false, why: 'the person it is for signs in with no address' };
   // The link is to what the notification is about, where there is something to do, else to the notification.
-  const link = itemLink(l.workspace).replace('{id}', (await subjectOf(await wholeMap(l), heard.target)) ?? heard.target);
+  const link = itemLink(l.workspace).replace('{id}', (await subjectOf(await bypassingRls(l), heard.target)) ?? heard.target);
   await sendMail({ to, subject, text: `${text.replace(/\n+$/, '')}\n\n${link}\n` });
   console.log(`${pack}: mailed notification ${heard.target}`);
   return { sent: true };

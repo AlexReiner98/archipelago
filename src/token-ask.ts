@@ -11,7 +11,7 @@ import { randomHex, sameBytes, sha256Hex } from './hashes.ts';
 import { z } from 'zod';
 import { createToken } from './auth.ts';
 import type { Q } from './db.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Actor, Archipelago, Entity } from './pelago.ts';
 import { sameAddress } from './report.ts';
 import type { Tool } from './tools.ts';
@@ -119,7 +119,7 @@ export const ASK_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: { within: z.string().optional().describe('Only the requests about this item.'), answered: z.boolean().optional().describe('Also the requests answered in their ten minutes.') },
     run: async (l, _actor, input) => {
-      const whole = await wholeMap(l);
+      const whole = await bypassingRls(l);
       const listed = await Promise.all((await asks(whole.db)).filter((a) => input.answered || a.state === 'pending').map((a) => shown(l, a)));
       return listed.filter((a) => !input.within || a.items.some((e) => e?.id === input.within));
     },
@@ -129,7 +129,7 @@ export const ASK_TOOLS: Record<string, Tool> = {
     humanOnly: true,
     input: { id: z.string(), approve: z.boolean() },
     run: async (l, actor: Actor, input) => {
-      const whole = await wholeMap(l);
+      const whole = await bypassingRls(l);
       const ask = (await asks(whole.db)).find((a) => a.id === input.id);
       if (!ask || ask.state !== 'pending') throw new Error('That request is no longer waiting: it was answered, or ran out.');
       if (!input.approve) {

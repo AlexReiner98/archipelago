@@ -6,14 +6,14 @@ import { z } from 'zod';
 import { needAdmin } from './actor-checks.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { humanTokenAllowed } from './members.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 import { createPersonToken, extendPersonToken, personTokensOf, revokePersonToken } from './person-tokens.ts';
 import type { Tool } from './tools.ts';
 
 /** The sign-in addresses of the caller here, or of every member for an admin listing: who a person token acts for. */
 async function addresses(l: Archipelago, actor: Actor, every = false): Promise<string[]> {
-  const { rows } = await (await wholeMap(l)).db.query<{ email: string }>(`select email from member where removed_at is null and ($2 or person_id = $1)`, [actor.person ?? '', every]);
+  const { rows } = await (await bypassingRls(l)).db.query<{ email: string }>(`select email from member where removed_at is null and ($2 or person_id = $1)`, [actor.person ?? '', every]);
   return rows.map((r) => r.email);
 }
 

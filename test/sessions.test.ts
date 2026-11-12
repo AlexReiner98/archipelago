@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { resolveRun, sessionEnd, sessionPrompted, sessionStart, sessionUpdate, tell } from '../src/sessions.ts';
 import { hookSessionEnd, hookSessionStart } from '../src/session-hook.ts';
 import { callTool } from '../src/tools.ts';
-import { wholeMap } from '../src/outbox.ts';
+import { bypassingRls } from '../src/outbox.ts';
 import { presence } from '../src/presence.ts';
 import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
@@ -98,7 +98,7 @@ test('one chat is one session: its agent saying it is done keeps it open, and on
 test('a session opens a tab once, on what it works on, and what it takes on is shown there', async () => {
   const l = await fresh();
   const made = await make(l, [{ op: 'create', ref: 'task', type: 'task', title: 'Some work' }]);
-  const shows = async () => (await presence((await wholeMap(l)).db, l)).steps.filter((s) => s.kind === 'show');
+  const shows = async () => (await presence((await bypassingRls(l)).db, l)).steps.filter((s) => s.kind === 'show');
   const { run } = (await callTool(l, agent, 'session_start', { session_id: 'tabbed', surface: 'claude-code', task: made.task })) as any;
   assert.deepEqual((await shows()).map((s) => [s.hash, s.opens, s.run]), [[`e/${made.task}`, true, run]]);
   await callTool(l, agent, 'session_start', { session_id: 'tabbed', surface: 'claude-code' });

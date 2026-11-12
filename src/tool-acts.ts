@@ -11,7 +11,7 @@ import { takeLook } from './looks.ts';
 import { toConfirm } from './confirm.ts';
 import { stopLaunched } from './launcher.ts';
 import { notify } from './notify.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import { itemLink } from './members.ts';
 import { actorId } from './pelago.ts';
 import { PICTURE_TYPES, putPicture } from './pictures.ts';
@@ -76,7 +76,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // Where it pointed, and whether a page of theirs is there to follow it; with a look, the picture of what is there.
       if (input.url && input.look) throw new Error('look draws the map: a url is framed on their page, never drawn by the server.');
       const hash = input.url ? webAddress(input.url) : await viewAddress(l, input);
-      const { db } = await wholeMap(l);
+      const { db } = await bypassingRls(l);
       const focus = input.focus ?? true;
       const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run, focus, input.watch);
       const pages = await watching(db, l);
@@ -178,7 +178,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       const answer = await tell(l, actor, input);
-      const { db } = await wholeMap(l);
+      const { db } = await bypassingRls(l);
       await tellStamp(db, l.workspace);
       await took(db, l, { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}`, run: answer.run }, true);
       return answer;

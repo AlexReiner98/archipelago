@@ -9,7 +9,7 @@
 
 import { checkAutomation } from './automation-rules.ts';
 import type { LaunchInput, LaunchMode, StartedBy } from './launch-brief.ts';
-import { wholeMap } from './outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 
 /** How a session is started: src/launcher.ts hands it in when it loads, since what it reads reaches back to the pack host. */
@@ -42,7 +42,7 @@ const text = (s: unknown) => (typeof s === 'string' ? s : '');
 export async function launchHeard(l: Archipelago, pack: string, input: unknown, asked: LaunchAsked): Promise<{ launched: boolean; run?: string; mode?: LaunchMode; why?: string }> {
   const id = dueOf(input);
   if (!id) throw new Error(`The ${pack} pack asks to launch: a pack launches only on hearing an automation come due (${ITEM_DUE}).`);
-  const whole = await wholeMap(l);
+  const whole = await bypassingRls(l);
   const auto = await whole.entity(id);
   if (!auto || auto.archived_at || !whole.registry.isA(auto.type, 'automation')) throw new Error(`The ${pack} pack asks to launch for ${id}, which is not an automation.`);
   if (auto.status !== 'enabled') throw new Error(`The ${pack} pack asks to launch for "${auto.title}", which is not enabled.`);
