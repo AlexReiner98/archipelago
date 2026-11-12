@@ -6,20 +6,16 @@
 // a window of time (`time`, src/timeaxis.ts): it finds nothing more, and each item says where it falls in the window.
 //
 // Every read is bounded by the ids in hand, an end of a link, the type index or the limit, and runs as the viewer:
-// row-level security keeps what they may not see out of the seeds, the walk and the links alike.
+// row-level security keeps what they may not see out of the seeds, the walk and the links alike. The SQL is the reads
+// API's (flat, packs/surface/kernel/packreads-flat.ts); what a pack answers of a term is asked here, by its name.
 
-import { SYSTEM, WRAPS } from '../../../src/head.ts';
-import { ISLAND, islandPack, onIslands } from '../../../src/island-items.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import { checkedAfter, holding, wordConditions, type Narrowing, type Word } from './query-only.ts';
-import { heldIds } from './query-held.ts';
-import { movedIds } from '../../../src/moved.ts';
-import { endsOf, frontierOf, readTerm, sayTerm, setOf, workedBy, type Term } from './query-terms.ts';
-import { rankSql, searchIds, slipsOf } from '../../../src/search.ts';
-import { markOf, sessionStates } from '../../../src/session-state.ts';
-import { headPos } from '../../../src/tail.ts';
-import { fileOnAxis } from '../../../src/timelanes.ts';
-import { placeAll, readAxis, resolveAxis, windowOf, zoneOf, type TimeAxis } from './timeaxis.ts';
+import type { KernelContext } from '#pelago/kernel';
+import { atInstant, saysDay, type Word } from './query-only.ts';
+import { found, readTerm, sayTerm, termsOf, type Found as FoundTerm, type Reasons, type Term, type Terms } from './query-terms.ts';
+import { placeAll, readAxis, resolveAxis, windowOf, zoneOf, type Span, type TimeAxis } from './timeaxis.ts';
+import { islandPack } from './island-legend.ts';
+
+export { termsOf };
 
 /** Which term of the filter found an item: its words, a type, an id named, a link term. */
 export type Found = 'text' | 'type' | 'id' | 'link' | 'in';
@@ -39,6 +35,8 @@ export interface FlatLens {
   time?: TimeAxis;
 }
 
+/** The kernel flag's kind: the app's own configuration. */
+const SYSTEM = 'system';
 /** What is left out unless the lens says otherwise: the app's own configuration. */
 const NOT_DEFAULT = [`kind ${SYSTEM}`];
 /** The most items one answer sends. */
@@ -78,31 +76,42 @@ export const fromBefore = (f: Record<string, unknown>) => {
 };
 
 /** The flat lens asked for, each field checked. A filter that includes nothing is refused: never the whole map. */
-export function readFlat(l: Archipelago, input: Record<string, unknown>): FlatLens {
+export function readFlat(at: Terms, input: Record<string, unknown>): FlatLens {
+  const reg = at.registry;
   const asked = (input.filter ?? {}) as Record<string, unknown>;
   if (typeof asked !== 'object' || Array.isArray(asked)) throw new Error('filter must be an object: { find, only, not }, each a list of terms');
   const filter = asked as { find?: unknown; only?: unknown; not?: unknown };
   const part = (name: 'find' | 'only' | 'not', value: unknown) => {
     if (value !== undefined && !Array.isArray(value)) throw new Error(`filter.${name} must be a list of terms`);
     // Words with nothing in them are no term: find sends what was typed.
-    return [...new Set(((value ?? []) as unknown[]).filter((t) => !/^\s*text\s*$/i.test(String(t))).map((t) => sayTerm(readTerm(l, t, name))))];
+    return [...new Set(((value ?? []) as unknown[]).filter((t) => !/^\s*text\s*$/i.test(String(t))).map((t) => sayTerm(readTerm(at, t, name))))];
   };
   const find = part('find', filter.find);
   const only = part('only', filter.only);
   const not = filter.not === undefined ? NOT_DEFAULT : part('not', filter.not);
-  for (const t of find.map((x) => readTerm(l, x, 'find'))) if (t.sort === 'word' || t.sort === 'kind') throw new Error(`filter.find: "${sayTerm(t)}" can narrow what is found (only, not) but finds nothing itself: alone it would read the whole map`);
+  for (const t of find.map((x) => readTerm(at, x, 'find'))) if (t.sort === 'word' || t.sort === 'kind') throw new Error(`filter.find: "${sayTerm(t)}" can narrow what is found (only, not) but finds nothing itself: alone it would read the whole map`);
   if (!find.length && !input.preview)
     throw new Error(only.length
       ? 'A lens includes something (filter.find) for only to narrow: alone, it would read the whole map.'
       : 'A lens includes something (filter.find): a filter that includes nothing would read the whole map.');
   const walkIn = (input.walk ?? {}) as Record<string, unknown>;
   const over = walkIn.over === undefined ? [] : walkIn.over === 'all' ? 'all' : names(walkIn.over, 'walk.over');
-  if (over !== 'all') for (const { link } of over.map(wayOf)) if (!l.registry.relations.has(l.registry.canonical(link))) throw new Error(`walk.over: unknown link type "${link}" (a link type, with > to go out along it or < to come in)`);
+  if (over !== 'all') for (const { link } of over.map(wayOf)) if (!reg.relations.has(reg.canonical(link))) throw new Error(`walk.over: unknown link type "${link}" (a link type, with > to go out along it or < to come in)`);
   const steps = walkIn.steps ?? (over.length ? 1 : 0);
   if (!Number.isInteger(steps) || (steps as number) < 0 || (steps as number) > MAX_STEPS) throw new Error(`walk.steps must be a whole number from 0 to ${MAX_STEPS}`);
   const limit = input.limit ?? FLAT_LIMIT;
   if (!Number.isInteger(limit) || (limit as number) < 1 || (limit as number) > LENS_LIMIT) throw new Error(`limit must be a whole number from 1 to ${LENS_LIMIT}`);
   return { find, only, not, walk: { over, steps: steps as number }, limit: limit as number, ...(input.time !== undefined && { time: readAxis(input.time) }) };
+}
+
+/** Why a lens cannot be read, or nothing: read as the flat lens reads it, and nothing asked of the map. */
+export function flatProblem(ctx: KernelContext, input: Record<string, unknown>): string | undefined {
+  try {
+    readFlat(termsOf(ctx), input);
+  } catch (err) {
+    return (err as Error).message;
+  }
+  return undefined;
 }
 
 interface Row {
@@ -111,214 +120,87 @@ interface Row {
   props: Record<string, unknown>; created_at: Date; updated_at: Date;
 }
 
+/** What the reads API's flat read answers: the rows sent, the links among them, and why each is there. */
+interface Seeded {
+  items: Row[];
+  links: { id: string; type: string; from_id: string; to_id: string; props: Record<string, unknown> }[];
+  whole: string[];
+  found: Record<string, Found[]>;
+  terms: Record<string, string[]>;
+  step: Record<string, number>;
+  on_islands: boolean;
+  islands: { id: string; title?: string; pack?: string | null }[];
+  cut?: boolean;
+  matched?: number;
+}
+
+type Filed = { filed: Record<string, Span[]>; lane: Record<string, string | null>; stream: Record<string, string | null>; lanes: unknown[]; streams: unknown[] };
+
+/** A word term with its time as an instant, as the reads API reads it. */
+const instants = (terms: FoundTerm[], zone: string | null): FoundTerm[] => terms.map((t) => (t.sort === 'word' ? { ...t, word: atInstant(t.word, zone) } : t));
+
+const has = (o: Record<string, unknown> | undefined, id: string) => Boolean(o) && Object.hasOwn(o!, id);
+
 /** The flat lens answered: the lens as read, the items (head and shown fields), the links among them, and whether the limit cut it. */
-export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
-  const lens = readFlat(l, input);
+export async function flatRead(ctx: KernelContext, input: Record<string, unknown>) {
+  const at = termsOf(ctx);
+  const lens = readFlat(at, input);
   // How much of each note is sent is not the lens: the same items, their notes whole for a drawing that reads them.
   if (input.notes !== undefined && input.notes !== 'whole') throw new Error('notes must be "whole", or left out for the start of each note');
   const whole = input.notes === 'whole';
   // Asked by a page that keeps the answer current: where the log stood before anything was read, so the facts after it
   // that the page plays reach what this answer holds, and nothing said while it was read is missed (ui/live.js).
   if (input.follow !== undefined && input.follow !== true) throw new Error('follow must be true, or left out');
-  const pos = input.follow ? await headPos(l.db) : undefined;
+  const pos = input.follow ? ((await ctx.reads({ flat_pos: true } as never)) as number) : undefined;
   // On a time axis its ends said from today are worked out now, in the workspace's zone; a seed is open, or changed
   // since the window began (as the old placed read had it), so the sessions of past months do not crowd it out.
-  const zone = lens.time && (await zoneOf(l));
+  const zone = lens.time ? await zoneOf(ctx) : null;
   if (lens.time) lens.time = resolveAxis(lens.time, zone!);
-  const inWindow = lens.time ? `(e.is_open or e.updated_at >= '${new Date(windowOf(lens.time, zone!)[0]).toISOString()}'::timestamptz)` : null;
-  const me = l.viewer || (await l.setting<string>('me')) || null;
-  const finds = lens.find.map((t) => readTerm(l, t, 'find'));
-  const onlys = lens.only.map((t) => readTerm(l, t, 'only'));
-  const nots = lens.not.map((t) => readTerm(l, t, 'not'));
-  // What a seed must also be, and what nothing may be, as conditions on an item (as e), each with its parameter. An
-  // item is of one type, so Only's types are one set. Only within what the viewer cannot see, nothing is.
-  const isWord = (t: Term): t is Extract<Term, { sort: 'word' }> => t.sort === 'word';
-  const types = onlys.flatMap((t) => (t.sort === 'type' ? l.registry.family(t.type) : []));
-  const onlySets = await Promise.all(onlys.filter((t) => !isWord(t) && t.sort !== 'type').map((t) => setOf(l, t as Exclude<Term, { sort: 'word' }>, me)));
-  const words = onlys.filter(isWord).map((t) => t.word);
-  const terms: Narrowing[] = [...(types.length ? [{ cond: 'e.type = any($?::text[])', param: types }] : []), ...onlySets, ...(await wordConditions(l, words, me))];
-  const hidden = onlySets.some((t) => Array.isArray(t.param) && !t.param.length);
-  const notWords = nots.filter(isWord).map((t) => t.word);
-  const out: Narrowing[] = [...(await Promise.all(nots.filter((t) => !isWord(t)).map((t) => setOf(l, t as Exclude<Term, { sort: 'word' }>, me)))), ...(await wordConditions(l, notWords, me))].map((t) => ({ ...t, cond: `not coalesce((${t.cond}), false)` }));
-  const notChecked = notWords.filter((w) => checkedAfter([w]));
-  const numbered = (list: Narrowing[], n: number) => list.map((t) => (t.param === undefined ? t.cond : t.cond.replaceAll('$?', `$${n++}`)));
-  const leftOut = out.filter((t) => t.param !== undefined).map((t) => t.param);
-  const narrowing = terms.filter((t) => t.param !== undefined).map((t) => t.param);
-  // A document made to give a view or an item as a link is the link's own: no view finds it, unless it names it.
-  const keep = (n: number) => ['e.archived_at is null', `not (e.props ? '${WRAPS}')`, ...numbered(out, n)].join(' and ');
-  const narrows = (n: number) => numbered(terms, n + leftOut.length);
-  const narrowed = (n: number) => [keep(n), ...narrows(n), inWindow].filter(Boolean).join(' and ');
-  // Each read finds ids only; what is sent of them is read once, at the end. A seed is found narrowed; a step of the walk is not.
-  const read = async (cond: string, sql: (keep: string) => string, own: unknown[], more: unknown[]) => (await l.db.query<{ id: string }>(sql(cond), [...own, ...leftOut, ...more])).rows.map((r) => r.id);
-  const find = (sql: (keep: string) => string, own: unknown[]) => read(keep(own.length + 1), sql, own, []);
-  const seed = (sql: (keep: string) => string, own: unknown[]) => (hidden ? Promise.resolve([]) : read(narrowed(own.length + 1), sql, own, narrowing));
-
-  const sent = new Set<string>();
-  const room = () => lens.limit + 1 - sent.size;
-  // Why each item is there: the terms of the filter that found it (a seed may be found by more than one), or the step
-  // of the walk that reached it. A person and an agent read the same reason (decision e_drt4g872: Find's terms).
-  const foundBy = new Map<string, Found[]>();
-  // And by which of them, as the lens says it: what a term lights when it is hovered.
-  const termsBy = new Map<string, string[]>();
-  const stepOf = new Map<string, number>();
-  const add = (ids: string[], by?: Found, terms: Term[] = []) => {
-    for (const id of ids) {
-      if (by && (sent.has(id) || room() > 0)) {
-        foundBy.set(id, [...new Set([...(foundBy.get(id) ?? []), by])]);
-        termsBy.set(id, [...new Set([...(termsBy.get(id) ?? []), ...terms.map(sayTerm)])]);
-      }
-      if (room() > 0) sent.add(id);
-    }
+  const since = lens.time ? new Date(windowOf(lens.time, zone!)[0]).toISOString() : undefined;
+  const me = ((await ctx.reads({ me: true })) as string | null) || null;
+  const finds = lens.find.map((t) => readTerm(at, t, 'find'));
+  const onlys = lens.only.map((t) => readTerm(at, t, 'only'));
+  const nots = lens.not.map((t) => readTerm(at, t, 'not'));
+  // What a term offered would change, asked before it is added: its terms read as the lens's are.
+  const preview = input.preview as { part?: string; terms?: unknown; ids?: unknown } | undefined;
+  if (preview) {
+    if (preview.part !== 'find' && preview.part !== 'only' && preview.part !== 'not') throw new Error('preview.part must be find, only or not');
+    if (!Array.isArray(preview.terms) || preview.terms.length > PREVIEW_TERMS) throw new Error(`preview.terms must be a list of at most ${PREVIEW_TERMS} terms`);
+  }
+  const offered = preview ? (preview.terms as unknown[]).map((raw) => ({ raw: String(raw), term: readTerm(at, raw, preview.part!) })) : [];
+  // Each end found and each set a pack answers asked, once; the frontier's reasons are kept for what it finds.
+  const read: { reasons?: Promise<Reasons> } = {};
+  const all = await found(ctx, [...finds, ...onlys, ...nots, ...offered.map((x) => x.term)], me, read);
+  const words = all.flatMap((t) => (t.sort === 'word' ? [t.word as Word] : []));
+  const terms = instants(all, saysDay(words) ? (zone ?? (await zoneOf(ctx))) : null);
+  const [f, o, n] = [finds.length, onlys.length, nots.length];
+  const flat = {
+    find: terms.slice(0, f), only: terms.slice(f, f + o), not: terms.slice(f + o, f + o + n),
+    said_not: (input.filter as { not?: unknown } | undefined)?.not !== undefined,
+    walk: lens.walk, limit: lens.limit, me,
+    ...(since && { since }), ...(whole && { whole }),
+    ...(preview && { preview: { part: preview.part, terms: offered.map((x, i) => ({ raw: x.raw, term: terms[f + o + n + i] })), ids: Array.isArray(preview.ids) ? preview.ids : [] } }),
   };
-  // Only's words checked on what a read found: then each read of seeds finds as many as one answer may send, for them
-  // to keep what they hold of.
-  const checked = checkedAfter(words);
-  const reach = () => (checked ? LENS_LIMIT : room());
-  const unless = async (found: string[], ws: Word[]) => {
-    let kept = found;
-    for (const w of ws) if (kept.length) { const held = new Set(await holding(l, [w], kept)); kept = kept.filter((id) => !held.has(id)); }
-    return kept;
-  };
-  const holds = async (found: string[]) => unless(checked ? await holding(l, words, found) : found, notChecked);
-
-  // Why each item the frontier finds needs attention (src/frontier.ts), read once, when a term asks for it.
-  let frontierRead: ReturnType<typeof frontierOf> | undefined;
-  const reasons = () => (frontierRead ??= frontierOf(l));
-  // Not takes away what it says of an item named by id (e_ndcxf2bv); what nobody said, the default, hides nothing named.
-  const saidNot = (input.filter as { not?: unknown } | undefined)?.not !== undefined;
-  /** The items one term of Find finds, narrowed: every read bounded by the term's end, the type index or `most`. */
-  const seedOf = async (term: Term, most: number): Promise<string[]> => {
-    if (term.sort === 'id') return hidden ? [] : holds((await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${[saidNot ? keep(2) : 'e.archived_at is null', ...numbered(terms, saidNot ? 2 + leftOut.length : 2)].join(' and ')}`, [[term.id], ...(saidNot ? leftOut : []), ...narrowing])).rows.map((r) => r.id));
-    if (term.sort === 'type') return holds(await seed((k) => `select e.id from entity e where e.type = any($1::text[]) and ${k} order by e.created_at desc, e.id limit $2 -- index entity_type_created`, [l.registry.family(term.type), most]));
-    // The frontier in its own order, the strongest reason first; what a session worked on, the newest first.
-    if (term.sort === 'frontier') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by array_position($1::text[], e.id) limit $2`, [[...(await reasons()).keys()], most]));
-    if (term.sort === 'held' || term.sort === 'moved') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [term.sort === 'held' ? await heldIds(l) : await movedIds(l), most]));
-    if (term.sort !== 'link' && term.sort !== 'related' && term.sort !== 'in' && term.sort !== 'island' && term.sort !== 'worked') return [];
-    const at = await endsOf(l, term, me);
-    if (!at.length) return [];
-    if (term.sort === 'worked') return holds(await seed((k) => `select e.id from entity e where e.id = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [await workedBy(l, at), most]));
-    if (term.sort === 'island') return holds(await seed((k) => `select e.id from entity e where ${onIslands('$1')} and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
-    if (term.sort === 'in') return holds(await seed((k) => `select e.id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
-    if (term.sort === 'related') return holds(await seed((k) => `select e.id from relation r join entity e on e.id = case when r.from_id = any($1::text[]) then r.to_id else r.from_id end where (r.from_id = any($1::text[]) or r.to_id = any($1::text[])) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $2`, [at, most]));
-    const [near, far] = term.back ? ['to_id', 'from_id'] : ['from_id', 'to_id'];
-    return holds(await seed((k) => `select e.id from relation r join entity e on e.id = r.${near} where r.${far} = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null and ${k} order by e.updated_at desc, e.id limit $3`, [at, l.registry.relationFamily(term.link), most]));
-  };
-  // What a term offered in find would change, asked before it is added: what it would find, or which of the items drawn
-  // it would leave out. Nothing else of the lens is read.
-  if (input.preview) {
-    const asked = input.preview as { part?: string; terms?: unknown; ids?: unknown };
-    const part = asked.part;
-    if (part !== 'find' && part !== 'only' && part !== 'not') throw new Error('preview.part must be find, only or not');
-    if (!Array.isArray(asked.terms) || asked.terms.length > PREVIEW_TERMS) throw new Error(`preview.terms must be a list of at most ${PREVIEW_TERMS} terms`);
-    const drawn = Array.isArray(asked.ids) ? (asked.ids as string[]).slice(0, LENS_LIMIT) : [];
-    const said: Record<string, string[]> = {};
-    for (const raw of asked.terms) {
-      const term = readTerm(l, raw, part);
-      if (part === 'find') {
-        said[String(raw)] = (await seedOf(term, PREVIEW_MOST + 1)).slice(0, PREVIEW_MOST + 1);
-        continue;
-      }
-      let held: string[];
-      const [cond] = term.sort === 'word' ? await wordConditions(l, [term.word], me) : [await setOf(l, term, me)];
-      if (term.sort === 'word' && checkedAfter([term.word])) held = await holding(l, [term.word], drawn);
-      else held = (await l.db.query<{ id: string }>(`select e.id from entity e where e.id = any($1::text[]) and ${cond.cond.replaceAll('$?', '$2')}`, [drawn, ...(cond.param === undefined ? [] : [cond.param])])).rows.map((r) => r.id);
-      const inSet = new Set(held);
-      said[String(raw)] = part === 'not' ? held : drawn.filter((id) => !inSet.has(id));
-    }
-    return { preview: said } as never;
-  }
-
-  // The seeds, each narrowed: ids first, then what a link term finds, what is related, what is in an item, what the
-  // text finds, the newest of each type named.
-  for (const t of finds) if (t.sort === 'id') add(await seedOf(t, 1), 'id', [t]);
-  for (const t of finds) if (t.sort === 'held' || t.sort === 'moved' || t.sort === 'frontier') add(await seedOf(t, reach()), 'id', [t]);
-  for (const t of finds) if (t.sort === 'worked' && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
-  for (const t of finds) if ((t.sort === 'link' || t.sort === 'related') && room() > 0) add(await seedOf(t, reach()), 'link', [t]);
-  // What is in an item, at any depth, read from the part_of closure (decision e_tvsdqjeq), the newest first; in an item
-  // the viewer cannot see, nothing is.
-  for (const t of finds) if ((t.sort === 'in' || t.sort === 'island') && room() > 0) add(await seedOf(t, reach()), 'in', [t]);
-  // The text is the search read's own (src/search.ts): the words in any form in the title or note, or as typed anywhere
-  // in the title, the best match first; only when that finds nothing, titles with a word close to what was typed.
-  // How many it found in all is kept (`matched`), counted over what the viewer may see and the filter keeps; an item
-  // two sets of words both find is counted once (issue e_z4sg2n8f).
-  let matched: number | undefined;
-  const asked: { said: string; near: boolean }[] = [];
-  const matchedIds = new Set<string>();
-  for (const said of hidden ? [] : finds.flatMap((t) => (t.sort === 'text' ? [t.said] : []))) {
-    if (room() <= 0) break;
-    const finding = async (near: boolean) => (await l.db.query<{ id: string; n: number }>(
-      `select e.id, count(*) over ()::int as n from entity e where e.id in (${searchIds('$1', near)}) and ${narrowed(3)} order by ${rankSql('$1', 'e.')} desc, e.updated_at desc, e.id limit $2`,
-      [said, reach(), ...leftOut, ...narrowing])).rows;
-    let near = false;
-    let rows = await finding(false);
-    if (!rows.length) rows = await finding((near = true));
-    const found = await holds(rows.map((r) => r.id));
-    asked.push({ said, near });
-    for (const id of found) matchedIds.add(id);
-    matched = (matched ?? 0) + (checked ? found.length : (rows[0]?.n ?? 0));
-    add(found, 'text', [{ sort: 'text', said }]);
-  }
-  if (asked.length > 1 && matched) {
-    matched = checked
-      ? matchedIds.size
-      : (await l.db.query<{ n: number }>(
-          `select count(*)::int as n from entity e where e.id in (select pelago_search_ids(v, s.near) from unnest($1::text[], $2::boolean[]) s(q, near) cross join lateral ${slipsOf('s.q', 's.near')} slips(v)) and ${narrowed(3)}`,
-          [asked.map((a) => a.said), asked.map((a) => a.near), ...leftOut, ...narrowing])).rows[0].n;
-  }
-  for (const t of finds) if (t.sort === 'type' && room() > 0) add(await seedOf(t, reach()), 'type', [t]);
-
-  // The walk: a step at a time along the links named, each the way it is named (out along it, in to it, or either), to
-  // what the filter does not exclude. An excluded item is not walked through. Each step is bounded by the ids reached
-  // the step before and what room is left.
-  const along = (way: 'out' | 'in') => (lens.walk.over === 'all' ? null : l.registry.relationFamily(...lens.walk.over.map(wayOf).filter((t) => t.way !== (way === 'out' ? 'in' : 'out')).map((t) => t.link)));
-  // Out from an item is along its links (it is their from); in is back along the links to it. Every link goes both.
-  const ways = ([['from_id', 'to_id', along('out')], ['to_id', 'from_id', along('in')]] as const).filter(([, , types]) => types?.length !== 0);
-  // Under the default Not, a walk back along works_on keeps the runs it reaches: the sessions at work on what the view
-  // draws are drawn on it (a plan watched, e_j7hdfq9m), and nothing else of the kernel's is let in.
-  const working = new Set(l.registry.relationFamily('works_on'));
-  const defaultNot = (input.filter as { not?: unknown } | undefined)?.not === undefined;
-  const sessions = defaultNot && lens.walk.over !== 'all' && lens.walk.over.map(wayOf).some((t) => t.way !== 'out' && working.has(l.registry.canonical(t.link))) ? l.registry.family('run') : [];
-  for (let level = [...sent], n = 0; level.length && n < lens.walk.steps && room() > 0 && ways.length; n++) {
-    const typed = ways.flatMap(([, , types]) => (types ? [types] : []));
-    const kept = (k: string) => (sessions.length ? `(${k} or (e.archived_at is null and e.type = any($${4 + typed.length}::text[])))` : k);
-    const way = (k: string) => ways.map(([near, far, types], i) => `select e.id, e.updated_at from relation r join unnest($1::text[]) s(id) on s.id = r.${near} join entity e on e.id = r.${far} where r.valid_to is null${types ? ` and r.type = any($${4 + ways.slice(0, i).filter(([, , t]) => t).length}::text[])` : ''} and e.id <> all($2::text[]) and ${kept(k)}`).join(' union ');
-    level = await unless(await find((k) => `select id from (${way(k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...typed, ...(sessions.length ? [sessions] : [])]), notChecked);
-    for (const id of level) if (!sent.has(id)) stepOf.set(id, n + 1);
-    add(level);
-  }
-
-  const cut = sent.size > lens.limit;
-  const kept = [...sent].slice(0, lens.limit);
-  const { rows } = await l.db.query<Row>(`select id, type, title, case when id = any($2::text[]) then body else left(body, ${NOTE_START + 1}) end as body, visibility, status, is_open, owner, ${l.props}, created_at, updated_at from entity where id = any($1::text[])`, [kept, whole ? kept.slice(0, NOTES_WHOLE_MOST) : []]);
-  const wholeIds = new Set(whole ? kept.slice(0, NOTES_WHOLE_MOST) : []);
-  const byId = new Map(rows.map((r) => [r.id, r]));
-  const items = kept.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  if (preview) return (await ctx.reads({ flat } as never)) as never;
+  const seeded = (await ctx.reads({ flat } as never)) as Seeded;
+  const items = seeded.items;
   // On a time axis, where each falls in its window.
-  const spans = lens.time && (await placeAll(l, items, lens.time, zone!));
-  // And whose lane each is in and what it counts toward (src/timelanes.ts): a person's, or each session its own.
-  const filed = spans && (await fileOnAxis(l, items, spans, me));
-  // The links among what is sent, of every type: a canvas draws what ties what it shows.
-  const { rows: relations } = await l.db.query<{ id: string; type: string; from_id: string; to_id: string; props: Record<string, unknown> }>(
-    `with s(id) as (select unnest($1::text[])) select r.id, r.type, r.from_id, r.to_id, r.props from relation r join s a on a.id = r.from_id join s b on b.id = r.to_id where r.valid_to is null order by r.id`,
-    [items.map((e) => e.id)],
-  );
-  // Each run sent says where its session stands (src/session-state.ts), read for all of them at once.
-  const runTypes = new Set(l.registry.family('run'));
-  const states = await sessionStates(l, items.filter((e) => runTypes.has(e.type)).map((e) => e.id));
-  // Where each lives, on a map with islands on (src/island-items.ts), and each island's name, in the order they come: a
-  // drawing draws each island's border from them (task e_auw7hb3v). Read for those sent alone.
-  const islandOf = (e: Row) => (l.registry.onIslands && typeof e.props?.[ISLAND] === 'string' ? (e.props[ISLAND] as string) : undefined);
-  const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
-  // Each island's name, and the pack it speaks, whose vocabulary a drawing names in the island's legend.
-  const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; pack: string | null }>(`select id, title, props->>'pack' as pack from entity where id = any($1::text[])`, [islandIds])).rows : [];
-  // What is in use on each island in this picture: the types of its items, and the link types of the links within it.
+  const spans = lens.time && (await placeAll(ctx, items, lens.time, zone!));
+  // And whose lane each is in and what it counts toward (the views pack's): a person's, or each session its own.
+  const filed = spans && (await ctx.call<unknown, Filed>('answer.time_lanes', { items: items.map(({ id, type, title, owner }) => ({ id, type, title, owner })), spans: Object.fromEntries(spans), me }));
+  // Each run sent says where its session stands (the runs pack's), read for all of them at once.
+  const runs = items.filter((e) => ctx.registry.isA(e.type, 'run')).map((e) => e.id);
+  const marks = runs.length ? (await ctx.call<unknown, { marks: Record<string, unknown> }>('answer.session_marks', { runs })).marks : {};
+  // Where each lives, on a map with islands on, and each island's name, in the order they come: a drawing draws each
+  // island's border from them (task e_auw7hb3v). Each island's legend names the pack it speaks and what is used there.
+  const islandOf = (e: Row) => (seeded.on_islands && typeof e.props?.island === 'string' ? (e.props.island as string) : undefined);
   const onIsle = new Map(items.flatMap((e) => (islandOf(e) ? [[e.id, islandOf(e)!] as const] : [])));
   const usedOn = (isle: string) => ({
     types: items.filter((e) => onIsle.get(e.id) === isle).map((e) => e.type),
-    links: relations.filter((r) => onIsle.get(r.from_id) === isle && onIsle.get(r.to_id) === isle).map((r) => r.type),
+    links: seeded.links.filter((r) => onIsle.get(r.from_id) === isle && onIsle.get(r.to_id) === isle).map((r) => r.type),
   });
-  const named = new Map(isles.map((r) => [r.id, r.title])), packOf = new Map(isles.map((r) => [r.id, r.pack ? islandPack(l.registry, r.pack, usedOn(r.id)) : undefined]));
-  const why = frontierRead && (await frontierRead);
+  const why = read.reasons && (await read.reasons);
+  const wholeIds = new Set(seeded.whole);
   // An end said by name goes back in the lens as its id.
   lens.find = finds.map(sayTerm);
   lens.only = onlys.map(sayTerm);
@@ -328,7 +210,7 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
     // Who is looking (a person), so a drawing can say what waits on them.
     ...(me && { viewer: me }),
     items: items.map((e) => {
-      const type = l.registry.type(e.type), defs = type?.fields ?? {};
+      const type = ctx.registry.type(e.type), defs = type?.fields ?? {};
       const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
       return {
         id: e.id, type: e.type,
@@ -337,35 +219,36 @@ export async function flatRead(l: Archipelago, input: Record<string, unknown>) {
         title: e.title,
         // The start of the note, for a hover: the whole of it is on the item's page (or here, asked for whole).
         ...(e.body && { body: e.body.length > NOTE_START && !wholeIds.has(e.id) ? `${e.body.slice(0, NOTE_START)}…` : e.body }),
-        // Where it stands in its course (src/phases.ts), so every drawing reads one phase and keeps no registry.
+        // Where it stands in its course, so every drawing reads one phase and keeps no registry.
         visibility: e.visibility, status: e.status, ...(type?.statuses.phases?.[e.status] && { phase: type.statuses.phases[e.status] }), open: e.is_open, owner: e.owner,
-        ...(states.has(e.id) && { session: markOf(states.get(e.id)!) }),
+        ...(has(marks, e.id) && { session: marks[e.id] }),
         // Found by the frontier: why it needs attention now, the strongest first, each a word and its few words.
         ...(why?.has(e.id) && { reasons: why.get(e.id) }),
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
         ...(islandOf(e) && { island: islandOf(e) }),
-        ...(spans && { time: filed!.filed.get(e.id) ?? spans.get(e.id) ?? [] }),
-        ...(filed?.lane.has(e.id) && { lane: filed.lane.get(e.id) }),
-        ...(filed?.stream.has(e.id) && { stream: filed.stream.get(e.id) }),
-        ...(foundBy.has(e.id) ? { found: foundBy.get(e.id), terms: termsBy.get(e.id) } : stepOf.has(e.id) && { step: stepOf.get(e.id) }),
+        ...(spans && { time: filed!.filed[e.id] ?? spans.get(e.id) ?? [] }),
+        ...(filed && has(filed.lane, e.id) && { lane: filed.lane[e.id] }),
+        ...(filed && has(filed.stream, e.id) && { stream: filed.stream[e.id] }),
+        ...(has(seeded.found, e.id) ? { found: seeded.found[e.id], terms: seeded.terms[e.id] } : has(seeded.step, e.id) && { step: seeded.step[e.id] }),
       };
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
-    links: relations.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(l, r.type).length && { is: flavourOf(l, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
-    ...(islandIds.length && { islands: islandIds.map((id) => ({ id, ...(named.has(id) && { title: named.get(id) }), ...(packOf.get(id) && { pack: packOf.get(id) }) })) }),
+    links: seeded.links.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(ctx.registry, r.type).length && { is: flavourOf(ctx.registry, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
+    ...(seeded.islands.length && { islands: seeded.islands.map((r) => { const pack = r.pack ? islandPack(ctx.registry, r.pack, usedOn(r.id)) : undefined; return { id: r.id, ...(r.title !== undefined && { title: r.title }), ...(pack && { pack }) }; }) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
-    ...(cut && { cut: true }),
-    ...(matched !== undefined && { matched }),
+    ...(seeded.cut && { cut: true }),
+    ...(seeded.matched !== undefined && { matched: seeded.matched }),
     // The items whose notes are sent whole, so a page keeping the answer current keeps those whole too (ui/replica.js).
-    ...(whole && { whole: items.filter((e) => wholeIds.has(e.id)).map((e) => e.id) }),
+    ...(whole && { whole: seeded.whole }),
     ...(pos !== undefined && { pos }),
   };
 }
 
 /** What a link type is a flavour of, nearest first: [] for a root. */
-const flavourOf = (l: Archipelago, type: string): string[] => {
+const flavourOf = (registry: KernelContext['registry'], type: string): string[] => {
   const out: string[] = [];
-  for (let r = l.registry.relations.get(type); r?.extends && !out.includes(r.extends); r = l.registry.relations.get(r.extends)) out.push(r.extends);
+  for (let r = registry.relations.get(type); r?.extends && !out.includes(r.extends); r = registry.relations.get(r.extends)) out.push(r.extends);
   return out;
 };
+

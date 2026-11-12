@@ -81,7 +81,7 @@ test('the kernel names no surface', () => {
 
 // The sessions' actions, named here until the sessions pack declares them (e_xzwgetrg): the kernel switches on none.
 const NAMES_SESSION_ACTS: Owed = {
-  'src/views.ts': [1, SESSIONS], 'ui/item.js': [1, VIEWS],
+  'ui/item.js': [1, VIEWS],
 };
 test("the kernel names no session's action", () => {
   const named = count(kernelFiles, /['"`]session_(?:start|update|end)['"`]/g);

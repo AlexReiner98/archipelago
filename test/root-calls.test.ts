@@ -81,7 +81,7 @@ test('root.uses: usage adds to its map’s uses and reads what is held; any othe
   assert.equal(await held(), was + 2);
   await assert.rejects(usage.call('root.uses', { workspace: 'another', add: [{ key: 'x' }] }), /counts only the map that calls it/);
   // backup is no caller of root.uses: refused by the list, though it names the service here.
-  await assert.rejects(callRoot('backup', 'root.uses', { held: true }, { map: l }), /The backup pack may not call root\.uses: packs\/roots\.json lets only usage call it/);
+  await assert.rejects(callRoot('backup', 'root.uses', { held: true }, { map: l }), /The backup pack may not call root\.uses: packs\/roots\.json lets only usage, query call it/);
   await assert.rejects(kernelContext(l, 'backup').call('root.uses', { held: true }), /neither requires nor uses|may not call root\.uses/);
 });
 
