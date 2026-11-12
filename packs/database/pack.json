@@ -1,0 +1,11 @@
+{
+  "id": "database",
+  "version": "0.1.0",
+  "title": "Database",
+  "description": "Storage, row-level security and the shared lock: the database every map is kept in, its schema and its steps, and which server leads. The first root pack with code, started after core.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
