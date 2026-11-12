@@ -5,87 +5,17 @@
 // it as on a time. The kernel decides nothing beyond "this came due" and names no pack.
 //
 // What an edge has met is remembered, so a restart or a second pass does not fire it again: per automation, in the
-// workspace's settings (src/operational.ts, setting), beside the clock's cursor, with the `on` it was met under. The
-// first pass over an `on` only learns what already matches: a query starts to match after it is set, never before.
+// workspace's settings (src/operational.ts, setting), beside the clock's cursor, with the `on` it was met under. What
+// an edge meets is the automation_triggers pack's (packs/automation_triggers/kernel/edges.ts, meet); this is the
+// clock's half that reads the map, until the reads it needs are a pack's (head position, a flat answer, its memory).
 
-import { checkOn, edgeOf, type Edge, type On } from './automation-rules.ts';
+import { checkOn, edgeOf, meet, type Memory, type Met, type On } from './automation-rules.ts';
 import { flatRead } from './query-flat.ts';
 import type { Archipelago, Entity } from './pelago.ts';
 import { headPos } from './tail.ts';
 
 /** Where the clock keeps what each automation's edge has met, by the automation's id. */
 const MEMORY = 'due_on:';
-
-/** What an edge has met, kept between passes. */
-interface Memory {
-  /** The `on` it was met under: another `on` starts again from what matches then. */
-  on: string;
-  /** The log's position when the query was last asked: until the log moves, nothing can start to match. */
-  pos: number;
-  /** first: whether it has fired (or matched when first asked). */
-  done?: boolean;
-  /** each: the items that have matched. first_per: the values met. crosses: the items at or over n. */
-  seen?: (string | number | boolean)[];
-}
-
-/** One firing of a query's edge: the automation, the edge met and what met it. */
-export interface Met {
-  item: string;
-  type: string;
-  title: string;
-  at: string;
-  edge: string;
-  matched: string[];
-  value?: unknown;
-}
-
-/** The value of a field of an item: a field its type declares, else a column of its head (status, owner, title). */
-const valueOf = (e: Entity, field: string): unknown => (field in (e.props ?? {}) ? e.props[field] : (e as unknown as Record<string, unknown>)[field]);
-const key = (v: unknown): string | number | boolean => (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? v : JSON.stringify(v));
-
-/**
- * What an edge meets, given the items its query matches now and what it remembered: the firings, and what to remember.
- * Without memory (the first pass over this `on`) it only learns what matches.
- */
-export function meet(edge: Edge, now: Entity[], was: Memory | undefined, on: string, pos: number): { met: Omit<Met, 'item' | 'type' | 'title' | 'at'>[]; keep: Memory } {
-  const met: Omit<Met, 'item' | 'type' | 'title' | 'at'>[] = [];
-  const first = !was;
-  const seen = new Set(was?.seen ?? []);
-  switch (edge.kind) {
-    case 'first': {
-      const done = Boolean(was?.done) || (now.length > 0 && first);
-      if (!done && now.length) met.push({ edge: 'first', matched: now.map((e) => e.id) });
-      return { met, keep: { on, pos, done: done || now.length > 0 } };
-    }
-    case 'each': {
-      for (const e of now) if (!seen.has(e.id) && !first) met.push({ edge: 'each', matched: [e.id] });
-      // What left the query may match again later, and then it starts to match again.
-      return { met, keep: { on, pos, seen: now.map((e) => e.id) } };
-    }
-    case 'first_per': {
-      const values = new Map<string | number | boolean, string[]>();
-      for (const e of now) {
-        const v = valueOf(e, edge.field);
-        if (v === undefined || v === null || v === '') continue;
-        values.set(key(v), [...(values.get(key(v)) ?? []), e.id]);
-      }
-      for (const [v, ids] of values) if (!seen.has(v) && !first) met.push({ edge: `first_per:${edge.field}`, matched: ids, value: v });
-      // A value once met stays met: one firing for each value, ever.
-      return { met, keep: { on, pos, seen: [...new Set([...seen, ...values.keys()])] } };
-    }
-    case 'crosses': {
-      const over: string[] = [];
-      for (const e of now) {
-        const v = Number(valueOf(e, edge.field));
-        if (!Number.isFinite(v) || v < edge.n) continue;
-        over.push(e.id);
-        if (!seen.has(e.id) && !first) met.push({ edge: `crosses:${edge.n}`, matched: [e.id], value: v });
-      }
-      // An item back under n may cross it again: it is no longer remembered as over.
-      return { met, keep: { on, pos, seen: over } };
-    }
-  }
-}
 
 /** One pass over the automations that watch a query: each edge met recorded as item.due, and told to the packs. */
 export async function onPass(l: Archipelago, now: number, tell: (event: { action: string; target: string; reason: string; detail: Record<string, unknown> }) => Promise<void>): Promise<Met[]> {
