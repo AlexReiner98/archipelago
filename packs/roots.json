@@ -31,6 +31,10 @@
     {
       "id": "rules",
       "hash": "721fc025dbb28915a5a4384bf5cc51baa7a1f13c5d361fd075610edbc6440096"
+    },
+    {
+      "id": "write",
+      "hash": "c45282a60160d848f858c0f125b5cf88583cb0642a28caec41d617959c39f16d"
     }
   ]
 }
