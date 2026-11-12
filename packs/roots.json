@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "9e69a41cf34deb22f1ee1cdd3d1ac2ff3fa81024a66cf0d20f02b8e260816b58"
+      "hash": "e5c47339e617cc9155bee2a82c2f30248fd9d0a43b62004c308e463b710a858e"
     },
     {
       "id": "rules",
@@ -56,6 +56,9 @@
     ],
     "root.uses": [
       "usage"
+    ],
+    "root.server_packs": [
+      "connect"
     ]
   }
 }

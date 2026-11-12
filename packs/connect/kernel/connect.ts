@@ -21,6 +21,7 @@ import { documentsInForce, signinGate } from '../../../src/server-gates.ts';
 import { serveFile, setupPack } from '../../../src/server-files.ts';
 import { serveServerPack } from '../../../src/server-routes.ts';
 import { pageStyle } from '../../../src/styles.ts';
+import { workingRules } from '../../../src/working-rules.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
 import type { Workspace, Workspaces } from '../../../src/workspaces.ts';
 
@@ -65,7 +66,7 @@ const reply = (res: ServerResponse, status: number, body: unknown) => json(res, 
 const INSTALL: Record<string, [string, (origin: string) => string]> = {
   '/connect/install': ['text/plain', installPage],
   '/connect/install.md': ['text/markdown', installPage],
-  '/connect/install.mjs': ['text/javascript', installScript],
+  '/connect/install.mjs': ['text/javascript', (origin) => installScript(origin, workingRules())],
   '/connect/install.ps1': ['text/plain', installPs1],
   '/connect/install.sh': ['text/x-shellscript', installSh],
   '/connect/llms.txt': ['text/plain', llmsTxt],

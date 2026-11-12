@@ -6,6 +6,40 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.server_packs": {
+        "in": {},
+        "out": {
+          "packs": [
+            {
+              "id": "string",
+              "version": "string",
+              "acts": [
+                "string"
+              ],
+              "pages": [
+                "string"
+              ],
+              "entries": [
+                "string"
+              ],
+              "webhooks": [
+                "string"
+              ]
+            }
+          ],
+          "refused": [
+            {
+              "folder": "string",
+              "why": [
+                "string"
+              ]
+            }
+          ]
+        },
+        "run": "root-services.ts#serverPacksShown"
+      }
+    }
   }
 }

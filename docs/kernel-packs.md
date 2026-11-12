@@ -188,6 +188,7 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.dump` | log | backup | a workspace's backup and its vault's, the workspace held open while read |
 | `root.merge` | log | backup | the writes a merge makes, and what they did |
 | `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
+| `root.server_packs` | loader | connect | the server packs the server's folders hold, each as the owner is shown it, and those left out with why (wave 6b: the `server_packs` tool, wired at `src/server-pack-tools.ts`) |
 | `root.uses` | surface | usage | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`) |
 
 ## Write-path hooks
@@ -369,7 +370,7 @@ moves with a shim to the pack named.
 | alerts | alert |
 | looks | chrome, look-draw, icon, looks (`passFor` stays in walls) |
 | launch | launcher (the token stays in identity) |
-| connect | install, connect, token-ask, connection-tools, server-pack-tools |
+| connect | install, connect, token-ask, connection-tools, server-pack-tools (as built, wave 6b: install and server-pack-tools import nothing of the kernel, the latter through `root.server_packs`; the rest still do) |
 | presence | presence, seeing |
 | monitoring | report |
 | devtools | dev, pull |
