@@ -13,6 +13,7 @@ import { draftDocument, publicDocument } from '../../walls/kernel/public-documen
 import { islandsOff } from '../../loader/kernel/islands.ts';
 import { LOCAL_PACK } from '../../loader/kernel/packs.ts';
 import { memoryPrefix, type Manifest } from '../../loader/kernel/manifest.ts';
+import { workspaceName } from '../../rules/kernel/standing.ts';
 
 export type ServiceRead = {
   /** One open link by its id, or null: what an unlink takes away, read alone rather than every link of its kind. */
@@ -43,10 +44,16 @@ export type ServiceRead = {
   uses_lately?: { days: [string, string] };
   /** Of some types and link types, the items and open links standing, and how many of them were made since a time. */
   type_counts?: { types: string[]; links: string[]; since: string };
+  /** The workspace's name, as the list of workspaces has it (its id when it has none). */
+  workspace_name?: true;
+  /** Live items of these exact types on no island, by id after a cursor, UNPLACED at most: what moves onto islands when they are turned on. */
+  unplaced?: { types: string[]; after?: string };
 };
 
 /** The reads of this module, by name. */
-const SERVICE_READS = ['link', 'log_head', 'memory', 'islands_off', 'public_views', 'public_view_at', 'public_document', 'published_row', 'shared', 'picture', 'counts', 'corrections', 'uses_lately', 'type_counts'] as const satisfies readonly (keyof ServiceRead)[];
+const SERVICE_READS = ['link', 'log_head', 'memory', 'islands_off', 'public_views', 'public_view_at', 'public_document', 'published_row', 'shared', 'picture', 'counts', 'corrections', 'uses_lately', 'type_counts', 'workspace_name', 'unplaced'] as const satisfies readonly (keyof ServiceRead)[];
+/** The most items one read of what is on no island answers. */
+export const UNPLACED = 500;
 /** The most entries one read of a count stream answers. */
 export const COUNT_ENTRIES = 1000;
 /** A key of a pack's memory: a short word of letters, digits, _, -, : and . */
@@ -88,6 +95,15 @@ export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string)
     if (q.memory.value === null || q.memory.value === undefined) await l.db.query(`delete from setting where key = $1`, [at]);
     else await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [at, JSON.stringify(q.memory.value)]);
     return true;
+  }
+  if (q.workspace_name) return workspaceName(l.workspace);
+  if (q.unplaced !== undefined) {
+    const types = list(q.unplaced.types, 'unplaced.types');
+    const { rows } = await l.db.query<{ id: string; type: string }>(
+      `select id, type from entity where archived_at is null and props->>'island' is null and type = any($1::text[]) and id > $2 order by id limit ${UNPLACED}`,
+      [types, String(q.unplaced.after ?? '')],
+    );
+    return rows;
   }
   if (q.islands_off) return { local: LOCAL_PACK, off: [...islandsOff(l.registry.packs, LOCAL_PACK)] };
   if (q.public_views) return publicViews(l);
