@@ -14,11 +14,11 @@
     },
     {
       "id": "log",
-      "hash": "9650f3050e79ca4c4e8c7a9fe304ecfffd88ad81462791b101c3344a951e0b22"
+      "hash": "ae95df5cbe7fb53493a87d619cd6f6b86b213c04322db49d585909c5e4680785"
     },
     {
       "id": "identity",
-      "hash": "ebfa21c314605e7b252325e6c1158334e0a7fd6435c2af2734127058726ff6c3"
+      "hash": "399eaaaace09a18e6745ee92db8ddfdd844c15b8512223e193bdcd948c157125"
     },
     {
       "id": "walls",
@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "530428f5886d35222102cdd94544fc820090bc1e6d5661a5188c6d3fd89f202a"
+      "hash": "01471425fcfdc10f9a1cfab62721ceb4f2598b946c03b4b2887074f19afba4ee"
     },
     {
       "id": "rules",
@@ -38,7 +38,18 @@
     },
     {
       "id": "surface",
-      "hash": "8067106d670c278a5dfc2fc32e129396db448a55b0a2f395da30165aa4a791c9"
+      "hash": "c8c866a2ded832da6bb62322f0f3b1a7f5121fa107298dbb3c9c7e8b7a85a6ca"
     }
-  ]
+  ],
+  "calls": {
+    "root.workspaces": [
+      "backup"
+    ],
+    "root.dump": [
+      "backup"
+    ],
+    "root.merge": [
+      "backup"
+    ]
+  }
 }

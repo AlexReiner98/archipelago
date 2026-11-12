@@ -173,7 +173,6 @@
   "src/tool-reads.ts -> src/styles.ts",
   "src/tool-reads.ts -> src/summary.ts",
   "src/tools.ts -> src/askview.ts",
-  "src/tools.ts -> src/backup-tools.ts",
   "src/tools.ts -> src/connection-tools.ts",
   "src/tools.ts -> src/hook-tool.ts",
   "src/tools.ts -> src/looks.ts",

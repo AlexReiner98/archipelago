@@ -6,6 +6,18 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.workspaces": {
+        "in": {},
+        "out": [
+          {
+            "id": "id",
+            "name": "string"
+          }
+        ],
+        "run": "root-services.ts#workspacesOf"
+      }
+    }
   }
 }

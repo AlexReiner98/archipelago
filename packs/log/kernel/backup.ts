@@ -30,13 +30,15 @@ import { regatherAll } from './closure.ts';
 import { recountBytes } from '../../../src/bytes.ts';
 import { mentionedAll } from '../../../src/mentions.ts';
 import { databaseFor } from '../../../src/pg.ts';
-import { analyzeAll } from '../../../src/stats.ts';
+import { analyzeAll, analyzeDue } from '../../../src/stats.ts';
 import { FACT_ACTIONS, factEvents } from '../../../src/eventlog.ts';
-import { CARRIED, carryRows, doneEvents, type EventRow } from './activity.ts';
+import { bringIn, CARRIED, carryRows, doneEvents, type EventRow } from './activity.ts';
 import { openTables, sealTables, sealedDump } from '../../../src/backup-seal.ts';
 import { projectBackup } from './backup-log.ts';
 import { liveSnapshot } from './snapshot.ts';
-import { restoreVault, type VaultDump } from '../../../src/vault.ts';
+import { dumpVault, restoreVault, type VaultDump } from '../../../src/vault.ts';
+import { restoreRows } from '../../../src/pelago.ts';
+import type { RootCall } from '../../../src/root-calls.ts';
 import { makePartitions } from './partitions.ts';
 
 /** Every table, parents before the rows that point at them. */
@@ -217,6 +219,102 @@ export async function restoreTo(backup: Dump, target: string): Promise<{ where: 
   } finally {
     await db.close();
   }
+}
+
+// The log's root services (docs/kernel-packs.md, "Root services"), called only by the packs packs/roots.json names
+// for each (the backup pack): values in, values out, never a handle on the database.
+
+/**
+ * root.dump: a workspace's backup and its vault's, for a server duty that walks every workspace. The workspace is held
+ * open while it is read and closed again if it was opened for this, so a backup never keeps every map in memory.
+ */
+export async function dumpOf(call: RootCall, input: { workspace: string; name: string }): Promise<{ dump: Dump; vault?: VaultDump; vault_error?: string }> {
+  const ws = call.workspaces;
+  if (!ws) throw new Error('root.dump is a server duty: it reads a workspace whole, and no map asks it');
+  const wasOpen = ws.isOpen(input.workspace);
+  const release = ws.hold(input.workspace);
+  try {
+    const { pelago } = await ws.get(input.workspace);
+    const taken = await dump(pelago.db, { id: input.workspace, name: input.name }, localPackOf(pelago.registry));
+    // The backup stands if the vault's fails: its caller writes it first, then says why the vault's did not come.
+    return await dumpVault(pelago.db).then((vault) => ({ dump: taken, vault }), (err: Error) => ({ dump: taken, vault_error: err.message }));
+  } finally {
+    release();
+    if (!wasOpen) await ws.closeIfUnused(input.workspace).catch(() => false);
+  }
+}
+
+/** What merging a backup did to the map's rows, or would do: the backup pack makes its report from it. */
+export interface Merged {
+  from: { id: string; name: string };
+  taken: string;
+  /** Each item of the file, newest first, and what becomes of it here. */
+  plan: { title: string; what: 'added' | 'updated' | 'kept_newer_here' | 'same' }[];
+  relations: { added: boolean }[];
+  proposals: { added: boolean }[];
+  /** The positions its events took in this map's activity stream. */
+  events: number[];
+  owner_set: boolean;
+  open_sessions: number;
+  holds: number;
+}
+
+class Preview extends Error {}
+
+/**
+ * root.merge: a dump merged into the map that asks, matching rows by id. Nothing is deleted. An entity on both sides
+ * keeps whichever was edited later, as a whole. A relation ended on either side is ended; a proposal decided on either
+ * side is decided. Events the map does not have are added after its own, keeping their times. Tokens and settings stay
+ * as they are here, except that a map with no owner takes the file's. Sessions still open in the file (of
+ * `session_types`), and what they hold, are left out. Without `apply` it changes nothing. The map is the whole one.
+ */
+export async function mergeOf(call: RootCall, input: { dump: Dump; session_types?: string[]; apply?: boolean }): Promise<Merged> {
+  const l = call.map;
+  if (!l || l.viewer !== undefined) throw new Error('root.merge writes the whole map: call it from the whole map, not one person’s view');
+  const { db, workspace } = l;
+  const backup = await db.transaction((tx) => opened(tx, input.dump, Boolean(input.apply)));
+  const here = (rows: Record<string, unknown>[] = []) => rows.map((row) => ({ ...row, workspace }));
+  const openSession = (e: Record<string, unknown>) => Boolean(input.session_types?.includes(e.type as string) && e.is_open);
+  const all = backup.tables.entity ?? [];
+  const entities = JSON.stringify(here(all.filter((e) => !openSession(e))));
+  const held = (r: Record<string, unknown>) => r.type === 'holds' && r.valid_to == null;
+  const relations = backup.tables.relation ?? [];
+  const me = backup.tables.setting?.find((s) => s.key === 'me')?.value ?? null;
+  let merged!: Merged;
+  try {
+    await db.transaction(async (tx) => {
+      const { rows: plan } = await tx.query<Merged['plan'][number]>(
+        `select i.title, case when e.id is null then 'added' when i.updated_at > e.updated_at then 'updated' when e.updated_at > i.updated_at then 'kept_newer_here' else 'same' end as what
+         from jsonb_populate_recordset(null::entity, $1::jsonb) i left join entity e on e.id = i.id order by i.updated_at desc`,
+        [entities],
+      );
+      const rels = await restoreRows(tx, entities, JSON.stringify(here(relations.filter((r) => !held(r)))));
+      await regatherAll(tx, ['part_of']);
+      await mentionedAll(tx);
+      await recountBytes(tx);
+      const { rows: props } = await tx.query<{ added: boolean }>(
+        `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)
+         on conflict (id) do update set status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at, note = excluded.note
+         where proposal.status = 'pending' and excluded.status <> 'pending'
+         returning (xmax = 0) as added`,
+        [JSON.stringify(here(backup.tables.proposal))],
+      );
+      // Its events go in the activity stream, after this map's own (src/activity.ts): each once.
+      const events = await bringIn(tx, workspace, [], backup.tables.event ?? []);
+      // The file's owner, if this map has none and the person is on it: read by the id, as only an id names an item.
+      const { rows: owner } = await tx.query(
+        `insert into setting (key, value) select 'me', $1::jsonb where exists (select 1 from entity where id = $2) on conflict (key) do nothing returning key`,
+        [JSON.stringify(me), typeof me === 'string' ? me : null],
+      );
+      merged = { from: backup.workspace, taken: backup.taken, plan, relations: rels, proposals: props, events, owner_set: owner.length > 0, open_sessions: all.filter(openSession).length, holds: relations.filter(held).length };
+      // Looking only: undo all of it.
+      if (!input.apply) throw new Preview();
+    });
+  } catch (err) {
+    if (!(err instanceof Preview)) throw err;
+  }
+  if (input.apply) await analyzeDue(db);
+  return merged;
 }
 
 // Run as `node src/backup.ts restore ...` too, through the shim the wave leaves there.

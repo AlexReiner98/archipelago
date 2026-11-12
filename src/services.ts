@@ -147,6 +147,8 @@ export function checkServices(pack: object, kernelOwns: Record<Family, readonly 
   for (const [what, list] of Object.entries({ provides, calls })) {
     for (const [name, sig] of Object.entries(list ?? {})) {
       const at = `kernel.${what} "${name}"`;
+      // A root service (src/root-calls.ts) is no family's: who provides one is the manifest's check, who calls one roots.json's.
+      if (name.startsWith('root.')) { if (!/^root\.[a-z][a-z0-9_]*$/.test(name)) problems.push(`${at} is no root service: root.<name>`); continue; }
       const s = serviceName(name);
       if (!s) { problems.push(`${at} is no service name: <family>.<name>, its family one of ${FAMILIES.join(', ')}`); continue; }
       if (!sig || typeof sig !== 'object') { problems.push(`${at} is { in, out }, each a shape`); continue; }

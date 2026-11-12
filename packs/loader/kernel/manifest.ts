@@ -80,7 +80,7 @@ export interface KernelSpec {
   internal: true;
   /** The folder of its code under the pack's own, `kernel/` unless said. */
   modules?: string;
-  /** The service names it provides (`<family>.<name>`), each with its shapes (src/services.ts) and the function that answers it. */
+  /** The service names it provides (`<family>.<name>`; a root's are `root.<name>`, src/root-calls.ts), each with its shapes (src/services.ts) and the function that answers it. */
   provides?: Record<string, { in?: unknown; out?: unknown; read?: string; run: ModuleRef }>;
   /** The shapes it calls service names with: what it gives and reads, checked against the provider's (src/packorder.ts). */
   calls?: Record<string, { in?: unknown; out?: unknown }>;
@@ -110,7 +110,9 @@ export function kernelProblems(k: unknown): string[] {
   for (const [point, r] of Object.entries((s.hooks ?? {}) as Record<string, unknown>)) for (const one of [r].flat()) ref(`kernel.hooks.${point}`, one);
   if (s.fills !== undefined && (!Array.isArray(s.fills) || s.fills.some((f) => typeof f !== 'string' || !f))) problems.push('kernel.fills is a list of the fields its rewrite may set');
   for (const [i, t] of arr<Raw>(s.timers).entries()) { ref(`kernel.timers[${i}]`, t.run); if (typeof t.every_ms !== 'number' || t.every_ms < 1000) problems.push(`kernel.timers[${i}].every_ms is a number of milliseconds, 1000 or more`); }
-  if (s.trust === 'root' && (s.provides !== undefined || s.hooks !== undefined || s.fills !== undefined)) problems.push('a root pack opens hook points and slots; it fills none and provides no service name');
+  if (s.trust === 'root' && (s.hooks !== undefined || s.fills !== undefined)) problems.push('a root pack opens hook points and slots; it fills none');
+  // The root service family (src/root-calls.ts): a root provides only root.<name>, and only a root provides one.
+  for (const name of Object.keys((s.provides ?? {}) as Raw)) if ((s.trust === 'root') !== name.startsWith('root.')) problems.push(s.trust === 'root' ? `kernel.provides "${name}": a root pack provides only root.<name>, a root service` : `kernel.provides "${name}": only a root pack provides a root service`);
   return problems;
 }
 
