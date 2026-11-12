@@ -1,0 +1,11 @@
+{
+  "id": "loader",
+  "version": "0.1.0",
+  "title": "Loader",
+  "description": "Packs, versions, islands, the sandbox and the in-process tier: the registry and its manifests, pack states and pins, island guards, reach, the pack host and the reads a pack is answered. A root pack, started after the database.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

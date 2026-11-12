@@ -7,6 +7,10 @@
     {
       "id": "database",
       "hash": "9e99e898b87d65539835d0d9f91198869d1d7c4a83efc2a9e401310d9470944b"
+    },
+    {
+      "id": "loader",
+      "hash": "ee14332ecba9324ab190ee116e5b32d39bb9c325c939a5fdfea099e9f7d6f510"
     }
   ]
 }
