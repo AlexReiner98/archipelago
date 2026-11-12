@@ -16,6 +16,7 @@
   "packs/core/session-states.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/core/turns.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/mentions/kernel/mentions.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/query/kernel/query.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/views/kernel/views.test.ts": { "pglite": 0, "postgres": 0 },
   "test/activity.test.ts": { "pglite": 4.2, "postgres": 1.7 },
   "test/addresses.test.ts": { "pglite": 6.7, "postgres": 3.4 },
