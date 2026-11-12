@@ -77,6 +77,11 @@
         "in": "any",
         "out": "any",
         "run": "root-looks.ts#lookOf"
+      },
+      "root.connections": {
+        "in": "any",
+        "out": "any",
+        "run": "root-connections.ts#connectionsOf"
       }
     }
   }

@@ -18,7 +18,7 @@
     },
     {
       "id": "identity",
-      "hash": "77c317c56c01e6253506043431a30669f676c4366376ee3dfacb0e02bcc1d0c8"
+      "hash": "7078e00ca57b17d819f0555907e520c778c4631bb2d04309fb7df114b32b34e9"
     },
     {
       "id": "walls",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "178e1fe405d97cca645467bec088805a20280820e303e95b6c17c42e22e94e4d"
+      "hash": "c199f6c558e5326690fda6bc82f9c8dbc9cd77d9e0045fca8b7625e12aa09a61"
     }
   ],
   "calls": {
@@ -85,6 +85,7 @@
       "publish"
     ],
     "root.transient": [
+      "connect",
       "look_draw",
       "mailer",
       "presence"
@@ -97,6 +98,12 @@
     ],
     "root.mail": [
       "alerts"
+    ],
+    "root.token": [
+      "connect"
+    ],
+    "root.connections": [
+      "connect"
     ]
   }
 }

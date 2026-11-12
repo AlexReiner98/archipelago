@@ -22,7 +22,7 @@ import { serveFile, setupPack } from '../../../src/server-files.ts';
 import { serveServerPack } from '../../../src/server-routes.ts';
 import { pageStyle } from '../../../src/styles.ts';
 import { workingRules } from '../../../src/working-rules.ts';
-import { askForToken, pollForToken } from './token-ask.ts';
+import { askForToken, pollForToken } from '../../../src/token-ask.ts';
 import type { Workspace, Workspaces } from '../../../src/workspaces.ts';
 
 /** The one command, with no secret in it, that sets a project up or brings its files up to date. */
@@ -234,13 +234,13 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   const workspace = poll ? poll[1] : typeof body?.workspace === 'string' ? body.workspace : at.fallback;
   if (!(await at.workspaces.has(workspace))) return reply(res, 404, { error: `No workspace "${workspace}".` });
   res.once('close', at.workspaces.hold(workspace));
-  const db = (await at.workspaces.get(workspace)).pelago.db;
+  const map = (await at.workspaces.get(workspace)).pelago;
   if (poll) {
-    const answer = await pollForToken(db, workspace, poll[2], bearer(req.headers.authorization) ?? '');
+    const answer = await pollForToken(map, poll[2], bearer(req.headers.authorization) ?? '');
     return reply(res, answer.state === 'gone' ? 410 : 200, answer);
   }
   try {
-    const asked = await askForToken(db, body);
+    const asked = await askForToken(map, body);
     return reply(res, 200, {
       code: asked.code,
       poll: { url: `${origin}/connect/poll/${workspace}/${asked.id}`, secret: asked.secret },

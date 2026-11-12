@@ -26,7 +26,6 @@ const CALLERS: Record<string, number> = {
   'src/session-name.ts': 2,
   'src/session-quiet.ts': 1,
   'src/sessions.ts': 1,
-  'src/token-ask.ts': 2,
   'src/token-tools.ts': 1,
   'src/tool-acts.ts': 2,
   'src/tool-change.ts': 6,

@@ -13,7 +13,7 @@ import { SHARE_TOOLS, context as publishing } from '../../../src/share-tools.ts'
 import { BACKUP_TOOLS } from '../../../src/backup-tools.ts';
 import { FORMER_NAMES, REPORT_TOOLS } from './report-tool.ts';
 import { TOKEN_TOOLS } from '../../../src/token-tools.ts';
-import { ASK_TOOLS } from '../../../src/token-ask.ts';
+import { ASK_TOOLS, context as connecting } from '../../../src/token-ask.ts';
 import { CONNECTION_TOOLS } from '../../../src/connection-tools.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import { LOOK_READS } from '../../../src/look-pass.ts';
@@ -82,7 +82,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 export const TOOLS: Record<string, Tool> = {
   ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HOOK_TOOLS, ...HUMAN_TOOLS,
   ...PACK_STATE_TOOLS, ...declaredTools(SHARE_TOOLS, publishing), ...BACKUP_TOOLS, ...REPORT_TOOLS,
-  ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS,
+  ...TOKEN_TOOLS, ...declaredTools(ASK_TOOLS, connecting), ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...declaredTools(CONNECTION_TOOLS, connecting),
 };
 
 /** The view tool as a registry offers it: described with the lenses its core pack declares, then the kernel's own views. */
