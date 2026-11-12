@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkAutomation, checkOn, checkUpdated, checkWritten, edgeOf, meet, weekdays, type Memory } from './automation-rules.ts';
+import { validate } from './validate.ts';
 
 const types = { isA: (t: string, of: string) => t === of || (t === 'reminder' && of === 'automation') };
 const on = { query: { filter: { find: ['type signup'] } }, edge: 'each' };
@@ -36,4 +37,16 @@ test('an edge learns what matches first, then fires on what starts to match', ()
   const first = edgeOf({ ...on, edge: 'first' } as never);
   const none = meet(first, [], undefined, said, 1).keep;
   assert.deepEqual(meet(first, [a], none, said, 2).met, [{ edge: 'first', matched: ['a'] }]);
+});
+
+test('the write path hears a wrong automation by the types of its island, and an update by what it changes', async () => {
+  const typesOf = (automation: boolean) => ({ isA: (t: string, of: string) => automation && t === 'automation' && of === 'automation', type: (t: string) => (t === 'automation' ? {} : undefined) });
+  const asked: unknown[] = [];
+  const judged = { islandRegistry: async (island: unknown) => (asked.push(island), typesOf(island !== 'e_old')) };
+  const ctx = { reads: async () => [{ type: 'automation', props: { island: 'e_here' } }] } as never;
+  const wrong = { op: 'create', type: 'automation', props: { trigger: 'daily' } };
+  assert.match((await validate(ctx, [wrong], undefined, judged)).refusals[0], /^op 1 \(create\): trigger "daily" needs at/);
+  assert.deepEqual((await validate(ctx, [{ ...wrong, props: { ...wrong.props, island: 'e_old' } }], undefined, judged)).refusals, [], 'not an automation where its island runs');
+  assert.match((await validate(ctx, [{ op: 'update', id: 'e_a', props: { on: 1 } }], undefined, judged)).refusals[0], /^op 1 \(update\): /);
+  assert.equal(asked.at(-1), 'e_here', "an update is judged where the item's island is");
 });

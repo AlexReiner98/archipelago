@@ -5,33 +5,10 @@
 // Unwait and sources stay inline for now: both act at the level of facts inside the apply loop, and as a
 // write.follow their ops would be judged by the rules, which is the owner's to see first (task e_mhqvdzj6).
 
-import { checkUpdated, checkWritten } from './automation-rules.ts'; import { islandRegistry } from './island-pin.ts';
 import { typesApplied } from './type-items.ts'; import { supersede } from './proposals.ts';
-import type { Op } from './pelago-types.ts';
-import type { AfterEntry, BuiltIn, Checked, Point, WriteEnv } from './write-hooks.ts';
-
-/** An automation's trigger and conditions, checked as written (src/automation-rules.ts), by the version its island runs. */
-async function automations(env: WriteEnv, ops: Op[]): Promise<Checked> {
-  const refusals: string[] = [];
-  for (const [i, op] of ops.entries()) {
-    const where = `op ${i + 1} (${op.op})`;
-    if (op.op === 'create') {
-      const here = await islandRegistry(env.map, op.props?.island, env.reg);
-      if (here.type(op.type)) refusals.push(...checkWritten(here, op.type, op.props ?? {}).map((p) => `${where}: ${p}`));
-    } else if (op.op === 'update' && op.props?.on !== undefined && op.props.on !== null) {
-      const target = await env.map.entity(op.id);
-      if (!target) continue;
-      const here = await islandRegistry(env.map, op.props.island ?? target.props.island, env.reg);
-      refusals.push(...checkUpdated(here, target.type, op.props).map((p) => `${where}: ${p}`));
-    }
-  }
-  return { refusals };
-}
+import type { AfterEntry, BuiltIn, Point, WriteEnv } from './write-hooks.ts';
 
 export const BUILT_IN: { [P in Point]?: BuiltIn[] } = {
-  'write.validate': [
-    { pack: 'automations', run: automations },
-  ],
   'write.after': [
     { pack: 'types', run: (env: WriteEnv, entry: AfterEntry) => typesApplied(env.map, entry.ops, env.reg) },
     { pack: 'proposals', run: (env: WriteEnv, entry: AfterEntry) => supersede(env.map, entry.changeset) },

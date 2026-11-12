@@ -6,6 +6,7 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "hooks": { "write.validate": "validate.ts#validate" }
   }
 }
