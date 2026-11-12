@@ -1,0 +1,11 @@
+{
+  "id": "rules",
+  "version": "0.1.0",
+  "title": "Rules",
+  "description": "Who decides what applies: the judge that reads every pack's rules as data and says whether a change applies, waits for a person or is refused, naming the rule; who may do what, on whose authority, the workspace's standing, and what a drawing may ask. A root pack, started after the loader.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

@@ -1,4 +1,5 @@
 [
+  "packs/rules/kernel/rule-fillings.ts -> src/reply-rules.ts",
   "src/backup.ts -> src/bytes.ts",
   "src/backup.ts -> src/control-index.ts",
   "src/backup.ts -> src/control.ts",
@@ -101,7 +102,6 @@
   "src/rebuild.ts -> src/packs.ts",
   "src/rebuild.ts -> src/registry-at.ts",
   "src/replay.ts -> src/log-project.ts",
-  "src/rules.ts -> src/reply-rules.ts",
   "src/scope.ts -> src/packtools.ts",
   "src/scope.ts -> src/places.ts",
   "src/scope.ts -> src/sessions.ts",
