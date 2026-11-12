@@ -2,7 +2,7 @@
 // change would create is no item yet, so the page draws it as a faint node beside these (ui/ghosts.js). Held changes are
 // read as the viewer may see them (row-level security on the proposal), so a change held for someone else is not here.
 
-import type { Archipelago, Op } from './pelago.ts';
+import type { Archipelago, Op } from './pelago.ts'; import { proposals } from './map-reads.ts';
 
 /** The ids a change's ops name, as written: an end that is a ref of the same change is no item, and finds nothing. */
 const named = (ops: Op[]): string[] =>
@@ -13,7 +13,7 @@ const named = (ops: Op[]): string[] =>
 
 /** The items the viewer's pending held changes would edit, archive, merge or tie, and the ends of a link they would end. */
 export async function heldIds(l: Archipelago): Promise<string[]> {
-  const ops = (await l.proposals()).flatMap((p) => p.ops as Op[]);
+  const ops = (await proposals(l)).flatMap((p) => p.ops as Op[]);
   const ids = new Set(named(ops));
   const ended = ops.flatMap((o) => (o.op === 'unlink' ? [o.relation] : []));
   if (ended.length) {

@@ -8,6 +8,8 @@ import { agent, all, fresh, human, make, replayed } from './map.ts';
 import { canonical, entryHash, jcs } from '../src/jcs.ts';
 import { entry, stored, verify } from '../src/log.ts';
 import { undo } from '../src/undo.ts';
+import { getItem, proposals } from '../src/map-reads.ts';
+import { readEvents } from '../src/eventlog.ts';
 
 test('the canonical form is RFC 8785, and a sealed value is hashed by its digest', () => {
   assert.equal(jcs({ b: [1, 'x', null, true], a: { d: 1e21, c: 0.1 }, é: ' "' }), '{"a":{"c":0.1,"d":1e+21},"b":[1,"x",null,true],"é":" \\""}');
@@ -143,7 +145,7 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   const edit = (await l.change(human, { reason: 'Reshape', ops: [{ op: 'update', id: made.c, title: 'Build the stream', props: { priority: 'low' }, owner: made.x }, { op: 'archive', id: made.p }] })) as { changeset: string };
   const hidden = (await mine.change(human, { reason: 'Mine', ops: [{ op: 'create', ref: 'h', type: 'task', title: 'Private to me', visibility: 'private' }] })) as { created: Record<string, string> };
   await mine.change(human, { reason: 'Share it', ops: [{ op: 'update', id: hidden.created.h, visibility: 'shared' }] });
-  const waits = (await l.get(made.c)).outgoing.find((r: any) => r.type === 'waits_on') as { relation: string };
+  const waits = (await getItem(l, made.c)).outgoing.find((r: any) => r.type === 'waits_on') as { relation: string };
   await make(l, [{ op: 'unlink', relation: waits.relation }, { op: 'restore', id: made.p }]);
 
   // A merge: b's part_of repeats a's and goes, its depends_on a would join a to itself and goes, c's depends_on moves to a.
@@ -161,7 +163,7 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   assert.deepEqual(back.skipped, ['"Build the stream": owner has changed again since, so it was left as it is']);
   assert.deepEqual(opposite.facts.filter((f) => f[1] === made.c), [['+', made.c, 'title', 'Build it'], ['-', made.c, 'priority']]);
   // An item's history says which change undid which: the page offers Undo by it.
-  const told = new Map(((await l.events({ target: made.c })) as any[]).map((e) => [e.changeset, e.detail]));
+  const told = new Map(((await readEvents(l.db, { target: made.c })) as any[]).map((e) => [e.changeset, e.detail]));
   assert.equal(told.get(edit.changeset).undone_by, back.changeset);
   assert.equal(told.get(back.changeset).undoes, edit.changeset);
   assert.equal(told.get(back.changeset).undone_by, undefined);
@@ -188,5 +190,5 @@ test('undo appends the opposite change set, and the facts replay into the rows t
   // What is pending is a projection too: the records no entry has decided.
   const decided = new Set((await all(l)).map((e) => (e.rule as { proposal?: string } | null)?.proposal).filter(Boolean));
   const pending = (await all(l, 'pending')).filter((p) => !decided.has(p.id)).map((p) => p.id);
-  assert.deepEqual(pending, (await l.proposals()).map((p) => p.id));
+  assert.deepEqual(pending, (await proposals(l)).map((p) => p.id));
 });

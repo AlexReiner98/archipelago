@@ -16,6 +16,7 @@ import { move } from '../src/move.ts';
 import { Archipelago } from '../src/pelago.ts';
 import { callTool } from '../src/tools.ts';
 import { undo } from '../src/undo.ts';
+import { getItem } from '../src/map-reads.ts';
 
 const server = process.env.PELAGO_TEST_DATABASE_URL;
 
@@ -69,7 +70,7 @@ async function same(a: Archipelago, b: Archipelago, id: string) {
     assert.deepEqual(w.problems, []);
     assert.deepEqual([w.entries, w.head], [v.entries, v.head], `the ${stream} stream is the same chain`);
   }
-  const [g, h] = [await a.get(id), await b.get(id)];
+  const [g, h] = [await getItem(a, id), await getItem(b, id)];
   assert.deepEqual([h.entity.title, h.entity.body, h.outgoing.length], [g.entity.title, g.entity.body, g.outgoing.length]);
   assert.deepEqual((await all(b)).map((e) => e.reason), (await all(a)).map((e) => e.reason), 'every reason opens there as here');
 }

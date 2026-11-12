@@ -10,6 +10,8 @@ import { askView } from '../src/askview.ts';
 import { join } from 'node:path';
 import { Registry } from '../src/packs.ts';
 import { human, agent, fresh, freshWith, attend, make, PACKS } from './map.ts';
+import { getItem, proposals } from '../src/map-reads.ts';
+import { readEvents } from '../src/eventlog.ts';
 
 /** A map with core and a type of repository found by its folder or its remote (test/packs/checkout), and no other pack. */
 const laneMap = () => freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs')], ['core', 'checkout']));
@@ -46,7 +48,7 @@ test('a session registers, takes the lane its task needs, and gives it back when
   assert.equal(one.status, 'running');
   assert.deepEqual(one.claimed, ['Live lane']);
   assert.equal(one.repo?.title, 'Apex repo', 'found by a subfolder, whatever the slashes or case');
-  assert.equal((await l.proposals()).length, 0, 'operational state needs no approval');
+  assert.equal((await proposals(l)).length, 0, 'operational state needs no approval');
   assert.equal((await sessionStart(l, agent, { session_id: 's1' })).resumed, true, 'announcing twice is safe');
 
   // A second session wanting the same lane is told who has it, and waits.
@@ -160,8 +162,8 @@ test('a session tells the story of its work, beat by beat, and can take a beat b
   await tell(l, agent, { run, said: 'The unrelated task matters after all.', about: [made.c] });
   const three = await tell(l, agent, { run, said: 'No: it does not.', replaces: 2 });
   assert.equal(three.standing, 2);
-  assert.equal((await l.proposals()).length, 0, 'a story needs no approval');
-  assert.equal(((await l.events({ target: run })) as any[]).length, 1, 'and logs no event: only the session starting');
+  assert.equal((await proposals(l)).length, 0, 'a story needs no approval');
+  assert.equal(((await readEvents(l.db, { target: run })) as any[]).length, 1, 'and logs no event: only the session starting');
 
   const told = (await VIEWS.story.run(l, { run })) as any;
   assert.deepEqual(told.beats.map((b: any) => [b.n, b.replaced_by ?? null]), [[1, null], [2, 3], [3, null]]);
@@ -190,7 +192,7 @@ test('a session that goes quiet is shown as stale', async () => {
   assert.equal(((await VIEWS.sessions.run(l, {})) as any).open[0].stale, true);
   await sessionUpdate(l, agent, { run });
   assert.equal(((await VIEWS.sessions.run(l, {})) as any).open[0].stale, false, 'a heartbeat clears it');
-  assert.equal(((await l.events({ target: run })) as any[]).length, 1, 'and leaves no event');
+  assert.equal(((await readEvents(l.db, { target: run })) as any[]).length, 1, 'and leaves no event');
 });
 
 test('a brief gathers a task\'s context, blockers, needs and rules', async () => {
@@ -258,11 +260,11 @@ test('a session that finishes says where the repository\'s open work stands', as
   assert.match((await l.entity(run))!.body, /Tests written\nSaid still true: .*Capture probe.*Tune the solver/);
   // Vouching is said on the item as well: an update that changes nothing, which moves when it was last known true.
   // It is the agent's word like any other, so here, where agents' changes are held, it waits for the owner.
-  const vouch = (await l.proposals()).at(-1)!;
+  const vouch = (await proposals(l)).at(-1)!;
   assert.deepEqual(vouch.ops, [{ op: 'update', id: made.live }, { op: 'update', id: made.gated }]);
   assert.match(vouch.reason, /still true as written/);
   await l.decide({ kind: 'human', name: 'owner' }, { proposal: vouch.id, approve: true });
-  const said = ((await l.events({ target: made.live })) as any[])[0];
+  const said = ((await readEvents(l.db, { target: made.live })) as any[])[0];
   assert.deepEqual([said.action, said.detail.changes], ['entity.update', {}]);
 
   // What nobody has changed or confirmed for longest comes first, with its age; the session is told of it at the start.
@@ -329,7 +331,7 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   const ended = (await callTool(l, agent, 'session_end', { run, summary: 'Probe looked at', still_true: [made.live], cannot_tell: [made.gated] })) as any;
   assert.equal(ended.status, 'finished');
   assert.match((await l.entity(run))!.body, /Said still true: Capture probe .*\nCould not tell from here, left as found: Tune the solver/);
-  assert.deepEqual((await l.proposals()).at(-1)!.ops, [{ op: 'update', id: made.live }], 'only what was vouched for is said to be checked');
+  assert.deepEqual((await proposals(l)).at(-1)!.ops, [{ op: 'update', id: made.live }], 'only what was vouched for is said to be checked');
   assert.deepEqual((await l.entity(made.gated))!.updated_at, before);
 
   // The next session is not asked about what has a change waiting for the owner (the vouching above is one, held),
@@ -341,7 +343,7 @@ test('work that waits on a person is blocked by them, needs them, and is not ask
   assert.match((await l.entity(next.run))!.body, /Could not tell from here, left as found: 1 item it did not look at\./);
 
   // Once they have answered, the link is removed and the work is free again.
-  const link = (await l.get(made.offline)).outgoing.find((r: any) => r.type === 'waits_on') as any;
+  const link = (await getItem(l, made.offline)).outgoing.find((r: any) => r.type === 'waits_on') as any;
   await make(l, [{ op: 'unlink', relation: link.relation }]);
   assert.ok((await attend(l, { reasons: ['ready'], within: made.tree })).items.some((t: any) => t.id === made.offline));
 });

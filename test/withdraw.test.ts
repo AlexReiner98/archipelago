@@ -5,6 +5,7 @@ import type { Op } from '../src/pelago.ts';
 import { callTool } from '../src/tools.ts';
 import { covering } from '../src/withdraw.ts';
 import { human, agent, fresh, make, all, replayed } from './map.ts';
+import { proposals } from '../src/map-reads.ts';
 
 const at = (minute: number) => new Date(Date.UTC(2026, 10, 3, 12, minute));
 const held = (id: string, minute: number, ops: Op[], actor = 'agent:test') => ({ id, ts: at(minute), actor, ops });
@@ -36,8 +37,8 @@ test('an agent withdraws its own held change, never another’s, and a newer one
   await assert.rejects(callTool(l, other, 'revise', { action: 'withdraw', params: { proposal: older.proposal } }), /only its proposer may withdraw it/);
   const gone = (await callTool(l, agent, 'revise', { action: 'withdraw', params: { proposal: older.proposal } })) as any;
   assert.deepEqual(gone, { proposal: older.proposal, status: 'withdrawn', note: `Covered by ${newer.proposal}` });
-  assert.deepEqual((await l.proposals()).map((p) => p.id), [newer.proposal]);
-  const [w] = await l.proposals({ status: 'withdrawn' });
+  assert.deepEqual((await proposals(l)).map((p) => p.id), [newer.proposal]);
+  const [w] = await proposals(l, { status: 'withdrawn' });
   assert.deepEqual([w.decided_by, w.note], ['agent:test', `Covered by ${newer.proposal}`]);
   assert.equal((await l.entity(s))!.title, 'Ridges', 'withdrawing applies nothing');
   await assert.rejects(callTool(l, agent, 'revise', { action: 'withdraw', params: { proposal: older.proposal } }), /already withdrawn/);

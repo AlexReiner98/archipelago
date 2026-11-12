@@ -7,6 +7,7 @@ import { openDb } from '../src/db.ts';
 import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
 import { callTool } from '../src/tools.ts';
+import '../src/packreads.ts'; // the reads API fills the loader's slot loader.reads, as the surface root loads it at a workspace's open
 import { syncTypes } from '../src/typetable.ts';
 import { entries, type Entry } from '../src/log.ts';
 import { rebuild } from '../src/replay.ts';

@@ -4,7 +4,7 @@
 // to decide. A newer held change that sets every field an older one of the same proposer sets says it covers it.
 
 import type { Actor, Archipelago, Op, Proposal } from './pelago.ts';
-import { rejection } from './proposals.ts';
+import { proposalsOf, rejection } from './proposals.ts';
 
 const SET = ['title', 'status', 'owner', 'visibility', 'confidence'] as const;
 
@@ -62,7 +62,7 @@ export async function withdraw(l: Archipelago, actor: Actor, input: { proposal: 
   if (!p) throw new Error(`No proposal "${input.proposal}"`);
   if (p.actor !== me) throw new Error(`Proposal ${p.id} was made by ${p.actor}, not you: only its proposer may withdraw it, and deciding it is a person's.`);
   if (p.status !== 'pending') throw new Error(`Proposal ${p.id} is already ${p.status}`);
-  const by = [...covering(await l.proposals())].find(([, older]) => older.includes(p.id))?.[0];
+  const by = [...covering(await proposalsOf(l))].find(([, older]) => older.includes(p.id))?.[0];
   const note = input.reason ?? (by ? `Covered by ${by}` : 'Withdrawn by its proposer');
   const done = await l.db.transaction((tx) => rejection(tx, l.workspace, p.id, { outcome: 'withdrawn', actor: me, by: me, reason: p.reason, note }));
   if (!done) throw new Error(`Proposal ${p.id} was decided first`);

@@ -5,6 +5,7 @@ import { hookSessionStart } from '../src/session-hook.ts';
 import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 import { agent, fresh } from './map.ts';
+import { proposals } from '../src/map-reads.ts';
 
 /** The runs a run was started from, as the map links them. */
 const parentsOf = async (l: Awaited<ReturnType<typeof fresh>>, run: string) =>
@@ -18,7 +19,7 @@ test('a session started by another is linked to it, by its run id or its session
   assert.deepEqual(await parentsOf(l, byId.run), [top.run]);
   assert.deepEqual(await parentsOf(l, bySession.run), [top.run], 'a session id is resolved as any run is');
   assert.deepEqual(await parentsOf(l, top.run), [], 'one no session started has none');
-  assert.equal((await l.proposals()).length, 0, 'a session’s own state needs no approval');
+  assert.equal((await proposals(l)).length, 0, 'a session’s own state needs no approval');
   // Announced again, with the same parent, it keeps its one link.
   await sessionStart(l, agent, { session_id: 'side-1', parent: 'top' });
   assert.deepEqual(await parentsOf(l, byId.run), [top.run]);

@@ -246,9 +246,9 @@ are slots of the write and log packs; the others:
 |---|---|---|---|
 | `log.appended` | log | usage | `bytes` called inside `log.append` |
 | `rules.reply_ended` | rules | sessions | `rules.ts` importing `reply-rules.ts` |
-| `loader.reads` | loader | surface | `packhost.ts` importing `packreads.ts` (the sandbox's reads) |
+| `loader.reads` | loader | surface | `packhost.ts` and `kernel-context.ts` importing `packreads.ts` (the sandbox's reads, and a kernel pack's `ctx.reads`, which names the pack asking); the surface root's `open.ts` loads it before any workspace opens |
 | `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
-| `open.<phase>` | the stub | any | the fixed order in `Workspaces.load` |
+| `open.<phase>` | identity (`src/lifecycle.ts`) | each root, by its `kernel/open.ts` (`OPEN`, and `LEADING` for what runs while the server leads), read in roots.json's order; an internal pack by `kernel.hooks`; what a service module still does there, `src/open-steps.ts` until its pack takes it | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
 | `surface.reads` | surface | agents (`instructions`); the kernel until their packs hold their modules: uses (`told`), touched (`touched`), eventlog (`events`), views and askview (`view`), timeaxis (`placed`) | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 
@@ -310,9 +310,13 @@ to the connect pack. As built (wave 5): `search` is surface's `searchMap`
 seal's `readSecret` and `writeSecret`, the class's names kept as adapters;
 `checkConnections` is the connect pack's (`src/check-connections.ts`),
 filling `surface.act` as `check_connections`, and hands what it saw to the
-class's `observed`, which keeps it on the write path. `get`, `trail`,
-`events` and `proposals` still go through the class (`src/map-reads.ts`)
-until the reads API calls them there. The rules root reads `rules.<on>`
+class's `observed`, which keeps it on the write path. As built (wave 6): `get`,
+`trail`, `hidden` and `proposals` left the class for surface's
+`src/map-reads.ts` (`getItem`, `trail`, `hidden`, `proposals`); `events` is the
+activity log's `readEvents` (`src/eventlog.ts`), asked where an answer needs it
+(`get`'s recent events and the `events` read, `src/tool-reads.ts`); the queue's
+read is the write root's `proposalsOf` (`src/proposals.ts`), which withdraw
+reads too. The class keeps its writes, `entity` and `mentionedIn`. The rules root reads `rules.<on>`
 fillings from the internal packs' `kernel.hooks`; sessions declares
 `rules.reply_ended`.
 
@@ -489,17 +493,15 @@ Set by the database step (e_8e5yhfdy); every root step moves its row the same wa
   imports do not count. Which pack a module is in is read from this document ("Where each
   module goes", "Plumbing"), or from where it now lives. The rule holds of every module of a root
   row, moved or not. What those modules imported above that when the wave began is owed, listed
-  in `test/fixtures/root-imports.json` (193 imports, as `src/<m>.ts -> src/<n>.ts`); an import
+  in `test/fixtures/root-imports.json` (193 imports when the wave began, as `src/<m>.ts -> src/<n>.ts`); an import
   not on it is refused. Cutting one needs no edit there; the gather step empties the list.
 - **Run** the tests that import the moved modules, the structure test, `npm run roots:check` and
   `npm run typecheck`, and start a throwaway server with `node src/server.ts` (see below) to see
   `/health` answer the new root's hash.
 
-> [!WARNING]
-> `node src/boot.ts` (`npm start`) does not start on `kernel-packs` as of 8463aba4: `src/lifecycle.ts`
-> imports `OPEN_PHASES` from `src/boot.ts`, the entry module still in its top-level await, so the
-> import of `server.ts` never settles. `node src/server.ts` starts. Found by the database step; its fix
-> is the lifecycle hooks' owner's.
+- **Boot.** `node src/boot.ts` (`npm start`) starts (wave 6): `OPEN_PHASES` is in
+  `src/open-phases.ts`, apart from the entry module, and the open phases no longer reach the stub.
+
 ## Moving a service in the wave (as built)
 
 How the kernel views step (e_8f8m2xtf) moved its modules into `packs/attention`

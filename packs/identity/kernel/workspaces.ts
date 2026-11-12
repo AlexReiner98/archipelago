@@ -12,8 +12,8 @@ import type { Dump } from '../../../src/backup.ts';
 import type { Booted } from '../../../src/boot.ts';
 import { addWorkspace, claimControlValue, controlValue, importControlFiles, listWorkspaces, localTypes, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
 import { openDb, type Database } from '../../../src/db.ts';
-import { openPhases, startDuties } from '../../../src/lifecycle.ts';
-import { takeTypeItems } from '../../../src/open-steps.ts'; // the kernel's steps of a workspace's open, and the clock
+import { openPhases, startDuties } from './lifecycle.ts';
+import '../../../src/open-steps.ts'; // what service packs do at a workspace's open, and the clock, held by the kernel
 import { databaseFor, dropDatabaseFor } from '../../../src/pg.ts';
 import type { Archipelago, Policy } from '../../../src/pelago.ts';
 import type { TypeDef } from '../../../src/packs.ts';
@@ -21,7 +21,7 @@ import { followMade, followPacks, setIslands } from '../../../src/packstate.ts';
 import { firstIsland } from '../../../src/island-start.ts';
 import { hostFor } from '../../../src/packtools.ts';
 import { syncTypes } from '../../../src/typetable.ts';
-import { onPacksChanged, onTypesChanged } from '../../../src/type-items.ts';
+import { onPacksChanged, onTypesChanged, takeTypeItems } from '../../../src/type-items.ts';
 
 // The type table follows the types kept on the map as it follows the packs.
 onTypesChanged(syncTypes);

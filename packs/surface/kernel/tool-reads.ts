@@ -18,7 +18,7 @@ import { schemaBrief, schemaOf } from '../../../src/schema-brief.ts';
 import { NOW_MS, seeing, seenNow } from '../../../src/seeing.ts';
 import { withStyles } from '../../../src/styles.ts';
 import { LARGE, sizeOf } from '../../../src/head.ts';
-import { props } from './tool-ops.ts'; import { searchMap } from './search.ts';
+import { props } from './tool-ops.ts'; import { searchMap } from './search.ts'; import { getItem, proposals } from './map-reads.ts';
 import type { Tool } from './tools.ts';
 import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
 import { withCovers } from '../../../src/withdraw.ts';
@@ -242,7 +242,9 @@ export const READ_TOOLS: Record<string, Tool> = {
     description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass), the public views that show it (public_views, frozen when shared: one marked behind has changed since, so tell the person, whose act sharing it again is) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
     input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for all of it whole. Past ${GET_LISTED} links in a direction, an agent is given those and a count by type (links_cut); of what names it the first ${GET_MENTIONS}; of what holds it the number of views about each; and of a large field (a layout's code) its first lines and size. The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
-      const found = { ...(await l.get(input.id)), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
+      // Its recent events are the activity log's (src/eventlog.ts), read beside the item as get read them.
+      const [item_, events_] = await Promise.all([getItem(l, input.id), readEvents(l.db, { target: input.id, limit: 8 })]);
+      const found = { ...item_, recent_events: events_.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
       found.shown_in = await shownIn(l, input.id, found.trail);
       // The public views that show it, frozen when shared: one marked behind has changed since, and sharing that view again
       // is the person's (an agent editing it tells them).
@@ -295,7 +297,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       full: FULL,
     },
     run: async (l, actor, { full, by, ...input }) => {
-      const events = await l.events({ ...input, ...(by && { actor: by }) });
+      const events = await readEvents(l.db, { ...input, ...(by && { actor: by }) });
       return actor.kind === 'human' || full ? events : shortHistory(events);
     },
   },
@@ -304,7 +306,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       'List the changes held for a human, by status (default pending; "approved" is applied, "rejected" is declined, "superseded" asked only for what a later change had already made so, "withdrawn" was taken back by its proposer). A pending one says which older ones of the same proposer it covers (covers, covered_by). Agents can read these but only a human can decide them.',
     input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded', 'withdrawn']).optional(), full: z.boolean().optional().describe(`true for all of them, whole. Left out, an agent is given long values cut, and of a closed status the newest ${PROPOSALS_LISTED}.`) },
     run: async (l, actor, { full, ...input }) => {
-      const listed = await l.proposals(input);
+      const listed = await proposals(l, input);
       const all = (input.status ?? 'pending') === 'pending' ? withCovers(listed) : listed;
       const short = actor.kind === 'agent' && !full;
       const held = short ? all.slice(input.status && input.status !== 'pending' ? -PROPOSALS_LISTED : 0).map((p) => ({ ...p, ops: (p.ops as unknown[]).map((op) => shorter(op, 'proposals with full: true has it')) })) : all;

@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { moveQueries, oldQuery, termQueries } from '../src/query-saved.ts';
 import { renamedQuery } from '../src/query-names.ts';
 import { fresh, make } from './map.ts';
+import { readEvents } from '../src/eventlog.ts';
 
 test('a view kept before the flat lens is translated once into the flat lens its fields say', async () => {
   const l = await fresh();
@@ -63,7 +64,7 @@ test('a view kept before the flat lens is translated once into the flat lens its
   await l.db.transaction((tx) => l.moved(tx, 'test', 'test: a time view', Object.entries(day).map(([k, v]): ['+', string, string, unknown] => ['+', made.cut, k, v])));
   assert.deepEqual((await moveQueries(l)).moved, 0);
   assert.deepEqual(await props(made.cut), day);
-  const said = (await l.events({ action: 'lens.moved' })) as unknown as { detail: { lost: Record<string, string[]> } }[];
+  const said = (await readEvents(l.db, { action: 'lens.moved' })) as unknown as { detail: { lost: Record<string, string[]> } }[];
   assert.deepEqual(said[0].detail.lost[made.whole], ['kinds nothing.like_it', 'leaving out what is linked to nothing']);
 });
 

@@ -494,6 +494,6 @@ test("a root pack's code imports only plumbing and the roots before it", () => {
   const owed = new Set(JSON.parse(read('test/fixtures/root-imports.json')) as string[]), added = rootImports().filter((e) => !owed.has(e));
   assert.deepEqual(added, [], 'Open a slot the higher pack fills, or hand the value in (docs/kernel-packs.md, "Slots").');
 });
-// 23. A service name is answered as the map that asks it (callAs, src/kernel-context.ts): callService runs its provider as the map the names were filled for, so it is called only where no map asks; kernel-context's is a name no internal pack provides.
-const CALLS_SERVICE: Record<string, number> = { 'src/kernel-context.ts': 1 }, servicePacks = walk('packs').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+// 23. A service name is answered as the map that asks it (callAs, src/kernel-context.ts): callService ran its provider as the map the names were filled for, and is gone (wave 6); none comes back.
+const CALLS_SERVICE: Record<string, number> = {}, servicePacks = walk('packs').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
 test('a service name is answered as the map that asks it', () => assert.deepEqual(ratchet(count([...kernelFiles, ...servicePacks], /(?<!function )\bcallService\s*[<(]/g), CALLS_SERVICE), [], 'Call it with callAs(l, name, input): its provider reads as the asker, under row-level security.'));
