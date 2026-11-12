@@ -7,6 +7,7 @@ import type { KernelContext } from '#pelago/kernel';
 import { appended } from './appended.ts';
 import { gist, packTouches } from './pack-touches.ts';
 import { withUse } from './pack-use.ts';
+import { told } from './reads.ts';
 import { used } from './uses.ts';
 
 const DAY = new Date().toISOString().slice(0, 10);
@@ -46,6 +47,15 @@ test('a use is counted through root.uses, on the context’s workspace or the on
     ['root.uses', { workspace: 'w', add: [{ key: 'view:core.frontier', n: 1 }] }],
     ['root.uses', { workspace: 'other', add: [{ key: 'held:core.asked_rule', n: 2 }] }],
   ]);
+});
+
+test('told counts each instruction said once, on the asking map, and answers true', async () => {
+  const calls: [string, unknown][] = [];
+  const at = { workspace: 'w', call: async (name: string, input: unknown) => void calls.push([name, input]), said: () => {} } as unknown as KernelContext;
+  assert.equal(await told(at, { told: ['e_counted', 'e_counted'] }), true);
+  await new Promise((r) => setTimeout(r, 0));
+  assert.deepEqual(calls.map(([, i]) => i), [1, 2].map(() => ({ workspace: 'w', add: [{ key: 'told:e_counted', n: 1 }] })));
+  await assert.rejects(told(at, { told: 'e_counted' }), /told is a list of ids/);
 });
 
 test('beside each counted thing, its use: the items standing, and the uses written down and held summed', async () => {

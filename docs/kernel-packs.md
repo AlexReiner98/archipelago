@@ -250,7 +250,7 @@ are slots of the write and log packs; the others:
 | `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
 | `open.<phase>` | the stub | any | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
-| `surface.reads` | surface | agents (`instructions`); the kernel until their packs hold their modules: uses (`told`), touched (`touched`), eventlog (`events`), views and askview (`view`), timeaxis (`placed`) | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
+| `surface.reads` | surface | agents (`instructions`), usage (`told`); the kernel until their packs hold their modules: eventlog (`events`), views and askview (`view`), timeaxis (`placed`) | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 
 This is also the fix for bug e_wpww27fm (trusted modules import services):
 each import it names becomes a slot, cut by the step that moves the
@@ -552,10 +552,10 @@ read with several keys answers as it did): an internal pack names it in its mani
 (`"hooks": { "surface.reads": "reads.ts#instructions" }`, agents) and is handed its context of the
 map that asks, any map, opened or not (`hostAt`, `src/kernel-context.ts`); a module still in
 `src/` fills it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`, through
-`src/service-reads.ts`), until its pack holds it: `told` (uses: the usage pack's code still
-imports the kernel, so it does not load from a copy of the packs), `touched` (sessions is
-optional, and an optional pack fills only `write.*`), `events`, `view` (with its pin) and
-`placed`. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
+`src/service-reads.ts`), until its pack holds it: `events`, `view` (with its pin) and
+`placed`. As built (wave 6): `told` is the usage pack's (`reads.ts#told`), and what a run touched
+is the reads API's own, read from the transient store in `runsOf` (`src/packreads-log.ts`), since
+sessions is optional and an optional pack fills only `write.*`. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
 reads API's own bounded scan, `packreads-scope`, which places re-exports. `test/packreads-slots.test.ts`
 pins each answer against its service's own functions.
 

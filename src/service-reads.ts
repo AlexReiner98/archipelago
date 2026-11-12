@@ -1,11 +1,9 @@
 // The reads of the reads API (src/packreads.ts) that kernel modules of service rows still answer, as fillings of the
-// surface's slot surface.reads (src/surface-fillings.ts): an instruction counted as said (the usage pack's uses), what
-// a run touched (the sessions pack's touched; that pack is optional, and an optional pack fills only the write path's
-// points, so the kernel module fills it while the pack is on or off, as it read before), the activity log's events (the views pack's eventlog), a view by its name (the query pack's views and askview) and what
-// falls in a window of time (the query pack's timeaxis and its limit). Each is what packreads answered itself before,
-// moved whole; the step that moves its module into its pack moves its filling there too, named in the pack's
-// manifest. The usage pack holds uses already, but uses.ts still imports the kernel (src/pack-counts.ts), so its code
-// does not load from a copy of the packs (test/map.ts, packsWith): it fills told once it reads no kernel module.
+// surface's slot surface.reads (src/surface-fillings.ts): the activity log's events (the views pack's eventlog), a view by
+// its name (the query pack's views and askview) and what falls in a window of time (the query pack's timeaxis and its
+// limit). Each is what packreads answered itself before, moved whole; the step that moves its module into its pack
+// moves its filling there too, named in the pack's manifest. An instruction counted as said is the usage pack's
+// filling (reads.ts#told), and what a run touched the reads API's own (src/packreads-log.ts, runsOf).
 
 import { readEvents } from './eventlog.ts';
 import type { Archipelago, Entity } from './pelago.ts';
@@ -14,19 +12,7 @@ import { pinned } from './packreads-pin.ts';
 import { READ_LIMIT, shapes } from './packreads-rows.ts';
 import { LENS_LIMIT } from './query-flat.ts';
 import { placeAll, readAxis, zoneOf } from './timeaxis.ts';
-import { touchedBy } from './touched.ts';
-import { used } from './uses.ts';
 import { askPackView, VIEWS } from './views.ts';
-
-/** Each instruction said (a preset's id, or a kept one's) counted once; answered true. */
-export async function told(l: Archipelago, q: { told: unknown }): Promise<true> {
-  if (!Array.isArray(q.told) || q.told.some((id) => typeof id !== 'string')) throw new Error('told is a list of ids');
-  for (const id of q.told as string[]) used(l.workspace, 'told', id);
-  return true;
-}
-
-/** What a run touched, as its session's hook kept it (runs, touched: true, reads it of each run it answers). */
-export const touched = (l: Archipelago, q: { touched: string }): Promise<string[]> => touchedBy(l, q.touched);
 
 /** Events of a kind, about one item, since a moment, newest first. */
 export async function events(l: Archipelago, q: Read & { events: NonNullable<Read['events']> }): Promise<unknown> {
