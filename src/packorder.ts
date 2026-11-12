@@ -18,7 +18,11 @@ import type { PackFile, TypeDef } from './packs.ts';
 
 export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 
-/** The kernel's packs: the kinds and root relations, and the system tier. Never off. */
+/**
+ * The pack of words every map starts with: the kinds, root relations and the shared set. Never off. Which packs run in
+ * the server's process (root and service) is not listed here: each says so in its manifest's `kernel` (isInternal,
+ * src/manifest.ts), and is always on too (src/packs.ts).
+ */
 export const KERNEL_PACKS = ['core'];
 
 /**

@@ -144,13 +144,13 @@ test('every approval is decided by a rule', () => {
   assert.deepEqual(policy, {}, "The server's policy is read only by the rules: what it lifts, and what it forbids (serverRules).");
 });
 
-// 4. A pack's code imports only its own files and Node's built-ins, never the kernel's; its tests also #pelago/test.
+// 4. A pack's code imports only its own files and Node's built-ins, never the kernel's; its tests also #pelago/test, and a kernel pack's modules `import type` #pelago/kernel.
 test("a pack's code imports nothing of the kernel", () => {
   const reaching: string[] = [];
-  for (const file of walk('packs').filter((f) => /\.(ts|js|mjs)$/.test(f))) {
-    for (const [, spec] of read(file).matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)) {
+  for (const file of walk('packs').filter((f) => /\.(ts|js|mjs)$/.test(f))) { const text = read(file);
+    for (const { 1: spec, index } of text.matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)) {
       const own = spec.startsWith('./') || (spec.startsWith('../') && !relative(join(ROOT, 'packs', file.split('/')[1]), join(ROOT, file, '..', spec)).startsWith('..'));
-      if (!own && !(spec === '#pelago/test' && /\.test\.ts$/.test(file)) && !spec.startsWith('node:')) reaching.push(`${file} imports ${spec}`);
+      if (!own && !(spec === '#pelago/test' && /\.test\.ts$/.test(file)) && !(spec === '#pelago/kernel' && /^import\s+type\b/.test(text.slice(text.lastIndexOf('import', index), index))) && !spec.startsWith('node:')) reaching.push(`${file} imports ${spec}`);
     }
   }
   assert.deepEqual(reaching, [], 'A pack is handed what it reads and answers with ops and requests.');

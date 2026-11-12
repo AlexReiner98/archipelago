@@ -65,10 +65,64 @@ export interface Manifest {
   shared?: string[];
   /** The packs it took declarations from, keeping their ids (src/pack-moved.ts): it may name a view, a style, a rule, an action or a layout `<pack>.<name>` for each, and is turned on, once, wherever one of them was. The kernel's packs are always among them. */
   moved_from?: string[];
+  /** Its tier, and the code it runs in the server's process (docs/kernel-packs.md): only a pack of the server's own folder. */
+  kernel?: KernelSpec;
 }
 
+/** A pack's tier: root holds control, service runs in-process beside it through the KernelContext (src/kernel-context.ts). */
+export type Trust = 'root' | 'service';
+/** A function of a pack's modules, `<file>.ts#<export>`, under its `modules` folder. */
+export type ModuleRef = string;
+/** The manifest key `kernel` (docs/kernel-packs.md, "The manifest key"). */
+export interface KernelSpec {
+  trust: Trust;
+  /** Never offered on the Packs screen, never taken out, versioned with the server: every root and service pack is. */
+  internal: true;
+  /** The folder of its code under the pack's own, `kernel/` unless said. */
+  modules?: string;
+  /** The service names it provides, each with its shapes and the function that answers it. */
+  provides?: Record<string, { in?: unknown; out?: unknown; run: ModuleRef }>;
+  /** The hook points and slots it fills, each with its function (or several, in order). */
+  hooks?: Record<string, ModuleRef | ModuleRef[]>;
+  /** The tables of its own that a log.project filling writes, each a column by its shape. */
+  tables?: Record<string, Record<string, string>>;
+  /** What it runs on a clock, on the server that leads. */
+  timers?: { run: ModuleRef; every_ms: number; leading?: boolean }[];
+}
+export const KERNEL_KEYS = ['trust', 'internal', 'modules', 'provides', 'hooks', 'tables', 'timers'] as const;
+const MODULE_REF = /^[\w./-]+\.ts#[A-Za-z_$][\w$]*$/;
+
+/** Problems with a manifest's `kernel`, as sentences. Where a pack may carry it is the registry's (kernelRefused). */
+export function kernelProblems(k: unknown): string[] {
+  if (k === undefined) return [];
+  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, hooks?, tables?, timers? }'];
+  const s = k as Raw, problems: string[] = [];
+  for (const key of Object.keys(s)) if (!(KERNEL_KEYS as readonly string[]).includes(key)) problems.push(`"kernel.${key}" is not a key of a manifest: in kernel, one of ${KERNEL_KEYS.join(', ')}`);
+  if (s.trust !== 'root' && s.trust !== 'service') problems.push('kernel.trust is root or service');
+  if (s.internal !== true) problems.push('kernel.internal is true: a root or service pack is versioned with the server');
+  if (s.modules !== undefined && (typeof s.modules !== 'string' || !/^[\w-]+\/?$/.test(s.modules))) problems.push(`kernel.modules is a folder of the pack's own, such as "kernel/"`);
+  const ref = (where: string, r: unknown) => { if (typeof r !== 'string' || !MODULE_REF.test(r) || r.includes('..')) problems.push(`${where} names a function of the pack's modules, <file>.ts#<export>: ${JSON.stringify(r)}`); };
+  for (const [name, p] of Object.entries((s.provides ?? {}) as Record<string, Raw>)) ref(`kernel.provides.${name}`, p?.run);
+  for (const [point, r] of Object.entries((s.hooks ?? {}) as Record<string, unknown>)) for (const one of [r].flat()) ref(`kernel.hooks.${point}`, one);
+  for (const [i, t] of arr<Raw>(s.timers).entries()) { ref(`kernel.timers[${i}]`, t.run); if (typeof t.every_ms !== 'number' || t.every_ms < 1000) problems.push(`kernel.timers[${i}].every_ms is a number of milliseconds, 1000 or more`); }
+  if (s.trust === 'root' && (s.provides !== undefined || s.hooks !== undefined)) problems.push('a root pack opens hook points and slots; it fills none and provides no service name');
+  return problems;
+}
+
+/** A pack's tier: root, service, or none (plain, in the sandbox). */
+export const tierOf = (m: Pick<Manifest, 'kernel'>): Trust | undefined => m.kernel?.trust;
+/** Whether a pack is the server's own internal one: always on, never on the Packs screen. */
+export const isInternal = (m: Pick<Manifest, 'kernel'>): boolean => m.kernel?.internal === true;
+
+/**
+ * The packs that carry `kernel` but are not of the server's own folder (a pack kept as an item, a version, a folder
+ * `PELAGO_PACKS` names), each with why: they are refused, and stay off.
+ */
+export const kernelRefused = (packs: Iterable<Manifest>, own: (id: string) => boolean): [string, string][] =>
+  [...packs].filter((p) => p.kernel !== undefined && !own(p.id)).map((p) => [p.id, "carries kernel code, which only the server's own packs may"]);
+
 /** The keys of a manifest, and of its reach. */
-export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared', 'moved_from'] as const;
+export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared', 'moved_from', 'kernel'] as const;
 export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'server', 'launch'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'gates', 'mounts', 'streams', 'files', 'launchers', 'adapter', 'counts'] as const;
 
@@ -121,6 +175,8 @@ function keyProblems(m: Raw): string[] {
   if (m.moved_from !== undefined && (!Array.isArray(m.moved_from) || m.moved_from.some((p) => typeof p !== 'string' || !/^[a-z][\w-]*$/.test(p) || p === m.id))) problems.push('moved_from is a list of the ids of the packs it took declarations from, not its own');
   for (const [key, names] of Object.entries({ requires: m.requires, uses: m.uses })) for (const n of arr<unknown>(names)) if (!isName(n)) problems.push(`${key} names ${JSON.stringify(n)}: ${NAME_FORMS}`);
   for (const t of arr<Raw>(m.types)) if (t.of !== undefined && (t.id !== undefined || typeof t.fields !== 'object')) problems.push(`type entry of "${String(t.of)}" adds fields to another pack's type: of and fields only`);
+  problems.push(...kernelProblems(m.kernel));
+  if (m.kernel !== undefined && (m.handlers !== undefined || (m.reach as Raw | undefined)?.server !== undefined)) problems.push("a kernel pack runs in the server's process: no handlers for the sandbox, and no server reach");
   return problems;
 }
 
