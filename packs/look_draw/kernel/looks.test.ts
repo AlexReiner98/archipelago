@@ -1,10 +1,9 @@
 // Looks on a fake context: the roots' part (root.look) and the transient store (root.transient) in memory. Drawing
-// needs Chrome and is tried in test/looks.test.ts; here, the count, a kept look read again, and the icon's answer.
+// needs Chrome and is tried in test/looks.test.ts; here, the count and a kept look read again.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';
 import { countLook, lookAt, looksBy, looksThisHour } from './looks.ts';
-import { ICON, serveIcon } from './icon.ts';
 
 function fake(workspace: string, refused?: string) {
   const store = new Map<string, { value: unknown; data?: Buffer }>();
@@ -43,14 +42,4 @@ test('a look kept on this screen is read again, and none other', async () => {
   assert.equal(again.image.data, Buffer.from('png').toString('base64'));
   await assert.rejects(lookAt(ctx, { workspace: 'w1' }, 'l_0123456789ab'), /No look/, 'another screen');
   await assert.rejects(lookAt(ctx, w, 'nope'), /is not a look/);
-});
-
-test('the icon is answered as its PNG, or not found', () => {
-  assert.ok(ICON.test('/favicon.ico') && ICON.test('/favicon.png') && !ICON.test('/favicon.gif'));
-  const res = () => {
-    const r = { status: 0, body: undefined as unknown, writeHead: (s: number) => ((r.status = s), r), end: (b: unknown) => ((r.body = b), r) };
-    return r;
-  };
-  assert.equal((serveIcon(res() as never, null) as unknown as { status: number }).status, 404);
-  assert.equal((serveIcon(res() as never, Buffer.from('png')) as unknown as { status: number }).status, 200);
 });

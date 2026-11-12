@@ -79,6 +79,10 @@
         },
         "run": "query-answers.ts#timeLanes"
       }
+    },
+    "hooks": {
+      "surface.for_reader": "documents.ts#forReader",
+      "surface.sections": "documents.ts#sectionsOf"
     }
   },
   "views": [

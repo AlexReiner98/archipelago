@@ -25,6 +25,9 @@
         "out": "any",
         "run": "looks.ts#lookAnswer"
       }
+    },
+    "hooks": {
+      "surface.looks": "served.ts#served"
     }
   }
 }

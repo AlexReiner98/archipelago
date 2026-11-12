@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Actor } from '../src/pelago.ts';
-import { publicView, publicViewAt, publicViews } from '../src/public-view-store.ts';
+import { publicView, publicViewAt, publicViews } from '../packs/surface/kernel/public-views.ts';
 import { callTool } from '../src/tools.ts';
 import { fresh, freshWith, make, packsWith } from './map.ts';
 import { Registry } from '../src/packs.ts';

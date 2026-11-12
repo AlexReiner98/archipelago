@@ -6,7 +6,7 @@
 
 import type { Archipelago } from '../../../src/pelago.ts';
 import { finishedStatuses, readable } from '../../walls/kernel/public-document.ts';
-import { drawingsGiven } from '../../database/kernel/public-view-store.ts';
+import { drawingsGiven } from './public-views.ts';
 
 export type PublishRead = {
   /** Items by id, every column as the asker may read them (archived ones too): what the publish pack's checks read of an item, as the map's own entity() does. */

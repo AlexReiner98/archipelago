@@ -24,6 +24,9 @@
         "out": "any",
         "run": "backup-run.ts#mergeAct"
       }
+    },
+    "hooks": {
+      "surface.backup": "served.ts#served"
     }
   }
 }

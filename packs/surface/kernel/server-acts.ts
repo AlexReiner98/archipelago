@@ -5,14 +5,12 @@
 // so what a server pack did is in the owner's history like anything else.
 
 import { setControlValue, controlValue } from '../../../src/control.ts';
-import { normalEmail, sendMail } from '../../../src/mail.ts';
+import { mailing, onMap, published } from './above.ts';
 import '../../loader/kernel/server-slots.ts'; // a workspace is made only where members' notices go out as mail
 import { admitMember, linkFor, memberOf, ownerEmail } from '../../../src/members.ts';
 import { madeKey } from './server-gates.ts';
 import type { ServerAct, ServerPackFile } from '../../../src/server-packs.ts';
 import { env } from '../../../src/env.ts';
-import { readSites } from '../../../src/site.ts';
-import { addCount, COUNT_KEY, countsSince, heldCounts } from '../../../src/pack-counts.ts';
 import type { RootCall } from '../../../src/root-calls.ts';
 import { freeId } from '../../../src/workspace-id.ts';
 import type { Workspaces } from '../../../src/workspaces.ts';
@@ -41,7 +39,7 @@ export type Agrees = (ask: { email: string; agree: unknown; via: string }) => Pr
 /** The workspace of a site this server serves, by its domain, or a refusal. */
 async function siteOf(at: ActPlaces, input: Record<string, unknown>) {
   const site = String(input.site ?? '').toLowerCase();
-  const workspace = readSites(env('SITES'))[site];
+  const workspace = (await published()).readSites(env('SITES'))[site];
   if (!workspace || !(await at.has(workspace))) throw new Error(`"${site}" is not a site this server serves.`);
   return { site, workspace };
 }
@@ -68,7 +66,7 @@ async function readCounts(at: ActPlaces, pack: ServerPackFile, act: string, inpu
   const after = input.after == null ? 0 : Number(input.after);
   if (!(Number.isInteger(after) && after >= 0)) throw new Error('after: a position of the counts stream, a whole number.');
   const { pelago } = await at.get(workspace);
-  const read = stream ? await countsSince(pelago, stream, after) : { counts: [], pos: after };
+  const read = stream ? await onMap<{ counts: { key: string; day: string; n: number }[]; pos: number }>(pelago, 'surface.counts_since', stream, after) : { counts: [], pos: after };
   await pelago.log(pelago.db, { actor: `pack:${pack.id}`, action: `server.${act}`, reason: `Read the counts on ${site}: ${read.counts.length} rows`, detail: { site, after, rows: read.counts.length, pos: read.pos, ...(input.of != null && { of: String(input.of) }) } });
   return read;
 }
@@ -94,7 +92,7 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
     }
     case 'workspace.admit': {
       const ws = await itsOwn(at, pack.id, input.workspace);
-      const email = normalEmail(input.email);
+      const email = (await mailing()).email(input.email);
       if (!email) throw new Error('That is not an email address.');
       const person = await admitMember(ws.pelago, email, Boolean(input.admin));
       await log(`Added ${email} to "${ws.name}"`, { workspace: ws.id, email, admin: Boolean(input.admin) });
@@ -102,7 +100,7 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
     }
     case 'signin.link': {
       const ws = await itsOwn(at, pack.id, input.workspace);
-      const email = normalEmail(input.email);
+      const email = (await mailing()).email(input.email);
       if (!email || !(await memberOf(ws.pelago.db, email))) throw new Error(`${input.email} is not a member of "${ws.name}".`);
       const minutes = Math.min(Math.max(Number(input.minutes) || 30, 1), LINK_MOST_MINUTES);
       const link = await linkFor(ws.pelago.db, ws.id, email, minutes * 60_000);
@@ -113,21 +111,22 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       // A buyer who ticked the box when they paid is not asked again at their first sign-in. Only a member of a
       // workspace the pack made, and only a version in force now: anything else is asked for at sign-in instead.
       const ws = await itsOwn(at, pack.id, input.workspace);
-      const email = normalEmail(input.email);
+      const email = (await mailing()).email(input.email);
       if (!email || !(await memberOf(ws.pelago.db, email))) throw new Error(`${input.email} is not a member of "${ws.name}".`);
       const { owes } = await agrees({ email, agree: input.agreed, via: `pack:${pack.id}` });
       await log(`${email} agreed to the documents in force`, { workspace: ws.id, email, owes: owes.map((a) => a.id) });
       return { owes: owes.map(({ id, version }) => ({ id, version })) };
     }
     case 'count.add': {
-      // A pack's count on a site's map, held in memory and written down each minute (src/pack-counts.ts); the day is the server's.
+      // A pack's count on a site's map, held in memory and written down each minute (the publish pack's, surface.published); the day is the server's.
       const stream = pack.reach.server.counts;
       if (!stream) throw new Error(`The pack "${pack.id}" names no stream for its counts (counts).`);
       const key = String(input.key ?? '');
-      if (!COUNT_KEY.test(key)) throw new Error('key: 1 to 40 letters, digits, _ and -.');
+      const { counts } = await published();
+      if (!counts.KEY.test(key)) throw new Error('key: 1 to 40 letters, digits, _ and -.');
       const n = input.n == null ? 1 : Number(input.n);
       if (!(Number.isInteger(n) && n >= 1 && n <= 1000)) throw new Error('n: a whole number from 1 to 1000.');
-      addCount((await countedOn(at, input)).workspace, stream, key, undefined, n);
+      counts.addCount((await countedOn(at, input)).workspace, stream, key, undefined, n);
       return { counted: true };
     }
     case 'count.read': {
@@ -141,7 +140,7 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
       return { counts: read.counts.map(({ key, day, n }) => ({ tag: key, day, n })), pos: read.pos };
     }
     case 'mail.send': {
-      const to = normalEmail(input.to);
+      const to = (await mailing()).email(input.to);
       if (!to) throw new Error('That is not an email address.');
       const subject = text(input.subject, 200, 'A subject');
       // A way out of mail that sells: one of the pack's own entries, on https, which a mail program POSTs to.
@@ -150,7 +149,7 @@ export async function runAct(at: ActPlaces, pack: ServerPackFile, act: string, i
         const u = URL.canParse(unsubscribe) ? new URL(unsubscribe) : undefined;
         if (u?.protocol !== 'https:' || !u.pathname.startsWith(`/x/${pack.id}/`)) throw new Error(`unsubscribe: an https address of one of this pack's own entries (/x/${pack.id}/...).`);
       }
-      await sendMail({ to, subject, text: text(input.text, 20_000, 'The text'), ...(unsubscribe && { unsubscribe }) });
+      await (await mailing()).sendMail({ to, subject, text: text(input.text, 20_000, 'The text'), ...(unsubscribe && { unsubscribe }) });
       await log(`Sent "${subject}" to ${to}`, { to });
       return { sent: true };
     }
@@ -166,13 +165,14 @@ const USES = 'uses';
  * answers what is not yet written, as rows of key, day and n. The workspace is the caller's map's; a caller with no map
  * (the kernel's, which names only a workspace) names it.
  */
-export function usesOf(call: RootCall, input: { workspace?: string; add?: { key: string; n?: number }[]; held?: boolean }) {
+export async function usesOf(call: RootCall, input: { workspace?: string; add?: { key: string; n?: number }[]; held?: boolean }) {
   const workspace = call.map?.workspace ?? input.workspace;
   if (typeof workspace !== 'string' || !workspace) throw new Error('root.uses counts a workspace: call it from its map, or name it');
   if (call.map && input.workspace !== undefined && input.workspace !== workspace) throw new Error('root.uses counts only the map that calls it');
+  const { counts } = await published();
   for (const { key, n = 1 } of input.add ?? []) {
     if (typeof key !== 'string' || !key || !(Number.isInteger(n) && n >= 1)) throw new Error('root.uses adds a key and a whole number');
-    addCount(workspace, USES, key, undefined, n);
+    counts.addCount(workspace, USES, key, undefined, n);
   }
-  return input.held ? heldCounts(workspace, USES) : { counted: (input.add ?? []).length };
+  return input.held ? counts.heldCounts(workspace, USES) : { counted: (input.add ?? []).length };
 }

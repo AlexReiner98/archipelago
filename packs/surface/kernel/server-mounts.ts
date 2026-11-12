@@ -10,17 +10,17 @@
 // ({ stream: true, id? }), or nothing ({ pass: true }): the kernel answers the address as it would with no pack there.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { ICON } from '../../../src/icon.ts';
-import { GUARD, POLICY, READER_POLICY } from '../../../src/public-document.ts';
-import { publicView } from '../../../src/public-view-store.ts';
-import { listenForPack } from '../../../src/published-live.ts';
-import { json } from '../../../src/reply.ts';
-import type { ActPlaces } from '../../../src/server-acts.ts';
-import { serveFile } from '../../../src/server-files.ts';
-import type { ServerPacks } from '../../../src/server-host.ts';
-import type { Mount } from './server-reach.ts';
-import { onThisServer } from '../../../src/server-routes.ts';
-import { UI_FILES, uiVersioned } from '../../../src/ui-files.ts';
+import { published } from './above.ts';
+import { ICON } from './icon.ts';
+import { GUARD, POLICY, READER_POLICY } from '../../walls/kernel/public-document.ts';
+import { publicView } from './public-views.ts';
+import { json } from './reply.ts';
+import type { ActPlaces } from './server-acts.ts';
+import { serveFile } from './server-files.ts';
+import type { ServerPacks } from './server-host.ts';
+import type { Mount } from '../../loader/kernel/server-reach.ts';
+import { onThisServer } from './server-routes.ts';
+import { UI_FILES, uiVersioned } from './ui-files.ts';
 
 export interface MountCall {
   packs: ServerPacks;
@@ -137,7 +137,7 @@ export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = 
     const ws = at.workspace;
     const found = Boolean(id && ws && at.pack && at.workspaces && (await at.workspaces.has(ws).catch(() => false)) && (await publicView((await at.workspaces.get(ws)).pelago, id)));
     if (!found) return (json(res, 404, { error: 'Not found' }, GUARD), true);
-    listenForPack(res, at.pack!, ws!, id!, GUARD, at.from);
+    (await published()).listenForPack(res, at.pack!, ws!, id!, GUARD, at.from);
     return true;
   }
   return fault('nothing it may answer');

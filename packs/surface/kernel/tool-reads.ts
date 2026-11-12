@@ -7,7 +7,7 @@ import { lastSeq, readEvents } from '../../../src/eventlog.ts';
 import { listening } from '../../../src/presence.ts';
 import { askView, viewList, viewsSaid } from '../../../src/askview.ts';
 import { shownIn } from '../../../src/query-saved.ts';
-import { showingIn } from '../../../src/public-view-store.ts';
+import { showingIn } from './public-views.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
 import { lookAt, takeLook } from '../../../src/looks.ts';

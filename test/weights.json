@@ -105,6 +105,7 @@
   "test/holds-off.test.ts": { "pglite": 3.1, "postgres": 1.1 },
   "test/hook-events.test.ts": { "pglite": 1.2, "postgres": 1.2 },
   "test/hook-tool.test.ts": { "pglite": 3.5, "postgres": 1.5 },
+  "test/icon.test.ts": { "pglite": 0, "postgres": 0 },
   "test/install.test.ts": { "pglite": 3.7, "postgres": 2 },
   "test/instructions.test.ts": { "pglite": 2.6, "postgres": 0.8 },
   "test/island-findings.test.ts": { "pglite": 1.8, "postgres": 0.8 },
