@@ -5,6 +5,7 @@
 import { SignInNeeded, authHeaders, call, h } from './base.js';
 import { drawFrozen } from './doc-lens.js';
 import { openItem } from './doc-sheet.js';
+import { wholeRead } from './item-doc.js';
 import { carried } from './doc-ref.js';
 import { warmLayouts } from './layout.js';
 import { sayLook } from './look.js';
@@ -284,7 +285,7 @@ if (!given) warmLayouts();
   : preview
   ? post(`${here}/data`, {})
   : own
-  ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: { of: own } })]).then(([d, { style: s }]) => ({ ...d, theme: s.theme, lengths: s.lengths, faces: s.faces, type: s.type, head: s.page?.head, share: s.page?.share }))
+  ? Promise.all([api('schema').then((s) => api(wholeRead(s), { id: own, drawn: true })), api('view', { name: 'style', params: { of: own } })]).then(([d, { style: s }]) => ({ ...d, theme: s.theme, lengths: s.lengths, faces: s.faces, type: s.type, head: s.page?.head, share: s.page?.share }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'This page does not open anything.');

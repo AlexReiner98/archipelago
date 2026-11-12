@@ -42,8 +42,7 @@ test('the kernel names no pack', () => {
 const NAMES_PACK_TYPES: Record<string, number> = {
   'src/altitude.ts': 1, 'src/capabilities.ts': 2, 'src/declared.ts': 3, 'src/look-pass.ts': 1, 'src/manifest.ts': 1, 'src/outside.ts': 1,
   'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/public-document.ts': 1,
-  'src/public.ts': 1, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2, 'src/ui-files.ts': 1, 'ui/doc.js': 1,
-  'ui/item-doc.js': 1,
+  'src/public.ts': 1, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2, 'src/ui-files.ts': 1,
 };
 
 // Core's words until 11 Nov 2026 (people and calendar packs, e_wrdg6udh); `event` is also the kernel's for a log event.
@@ -58,15 +57,9 @@ test("the kernel names no pack's type by its bare name", () => {
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
 
-// Every part of the kernel becomes a pack (the owner, e_ykymc952). Until each moves, what the kernel
-// still knows of it is listed with the step on the map that takes it away; an entry may only shrink.
-const SESSIONS = 'e_xzwgetrg Sessions behaviour into its pack', VIEWS = 'e_8f8m2xtf Kernel views as packs';
-
 // A surface is a pack that adapts a client's hooks or launches one (reach.server adapter or launchers), and the kernel
 // names none of it: not `claude_code`, `claude-code`, `claude-headless`, nor the client `claude`.
-const NAMES_SURFACES: Owed = {
-  'ui/agents-card.js': [1, VIEWS],
-};
+const NAMES_SURFACES: Owed = {};
 test('the kernel names no surface', () => {
   const vendors = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
     const server = (JSON.parse(read(`packs/${p}/pack.json`)) as { reach?: { server?: { adapter?: unknown; launchers?: unknown[] } } }).reach?.server;
@@ -78,9 +71,7 @@ test('the kernel names no surface', () => {
 });
 
 // The sessions' actions, named here until the sessions pack declares them (e_xzwgetrg): the kernel switches on none.
-const NAMES_SESSION_ACTS: Owed = {
-  'ui/item.js': [1, VIEWS],
-};
+const NAMES_SESSION_ACTS: Owed = {};
 test("the kernel names no session's action", () => {
   const named = count(kernelFiles, /['"`]session_(?:start|update|end)['"`]/g);
   assert.deepEqual(ratchet(named, counts(NAMES_SESSION_ACTS)), [], 'An action is its pack\'s: let the pack declare what it checks.');
@@ -379,10 +370,10 @@ test('no read of the whole map', () => {
 // screen names (ui/screens.js calls it by the name its pack declares) is the pack's, and is not counted. `undo`, one of
 // the agents' ten tools, came on 2 Nov 2026 at the owner's word: the page takes a change back as an agent does.
 const PAGE_CALLS = [
-  'backup_download', 'change', 'connections', 'decide', 'document', 'events', 'get', 'import_backup', 'init',
+  'backup_download', 'change', 'connections', 'decide', 'events', 'get', 'import_backup', 'init',
   'launch', 'member_add', 'member_list', 'member_set', 'pack_set', 'packs', 'picture',
   'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
-  'session_end', 'share_create', 'share_list', 'share_plan', 'share_revoke', 'tail',
+  'share_create', 'share_list', 'share_plan', 'share_revoke', 'tail',
   'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',
   'token_request_answer', 'token_requests', 'token_revoke', 'undo', 'unpublish', 'view', 'workspace_info', 'workspace_set',
 ];
