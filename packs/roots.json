@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "3817a4b6e61c1c178ed1b597c3fdb91369138261d11f17c339f8f8f2f5273e04"
+      "hash": "4bffa3a13c8c60c7cc2b5ec176073b0263c78ee97a32b7496bcc9c227268c084"
     },
     {
       "id": "rules",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "b67aa5220d18e78ed71b836bc2fa9c6aa19d5b6176b95397906a3fb2031736fe"
+      "hash": "146c4a6c1deac89be84b3b221536b590b58aac719acfdc08363c175bd30debd0"
     }
   ],
   "calls": {
@@ -118,6 +118,9 @@
       "sessions"
     ],
     "root.sessions": [
+      "sessions"
+    ],
+    "root.hook": [
       "sessions"
     ]
   }
