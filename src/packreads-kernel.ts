@@ -12,6 +12,11 @@ import { scanAround, scanKinds, type Around } from './region.ts';
 import { instructionsFor } from './instructions.ts';
 import { shapes } from './packreads-rows.ts';
 import { notKernel } from './head.ts';
+import { islandRegistry } from './island-pin.ts';
+import { presetsOf } from './declared.ts';
+import { asOf } from './rebuild.ts';
+import { layoutFor } from './layouts.ts';
+import { used } from './uses.ts';
 
 export type KernelRead = {
   /** Items by id, every column the asker may read and their confidence (archived ones too), in the order the database gives them. */
@@ -47,6 +52,29 @@ export type KernelRead = {
   ancestors?: string[];
   /** Which of some items hold something kept (not archived, not the system's) at any depth. */
   holding?: string[];
+  // What the styles and agents packs read (packs/styles, packs/agents): the looks and the words the map keeps.
+  /** The instruction presets the packs ship (of the island's version of each, on an island), and every instruction kept, open or retired, with what each is about. */
+  told_from?: { island?: string };
+  /** Count each of these instructions (a preset's id, or a kept one's) as said once (src/uses.ts): answered true. */
+  told?: string[];
+  /** The owner's versions of presets, open or retired: of the packs' style presets, or of their drawings (layout). */
+  versions?: 'style' | 'layout';
+  /** Every style or layout (of these types) kept on the map, with what each is about; and one named outright, retired or not. */
+  looks?: { types: ('style' | 'layout')[]; named?: string };
+  /** The styles kept, and the owner's versions of presets, as the map stood at a fact position (src/rebuild.ts, asOf). */
+  styles_at?: number;
+  /** The drawing a style is drawn by, if a pack draws its shape, its modules left out when the page has them (src/layouts.ts). */
+  drawing?: { style: Record<string, unknown>; have?: string[] };
+  /** The person a page is drawn for: the one signed in, or on a map nobody signs in to, its owner; none for anyone. */
+  drawn_for?: true;
+  /** The screens kept on the map, open or retired, in the order made. */
+  screens?: true;
+  /** Which of these types hold anything not archived: one look each, by the index on type. */
+  held_types?: string[];
+  /** What the move of styles made for one view reads (src/style-move.ts): none when nothing is to move. */
+  style_moves?: true;
+  /** The styles that are layouts by their fields: code, modules, or a version of one of these drawings (src/layout-move.ts). */
+  layout_moves?: string[];
 };
 
 const list = (v: unknown, what: string): string[] => {
@@ -121,6 +149,8 @@ export async function kernelRead(l: Archipelago, q: KernelRead): Promise<unknown
     loggedIn(l, 'region');
     return scanKinds(l, q.kinds);
   }
+  const looks = await lookRead(l, q);
+  if (looks !== undefined) return looks;
   if (q.instructions !== undefined) return instructionsFor(l, String(q.instructions.where), q.instructions.about === undefined ? {} : { about: String(q.instructions.about) });
   if (q.owner) return (await l.setting<string>('me')) || null;
   if (q.owned !== undefined) {
@@ -168,4 +198,100 @@ async function crossed(l: Archipelago, days: number, among: string[]) {
     [JSON.stringify(bounds.filter((b) => b.below)), among],
   );
   return { due, under };
+}
+
+/** Open style, layout or screen items with what each is about. */
+const aboutOf = async (l: Archipelago, ids: string[]) =>
+  (await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'about' and valid_to is null and from_id = any($1::text[])`, [ids])).rows;
+
+/** The reads of the looks and words the map keeps (the styles and agents packs), or undefined when the read is none of them. */
+async function lookRead(l: Archipelago, q: KernelRead): Promise<unknown> {
+  if (q.told_from !== undefined) {
+    const island = q.told_from.island;
+    const presets = presetsOf((await islandRegistry(l, island)).packs, 'instruction');
+    const { rows } = await l.db.query<{ id: string }>(
+      `select id, title, body, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by updated_at, id -- index entity_type_created`,
+      [l.registry.family('instruction')],
+    );
+    const links = await aboutOf(l, rows.map((r) => r.id));
+    return { presets, kept: rows.map((r) => ({ ...r, about: links.filter((link) => link.from_id === r.id).map((link) => link.to_id) })) };
+  }
+  if (q.told !== undefined) {
+    for (const id of list(q.told, 'told')) used(l.workspace, 'told', id);
+    return true;
+  }
+  if (q.versions !== undefined) {
+    const { rows } = await l.db.query(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null and props ->> 'preset' is not null order by updated_at, id`, [l.registry.family(q.versions === 'layout' ? 'layout' : 'style')]);
+    return rows;
+  }
+  if (q.looks !== undefined) {
+    const { types, named } = q.looks;
+    const of = list(types, 'looks.types');
+    if (of.some((t) => t !== 'style' && t !== 'layout')) throw new Error('looks reads styles and layouts');
+    const { rows } = await l.db.query<{ id: string }>(
+      `select id, type, title, ${l.props} from entity where type = any($1::text[]) and archived_at is null and (is_open or id = $2) order by updated_at, id`,
+      [of.flatMap((t) => l.registry.family(t)), typeof named === 'string' ? named : null],
+    );
+    // One archived is left out, and what named it falls back; only a name never kept is refused.
+    if (typeof named === 'string' && !rows.some((r) => r.id === named) && !(await l.entity(named))) throw new Error(`No ${of.join(' or ')} "${named}"`);
+    const links = await aboutOf(l, rows.map((r) => r.id));
+    return rows.map((r) => ({ ...r, about: links.filter((link) => link.from_id === r.id).map((link) => link.to_id) }));
+  }
+  if (q.styles_at !== undefined) {
+    const { rows } = await asOf(l.db, l.registry, l.workspace, Number(q.styles_at));
+    const family = new Set(l.registry.family('style'));
+    type Style = { id: string; title: string; is_open: boolean; props: Record<string, unknown>; updated_at: string };
+    const styles = rows.entity.filter((e) => family.has(String(e.type)) && e.archived_at == null) as unknown as Style[];
+    styles.sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)) || a.id.localeCompare(b.id));
+    const about = rows.relation.filter((r) => r.type === 'about' && r.valid_to == null);
+    return {
+      versions: styles.filter((s) => s.props?.preset != null),
+      kept: styles.filter((s) => s.is_open).map((s) => ({ id: s.id, title: s.title, props: s.props ?? {}, about: about.filter((r) => r.from_id === s.id).map((r) => String(r.to_id)) })),
+    };
+  }
+  if (q.drawing !== undefined) {
+    const versions = (await lookRead(l, { versions: 'layout' })) as { is_open: boolean; props: Record<string, unknown> }[];
+    return layoutFor(l.registry, q.drawing.style ?? {}, versions, Array.isArray(q.drawing.have) ? q.drawing.have.map(String) : []) ?? null;
+  }
+  if (q.drawn_for) return (l.viewer === undefined ? await l.setting<string>('me') : l.viewer) || null;
+  if (q.screens) {
+    const { rows } = await l.db.query(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by created_at, id`, [l.registry.family('screen')]);
+    return rows;
+  }
+  if (q.held_types !== undefined) {
+    const { rows } = await l.db.query<{ type: string }>(`select t as type from unnest($1::text[]) t where exists (select 1 from entity where type = t and archived_at is null)`, [list(q.held_types, 'held_types')]);
+    return rows.map((r) => r.type);
+  }
+  if (q.style_moves) return styleMoves(l);
+  if (q.layout_moves !== undefined) {
+    const { rows } = await l.db.query(
+      `select id, props from entity where type = any($1::text[]) and (props ? 'code' or props ? 'modules' or props ->> 'preset' = any($2::text[])) order by updated_at, id -- index entity_type`,
+      [l.registry.family('style'), list(q.layout_moves, 'layout_moves')],
+    );
+    return rows;
+  }
+  return undefined;
+}
+
+/** What the move of styles made for one view reads: the styles, what each is about, the views of those, and the views' own props; none when nothing is to move. */
+async function styleMoves(l: Archipelago) {
+  type Props = Record<string, unknown>;
+  const lens = l.registry.family('lens');
+  const { rows: styles } = await l.db.query<{ id: string; props: Props }>(
+    `select id, props from entity where type = any($1::text[]) and archived_at is null and is_open and props ->> 'preset' is null and not props ? 'on' order by updated_at, id -- index entity_type`,
+    [l.registry.family('style')],
+  );
+  if (!styles.length) return null;
+  const { rows: ties } = await l.db.query<{ style: string; to: string; to_type: string; gone: boolean }>(
+    `select r.from_id as style, r.to_id as "to", t.type as to_type, t.archived_at is not null as gone from relation r join entity t on t.id = r.to_id where r.type = 'about' and r.valid_to is null and r.from_id = any($1::text[]) order by r.id`,
+    [styles.map((s) => s.id)],
+  );
+  if (!ties.length) return null;
+  const { rows: about } = await l.db.query<{ view: string; item: string }>(
+    `select r.from_id as view, r.to_id as item from relation r join entity v on v.id = r.from_id where r.type = 'about' and r.valid_to is null and r.to_id = any($1::text[]) and v.type = any($2::text[]) and v.archived_at is null order by r.id`,
+    [[...new Set(ties.map((t) => t.to))], lens],
+  );
+  const ids = [...new Set([...about.map((a) => a.view), ...ties.filter((t) => lens.includes(t.to_type) && !t.gone).map((t) => t.to)])];
+  const { rows: kept } = await l.db.query<{ id: string; props: Props }>(`select id, props from entity where id = any($1::text[])`, [ids]);
+  return { styles, ties, about, kept };
 }

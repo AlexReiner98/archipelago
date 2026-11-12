@@ -1,0 +1,11 @@
+{
+  "id": "styles",
+  "version": "0.1.0",
+  "title": "Styles",
+  "description": "How a picture or a page looks: the style presets the packs ship under the styles and layouts the map keeps, their colours finished, the look a public page is drawn in, the screens as the owner keeps them, and the moves that made views hold their own settings and styles with code layouts.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
