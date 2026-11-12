@@ -1265,7 +1265,5 @@
     { "id": "revise", "title": "Revise", "description": "Change, correct or undo what is on the map.", "kernel": true }
   ],
   "styles": [
-    { "id": "core.held", "type": "lens", "title": "Held for you", "props": { "filter": { "find": ["held"], "not": ["type run"] }, "walk": { "over": "all", "steps": 1 } } },
-    { "id": "core.reading", "title": "Reading what is made for a reader", "on": ["has:deliverable"], "props": { "page": { "picture": false, "notes": "whole" }, "notes": { "measure": "reader_measure" } } }
   ]
 }
