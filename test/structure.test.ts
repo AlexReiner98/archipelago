@@ -42,7 +42,7 @@ test('the kernel names no pack', () => {
 const NAMES_PACK_TYPES: Record<string, number> = {
   'packs/loader/kernel/altitude.ts': 1, 'packs/loader/kernel/capabilities.ts': 2, 'packs/loader/kernel/declared.ts': 3, 'packs/walls/kernel/look-pass.ts': 1, 'packs/loader/kernel/manifest.ts': 1, 'packs/loader/kernel/outside.ts': 1,
   'packs/loader/kernel/packhost.ts': 4, 'packs/surface/kernel/packreads.ts': 1, 'packs/loader/kernel/packs.ts': 3, 'packs/loader/kernel/packtools.ts': 3, 'packs/write/kernel/pelago.ts': 2, 'packs/walls/kernel/public-document.ts': 1,
-  'packs/surface/kernel/public.ts': 1, 'packs/rules/kernel/rules.ts': 1, 'packs/database/kernel/schema.ts': 1, 'packs/surface/kernel/scope.ts': 2, 'packs/surface/kernel/ui-files.ts': 1,
+  'packs/rules/kernel/rules.ts': 1, 'packs/database/kernel/schema.ts': 1, 'packs/surface/kernel/scope.ts': 2, 'packs/surface/kernel/ui-files.ts': 1,
 };
 
 // Core's words until 11 Nov 2026 (people and calendar packs, e_wrdg6udh); `event` is also the kernel's for a log event.
@@ -343,10 +343,7 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
 // (`-- index <name>`), one the schema makes (packs/database/kernel/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
 const WHOLE_READS: Record<string, number> = {
-  'packs/write/kernel/forget.ts': 1,
-  'packs/log/kernel/log.ts': 1,
   'packs/database/kernel/mentions.ts': 1,
-  'packs/write/kernel/pelago.ts': 1,
   'packs/surface/kernel/search.ts': 1,
 };
 

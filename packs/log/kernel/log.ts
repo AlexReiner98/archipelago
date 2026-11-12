@@ -143,17 +143,21 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
   return { ...entry, ...head, keys: sealed.head.keys, facts: plain } as unknown as Entry;
 }
 
-const FACTS = `coalesce((select jsonb_agg(case when f.op = '-' then jsonb_build_array(f.op, f.id, f.field)
-  when f.meta is null then jsonb_build_array(f.op, f.id, f.field, f.value) else jsonb_build_array(f.op, f.id, f.field, f.value, f.meta) end order by f.n)
-  from log_fact f where f.stream = e.stream and f.at = e.at and f.pos = e.pos), '[]'::jsonb)`;
+/** One fact of an entry as the log reads it back (f, a row of log_fact). Each read below takes an entry's facts by its key. */
+const FACT = `case when f.op = '-' then jsonb_build_array(f.op, f.id, f.field)
+  when f.meta is null then jsonb_build_array(f.op, f.id, f.field, f.value) else jsonb_build_array(f.op, f.id, f.field, f.value, f.meta) end`;
 
 type Row = { stream: Stream; pos: number; id: string; at: Date; head: Record<string, unknown>; prev: string; hash: string; facts: Fact[] };
 const toEntry = (r: Row) => ({ ...r.head, stream: r.stream, pos: r.pos, id: r.id, at: new Date(r.at).toISOString(), facts: r.facts, prev: r.prev, hash: r.hash }) as Entry;
-const COLUMNS = `e.stream, e.pos::int as pos, e.id, e.at, e.head, encode(e.prev, 'hex') as prev, encode(e.hash, 'hex') as hash, ${FACTS} as facts`;
+const COLUMNS = `e.stream, e.pos::int as pos, e.id, e.at, e.head, encode(e.prev, 'hex') as prev, encode(e.hash, 'hex') as hash`;
 
 /** Entries of a stream from a position on, in order, as they are stored: sealed values sealed. */
 export async function stored(q: Q, stream: Stream = 'facts', from = 1, limit = 500): Promise<Entry[]> {
-  const { rows } = await q.query<Row>(`select ${COLUMNS} from log_entry e where e.stream = $1 and e.pos >= $2 order by e.pos limit $3`, [stream, from, limit]);
+  const { rows } = await q.query<Row>(
+    `select ${COLUMNS}, coalesce((select jsonb_agg(${FACT} order by f.n) from log_fact f where f.stream = e.stream and f.at = e.at and f.pos = e.pos), '[]'::jsonb) as facts
+     from log_entry e where e.stream = $1 and e.pos >= $2 order by e.pos limit $3`,
+    [stream, from, limit],
+  );
   return rows.map(toEntry);
 }
 
@@ -162,7 +166,11 @@ export const entries = async (q: Q, stream: Stream = 'facts', from = 1, limit = 
 
 /** One entry by its id (a change set's c_…, a proposal's p_…). */
 export async function entry(q: Q, id: string): Promise<Entry | undefined> {
-  const { rows } = await q.query<Row>(`select ${COLUMNS} from log_entry e where e.id = $1`, [id]);
+  const { rows } = await q.query<Row>(
+    `select ${COLUMNS}, coalesce((select jsonb_agg(${FACT} order by f.n) from log_fact f where f.stream = e.stream and f.at = e.at and f.pos = e.pos), '[]'::jsonb) as facts
+     from log_entry e where e.id = $1`,
+    [id],
+  );
   return rows[0] && (await openEntries(q, [toEntry(rows[0])]))[0];
 }
 

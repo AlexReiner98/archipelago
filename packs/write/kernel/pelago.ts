@@ -186,7 +186,7 @@ export class Archipelago {
     const { callAs } = await kernel();
     const moved = await this.db.transaction(async (tx) => {
       const { rows } = await tx.query<{ id: string; status?: string; from_id?: string; to_id?: string }>(
-        what === 'entity' ? `select id, status from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1`,
+        what === 'entity' ? `select id, status from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1 -- index relation_type`,
         [from],
       );
       // What names it in its settings: a screen in on, a view kept on the map in its lens (the lenses pack's answer.renamed_query).
