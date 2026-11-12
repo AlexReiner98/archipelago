@@ -246,6 +246,7 @@ are slots of the write and log packs; the others:
 |---|---|---|---|
 | `log.appended` | log | usage | `bytes` called inside `log.append` |
 | `rules.reply_ended` | rules | sessions | `rules.ts` importing `reply-rules.ts` |
+| `walls.pass_store` | walls | surface (`transient`) | `look-pass.ts` importing `transient.ts` (a look pass kept in the transient store) |
 | `loader.reads` | loader | surface | `packhost.ts` importing `packreads.ts` (the sandbox's reads) |
 | `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
 | `open.<phase>` | the stub | any | the fixed order in `Workspaces.load` |
@@ -296,7 +297,7 @@ Started in this order; each needs only those above it in the table.
 | 2 | seal | keys, and what forget destroys of them | `seal(id, text)`, `openSaid(id, bytes)`, `destroyKey(id)`, `secret(key)`, `setSecret(key, v)`, `opseal` |
 | 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended`; `root.dump`, `root.merge` |
 | 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited`; `root.workspaces` |
-| 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate` |
+| 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate`, `drawingBox` (a drawing's first frame in a walled process), `lookPass`; slot `walls.pass_store` |
 | 6 | loader | packs, versions, islands, the sandbox, the in-process tier | `Registry`, pack states, pins, island guards, `reach`, `host` (sandbox), `context(pack)` (the `KernelContext`), `call(service)`, `fillings(point)`; slot `loader.reads` |
 | 7 | rules | who decides what applies | `decide(who, ops, runs)`, `judge`, `mayDo`, `authorityOf`, actor checks, `standing` (still writable, room to store), private deps, layout changes; slot `rules.reply_ended` |
 | 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*` |
@@ -331,7 +332,7 @@ moves with a shim to the pack named.
 | seal | seal, opseal, vault, secrets, backup-seal |
 | log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage) |
 | identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
-| walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail |
+| walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail, drawing-box, drawing-runner, look-pass |
 | loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
