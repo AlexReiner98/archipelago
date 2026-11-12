@@ -9,7 +9,7 @@ import { MEMBER_TOOLS } from '../../../src/members.ts';
 import { WORKSPACE_TOOLS } from './workspace-tools.ts';
 import { SERVER_PACK_TOOLS } from '../../../src/server-pack-tools.ts';
 import { PACK_STATE_TOOLS } from '../../../src/packstate.ts';
-import { SHARE_TOOLS } from '../../../src/share-tools.ts';
+import { SHARE_TOOLS, context as publishing } from '../../../src/share-tools.ts';
 import { BACKUP_TOOLS } from '../../../src/backup-tools.ts';
 import { FORMER_NAMES, REPORT_TOOLS } from './report-tool.ts';
 import { TOKEN_TOOLS } from '../../../src/token-tools.ts';
@@ -30,6 +30,7 @@ import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
 import { READ_TOOLS } from './tool-reads.ts';
+import { declaredTools } from './tool-input.ts';
 
 export { configureBackup, configureRestart, devMode } from './tool-config.ts';
 export { describeChanges, humanChanges, latestSeq, type HumanChange } from './tool-reads.ts';
@@ -80,7 +81,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 
 export const TOOLS: Record<string, Tool> = {
   ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HOOK_TOOLS, ...HUMAN_TOOLS,
-  ...PACK_STATE_TOOLS, ...SHARE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
+  ...PACK_STATE_TOOLS, ...declaredTools(SHARE_TOOLS, publishing), ...BACKUP_TOOLS, ...REPORT_TOOLS,
   ...TOKEN_TOOLS, ...ASK_TOOLS, ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...CONNECTION_TOOLS,
 };
 

@@ -173,6 +173,7 @@
   "test/pack-needs.test.ts": { "pglite": 2.6, "postgres": 1 },
   "test/pack-requires.test.ts": { "pglite": 2.4, "postgres": 1.3 },
   "test/pack-split.test.ts": { "pglite": 6.8, "postgres": 2.5 },
+  "test/pack-tool-inputs.test.ts": { "pglite": 0, "postgres": 0 },
   "test/pack-use.test.ts": { "pglite": 2.5, "postgres": 0.8 },
   "test/packhost.test.ts": { "pglite": 5.9, "postgres": 3.3 },
   "test/packstate.test.ts": { "pglite": 4.9, "postgres": 2.9 },

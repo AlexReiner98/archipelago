@@ -13,9 +13,12 @@ import type { Tool } from './tools.ts';
 /** A JSON sketch of a tool's input value. */
 export type InputShape = 'string' | 'number' | 'boolean' | 'id' | 'any' | InputShape[] | string[] | { [key: string]: InputShape };
 
-/** A tool as a pack declares it: its input a shape, its run handed whatever context the adapter at its old path builds. */
+/**
+ * A tool as a pack declares it: its input a shape (checked as it is built: a pack's module has no type of the
+ * surface's to declare it with), its run handed whatever context the adapter at its old path builds.
+ */
 export interface DeclaredTool<C = unknown> extends Omit<Tool, 'input' | 'run'> {
-  input: Record<string, InputShape>;
+  input: Record<string, unknown>;
   /** What each field is for, by its path. */
   says?: Record<string, string>;
   run(ctx: C, actor: Actor, input: any): Promise<unknown>;
@@ -49,7 +52,7 @@ function shapeOf(shape: Record<string, InputShape>, says: Record<string, string>
 }
 
 /** A declared input as the zod shape a Tool's input is. */
-export const inputOf = (input: Record<string, InputShape>, says: Record<string, string> = {}): z.ZodRawShape => shapeOf(input, says);
+export const inputOf = (input: Record<string, unknown>, says: Record<string, string> = {}): z.ZodRawShape => shapeOf(input as Record<string, InputShape>, says);
 
 /**
  * A pack's declared tools as the surface's: each input built as zod, and each run handed the context `ctxOf` makes of
