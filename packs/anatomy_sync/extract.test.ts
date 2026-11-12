@@ -17,6 +17,7 @@ const FILES = [
   file('packs/loader/kernel/types.ts', 'export type T = 1;\n'),
   file('workspace-packs/calendar/pack.json', { id: 'calendar', title: 'Calendar', requires: ['has:owned'], types: [{ id: 'event', title: 'Event', extends: 'work' }] }, 'hosted'),
   file('ui/find.js', '// The find bar.\nimport { order } from \'../packs/loader/kernel/order.ts\';\n'),
+  file('packs/loader/page/approve.js', '// The approval screen.\n'),
   file('test/order.test.ts', '// Order.\nimport { order } from \'../packs/loader/kernel/order.ts\';\n'),
   file('test/sets.ts', "export const SLOW: Record<string, string> = {\n  'test/order.test.ts': 'browser',\n};\n"),
   file('test/structure.test.ts', "// 6. Kernel modules import one way.\nconst CYCLES: Record<string, number> = { 'a -> b': 1 };\ntest('kernel modules import one way', () => {});\nconst LONG: Record<string, number> = {};\ntest('no file over 500 lines', () => {});\n"),
@@ -32,6 +33,8 @@ test('packs, modules, imports, tests and checks come out keyed and tied as the f
   assert.equal(item('module:packs/loader/kernel/order.ts')!.props.layer, 'root');
   assert.equal(item('module:packs/loader/kernel/order.ts')!.body, 'Orders the packs.', 'a module\'s note is its header comment');
   assert.equal(item('module:ui/find.js')!.props.layer, 'page');
+  assert.equal(item('module:packs/loader/page/approve.js')!.props.layer, 'page', 'a root\'s page module is page code');
+  assert.ok(has('part_of', 'module:packs/loader/page/approve.js', 'pack:loader'), 'part of the root it moved into');
   assert.ok(has('part_of', 'module:packs/loader/kernel/order.ts', 'pack:loader') && !links.some((l) => l.from === 'module:ui/find.js' && l.type === 'part_of'), 'the page has no pack yet');
   assert.ok(has('anatomy.imports', 'module:packs/loader/kernel/order.ts', 'module:packs/loader/kernel/ids.ts'));
   assert.deepEqual(links.find((l) => l.to === 'module:packs/loader/kernel/types.ts')!.props, { type_only: true });

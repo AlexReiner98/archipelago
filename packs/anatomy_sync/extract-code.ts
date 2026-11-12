@@ -9,12 +9,16 @@ const CODE = /\.(ts|js|mjs)$/;
 const isTest = (path: string) => /\.test\.(ts|js|mjs)$/.test(path) || path.startsWith('test/');
 const packOf = (path: string) => /^(?:packs|workspace-packs)\/([\w-]+)\//.exec(path)?.[1];
 
-/** Where a module sits: a root pack's kernel, another pack's code, src/ or the page. */
+/**
+ * Where a module sits: a root pack's kernel, another pack's code, src/ or the page. The page is ui/ and a root's
+ * page/ folder (the host's modules, part of that root: task e_qhrvu922), served by their names as ui/'s are.
+ */
 export function layerOf(path: string, roots: Set<string>): string | undefined {
   if (path.startsWith('src/')) return 'src';
   if (path.startsWith('ui/')) return 'page';
   const pack = packOf(path);
   if (!pack) return undefined;
+  if (/^packs\/[\w-]+\/page\//.test(path)) return 'page';
   return roots.has(pack) && path.startsWith(`packs/${pack}/kernel/`) ? 'root' : 'pack';
 }
 
