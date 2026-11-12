@@ -72,7 +72,10 @@ trusted).
   never optional. Sessions is optional. Automations stays a plain pack: its
   handler runs in the sandbox, which a kernel pack may not have; its triggers
   are the required `automation_triggers`, which does nothing on a map where
-  automations is off.
+  automations is off. Claude Code stays a plain pack too (decision e_n7ruedb7,
+  the owner, 12 Nov 2026): its adapter and launcher are server reach; its hook
+  tool over MCP is the required `claude_code_hooks`, which fills the server
+  slot `surface.tools` and answers on any map, as it did from sessions.
   What a run records (`packs/loader/kernel/pack-versions.ts`): the required internal packs are
   one entry, `internal`, the same on every map one server runs; an optional one
   is recorded as a plain pack is, its own `id@version` entry while it is on and
@@ -220,7 +223,7 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `packs/loader/kernel/root-
 | `root.transient` | surface | looks, presence, mail, connect, sessions | the transient store, kept, read and taken (a key, a key with its bytes, a key read once, keys and prefixes at once) as the whole workspace of the calling map |
 | `root.bookkeep` | write | sessions | a session's own record of itself as it always reached the log (wave 6b, e_5vtbam7d): a change applied as the session's actor, judged as its bookkeeping and let through by `sessions.bookkeeping` (e_rr96yyj3), the operational write, a claim and a give-back, what it vouches for as its own change through the rules, its events on the sessions stream deduplicated under their lock, an audit import with its cursor |
 | `root.sessions` | surface | sessions | what the sessions pack needs of the whole workspace (wave 6b): the sessions at work, whether there is room for one more, the owner's settings of the reply rules; and what a hook is told of the server and of people (e_rr96yyj3): whether a setup is behind, the actions offered, the newest event, what people did after one with the newest described |
-| `root.hook` | surface | sessions | a session's hook called over MCP (report, action hook: claude_code's tool, run on the sessions pack's context since claude_code is a server pack) answered as `/hooks/<surface>/<event>` answers it, with the server's packs, the code it runs, its setup version and working rules (wave 6b, e_rr96yyj3; `configureHookTool` is surface's `root-hook.ts`) |
+| `root.hook` | surface | claude_code_hooks | a session's hook called over MCP (report, action hook: the tool of claude_code_hooks, run on its own context, for the server pack its id names less `_hooks`, claude_code; decision e_n7ruedb7) answered as `/hooks/<surface>/<event>` answers it, with the server's packs, the code it runs, its setup version and working rules (wave 6b, e_rr96yyj3; `configureHookTool` is surface's `root-hook.ts`) |
 | `root.look` | surface | looks | the UI's version, a look pass for the calling map's screen (walls), the room for another look this hour (rules) |
 | `root.notify` | write | notifications | a notification made on the calling map as its sender, past the rules, private, for the sender's person or the owner; told to the packs that hear notification.made |
 | `root.mail` | walls | alerts | a mail to the server's operator at PELAGO_ALERT_TO and no one else, with or without a map (a crash), through the mail gate |
@@ -297,7 +300,7 @@ are slots of the write and log packs; the others:
 | `surface.read`, `surface.act`, `surface.route` | surface | any internal pack (`surface.route`: the surface's own backup file route; `KERNEL_FILLINGS` and `src/surface-fillings.ts` gone in wave 7, `rechecked` the surface's own act) | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
 | `surface.reads` | surface | agents (`instructions`), usage (`told`), query (`view`, `placed`, wave 6b). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 | `surface.serve` | surface | publish (`published`, `public`, `preview`, `site_nav`, `bake`, `counts_since`), styles (`icon`, `page_style`, `lengths`), mailer (`mail`, `bounced`, `note_bounced`), connect (`connect`, `token_asked`, `token_polled`), backup (`backup`), look_draw (`looks`), alerts (`crash`), views (`for_reader`, `sections`): each `surface.<name>` in `kernel.hooks`, asked on a map or for the server (`packs/surface/kernel/above.ts`, wave 7) | the server's imports of those packs' modules (`server.ts`, `server-acts.ts`, `server-published.ts`, `server-streams.ts`, `server-mounts.ts`), and `public-document.ts` importing `documents.ts` |
-| `surface.tools` | surface, for the server (`server-fillings.ts`, read once before anything is called) | publish (`share`, `publish` and their reads), connect (token requests, `server_packs`, `connections`): each a table of declared tools, inputs as JSON shapes (`tool-input.ts`), run on the pack's context | `tools.ts` importing share-tools, token-ask, connection-tools, server-pack-tools (wave 7) |
+| `surface.tools` | surface, for the server (`server-fillings.ts`, read once before anything is called) | publish (`share`, `publish` and their reads), connect (token requests, `server_packs`, `connections`), claude_code_hooks (`hook`, decision e_n7ruedb7): each a table of declared tools, inputs as JSON shapes (`tool-input.ts`), run on the pack's context | `tools.ts` importing share-tools, token-ask, connection-tools, server-pack-tools (wave 7) |
 | `loader.calls` | loader, for the server (`own-calls.ts`, read once from the server's own folder) | sessions (its acts and `sessionAnswer`): an export called by name on the pack's own context of the asking map, whether or not the map has it on, so an optional pack may fill it (wave 7; e_5hfp4p7m) | the surface's and loader's imports of the sessions pack's `sessions.ts`, `hook-answers.ts` |
 | `loader.leading` | loader, for the server (`leading.ts`, read once from the server's own folder; its beat is the loader's `LEADING`) | sessions (`session-quiet.ts#tick`, the look for quiet sessions): every 30 s in each workspace while this server leads, each filling on its pack's context of the map, run only where the map has its pack on, read at each beat (decision e_nxqn32mb, the owner, 12 Nov 2026) | identity's `workspaces.ts` importing `session-quiet.ts` for the kernel's quiet timer, the last owed root import |
 | `surface.views`, `surface.replies` | surface, for the server (`view-words.ts`, `reply-words.ts`) | query (the views' names, list and words), sessions (what a reply rule counts): one filling each (wave 7) | the surface's imports of `askview.ts`, `reply-rules.ts` |
@@ -405,6 +408,7 @@ e_3yz459ez) removed every shim and rewrote every importer.
 | attention | attention, blocks, bounds, confirm, moved, query-answers, rows |
 | automation_triggers | automation-rules, due-on, edges, validate |
 | backup | backup-run, served |
+| claude_code_hooks | hook-tool |
 | clocks | due, when |
 | connect | check-connections, connect, connection-tools, install, served, server-pack-tools, surface-tools, token-ask |
 | lenses | kept-picture, lens-words, moves, query-answers, query-kept, query-names, query-saved, saved-views, shown-in, view-life, view-twins |
@@ -419,7 +423,7 @@ e_3yz459ez) removed every shim and rewrote every importer.
 | publish | document-read, drawing-files, map, pack-counts, pictures, public-bake, public-route, public-view, public-view-freeze, published, published-data, published-frames, published-freeze, published-live, published-pictures, published-preview, served, share-tools, site, surface-tools |
 | query | answers, askview, island-legend, query-flat, query-only, query-presets, query-steps, query-terms, reads, repeat, summary, timeaxis, views |
 | runs | answers, frontier, frontier-prompt, places, run-story, run-turns, session-measures, session-state, sessiontime, spent |
-| sessions (optional) | audit, bookkeeping, chat-run, close-offer, file-said, hook-answers, hook-tool, places, reconcile, replies, reply-rules, run-record, session-events, session-hook, session-life, session-name, session-parent, session-quiet, session-turns, sessions, stands, touched, types |
+| sessions (optional) | audit, bookkeeping, chat-run, close-offer, file-said, hook-answers, places, reconcile, replies, reply-rules, run-record, session-events, session-hook, session-life, session-name, session-parent, session-quiet, session-turns, sessions, stands, touched, types |
 | styles | colours, layout-move, moves, page-css, query-answers, schema-styled, screens, style-move, styles, view-style |
 | usage | appended, pack-use, query-answers, reads, usage, uses |
 | views | answers, blocks, brief, documents, findings, inside, query-answers, rows, timelanes, view-graph, view-tree |

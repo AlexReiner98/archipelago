@@ -21,6 +21,7 @@
   "packs/canvas/map-undrawn.test.ts": { "pglite": 0.2, "postgres": 0.3 },
   "packs/canvas/rails.test.ts": { "pglite": 0.3, "postgres": 0.4 },
   "packs/claude_code/claude-code.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/claude_code_hooks/kernel/hook-tool.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/clocks/kernel/due.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/connect/kernel/connect.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/connect/kernel/token-ask.test.ts": { "pglite": 0, "postgres": 0 },

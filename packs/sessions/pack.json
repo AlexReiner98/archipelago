@@ -3,12 +3,11 @@
   "version": "0.1.0",
   "title": "Sessions",
   "description": "What a session is shown and told: its turns and what it worked on, on its page; the Sessions view and how a session's state is marked; and what every session is told at its start. Split out of core with its ids kept: the run type stays in core, which the kernel reads.",
-  "uses": ["service:root.bookkeep", "service:root.sessions", "service:root.transient", "service:root.uses", "service:root.hook", "service:answer.place_for", "service:answer.view_style", "service:answer.turns", "service:act.report.took", "service:act.report.told", "service:act.report.notify", "service:act.report.alert", "service:answer.frontier", "service:answer.instructions", "service:answer.to_confirm", "service:answer.narrowed", "service:answer.seeing_line"],
+  "uses": ["service:root.bookkeep", "service:root.sessions", "service:root.transient", "service:root.uses", "service:answer.place_for", "service:answer.view_style", "service:answer.turns", "service:act.report.took", "service:act.report.told", "service:act.report.notify", "service:act.report.alert", "service:answer.frontier", "service:answer.instructions", "service:answer.to_confirm", "service:answer.narrowed", "service:answer.seeing_line"],
   "kernel": { "trust": "service", "internal": true, "optional": true, "modules": "kernel/", "hooks": {
     "rules.reply_ended": "reply-rules.ts#checkReplyRule",
     "loader.calls": ["sessions.ts#sessionStart", "sessions.ts#sessionUpdate", "sessions.ts#sessionEnd", "sessions.ts#tell", "sessions.ts#recordUsage", "sessions.ts#recordRun", "sessions.ts#importAudit", "sessions.ts#resolveRun", "sessions.ts#closeOffers", "sessions.ts#sessionsAwake", "hook-answers.ts#sessionAnswer"],
     "loader.leading": "session-quiet.ts#tick",
-    "surface.tools": "hook-tool.ts#tools",
     "surface.replies": "reply-rules.ts#replyWords"
   } },
   "rules": [

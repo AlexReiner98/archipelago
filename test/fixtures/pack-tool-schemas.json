@@ -602,5 +602,87 @@
       },
       "additionalProperties": false
     }
+  },
+  "hook": {
+    "description": "A Claude Code hook, called by an mcp_tool hook rather than by an agent: event (session-start, prompt, stop) and what Claude Code hands the hook (session_id, cwd, prompt, source, stop_hook_active). Answers in the hook’s own shape. A session not yet started is started at its first prompt.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "session-start",
+            "prompt",
+            "stop"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "stop_hook_active": {
+          "description": "As Claude Code passes it: true, or \"true\" when substituted into a string.",
+          "type": [
+            "boolean",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "event",
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "session-start",
+            "prompt",
+            "stop"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "stop_hook_active": {
+          "description": "As Claude Code passes it: true, or \"true\" when substituted into a string.",
+          "type": [
+            "boolean",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "event",
+        "session_id"
+      ],
+      "additionalProperties": false
+    }
   }
 }

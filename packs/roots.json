@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "b01a061ed4f95972b4edce60301603484a4a832dbd20250970f2f926b9c39fe2"
+      "hash": "7f5af2b41e9c3a91764880239c2d7cca1e15f0da3fb5680f07cf8d61d3d6a2c3"
     }
   ],
   "calls": {
@@ -121,7 +121,7 @@
       "sessions"
     ],
     "root.hook": [
-      "sessions"
+      "claude_code_hooks"
     ]
   }
 }
