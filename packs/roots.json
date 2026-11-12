@@ -19,6 +19,10 @@
     {
       "id": "identity",
       "hash": "ebfa21c314605e7b252325e6c1158334e0a7fd6435c2af2734127058726ff6c3"
+    },
+    {
+      "id": "walls",
+      "hash": "1ffa5ac28ba5cb1538025c6c1de174f20952c3ea44560eaf7a7d3603023d82c6"
     }
   ]
 }
