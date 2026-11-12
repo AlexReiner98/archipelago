@@ -24,6 +24,7 @@ const reg = (onIslands = true): Reg => ({
 /** A context whose reads answer the few the placement pack asks, from the items and links above. */
 function context(): KernelContext {
   const reads = async (q: Record<string, unknown>) => {
+    if (q.link !== undefined) return links.find((l) => l.id === q.link) ?? null;
     if (q.ids) return (q.ids as string[]).flatMap((id) => (items.has(id) ? [items.get(id)] : []));
     if (q.links) { const { from, types: kinds } = q.links as { from?: string[]; types: string[] }; return links.filter((l) => kinds.includes(l.type) && (!from || from.includes(l.from_id))); }
     if (q.items) return { rows: [...items.values()].filter((e) => e.type === (q.items as { type: string }).type) };
@@ -44,6 +45,7 @@ test('one made with no subject, or the last tie taken away, is refused', async (
   const cut = await subjectRefusals(context(), reg(), [{ op: 'unlink', relation: 'r1' }]);
   assert.match(cut[0], /"A1" lives with what it is about/);
   assert.deepEqual(await subjectRefusals(context(), reg(), [{ op: 'unlink', relation: 'r1' }, { op: 'archive', id: 'a1' }]), []);
+  assert.deepEqual(await subjectRefusals(context(), reg(), [{ op: 'unlink', relation: 'r_gone' }]), [], 'a link not there, or taken away already, is no tie');
 });
 
 test('a new item naming no island goes to what it is part of, else the lone island it fits', async () => {
