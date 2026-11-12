@@ -44,6 +44,12 @@ export interface Tool {
   devOnly?: boolean;
   /** Sends what a system measured: the only kind of tool a token that may only report can call. */
   report?: boolean;
+  /** No step of its own on the session's page when this holds of its input: a session saying only that it is alive. */
+  quiet?(input: Record<string, unknown>): boolean;
+  /** Its answer names the session that called it ({ run }): its first step is already that session's own. */
+  begins?: boolean;
+  /** For a token limited to some items: the inputs that name the items it acts on, with what it would do to them (src/scope.ts). */
+  within?: Record<string, string>;
   run(l: Archipelago, actor: Actor, input: any): Promise<unknown>;
 }
 
@@ -53,10 +59,10 @@ const UNWATCHED = new Set(['show', 'change', 'tell', 'watch', 'hook']);
 const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
 /** What a member who only reads may call (src/members.ts): the reads a canvas makes, the page's feed of the log, query, and the workspace's settings. Their database writes nothing besides (src/db.ts). */
 const MEMBER_READS = new Set([...LOOK_READS, 'tail', 'query', 'workspace_info']);
-async function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>): Promise<void> {
+async function step(l: Archipelago, actor: Actor, name: string, input: Record<string, unknown>, tool?: Tool): Promise<void> {
   const params = (input.params ?? {}) as Record<string, unknown>;
-  // A session saying only that it is alive has done nothing to see.
-  if (UNWATCHED.has(name) || (name === 'session_update' && !input.task && !input.note)) return;
+  // A session saying only that it is alive has done nothing to see (the tool's quiet).
+  if (UNWATCHED.has(name) || tool?.quiet?.(input)) return;
   const named = [input.id, input.entity, input.target, input.task, input.resource, input.about, input.repo, params.from, params.root, params.project, params.event, params.of, params.task, params.repo, params.focus];
   const id = named.find((v): v is string => typeof v === 'string' && /^e_[a-z0-9]{8}$/.test(v));
   const did =
@@ -133,7 +139,7 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);
   // An agent whose token is within some items is held to them here, whatever the tool; what it writes, where every change is checked.
   const limited = actor.kind === 'agent' && Boolean(actor.within?.length);
-  if (limited && !surface) await withinScope(l, actor, name, parsed.data as Record<string, unknown>);
+  if (limited && !surface) await withinScope(l, actor, name, parsed.data as Record<string, unknown>, tool.within);
   const answer = inProcess
     ? await inProcess(l, actor, parsed.data)
     : pack && !TOOLS[name] && limited
@@ -143,7 +149,7 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
       : await tool.run(l, actor, parsed.data);
   // A step that could not be kept costs the page a step, never the agent its answer.
   // A session that has just started is named by the run its answer gives, so its first step is already its own.
-  const begun = name === 'session_start' && typeof (answer as { run?: unknown })?.run === 'string' ? { run: (answer as { run: string }).run } : {};
-  if (actor.kind === 'agent' && !surface) await step(l, actor, name, { ...(parsed.data as Record<string, unknown>), ...begun }).catch((err) => console.error(`${name}: the session's step could not be kept: ${(err as Error).message}`));
+  const begun = tool.begins && typeof (answer as { run?: unknown })?.run === 'string' ? { run: (answer as { run: string }).run } : {};
+  if (actor.kind === 'agent' && !surface) await step(l, actor, name, { ...(parsed.data as Record<string, unknown>), ...begun }, tool).catch((err) => console.error(`${name}: the session's step could not be kept: ${(err as Error).message}`));
   return answer;
 }

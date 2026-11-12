@@ -12,7 +12,10 @@ import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { resolveRun } from '../../../src/sessions.ts';
 import { refuser, scopeWithin } from '../../../src/within.ts';
 
-export async function withinScope(l: Archipelago, actor: Actor, tool: string, input: Record<string, unknown>): Promise<void> {
+/** What a tool says of a limited token: each input that names items it acts on (an id, or a list of ids), with what it would do to them. */
+export type WithinInputs = Record<string, string>;
+
+export async function withinScope(l: Archipelago, actor: Actor, tool: string, input: Record<string, unknown>, inputs?: WithinInputs): Promise<void> {
   const within = actor.within ?? [];
   if (!within.length) return;
   const scope = await scopeWithin(l, within);
@@ -26,6 +29,12 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
     if (!id || !scope.has(id)) refuse('It cannot speak for another repository.');
   };
 
+  // A tool that says which of its inputs name the items it acts on (the sessions' actions: the task taken on, what is
+  // vouched for) is held to those.
+  if (inputs) {
+    for (const [key, doing] of Object.entries(inputs)) for (const id of [input[key] ?? []].flat()) await mustBeIn(id, doing);
+    return;
+  }
   switch (tool) {
     // What a change writes is checked where every change is (within.ts), and so is what a pack's action writes.
     case 'change':
@@ -37,9 +46,6 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
       for (const row of rows) if (row.target_id) await mustBeIn(row.target_id, 'undo a change to it');
       return;
     }
-    case 'session_start':
-    case 'session_update':
-      return mustBeIn(input.task, 'take it on');
     // A story is told of the token's own work: the run is one of a session in its repository.
     case 'tell': {
       const run = await resolveRun(l, String(input.run ?? ''));
@@ -48,9 +54,6 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
       if (!rows.length) refuse(`${await named(run.id)} is not a session there, so this token cannot tell its story.`);
       return;
     }
-    case 'session_end':
-      for (const id of (input.still_true ?? []) as string[]) await mustBeIn(id, 'vouch for it');
-      return;
     case 'rechecked':
     case 'run_report':
       return isRepo(input.repo);
