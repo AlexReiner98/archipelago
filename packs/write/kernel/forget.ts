@@ -3,8 +3,8 @@
 // log as its digest (e_k2aex62z), and takes what it said out of the stores beside the log. A held change that touches it
 // loses its ops with it; a change set's reason and basis go only when the person forgetting chooses them, from those
 // mentions() finds (e_4uzgmsry). The chain still verifies: it always hashed a sealed value by that same digest. The
-// compacted streams lose what they sealed with those keys the same way, through the compaction role (src/opseal.ts).
-// Today's rows of the item leave in the write path (src/pelago.ts), through asOwner.
+// compacted streams lose what they sealed with those keys the same way, through the compaction role (packs/seal/kernel/opseal.ts).
+// Today's rows of the item leave in the write path (packs/write/kernel/pelago.ts), through asOwner.
 
 import type { Q } from '../../database/kernel/db.ts';
 import { digested } from '../../seal/kernel/seal.ts';
@@ -20,7 +20,7 @@ export interface ForgetOp {
 }
 
 /**
- * Step 20, with the vault (src/vault.ts). The log's one exception to append-only: under the forget, a fact's sealed
+ * Step 20, with the vault (packs/seal/kernel/vault.ts). The log's one exception to append-only: under the forget, a fact's sealed
  * value may become its digest, computed here so that nothing else can be put in its place, and a header may lose its
  * sealed text. Nothing else about a row may change, and nobody but the forget's function can say it is forgetting.
  */

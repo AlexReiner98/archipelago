@@ -1,9 +1,9 @@
 // A version of a pack tried on one island while the rest of the map keeps the pack as it is (task e_j4bzhegb, the
 // plan "The harness refines itself through packs", e_e9526ead). A version is a pack item that names the pack in its
-// field version_of (src/pack-items.ts): it declares the same types and link types by the same ids, and may change
+// field version_of (packs/loader/kernel/pack-items.ts): it declares the same types and link types by the same ids, and may change
 // their fields, the rules and the instructions. An island runs one by naming it in its field pack_version; unset, it
 // runs the map's. It names a version of the pack it speaks, or of a map pack (one that brings code and looks to the
-// whole map, src/islands.ts): a map pack's version may carry code of its own, run there alone (src/pack-code.ts). Setting it is a change like any other, and unsetting it is the rollback: nothing is unwound.
+// whole map, packs/loader/kernel/islands.ts): a map pack's version may carry code of its own, run there alone (packs/loader/kernel/pack-code.ts). Setting it is a change like any other, and unsetting it is the rollback: nothing is unwound.
 //
 // Each version runs in a registry of its own, built from the map's with the version in its pack's place and kept until
 // the map's loads again: so every read of a type stays one consistent map, and nothing that reads a registry has to
@@ -87,7 +87,7 @@ export async function pinRefusals(map: Archipelago, reg: Registry, ops: Op[]): P
     if (!mayRun(reg, version.of, island)) { errors.push(`${where}: ${item} is a version of ${version.of}, and this island speaks ${String(island.props.pack ?? 'none')}`); continue; }
     const run = versionRegistry(reg, item);
     if (run instanceof Error) { errors.push(`${where}: the version ${item} of ${version.of} does not load: ${run.message}`); continue; }
-    // A pack active on the map that would wait under the version: it drops what that one reads (by shape, src/packorder.ts).
+    // A pack active on the map that would wait under the version: it drops what that one reads (by shape, packs/loader/kernel/packorder.ts).
     const left = run ? [...reg.states].filter(([id, s]) => s.state === 'active' && run.states.get(id)?.state === 'waiting').map(([id]) => `${id} ${run.states.get(id)!.why}`) : [];
     if (left.length) errors.push(`${where}: the version ${item} of ${version.of} drops what a pack here needs: ${left.join('; ')}`);
   }

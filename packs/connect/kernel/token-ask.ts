@@ -9,7 +9,7 @@
 // On the connect pack's context: the requests are kept under `connect:` in the whole workspace's transient store
 // (root.transient), the token is made by identity (root.token, an agent's that may only report), and the items watched
 // at an address are read as the asker under row-level security. The tools' inputs are JSON shapes the surface builds
-// its schemas from; the adapter at src/token-ask.ts hands each run the pack's context of its map.
+// its schemas from; the adapter at packs/connect/kernel/token-ask.ts hands each run the pack's context of its map.
 
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { KernelContext } from '#pelago/kernel';
@@ -37,7 +37,7 @@ export interface Ask {
   answered_by?: string;
 }
 
-/** Who answers a request, as the kernel hands it (src/pelago-types.ts, Actor): only what is read of it here. */
+/** Who answers a request, as the kernel hands it (packs/write/kernel/pelago-types.ts, Actor): only what is read of it here. */
 export interface Asker {
   kind: 'human' | 'agent';
   name: string;

@@ -1,4 +1,4 @@
-// The registry as of a past position (docs/log.md section 8, src/registry-at.ts): a pack's manifest changes, the log
+// The registry as of a past position (docs/log.md section 8, packs/loader/kernel/registry-at.ts): a pack's manifest changes, the log
 // keeps both texts by hash, and a read of the map before the change runs under the pack as it was, after it under the
 // pack as it is.
 

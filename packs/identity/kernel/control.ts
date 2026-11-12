@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Q } from '../../database/kernel/db.ts';
 
-/** The tables, made by step 4 of the schema (src/migrate.ts). */
+/** The tables, made by step 4 of the schema (packs/database/kernel/migrate.ts). */
 export const CONTROL = `
 create table if not exists control_workspace (
   id      text primary key,
@@ -128,7 +128,7 @@ export async function importLocalPack(db: Q, file: string): Promise<number> {
   return types.length;
 }
 
-// ---- what a server pack keeps (src/server-host.ts) ----------------------
+// ---- what a server pack keeps (packs/surface/kernel/server-host.ts) ----------------------
 
 /** Step 8 of the schema: keys and values a server pack keeps, each pack its own, some until a time. */
 export const PACK_STORE = `

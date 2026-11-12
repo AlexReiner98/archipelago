@@ -3,7 +3,7 @@ import { isLink, project } from './project.js';
 
 // ---- the steps a catch-up plays, worked out from the log --------------------------
 //
-// Pure: rows and entries in, rows and steps out, with the projector the page and the server run (src/project.ts).
+// Pure: rows and entries in, rows and steps out, with the projector the page and the server run (packs/log/kernel/project.ts).
 // ui/catch-up.js plays them; test/catch-up.test.ts checks them without a page.
 
 /** What a store's items and links were at a position: the facts said of them up to it, folded from nothing. */

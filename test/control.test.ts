@@ -134,7 +134,7 @@ test('an ended workspace whose day has come is deleted from Postgres, its databa
     await a.create('acme', 'Acme');
     await (await b.get('acme')).pelago.db.query('select 1');
     assert.equal(await exists(`${name}_acme`), true);
-    // Its server pack says it ended, to be deleted in a day (src/server-gates.ts): here, as the leader is told.
+    // Its server pack says it ended, to be deleted in a day (packs/surface/kernel/server-gates.ts): here, as the leader is told.
     const deleteAt = Date.now() + 86_400_000;
     a.dueForDeletion = async (now) => (now.getTime() >= deleteAt && (await a.has('acme')) ? ['acme'] : []);
     assert.deepEqual(await a.deleteDue(), [], 'not before its day');

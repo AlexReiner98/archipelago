@@ -1,20 +1,21 @@
 // The registry as of a past position (docs/log.md section 8, "Any moment is replayable"): the packs the log says were
 // active at fact position P, each read from the manifest text the log keeps by its hash, so a read or a replay of the
 // map as it was runs under the types and rules as they were declared then. A pack's code (its handler, its layouts, its
-// pages) is read back the same way, by the hashes of its files (src/pack-code.ts): the registry runs the code it had.
+// pages) is read back the same way, by the hashes of its files (packs/loader/kernel/pack-code.ts): the registry runs the code it had.
 //
 // What it cannot read from the log it takes from today, and says so: a manifest whose text the log never kept (the
 // pack was said before texts were kept) is today's when its hash is the same, else today's file stands in for it
 // (`stand_in`), and so with code a fact did not name or whose files the log lacks; a type the packs at P do not define
 // but today's registry knows (a pack added later, a type of the workspace's own defined later) is kept dormant, as a
 // pack taken out is. Before any pack fact, there is no past registry: today's stands. The islands setting and the
-// workspace's own types are as the logs said them by P (src/registry-then.ts).
+// workspace's own types are as the logs said them by P (packs/loader/kernel/registry-then.ts).
 
 import type { Q } from '../../database/kernel/db.ts';
 import { dirname } from 'node:path';
 import { readManifest } from './manifest.ts';
 import { codeFromLog, folderCode } from './pack-code.ts';
 import { LOCAL_PACK, Registry, type PackFile } from './packs.ts';
+import { providedOf } from './services.ts';
 import { islandsAt, localAt } from './registry-then.ts';
 import { typeItemsIn } from './type-items.ts';
 
@@ -80,7 +81,7 @@ export async function registryAt(q: Q, today: Registry, pos: number): Promise<Re
   }
   if (!found.has('core')) return undefined;
   const local = await localAt(q, [...today.types.values()].filter((t) => t.pack === LOCAL_PACK).map((t) => t.id), pos);
-  const registry = new Registry({ found, hashes, where }, undefined, local);
+  const registry = new Registry({ found, hashes, where, answers: providedOf(today.found.filter((p) => today.internal.has(p.id)), 'answer') }, undefined, local); // a view of then may name what an internal pack answers, as it named the kernel's own answers before they moved to packs
   registry.turnOff([], await islandsAt(q, today.onIslands, pos));
   // What the packs then did not define and today's registry knows is dormant, as a pack taken out leaves its types.
   registry.keep({ types: [...today.types.values()].filter((t) => !registry.types.has(t.id)), relations: [...today.relations.values()].filter((r) => !registry.relations.has(r.id)) });

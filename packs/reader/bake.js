@@ -1,4 +1,4 @@
-// A public view baked as one page (task e_4c8u53gw): its rails picture, run by the server (src/public-bake.ts, the act
+// A public view baked as one page (task e_4c8u53gw): its rails picture, run by the server (packs/publish/kernel/public-bake.ts, the act
 // public.baked), written as HTML a reader walks by scrolling (public/rails.js) and a search engine or a reader with no
 // script reads whole: each stop's title and note as text in order, the map as SVG, its stops as a list. Pure: what the
 // kernel answered in, the page out. Nothing is read here but that answer, so what was not frozen is not on the page.

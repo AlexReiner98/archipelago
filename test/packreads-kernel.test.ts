@@ -1,4 +1,4 @@
-// The reads a kernel view needs of src/packreads.ts (task e_exet8395): what a run wrote and who last said each field,
+// The reads a kernel view needs of packs/surface/kernel/packreads.ts (task e_exet8395): what a run wrote and who last said each field,
 // the runs of a repository or a folder and what each touched, the held changes and the questions to confirm, a cursor
 // past one page, and a view pinned to the version of the pack that answers it. Each answers as the asker.
 import assert from 'node:assert/strict';

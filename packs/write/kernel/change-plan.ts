@@ -1,5 +1,5 @@
 // Planning a change: its ops checked against the schema and the map as it is now, before anything is written. The
-// write path (src/pelago.ts) asks it before a change is judged and again before it is applied.
+// write path (packs/write/kernel/pelago.ts) asks it before a change is judged and again before it is applied.
 
 import { undeclaredColumns } from '../../loader/kernel/head.ts'; import { typedProblems } from '../../loader/kernel/fields.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
@@ -8,13 +8,13 @@ import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { 
 import type { Archipelago } from './pelago.ts';
 import { validate, type Who } from './write-hooks.ts';
 
-/** Validate ops against the schema and the current map, and by what fills write.validate (src/write-hooks.ts): who, where a change is judged. Throws listing every problem. */
+/** Validate ops against the schema and the current map, and by what fills write.validate (packs/write/kernel/write-hooks.ts): who, where a change is judged. Throws listing every problem. */
 export async function planChange(map: Archipelago, ops: Op[], who?: Who): Promise<{ warnings: string[] }> {
   if (!ops.length) throw new Error('A change needs at least one op.'); currentNames(map.registry, ops);
   const errors: string[] = [], warnings: string[] = [];
   const refs = new Map<string, string>(), refIslands = new Map<string, unknown>(); // ref -> type, and the island it is made on
   const seen = new Set<string>(), dropped = new Set<string>(); // dropped: what this change has merged away so far
-  const reg = await typesAfter(map, ops); // a type made in this change can be used in it (src/type-items.ts)
+  const reg = await typesAfter(map, ops); // a type made in this change can be used in it (packs/loader/kernel/type-items.ts)
 
   const typeOf = async (key: string, where: string): Promise<string | undefined> => {
     const local = refs.get(key);
@@ -29,7 +29,7 @@ export async function planChange(map: Archipelago, ops: Op[], who?: Who): Promis
     if (!found) errors.push(`${where}: no entity "${id}"`);
     return found;
   };
-  // Saying an owner makes an owned_by link (src/owner-link.ts), so it is checked as that link op is: both ends.
+  // Saying an owner makes an owned_by link (packs/write/kernel/owner-link.ts), so it is checked as that link op is: both ends.
   const checkOwner = async (item: string | undefined, owner: string, where: string) => {
     const type = await typeOf(owner, where);
     const problem = item && type ? reg.checkRelation(OWNED_BY, item, type) : undefined;

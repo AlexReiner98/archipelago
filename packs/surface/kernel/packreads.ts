@@ -42,9 +42,9 @@ export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & PublishRe
   since?: string;
   /** Everything part of any of these items, and the items themselves, in one read. */
   parts_of?: string[];
-  /** What is around an item (src/region.ts), in one read: what is inside it, what it is tied to and what is inside that, and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
+  /** What is around an item (packs/surface/kernel/region.ts), in one read: what is inside it, what it is tied to and what is inside that, and the links among them, each with what it is, the links in the order they were made. over: the links it follows (every kind unless given); above: what holds what it is tied to, all the way up. */
   around?: { from: string; over?: string[]; above?: boolean };
-  /** Items of these types placed in a window of time (src/timeaxis.ts): each with where it falls (time), by its when (a repeat's days) or bound, a session where it was at work. Only what falls in it; what is closed, only if it changed in or after the window. */
+  /** Items of these types placed in a window of time (packs/query/kernel/timeaxis.ts): each with where it falls (time), by its when (a repeat's days) or bound, a session where it was at work. Only what falls in it; what is closed, only if it changed in or after the window. */
   placed?: { types: string[]; from: string; to: string; by?: ('when' | 'bound')[] };
   /** Which of these items have a picture kept for them. */
   pictures?: string[];
@@ -79,16 +79,16 @@ export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & PublishRe
   proposed?: Record<string, unknown>;
   /** Only these of each item's props, and no note. */
   fields?: string[];
-  /** The packs in force here, each with its version and its manifest's hash (src/pack-versions.ts). */
+  /** The packs in force here, each with its version and its manifest's hash (packs/loader/kernel/pack-versions.ts). */
   packs?: boolean;
 };
 
-// The loader's sandbox asks its packs' reads of this (the slot loader.reads, src/packhost.ts).
+// The loader's sandbox asks its packs' reads of this (the slot loader.reads, packs/loader/kernel/packhost.ts).
 fillReads((l, read, pack) => answerRead(l, read, pack));
 
 /** The answer to a read, as the map asks it; `pack` is the internal pack asking, when one is (its own memory is read by it alone). */
 export async function answerRead(l: Archipelago, q: Read, pack?: string): Promise<unknown> {
-  // The reads a kernel view needs as a service pack (src/packreads-kernel.ts), and those the moved services need (src/packreads-service.ts).
+  // The reads a kernel view needs as a service pack (packs/surface/kernel/packreads-kernel.ts), and those the moved services need (packs/surface/kernel/packreads-service.ts).
   const kernel = await kernelRead(l, q, pack);
   if (kernel !== undefined) return kernel;
   const service = await serviceRead(l, q, pack);
@@ -111,7 +111,7 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   // An item's columns as the asker may read them: anyone with no login reads no note, no owner, no link's id, and of the
   // props only the few public ones, and may not filter by props at all.
   const { open, cols, typed, family } = shapes(l, q.fields);
-  // A paged read is one row past the page, from where the last page ended, by its order's key (src/packreads-rows.ts).
+  // A paged read is one row past the page, from where the last page ended, by its order's key (packs/surface/kernel/packreads-rows.ts).
   const page = pageOf(q.page);
   const size = page ? page.size + 1 : READ_LIMIT;
   const after = page?.after ?? [null, null];
@@ -153,7 +153,7 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   if (q.trail !== undefined) return (await trail(l, q.trail)).map(({ id, type, title }) => typed({ id, type, title }));
   if (q.scope !== undefined) {
     // Its parts at any depth, along the part_of family as the registry has it. Walked, not read from the closure: a
-    // pack's read may run for a public page, whose reader is not given the closure (src/closure.ts).
+    // pack's read may run for a public page, whose reader is not given the closure (packs/log/kernel/closure.ts).
     const under = q.parts ? `with recursive scope(id) as (select $1::text union select r.from_id from relation r join scope s on r.to_id = s.id where r.type = any($6::text[]) and r.valid_to is null and $2::text[] is not null)` : SCOPE;
     // Unpaged, all of it as before; paged, newest first by when it changed and its id, a page at a time.
     const n = q.parts ? 7 : 6;

@@ -1,4 +1,4 @@
-// An item lives on one island (src/island-items.ts, task e_xgpnmgp6): on a map with islands on, every item but the
+// An item lives on one island (packs/loader/kernel/island-items.ts, task e_xgpnmgp6): on a map with islands on, every item but the
 // kernel's own and actors names its island, its type is the island's pack's or of the shared set, and no link joins
 // two islands. The query term `island <island>` is what lives on one. With islands off, nothing changes.
 import assert from 'node:assert/strict';

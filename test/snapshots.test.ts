@@ -89,7 +89,7 @@ test('a rebuild from a snapshot is the rebuild from the start, made beside the l
   // Damage the live tables, then rebuild from the start: the same rows, the damage swapped away.
   await l.db.query(`update entity set title = 'Wrong', props = props || '{"tokens_used": 7}' where id = $1`, [made.t]);
   await l.db.query(`delete from relation where type = 'depends_on'`);
-  // The closure and mentions too: a pair the links do not make, and one they do taken away (src/closure.ts).
+  // The closure and mentions too: a pair the links do not make, and one they do taken away (packs/log/kernel/closure.ts).
   await l.db.query(`insert into part_closure (ancestor, descendant) values ($1, $2)`, [made.t, made.p]);
   await l.db.query(`delete from part_closure where ancestor = $1 and descendant = $2`, [made.p, made.t]);
   const fromStart = await rebuildProjections(l.db, l.registry, l.workspace, { fromStart: true, chunk: 5 });

@@ -27,7 +27,7 @@ export const typeOnLegend = (t: { system: boolean; lineage: string[]; retired?: 
 /** Whether a link type is named in an island's legend: never the kernel's own (a claim, a session's work, a tie between actors), nor what is retired or gone. */
 export const linkOnLegend = (r: { kernel?: boolean; retired?: boolean; dormant?: boolean }) => !r.kernel && !r.retired && !r.dormant;
 
-/** Step 32 (src/migrate.ts): what lives on an island, read by the query term `island <island>`. */
+/** Step 32 (packs/database/kernel/migrate.ts): what lives on an island, read by the query term `island <island>`. */
 export const ISLAND_INDEX = `create index if not exists entity_island on entity ((props->>'island')) where (props->>'island') is not null;`;
 
 /** SQL that holds of an item (as e) on one of the islands in a parameter. */
@@ -35,7 +35,7 @@ export const onIslands = (param: string) => `e.props->>'island' = any(${param}::
 
 interface Where { island: string | null; title: string }
 
-// Where a new item that names no island goes (placeOnIslands) is the placement pack's: src/island-place.ts.
+// Where a new item that names no island goes (placeOnIslands) is the placement pack's: packs/placement/kernel/island-place.ts.
 
 /** Why ops break the island rules, as sentences; none when they keep them, or when the map has islands off. */
 export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[]): Promise<string[]> {

@@ -1,5 +1,5 @@
 // The reader: what anyone may open with no login. The kernel hands it the public addresses (/p/) and a site's domain
-// (src/server-mounts.ts), and it reads public views through the public acts alone (src/server-published.ts): it is
+// (packs/surface/kernel/server-mounts.ts), and it reads public views through the public acts alone (packs/surface/kernel/server-published.ts): it is
 // handed no map, so what is not public is not there to be found. Its page is the shared document page
 // (public/page.html, the kernel's ui/doc.html as a reader's), whose scripts the kernel serves; a site whose home view is
 // drawn by the rails is answered at / by that view baked (baked-site.js). A reader's page load on a site with a source

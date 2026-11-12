@@ -7,7 +7,7 @@
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** A fact of the log (src/log.ts, Fact): a field set, or taken off. */
+/** A fact of the log (packs/log/kernel/log.ts, Fact): a field set, or taken off. */
 export type Fact = ['+', string, string, unknown] | ['-', string, string];
 
 /** The status a view or layout had before its life. */

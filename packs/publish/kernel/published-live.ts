@@ -1,7 +1,7 @@
 // A published page kept open while it is changed: opened with ?live, the page listens here (server-sent events) and
 // is told the moment its document is published again, then draws itself anew from its data. Only a page that asks
 // listens; what it is told is that there is something new to read, nothing more. A server pack's page listens the
-// same way, on a stream its pack declares (src/server-streams.ts): the kernel holds that connection too, counted
+// same way, on a stream its pack declares (packs/surface/kernel/server-streams.ts): the kernel holds that connection too, counted
 // with the pages', and closes it when the pack goes.
 
 import type { ServerResponse } from 'node:http';
@@ -28,7 +28,7 @@ export function listen(res: ServerResponse, workspace: string, id: string, heade
   hold(res, workspace, id, headers, from);
 }
 
-/** Keep this response open as the stream a server pack's page listens to for a document (src/server-streams.ts). */
+/** Keep this response open as the stream a server pack's page listens to for a document (packs/surface/kernel/server-streams.ts). */
 export function listenForPack(res: ServerResponse, pack: string, workspace: string, id: string, headers: Record<string, string>, from = '') {
   hold(res, workspace, id, headers, from, pack);
 }
@@ -39,7 +39,7 @@ export function closePackListeners(pack: string) {
   byPack.delete(pack);
 }
 
-/** An address as it is counted: an IPv6 one by its /64, so one machine is not counted as many (the same as src/limit.ts counted, kept here so the pack imports nothing of the kernel). */
+/** An address as it is counted: an IPv6 one by its /64, so one machine is not counted as many (the same as packs/surface/kernel/limit.ts counted, kept here so the pack imports nothing of the kernel). */
 function counted(address: string): string {
   const plain = address.replace(/%.*$/, '');
   if (isIP(plain) !== 6 || /^::ffff:\d+\./i.test(plain)) return address;

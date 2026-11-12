@@ -1,6 +1,6 @@
 // What the Packs screen shows of a pack: every declaration its manifest makes, nothing filtered out, and beside each
-// what can be counted of its use on the map (src/pack-touches.ts, src/pack-use.ts): items of a type, links of a link
-// type, a view's reads, a rule's refusals and holds, counted as they happen (src/uses.ts).
+// what can be counted of its use on the map (packs/loader/kernel/pack-touches.ts, packs/usage/kernel/pack-use.ts): items of a type, links of a link
+// type, a view's reads, a rule's refusals and holds, counted as they happen (packs/usage/kernel/uses.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { gist, packTouches, whenWords } from '../packs/loader/kernel/pack-touches.ts';

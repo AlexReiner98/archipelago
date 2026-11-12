@@ -1,4 +1,4 @@
-// One read of an island's findings, for both (src/findings.ts, task e_p27ddjqt): the brief of an island lists the open
+// One read of an island's findings, for both (packs/views/kernel/findings.ts, task e_p27ddjqt): the brief of an island lists the open
 // findings it stands by (marked published), one row each (claim, value with its unit, how sure, as of, how many read
 // it), as data the island's page and shore draw and as one line each in its text, then its working findings apart; in
 // place of the traps and reporting a task's brief gives.

@@ -1,5 +1,5 @@
 // Attention run without a database: a context whose reads answer from a few items in memory, the reasons out.
-// The whole of it against a real map is test/attention.test.ts, through the shim at src/attention.ts.
+// The whole of it against a real map is test/attention.test.ts.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';

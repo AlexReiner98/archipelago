@@ -2,7 +2,7 @@
 // schema of its own beside the live tables (`pelago_rebuild`, named first on the search path), starting from the
 // newest snapshot this code can build on, a chunk of entries per transaction so pages are served between them. When
 // what is left is a last chunk, one transaction takes both streams' locks, projects the rest and swaps the result in
-// (src/replay.ts, swapIn). The same walk, without the swap, takes a snapshot; with a stop, it answers a past position.
+// (packs/log/kernel/replay.ts, swapIn). The same walk, without the swap, takes a snapshot; with a stop, it answers a past position.
 
 import { setImmediate } from 'node:timers/promises';
 import type { Db, Q } from '../../database/kernel/db.ts';
@@ -156,7 +156,7 @@ export const snapshotNow = (db: Db, reg: TypesRead, ws: string, o?: RebuildOptio
  * The projections as they stood at a fact position: the nearest snapshot at or before it, and the entries of both
  * streams up to that moment, projected into tables that live for one transaction and are thrown away. `reader` says
  * who asks: only the items and links their database shows them now are given back, as the log's facts are read.
- * Given today's registry, it projects under the registry of that position (src/registry-at.ts): the packs active
+ * Given today's registry, it projects under the registry of that position (packs/loader/kernel/registry-at.ts): the packs active
  * then, with the manifests named then, and the type items as they stood; that registry is given back (`registry`,
  * with `items` saying why the type items did not load). Where the manifests then do not load under this server's
  * code, it projects under today's and says why (`past_refused`).

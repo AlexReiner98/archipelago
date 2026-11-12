@@ -1,4 +1,4 @@
-// What blocks what, as the kernel's block graph reads it (src/blocking.ts) and hands it over: each edge says x waits
+// What blocks what, as the kernel's block graph reads it (packs/surface/kernel/blocking.ts) and hands it over: each edge says x waits
 // on y and why. Built here from the edges a read gives (ctx.reads({ blocks })), so the pack asks the graph the same
 // questions the kernel's own views did.
 

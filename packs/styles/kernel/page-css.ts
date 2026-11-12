@@ -1,4 +1,4 @@
-// A copy of src/css-check.ts (the walls' cssCheck), which a pack may not import: what a published page's stylesheet
+// A copy of packs/walls/kernel/css-check.ts (the walls' cssCheck), which a pack may not import: what a published page's stylesheet
 // (page_css) may say, checked again where its look is read (pageLook). Keep the two the same: the walls' is the one the
 // page and the write path use, and test/styles-css.test.ts holds this one to it.
 

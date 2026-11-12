@@ -107,7 +107,7 @@ test('a closed day is sealed in the fact stream and verifies', async () => {
   assert.equal(sealed.length, 2, 'one segment per day');
   assert.deepEqual(sealed.map((s) => [s.from, s.to, s.entries]), [[1, 2, 2], [3, 3, 1]]);
   assert.equal((await seal(l.db, 'default', now)).length, 0, 'a day is sealed once');
-  // Read opened: a change set's reason is sealed in the log (src/seal.ts).
+  // Read opened: a change set's reason is sealed in the log (packs/seal/kernel/seal.ts).
   const rows = (await entries(l.db)).flatMap((e) => e.facts.filter((f) => f[2] === 'segment').map((f) => ({ reason: e.reason, id: f[1] })));
   assert.deepEqual(rows.map((r) => r.reason), ['Day sealed', 'Day sealed']);
   assert.match(rows[0].id, /^seg_settings_\d{8}$/);

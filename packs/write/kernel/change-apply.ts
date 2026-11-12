@@ -1,5 +1,5 @@
 // Applying a change: each op planned into facts and projected at once, then appended to the log as one change set.
-// The apply loop of the one write path (src/pelago.ts), which calls it once the rules have let the change through.
+// The apply loop of the one write path (packs/write/kernel/pelago.ts), which calls it once the rules have let the change through.
 
 import { newId, type Q } from '../../database/kernel/db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
@@ -20,14 +20,14 @@ const privateTo = (map: Archipelago, visibility: string, to?: string | null): st
 
 /**
  * Apply a change without consulting policy. For human changes, approved proposals, and the system's own bookkeeping
- * (sessions). Each op is planned into facts and projected at once (src/replay.ts), so the next reads what it did; the
+ * (sessions). Each op is planned into facts and projected at once (packs/log/kernel/replay.ts), so the next reads what it did; the
  * facts are appended to the fact stream as one change set in the same transaction. dry: the facts it would append and
  * the ids it would make, with nothing written; ids: those ids, to make the same ones again.
  */
 export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string>; privateTo?: string | null; followed?: Followed } = {}) {
   const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(map.workspace); if (!opts.dry) await roomToStore(map.workspace);
   if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
-  // Validate again: the map may have changed since this was proposed. A new item naming no island is placed again (src/island-items.ts).
+  // Validate again: the map may have changed since this was proposed. A new item naming no island is placed again (packs/loader/kernel/island-items.ts).
   await rewrite({ map, reg: map.registry }, ops);
   const { warnings } = await map.plan(ops);
   // A change judged with what followed it (write.follow): what follows it now must be the same, or the map moved.
@@ -205,7 +205,7 @@ export function letThrough(spared: Verdict['spared']): { let_through?: { rule: s
   return each.size ? { let_through: [...each.values()] } : {};
 }
 
-/** What an op sets of an item's operational state (src/operational.ts) is not a fact: it is written beside them, never logged. */
+/** What an op sets of an item's operational state (packs/log/kernel/operational.ts) is not a fact: it is written beside them, never logged. */
 async function kept(tx: Q, id: string, props: Props = {}) {
   const ours = Object.entries(props).filter(([k]) => KEPT_FIELDS.includes(k));
   if (!ours.length) return;

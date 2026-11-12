@@ -2,7 +2,7 @@
 // before it. The fact stream (`facts`) holds each applied change set; the `pending` stream each held one. An entry is
 // one row of log_entry (its header) and a row of log_fact per fact, and neither table takes an update or a delete.
 // The tables pages read (entity, relation, proposal) are its projections, made from its entries in the append's
-// transaction by src/replay.ts.
+// transaction by packs/log/kernel/replay.ts.
 
 import { GENESIS, entryHash } from '../../../src/jcs.ts';
 import type { Q } from '../../database/kernel/db.ts';
@@ -49,7 +49,7 @@ export interface Entry {
  * Step 18. Append-only twice over: the member role is granted no update or delete, and a trigger refuses both (and
  * truncate) from anyone, the owner included. Compaction (section 4) will be the one role the trigger lets through.
  * The history index is log_fact by (id, field, pos): the value a field held at any position is one lookup. Step 22
- * (src/partitions.ts) makes these tables again, cut by time.
+ * (packs/log/kernel/partitions.ts) makes these tables again, cut by time.
  */
 export const LOG = `
 create table if not exists log_entry (
@@ -107,7 +107,7 @@ export async function headOf(q: Q, stream: Stream = 'facts'): Promise<{ pos: num
  * it answers is in clear, with the stored entry's position, time and hash.
  */
 export async function append(tx: Q, ws: string, stream: Stream, head: { id: string; actor: Entry['actor']; reason: string; [field: string]: unknown }, facts: Fact[]): Promise<Entry> {
-  // Every value that is someone's words goes in sealed with its key (src/seal.ts), and `keys` names them.
+  // Every value that is someone's words goes in sealed with its key (packs/seal/kernel/seal.ts), and `keys` names them.
   const plain = facts;
   const sealed = await sealEntry(tx, ws, stream, head, facts);
   facts = sealed.facts;
@@ -118,7 +118,7 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
     [stream],
   );
   const last = rows[0];
-  // The log is cut by time (src/partitions.ts): made ahead of need, and here when a year came before its partition.
+  // The log is cut by time (packs/log/kernel/partitions.ts): made ahead of need, and here when a year came before its partition.
   if (!last.made) await makePartitions(tx);
   // The transaction's own time, which today's tables are written with, clamped so time order and position order agree.
   const at = new Date(Math.max(new Date(last.now).getTime(), last.at ? new Date(last.at).getTime() : 0)).toISOString();

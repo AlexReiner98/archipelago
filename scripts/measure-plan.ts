@@ -1,4 +1,4 @@
-// What the limits per plan (src/standing.ts) rest on, measured here and never on the live server: a workspace's storage
+// What the limits per plan (packs/identity/kernel/standing.ts) rest on, measured here and never on the live server: a workspace's storage
 // (its log and pictures, as the limit counts them, and the folder it takes on disk), the memory of a server process
 // with N workspaces open, the requests a minute it answers, and how many requests a minute real sessions make.
 //

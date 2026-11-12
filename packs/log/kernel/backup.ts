@@ -8,14 +8,14 @@
 // goes in that database's own beside it, as the server looks for it):
 //   node src/backup.ts restore <backup file> <new data folder | postgres://...> [vault backup file]
 //
-// What the map's rows say is sealed in the file with each item's key (src/backup-seal.ts), and the keys are backed up
-// apart, kept 30 days (src/vault.ts): a backup is read with the vault as it is when it is restored, or with a vault
+// What the map's rows say is sealed in the file with each item's key (packs/seal/kernel/backup-seal.ts), and the keys are backed up
+// apart, kept 30 days (packs/seal/kernel/vault.ts): a backup is read with the vault as it is when it is restored, or with a vault
 // backup given beside it, on a server with the same sealing key. What was forgotten since it was taken stays out.
 //
 // Backing every workspace up on a clock, sending a copy off the server and merging a backup into a map are the backup
 // pack's (packs/backup/kernel/backup-run.ts): this module is the copy of the record and its way back.
 //
-// Since format 3 a backup is the log and a snapshot (src/backup-log.ts): the log's rows whole, the newest snapshot of
+// Since format 3 a backup is the log and a snapshot (packs/log/kernel/backup-log.ts): the log's rows whole, the newest snapshot of
 // the projections, and only what the log does not say. Items, links and the review queue are made again from them.
 
 import { isSealed, seal, SECRET_SETTINGS } from '../../seal/kernel/secrets.ts';
@@ -62,7 +62,7 @@ export interface Dump {
   tables: Record<string, Record<string, unknown>[]>;
   /** A backup of the vault given beside the file, never written into it: what a restore opens the rows with. */
   vault?: VaultDump;
-  /** Format 3: the projections at the head of the log, as a snapshot (src/snapshot.ts, liveSnapshot). */
+  /** Format 3: the projections at the head of the log, as a snapshot (packs/log/kernel/snapshot.ts, liveSnapshot). */
   snapshot?: Record<string, unknown> | null;
 }
 
@@ -132,9 +132,9 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     // And what log_op holds is read from there: an event row numbered as one of its entries is that entry, for a merge.
     const numbered = new Set((backup.tables.log_op ?? []).map((o) => Number(o.seq)).filter((n) => n > 0));
     // A backup from before 9 Nov 2026 holds the event table: its rows not yet in the activity stream are carried into
-    // it once the stream is in (src/activity.ts), as step 34 carried the table's own.
+    // it once the stream is in (packs/log/kernel/activity.ts), as step 34 carried the table's own.
     const events = (backup.tables.event ?? []).filter((ev) => !(logged.has(ev.changeset as string) && FACT_ACTIONS.includes(ev.action as string)) && !numbered.has(Number(ev.seq)));
-    // The log goes into the years it was written in, in order: each entry follows the one before (src/partitions.ts),
+    // The log goes into the years it was written in, in order: each entry follows the one before (packs/log/kernel/partitions.ts),
     // the compacted streams' too, whose rows a forget has rewritten out of their order on disk.
     const logAt = new Map((backup.tables.log_entry ?? []).map((e) => [`${e.stream} ${e.pos}`, e.at]));
     for (const f of backup.tables.log_fact ?? []) f.at ??= logAt.get(`${f.stream} ${f.pos}`);
@@ -162,7 +162,7 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
       await tx.query(`update token set revoked_at = now() where revoked_at is null`);
     }
   });
-  // Nearly every row is new: without statistics the planner would take the map for empty (src/stats.ts).
+  // Nearly every row is new: without statistics the planner would take the map for empty (packs/database/kernel/stats.ts).
   await analyzeAll(db);
   return counts;
 }
@@ -213,7 +213,7 @@ export async function restoreTo(backup: Dump, target: string): Promise<{ where: 
     const counts = await restore(db, backup);
     // On a server, the default one's database is where every server on it looks: the roots above the log keep what
     // they keep there (the slot log.restored_to). The identity root lists another workspace, and notes its members and
-    // tokens, so they sign in (src/control-index.ts). A new folder has no index yet, and makes it whole.
+    // tokens, so they sign in (packs/identity/kernel/control-index.ts). A new folder has no index yet, and makes it whole.
     if (isServer(target)) {
       const control = id === 'default' ? db : await openDb(target);
       try {
@@ -230,7 +230,7 @@ export async function restoreTo(backup: Dump, target: string): Promise<{ where: 
 
 // The log's root service (docs/kernel-packs.md, "Root services"), called only by the packs packs/roots.json names
 // for it (the backup pack): values in, values out, never a handle on the database. root.merge, which writes the rows of
-// a backup into a map, is the write root's (src/backup-merge.ts).
+// a backup into a map, is the write root's (packs/write/kernel/backup-merge.ts).
 
 /**
  * root.dump: a workspace's backup and its vault's, for a server duty that walks every workspace. The workspace is held

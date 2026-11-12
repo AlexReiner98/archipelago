@@ -1,5 +1,5 @@
 // The map and its single write path. Every change to items and links goes through change(): it is validated, judged
-// by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
+// by the rules (packs/rules/kernel/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
 import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type Policy } from '../../rules/kernel/rules.ts';
 import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomToStore, stillWritable } from '../../identity/kernel/standing.ts'; import { authorityOf } from '../../rules/kernel/authority.ts';
@@ -61,12 +61,12 @@ export class Archipelago {
     return new Archipelago(anyone(this.db), this.registry, this.policy, this.workspace, '', 'pelago_public_props(id) as props');
   }
 
-  /** This map as one person sees it. An empty viewer sees only what is shared; an admin also sees every token and setting; one who only reads writes nothing (src/db.ts). */
+  /** This map as one person sees it. An empty viewer sees only what is shared; an admin also sees every token and setting; one who only reads writes nothing (packs/database/kernel/db.ts). */
   as(viewer: string, admin = false, readOnly = false): Archipelago {
     return new Archipelago(scoped(this.db, viewer, admin, readOnly), this.registry, this.policy, this.workspace, viewer);
   }
 
-  /** This map read through another registry: the one an island runs, when a read names it (src/island-pin.ts). For reads alone; a change is judged per island where it is planned. */
+  /** This map read through another registry: the one an island runs, when a read names it (packs/loader/kernel/island-pin.ts). For reads alone; a change is judged per island where it is planned. */
   readIn(registry: Registry): Archipelago {
     return registry === this.registry ? this : new Archipelago(this.db, registry, this.policy, this.workspace, this.viewer, this.props);
   }
@@ -106,7 +106,7 @@ export class Archipelago {
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
-    // The write path's hook points (src/write-hooks.ts): rewrite, then who may write, then what follows the change, then
+    // The write path's hook points (packs/write/kernel/write-hooks.ts): rewrite, then who may write, then what follows the change, then
     // validate as it is planned. The verdict covers every op, what followed included.
     currentNames(this.registry, input.ops); await rewrite({ map: this, reg: this.registry, island: input.island }, input.ops); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
     const followed = await follow({ map: this, reg: this.registry }, input.ops);
@@ -115,11 +115,11 @@ export class Archipelago {
     const me = actorId(actor);
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);
-    // Whether it applies, waits or is refused is the rules' to say (src/rules.ts), and the answer names the rule.
+    // Whether it applies, waits or is refused is the rules' to say (packs/rules/kernel/rules.ts), and the answer names the rule.
     const who = { human: actor.kind === 'human', reading: measured, may: actor.may, asked: input.hold, said: Boolean(claimed), ownerSaid: claimed?.of === 'human' && Boolean(claimed.basis?.trim()), pack: input.pack, ...(await layoutOf(this, actor, input)) };
-    // Each op is judged by the rules of the version of its pack its island runs, if one does (src/island-rules.ts).
+    // Each op is judged by the rules of the version of its pack its island runs, if one does (packs/loader/kernel/island-rules.ts).
     const verdict = await decide(this.db, this.registry, who, input.ops, this.policy, await opRuns(this, input.ops));
-    // Each rule that refused or held it is counted once a change, for the Packs screen (src/uses.ts).
+    // Each rule that refused or held it is counted once a change, for the Packs screen (packs/usage/kernel/uses.ts).
     for (const r of new Set(verdict.refusers.map((x) => `${x.pack}.${x.rule}`))) this.used('refused', r);
     if (verdict.outcome === 'hold') for (const r of new Set(verdict.held.map((x) => `${x.pack}.${x.rule}`))) this.used('held', r);
     if (verdict.outcome === 'refuse') throw new Error(`Change rejected:\n${verdict.refused.map((r) => `- ${r}`).join('\n')}`);
@@ -141,7 +141,7 @@ export class Archipelago {
       // What it would do on the map as it is now, with the ids it would make: approved with nothing moved, it appends these facts.
       const { facts = [], ids = {}, created: would = {} } = await this.apply(me, input, { authority, dry: true });
       const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say, ...(verdict.by.version && { version: verdict.by.version }) };
-      // The queue is a projection of the pending stream: the record makes its row (src/replay.ts).
+      // The queue is a projection of the pending stream: the record makes its row (packs/log/kernel/replay.ts).
       await this.db.transaction(async (tx) =>
         projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),
       );
@@ -161,10 +161,10 @@ export class Archipelago {
   /** `ops`, when given, replaces the proposed ops: the reviewer's corrected version. One at a time: a second click while one applies is refused, not applied again. */
   decide(actor: Actor, input: Parameters<typeof decideProposal>[2]) { return once(input.proposal, () => decideProposal(this, actor, input)); }
 
-  /** Validate ops against the schema and the current map (src/change-plan.ts), and as who, where a change is judged. Throws listing every problem. */
+  /** Validate ops against the schema and the current map (packs/write/kernel/change-plan.ts), and as who, where a change is judged. Throws listing every problem. */
   plan(ops: Op[], who?: Who): Promise<{ warnings: string[] }> { return planChange(this, ops, who); }
 
-  /** Apply a change without consulting policy (src/change-apply.ts): for human changes, approved proposals, and the system's own bookkeeping. */
+  /** Apply a change without consulting policy (packs/write/kernel/change-apply.ts): for human changes, approved proposals, and the system's own bookkeeping. */
   apply(actor: string, input: ChangeInput, opts?: Parameters<typeof applyChange>[3]) { return applyChange(this, actor, input, opts); }
 
   /** A change set the system appends in a migration (a pack moves a type or a kind, places move to their stream): what moved, and nothing else. */
@@ -173,7 +173,7 @@ export class Archipelago {
     await append(tx, this.workspace, 'facts', { id: newId('c'), actor: { id: 'system' }, authority: null, rule: { outcome: 'apply', spared: [] }, reason, source: null, action, undoes: null, keys: [] }, facts);
   }
 
-  /** Each item's kind column, its type's starter (the last of its lineage in the type table), where the row lacks it or has another (src/head.ts): when a workspace opens. */
+  /** Each item's kind column, its type's starter (the last of its lineage in the type table), where the row lacks it or has another (packs/loader/kernel/head.ts): when a workspace opens. */
   fillKinds = async () => (await this.db.query(`update entity e set kind = t.def->'lineage'->>-1 from type_def t where t.id = e.type and t.def ? 'lineage' and e.kind is distinct from t.def->'lineage'->>-1 returning e.id`)).rows.length;
 
   /**
@@ -200,25 +200,25 @@ export class Archipelago {
       if (facts.length) await this.moved(tx, 'type.moved', reason, facts);
       return rows.length;
     });
-    await retyped(this, from, to, what); // what packs keep of it follows (write.retype, src/write-hooks.ts)
+    await retyped(this, from, to, what); // what packs keep of it follows (write.retype, packs/write/kernel/write-hooks.ts)
     return moved;
   }
 
   /**
    * Something done that is no change to the map and is kept in no other stream (a push heard, a pack turned on), in
-   * the activity stream (src/activity.ts), in the transaction given. An entry about an item is as visible as the item.
+   * the activity stream (packs/log/kernel/activity.ts), in the transaction given. An entry about an item is as visible as the item.
    */
   /** Record what was done; answers its seq, the number readers of events know it by. */
   async log(q: Q, e: Done): Promise<number | undefined> {
     return (await this.record('activity', e.actor, [doneFact(e)], e.reason || undefined, q === this.db ? undefined : q))[0]?.seq;
   }
 
-  // ---- operational state (src/operational.ts) ------------------------------
+  // ---- operational state (packs/log/kernel/operational.ts) ------------------------------
   // These take effect at once for agents too and are never held: coordination that waits for approval is no coordination.
 
   /**
    * The one write to an item that skips change: bookkeeping no one states as a fact (a session's heartbeat, an
-   * automation's last firing), and who may read a notification. Only the fields src/operational.ts names; out of the
+   * automation's last firing), and who may read a notification. Only the fields packs/log/kernel/operational.ts names; out of the
    * item's history, so it does not look newly confirmed. The event's actor and reason, when given, go with its stream's entry.
    */
   async operational(id: string, set: { props?: Props; unset?: string[]; add?: Record<string, number>; reach?: { private_to: string | null; visibility?: 'shared' } }, event?: { actor: string; action: string; reason?: string; detail?: Props }) {
@@ -232,14 +232,14 @@ export class Archipelago {
     for (const [stream, facts] of rows[0] ? operationalFacts(id, set, rows[0]) : []) await this.record(stream, event?.actor ?? 'system', facts, event?.reason);
   }
 
-  /** Append to a compacted stream at once (src/streams.ts), kept by the retention rules the packs declare. */
+  /** Append to a compacted stream at once (packs/log/kernel/streams.ts), kept by the retention rules the packs declare. */
   record(stream: OpStream, actor: string, facts: OpFact[], reason?: string, tx?: Q) {
     return tx ? record(tx, this.workspace, stream, actor, facts, { rules: this.registry.rules, reason }) : this.db.transaction((t) => record(t, this.workspace, stream, actor, facts, { rules: this.registry.rules, reason }));
   }
 
   async claim(actor: Actor, input: { resource: string; holder: string; for?: string; reason: string }) {
     return this.db.transaction(async (tx) => {
-      await tx.query(`select pelago_hold_lock($1)`, [input.resource]); // one claim of it at a time (src/db.ts): what is held is read after
+      await tx.query(`select pelago_hold_lock($1)`, [input.resource]); // one claim of it at a time (packs/database/kernel/db.ts): what is held is read after
       const resource = await this.entity(input.resource, tx);
       if (!resource || !this.registry.capacity(resource)) throw new Error(`"${input.resource}" is not a resource: nothing of its type can be held`);
       const holder = await this.entity(input.holder, tx);
@@ -308,7 +308,7 @@ export class Archipelago {
     return id;
   }
 
-  /** A setting that is a secret the server has to use, kept sealed: the seal's (readSecret, src/secrets.ts). */
+  /** A setting that is a secret the server has to use, kept sealed: the seal's (readSecret, packs/seal/kernel/secrets.ts). */
   secret(key: string): Promise<string | undefined> { return readSecret(this, key); }
   setSecret(key: string, value: string | undefined): Promise<void> { return writeSecret(this, key, value); }
 
@@ -331,7 +331,7 @@ export class Archipelago {
     return rows[0];
   }
 
-  // The map's reads (get, search, trail, events, proposals) are surface's (src/map-reads.ts, src/search.ts): the class
+  // The map's reads (get, search, trail, events, proposals) are surface's (packs/surface/kernel/map-reads.ts, packs/surface/kernel/search.ts): the class
   // keeps its writes, and the reads they need.
   /**
    * What names an item in its text or its fields (a note that points at it, a document that brings it in, a
@@ -349,7 +349,7 @@ export class Archipelago {
 }
 
 /**
- * The restore path (src/operational.ts): a backup's items and links merged into the map as they were, never applied
+ * The restore path (packs/log/kernel/operational.ts): a backup's items and links merged into the map as they were, never applied
  * again as changes, since their events come with them. An item on both sides keeps whichever was edited later; a link
  * ended on either side is ended. Answers, for each link written, whether it was new.
  */

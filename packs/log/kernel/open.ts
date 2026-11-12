@@ -1,6 +1,6 @@
-// What the log root fills of a workspace's open (src/lifecycle.ts, read in the order packs/roots.json starts the roots):
+// What the log root fills of a workspace's open (packs/identity/kernel/lifecycle.ts, read in the order packs/roots.json starts the roots):
 // in the restore phase, what a backup brings; in the types phase, once the map's packs are read, the packs' tables made
-// again if a restore asked it (src/log-project.ts). While this server leads, the log is kept once a day.
+// again if a restore asked it (packs/log/kernel/log-project.ts). While this server leads, the log is kept once a day.
 
 import type { RootLeading, RootOpen } from '../../identity/kernel/lifecycle.ts';
 import type { Workspace } from '../../identity/kernel/workspaces.ts';
@@ -19,7 +19,7 @@ export const OPEN: RootOpen = {
 /** Make the log's partitions ahead, seal its compacted streams up to today and compact what their rules no longer keep (docs/log.md, section 4). */
 export async function keepStreams(ws: Workspace, now = new Date()): Promise<void> {
   const { pelago } = ws;
-  await makePartitions(pelago.db); // the log's partitions, two months ahead (src/partitions.ts)
+  await makePartitions(pelago.db); // the log's partitions, two months ahead (packs/log/kernel/partitions.ts)
   const sealed = await seal(pelago.db, pelago.workspace, now);
   const { dropped } = await compact(pelago.db, pelago.workspace, pelago.registry.rules, now);
   if (sealed.length || dropped) console.log(`${ws.id}: ${sealed.length} days sealed, ${dropped} entries compacted away`);

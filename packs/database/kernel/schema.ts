@@ -1,4 +1,4 @@
-// The schema as SQL, in the parts src/migrate.ts applies once each, in order. What is here already stands in
+// The schema as SQL, in the parts packs/database/kernel/migrate.ts applies once each, in order. What is here already stands in
 // every database: change it only by adding a migration there, never by editing a part a database has applied.
 
 // Types are not stored here: pack files are the source of truth for them.
@@ -56,7 +56,7 @@ create table if not exists event (
 alter table event alter column origin set default 'pelago';
 create index if not exists event_ts on event(ts);
 create index if not exists event_target on event(target_id);
--- One claim of a resource at a time. PGlite has one connection, so nothing to wait for; a server makes it a lock (src/pg.ts).
+-- One claim of a resource at a time. PGlite has one connection, so nothing to wait for; a server makes it a lock (packs/database/kernel/pg.ts).
 do $$ begin if to_regprocedure('pelago_hold_lock(text)') is null then create function pelago_hold_lock(resource text) returns void language plpgsql as $fn$ begin end $fn$; end if; end $$;
 
 create table if not exists proposal (
@@ -391,10 +391,10 @@ alter table token add column if not exists may text default 'change';
 update token set within = repos where repos is not null and within is null;
 `;
 
-/** A client a person allowed by signing in through the browser, and the hash of its refresh token (src/auth.ts). */
+/** A client a person allowed by signing in through the browser, and the hash of its refresh token (packs/identity/kernel/auth.ts). */
 export const TOKEN_GRANT = `alter table token add column if not exists granted jsonb;`;
 
-/** Members, each by an email address (src/members.ts): step 6. Only the whole database reads it. */
+/** Members, each by an email address (packs/identity/kernel/members.ts): step 6. Only the whole database reads it. */
 export const MEMBER = `
 create table if not exists member (
   email      text primary key,
@@ -407,7 +407,7 @@ create table if not exists member (
 alter table member enable row level security;
 `;
 
-/** Step 7 (src/migrate.ts): a share may be made out to another workspace on the server instead of to a secret (dropped 10 Nov 2026; its columns and functions by step 39). */
+/** Step 7 (packs/database/kernel/migrate.ts): a share may be made out to another workspace on the server instead of to a secret (dropped 10 Nov 2026; its columns and functions by step 39). */
 export const WORKSPACE_SHARE = `
 alter table share add column if not exists to_workspace text;
 alter table share add column if not exists to_item text;
@@ -443,22 +443,22 @@ language sql stable security definer set search_path = public as $fn$
 $fn$;
 grant execute on function pelago_workspace_document(text, text), pelago_workspace_picture(text, text, text) to pelago_public;`;
 
-/** Step 12 (src/migrate.ts): a member, and so an agent's token, reads whether the owner lets agents publish (src/published.ts). */
-/** Step 14 (src/migrate.ts): and whether the owner lets agents change the code drawings run, unreviewed (src/rules.ts, lifted). */
+/** Step 12 (packs/database/kernel/migrate.ts): a member, and so an agent's token, reads whether the owner lets agents publish (packs/publish/kernel/published.ts). */
+/** Step 14 (packs/database/kernel/migrate.ts): and whether the owner lets agents change the code drawings run, unreviewed (packs/rules/kernel/rules.ts, lifted). */
 export const AGENT_CODE_READ = `
 drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member
   using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish', 'agent_code'));
 `;
 
-/** Step 30 (src/migrate.ts): and whether the owner has turned holds off (src/rules.ts, HOLDS_OFF). */
+/** Step 30 (packs/database/kernel/migrate.ts): and whether the owner has turned holds off (packs/rules/kernel/rules.ts, HOLDS_OFF). */
 export const HOLDS_OFF_READ = `
 drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member
   using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish', 'agent_code', 'holds_off'));
 `;
 
-/** Step 45 (src/migrate.ts): a pack's setting members read, kept as member.<key> (src/workspace-tools.ts); reading only. */
+/** Step 45 (packs/database/kernel/migrate.ts): a pack's setting members read, kept as member.<key> (packs/surface/kernel/workspace-tools.ts); reading only. */
 export const SETTING_READ_OPEN = `drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member
   using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish', 'agent_code', 'holds_off') or key like 'member.%');
@@ -471,7 +471,7 @@ create policy member_setting_read on setting for select to pelago_member
 `;
 
 /**
- * Step 35 (src/migrate.ts): whether an item the reader may not see is there at all, and nothing more about it: so a get
+ * Step 35 (packs/database/kernel/migrate.ts): whether an item the reader may not see is there at all, and nothing more about it: so a get
  * of a private item says it is hidden, not that the id is wrong. Its title, type and who it is private to stay unread.
  */
 export const ITEM_HIDDEN = `
@@ -482,11 +482,11 @@ $fn$;
 grant execute on function pelago_item_hidden(text) to pelago_member;
 `;
 
-/** Step 16 (src/migrate.ts): a held change keeps the rule that held it (src/rules.ts, decide). */
+/** Step 16 (packs/database/kernel/migrate.ts): a held change keeps the rule that held it (packs/rules/kernel/rules.ts, decide). */
 export const HELD_BY = `alter table proposal add column if not exists held_by jsonb;`;
 
 /**
- * Step 36 (src/migrate.ts): a link keeps the view it shows,  frozen when it was made (src/share-link.ts, gone since public views), and a reader
+ * Step 36 (packs/database/kernel/migrate.ts): a link keeps the view it shows,  frozen when it was made (src/share-link.ts, gone since public views), and a reader
  * token reads that and nothing else, while the token is good and the link stands.
  */
 export const LINK_SNAPSHOT = `

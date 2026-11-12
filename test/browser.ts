@@ -11,7 +11,7 @@ import { until, wait } from './wait.ts';
 
 export { until, wait };
 
-/** Where Chrome is, or null: where the server looks for the one it draws looks in (src/chrome.ts). In CI there is no
+/** Where Chrome is, or null: where the server looks for the one it draws looks in (packs/look_draw/kernel/chrome.ts). In CI there is no
  * null: a file of browser tests that finds no Chrome there fails, rather than skipping every test in it. */
 export function chrome(): string | null {
   const found = chromeBinary();
@@ -20,7 +20,7 @@ export function chrome(): string | null {
 }
 
 /** An expression importing the page's own copy of one of its modules (`live.js`), at the version it loads them at
- * (src/ui-files.ts): a bare address would load a second copy, with state and timers of its own. */
+ * (packs/surface/kernel/ui-files.ts): a bare address would load a second copy, with state and timers of its own. */
 export const pageModule = (name: string) => `import('/${name}' + new URL(document.querySelector('link[href^="/base.js"]').href).search)`;
 
 export interface Page {

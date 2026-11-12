@@ -1,7 +1,7 @@
 // A view that reads another is made against what that other answered then: its pack, at a version. Pinned, the read
 // is refused when what answers now is another pack or another version of it, saying both, rather than hand the asking
 // view an answer of a shape it was not made for (task e_exet8395). A pin says the pack, and its version, the SHA-256
-// of its manifest (src/pack-versions.ts), or both. Whether the name is one of the kernel's own views is said by what
+// of its manifest (packs/loader/kernel/pack-versions.ts), or both. Whether the name is one of the kernel's own views is said by what
 // answers the read (the filling of `view`, surface.reads): the reads API names none.
 
 import { parts } from '../../loader/kernel/manifest.ts';
@@ -12,7 +12,7 @@ export type Pin = { pack: string; version?: string; manifest?: string };
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);
 
-/** The pack that answers a view by its short name here: the kernel's own views are its root pack's; else the first pack to load that declares it (src/askview.ts). */
+/** The pack that answers a view by its short name here: the kernel's own views are its root pack's; else the first pack to load that declares it (packs/query/kernel/askview.ts). */
 export function answeredBy(l: Archipelago, name: string, kernelView: boolean): string | undefined {
   if (kernelView) return KERNEL_PACKS[0];
   return l.registry.packs.find((p) => parts(p).views.some((v) => short(v.id) === name))?.id;

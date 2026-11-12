@@ -1,11 +1,11 @@
 // A notification for the human: something they should know or act on that is not itself a change to the map, so it
 // needs no approval. Made by the write root (root.notify, which only this pack may call): on the map that asks, as the
 // one who sends it, past the rules, and told to the packs that hear notification.made. Another internal pack notifies
-// by this pack's name, act.report.notify; the kernel through the adapter at src/notify.ts.
+// by this pack's name, act.report.notify; the kernel through the adapter at packs/notifications/kernel/notify.ts.
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** Who sends a notification, as the kernel hands it (src/pelago-types.ts, Actor): only what the log names it by. */
+/** Who sends a notification, as the kernel hands it (packs/write/kernel/pelago-types.ts, Actor): only what the log names it by. */
 export interface Sender {
   kind: 'human' | 'agent';
   name: string;

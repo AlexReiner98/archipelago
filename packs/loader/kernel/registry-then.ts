@@ -1,4 +1,4 @@
-// What a past registry (src/registry-at.ts) reads besides the pack facts: whether the map was on islands then, and the
+// What a past registry (packs/loader/kernel/registry-at.ts) reads besides the pack facts: whether the map was on islands then, and the
 // types the workspace had defined for itself (define_type) by then. Both are read from the logs, as of a fact position.
 
 import type { Q } from '../../database/kernel/db.ts';
@@ -7,7 +7,7 @@ import type { TypeDef } from './packs.ts';
 
 /**
  * Whether the map held its packs to the island rules at fact position `pos`: the last time the setting was said by
- * then (the settings stream, src/packstate.ts setIslands). Said only later, it was off then; never said (a map from
+ * then (the settings stream, packs/loader/kernel/packstate.ts setIslands). Said only later, it was off then; never said (a map from
  * before settings were streamed, or one whose history is compacted away), today's stands.
  */
 export async function islandsAt(q: Q, today: boolean, pos: number): Promise<boolean> {

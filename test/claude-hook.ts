@@ -1,6 +1,6 @@
 // A hook answered as Claude Code reads it, for the tests that check what a session is told: the kernel's neutral
-// answer (src/hook-answers.ts) put in Claude Code's shape by the claude_code pack's handler, as the server does at
-// /hooks/<event> (src/server-adapter.ts), without the pack's sandbox in between.
+// answer (packs/sessions/kernel/hook-answers.ts) put in Claude Code's shape by the claude_code pack's handler, as the server does at
+// /hooks/<event> (packs/loader/kernel/server-adapter.ts), without the pack's sandbox in between.
 import { sessionAnswer, type HookAsk } from '../packs/sessions/kernel/hook-answers.ts';
 import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 import type { Q } from '../packs/database/kernel/db.ts';

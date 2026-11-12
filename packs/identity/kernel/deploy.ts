@@ -1,5 +1,5 @@
 // The deploy step, `npm run migrate`: every database on the Postgres server, the default one and each workspace's,
-// brought to the latest step of the schema (src/migrate.ts) before the new app starts. A database in a folder has one
+// brought to the latest step of the schema (packs/database/kernel/migrate.ts) before the new app starts. A database in a folder has one
 // server and is migrated by it as it starts.
 
 import { existsSync, readFileSync } from 'node:fs';

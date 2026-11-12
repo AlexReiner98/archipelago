@@ -4,8 +4,8 @@
 // Losing it costs nothing: the emailed link still signs them in, and they set another.
 //
 // It belongs to the address, not to a workspace, as a sign-in does: kept in the server's own database (control values,
-// src/control.ts) as a scrypt hash with its salt, never the password. Wrong ones are counted per address there, as
-// wrong codes are (src/members.ts), and past PASSWORD_TRIES the address waits.
+// packs/identity/kernel/control.ts) as a scrypt hash with its salt, never the password. Wrong ones are counted per address there, as
+// wrong codes are (packs/identity/kernel/members.ts), and past PASSWORD_TRIES the address waits.
 
 import { randomBytes, scrypt } from 'node:crypto';
 import type { Q } from '../../database/kernel/db.ts';

@@ -1,4 +1,4 @@
-// Nothing shared may wait on what is private to someone: checked by plan (src/pelago.ts) for every change.
+// Nothing shared may wait on what is private to someone: checked by plan (packs/write/kernel/pelago.ts) for every change.
 
 import type { Archipelago, Op } from '../../write/kernel/pelago.ts';
 

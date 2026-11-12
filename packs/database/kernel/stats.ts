@@ -1,5 +1,5 @@
 // The planner's table statistics. Without them it guesses, and on a large map it guesses badly: the recursive scope
-// query in src/places.ts made the handoff take 23 s on 20,000 items before ANALYZE and 0.7 s after. A Postgres server's
+// query in packs/runs/kernel/places.ts made the handoff take 23 s on 20,000 items before ANALYZE and 0.7 s after. A Postgres server's
 // autovacuum keeps them; PGlite has no autovacuum, so here they are collected when a database opens, after a backup
 // is restored into it (a pull is one), and after enough writes since the last time.
 //
@@ -19,7 +19,7 @@ const CHECK_MS = 60_000;
 
 // A table is due if it was never analysed, if enough rows changed since, or if it has grown by more than the share
 // in pages: the counts are held in memory and lost if the process stops without closing the database.
-// A partition of the log (src/partitions.ts) is analysed through its table, which the planner reads the statistics of
+// A partition of the log (packs/log/kernel/partitions.ts) is analysed through its table, which the planner reads the statistics of
 // as well as each month's.
 const DUE = `select distinct coalesce(p.relname, s.relname) as name from pg_stat_user_tables s join pg_class c on c.oid = s.relid
   left join pg_inherits i on i.inhrelid = c.oid left join pg_class p on p.oid = i.inhparent

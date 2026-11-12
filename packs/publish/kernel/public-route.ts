@@ -1,6 +1,6 @@
 // What anyone may open at /p/<workspace>/<id> that the reader pack (packs/reader) does not answer: a product's
 // public page (ui/public.html), its data and its results' pictures. A published document is the reader's; a product's
-// page stays here while it reads software's proof and changelog views, which no act gives a pack (src/public.ts).
+// page stays here while it reads software's proof and changelog views, which no act gives a pack (packs/surface/kernel/public.ts).
 // Everything is read as the public role sees the map (root.public_product, the surface's), so there is nothing here to
 // guard: what is not public is not there to be found.
 

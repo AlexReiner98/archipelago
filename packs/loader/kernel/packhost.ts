@@ -31,9 +31,9 @@ const notify = async (l: Archipelago, actor: Actor, n: object) => (await import(
  */
 let reads: ((l: Archipelago, read: Read, pack?: string) => Promise<unknown>) | undefined;
 export const fillReads = (answer: (l: Archipelago, read: Read, pack?: string) => Promise<unknown>): void => void (reads = answer);
-/** A read of the reads API as the map asks it; `pack` is the internal pack asking, when one is (its context's reads, src/kernel-context.ts). */
+/** A read of the reads API as the map asks it; `pack` is the internal pack asking, when one is (its context's reads, packs/loader/kernel/kernel-context.ts). */
 export const readsAnswer = async (l: Archipelago, read: Read, pack?: string): Promise<unknown> => {
-  if (!reads) throw new Error('No reads API is loaded: the loader slot loader.reads is filled by surface (src/packreads.ts).');
+  if (!reads) throw new Error('No reads API is loaded: the loader slot loader.reads is filled by surface (packs/surface/kernel/packreads.ts).');
   return reads(l, read, pack);
 };
 
@@ -61,11 +61,11 @@ export interface Done {
   log?: LogEntry[];
   /** What the owner is told; a notification with a ref is named by it in what is logged. */
   notify?: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string; ref?: string }[];
-  /** On hearing a notification made: one mail about it, to its person (src/notify-mail.ts). */
+  /** On hearing a notification made: one mail about it, to its person (packs/walls/kernel/notify-mail.ts). */
   mail?: NotificationMail[];
-  /** On hearing an automation come due: the session it says to start, started by the kernel (src/pack-launch.ts). */
+  /** On hearing an automation come due: the session it says to start, started by the kernel (packs/loader/kernel/pack-launch.ts). */
   launch?: LaunchAsked;
-  /** On a person calling its action, where its manifest asks for reach.launch: the sessions to start, ten at most (src/pack-action-launch.ts). */
+  /** On a person calling its action, where its manifest asks for reach.launch: the sessions to start, ten at most (packs/loader/kernel/pack-action-launch.ts). */
   launches?: LaunchesAsked[];
 }
 
@@ -233,10 +233,10 @@ export class PackHost {
 
   /**
    * Call one entry of a pack's handler and give back what it answered, writing nothing. While it runs it reads the map
-   * and what its pack reads through (src/pack-reach.ts); `answer` may answer some questions first (a run's tools).
+   * and what its pack reads through (packs/loader/kernel/pack-reach.ts); `answer` may answer some questions first (a run's tools).
    */
   async call(l: Archipelago, actor: Actor, pack: string, call: Call, name: string, input: unknown, ms = CALL_MS, answer?: (query: Record<string, unknown>, reads: Answerer) => Promise<unknown>): Promise<Done> {
-    // A root or service pack's code runs in the server's process (src/kernel-context.ts), never here.
+    // A root or service pack's code runs in the server's process (packs/loader/kernel/kernel-context.ts), never here.
     if (l.registry.internal.has(pack)) throw new Error(`Pack "${pack}" runs in the server's process, not the sandbox.`);
     const folder = this.folderOf(pack);
     if (!existsSync(join(folder, 'handler.js'))) throw new Error(`Pack "${pack}" has no handler.`);
@@ -283,7 +283,7 @@ export class PackHost {
 
   /**
    * Tell the packs that hear a kind of event that another pack recorded one (or the kernel, from "kernel": an item.due
-   * from its clock, src/due.ts, or a notification.made, src/notify.ts), each at its entry of that name, as
+   * from its clock, packs/clocks/kernel/due.ts, or a notification.made, packs/notifications/kernel/notify.ts), each at its entry of that name, as
    * itself. Not waited for: what records it (a webhook) answers its sender now. What each answers is applied like
    * any of its calls; it may only read beyond the map.
    */

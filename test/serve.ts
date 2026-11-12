@@ -30,7 +30,7 @@ after(async () => {
 /**
  * A server on its own port with in-memory databases and the repository's packs, read in place (test/map.ts). A folder
  * given is read in their place (packsWith in test/map.ts, for a test pack beside them); a list is read after them, as
- * PELAGO_PACKS names more folders (src/config.ts).
+ * PELAGO_PACKS names more folders (packs/database/kernel/config.ts).
  */
 export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }, sites?: Record<string, string>, packs: string | string[] = []) {
   const root = mkdtempSync(join(tmpdir(), 'pelago-platform-'));
@@ -44,7 +44,7 @@ export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; del
   await new Promise<void>((r) => probe.listen(0, '127.0.0.1', r));
   const port = (probe.address() as AddressInfo).port;
   await new Promise((r) => probe.close(r));
-  // Drawn as on a dev server: a page on 127.0.0.1 frames its drawings at localhost (src/draw-host.ts).
+  // Drawn as on a dev server: a page on 127.0.0.1 frames its drawings at localhost (packs/walls/kernel/draw-host.ts).
   const server = createHttpServer(workspaces, port, { auth, limits, sites, draw: { loopback: auth === 'off' } });
   await new Promise<void>((r) => server.listen(port, '127.0.0.1', r));
   closers.push(async () => {

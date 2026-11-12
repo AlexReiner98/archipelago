@@ -1,4 +1,4 @@
-// The root service family (src/root-calls.ts): a root provides root.<name>, only the packs roots.json names for it
+// The root service family (packs/loader/kernel/root-calls.ts): a root provides root.<name>, only the packs roots.json names for it
 // call it, and boot refuses a list that names a pack not here or a name no root provides.
 
 import assert from 'node:assert/strict';

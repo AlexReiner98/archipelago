@@ -1,4 +1,4 @@
-// An automation lives with what it is about (src/subject.ts, task e_ehwndqcw): it is made with an about link to its
+// An automation lives with what it is about (packs/placement/kernel/subject.ts, task e_ehwndqcw): it is made with an about link to its
 // subject, keeps one while it is live, lands on its subject's island and is as visible as it. One about an item that
 // lives on no island stays map-wide.
 import assert from 'node:assert/strict';

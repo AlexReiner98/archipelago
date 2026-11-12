@@ -2,7 +2,7 @@
 // How many sessions are at work, whoever's they are, and whether there is room for one more: every session counts
 // against the workspace's limit, not only those its asker may see. And the owner's settings of the reply rules (which
 // are off here, and what each that counts counts to), which no member's view reads. Each is read as the whole
-// workspace, as the sessions pack read it before it moved (src/chat-run.ts's sessionsAwake, src/replies.ts's
+// workspace, as the sessions pack read it before it moved (packs/sessions/kernel/chat-run.ts's sessionsAwake, packs/sessions/kernel/replies.ts's
 // liftedHere, handed the whole database by its hook).
 
 import type { RootCall } from '../../loader/kernel/root-calls.ts';

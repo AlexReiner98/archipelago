@@ -1,13 +1,13 @@
 // A layout is its own type (decision e_nv3rfcge): a style with code, or the owner's version of a pack's drawing, is
 // a layout now. A migration, run when a workspace opens, after the styles made for one view have moved into it
-// (src/style-move.ts): one change set the system appends, so the log keeps what each style said and is never
+// (packs/styles/kernel/style-move.ts): one change set the system appends, so the log keeps what each style said and is never
 // rewritten. A view that named one by its id names it still.
 
 import type { KernelContext } from '#pelago/kernel';
 
 type Props = Record<string, unknown>;
 
-/** A fact of the log (src/log.ts, Fact): a field set, or taken off. */
+/** A fact of the log (packs/log/kernel/log.ts, Fact): a field set, or taken off. */
 export type Fact = ['+', string, string, unknown] | ['-', string, string];
 
 /** What a layout keeps as its own; every other field a style held goes into its settings. */

@@ -1,4 +1,4 @@
-// What a view looks like, for an agent (src/looks.ts, decision e_wsz3wdzp): drawn by the server in its own headless
+// What a view looks like, for an agent (packs/look_draw/kernel/looks.ts, decision e_wsz3wdzp): drawn by the server in its own headless
 // Chrome, from the app's page in look mode, with a pass that reads as the asking agent and only reads. Without a
 // browser: what a pass may read and call, and the picture going out as an MCP image. In a real browser (skipped where
 // there is no Chrome): a flow, a style whose own code paints its canvas, and a lens that finds nothing, each taken once

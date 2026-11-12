@@ -8,7 +8,7 @@
 // Only ever against a scratch map: the dev server's pulled copy, or a throwaway one with its own data folder.
 // A database without table statistics plans the scope query badly: on 20,000 items the handoff took over 20 s
 // without them and 0.7 s with. The server collects them as it opens, after a restore and after enough writes
-// (src/stats.ts); a server that has just started also takes a backup, so let that finish before timing.
+// (packs/database/kernel/stats.ts); a server that has just started also takes a backup, so let that finish before timing.
 // At year-three size, on a generated map of ten million events: npm run bench:scale (docs/bench.md), which sets
 // SLOW: a call slower than that many ms is timed once.
 

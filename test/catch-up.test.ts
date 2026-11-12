@@ -1,5 +1,5 @@
 // Catch-up (ui/catch-up.js): a page opened after time away works out, from the log alone, what the canvas held when
-// its reader last looked (every fact said of it up to then, src/tail.ts `was`, folded by the projector), what changed
+// its reader last looked (every fact said of it up to then, packs/log/kernel/tail.ts `was`, folded by the projector), what changed
 // since, and the steps it plays: chapters by who made them, island by island; played through the store, they end
 // where the map stands.
 

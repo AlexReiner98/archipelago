@@ -12,14 +12,14 @@
 // A style kept with a preset's id (preset) is the owner's version of that preset: its fields over the preset's, in
 // the preset's place; retired, the preset is not used. Read each time, so a change shows on the next look.
 // A preset that says it is chosen (over: "chosen", a theme) is used only once the owner keeps a version of it, and
-// lies over the presets on nothing. The colours (theme) merge name by name and are finished last (src/colours.ts); a
+// lies over the presets on nothing. The colours (theme) merge name by name and are finished last (packs/styles/kernel/colours.ts); a
 // person's own style, kept about their person item, gives its colours over everything for the pages they see.
 
 import type { KernelContext, RegistryRead } from '#pelago/kernel';
 import { finishTheme, mergeTheme } from './colours.ts';
 import { cssProblem } from './page-css.ts';
 
-/** A preset a pack ships (src/declared.ts, StyleDef). */
+/** A preset a pack ships (packs/loader/kernel/declared.ts, StyleDef). */
 export interface StyleDef {
   id: string;
   type?: string;
@@ -30,7 +30,7 @@ export interface StyleDef {
   props: Record<string, unknown>;
 }
 
-/** A style, layout or view kept on the map, with what it is about (src/query-kept.ts, Kept). */
+/** A style, layout or view kept on the map, with what it is about (packs/lenses/kernel/query-kept.ts, Kept). */
 export interface Kept {
   id: string;
   type?: string;
@@ -39,11 +39,11 @@ export interface Kept {
   about: string[];
 }
 
-/** The style presets the packs ship, each with its pack, in the order the packs load (src/declared.ts, stylesOf). */
+/** The style presets the packs ship, each with its pack, in the order the packs load (packs/loader/kernel/declared.ts, stylesOf). */
 const stylesOf = (packs: readonly { id: string; styles?: StyleDef[] }[]): Preset[] =>
   packs.flatMap((pack) => (pack.styles ?? []).filter((s) => (s.type ?? 'style') === 'style').map((s) => ({ ...s, pack: pack.id })));
 
-// What a style is on, as a link's end names it (src/link-ends.ts): a type, has:<capability>, or has:deliverable.
+// What a style is on, as a link's end names it (packs/loader/kernel/link-ends.ts): a type, has:<capability>, or has:deliverable.
 const HAS = 'has:';
 const DELIVERABLE = `${HAS}deliverable`;
 const capabilityOf = (end: string) => (end.startsWith(HAS) ? end.slice(HAS.length) : undefined);
@@ -81,7 +81,7 @@ export interface StyleAsk {
 /** The owner's versions of presets, open or retired: retired, the preset is not used. A style's of the packs' style presets, a layout's of their drawings. */
 const versionsOf = async (ctx: KernelContext, type: 'style' | 'layout' = 'style') => (await ctx.reads({ versions: type })) as Version[];
 
-/** Every style or layout (of the types given) kept on the map, with what each is about; and one named outright, retired or not (src/query-kept.ts, keptOf). */
+/** Every style or layout (of the types given) kept on the map, with what each is about; and one named outright, retired or not (packs/lenses/kernel/query-kept.ts, keptOf). */
 const keptOf = async (ctx: KernelContext, type: 'style' | 'layout' | ('style' | 'layout')[], named: unknown) =>
   (await ctx.reads({ looks: { types: [type].flat(), ...(typeof named === 'string' && { named }) } })) as Kept[];
 
@@ -148,7 +148,7 @@ export async function styleFor(ctx: KernelContext, kept: Kept[], ask: StyleAsk, 
   if (ask.own) layers.push({ weight: 5, id: 'view', title: 'This view', props: ask.own });
   layers.sort((a, b) => a.weight - b.weight);
   let style: Record<string, unknown> = {};
-  // The layout whose code draws, when one has code: what a change its drawing asks for names (src/layout-changes.ts).
+  // The layout whose code draws, when one has code: what a change its drawing asks for names (packs/rules/kernel/layout-changes.ts).
   let coder: string | undefined;
   for (const layer of layers) {
     // A nearer style that names a shape and has no code of its own, or says code: null, is drawn as it says: the code beneath it is cleared.
@@ -162,7 +162,7 @@ export async function styleFor(ctx: KernelContext, kept: Kept[], ask: StyleAsk, 
 
 /** A picture's style with the drawing it is drawn by, if a pack draws its shape: its modules left out when the page has them (`have`, hashes). */
 export async function drawn(ctx: KernelContext, style: Record<string, unknown>, have: unknown): Promise<Record<string, unknown>> {
-  // Which drawing, under the owner's version of it, and its modules: read off the packs' folders (src/layouts.ts, layoutFor).
+  // Which drawing, under the owner's version of it, and its modules: read off the packs' folders (packs/loader/kernel/layouts.ts, layoutFor).
   const drawing = (await ctx.reads({ drawing: { style, have: Array.isArray(have) ? have.map(String) : [] } })) as { shape: string } | null;
   return drawing ? { ...style, shape: drawing.shape, drawing } : style;
 }
@@ -220,7 +220,7 @@ export async function iconOf(ctx: KernelContext): Promise<Buffer | null> {
  * it (`look`), or one published before that was kept, as the map stood at the position it was published at (`at`), so its look changes only when a person publishes it again.
  */
 export async function pageLook(ctx: KernelContext, doc?: Record<string, unknown>) {
-  // One published since its look is kept with it (src/published.ts) is drawn in that, whatever the map holds now.
+  // One published since its look is kept with it (packs/publish/kernel/published.ts) is drawn in that, whatever the map holds now.
   // One kept before a look held its way to start a map is given the workspace's words for it as they stand.
   if (doc?.look && typeof doc.look === 'object') return 'start' in doc.look ? (doc.look as Look) : { ...(doc.look as Look), ...(await startWords(ctx)) };
   const hub = doc && typeof doc.type === 'string' ? { hub: { id: String(doc.id ?? ''), type: doc.type } } : {};
@@ -261,7 +261,7 @@ const SECTION = /^e_[a-z0-9]{8}$/;
 const looks = new Map<string, Look>();
 const LOOKS_KEPT = 256;
 
-/** The styles kept on the map as they stood at a fact position: made again from the log (src/rebuild.ts, asOf). */
+/** The styles kept on the map as they stood at a fact position: made again from the log (packs/log/kernel/rebuild.ts, asOf). */
 const stylesAt = async (ctx: KernelContext, pos: number) => (await ctx.reads({ styles_at: pos })) as { kept: Kept[]; versions: Version[] };
 
 /** A length as a style may give it: a number of pixels, or numbers with one of these units. */

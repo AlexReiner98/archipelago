@@ -63,7 +63,7 @@ test('an agent can notify the human; a stale session raises one notification', a
 
 test('an automation is checked on write, and what an agent makes or changes of one waits for the human', async () => {
   const l = await fresh();
-  // Each lives with what it is about (src/subject.ts).
+  // Each lives with what it is about (packs/placement/kernel/subject.ts).
   const { subject } = await make(l, [{ op: 'create', ref: 'subject', type: 'task', title: 'The map' }]);
   const about = (...refs: string[]): Op[] => refs.map((from) => ({ op: 'link', type: 'about', from, to: subject }));
   // What the old runner did and nothing does now (an interval, a logged event, a tool) is refused.

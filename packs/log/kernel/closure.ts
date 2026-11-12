@@ -1,7 +1,7 @@
 // What is inside what, all the way down: a projection of the part_of links (docs/log.md, section 7), so a subtree is
 // one lookup by index and not a walk of the map. Each row says an ancestor holds a descendant, at any depth, along open
 // links of the part_of family; a loop of belonging holds each of its members once. The projector keeps it in the
-// append's transaction (src/replay.ts): a link made adds the pairs it joins, and one ended, moved or retyped has the
+// append's transaction (packs/log/kernel/replay.ts): a link made adds the pairs it joins, and one ended, moved or retyped has the
 // ancestors of everything below it found again. A row says nothing of visibility: every read joins it to entity,
 // whose row-level security keeps what the reader may not see out. The migration fills it from part_of itself, which no
 // pack extends today; a rebuild (regatherAll) reads the whole family as the registry has it.
@@ -47,7 +47,7 @@ insert into part_closure (ancestor, descendant) ${UP('true', "array['part_of']")
 
 /**
  * Transactions that project into tables of their own, named first on the search path (a rebuild's shadow, an as-of
- * read's or a backup's temporary tables, src/rebuild.ts): they run as the owner, and the closure and mentions they
+ * read's or a backup's temporary tables, packs/log/kernel/rebuild.ts): they run as the owner, and the closure and mentions they
  * keep are those tables'. The functions above name public on their path, which reaches past the shadow to the live
  * tables, so these write directly.
  */

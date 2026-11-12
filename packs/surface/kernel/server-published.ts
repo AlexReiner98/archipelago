@@ -1,6 +1,6 @@
 // What a server pack may read of what a person made public (task e_uc8m8jwa, public views since e_79erzrcx): a public
 // view as it was frozen, the one at a site's path, its pictures and drawings, every public view. Each act goes through
-// the security-definer reads alone (src/public-schema.ts, by way of ./public-views.ts), as anyone: the pack is
+// the security-definer reads alone (packs/database/kernel/public-schema.ts, by way of ./public-views.ts), as anyone: the pack is
 // handed only what is public, never the map. Sharing, publishing and taking down stay the kernel's.
 //
 // Every answer is JSON: a document as its page's /data gives it (packs/reader), its look beside it and each

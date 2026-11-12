@@ -139,7 +139,7 @@ export function sourceSection(source) {
 }
 
 /**
- * Take a change set back, on the person's word: its opposite is a new change (src/undo.ts), held where a rule holds it.
+ * Take a change set back, on the person's word: its opposite is a new change (packs/write/kernel/undo.ts), held where a rule holds it.
  * What it could not reach (a field changed again since, an act made outside the map) is said, not passed over.
  */
 async function undoSet(g, done) {

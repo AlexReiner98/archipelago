@@ -1,6 +1,6 @@
 // What a view looks like, for an agent: drawn by the server, in its headless Chrome (look-draw.ts), from the
 // app's own page, as the agent sees the map, whatever page of the owner's is open or not (decision e_wsz3wdzp). The
-// page reads with a look pass (src/look-pass.ts, the trusted half, kept in the walls): a token for one look, minted
+// page reads with a look pass (packs/walls/kernel/look-pass.ts, the trusted half, kept in the walls): a token for one look, minted
 // for the asking agent's own person (never an admin), good for one drawing and for the reads a canvas makes
 // (LOOK_READS) and nothing else. So private items are drawn exactly as query shows them to that agent. The picture
 // is kept in the transient table for LOOK_MS, under the screen it was asked for, and read again with query picture;
@@ -13,7 +13,7 @@ import { drawLook, type Marks } from './look-draw.ts';
 import { keep, kept, keptWith } from './store.ts';
 
 // What the roots do for a look (root.look, packs/surface): the UI's version, the pass the drawing reads with (minted by
-// the walls, src/look-pass.ts, where the server's gate reads it) and the room the workspace has for another look.
+// the walls, packs/walls/kernel/look-pass.ts, where the server's gate reads it) and the room the workspace has for another look.
 type Look = { ui: string } & { pass: string } & { most: number; refused?: string };
 const ofRoots = (ctx: KernelContext, ask: Record<string, unknown>) => ctx.call<Record<string, unknown>, Look>('root.look', ask);
 
@@ -71,7 +71,7 @@ interface Kept {
   fell_back?: { asked: string; drawn: string }[];
 }
 
-/** What a look answers: what was drawn and how it stood, with the picture as an image (src/mcp.ts sends it as one), or the drawing's marks where they were asked for and it has them. */
+/** What a look answers: what was drawn and how it stood, with the picture as an image (packs/surface/kernel/mcp.ts sends it as one), or the drawing's marks where they were asked for and it has them. */
 const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
   look,
   view: k.hash,

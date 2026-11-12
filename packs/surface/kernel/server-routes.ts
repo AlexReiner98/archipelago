@@ -65,7 +65,7 @@ export async function serveServerPack(req: IncomingMessage, res: ServerResponse,
   if (at.tooOften()) return;
   const { file, folder } = pack;
   if (stream) return serveStream(res, file, stream.id, { workspace: more, id: extra!, from: at.from, workspaces: at.workspaces });
-  // A file it hands out, filled with this server's values (src/server-files.ts).
+  // A file it hands out, filled with this server's values (packs/surface/kernel/server-files.ts).
   if (req.method === 'GET' && name === 'files' && more) return serveFile(res, file, more, { origin: packs.origin, tokens: at.tokens ?? true, folder });
 
   if (req.method === 'GET') {
@@ -164,7 +164,7 @@ export async function serveDrawingFile(res: ServerResponse, path: string, at: Dr
       'content-type': 'text/javascript; charset=utf-8',
       'cache-control': worker ? 'no-cache' : 'public, max-age=31536000, immutable',
       'x-content-type-options': 'nosniff',
-      // 'self' is the drawing host, which serves /three.js too (src/draw-host.ts): nothing of the page's origin is needed.
+      // 'self' is the drawing host, which serves /three.js too (packs/walls/kernel/draw-host.ts): nothing of the page's origin is needed.
       'content-security-policy': worker ? "default-src 'none'; script-src 'self'" : "default-src 'none'",
     })
     .end(text);

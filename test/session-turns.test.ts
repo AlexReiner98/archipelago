@@ -1,4 +1,4 @@
-// A run's turns as a read (src/session-turns.ts, docs/sessions.md "Wired"): the events its adapter sent, worked out
+// A run's turns as a read (packs/sessions/kernel/session-turns.ts, docs/sessions.md "Wired"): the events its adapter sent, worked out
 // into turns, newest first, with the name of a session that started one, and a limit that counts what it left out.
 
 import assert from 'node:assert/strict';

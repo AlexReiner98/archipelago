@@ -1,5 +1,5 @@
 // How often each reply rule asked lately, for the owner's settings page (./workspace-tools.ts): read as the whole
-// workspace from the beats the sessions kept on their runs. It was the sessions pack's (src/replies.ts); a read of the
+// workspace from the beats the sessions kept on their runs. It was the sessions pack's (packs/sessions/kernel/replies.ts); a read of the
 // whole workspace is a root's.
 
 import type { Q } from '../../database/kernel/db.ts';
@@ -10,7 +10,7 @@ const LATELY_MS = 7 * 86_400_000;
 /** The newest sessions whose stories are read for them: one that asked this week is among these. */
 const RUNS_READ = 500;
 
-/** How often each reply rule asked in the last week, by pack.id, read from the steps the sessions kept (the workspace's settings page, as the whole workspace: it was src/replies.ts's). */
+/** How often each reply rule asked in the last week, by pack.id, read from the steps the sessions kept (the workspace's settings page, as the whole workspace: it was packs/sessions/kernel/replies.ts's). */
 export async function askedLately(whole: Q, l: Pick<Archipelago, 'registry'>): Promise<Map<string, number>> {
   const { rows } = await whole.query<{ rule: string; n: number }>(
     `select b->>'asked' as rule, count(*)::int as n

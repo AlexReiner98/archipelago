@@ -181,8 +181,8 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       // What it closes was meant to fix what is still open: the answer names each, with the op that closes it.
       const offers = await closeOffers(l, input.ops as { op: string; id?: string; status?: string }[]);
       if (offers) result = { ...result, still_open: offers };
-      // With holds off (src/rules.ts, HOLDS_OFF), the answer says so: no rule held it, and none will until the owner turns them on.
-      // A structure put in as one long note (a plan, findings, options) is said back, so its pieces are laid out as items (src/plan-note.ts).
+      // With holds off (packs/rules/kernel/rules.ts, HOLDS_OFF), the answer says so: no rule held it, and none will until the owner turns them on.
+      // A structure put in as one long note (a plan, findings, options) is said back, so its pieces are laid out as items (packs/surface/kernel/plan-note.ts).
       const structure = structureAsText(noted);
       if (structure) result = { ...result, structure };
       if (actor.kind === 'agent' && result.status !== 'proposed' && (await holdsOff(l.db))) return { ...result, holds: 'off' };

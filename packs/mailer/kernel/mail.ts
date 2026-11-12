@@ -1,5 +1,5 @@
 // The mail this server sends: an invitation and a sign-in code, plain text. It goes out from this server itself
-// (src/smtp.ts), signed with DKIM so the recipient's server can tell it really comes from our domain.
+// (packs/mailer/kernel/smtp.ts), signed with DKIM so the recipient's server can tell it really comes from our domain.
 //
 // Settings, from the environment:
 //   PELAGO_MAIL_FROM      who it is from, e.g. "Archipelago <signin@example.com>". Without it nothing is sent:
@@ -36,7 +36,7 @@ export function setMailer(m: Mailer | undefined) {
   mailer = m;
 }
 
-/** Whether an address bounced lately (src/bounces.ts), told by the server at its start: such an address is sent nothing. */
+/** Whether an address bounced lately (packs/mailer/kernel/bounces.ts), told by the server at its start: such an address is sent nothing. */
 let bounced: ((email: string) => Promise<boolean>) | undefined;
 export function setBounced(check: ((email: string) => Promise<boolean>) | undefined) {
   bounced = check;

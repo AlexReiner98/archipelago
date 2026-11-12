@@ -1,4 +1,4 @@
-// Where the server runs a drawing for a first frame (src/drawing-box.ts): in a process of its own, never its own. A
+// Where the server runs a drawing for a first frame (packs/walls/kernel/drawing-box.ts): in a process of its own, never its own. A
 // hostile drawing reads no file, reaches no network, starts no process, sees no environment and makes no code from
 // strings; one that never answers is stopped; one that is the pack's own still draws.
 

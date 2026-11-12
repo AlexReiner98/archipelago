@@ -52,7 +52,7 @@ const weighted = <T extends string>(w: Record<T, number>): T => {
   return Object.keys(w)[0] as T;
 };
 
-// Ids as the server makes them (src/db.ts newId), but each a step of a permutation of the id space: unique, and the same for the same seed.
+// Ids as the server makes them (packs/database/kernel/db.ts newId), but each a step of a permutation of the id space: unique, and the same for the same seed.
 const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 const SPACE = 31n ** 8n;
 const made: Record<string, bigint> = {};
@@ -396,7 +396,7 @@ for (today = 0; today < DAYS; today++) {
 for (const c of components) buffers.entity.push([c.id, c.type, kindOf(c.type), c.title, '', c.status, true, null, 'shared', null, '{}', null, iso(START), iso(c.at), null]);
 await flush(true);
 await db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [json(person[0].id)]);
-// What the projector keeps beside the rows (src/closure.ts; the packs' tables, src/log-project.ts), made whole as a restore does.
+// What the projector keeps beside the rows (packs/log/kernel/closure.ts; the packs' tables, packs/log/kernel/log-project.ts), made whole as a restore does.
 process.stderr.write('projecting what is inside what, and what names what\n');
 await regatherAll(db, ['part_of']);
 await projectAgainAtOpen(db); // what names what: made by the packs' projectors when the server first opens it

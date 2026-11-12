@@ -1,6 +1,6 @@
 // Packs on an island map (decisions e_pp5mu6xd, e_rf6q3q34 and e_ubd8satd). A workspace with the setting `islands` on
 // knows two kinds of pack, read off the file with no key of its own. An island pack speaks on an island: it declares a
-// type that lives on one (src/island-items.ts, livesOnIsland), a link type, or fields on another pack's type. It is
+// type that lives on one (packs/loader/kernel/island-items.ts, livesOnIsland), a link type, or fields on another pack's type. It is
 // held to the island rules: its file holds vocabulary (types, links, the rules on its own items), views the kernel
 // draws and instructions, and it builds on the shared set alone, requiring the kernel's pack and no other. The shared
 // set is the list `shared` in the kernel's pack file: type ids, grown only by the owner's decision. A map pack owns no
@@ -54,7 +54,7 @@ export function actorsOf(packs: Manifest[], known: Set<string> = new Set(['actor
   return actors;
 }
 
-/** The types of a pack that live on an island: its own, but actors. A pack's types never carry the kernel flag (src/packs.ts), so none is the kernel's own. */
+/** The types of a pack that live on an island: its own, but actors. A pack's types never carry the kernel flag (packs/loader/kernel/packs.ts), so none is the kernel's own. */
 const islandTypes = (m: Manifest, shared: Shared) => {
   const actors = actorsOf([m], shared.actors);
   return parts(m).types.filter((t) => !actors.has(t.id)).map((t) => t.id);

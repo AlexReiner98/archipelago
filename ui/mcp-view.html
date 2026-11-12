@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="{{policy}}">
 <title>A view of the map</title>
-<!-- A view drawn inline in a chat (src/mcp-view.ts): one self-contained page, opened by a host that draws MCP Apps. It
+<!-- A view drawn inline in a chat (packs/mcp_apps/kernel/mcp-view.ts): one self-contained page, opened by a host that draws MCP Apps. It
      holds no data and no token and reaches nothing itself: all it knows comes from the host over postMessage, and all
      it asks goes through the host to this server's own tools. A call of draw names what to draw, and any other call
      (a client that still holds the old tool list opens it for query and report) leaves it shut. -->

@@ -5,7 +5,7 @@
 // nothing of another workspace. What it does not give is scrubbed from the text as a link's is, by the pack that reads
 // documents (surface.for_reader, surface.sections).
 //
-// What the database gives of it is pelago_public_document (src/public-schema.ts).
+// What the database gives of it is pelago_public_document (packs/database/kernel/public-schema.ts).
 
 import { onMap } from './above.ts';
 import { readable } from '../../walls/kernel/public-document.ts';

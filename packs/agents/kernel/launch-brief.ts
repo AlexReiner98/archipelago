@@ -1,12 +1,12 @@
-// What a launched session is told and who it is started for: on this machine (src/launcher.ts, the surface's).
+// What a launched session is told and who it is started for: on this machine (packs/surface/kernel/launcher.ts, the surface's).
 // Moved from src/launch-brief.ts; the old path adapts what took the map.
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** Who asks: a person, an agent, a pack (src/pelago.ts, Actor). */
+/** Who asks: a person, an agent, a pack (packs/write/kernel/pelago.ts, Actor). */
 export interface Actor { kind: string; name: string; person?: string }
 
-/** Who a run is started for, when it is not the owner (src/actor-checks.ts, StartedBy). */
+/** Who a run is started for, when it is not the owner (packs/identity/kernel/actor-checks.ts, StartedBy). */
 export interface StartedBy {
   kind: 'person' | 'automation' | 'webhook' | 'pack';
   id?: string;
@@ -15,7 +15,7 @@ export interface StartedBy {
   [field: string]: unknown;
 }
 
-// Who a run is started for, and that one not the owner's only proposes, is an actor check (src/actor-checks.ts): the
+// Who a run is started for, and that one not the owner's only proposes, is an actor check (packs/identity/kernel/actor-checks.ts): the
 // two it makes here are copied, small and pure, since a pack imports nothing of the kernel.
 function startedFor(actor: { person?: string; name: string }, owner: string | undefined, by?: StartedBy): StartedBy | undefined {
   return by ?? (owner && actor.person && actor.person !== owner ? { kind: 'person', id: actor.person, name: actor.name } : undefined);
@@ -51,7 +51,7 @@ export interface Brief {
 export async function briefFor(ctx: KernelContext, actor: Actor, input: LaunchInput, by?: StartedBy): Promise<{ brief: Brief; started?: StartedBy }> {
   needHuman(actor, 'Only a human can launch a session.');
   const started = startedFor(actor, ((await ctx.reads({ owner: true })) as string | null) ?? undefined, by);
-  // The brief view, asked as the kernel asks a view (src/askview.ts): its answer is a lens preset's, whoever asks.
+  // The brief view, asked as the kernel asks a view (packs/query/kernel/askview.ts): its answer is a lens preset's, whoever asks.
   const brief = input.brief ?? ((await ctx.reads({ view: 'brief', params: { task: input.task } })) as Brief);
   return { brief, started };
 }

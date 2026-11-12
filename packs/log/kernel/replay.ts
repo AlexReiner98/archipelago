@@ -10,7 +10,7 @@ import { itemStep, isLink, linkStep, MOVED, runs, type TypesRead } from './proje
 import { joined, regather } from './closure.ts';
 import { declaredTables, projectPacks } from './log-project.ts';
 
-// The pure part, one file the page runs too (src/project.ts): kept importable from here, where it always was.
+// The pure part, one file the page runs too (packs/log/kernel/project.ts): kept importable from here, where it always was.
 export { isLink, typesOf, MOVED, type TypesRead } from './project.ts';
 
 type Props = Record<string, unknown>;
@@ -18,14 +18,14 @@ type Props = Record<string, unknown>;
 /** A forgotten item's rows leave today's tables, its links with them, and what named it as owner or source names nothing. */
 export const FORGET_ROWS = [`update entity set owner = null where owner = $1`, `update entity set source_id = null where source_id = $1`, `update relation set source_id = null where source_id = $1`,
   `delete from relation where from_id = $1 or to_id = $1`, `delete from entity where id = $1`,
-  // What was inside it keeps only the ancestors its links still reach (src/closure.ts), and it leaves the closure.
+  // What was inside it keeps only the ancestors its links still reach (packs/log/kernel/closure.ts), and it leaves the closure.
   `with recursive below(id) as (select descendant from part_closure where ancestor = $1),
    up(d, a) as (select r.from_id, r.to_id from relation r join below b on b.id = r.from_id where r.valid_to is null and r.type = 'part_of'
      union select up.d, r.to_id from up join relation r on r.from_id = up.a where r.valid_to is null and r.type = 'part_of')
    delete from part_closure c using below b where c.descendant = b.id and not exists (select 1 from up where up.d = c.descendant and up.a = c.ancestor)`,
-  `delete from part_closure where ancestor = $1 or descendant = $1`]; // the packs' tables: src/log-project.ts
+  `delete from part_closure where ancestor = $1 or descendant = $1`]; // the packs' tables: packs/log/kernel/log-project.ts
 
-/** One run of facts on an item, folded (src/project.ts) and written into entity. */
+/** One run of facts on an item, folded (packs/log/kernel/project.ts) and written into entity. */
 async function item(tx: Q, reg: TypesRead, at: string, moved: boolean, id: string, run: Fact[]) {
   const { rows } = await tx.query<{ type: string; status: string }>(`select type, status from entity where id = $1`, [id]);
   const step = itemStep(reg, at, id, run, rows[0]);
@@ -52,7 +52,7 @@ async function item(tx: Q, reg: TypesRead, at: string, moved: boolean, id: strin
   );
 }
 
-/** One run of facts on a link, folded (src/project.ts) and written into relation, with what is inside what after it. */
+/** One run of facts on a link, folded (packs/log/kernel/project.ts) and written into relation, with what is inside what after it. */
 async function link(tx: Q, reg: TypesRead, at: string, id: string, run: Fact[]) {
   const { rows } = await tx.query<{ id: string; type: string; from_id: string }>(`select id, type, from_id from relation where id = $1`, [id]);
   const was = rows[0];
@@ -87,7 +87,7 @@ export async function projectFacts(tx: Q, reg: TypesRead, at: string, facts: Fac
     if (isLink(id)) await link(tx, reg, at, id, run);
     else await item(tx, reg, at, moved, id, run);
   }
-  // Then the packs' own tables, from the same facts (log.project, src/log-project.ts): what names what, first.
+  // Then the packs' own tables, from the same facts (log.project, packs/log/kernel/log-project.ts): what names what, first.
   await projectPacks(tx, reg, at, facts);
 }
 
@@ -128,14 +128,14 @@ export const inOrder = (a: Entry, b: Entry) =>
 
 /**
  * Every projection made again from the log: the tables emptied, then each entry of both streams projected in the
- * order it was appended. Run on a copy of the log (the test does); src/rebuild.ts does it in the background.
+ * order it was appended. Run on a copy of the log (the test does); packs/log/kernel/rebuild.ts does it in the background.
  */
 export async function rebuild(tx: Q, reg: TypesRead, all: Entry[]): Promise<void> {
   for (const table of new Set([...PROJECTED, ...declaredTables(reg)])) await tx.query(`delete from ${table}`);
   for (const e of [...all].sort(inOrder)) await projectEntry(tx, reg, e);
 }
 
-/** The schema a rebuild projects into, beside the live tables, until it is swapped in (src/rebuild.ts). */
+/** The schema a rebuild projects into, beside the live tables, until it is swapped in (packs/log/kernel/rebuild.ts). */
 export const SHADOW = 'pelago_rebuild';
 
 /** A projection's rows, table by table: what a snapshot keeps. */
@@ -221,7 +221,7 @@ export async function swapIn(tx: Q, kept: string[]): Promise<Record<string, numb
   out.proposal = await n(`insert into public.proposal select * from ${SHADOW}.proposal s where not exists (select 1 from public.proposal e where e.id = s.id)`);
   out.proposal += await n(`update public.proposal e set ${set(QUEUE)} from ${SHADOW}.proposal s where e.id = s.id and ${differs(QUEUE, 'e', 's')}`);
   out.proposal += await n(`delete from public.proposal e where not exists (select 1 from ${SHADOW}.proposal s where s.id = e.id)`);
-  // What is inside what and what names what, as the shadow's links and items make them (src/closure.ts, src/mentions.ts).
+  // What is inside what and what names what, as the shadow's links and items make them (packs/log/kernel/closure.ts, packs/mentions/kernel/mentions.ts).
   for (const [t, a, b] of [['part_closure', 'ancestor', 'descendant'], ['mention', 'from_id', 'to_id']]) {
     const same = (x: string, y: string) => `${x}.${a} = ${y}.${a} and ${x}.${b} = ${y}.${b}`;
     out[t] = await n(`insert into public.${t} select * from ${SHADOW}.${t} s where not exists (select 1 from public.${t} p where ${same('p', 's')})`);
@@ -231,8 +231,8 @@ export async function swapIn(tx: Q, kept: string[]): Promise<Record<string, numb
 }
 
 /**
- * What the log does not hold yet, laid back on items a rebuild made elsewhere (a move, src/move.ts): the operational
- * fields kept on them (KEPT_FIELDS in src/operational.ts), as they were.
+ * What the log does not hold yet, laid back on items a rebuild made elsewhere (a move, packs/log/kernel/move.ts): the operational
+ * fields kept on them (KEPT_FIELDS in packs/log/kernel/operational.ts), as they were.
  */
 export async function keepFields(tx: Q, kept: { id: string; kept: Record<string, unknown> }[]): Promise<void> {
   for (const r of kept) await tx.query(`update entity set props = props || $2::jsonb where id = $1`, [r.id, JSON.stringify(r.kept)]);

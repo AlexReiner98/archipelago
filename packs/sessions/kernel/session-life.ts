@@ -284,7 +284,7 @@ export interface Beat {
   replaced_by?: number;
   /** What the session has found, said whole: the latest that stands is what its page opens on. */
   finding?: boolean;
-  /** Set on a beat a rule on the reply's end asked with (src/replies.ts): the rule, as pack.id. */
+  /** Set on a beat a rule on the reply's end asked with (packs/sessions/kernel/replies.ts): the rule, as pack.id. */
   asked?: string;
 }
 const BEATS_KEPT = 80;

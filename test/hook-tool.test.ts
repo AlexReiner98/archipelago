@@ -1,4 +1,4 @@
-// A session's hooks called over MCP (report, action hook, src/hook-tool.ts): what the plugin directory's build calls
+// A session's hooks called over MCP (report, action hook, packs/sessions/kernel/hook-tool.ts): what the plugin directory's build calls
 // from its mcp_tool hooks, answered as /hooks/<event> is, in Claude Code's shape; a session it has not heard of starts
 // at its first prompt, since Claude Code runs no mcp_tool hook at launch.
 import assert from 'node:assert/strict';

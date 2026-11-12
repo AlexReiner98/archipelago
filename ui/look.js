@@ -1,4 +1,4 @@
-// The page in look mode (`?look`): opened by the server's own browser for an agent's look (src/look-draw.ts), never by
+// The page in look mode (`?look`): opened by the server's own browser for an agent's look (packs/look_draw/kernel/look-draw.ts), never by
 // a person. It follows no agent and counts as no page of the owner's (ui/live.js). It says on its root when the
 // canvas has drawn, so the server takes the picture then and not before: `data-look` is drawing, then drawn, empty
 // (the lens found nothing) or error, with `data-look-why`. A view says so with a `view-drawn` event, raised where its
@@ -28,7 +28,7 @@ export function sayLook(state, why) {
 }
 
 if (lookMode) {
-  // The drawing as marks, for a look that asks for them (src/look-draw.ts): loaded only here.
+  // The drawing as marks, for a look that asks for them (packs/look_draw/kernel/look-draw.ts): loaded only here.
   window.lookMarks = async () => (await import('./look-marks.js')).marksOf(document.querySelector('#canvas [data-drawing]'));
   root.dataset.look = 'drawing';
   // The canvas's first word is the one taken.

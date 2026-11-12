@@ -1,7 +1,7 @@
 // The hook point log.project (docs/kernel-packs.md, "Write-path hooks"): after the root projection has written an
 // entry's facts into entity and relation, each internal pack that declares it is handed the facts and writes the
 // rows of its own tables (`kernel.tables`), in the same transaction, in the write path and in every rebuild alike
-// (src/replay.ts, projectFacts). What names an item (the mentions pack) is the first.
+// (packs/log/kernel/replay.ts, projectFacts). What names an item (the mentions pack) is the first.
 //
 // A projector reads only the facts and the rows it is handed: its context answers nothing else, as it runs inside
 // the append's transaction. Its rows are written as the tables' owner, as the projections' own are (a person writes
@@ -90,7 +90,7 @@ function projectorContext(reg: Registry, pack: Manifest, at: string): KernelCont
   };
 }
 
-/** Run as the tables' owner from the first write on, and back as whoever it was at the end (as src/forget.ts asOwner). */
+/** Run as the tables' owner from the first write on, and back as whoever it was at the end (as packs/write/kernel/forget.ts asOwner). */
 function owner(tx: Q) {
   let was: string | undefined, checked = false;
   return {

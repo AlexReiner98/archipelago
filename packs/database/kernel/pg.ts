@@ -1,6 +1,6 @@
 // A Postgres server behind Db: a pool of connections per database, a transaction on one connection, and values
 // read back as PGlite gives them, so nothing else can tell which it has. The schema is applied as PGlite's is, with
-// the steps only a server needs (src/migrate.ts).
+// the steps only a server needs (packs/database/kernel/migrate.ts).
 //
 // Tests run on a server too when PELAGO_TEST_DATABASE_URL names one: each database they open in memory is a new
 // database copied from a template that holds the schema, dropped again when it is closed.

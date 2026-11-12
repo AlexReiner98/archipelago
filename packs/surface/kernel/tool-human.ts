@@ -25,7 +25,7 @@ const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(joi
 export const HUMAN_TOOLS: Record<string, Tool> = {
   tail: {
     description:
-      'What the page follows: the facts after `after` (a position in the fact stream) on the `ids` it holds and on what lives on the `islands` its views touch, as the viewer may see them, for it to project (src/tail.ts); ' +
+      'What the page follows: the facts after `after` (a position in the fact stream) on the `ids` it holds and on what lives on the `islands` its views touch, as the viewer may see them, for it to project (packs/log/kernel/tail.ts); ' +
       'which of them other events touched after `seq` (an event number); and the review queue, the agents and the UI as they stand. Without `after`, only where things stand.',
     humanOnly: true,
     input: {

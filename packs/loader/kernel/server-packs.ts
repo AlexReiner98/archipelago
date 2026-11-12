@@ -3,15 +3,15 @@
 // kernel's own packs folder (beside the workspace packs, for one that ships with it) or in one of the folders the
 // server's configuration names (PELAGO_SERVER_PACKS, separated as PATH is): so a private one is a folder on the
 // machine the server runs on, never a file of this repository. Being there enables it; no workspace owner can. Its
-// handler runs in the same sandbox as any pack's (src/packhost.ts), one process for the server.
+// handler runs in the same sandbox as any pack's (packs/loader/kernel/packhost.ts), one process for the server.
 //
-// What it may declare: public pages and entries, and webhooks, all under /x/<pack>/ (src/server-routes.ts); the
-// server acts it may ask for, from the kernel's closed list (src/server-acts.ts); the gates the kernel asks it at
-// (src/server-gates.ts: what a person agrees to before signing in, what a workspace it made may do); hosts it may call, with the secrets the kernel adds
-// (src/server-requests.ts); what a workspace's admin may connect it to (src/server-connect.ts); and schedules. It gets
+// What it may declare: public pages and entries, and webhooks, all under /x/<pack>/ (packs/surface/kernel/server-routes.ts); the
+// server acts it may ask for, from the kernel's closed list (packs/surface/kernel/server-acts.ts); the gates the kernel asks it at
+// (packs/surface/kernel/server-gates.ts: what a person agrees to before signing in, what a workspace it made may do); hosts it may call, with the secrets the kernel adds
+// (packs/surface/kernel/server-requests.ts); what a workspace's admin may connect it to (packs/surface/kernel/server-connect.ts); and schedules. It gets
 // no database, no map, no token and no secret: the kernel holds each secret, sealed, and adds it where it is needed.
 // What it says on a map (instructions, types, rules) is its workspace half, a workspace.json beside its pack.json, read
-// by every workspace's registry as a workspace pack of the same id (src/pack-folders.ts).
+// by every workspace's registry as a workspace pack of the same id (packs/loader/kernel/pack-folders.ts).
 
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { delimiter, join, resolve } from 'node:path';
@@ -26,16 +26,16 @@ export const SERVER_ACTS = [
   // What a buyer agreed to as they paid, handed to the packs that keep what a person agreed to (gates.signin).
   'agreement.record',
   // What a pack counts on a public site's workspace (PELAGO_SITES), per key per day, in the stream it names (counts):
-  // added to, and read after a position, its own or another pack's (src/pack-counts.ts).
+  // added to, and read after a position, its own or another pack's (packs/publish/kernel/pack-counts.ts).
   'count.add', 'count.read',
   // Kept for one release, until the packs that read it ask count.read: the counts of the pack that takes the site mount.
   'site.visits',
-  // On a workspace whose admin connected the pack (src/server-connect.ts).
+  // On a workspace whose admin connected the pack (packs/surface/kernel/server-connect.ts).
   'begun.get', 'begun.take', 'connection.make', 'connection.get', 'connection.drop', 'workspace.add', 'workspace.deliver',
-  // What a person made public, and nothing else: read through the security-definer reads, as anyone (src/server-published.ts).
+  // What a person made public, and nothing else: read through the security-definer reads, as anyone (packs/surface/kernel/server-published.ts).
   'public.read', 'public.at', 'public.picture', 'public.drawing', 'public.list', 'public.baked',
 ] as const;
-/** The acts answered in src/server-published.ts. */
+/** The acts answered in packs/surface/kernel/server-published.ts. */
 export const PUBLIC_ACTS: readonly ServerAct[] = ['public.read', 'public.at', 'public.picture', 'public.drawing', 'public.list', 'public.baked'];
 export type ServerAct = (typeof SERVER_ACTS)[number];
 
@@ -83,7 +83,7 @@ export interface ServerReach extends MoreReach {
    */
   pages?: { id: string; file: string; form_action?: string; start?: boolean }[];
   /**
-   * What a workspace's admin may connect it to (src/server-connect.ts): entries the kernel calls, never public. status
+   * What a workspace's admin may connect it to (packs/surface/kernel/server-connect.ts): entries the kernel calls, never public. status
    * says whether it is ready to be connected; start answers where to send the admin, given a one-time word (state).
    * With setup, the default workspace's admin readies it once for the server, through start too.
    */
@@ -91,11 +91,11 @@ export interface ServerReach extends MoreReach {
   /** Addresses it answered at before it was a pack, each to one of its own routes ("hook/<id>", an entry or a page). */
   aliases?: Record<string, string>;
   /**
-   * Functions of its handler the kernel calls, never anyone else (src/server-gates.ts). signin is given { email?,
+   * Functions of its handler the kernel calls, never anyone else (packs/surface/kernel/server-gates.ts). signin is given { email?,
    * agree?, via? } and answers { documents, owes? }: the documents a person agrees to before they are signed in, each
    * { id, title, url, version, also? }, and of those, by id, what the address has not agreed to at its version, with
    * agree recorded first. standing is given { workspace }, one the pack made, and answers what it may do: { limits?,
-   * ended? } (src/standing.ts). With no gate, nothing is asked and nothing is limited.
+   * ended? } (packs/identity/kernel/standing.ts). With no gate, nothing is asked and nothing is limited.
    */
   gates?: { signin?: string; standing?: string };
 }

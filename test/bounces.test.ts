@@ -1,5 +1,5 @@
 // Addresses that bounced for good are sent nothing for a while: the relay hands over its failure notices, and the
-// server reads which addresses failed for good from them (src/bounces.ts).
+// server reads which addresses failed for good from them (packs/mailer/kernel/bounces.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createToken } from '../packs/identity/kernel/auth.ts';

@@ -56,7 +56,7 @@ Before merging any change to the log, the schema, the write path or a heavy view
 
 ## The log itself
 
-`gen-map.ts` writes today's tables, not the log, so `scripts/bench-log.ts` lays down a fact stream of its own: a million change sets (`--entries`) over three years, chained and hashed, then times through `src/log.ts` what the log is read and written for: the head, an as-of value at a past position, a change set by id, a page from a past position, a week a year back, an item's history, the activity log newest first and since a day or a month, appends of 1, 5 and 15 facts, and verifying the chain.
+`gen-map.ts` writes today's tables, not the log, so `scripts/bench-log.ts` lays down a fact stream of its own: a million change sets (`--entries`) over three years, chained and hashed, then times through `packs/log/kernel/log.ts` what the log is read and written for: the head, an as-of value at a past position, a change set by id, a page from a past position, a week a year back, an item's history, the activity log newest first and since a day or a month, appends of 1, 5 and 15 facts, and verifying the chain.
 
 ```bash
 node scripts/bench-log.ts --entries 1000000 --runs 30

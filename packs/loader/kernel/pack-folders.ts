@@ -1,6 +1,6 @@
 // The folders workspace packs are read from: the server's own (packsDir), then those PELAGO_PACKS names, so a pack the
 // hosted service keeps to itself is a folder on its machine, never a file of the open repository. One id is one pack.
-// A server pack (reach.server, src/server-packs.ts) is the server's, but it may carry a workspace half beside it: a
+// A server pack (reach.server, packs/loader/kernel/server-packs.ts) is the server's, but it may carry a workspace half beside it: a
 // workspace.json in its folder, a manifest of the same id with no server reach, read here as any workspace pack is, so
 // one subsystem is one pack with both a server process and what it says on a map (task e_jpcsbt48).
 
@@ -14,7 +14,7 @@ export const OWN_PACKS = join(import.meta.dirname, '..', '..', '..', 'packs');
 
 /**
  * Each pack.json text this process has read, by its SHA-256: the text the log keeps for a pack fact naming that hash
- * (src/packstate.ts) is the one that was hashed, never the file as it is by the time the fact is written.
+ * (packs/loader/kernel/packstate.ts) is the one that was hashed, never the file as it is by the time the fact is written.
  */
 const read = new Map<string, string>();
 
@@ -56,7 +56,7 @@ export function readPackFolders<P extends Manifest>(dirs: string[], skip: string
       if (name === skip || !existsSync(file)) continue;
       let text = readFileSync(file, 'utf8');
       let pack = readManifest(text, `packs/${name}/pack.json`) as P;
-      // A server pack kept beside the workspace packs is the server's (src/server-packs.ts); what a workspace reads of
+      // A server pack kept beside the workspace packs is the server's (packs/loader/kernel/server-packs.ts); what a workspace reads of
       // it is its workspace half, if it has one.
       if (isServerPack(pack)) {
         const half = readWorkspaceHalf(join(dir, name), pack.id);

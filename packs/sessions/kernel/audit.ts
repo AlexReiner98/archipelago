@@ -6,7 +6,7 @@ import type { KernelContext } from '#pelago/kernel';
 import { recordAs } from './bookkeeping.ts';
 import { actorId, type Actor, type Item } from './types.ts';
 
-/** One entry as the activity keeps it (src/activity.ts, Done). */
+/** One entry as the activity keeps it (packs/log/kernel/activity.ts, Done). */
 type Done = { actor: string; action: string; target: string; origin: string; ts: string; detail: Record<string, unknown> };
 
 /**

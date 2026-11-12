@@ -1,4 +1,4 @@
-// Sessions started as the answer to a pack's action a person called (src/pack-action-launch.ts): only from a pack
+// Sessions started as the answer to a pack's action a person called (packs/loader/kernel/pack-action-launch.ts): only from a pack
 // that asks for reach.launch, ten at most, never for an agent, each run naming the pack. The launcher is stubbed:
 // nothing is started.
 

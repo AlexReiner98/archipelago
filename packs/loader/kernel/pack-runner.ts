@@ -1,5 +1,5 @@
 // What runs inside a pack's sandboxed process: it loads the pack's handler and speaks the host's protocol, one
-// JSON object per line on standard input and output. Started by src/packhost.ts under node --permission, with an
+// JSON object per line on standard input and output. Started by packs/loader/kernel/packhost.ts under node --permission, with an
 // empty environment and read access to the pack's folder and this file only. It imports nothing.
 //
 // The handler is one ES module whose default export maps each entry (an action, a view) to a function of
@@ -7,7 +7,7 @@
 // A function answers { ops, answer, reason } and the kernel does the writing; it throws to refuse.
 //
 // Node 24 has no wall for the network, so this file puts one up before the handler loads, as the drawing runner
-// does (src/drawing-runner.ts): a module may import only files of the handler's own folder and the node: built-ins
+// does (packs/walls/kernel/drawing-runner.ts): a module may import only files of the handler's own folder and the node: built-ins
 // that reach nothing outside it (no net, http, dns, child_process, worker, vm or module; no package, no data: or
 // http: URL), and what reaches the network or the process (fetch, WebSocket, process and with it process.binding)
 // is gone from its globals. What a pack may ask of its hosts it asks the kernel (`ctx.request`), past the server's walls.

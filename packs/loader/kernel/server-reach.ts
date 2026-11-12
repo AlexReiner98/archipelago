@@ -1,7 +1,7 @@
 // What a server pack may declare beyond its pages, entries, webhooks and gates (e_nsruapq3, 10 Nov 2026): the
 // addresses it takes from the kernel's closed list (mounts), entries that answer a page, streams the kernel feeds,
 // files it serves filled with the kernel's values, the agents it may launch, and the surface whose hooks it
-// translates. Each is a declaration the kernel acts on (src/server-mounts.ts, server-routes.ts, server-streams.ts,
+// translates. Each is a declaration the kernel acts on (packs/surface/kernel/server-mounts.ts, server-routes.ts, server-streams.ts,
 // server-files.ts, server-launch.ts, server-adapter.ts); none gives the pack a map, a process, a token or a header.
 
 import { existsSync } from 'node:fs';
@@ -31,9 +31,9 @@ export interface MoreReach {
   /** Files of its files/ folder served as they are, but for the values named in fill: at /x/<pack>/files/<id>. */
   files?: { id: string; file: string; type: (typeof FILE_TYPES)[number]; fill?: (typeof FILLS)[number][] }[];
   /** Agents it may launch: argv with {fill}s, run with no shell; read, a function given each line it prints. */
-  launchers?: { id: string; argv: string[]; read: string; /** The one launched when the launch setting names none (src/server-launch.ts). */ default?: true }[];
+  launchers?: { id: string; argv: string[]; read: string; /** The one launched when the launch setting names none (packs/surface/kernel/server-launch.ts). */ default?: true }[];
   /**
-   * The stream on a site's workspace its counts are kept in (the acts count.add and count.read, src/pack-counts.ts): a
+   * The stream on a site's workspace its counts are kept in (the acts count.add and count.read, packs/publish/kernel/pack-counts.ts): a
    * plain word no kernel stream has, one pack's alone, kept by the retention rule a workspace pack gives it.
    */
   counts?: string;
@@ -43,7 +43,7 @@ export interface MoreReach {
 
 /**
  * What a surface was before there were surfaces, said by the one pack whose it was: its hooks are those at /hooks/<event>
- * (src/server-adapter.ts), actor the name every session's hooks act under on the log, and agent the name an agent acts
+ * (packs/loader/kernel/server-adapter.ts), actor the name every session's hooks act under on the log, and agent the name an agent acts
  * under on a server with no tokens when it gives none (src/server.ts).
  */
 export interface Before { actor: string; agent: string }

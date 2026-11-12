@@ -1,5 +1,5 @@
 // Whether a notification is mailed, and what the mail says: the person's email channel in, a mail or nothing out.
-// Nothing here reads the map or sends anything: the handler reads, and the kernel sends (src/notify-mail.ts) to the
+// Nothing here reads the map or sends anything: the handler reads, and the kernel sends (packs/walls/kernel/notify-mail.ts) to the
 // address the person signs in with, so a channel never names where mail goes.
 
 const LEVELS = ['info', 'warning', 'urgent'];

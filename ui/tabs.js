@@ -134,7 +134,7 @@ export const named = (at) => {
 /**
  * The sessions whose next show lands in tab `t`, by the rules of ui/pane-route.js: the one it follows or is the tab of,
  * and one holding a pane in it that no other tab follows. The page says them with its beat, so a show can say whether
- * the owner sees it land (src/seeing.ts).
+ * the owner sees it land (packs/presence/kernel/seeing.ts).
  */
 export function landsIn(t) {
   if (!t) return [];

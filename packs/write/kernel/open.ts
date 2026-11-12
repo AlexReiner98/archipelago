@@ -1,4 +1,4 @@
-// What the write root fills of a workspace's open (src/lifecycle.ts): in the packs phase, once the loader has made the
+// What the write root fills of a workspace's open (packs/identity/kernel/lifecycle.ts): in the packs phase, once the loader has made the
 // registry, the map and its one write path on it.
 
 import type { RootOpen } from '../../identity/kernel/lifecycle.ts';

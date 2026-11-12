@@ -4,8 +4,8 @@ import { project } from './project.js';
 //
 // What changed between two positions of the log, as a person would tell it: what came, what left, what changed (its
 // title, status, note, owner, fields), what was linked or unlinked; each with who made it, on whose word and why
-// (`by`, as the tail sends it: src/tail.ts). Worked out by projecting the facts after the first position onto a copy
-// of what a store holds, with the projector the page and the server run (src/project.ts), and comparing each row
+// (`by`, as the tail sends it: packs/log/kernel/tail.ts). Worked out by projecting the facts after the first position onto a copy
+// of what a store holds, with the projector the page and the server run (packs/log/kernel/project.ts), and comparing each row
 // touched as it was before the first entry with how it stands after the last. Pure: rows and entries in, the set
 // out; it changes nothing it is handed (test/change-set.test.ts).
 

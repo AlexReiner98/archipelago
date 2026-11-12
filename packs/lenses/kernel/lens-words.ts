@@ -1,6 +1,6 @@
 // Small pure helpers the lenses pack keeps of the query pack's (docs/kernel-packs.md: a pack imports no other, and a
 // small pure helper is copied): the steps a kept view plays (packs/query/kernel/query-steps.ts: readSteps, stepsWrong,
-// stepIds, stepsPhased), and a filter said in the words before its three lists, in them (src/query-flat.ts,
+// stepIds, stepsPhased), and a filter said in the words before its three lists, in them (packs/query/kernel/query-flat.ts,
 // fromBefore). Keep each the same as where it came from.
 
 /** One step, as a lens keeps it (query-steps.ts, Step). */
@@ -76,12 +76,12 @@ export function stepsPhased(steps: Step[], phaseOf: (id: string, status: string)
   });
 }
 
-/** The most items one answer of the flat lens sends (src/query-flat.ts, LENS_LIMIT). */
+/** The most items one answer of the flat lens sends (packs/query/kernel/query-flat.ts, LENS_LIMIT). */
 export const LENS_LIMIT = 2000;
-/** The kind of the app's own configuration (src/head.ts, SYSTEM). */
+/** The kind of the app's own configuration (packs/loader/kernel/head.ts, SYSTEM). */
 const SYSTEM = 'system';
 
-/** A view kept in the words before the three lists, in them: what the migration writes (src/query-flat.ts, fromBefore). */
+/** A view kept in the words before the three lists, in them: what the migration writes (packs/query/kernel/query-flat.ts, fromBefore). */
 export const fromBefore = (f: Record<string, unknown>) => {
   const list = (x: unknown) => (x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]) as string[];
   const link = (t: unknown) => (typeof t === 'string' ? t : (t as { to?: string }).to !== undefined ? `${(t as { link: string }).link} ${(t as { to: string }).to}` : `${(t as { link: string }).link}< ${(t as { from: string }).from}`);

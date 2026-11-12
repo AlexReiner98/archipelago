@@ -1,6 +1,6 @@
 // The read of the reads API the usage pack answers (surface's slot surface.reads): an instruction counted as said.
 // Handed the context of the map that asks; each use is counted through root.uses a moment later, never awaited, as
-// the kernel counted it before (src/uses.ts).
+// the kernel counted it before (packs/usage/kernel/uses.ts).
 
 import type { KernelContext } from '#pelago/kernel';
 import { used } from './uses.ts';

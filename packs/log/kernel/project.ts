@@ -1,6 +1,6 @@
 // The projection of facts onto items and links as pure code: a run of facts on one id, and what that row was, in;
-// what becomes of the row, out. The server's projector (src/replay.ts) writes it into its tables; the page runs the
-// same file (served as /project.js, its types stripped, src/ui-files.ts) over the rows it holds (ui/replica.js).
+// what becomes of the row, out. The server's projector (packs/log/kernel/replay.ts) writes it into its tables; the page runs the
+// same file (served as /project.js, its types stripped, packs/surface/kernel/ui-files.ts) over the rows it holds (ui/replica.js).
 // It imports nothing, so it runs in a browser as it is: keep it so.
 
 import type { Fact } from './log.ts';
@@ -38,7 +38,7 @@ export const ITEM_COLUMNS: [column: string, field: string, unsaid: unknown][] = 
   ['source_id', 'source', null],
 ];
 
-/** How much of a note a lens answer sends (src/query-flat.ts), and so how much a page that holds one shows. */
+/** How much of a note a lens answer sends (packs/query/kernel/query-flat.ts), and so how much a page that holds one shows. */
 export const NOTE_START = 280;
 
 /** Whether an id is a link's (r_…), whose `link` field is its ends; an item's id is e_…. */
@@ -159,7 +159,7 @@ export interface Moved {
 }
 
 /**
- * Facts said at a moment, projected onto rows held in memory, as src/replay.ts projects them into its tables: the
+ * Facts said at a moment, projected onto rows held in memory, as packs/log/kernel/replay.ts projects them into its tables: the
  * same steps, applied to a Map instead of a table. moved: a pack moved a type or a kind, and the items' time stays.
  */
 export function project(held: Held, reg: TypesRead, at: string, facts: Fact[], moved = false, out: Moved = { items: new Set(), links: new Set(), gone: new Set() }): Moved {

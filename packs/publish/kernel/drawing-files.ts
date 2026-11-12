@@ -1,5 +1,5 @@
 // A drawing's code as files, at addresses its content names: GET /drawing/<hash>/<module>.js answers one module of the
-// drawing with that hash (src/layouts.ts, the same hash a style's `drawing.hash` carries), its text exactly what the
+// drawing with that hash (packs/loader/kernel/layouts.ts, the same hash a style's `drawing.hash` carries), its text exactly what the
 // page posts to the frame, so its `./name.js` imports resolve beside it. A worker that cannot import() a blob (a service
 // worker) imports these statically. The drawings are those the packs ship, and the owner's versions of them kept on the
 // map (core's layout type, a preset naming the drawing), read as the person asking sees them: the database decides

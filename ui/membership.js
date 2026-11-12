@@ -8,7 +8,7 @@
 // (test/replica.test.ts).
 
 const ID = /e_[a-z0-9]{8}/g;
-/** Only's words (src/query-only.ts) and the fields each reads; `*` for one that reads beyond its item's row. */
+/** Only's words (packs/query/kernel/query-only.ts) and the fields each reads; `*` for one that reads beyond its item's row. */
 const WORDS = [
   [/^done$/i, ['status']],
   [/^status\s/i, ['status']],
@@ -20,7 +20,7 @@ const WORDS = [
 ];
 
 /**
- * What a lens reads, from its terms as written (src/query-terms.ts): `fields` its terms name (`*`: any), `links` it
+ * What a lens reads, from its terms as written (packs/query/kernel/query-terms.ts): `fields` its terms name (`*`: any), `links` it
  * walks or names (`*`: any), `anchors` the items it names, `islands` the islands it names, and whether a new item
  * anywhere may be found by it (`unanchored`: a type, a kind, a text or an island term in Find).
  */

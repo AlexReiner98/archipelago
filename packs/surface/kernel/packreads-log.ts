@@ -1,4 +1,4 @@
-// The reads of the log a kernel view needs from src/packreads.ts (task e_exet8395, docs/kernel-packs.md): what a run
+// The reads of the log a kernel view needs from packs/surface/kernel/packreads.ts (task e_exet8395, docs/kernel-packs.md): what a run
 // wrote, who last said each field of some items and on whose authority, the runs of a repository or a folder and what
 // each touched, the changes held for a person and the questions agents settled for the owner to confirm.
 //
@@ -95,7 +95,7 @@ export async function touchedSets(l: Archipelago, runs: string[]): Promise<strin
 
 /**
  * The runs of a repository (those that live in it) or of a folder (started there, or in a folder under it), newest
- * first, a page at a time; each, if asked, with the items it touched that the asker may read (src/touched.ts).
+ * first, a page at a time; each, if asked, with the items it touched that the asker may read (packs/sessions/kernel/touched.ts).
  */
 export async function runsOf(l: Archipelago, q: { repo?: string; folder?: string; open?: boolean; touched?: boolean; fields?: string[]; page?: Page }) {
   noLogin(l);
@@ -175,7 +175,7 @@ export async function settledUnconfirmed(l: Archipelago, limit: number) {
   // chose themselves, in chat. The first are listed first, and counted apart.
   const own = (q: { authority: { of?: string } | null }) => q.authority?.of !== 'human';
   const newest = rows.sort((a, b) => Number(own(b)) - Number(own(a)) || b.seq - a.seq);
-  // The basis is the change set's words, sealed in the log with its key (src/seal.ts): opened only for those listed,
+  // The basis is the change set's words, sealed in the log with its key (packs/seal/kernel/seal.ts): opened only for those listed,
   // since each takes its key from the vault (a map with hundreds settled spent most of the read on the rest).
   const listed = newest.slice(0, limit);
   const bases = await openSaid(l.db, listed.map((r, i) => ({ id: r.changeset, field: 'basis', value: r.authority?.basis, i })));

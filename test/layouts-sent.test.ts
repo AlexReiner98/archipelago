@@ -1,4 +1,4 @@
-// What a picture is sent (src/layouts.ts, src/query-steps.ts): the drawing its shape is drawn by, once, the owner's
+// What a picture is sent (packs/loader/kernel/layouts.ts, packs/query/kernel/query-steps.ts): the drawing its shape is drawn by, once, the owner's
 // version standing in for the pack's module by module; and its steps, checked, naming only what it shows. No browser:
 // how drawings draw is test/layouts.test.ts and the files beside it.
 

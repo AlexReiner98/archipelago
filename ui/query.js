@@ -185,7 +185,7 @@ export function stepsOf(entity) {
   return { steps, told: [...new Set(told)] };
 }
 
-/** The steps with the phase of each status they give, by the type of what it is given to, as a drawing reads a phase now (src/query-steps.ts). */
+/** The steps with the phase of each status they give, by the type of what it is given to, as a drawing reads a phase now (packs/query/kernel/query-steps.ts). */
 const phased = (steps, items = []) => {
   const typeOf = new Map(items.map((i) => [i.id, i.type]));
   return steps.map((s) => (s.fields ? { ...s, fields: Object.fromEntries(Object.entries(s.fields).map(([id, f]) => [id, typeof f?.status === 'string' && kinds.phase(typeOf.get(id), f.status) ? { ...f, phase: kinds.phase(typeOf.get(id), f.status) } : f])) } : s));

@@ -63,7 +63,9 @@ test('a hook point is filled by the pack, called with its context: ops in, ops o
 test("a service pack's change goes through change as the pack, and it reads what it made", async () => {
   const l = await freshWith(new Registry(dir), { create: 'auto', update: 'auto', link: 'auto' });
   const host = new KernelHost((p) => l.registry.folderOf(p));
-  const [timer] = host.timers(l);
+  // The probe's own: other internal packs keep clocks too (the clocks pack's tick).
+  const probeTimer = (h: KernelHost, map: typeof l) => h.timers(map).find((t) => t.pack === 'kernel_probe')!;
+  const timer = probeTimer(host, l);
   assert.equal(timer.every_ms, 60000);
   const done = (await timer.fire()) as { status: string; id: string; read: { title: string } };
   assert.equal(done.status, 'applied');
@@ -73,7 +75,7 @@ test("a service pack's change goes through change as the pack, and it reads what
   assert.match(JSON.stringify(made.detail), /system: its timer/, "its authority says it is the pack's own");
   // Until the rules know the actor kind system (wave 2: core's system_reach), core's agent_changes holds it where agents' changes wait.
   const held = await freshWith(new Registry(dir));
-  assert.equal(((await new KernelHost((p) => held.registry.folderOf(p)).timers(held)[0].fire()) as { status: string }).status, 'proposed');
+  assert.equal(((await probeTimer(new KernelHost((p) => held.registry.folderOf(p)), held).fire()) as { status: string }).status, 'proposed');
 });
 
 test('a service name is called only as the caller declares it, and answered by its one provider', async () => {

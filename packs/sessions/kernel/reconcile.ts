@@ -1,5 +1,5 @@
 // What a session has left unsaid when it ends (report, action session_end): the open work it has to change, vouch
-// for, or say it cannot tell about. Kept beside what asks it (src/sessions.ts).
+// for, or say it cannot tell about. Kept beside what asks it (packs/sessions/kernel/sessions.ts).
 
 import type { KernelContext } from '#pelago/kernel';
 import { placesOf } from './places.ts';
@@ -10,7 +10,7 @@ export type Item = { id: string; type: string; title: string; status: string; to
 
 /**
  * What a session has left unsaid: the open work of the repository it ran in,
- * and what it touched itself (src/touched.ts) wherever that is, that nobody
+ * and what it touched itself (packs/sessions/kernel/touched.ts) wherever that is, that nobody
  * has changed since it began. A session that settled something says so by
  * changing it; what it leaves as it found it, it has to vouch for, or say it
  * could not tell. What it touched comes first, marked touched: it looked at

@@ -1,5 +1,5 @@
 // Where a new item that names no island goes on a map with islands on (task e_b8k453zf). Moved from
-// src/island-items.ts into the placement pack (task e_mhqvdzj6, docs/kernel-packs.md: `placeOnIslands` to placement);
+// packs/loader/kernel/island-items.ts into the placement pack (task e_mhqvdzj6, docs/kernel-packs.md: `placeOnIslands` to placement);
 // the island rules that check where it went stay with the loader (islandRefusals).
 
 import type { KernelContext } from '#pelago/kernel';
@@ -7,9 +7,9 @@ import { type Item, itemOf, type Judged, type Op, type Reg, type Type } from './
 
 /** Core's type of an island. */
 const ISLAND = 'island';
-/** The packs whose shared set any island speaks: core's (KERNEL_PACKS, src/packorder.ts). */
+/** The packs whose shared set any island speaks: core's (KERNEL_PACKS, packs/loader/kernel/packorder.ts). */
 const KERNEL_PACKS = ['core'];
-/** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors (src/island-items.ts). */
+/** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors (packs/loader/kernel/island-items.ts). */
 const livesOnIsland = (t: { system: boolean; lineage: string[] }) => !t.system && !t.lineage.includes('actor');
 
 /** How many islands the lone-island fallback reads. */

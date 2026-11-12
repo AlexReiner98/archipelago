@@ -1,6 +1,6 @@
 // What a row says as facts (docs/log.md, section 2): an item's head fields and declared fields, one fact each, and a
 // link's ends as one value. The write path plans each op as the row it would leave and states it so; the projector
-// (src/replay.ts) turns the facts into that row.
+// (packs/log/kernel/replay.ts) turns the facts into that row.
 
 import type { Fact } from './log.ts';
 import { KEPT_FIELDS } from './operational.ts';

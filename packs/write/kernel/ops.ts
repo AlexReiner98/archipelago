@@ -1,5 +1,5 @@
 // What an op does to what is there, worked out without the database: the note an update leaves, and the ops left
-// when a reviewer excludes some. Used by the write path (src/pelago.ts) and by what checks a change before it.
+// when a reviewer excludes some. Used by the write path (packs/write/kernel/pelago.ts) and by what checks a change before it.
 
 import type { Op, UpdateOp } from './pelago.ts';
 

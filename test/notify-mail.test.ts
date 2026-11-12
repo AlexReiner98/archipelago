@@ -1,5 +1,5 @@
 // A notification made is told to the packs that hear it, and the email pack's mail goes to the person it is for, at
-// the address they sign in with: never anywhere a pack names (src/notify-mail.ts).
+// the address they sign in with: never anywhere a pack names (packs/walls/kernel/notify-mail.ts).
 
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';

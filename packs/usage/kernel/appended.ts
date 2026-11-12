@@ -1,5 +1,5 @@
 // The usage pack's filling of the log's slot log.appended (docs/kernel-packs.md, "Slots"): each append's stored facts
-// added to what is to be counted, through the log's function pelago_bytes_add (src/bytes.ts holds the counts and their
+// added to what is to be counted, through the log's function pelago_bytes_add (packs/log/kernel/bytes.ts holds the counts and their
 // reads, which the usage view reads through root.counters).
 
 import type { KernelContext } from '#pelago/kernel';

@@ -14,7 +14,7 @@ export const UI_FILES: Record<string, string> = {
   '/app.js': 'app.js',
   // The reads every page waits on, asked as it starts, before its modules have loaded (ui/base.js takes them).
   '/early.js': 'early.js',
-  // The house style's lengths as a stylesheet, so the page is laid out before the workspace's style is read (src/styles.ts).
+  // The house style's lengths as a stylesheet, so the page is laid out before the workspace's style is read (packs/styles/kernel/styles.ts).
   '/layout.css': 'layout.css',
   '/style.css': 'style.css',
   '/shell.css': 'shell.css',
@@ -130,7 +130,7 @@ function preloaded(page: string, version: string, text: Map<string, string>): st
 
 /**
  * The frame drawings run in (draw.html) as served now: its scripts written into it, each with the hash its policy
- * allows it by (src/page-policies.ts). The frame has an origin of its own, for which no cache keeps a file, so a script
+ * allows it by (packs/walls/kernel/page-policies.ts). The frame has an origin of its own, for which no cache keeps a file, so a script
  * it named would be fetched again on every page, behind whatever the page is reading; written in, it runs as the
  * frame is parsed. The file keeps its scripts by name, as every page does.
  */

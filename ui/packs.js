@@ -1,10 +1,10 @@
 // The Workspace screen's packs: each pack on this server a plate, kept to what matters at a glance: its name, its
-// switch, and what it touches, as the server groups its manifest's keys (packTouches in src/packstate.ts): types,
+// switch, and what it touches, as the server groups its manifest's keys (packTouches in packs/loader/kernel/packstate.ts): types,
 // links, views, styles, instructions, rules, actions, runs, reach, each with how many. A group opens in the plate on a
 // click, so the owner sees exactly what the pack brings: each thing one line, by name and what it is, with how much it
-// was used on this map in the last 30 days (src/pack-use.ts), a mark where it was not used at all; a click opens its
+// was used on this map in the last 30 days (packs/usage/kernel/pack-use.ts), a mark where it was not used at all; a click opens its
 // whole definition as the manifest has it. Where the owner changes a thing here (its styles, the screens among its
-// views, the checks among its rules), its controls come first. Packs that go together (a bundle, src/bundles.ts) are
+// views, the checks among its rules), its controls come first. Packs that go together (a bundle, packs/loader/kernel/bundles.ts) are
 // one plate with one switch: each pack a band in it, its name on a line and what it touches under it.
 
 import { api, ask, h, state, tell } from './base.js';

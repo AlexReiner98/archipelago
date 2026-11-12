@@ -3,8 +3,8 @@
 // token should just give you all the same access as me"). A person across workspaces is the same sign-in address, so
 // the token holds the addresses it acts for, and each call names its workspace; one named none goes to the token's home.
 //
-// It belongs to no workspace, so it is kept in the server's own database (control values, src/control.ts), only as a
-// hash, beside the indexes of src/control-index.ts. Membership is asked on every call: a member removed is cut off
+// It belongs to no workspace, so it is kept in the server's own database (control values, packs/identity/kernel/control.ts), only as a
+// hash, beside the indexes of packs/identity/kernel/control-index.ts. Membership is asked on every call: a member removed is cut off
 // there at once, with nothing to revoke. It is always an agent's and never an admin's; what it changes is judged by each
 // workspace's own rules, as any agent's is.
 
@@ -86,7 +86,7 @@ export async function personToken(token: string): Promise<PersonToken | undefine
   return found;
 }
 
-/** A person merged into another acts as that other, as a workspace token's person does (src/auth.ts). */
+/** A person merged into another acts as that other, as a workspace token's person does (packs/identity/kernel/auth.ts). */
 async function kept(db: Q, person: string): Promise<string> {
   const { rows } = await db.query<{ id: string }>(
     `select coalesce((select f.value #>> '{}' from log_fact f join entity e on e.id = f.id and e.archived_at is not null

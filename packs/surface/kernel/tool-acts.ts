@@ -1,5 +1,5 @@
 // The kernel's actions: what an agent does besides changing facts, each one of the six verbs (KERNEL_VERBS in
-// src/declared.ts): a session registered, reporting in and ending, the story it tells, a resource taken and given
+// packs/loader/kernel/declared.ts): a session registered, reporting in and ending, the story it tells, a resource taken and given
 // back, the owner's screen pointed, a notification sent, the owner's word
 // recorded, a backup taken.
 
@@ -29,7 +29,7 @@ const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
 /** Who acts, as a pack's service is told it: only what the log names it by. */
 const sender = (actor: { kind: string; name: string }) => ({ kind: actor.kind, name: actor.name });
 
-// A launched session's run is kept with the same writes as the session acts here (src/launcher.ts, the surface's).
+// A launched session's run is kept with the same writes as the session acts here (packs/surface/kernel/launcher.ts, the surface's).
 keepRunsWith({ sessionStart, sessionUpdate, sessionEnd, tell, recordUsage });
 
 export const ACT_TOOLS: Record<string, Tool> = {
@@ -135,7 +135,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // What every session is told (instructions for the act that begins one, BEGINS_AT) is said in the answer too, so a session its hook
       // registered and that joins that run hears it as a new one does (issue e_sm2sa75h). A resume was told at first.
       if (started.resumed) return { ...started, link: itemLink(l.workspace) };
-      // A session on a task is told what its task's island says: the version of its pack the island runs (src/island-pin.ts).
+      // A session on a task is told what its task's island says: the version of its pack the island runs (packs/loader/kernel/island-pin.ts).
       const island = input.task ? (await l.entity(input.task))?.props.island : undefined;
       const { said: told } = await callAs<{ said: { text: string }[] }>(l, 'answer.instructions', { where: BEGINS_AT, about: started.repo?.id, ...(typeof island === 'string' && { island }), fill: { run: started.run } });
       // And where it stands: what the sessions before it here worked on that needs attention now (the runs pack's answer.frontier).
@@ -244,7 +244,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   check_connections: {
     description: 'Ping every connection (external tool) and record whether it is reachable. Work that needs an unreachable connection shows as blocked.',
     input: {},
-    run: slotted('surface.act', 'check_connections'), // what it does is the connect pack's filling (src/check-connections.ts)
+    run: slotted('surface.act', 'check_connections'), // what it does is the connect pack's filling (packs/connect/kernel/check-connections.ts)
   },
   rechecked: {
     description:

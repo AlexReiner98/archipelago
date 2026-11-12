@@ -1,7 +1,7 @@
 // The slot `rules.<on>` (docs/kernel-packs.md, "Slots"): a rule with `on` decides about an event, not a change, and
 // what such a rule may say is its event's pack's to check, not the judge's. Rules opens the slot; the pack that
 // decides about the event fills it, declaring `kernel.hooks["rules.<on>"]` (sessions: rules.reply_ended), and
-// whoever else calls fillRuleEvent. The judge skips every rule with `on` (src/rules.ts, judge).
+// whoever else calls fillRuleEvent. The judge skips every rule with `on` (packs/rules/kernel/rules.ts, judge).
 //
 // The server's own internal packs (the packs folder beside its code) are read for their fillings when this module
 // loads, before any registry checks a pack's rules: a check is pure, of a pack file's rule, and holds nothing of a

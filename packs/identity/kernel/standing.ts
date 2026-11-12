@@ -1,21 +1,21 @@
 // A workspace's standing: what the server says may be done there beyond what its own map decides. The server pack
-// that made a workspace says it (its gate standing, src/server-gates.ts): the limits it may use (members, storage,
+// that made a workspace says it (its gate standing, packs/surface/kernel/server-gates.ts): the limits it may use (members, storage,
 // requests a minute, agent sessions at once, looks an hour), and whether it has ended. The kernel keeps none of it,
 // and with nothing said, as on a server with no such pack, nothing is limited and nothing has ended.
 //
 // Over a limit, what would add to it is refused with a plain answer and the pack's note; what is there is never hidden
 // or lost: reads, export and the backup download go on working, so a workspace can always leave. An ended workspace
-// is read-only until its day to be deleted, when the server's leader deletes it (src/workspaces.ts).
-// The write path (src/pelago.ts) asks stillWritable and roomToStore, a session starting (src/sessions.ts)
-// roomForSession, a look (src/looks.ts) looksAllowed, a signed-in request (src/server.ts) requestWait, and adding a
-// member src/members.ts. The identity root's (wave 7): a workspace's standing is its tenancy, as its members are.
+// is read-only until its day to be deleted, when the server's leader deletes it (packs/identity/kernel/workspaces.ts).
+// The write path (packs/write/kernel/pelago.ts) asks stillWritable and roomToStore, a session starting (packs/sessions/kernel/sessions.ts)
+// roomForSession, a look (packs/look_draw/kernel/looks.ts) looksAllowed, a signed-in request (src/server.ts) requestWait, and adding a
+// member packs/identity/kernel/members.ts. The identity root's (wave 7): a workspace's standing is its tenancy, as its members are.
 
 /** A number of bytes as a person reads it. */
 export const bytes = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} kB` : `${n} bytes`);
 
 /**
  * The slot identity.use (docs/kernel-packs.md, "Slots"): what a workspace uses, as the surface measures it
- * (src/workspace-use.ts): the bytes it stores, and its signed-in requests a minute. The surface fills it when it loads,
+ * (packs/surface/kernel/workspace-use.ts): the bytes it stores, and its signed-in requests a minute. The surface fills it when it loads,
  * so a limit is held against its use without identity importing above itself.
  */
 export interface Use {
@@ -26,7 +26,7 @@ export interface Use {
 let use: Use | undefined;
 export const fillUse = (filled: Use): void => void (use = filled);
 const measured = (): Use => {
-  if (!use) throw new Error('Nothing measures what a workspace uses here: the surface fills identity.use (src/workspace-use.ts).');
+  if (!use) throw new Error('Nothing measures what a workspace uses here: the surface fills identity.use (packs/surface/kernel/workspace-use.ts).');
   return use;
 };
 const storageOf = (workspace: string) => measured().storageOf(workspace);

@@ -1,4 +1,4 @@
-// Packs on an island map (src/islands.ts, decisions e_pp5mu6xd and e_rf6q3q34): with the workspace setting on, a pack
+// Packs on an island map (packs/loader/kernel/islands.ts, decisions e_pp5mu6xd and e_rf6q3q34): with the workspace setting on, a pack
 // is taken only if its file holds vocabulary, views and instructions and it builds on the shared set alone. Off is the
 // default, and with it off every pack is taken as before.
 import assert from 'node:assert/strict';

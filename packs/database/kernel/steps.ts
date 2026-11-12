@@ -1,4 +1,4 @@
-// The database root's parts of the schema's numbered steps (src/migrate.ts): the tables, policies and functions every
+// The database root's parts of the schema's numbered steps (packs/database/kernel/migrate.ts): the tables, policies and functions every
 // map is kept in. Each root declares its own parts in its kernel/steps.ts; a step, once released, is never edited.
 
 import type { StepPart } from './migrate.ts';

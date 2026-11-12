@@ -9,7 +9,7 @@ import { agent, freshWith, human, PACKS } from './map.ts';
 
 export type { Actor, Archipelago, Op };
 export { agent, human, PACKS };
-/** How a style's colours are worked out, for a pack that adds colours or themes (src/colours.ts). */
+/** How a style's colours are worked out, for a pack that adds colours or themes (packs/styles/kernel/colours.ts). */
 export { contrast, finishTheme, mergeTheme, mix, search } from '../packs/styles/kernel/colours.ts';
 
 /** A fresh map in memory with the kernel's packs and those in the folders given (a pack's own folder's parent). */

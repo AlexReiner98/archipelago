@@ -1,5 +1,5 @@
 // Retention rules (docs/log.md, section 4): what a compacted stream keeps of its entries, declared as data in a pack
-// file's `rules` with a `stream` and a `keep` in place of `then`, checked with the other rules (src/rules.ts) and judged
+// file's `rules` with a `stream` and a `keep` in place of `then`, checked with the other rules (packs/rules/kernel/rules.ts) and judged
 // here without a database: entries and the time in, the positions kept out. An entry is never rewritten: it is kept
 // whole while any fact in it is kept, and dropped whole once none is.
 
@@ -32,7 +32,7 @@ export interface Retention {
 export const STREAMS = ['sessions', 'claims', 'notifications', 'automations', 'settings', 'access', 'observations', 'places', 'activity', 'uses'] as const;
 const PACK_STREAM = /^pack:([a-z][a-z0-9_]*|\*)$/;
 /**
- * A stream a server pack keeps its counts in (reach.server.counts, src/pack-counts.ts): a plain word no kernel stream
+ * A stream a server pack keeps its counts in (reach.server.counts, packs/publish/kernel/pack-counts.ts): a plain word no kernel stream
  * has. A retention rule names it as counts:<word>, so a word that names no stream is still refused there.
  */
 export const isCountStream = (s: string) => /^[a-z][a-z0-9_]{0,39}$/.test(s) && s !== 'facts' && !(STREAMS as readonly string[]).includes(s);

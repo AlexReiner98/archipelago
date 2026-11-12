@@ -1,5 +1,5 @@
 // How long a note is while it is written: a number under the words, counted as the places a post goes to count it
-// (an emoji is one character or more, never the two halves it is stored as). A pack's count piece (src/declared.ts)
+// (an emoji is one character or more, never the two halves it is stored as). A pack's count piece (packs/loader/kernel/declared.ts)
 // says which section of the note is counted and the limit each value of a field picks; with none, the whole note is
 // counted, against nothing. It imports nothing, so its counting is tested as it is (test/note-count.test.ts).
 

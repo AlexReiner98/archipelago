@@ -1,6 +1,6 @@
 // A pack split into a vocabulary half and a practice half (task e_qhtt4phv, hub e_9hkt86s7): the vocabulary half keeps
 // the pack's id with its types and links, and the practice half names it in moved_from and keeps its views', styles'
-// and instructions' ids (src/pack-moved.ts, ownsId in src/packorder.ts). A map that had the pack on keeps both on, once;
+// and instructions' ids (packs/loader/kernel/pack-moved.ts, ownsId in packs/loader/kernel/packorder.ts). A map that had the pack on keeps both on, once;
 // an owner's taking the practice half out stands; every id still resolves, and the practice half, requiring the
 // vocabulary by type, waits while no pack declares it.
 import assert from 'node:assert/strict';

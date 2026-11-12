@@ -1,5 +1,5 @@
-// The member table's later steps (src/migrate.ts). A member who only reads (the owner, 10-11 Nov 2026, decision
-// e_nwdn7ce6) sees what any member sees, and their requests run in a read-only transaction (src/db.ts scoped), so the
+// The member table's later steps (packs/database/kernel/migrate.ts). A member who only reads (the owner, 10-11 Nov 2026, decision
+// e_nwdn7ce6) sees what any member sees, and their requests run in a read-only transaction (packs/database/kernel/db.ts scoped), so the
 // database refuses every write of theirs whatever the page draws. Guests, who read one shared view through a reader
 // role and a reach table, went the same day: none was ever given out.
 

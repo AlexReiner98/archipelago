@@ -1,5 +1,5 @@
 // A run's state and line, worked out from what it did (docs/sessions.md, "Wired: what the server gives"): its events
-// (the sessions stream, src/session-events.ts), its turns (core's turnsOf) and its state (core's stateOf), with its
+// (the sessions stream, packs/sessions/kernel/session-events.ts), its turns (core's turnsOf) and its state (core's stateOf), with its
 // latest beat from its story, the title of what it works on, whether that waits on an open depends_on, and how long
 // an open run may be silent before it is quiet (the house style's `quiet_after`). Every read is by the runs' ids, and
 // many runs take as many reads as one.

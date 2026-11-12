@@ -71,7 +71,7 @@ function modulesWith(packs: { folderOf(pack: string): string }, d: LayoutDef & {
 
 /**
  * Every drawing a page may be sent, by its hash (the one `layoutFor` gives): each the packs ship as they ship it, and as
- * each open version of it (`versions`) changes it. What src/drawing-files.ts serves a module of.
+ * each open version of it (`versions`) changes it. What packs/publish/kernel/drawing-files.ts serves a module of.
  */
 export function drawingsBy(packs: { folderOf(pack: string): string; packs: { id: string; layouts?: LayoutDef[] }[] }, versions: { is_open: boolean; props: Record<string, unknown> }[] = []): Map<string, Record<string, string>> {
   const out = new Map<string, Record<string, string>>();
@@ -86,7 +86,7 @@ export function drawingsBy(packs: { folderOf(pack: string): string; packs: { id:
 
 /**
  * A pack's drawing as the pack ships it: its hash, and the entry's file, which the server may import
- * (src/published-frames.ts). Where each module is a file of its own name in one folder, that folder's; else (a module
+ * (packs/publish/kernel/published-frames.ts). Where each module is a file of its own name in one folder, that folder's; else (a module
  * shared with another drawing) the modules are laid out by name in a folder of their own, kept by the hash. Code kept
  * by the hash is the pack's own.
  */

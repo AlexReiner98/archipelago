@@ -51,7 +51,7 @@ export interface Step {
   rests?: boolean;
   /** The session it was taken in, as the agent said it or last said it: a pane can follow one session. */
   run?: string;
-  /** That session's word, never shown: the key to its hue (src/session-name.ts). */
+  /** That session's word, never shown: the key to its hue (packs/sessions/kernel/session-name.ts). */
   name?: string;
   /** What its chat is called, read at each step so a rename reaches every page. */
   title?: string;

@@ -9,7 +9,7 @@
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** A type's watch capability, as the registry holds it (src/capabilities.ts). */
+/** A type's watch capability, as the registry holds it (packs/loader/kernel/capabilities.ts). */
 export interface Watch { field: string; up: string; down: string; also?: string[]; idle?: string; commit?: string }
 /** An item as the reads API answers it. */
 type Item = { id: string; type: string; title: string; status: string; is_open?: boolean; props: Record<string, unknown> };

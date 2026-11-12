@@ -8,7 +8,7 @@ import { actorId, drawnWith, itemOf, type Actor } from './map.ts';
 
 /** The most a kept picture may weigh. A capture of a view at screen size is well under it. */
 export const PICTURE_MAX = 1_000_000;
-/** An SVG is a figure baked from a drawing's shapes, kept only when it is drawing alone (src/svg-figure.ts). */
+/** An SVG is a figure baked from a drawing's shapes, kept only when it is drawing alone (packs/walls/kernel/svg-figure.ts). */
 export const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;
 
 /**

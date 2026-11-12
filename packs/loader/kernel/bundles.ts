@@ -1,11 +1,11 @@
 // Bundles: packs that go on and off together (the owner, 11 Nov 2026, decision e_f9ybsuce). On an island map a pack
-// holds types or code, never both (src/islands.ts), so what is one way of working is often two packs: an island pack
+// holds types or code, never both (packs/loader/kernel/islands.ts), so what is one way of working is often two packs: an island pack
 // of words and the map pack that acts on them (refine and replays). A bundle names them, so the owner turns them on
 // and off as one, the Packs screen draws them as one plate, and a distribution (PELAGO_START_PACKS) can name it.
 //
 // A bundle is a small manifest of its own, bundle.json in a folder beside the packs (in any folder packs are read
 // from): { id, title, description, packs }. Its id is its folder's, never a pack's, and a pack is in one bundle at
-// most. A bundle is offered to a workspace only when all its packs are (src/pack-allow.ts); where one of them is not,
+// most. A bundle is offered to a workspace only when all its packs are (packs/loader/kernel/pack-allow.ts); where one of them is not,
 // the others stand alone there.
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';

@@ -219,7 +219,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     description: 'Describe the map\'s model: every type of item with its statuses and the fields you set, and every link type with its ends. Read this before writing. With type (a type, a link type or a pack): those whole, each field explained; full: true for everything, screens and verbs too. With island: as that island runs it, where it runs a version of its pack (version names it); one that runs the map\'s answers only that.',
     input: { type: z.string().optional().describe('A type, a link type or a pack, by its id as the brief lists it.'), full: z.boolean().optional(), island: z.string().optional().describe('An island, by its id: the model as it runs there.'), reads: z.boolean().optional().describe('true for only the reads query reaches, the one that reads an item whole marked.') },
     run: async (map, actor, input) => {
-      // An island that runs a version of its pack is described through that version's registry (src/island-pin.ts).
+      // An island that runs a version of its pack is described through that version's registry (packs/loader/kernel/island-pin.ts).
       const pinned = input.island ? await islandVersion(map, input.island) : undefined;
       if (input.island && !pinned) return { island: input.island, runs: 'map' };
       const l = pinned ? map.readIn(pinned.registry) : map;
@@ -255,7 +255,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass), the public views that show it (public_views, frozen when shared: one marked behind has changed since, so tell the person, whose act sharing it again is) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
     input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for all of it whole. Past ${GET_LISTED} links in a direction, an agent is given those and a count by type (links_cut); of what names it the first ${GET_MENTIONS}; of what holds it the number of views about each; and of a large field (a layout's code) its first lines and size. The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
-      // Its recent events are the activity log's (src/eventlog.ts), read beside the item as get read them.
+      // Its recent events are the activity log's (packs/log/kernel/eventlog.ts), read beside the item as get read them.
       const [item_, events_] = await Promise.all([getItem(l, input.id), readEvents(l.db, { target: input.id, limit: 8 })]);
       const found = { ...item_, recent_events: events_.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })), shown_in: [] as unknown[] };
       // The views it is drawn in are the lenses pack's to say (answer.shown_in).
@@ -400,7 +400,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     // What the owner's page said it shows is the presence pack's (answer.seeing).
     run: async (l, _actor, input) => callAs(l, 'answer.seeing', { run: input.run, viewer: l.viewer }),
   },
-  // The one tool that names the page in a chat (src/mcp-view.ts). The page takes the look, at the size it has: this only
+  // The one tool that names the page in a chat (packs/mcp_apps/kernel/mcp-view.ts). The page takes the look, at the size it has: this only
   // refuses what could not be drawn. Its inputs are cut short, since the tool list carries them on every request.
   draw: {
     description: 'Draw a view in this chat, for the person reading it, in a client that draws MCP Apps (Claude chat). Elsewhere nothing is drawn: report show opens it on their canvas, query look gives you the picture.',

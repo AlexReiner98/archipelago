@@ -1,8 +1,8 @@
 // Declarations moved between packs (the core audit, task e_sjhbyf52; any pack, task e_qhtt4phv): what pack A declared
 // once (a rule, a view, a style or instruction, an action, a layout) and pack B declares now, by A's id or by A's
 // `<A>.<name>` renamed `<B>.<name>`. B names A in its manifest's `moved_from` (the kernel's packs it never needs to
-// name, src/packorder.ts movedFrom). A map that had A on had those, so B is added to it with them, once, as a pack that
-// took over a type is (takenOver, src/packstate.ts). What A declared is read off its manifests kept on this map's log,
+// name, packs/loader/kernel/packorder.ts movedFrom). A map that had A on had those, so B is added to it with them, once, as a pack that
+// took over a type is (takenOver, packs/loader/kernel/packstate.ts). What A declared is read off its manifests kept on this map's log,
 // so a map made after the move, whose log never kept a manifest of A that held them, is not given B this way: it starts
 // with what the server starts it with. A types and link types move by takenOver, by their ids or their moved_from.
 
@@ -27,7 +27,7 @@ export function declaredIds(manifest: unknown): Set<string> {
 
 /**
  * Whether a pack keeps what a kernel pack shipped under the kernel's ids (`core.x`): such a pack is what the kernel's
- * pack was, so a new map starts with it as it starts with the kernel's (src/packstate.ts), and moving a declaration out
+ * pack was, so a new map starts with it as it starts with the kernel's (packs/loader/kernel/packstate.ts), and moving a declaration out
  * of core changes nothing a new map has either (the house style and the drawings every page reads, decision e_fgsgw8ja).
  */
 export const keepsKernel = (pack: { id: string }): boolean =>

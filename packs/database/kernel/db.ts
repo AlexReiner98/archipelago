@@ -46,7 +46,7 @@ export async function openDb(where?: string): Promise<Database> {
  */
 const WAL_KEPT = ['-c', 'min_wal_size=32MB', '-c', 'max_wal_size=64MB'];
 
-// The steps of the schema this database lacks (src/migrate.ts), then what each root does to it at every open (the
+// The steps of the schema this database lacks (packs/database/kernel/migrate.ts), then what each root does to it at every open (the
 // log's partitions, made ahead of need). pg_trgm, which search uses for near-misses and typos, is in the first step; a
 // Postgres server has it too.
 async function prepared<D extends Database>(db: D, server = false) {
@@ -61,7 +61,7 @@ async function prepared<D extends Database>(db: D, server = false) {
 // second); loading an image of one takes a fifth of that. npm test makes the image once for all its processes and
 // names it in PELAGO_TEST_IMAGE (test/global.ts), and the new folders a test opens start from it too. Each database
 // holds a few hundred MB, so the tests close what each one opened as it ends (test/each.ts). With
-// PELAGO_TEST_DATABASE_URL they are databases on that server instead (src/pg.ts).
+// PELAGO_TEST_DATABASE_URL they are databases on that server instead (packs/database/kernel/pg.ts).
 
 /** Databases in memory not yet closed. */
 export const openInMemory = new Set<Database>();
@@ -121,7 +121,7 @@ function pgliteVersion() {
  * The same database as one person sees it. Every statement runs inside a
  * transaction that first drops to the member role and names the viewer (and
  * whether they are an admin of the workspace), so neither can leak between
- * requests sharing the connection. A member who only reads (src/members.ts) runs in a read-only transaction besides:
+ * requests sharing the connection. A member who only reads (packs/identity/kernel/members.ts) runs in a read-only transaction besides:
  * the database refuses every write in it, and once it has read, refuses to be made to write again.
  */
 export function scoped(db: Db, viewer: string, admin = false, readOnly = false): Db {

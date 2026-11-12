@@ -1,6 +1,6 @@
-// The clock's query triggers (src/due-on.ts): an automation whose `on` names a query comes due when that query starts
+// The clock's query triggers (packs/automation_triggers/kernel/due-on.ts): an automation whose `on` names a query comes due when that query starts
 // to match, by its edge, once: what matched when it was set does not fire, and a second pass or a restart fires nothing
-// again. A bad `on` is refused on write (src/automation-rules.ts).
+// again. A bad `on` is refused on write (packs/automation_triggers/kernel/automation-rules.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkOn } from '../packs/automation_triggers/kernel/automation-rules.ts';
@@ -19,7 +19,7 @@ const map = () => freshWith(new Registry(packsWith(SIGNUPS as never)));
 const NOW = Date.parse('2030-01-07T13:00:00Z');
 const signups = { query: { filter: { find: ['type signup'] } } };
 const pass = async (l: Archipelago, i: number) => (await duePack.duePass(kernelContext(l, 'clocks'), (NOW + i * 60_000))).filter((d) => d.edge);
-// An automation lives with what it is about (src/subject.ts): each is made about a task.
+// An automation lives with what it is about (packs/placement/kernel/subject.ts): each is made about a task.
 const ABOUT = [{ op: 'create', ref: 'subject', type: 'task', title: 'Regulated regions' }, { op: 'link', type: 'about', from: 'auto', to: 'subject' }] as never[];
 const automation = (on: unknown) => ({ op: 'create', ref: 'auto', type: 'automation', title: 'Watch', status: 'enabled', props: { on, action: 'notify', message: 'Started to match' } });
 

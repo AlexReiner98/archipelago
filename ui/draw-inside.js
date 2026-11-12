@@ -1,7 +1,7 @@
 // What runs in a drawing's worker, around its code: in the frame's dedicated worker (ui/draw-marks.js hands this
 // function over as its text) and in a service worker the drawing host serves for a pack's own drawing
 // (/drawing/<hash>/sw.js, which imports the drawing and calls inside(null, made)). Not a module: the frame loads no
-// modules, so the server writes this file into the frame's script and into the service worker's (src/ui-files.ts).
+// modules, so the server writes this file into the frame's script and into the service worker's (packs/surface/kernel/ui-files.ts).
 'use strict';
 
 /**

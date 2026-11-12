@@ -18,7 +18,7 @@ async function madeBy(l: Archipelago, id: string) {
     [id],
   );
   const head = rows[0]?.head ?? {};
-  // The reason is sealed with the item's key (src/seal.ts): what it was given is pinned by the fields it has.
+  // The reason is sealed with the item's key (packs/seal/kernel/seal.ts): what it was given is pinned by the fields it has.
   return { action: head.action, actor: head.actor, authority: head.authority, rule: head.rule, fields: Object.keys(head).sort() };
 }
 const HEAD = ['action', 'actor', 'authority', 'id', 'keys', 'reason', 'rule', 'source', 'undoes', 'v', 'ws'];

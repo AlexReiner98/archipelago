@@ -1,5 +1,5 @@
 // Unwait run without a database: a query that answers from a few rows in memory, the facts out. The whole of it against
-// a real map is test/unwait.test.ts, through the shim at src/unwait.ts.
+// a real map is test/unwait.test.ts.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';

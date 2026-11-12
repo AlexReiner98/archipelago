@@ -1,7 +1,7 @@
 // What a session did, as raw events in one vocabulary (docs/sessions.md): an adapter sends them in batches
 // (POST /hooks/events), each is checked against its kind, one the run already has (same at, kind and turn) is dropped,
 // and the rest are appended in order to the sessions stream as `event` facts on the run, sealed with the run's key as
-// every value about an item is there (src/opseal.ts). Turns, states and a session's line are worked out from them.
+// every value about an item is there (packs/seal/kernel/opseal.ts). Turns, states and a session's line are worked out from them.
 
 import type { KernelContext } from '#pelago/kernel';
 import { actorId } from './types.ts';

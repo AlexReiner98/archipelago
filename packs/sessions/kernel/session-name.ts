@@ -6,7 +6,7 @@
 // are the style's.
 
 // A name that changes is shown on the owner's page at once (a step, presence's): each function that names a session says
-// whether it did, and the sessions pack's l-facing calls (src/sessions.ts) show it, as presence names no service yet.
+// whether it did, and the sessions pack's l-facing calls (packs/sessions/kernel/sessions.ts) show it, as presence names no service yet.
 
 import type { KernelContext } from '#pelago/kernel';
 import { bookkeep } from './bookkeeping.ts';

@@ -1,5 +1,5 @@
 // A notification mailed to the person it is for. The kernel tells the packs that hear notification.made that one was
-// made (src/notify.ts), and a pack that hears it may answer with one mail about it: its subject and text are the
+// made (packs/notifications/kernel/notify.ts), and a pack that hears it may answer with one mail about it: its subject and text are the
 // pack's, and nothing else is. Where it goes is the kernel's to say: the person the notification is for (the one it is
 // private to, else the workspace's owner), at the address they sign in with, which the sign-in proved is theirs. So a
 // pack can mail no one but that person, about nothing but that notification, once; whether it does (the person turned

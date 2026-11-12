@@ -2,7 +2,7 @@
 // they are sent an invitation, and from then on sign in by asking for a link at that address (POST /connect/sign-in).
 // The link (or the code beside it, typed: POST /connect/code) works once, for half an hour; opened, the page trades
 // its code (POST /connect/join) for a token that keeps
-// that browser signed in for a month; a member who set a password may sign in with it instead (src/passwords.ts).
+// that browser signed in for a month; a member who set a password may sign in with it instead (packs/identity/kernel/passwords.ts).
 // Whether a member is an admin is kept here, on the member, so every sign-in gets
 // it; removing a member ends their sign-ins at once. The table is read only through the whole database: no member's
 // role is granted it.
@@ -31,11 +31,11 @@ export interface Member {
   person_id: string;
   admin: boolean;
   added_at: string;
-  /** One who only reads: they see what any member sees, and the database refuses their writes (src/db.ts scoped). Never an admin. */
+  /** One who only reads: they see what any member sees, and the database refuses their writes (packs/database/kernel/db.ts scoped). Never an admin. */
   read_only: boolean;
 }
 
-/** A workspace's limits (src/standing.ts), members among them: the name it had when members were all a plan limited. */
+/** A workspace's limits (packs/identity/kernel/standing.ts), members among them: the name it had when members were all a plan limited. */
 export type MemberLimit = Limits;
 
 let site = { origin: 'http://127.0.0.1:3100', nameOf: async (id: string) => id, rename: async (_id: string, _name: string): Promise<void> => {} };
@@ -49,12 +49,12 @@ export function configureMembers(given: Partial<typeof site> & { standingOf?: (i
 export const itemLink = (workspace: string) => `${site.origin}/i/${workspace}/{id}`;
 /** Give a workspace another name, where the server keeps them. */
 export const renameWorkspace = (workspace: string, name: string) => site.rename(workspace, name);
-/** Which workspaces each address belongs to is kept beside the workspaces too, so a sign-in opens only those (src/control-index.ts). */
+/** Which workspaces each address belongs to is kept beside the workspaces too, so a sign-in opens only those (packs/identity/kernel/control-index.ts). */
 const noted = indexMember;
 
 /**
  * What members tells the people it is about: an invitation issued, or the sign-in codes asked for. Members only raises
- * it; the mail side (src/member-mail.ts) says how it reads and sends it, and whether it sends at all.
+ * it; the mail side (packs/mailer/kernel/member-mail.ts) says how it reads and sends it, and whether it sends at all.
  */
 export type MemberNotice =
   | { kind: 'invite_issued'; to: string; replyTo?: string; by: string; workspace: string; signIn: string }
@@ -71,7 +71,7 @@ export function onMemberNotice(given: MemberNotices) {
   notices = given;
 }
 
-// A workspace's limits are the server's, not its map's: the server pack that made it says them (src/standing.ts).
+// A workspace's limits are the server's, not its map's: the server pack that made it says them (packs/identity/kernel/standing.ts).
 export { limitOf };
 
 /** Refuse one more member past the limit, saying how to make room. Those already in stay when a limit is lowered. */
@@ -91,7 +91,7 @@ export async function memberOf(db: Q, email: string): Promise<Member | undefined
 }
 
 /**
- * Add someone to a workspace by their address, with no mail: a server pack's act (src/server-acts.ts). The first member
+ * Add someone to a workspace by their address, with no mail: a server pack's act (packs/surface/kernel/server-acts.ts). The first member
  * of a workspace is its owner, the person its views are for.
  */
 export async function admitMember(whole: Archipelago, email: string, admin: boolean): Promise<string> {
@@ -324,7 +324,7 @@ export const MEMBER_TOOLS: Record<string, Tool> = {
       const admin = input.admin ?? (input.read_only ? false : member.admin);
       const readOnly = input.read_only ?? (input.admin ? false : member.read_only);
       if ((!admin || readOnly) && member.person_id === actor.person) throw new Error('You cannot take away your own admin.');
-      // Their tokens' admin follows at once; whether they only read is read from here with each request (src/auth.ts).
+      // Their tokens' admin follows at once; whether they only read is read from here with each request (packs/identity/kernel/auth.ts).
       await whole.db.query(`update member set admin = $2, read_only = $3 where email = $1`, [member.email, admin, readOnly]);
       await whole.db.query(`update token set admin = $2 where ${live}`, [member.person_id, admin]);
       return { ...member, admin, read_only: readOnly };

@@ -1,6 +1,6 @@
 // The kernel's own views that are not lenses: each reads what is kept to run the map (runs, notifications, the log,
-// the styles and views kept) rather than a picture of the work, and src/operational.ts names each with its rule.
-// Every picture of the work is a lens: a lens preset a pack declares (src/query-presets.ts), asked by the same name.
+// the styles and views kept) rather than a picture of the work, and packs/log/kernel/operational.ts names each with its rule.
+// Every picture of the work is a lens: a lens preset a pack declares (packs/query/kernel/query-presets.ts), asked by the same name.
 
 import type { KernelContext } from '#pelago/kernel';
 

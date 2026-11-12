@@ -1,4 +1,4 @@
-// The clock (src/due.ts): what has a when comes due once per occurrence, in the workspace's zone, and the packs that
+// The clock (packs/clocks/kernel/due.ts): what has a when comes due once per occurrence, in the workspace's zone, and the packs that
 // hear item.due are told.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

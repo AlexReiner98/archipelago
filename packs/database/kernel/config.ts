@@ -14,7 +14,7 @@ export interface Config {
   /** Every folder workspace packs are read from: packsDir, then those PELAGO_PACKS names (separated as PATH is), so a
    * private pack is a folder on the machine the server runs on, never a file of this repository. */
   packDirs: string[];
-  /** Pack ids to enable (PELAGO_ONLY_PACKS, comma separated). Omit to enable every pack found (src/pack-allow.ts). */
+  /** Pack ids to enable (PELAGO_ONLY_PACKS, comma separated). Omit to enable every pack found (packs/loader/kernel/pack-allow.ts). */
   packs?: string[];
   /** Packs one workspace may have beyond `packs`, by workspace id (PELAGO_WORKSPACE_PACKS, "islands=a,b;other=c"). */
   workspacePacks?: Record<string, string[]>;
@@ -39,7 +39,7 @@ export interface Config {
   publicHosts: string[];
   /**
    * The name that serves the frame drawings run in, and nothing else (PELAGO_DRAW_HOST, e.g. "draw.example.com"),
-   * so the frame has an origin of its own and keeps a service worker (src/draw-host.ts). Unset, a dev server frames
+   * so the frame has an origin of its own and keeps a service worker (packs/walls/kernel/draw-host.ts). Unset, a dev server frames
    * drawings at the other loopback name, and any other at the page's own origin, sandboxed with none.
    */
   drawHost?: string;
@@ -52,7 +52,7 @@ export interface Config {
   /**
    * The proxies in front of the server whose word is taken for where a
    * request came from, beyond private networks (PELAGO_TRUSTED_PROXIES):
-   * networks as CIDR, comma separated, or "cloudflare". See src/address.ts.
+   * networks as CIDR, comma separated, or "cloudflare". See packs/walls/kernel/address.ts.
    */
   trustedProxies?: string;
   /**
@@ -84,7 +84,7 @@ export interface Config {
 /** The exit code that asks the dev supervisor (scripts/dev.ts) to start the server again. */
 export const RESTART_EXIT = 75;
 
-/** A name a drawing host may have (PELAGO_DRAW_HOST, src/draw-host.ts): a host name, and a port. */
+/** A name a drawing host may have (PELAGO_DRAW_HOST, packs/walls/kernel/draw-host.ts): a host name, and a port. */
 export const DRAW_HOST_NAME = /^[a-z0-9.-]+(:\d{1,5})?$/;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');

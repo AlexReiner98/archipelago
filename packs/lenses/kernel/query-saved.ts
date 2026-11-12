@@ -22,7 +22,7 @@ type Props = Record<string, unknown>;
 type Typed = Pick<KernelContext, 'registry'>;
 type Row = { id: string; type: string; title: string; props?: Props; is_open?: boolean; archived_at?: unknown; updated_at?: string | Date };
 type Link = { from_id: string; to_id: string };
-/** An item of the flat lens's answer: its head, the fields its type shows, and why it is there (src/query-flat.ts). */
+/** An item of the flat lens's answer: its head, the fields its type shows, and why it is there (packs/query/kernel/query-flat.ts). */
 export type FlatItem = { id: string; type: string; kind?: string; title: string; body?: string; visibility?: string; status?: string; open?: boolean; owner?: string | null; props?: Props; [field: string]: unknown };
 /** A link of the flat lens's answer. */
 export type FlatLink = { id: string; type: string; is?: string[]; from: string; to: string; props?: Props };
@@ -166,7 +166,7 @@ export const QUERIES_MOVED = 'Views kept before the flat lens are flat lenses no
  * A migration, planned: each view kept before the flat lens is given the flat lens its fields say (oldQuery) and its
  * old fields are taken off, with what did not translate said (lost); one with nothing to include is retired. A style
  * kept about it stays the style it is drawn in. The facts, and what moved and what was lost; the kernel appends them
- * with the event that says what was lost (src/query-saved.ts), which a pack's move does not carry.
+ * with the event that says what was lost (packs/lenses/kernel/query-saved.ts), which a pack's move does not carry.
  */
 export async function planQueries(ctx: KernelContext): Promise<{ facts: Fact[]; moved: number; retired: string[]; lost: Record<string, string[]> }> {
   const rows = (await ctx.reads({ marked: { types: ctx.registry.family(KEPT), keys: OLD_FIELDS } })) as Row[];

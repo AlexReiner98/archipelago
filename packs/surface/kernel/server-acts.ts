@@ -1,7 +1,7 @@
 // The server acts: the closed list of things a server pack may ask the kernel to do, each only if the pack declares
-// it (src/server-packs.ts). These act only on the workspaces the pack made itself: it can sell a workspace and sign its
+// it (packs/loader/kernel/server-packs.ts). These act only on the workspaces the pack made itself: it can sell a workspace and sign its
 // buyer in, never reach into another; beyond them, a pack keeps counts on a public site's map and reads them back
-// (count.add, count.read: how many, never of whom), each read logged on that site's map. What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
+// (count.add, count.read: how many, never of whom), each read logged on that site's map. What it may do on a workspace whose admin connected it is in packs/surface/kernel/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
 // so what a server pack did is in the owner's history like anything else.
 
 import { setControlValue, controlValue } from '../../identity/kernel/control.ts';
@@ -33,7 +33,7 @@ async function itsOwn(at: ActPlaces, pack: string, workspace: unknown) {
   return at.get(id);
 }
 
-/** Hands what an address agreed to to the packs that keep it (src/server-gates.ts), answering the documents it still owes. */
+/** Hands what an address agreed to to the packs that keep it (packs/surface/kernel/server-gates.ts), answering the documents it still owes. */
 export type Agrees = (ask: { email: string; agree: unknown; via: string }) => Promise<{ owes: { id: string; version: string }[] }>;
 
 /** The workspace of a site this server serves, by its domain, or a refusal. */

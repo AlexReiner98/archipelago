@@ -13,7 +13,7 @@ import { ownStyle } from './styles.ts';
 
 type Props = Record<string, unknown>;
 
-/** A fact of the log (src/log.ts, Fact): a field set, or taken off. */
+/** A fact of the log (packs/log/kernel/log.ts, Fact): a field set, or taken off. */
 export type Fact = ['+', string, string, unknown] | ['-', string, string];
 
 const PAGE_FIELDS = ['theme', 'page', 'page_css', 'faces', 'type', 'emblem', 'icon', 'font'];

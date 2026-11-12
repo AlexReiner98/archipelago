@@ -1,5 +1,5 @@
 // What the reader answers at each address, from the parts the kernel parsed and what the public acts give: public views
-// (src/public-view.ts), each as it was frozen. `act` asks the kernel for one of them; nothing else is read. An address
+// (packs/publish/kernel/public-view.ts), each as it was frozen. `act` asks the kernel for one of them; nothing else is read. An address
 // that is not a public view's is passed on
 // ({ pass: true }): the kernel answers it as it would with no reader (a product's page, the app's files).
 

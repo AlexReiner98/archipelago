@@ -1,5 +1,5 @@
 // An automation's weekly trigger: the days it names, and that it comes due once on each, at its time, by the clock
-// (src/due.ts); the automations pack hears it and tells the person, about what the automation is about.
+// (packs/clocks/kernel/due.ts); the automations pack hears it and tells the person, about what the automation is about.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { checkAutomation, weekdays } from '../packs/automation_triggers/kernel/automation-rules.ts';

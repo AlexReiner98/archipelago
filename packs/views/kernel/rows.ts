@@ -1,4 +1,4 @@
-// The rows the pack's reads give back (src/packreads.ts, src/packreads-kernel.ts): an item with every column the asker
+// The rows the pack's reads give back (packs/surface/kernel/packreads.ts, packs/surface/kernel/packreads-kernel.ts): an item with every column the asker
 // may read, a link as the map keeps it, and what the pack does with them that SQL did before (a field as text, one
 // value holding another).
 import type { KernelContext } from '#pelago/kernel';

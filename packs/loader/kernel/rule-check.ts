@@ -1,5 +1,5 @@
 // Whether a pack's rules can be enforced, checked as the pack loads: the schema half of rules (docs/kernel-packs.md,
-// "Service names": the half of a closed list that checks stays with the root that loads it). The judge (src/rules.ts)
+// "Service names": the half of a closed list that checks stays with the root that loads it). The judge (packs/rules/kernel/rules.ts)
 // reads the same words, which it takes from here: a comparison's form, a pattern. Which settings lift a rule is the
 // rules' to name (a setting is read only as the lift of a rule): they fill the slot loader.lifts as they load.
 
@@ -13,7 +13,7 @@ const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.
 
 /**
  * The slot loader.lifts (docs/kernel-packs.md, "Slots"): the settings an owner lifts a rule by, as the rules name them
- * (src/rules.ts, LIFTS), filled when the rules load, before any change is judged. Until then a rule's lifted is not
+ * (packs/rules/kernel/rules.ts, LIFTS), filled when the rules load, before any change is judged. Until then a rule's lifted is not
  * checked, and no setting is the rules' own.
  */
 let lifts: readonly string[] | undefined;

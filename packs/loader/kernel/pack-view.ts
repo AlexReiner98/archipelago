@@ -14,7 +14,7 @@ export async function packView(call: RootCall, input: { pack: string; view: stri
   const map = call.map;
   if (!map) throw new Error('A view is read of a map: a server duty has none');
   const params = input?.params ?? {};
-  // As the view is found: on the island's version of the pack when its params name an island (src/askview.ts).
+  // As the view is found: on the island's version of the pack when its params name an island (packs/query/kernel/askview.ts).
   const l = typeof params.island === 'string' ? map.readIn(await islandRegistry(map, params.island)) : map;
   const pack = l.registry.packs.find((p) => p.id === input.pack);
   const def = pack && parts(pack).views.find((v) => v.id === input.view);

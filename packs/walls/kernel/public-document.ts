@@ -15,5 +15,5 @@ export const readable = (l: Archipelago) => l.registry.drawnWith('document').fil
 export const finishedStatuses = (l: Archipelago) =>
   readable(l).flatMap((t) => Object.entries(l.registry.type(t)?.statuses.phases ?? {}).filter(([, p]) => p === 'finished').map(([s]) => `${t}:${s}`));
 
-/** What every public page and its data are sent with, and a public page's content policies, defined once with the others (src/page-policies.ts). */
+/** What every public page and its data are sent with, and a public page's content policies, defined once with the others (packs/walls/kernel/page-policies.ts). */
 export { GUARD, PUBLIC_POLICY as POLICY, READER_POLICY } from './page-policies.ts';

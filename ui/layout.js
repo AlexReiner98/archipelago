@@ -259,7 +259,7 @@ ${JSON.stringify(input)}`;
   const kept = scenes.get(seen);
   // Told what to draw before anything else, so what happens on the page waits behind it: the channel keeps it until the worker has the other end.
   port.postMessage({ type: 'start', input });
-  // A picture published with its first frame (src/published-frames.ts) has it on screen now; the drawing's own scene
+  // A picture published with its first frame (packs/publish/kernel/published-frames.ts) has it on screen now; the drawing's own scene
   // takes its place when it answers.
   if (kept) ((mounted = true), mount(kept), hovered(), saidDrawn(host, 'drawn'));
   else if (opening) {

@@ -1,5 +1,5 @@
 // The shapes the map is written and read in: who acts, the ops of a change, an item, a held change. The write path
-// (src/pelago.ts) takes and answers them; every other module names them from there.
+// (packs/write/kernel/pelago.ts) takes and answers them; every other module names them from there.
 
 import type { Ruled } from '../../rules/kernel/rules.ts';
 import type { Registry, TypeDef } from '../../loader/kernel/packs.ts';
@@ -116,13 +116,13 @@ export interface ChangeInput {
   /** From an agent: have this change wait for a human even where agents' changes are applied as made. */
   hold?: boolean;
   /** The pack action that made it, named on every event it logs ("time.log made this"). */
-  action?: string; /** The island a pack action was given (its `island` input): where what it makes goes when nothing it is tied to in the change says (src/island-items.ts). */ island?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string; /** From the page: the layout whose code asked for it (src/layout-changes.ts). */ drawing?: string;
+  action?: string; /** The island a pack action was given (its `island` input): where what it makes goes when nothing it is tied to in the change says (packs/loader/kernel/island-items.ts). */ island?: string; /** The pack whose action or handler made it: what it writes is kept to the pack's reach (core's pack_reach). */ pack?: string; /** From the page: the layout whose code asked for it (packs/rules/kernel/layout-changes.ts). */ drawing?: string;
   /** The change set this one reverses: undo's own. */
   undoes?: string; /** The session it was made in (a run's id), kept in the log's entry: where it came from, never on whose authority. */ run?: string;
 }
 
 export interface Entity {
-  id: string; /** Its kind, kept in its row (src/head.ts). */ kind: string | null; /** The row's own, which may not be the server's name for it (Archipelago.workspace). */ workspace: string;
+  id: string; /** Its kind, kept in its row (packs/loader/kernel/head.ts). */ kind: string | null; /** The row's own, which may not be the server's name for it (Archipelago.workspace). */ workspace: string;
   type: string;
   title: string;
   body: string;
@@ -154,7 +154,7 @@ export interface Proposal {
   note: string | null;
   /** Whom it was held for: the viewer of the map it was proposed on, or null. What it makes private is private to them. */
   private_to: string | null;
-  /** The rule that held it (src/rules.ts): null for one held before rules named themselves. */
+  /** The rule that held it (packs/rules/kernel/rules.ts): null for one held before rules named themselves. */
   held_by: Ruled | null;
 }
 

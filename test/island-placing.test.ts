@@ -1,4 +1,4 @@
-// A map pack's writes land on an island (src/island-items.ts, task e_b8k453zf): what its action makes of an island
+// A map pack's writes land on an island (packs/loader/kernel/island-items.ts, task e_b8k453zf): what its action makes of an island
 // pack's types goes on the island of what it is tied to in the same change, else on the island the action is given,
 // else on the lone island it fits; with none of these, it is refused, naming the islands it could go on.
 import assert from 'node:assert/strict';

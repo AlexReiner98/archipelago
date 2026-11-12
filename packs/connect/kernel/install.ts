@@ -10,7 +10,7 @@ import { join } from 'node:path';
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 
-/** What Archipelago is called and how it is described: listing.json, as src/listing.ts reads it. */
+/** What Archipelago is called and how it is described: listing.json, as packs/surface/kernel/listing.ts reads it. */
 const LISTING = JSON.parse(read('listing.json')) as { name: string; summary: string; not: string; urls: { repository: string } };
 
 /** The client the page's example names: the first the installer sets up (its CLIENTS), so the page names none of its own. */
@@ -25,7 +25,7 @@ export const installLines = (origin: string) => ({
 /**
  * The installer, with the address it connects to and the files it writes beside the person's sign-in (~/.pelago/bin):
  * the sign-in, and the hook with what it loads, for the clients whose hooks are not a plugin's (Codex, Cursor), and the
- * working rules a project is handed (rules: the sessions pack's workingRules, src/working-rules.ts).
+ * working rules a project is handed (rules: the sessions pack's workingRules, packs/loader/kernel/working-rules.ts).
  */
 export function installScript(origin: string, rules: string): string {
   const here = (path: string) => read(path).replace(`'http://127.0.0.1:3100'`, JSON.stringify(origin));

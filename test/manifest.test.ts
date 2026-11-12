@@ -112,7 +112,7 @@ test("adding and taking out a pack is a fact on the log; its registrations follo
   const first = await syncPacks(l);
   assert.deepEqual(first.map((f) => f[1]).sort(), l.registry.found.map((p) => `pack:${p.id}`).sort(), 'every pack the server starts a workspace with is asserted when it opens');
   const reacher = first.find((f) => f[1] === 'pack:reacher')![3] as { version: string; manifest: string; text: string; code: string; files: Record<string, string>; texts: Record<string, string> };
-  // Its code is named by its files' hashes beside it, their texts kept the first time too (src/pack-code.ts).
+  // Its code is named by its files' hashes beside it, their texts kept the first time too (packs/loader/kernel/pack-code.ts).
   const code = { code: reacher.code, files: reacher.files };
   assert.deepEqual(Object.keys(reacher.texts).sort(), [...new Set(Object.values(reacher.files))].sort(), 'and its code, file by file');
   assert.deepEqual([reacher.version, reacher.manifest, createHash('sha256').update(reacher.text).digest('hex')], ['0.1.0', l.registry.hashes.get('reacher'), l.registry.hashes.get('reacher')], 'the log keeps the manifest itself, the first time it meets it');

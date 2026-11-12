@@ -1,5 +1,5 @@
 // Sessions started as the answer to a pack's action a person called (task e_bagaw58f; the refine pack's replay is the
-// first). Beside src/pack-launch.ts, which starts what an automation says when it comes due, and changing nothing of
+// first). Beside packs/loader/kernel/pack-launch.ts, which starts what an automation says when it comes due, and changing nothing of
 // it. Three guards keep it a power the owner sees and bounds (the coordinator, 11 Nov 2026):
 // - declared: only a pack whose manifest asks for `reach.launch` may answer launches, and that shows in its reach on
 //   the Packs screen before the owner adds it;
@@ -13,7 +13,7 @@ import type { ActionDef } from './declared.ts';
 import type { Manifest } from './manifest.ts';
 import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 
-/** How a session is started: src/launcher.ts hands it in when it loads, since what it reads reaches back to the pack host. */
+/** How a session is started: packs/surface/kernel/launcher.ts hands it in when it loads, since what it reads reaches back to the pack host. */
 type Launch = (l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy) => Promise<{ run: string; mode: LaunchMode }>;
 let launch: Launch | undefined;
 export const setActionLaunch = (fn: Launch) => void (launch = fn);

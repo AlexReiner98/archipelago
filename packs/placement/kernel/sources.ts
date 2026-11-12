@@ -1,5 +1,5 @@
 // Where a change's facts came from: a source item for each uri a change or an op names, made the first time and
-// found every time after. Moved from the write path's apply loop (ensureSource, src/change-apply.ts) into the
+// found every time after. Moved from the write path's apply loop (ensureSource, packs/write/kernel/change-apply.ts) into the
 // placement pack (docs/kernel-packs.md, "Where each module goes"). It fills write.follow.rides (the owner, 12 Nov
 // 2026, e_umv4gdqr): the source it makes rides the change that names it, with that change's verdict and authority,
 // and no rule judges it on its own. The write path asks it where an op names its source, inside the apply's
@@ -11,7 +11,7 @@ import type { KernelContext } from '#pelago/kernel';
 export interface SourceSpec { uri: string; title?: string; kind?: string; excerpt?: string }
 /** What the write path hands: a query on the change's transaction. */
 export interface Q { query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> }
-/** What the write path hands a filling of write.follow.rides, as this reads it (src/write-hooks.ts, Ride). */
+/** What the write path hands a filling of write.follow.rides, as this reads it (packs/write/kernel/write-hooks.ts, Ride). */
 export interface Ride { q: Q; place: string; source?: SourceSpec }
 /** The source item it makes. */
 export type Made = { op: 'create'; ref: string; type: string; title: string; body: string; status: string; props: Record<string, unknown> };

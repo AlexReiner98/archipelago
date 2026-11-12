@@ -6,7 +6,7 @@
 
 import type { KernelContext } from '#pelago/kernel';
 
-/** Who acts, as the kernel hands it (src/pelago-types.ts, Actor): only what publishing reads of it. */
+/** Who acts, as the kernel hands it (packs/write/kernel/pelago-types.ts, Actor): only what publishing reads of it. */
 export interface Actor {
   kind: 'human' | 'agent';
   name: string;
@@ -14,7 +14,7 @@ export interface Actor {
   may?: string;
 }
 
-/** On whose authority (src/pelago-types.ts, Authority): as the log keeps it. */
+/** On whose authority (packs/write/kernel/pelago-types.ts, Authority): as the log keeps it. */
 export type Authority = { of: 'human' | 'agent'; who?: string; basis?: string; stated_by?: string };
 export type Said = Pick<Authority, 'of' | 'basis'>;
 
@@ -34,10 +34,10 @@ export type Item = {
 
 const ID = /^e_[a-z0-9]{8}$/;
 
-/** How an actor is named in the log: `<kind>:<name>` (src/pelago-types.ts, actorId). */
+/** How an actor is named in the log: `<kind>:<name>` (packs/write/kernel/pelago-types.ts, actorId). */
 export const actorId = (actor: Actor) => `${actor.kind}:${actor.name}`;
 
-/** The authority an act is logged with (src/authority.ts, authorityOf): a human's own, or an agent's saying whose word it acts on. */
+/** The authority an act is logged with (packs/rules/kernel/authority.ts, authorityOf): a human's own, or an agent's saying whose word it acts on. */
 export function authorityOf(human: boolean, me: string, claimed?: Said): Authority {
   if (human) return { of: 'human', who: me };
   if (claimed?.of !== 'human') return { of: 'agent', who: me, ...(claimed?.basis && { basis: claimed.basis }) };
@@ -58,7 +58,7 @@ export const itemsOf = async (ctx: KernelContext, ids: string[]): Promise<Item[]
 /** The types a document is read whole as and can be public, and of those each finished status as type:status (the walls' public-document.ts). */
 export const publishable = async (ctx: KernelContext) => (await ctx.reads({ publishable: true })) as { types: string[]; finished: string[] };
 
-/** The type a view is kept as (core's lens), and whether a type is one (src/query-saved.ts, isKept). */
+/** The type a view is kept as (core's lens), and whether a type is one (packs/lenses/kernel/query-saved.ts, isKept). */
 const KEPT = 'lens';
 export const isKept = (ctx: Pick<KernelContext, 'registry'>, type: string) => ctx.registry.isA(type, KEPT);
 
@@ -70,7 +70,7 @@ export function drawnWith(registry: KernelContext['registry'], piece: string): s
   return [...new Set(on.flatMap((t) => registry.family(t)))];
 }
 
-/** Of an item's fields, those its type's pack marks as shown (src/documents.ts, shownOf). */
+/** Of an item's fields, those its type's pack marks as shown (packs/views/kernel/documents.ts, shownOf). */
 export const shownOf = (ctx: Pick<KernelContext, 'registry'>, type: string, props: Record<string, unknown>) => {
   const defs = (ctx.registry.type(type)?.fields ?? {}) as Record<string, { shown?: boolean }>;
   return Object.fromEntries(Object.entries(props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
@@ -78,10 +78,10 @@ export const shownOf = (ctx: Pick<KernelContext, 'registry'>, type: string, prop
 
 /** A line that brings an item in: its id and nothing else. */
 const SECTION = /^[ \t]*(e_[a-z0-9]{8})[ \t]*$/;
-/** The ids a document's note brings in, in the order it brings them (src/documents.ts, sectionIds). */
+/** The ids a document's note brings in, in the order it brings them (packs/views/kernel/documents.ts, sectionIds). */
 export const sectionIds = (body: string): string[] => [...new Set(body.split('\n').flatMap((line) => SECTION.exec(line)?.[1] ?? []))];
 
-/** A step of a kept view's picture (src/query-steps.ts, Step): what a reader may be given of it. */
+/** A step of a kept view's picture (packs/query/kernel/query-steps.ts, Step): what a reader may be given of it. */
 export interface Step {
   add?: string[];
   remove?: string[];
@@ -98,7 +98,7 @@ export interface Step {
   card?: { title: string; text?: string };
 }
 
-/** The steps as a reader of a published picture may have them: naming only what the picture shows them (src/query-steps.ts, stepsShown). */
+/** The steps as a reader of a published picture may have them: naming only what the picture shows them (packs/query/kernel/query-steps.ts, stepsShown). */
 export function stepsShown(steps: Step[], shown: Set<string>): Step[] {
   const only = <T>(byId: Record<string, T> | undefined) => byId && Object.fromEntries(Object.entries(byId).filter(([id]) => shown.has(id)));
   // Only what a step is known to say: anything else kept in it is not the reader's.

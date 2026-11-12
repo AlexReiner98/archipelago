@@ -1,9 +1,9 @@
 // The flat lens (the decision "The lens is a filter, a walk and a limit", 25 Oct 2026): a filter, a walk and a limit,
-// and nothing else. The filter is three lists of one kind of term (src/query-terms.ts): Find's sets are added to pick the
+// and nothing else. The filter is three lists of one kind of term (packs/query/kernel/query-terms.ts): Find's sets are added to pick the
 // seeds, each of Only's must hold of every seed as well, and Not's are taken away from everything the walk reaches too.
 // The walk follows the link types named, each out, in or either way, step by step; the limit is the most it sends.
 // The answer is items and the links among them: no containment, no places, no views, no style. A lens may also name
-// a window of time (`time`, src/timeaxis.ts): it finds nothing more, and each item says where it falls in the window.
+// a window of time (`time`, packs/query/kernel/timeaxis.ts): it finds nothing more, and each item says where it falls in the window.
 //
 // Every read is bounded by the ids in hand, an end of a link, the type index or the limit, and runs as the viewer:
 // row-level security keeps what they may not see out of the seeds, the walk and the links alike. The SQL is the reads
@@ -64,7 +64,7 @@ const names = (value: unknown, field: string): string[] => {
   return value as string[];
 };
 
-/** A view kept in the words before the three lists, in them: what the migration writes (src/query-saved.ts). */
+/** A view kept in the words before the three lists, in them: what the migration writes (packs/lenses/kernel/query-saved.ts). */
 export const fromBefore = (f: Record<string, unknown>) => {
   const list = (x: unknown) => (x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]) as string[];
   const link = (t: unknown) => (typeof t === 'string' ? t : (t as { to?: string }).to !== undefined ? `${(t as { link: string }).link} ${(t as { to: string }).to}` : `${(t as { link: string }).link}< ${(t as { from: string }).from}`);

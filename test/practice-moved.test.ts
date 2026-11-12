@@ -1,6 +1,6 @@
-// The practice pack, moved out of core (decision e_2ane3hh4; src/pack-moved.ts): a map that had core while core
+// The practice pack, moved out of core (decision e_2ane3hh4; packs/loader/kernel/pack-moved.ts): a map that had core while core
 // declared the working habits is given the pack, once, and is still held to them; and the rules file a project is
-// handed says the words of every pack the server turns on, not core's alone (src/working-rules.ts).
+// handed says the words of every pack the server turns on, not core's alone (packs/loader/kernel/working-rules.ts).
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';

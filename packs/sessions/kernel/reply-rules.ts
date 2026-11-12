@@ -5,9 +5,9 @@
 // agent once, with its one-line say, to go on before it stops. It asks never while the agent is already going on
 // because a hook asked (stop_hook_active), never twice in one turn, and only of a registered session, whose story
 // keeps each time it asked as a step. Every such rule names the setting the owner turns it off by (lifted).
-// What such a rule is and when it holds is read here, with nothing of the map; src/replies.ts asks.
+// What such a rule is and when it holds is read here, with nothing of the map; packs/sessions/kernel/replies.ts asks.
 
-/** A rule as a pack declares it (src/rules.ts): the fields a rule on a reply's end is read by. */
+/** A rule as a pack declares it (packs/rules/kernel/rules.ts): the fields a rule on a reply's end is read by. */
 export interface RuleDef {
   id?: string;
   on?: string;

@@ -1,6 +1,6 @@
 // A session's start on a trial island (task e_6pcqrf9v): the hook knows no task, so it reads the island from where the
 // session works, its repository's island, and tells it the session_start instructions of the version that island
-// runs (src/island-pin.ts); a session anywhere else is told the map's. Once it says a task, the task's island leads.
+// runs (packs/loader/kernel/island-pin.ts); a session anywhere else is told the map's. Once it says a task, the task's island leads.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Registry } from '../packs/loader/kernel/packs.ts';

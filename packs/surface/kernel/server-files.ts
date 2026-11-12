@@ -2,7 +2,7 @@
 // /connect/setup.mjs. Each is a file of the pack's files/ folder, sent as it is but for the values the kernel fills in
 // ({origin}, {tokens}, {version}, {rules}), and only those its declaration names. Its version is the hash of what its
 // pack hands out (every file it declares, as written, and the working rules); a session whose hook says another
-// version is told its folder is behind (src/hook-answers.ts).
+// version is told its folder is behind (packs/sessions/kernel/hook-answers.ts).
 //
 // What is public is only what whoever runs the server put in a pack's folder: nothing here reads a map.
 

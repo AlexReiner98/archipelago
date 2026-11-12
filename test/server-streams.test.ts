@@ -1,4 +1,4 @@
-// A server pack's page listens on a stream the kernel holds (src/server-streams.ts): told when a published document
+// A server pack's page listens on a stream the kernel holds (packs/surface/kernel/server-streams.ts): told when a published document
 // is published again, refused for one that is not published, and closed when the pack goes.
 
 import assert from 'node:assert/strict';

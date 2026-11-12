@@ -1,11 +1,11 @@
-// What was published, as a reader's page is given it (src/server-published.ts hands it to the reader pack): a
+// What was published, as a reader's page is given it (packs/surface/kernel/server-published.ts hands it to the reader pack): a
 // document's data with each drawing's code left at the address it is fetched from by its hash, that code by its hash,
 // and where a public item is read.
 
 const HASH = /^[0-9a-f]{64}$/;
 
 type Lens = { style?: { drawing?: { id: string; title: string; hash: string; modules?: Record<string, string> } } } & Record<string, unknown>;
-type Doc = { title: string; /** Its parts, as src/documents.ts reads them: text, a section, or one missing. */ parts: unknown[]; lenses?: Record<string, Lens> } & Record<string, unknown>;
+type Doc = { title: string; /** Its parts, as packs/views/kernel/documents.ts reads them: text, a section, or one missing. */ parts: unknown[]; lenses?: Record<string, Lens> } & Record<string, unknown>;
 
 /** Where a public item's page is read: stable for as long as it is public, whatever it is renamed. */
 export const publicPath = (workspace: string, id: string) => `/p/${workspace}/${id}`;
@@ -20,7 +20,7 @@ export function pageData(doc: Doc, here: string) {
       return [id, { ...lens, style: { ...lens.style, drawing: { ...named, src: `${here.replace(/\/$/, '')}/drawing/${drawing.hash}` } } }];
     }),
   );
-  // The look it was published in is sent as the page's own fields (src/styles.ts, pageLook), never twice.
+  // The look it was published in is sent as the page's own fields (packs/styles/kernel/styles.ts, pageLook), never twice.
   const { look: _look, ...rest } = doc as Doc & { look?: unknown };
   return { ...rest, ...(doc.lenses && { lenses }) };
 }

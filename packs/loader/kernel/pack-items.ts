@@ -5,9 +5,9 @@
 // anything of theirs. On an island map the island rules judge it as any pack, looks included. A rule only
 // tightens, a view is drawn by the kernel, and what runs code (actions, handlers, layouts, reach) stays a server's
 // pack's. A version of a server's pack alone may carry code of its own (its field code: files by path over its
-// pack's), run only on the islands that run the version (src/pack-code.ts), and an agent's word for it always waits
-// for the owner (core's rule pack_code). The registry lays these beside the folder packs (src/packs.ts), off until the owner adds one, and judges
-// them as it judges any pack; a change that makes or changes one is checked here first (src/type-items.ts).
+// pack's), run only on the islands that run the version (packs/loader/kernel/pack-code.ts), and an agent's word for it always waits
+// for the owner (core's rule pack_code). The registry lays these beside the folder packs (packs/loader/kernel/packs.ts), off until the owner adds one, and judges
+// them as it judges any pack; a change that makes or changes one is checked here first (packs/loader/kernel/type-items.ts).
 
 import { createHash } from 'node:crypto';
 import { ISLAND_KEYS } from './islands.ts';
@@ -89,7 +89,7 @@ function heldProblems(manifest: Entry): string[] {
 /** A version of a pack kept as an item (its field version_of): what an island may run in that pack's place, never a pack of its own. */
 export interface PackVersion extends ItemPack {
   of: string;
-  /** Its own code, files by path over its pack's (src/pack-code.ts): run on its islands alone. */
+  /** Its own code, files by path over its pack's (packs/loader/kernel/pack-code.ts): run on its islands alone. */
   code?: Record<string, string>;
 }
 

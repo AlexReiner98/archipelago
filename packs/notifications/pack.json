@@ -2,7 +2,7 @@
   "id": "notifications",
   "version": "0.1.0",
   "title": "Notifications",
-  "description": "Sends the human a notification on the map, needing no approval: made by the write root as the one who sends it (root.notify), and told to the packs that hear it; whom it may mail is the walls' recipient gate (src/notify-mail.ts). Other internal packs notify by its name, act.report.notify. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "description": "Sends the human a notification on the map, needing no approval: made by the write root as the one who sends it (root.notify), and told to the packs that hear it; whom it may mail is the walls' recipient gate (packs/walls/kernel/notify-mail.ts). Other internal packs notify by its name, act.report.notify. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
   "uses": [
     "service:root.notify"
   ],

@@ -7,8 +7,8 @@
 //   node src/cli.ts move <from: data folder | postgres://…> <to: data folder | postgres://…>
 //
 // Run it with no server on either database. The target must be empty: a folder that does not exist yet, or a new
-// database on the server (each workspace is its own database, src/pg.ts). What is sealed stays sealed, so a server on
-// the target must have the sealing key the source's had (src/secrets.ts).
+// database on the server (each workspace is its own database, packs/database/kernel/pg.ts). What is sealed stays sealed, so a server on
+// the target must have the sealing key the source's had (packs/seal/kernel/secrets.ts).
 
 import { createHash } from 'node:crypto';
 import type { Db, Q } from '../../database/kernel/db.ts';
@@ -71,7 +71,7 @@ async function insert(tx: Q, table: string, columns: string[], rows: Record<stri
   await tx.query(`insert into ${table} (${list}) select ${list} from jsonb_populate_recordset(null::${table}, $1::jsonb)`, [JSON.stringify(rows)]);
 }
 
-/** Both streams as stored, merged into the order a rebuild projects them (src/replay.ts): by time, a held change before what decides it, by position. */
+/** Both streams as stored, merged into the order a rebuild projects them (packs/log/kernel/replay.ts): by time, a held change before what decides it, by position. */
 async function* inOrder(q: Q): AsyncGenerator<Entry> {
   const page = async (stream: Stream, from: number) => stored(q, stream, from, PAGE);
   const next = { facts: await page('facts', 1), pending: await page('pending', 1) };
@@ -92,7 +92,7 @@ async function* inOrder(q: Q): AsyncGenerator<Entry> {
   }
 }
 
-/** The projections with no id of their own, by the columns that are their key (src/closure.ts, src/mentions.ts). */
+/** The projections with no id of their own, by the columns that are their key (packs/log/kernel/closure.ts, packs/mentions/kernel/mentions.ts). */
 const KEYS: Record<string, string[]> = { part_closure: ['ancestor', 'descendant'], mention: ['to_id', 'from_id'] };
 
 /** A table's rows hashed in key order, read the same way on both sides: what a comparison of the projections compares. */
@@ -157,7 +157,7 @@ export async function move(from: Db, to: Db, registry: Registry): Promise<MoveRe
     // The key vault first, so what lands sealed can be opened here as it was there.
     const vault = carried.filter((t) => t.startsWith('vault_'));
     for (const t of vault) rows[t] = await carry(from, tx, t);
-    // The years the log was written in, back to its oldest entry (src/partitions.ts).
+    // The years the log was written in, back to its oldest entry (packs/log/kernel/partitions.ts).
     const { rows: oldest } = await from.query<{ at: Date | null }>(`select least((select at from log_entry order by at limit 1), (select at from log_op order by at limit 1)) as at`);
     if (oldest[0].at) await makePartitions(tx, oldest[0].at);
 
@@ -173,7 +173,7 @@ export async function move(from: Db, to: Db, registry: Registry): Promise<MoveRe
       await projectEntry(tx, registry, open);
     }
 
-    // What the log does not hold yet stays as rows: a run's heartbeat and the like on an item (src/operational.ts).
+    // What the log does not hold yet stays as rows: a run's heartbeat and the like on an item (packs/log/kernel/operational.ts).
     const { rows: kept } = await from.query<{ id: string; kept: Record<string, unknown> }>(
       `select id, (select coalesce(jsonb_object_agg(k, v), '{}'::jsonb) from jsonb_each(props) p(k, v) where k = any($1::text[])) as kept from entity where props ?| $1::text[]`,
       [KEPT_FIELDS],

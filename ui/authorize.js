@@ -1,4 +1,4 @@
-// A client asks to connect (src/oauth.ts): the person signs in if they need to, sees who is asking, the workspace it
+// A client asks to connect (packs/identity/kernel/oauth.ts): the person signs in if they need to, sees who is asking, the workspace it
 // would act in and where it returns to, and says Allow or Deny. Anyone can name a client anything, so every connection
 // is asked for here and the place it returns to is always shown.
 

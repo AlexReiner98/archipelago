@@ -1,4 +1,4 @@
-// Bundles (src/bundles.ts): packs that go on and off together, as one owner action and one change set, offered only
+// Bundles (packs/loader/kernel/bundles.ts): packs that go on and off together, as one owner action and one change set, offered only
 // where the server's list offers every pack in them, and named by a distribution (PELAGO_START_PACKS).
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';

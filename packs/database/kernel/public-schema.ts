@@ -1,8 +1,8 @@
-// The database's half of a public document (src/public-document.ts): what anyone with no login is given of one,
+// The database's half of a public document (packs/walls/kernel/public-document.ts): what anyone with no login is given of one,
 // through a function that sees everything and gives as little as it can. Kept apart, with no imports, so the schema's
-// steps (src/migrate.ts) can be read without the code that reads them.
+// steps (packs/database/kernel/migrate.ts) can be read without the code that reads them.
 
-/** Step 9 (src/migrate.ts): a public document, read by anyone with no login. */
+/** Step 9 (packs/database/kernel/migrate.ts): a public document, read by anyone with no login. */
 export const PUBLIC_DOCUMENT = `
 -- A public document as anyone reads it: the document, when it is public, not archived, private to nobody and of a type
 -- read whole (the server names those, as its packs' screens say: a project's note is never given here), and of the
@@ -44,7 +44,7 @@ $fn$;
 grant execute on function pelago_public_document(text, text[]), pelago_public_document_picture(text, text[], text) to pelago_public;
 `;
 
-/** Step 10 (src/migrate.ts): what a public document said when it was last published, read in place of the map. */
+/** Step 10 (packs/database/kernel/migrate.ts): what a public document said when it was last published, read in place of the map. */
 export const PUBLISHED = `
 -- A document as it was published: what a reader is given of it (its text, its sections, its pictures' data), frozen
 -- by the person who published it. The draft is edited on the map; nothing public changes until it is published again.
@@ -80,7 +80,7 @@ $fn$;
 grant execute on function pelago_published(text, text[]), pelago_published_picture(text, text[], text) to pelago_public;
 `;
 
-/** Step 11 (src/migrate.ts): a published document's address word and its place in the site's header. */
+/** Step 11 (packs/database/kernel/migrate.ts): a published document's address word and its place in the site's header. */
 export const PUBLISHED_PATH = `
 -- Kept with the revision, as everything public is: a new path or place takes effect when it is published again.
 alter table published add column if not exists path text;
@@ -106,7 +106,7 @@ grant execute on function pelago_published_at(text, text[]), pelago_site_pages(t
 `;
 
 /**
- * Step 26 (src/migrate.ts): a document shared with another workspace may be published there, when the admin who
+ * Step 26 (packs/database/kernel/migrate.ts): a document shared with another workspace may be published there, when the admin who
  * shares it says so (dropped 10 Nov 2026, with its column and function, by step 39). The receiving workspace was given what it may publish through one
  * function, and only while the share stands: the document and what it brings in, as the share shows them.
  */
@@ -120,7 +120,7 @@ grant execute on function pelago_workspace_publishable(text, text) to pelago_pub
 `;
 
 /**
- * Step 39 (src/migrate.ts): shares made out to another workspace are gone (the owner, 10 Nov 2026; #323 stopped
+ * Step 39 (packs/database/kernel/migrate.ts): shares made out to another workspace are gone (the owner, 10 Nov 2026; #323 stopped
  * reading them, and was live before this step). Their rows go first, so none is left looking like a link with no
  * secret; then the columns and the functions only they read. A backup kept from before restores all the same: rows
  * are filled by name, and a column no longer here is not read.
@@ -141,8 +141,8 @@ alter table share drop column if exists publishable;
 `;
 
 /**
- * Step 40 (src/migrate.ts): a public view (decision e_nwdn7ce6). A view or an item, frozen as the person who shared it
- * saw it, with nothing private in it (src/public-view.ts), kept at /p/<workspace>/<id> for anyone and for search
+ * Step 40 (packs/database/kernel/migrate.ts): a public view (decision e_nwdn7ce6). A view or an item, frozen as the person who shared it
+ * saw it, with nothing private in it (packs/publish/kernel/public-view.ts), kept at /p/<workspace>/<id> for anyone and for search
  * engines, and at its address word on its site's domain when it has one. Read through these functions alone, as
  * anyone: what a reader is given is the frozen copy, never the map as it is now, and only while the item it is of
  * stands (archiving or forgetting it takes the view down).
@@ -209,7 +209,7 @@ end $fn$;
 `;
 
 /**
- * Step 41 (src/migrate.ts): what is published becomes its public view, exactly as published (its frozen copy, never its
+ * Step 41 (packs/database/kernel/migrate.ts): what is published becomes its public view, exactly as published (its frozen copy, never its
  * draft), keeping its address word, its place and when (decision e_nwdn7ce6, task e_3zm5mexm): a site's pages answer
  * the same words from public views. Only what a reader can read now: a revision of a document made private or
  * archived since stays unread. A public view made already is kept (publishing since step 40 writes one too), as is an
@@ -224,9 +224,9 @@ on conflict do nothing;
 `;
 
 /**
- * Step 44 (src/migrate.ts): what a public view shows, indexed (task e_r9e87vgz), so an item's page can say which public
+ * Step 44 (packs/database/kernel/migrate.ts): what a public view shows, indexed (task e_r9e87vgz), so an item's page can say which public
  * views show it without reading every one. What it shows is read from the frozen copy itself: its sections and the
- * items each picture in it draws (src/public-view.ts, shownIn). An expression, not a column: every writer of a public
+ * items each picture in it draws (packs/publish/kernel/public-view.ts, shownIn). An expression, not a column: every writer of a public
  * view, a restore among them, keeps it true without knowing of it.
  */
 export const PUBLIC_VIEW_SHOWS = `

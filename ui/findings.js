@@ -1,6 +1,6 @@
 // An island's findings on its page, one line each: the claim, its value with its unit, how sure (a mark only when it
 // is not sure), how old (from as of), and how many read it (task e_p27ddjqt). The rows are the `brief` of the island,
-// the same answer an agent reads (src/findings.ts), so a person and an agent see one list.
+// the same answer an agent reads (packs/views/kernel/findings.ts), so a person and an agent see one list.
 
 import { api, h } from './base.js';
 import { day } from './words.js';

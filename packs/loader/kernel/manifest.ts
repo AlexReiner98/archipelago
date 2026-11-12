@@ -42,7 +42,7 @@ export interface ReachDef {
   via?: ViaDef[];
   /** Server reach: a pack that asks for it is the server's, never a workspace's. */
   server?: ServerReach;
-  /** It may answer an action a person calls with sessions to start: true for up to ten in one answer, or a number fewer (src/pack-action-launch.ts). */
+  /** It may answer an action a person calls with sessions to start: true for up to ten in one answer, or a number fewer (packs/loader/kernel/pack-action-launch.ts). */
   launch?: boolean | number;
 }
 
@@ -51,7 +51,7 @@ export interface Manifest {
   version: string;
   title: string;
   description?: string;
-  /** Names it cannot work without, each has:<capability>, type:<id> or event:<kind> (src/packorder.ts): while one has no active provider, it waits. A bare pack id is the old form, kept for a bundle's two halves. */
+  /** Names it cannot work without, each has:<capability>, type:<id> or event:<kind> (packs/loader/kernel/packorder.ts): while one has no active provider, it waits. A bare pack id is the old form, kept for a bundle's two halves. */
   requires?: string[];
   /** Names it works with while they are provided, as requires names them: what of it names their provider's types is registered only while that one is active. */
   uses?: string[];
@@ -64,15 +64,15 @@ export interface Manifest {
   layouts?: LayoutDef[];
   styles?: StyleDef[];
   reach?: ReachDef;
-  /** The shared set every pack on an island map may build on, by type id: the kernel's pack alone declares it (src/islands.ts). */
+  /** The shared set every pack on an island map may build on, by type id: the kernel's pack alone declares it (packs/loader/kernel/islands.ts). */
   shared?: string[];
-  /** The packs it took declarations from, keeping their ids (src/pack-moved.ts): it may name a view, a style, a rule, an action or a layout `<pack>.<name>` for each, and is turned on, once, wherever one of them was. The kernel's packs are always among them. */
+  /** The packs it took declarations from, keeping their ids (packs/loader/kernel/pack-moved.ts): it may name a view, a style, a rule, an action or a layout `<pack>.<name>` for each, and is turned on, once, wherever one of them was. The kernel's packs are always among them. */
   moved_from?: string[];
   /** Its tier, and the code it runs in the server's process (docs/kernel-packs.md): only a pack of the server's own folder. */
   kernel?: KernelSpec;
 }
 
-/** A pack's tier: root holds control, service runs in-process beside it through the KernelContext (src/kernel-context.ts). */
+/** A pack's tier: root holds control, service runs in-process beside it through the KernelContext (packs/loader/kernel/kernel-context.ts). */
 export type Trust = 'root' | 'service';
 /** A function of a pack's modules, `<file>.ts#<export>`, under its `modules` folder. */
 export type ModuleRef = string;
@@ -90,20 +90,20 @@ export interface KernelSpec {
   optional?: true;
   /** The folder of its code under the pack's own, `kernel/` unless said. */
   modules?: string;
-  /** The service names it provides (`<family>.<name>`; a root's are `root.<name>`, src/root-calls.ts), each with its shapes (src/services.ts) and the function that answers it. */
+  /** The service names it provides (`<family>.<name>`; a root's are `root.<name>`, packs/loader/kernel/root-calls.ts), each with its shapes (packs/loader/kernel/services.ts) and the function that answers it. */
   provides?: Record<string, { in?: unknown; out?: unknown; read?: string; run: ModuleRef }>;
-  /** The shapes it calls service names with: what it gives and reads, checked against the provider's (src/packorder.ts). */
+  /** The shapes it calls service names with: what it gives and reads, checked against the provider's (packs/loader/kernel/packorder.ts). */
   calls?: Record<string, { in?: unknown; out?: unknown }>;
   /** The hook points and slots it fills, each with its function (or several, in order). */
   hooks?: Record<string, ModuleRef | ModuleRef[]>;
-  /** The fields of an item its write.rewrite fillings may set (src/write-hooks.ts): none unless said. */
+  /** The fields of an item its write.rewrite fillings may set (packs/write/kernel/write-hooks.ts): none unless said. */
   fills?: string[];
   /** The tables of its own that a log.project filling writes, each a column by its shape. */
   tables?: Record<string, Record<string, string>>;
   /** What it runs on a clock, on the server that leads. */
   timers?: { run: ModuleRef; every_ms: number; leading?: boolean }[];
   /**
-   * The settings prefix its memory (the read memory, src/packreads-service.ts) is kept under, in place of
+   * The settings prefix its memory (the read memory, packs/surface/kernel/packreads-service.ts) is kept under, in place of
    * `pack:<id>:`: a prefix the code it took over already kept there, so nothing is migrated (decision e_a8dh8fg3).
    */
   memory?: string;
@@ -131,7 +131,7 @@ export function kernelProblems(k: unknown): string[] {
   if (s.fills !== undefined && (!Array.isArray(s.fills) || s.fills.some((f) => typeof f !== 'string' || !f))) problems.push('kernel.fills is a list of the fields its rewrite may set');
   for (const [i, t] of arr<Raw>(s.timers).entries()) { ref(`kernel.timers[${i}]`, t.run); if (typeof t.every_ms !== 'number' || t.every_ms < 1000) problems.push(`kernel.timers[${i}].every_ms is a number of milliseconds, 1000 or more`); }
   if (s.trust === 'root' && (s.hooks !== undefined || s.fills !== undefined)) problems.push('a root pack opens hook points and slots; it fills none');
-  // The root service family (src/root-calls.ts): a root provides only root.<name>, and only a root provides one.
+  // The root service family (packs/loader/kernel/root-calls.ts): a root provides only root.<name>, and only a root provides one.
   for (const name of Object.keys((s.provides ?? {}) as Raw)) if ((s.trust === 'root') !== name.startsWith('root.')) problems.push(s.trust === 'root' ? `kernel.provides "${name}": a root pack provides only root.<name>, a root service` : `kernel.provides "${name}": only a root pack provides a root service`);
   if (s.optional !== undefined && s.optional !== true) problems.push('kernel.optional is true, or absent for a required pack');
   if (s.optional === true && s.trust === 'root') problems.push('a root pack is never optional: it is always on');
