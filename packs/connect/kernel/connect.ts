@@ -8,7 +8,6 @@
 // 2026, e_wuqn82rf).
 
 import type { KernelContext } from '#pelago/kernel';
-import { workingRules } from '../../../src/working-rules.ts';
 import { installPage, installPs1, installScript, installSh, llmsTxt } from './install.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
 
@@ -16,19 +15,22 @@ import { askForToken, pollForToken } from './token-ask.ts';
 export const setupCommand = (origin: string) => `node -e "fetch('${origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
 
 /** What /connect/install hands out, by path: its type and its text for this server's address. */
-const INSTALL: Record<string, [string, (origin: string) => string]> = {
+const INSTALL: Record<string, [string, (origin: string, rules: () => string) => string]> = {
   '/connect/install': ['text/plain', installPage],
   '/connect/install.md': ['text/markdown', installPage],
-  '/connect/install.mjs': ['text/javascript', (origin) => installScript(origin, workingRules())],
+  '/connect/install.mjs': ['text/javascript', (origin, rules) => installScript(origin, rules())],
   '/connect/install.ps1': ['text/plain', installPs1],
   '/connect/install.sh': ['text/x-shellscript', installSh],
   '/connect/llms.txt': ['text/plain', llmsTxt],
 };
 
-/** What an install path hands out for this server's address: its type and its text, or undefined for no such path. */
-export function installed(path: string, origin: string): { type: string; text: string } | undefined {
+/**
+ * What an install path hands out for this server's address: its type and its text, or undefined for no such path. The
+ * working rules a project is handed are the loader's (which packs the server turns on): the surface hands them in.
+ */
+export function installed(path: string, origin: string, rules: () => string): { type: string; text: string } | undefined {
   const at = Object.hasOwn(INSTALL, path) ? INSTALL[path] : undefined;
-  return at && { type: at[0], text: at[1](origin) };
+  return at && { type: at[0], text: at[1](origin, rules) };
 }
 
 /** A system's request for its token (POST /connect/request), answered with what it shows and polls with. */

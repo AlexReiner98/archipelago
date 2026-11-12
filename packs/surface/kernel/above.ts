@@ -20,7 +20,8 @@ import { hostAt, serverContext } from '../../loader/kernel/kernel-context.ts';
 import { isInternal, type Manifest } from '../../loader/kernel/manifest.ts';
 import { OWN_PACKS } from '../../loader/kernel/pack-folders.ts';
 import { ownManifest, type RootCall } from '../../loader/kernel/root-calls.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import { workingRules } from '../../loader/kernel/working-rules.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** The server's workspaces, as a duty that walks them is handed them. */
 export type Walked = NonNullable<RootCall['workspaces']>;
@@ -99,14 +100,14 @@ export const mailing = () => onServer<Mailing>('surface.mail');
  * pack's and the connect pack's, each asked of the pack that fills it, on the map it is about.
  */
 export async function openRoutes() {
-  const [mail, connect] = await Promise.all([mailing(), onServer<{ installed(path: string, origin: string): { type: string; text: string } | undefined }>('surface.connect')]);
+  const [mail, connect] = await Promise.all([mailing(), onServer<{ installed(path: string, origin: string, rules: () => string): { type: string; text: string } | undefined }>('surface.connect')]);
   type Answer = { status: number; body: unknown };
   return {
     email: mail.email,
     pageStyle: (l: Archipelago) => onMap<{ style: { theme?: unknown; lengths?: unknown } }>(l, 'surface.page_style', {}, false),
     bounces: { ...mail.bounces, noteBounced: (l: Archipelago, emails: string[]) => onMap(l, 'surface.note_bounced', emails) },
     connect: {
-      installed: connect.installed,
+      installed: (path: string, origin: string) => connect.installed(path, origin, workingRules),
       asked: (l: Archipelago, body: unknown, origin: string, workspace: string) => onMap<Answer>(l, 'surface.token_asked', body, origin, workspace),
       polled: (l: Archipelago, workspace: string, id: string, secret: string) => onMap<Answer>(l, 'surface.token_polled', workspace, id, secret),
     },

@@ -112,13 +112,14 @@ function findShims(): Map<string, Shim> {
 
 /** An adapter's `export const f = async (l, ...) => moved.f(await ctx(l), ...)`, each as a template to inline at a call. */
 function parseAdapter(text: string): { adapted: Map<string, Adapted>; manual: string[] } {
-  const helpers = new Map<string, string>(); // ctx helper name -> pack id
-  for (const m of text.matchAll(/const (\w+) = async \((\w+)[^)]*\) => \(await import\('[^']*kernel-context\.ts'\)\)\.kernelContext\(\2, '([\w-]+)'\);/g)) helpers.set(m[1], m[3]);
+  const helpers = new Map<string, { fn: string; id: string }>(); // ctx helper name -> how it makes the context, and the pack
+  for (const m of text.matchAll(/const (\w+) = async \((\w+)[^)]*\) => \(await import\('[^']*kernel-context\.ts'\)\)\.(kernelContext|ownContext)\(\2, '([\w-]+)'\);/g)) helpers.set(m[1], { fn: m[3], id: m[4] });
   const locals = [...text.matchAll(/^(?:let|const) (\w+)/gm)].map((m) => m[1]).filter((n) => !helpers.has(n));
   const adapted = new Map<string, Adapted>(), manual: string[] = [];
   for (const m of text.matchAll(/^export (?:const|function|async function) (\w+)/gm)) {
     const name = m[1];
-    if (helpers.has(name)) continue; // an exported ctx helper (share-tools, token-ask): manual if anyone uses it
+    const helper = helpers.get(name); // an exported ctx helper (share-tools, sessions): the context, made where it is asked
+    if (helper) { adapted.set(name, { params: [{ name: 'l', rest: false }], body: `${helper.fn}(l, '${helper.id}')` }); continue; }
     let i = m.index + m[0].length;
     const head = /^ = (?:async )?/.exec(text.slice(i));
     if (!head || !/^export const/.test(m[0])) { manual.push(name); continue; }
@@ -133,9 +134,10 @@ function parseAdapter(text: string): { adapted: Map<string, Adapted>; manual: st
     let k = j;
     for (; k < text.length && text[k] !== ';'; k++) if ('([{'.includes(text[k])) k = close(text, k); else if ("'\"`".includes(text[k])) k = skipString(text, k);
     let body = text.slice(j, k).trim();
-    for (const [h, id] of helpers) body = body.replace(new RegExp(`await ${h}\\(([\\w.]+)\\)`, 'g'), `kernelContext($1, '${id}')`);
-    body = body.replace(/\(await import\('[^']*kernel-context\.ts'\)\)\.kernelContext\(/g, 'kernelContext(').replace(/^\(await ([\s\S]*)\) as [^()]+$/, '$1');
+    for (const [h, { fn, id }] of helpers) body = body.replace(new RegExp(`await ${h}\\(([\\w.]+)\\)`, 'g'), `${fn}($1, '${id}')`);
+    body = body.replace(/\(await import\('[^']*kernel-context\.ts'\)\)\.(kernelContext|ownContext)\(/g, '$1(').replace(/^\(await ([\s\S]*)\) as [^()]+$/, '$1');
     if (/\bawait\b|\bimport\(/.test(body) || locals.some((n) => new RegExp(`(?<![\\w$.])${n}(?![\\w$])`).test(body))) { manual.push(name); continue; }
+    if (params.some((p) => !/^(?:\.\.\.)?\w+/.test(p))) { manual.push(name); continue; } // a destructured parameter
     adapted.set(name, { params: params.map(param), body });
   }
   return { adapted, manual };
@@ -311,10 +313,12 @@ function rewriteFile(f: string, shims: Map<string, Shim>, kept: Map<string, Set<
       if (left) found.manual.push(`${f}: ${name} of ${a.s.path} is used ${left} time(s) as a value, not called`);
     }
   }
-  if (needsContext && !/\bkernelContext\b[^;]*\bfrom\b/.test(text) && f !== KERNEL_CONTEXT) {
+  // What the inlined calls make their context with, imported where it is not yet.
+  const makers = ['kernelContext', 'ownContext'].filter((fn) => needsContext && new RegExp(`(?<![\\w$.])${fn}\\(`).test(codeOnly(text)) && !new RegExp(`\\bimport\\s*\\{[^}]*\\b${fn}\\b[^}]*\\}\\s*from\\b`).test(text));
+  if (makers.length && f !== KERNEL_CONTEXT) {
     const last = [...text.matchAll(/^import\b[^;(]*;[ \t]*$/gm)].at(-1);
     const at = last ? last.index + last[0].length : 0;
-    text = `${text.slice(0, at)}\nimport { kernelContext } from '${rel(f, KERNEL_CONTEXT)}';${text.slice(at)}`;
+    text = `${text.slice(0, at)}\nimport { ${makers.join(', ')} } from '${rel(f, KERNEL_CONTEXT)}';${text.slice(at)}`;
   }
   if (n) found.rewritten.set(f, n);
   return text === before ? undefined : text;
@@ -422,7 +426,7 @@ if (!DRY) {
   for (const f of removable.keys()) unlinkSync(join(ROOT, f));
   if (noneKept && existsSync(join(ROOT, KEPT_FILE))) unlinkSync(join(ROOT, KEPT_FILE));
   // Every root's folder changed: pin the new hashes (packs/roots.json), as any change under a root's folder needs.
-  const pinned = spawnSync('npm', ['run', 'roots'], { cwd: ROOT, shell: true, encoding: 'utf8' });
+  const pinned = spawnSync('npm run roots', { cwd: ROOT, shell: true, encoding: 'utf8' });
   if (pinned.status !== 0) { console.error(pinned.stderr || pinned.stdout); process.exitCode = 1; }
 }
 const adapters = [...shims.values()].filter((s) => s.adapter);
