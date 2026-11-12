@@ -190,10 +190,12 @@ function forAgent(name: string, answer: unknown): unknown {
   if (name === 'flat' && Array.isArray(out?.items)) {
     // A row as an agent reads it: what its type and status already say (kind, open) and when it was made are left out,
     // the term that found it only when the filter has more than one, and its note to a shorter start. A quarter of a query.
+    // A note asked for whole (named in whole: notes "whole", or fields true) is sent whole.
     const finds = ((out.lens as { find?: unknown[] } | undefined)?.find ?? []).length;
+    const whole = new Set(Array.isArray(out.whole) ? (out.whole as string[]) : []);
     out.items = (out.items as Record<string, unknown>[]).map(({ kind, open, created_at, found, terms, body, ...row }) => ({
       ...row,
-      ...(typeof body === 'string' && { body: body.length > FLAT_NOTE ? `${body.slice(0, FLAT_NOTE).trimEnd()}…` : body }),
+      ...(typeof body === 'string' && { body: body.length > FLAT_NOTE && !whole.has(row.id as string) ? `${body.slice(0, FLAT_NOTE).trimEnd()}…` : body }),
       ...(finds > 1 && terms !== undefined && { found, terms }),
     }));
   }

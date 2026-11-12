@@ -239,6 +239,27 @@ test('notes whole: each note sent whole and named in whole, for a drawing that r
   await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`id ${made.a}`] }, notes: 'all' })), /notes must be "whole"/);
 });
 
+test('fields true: every item with every field its type declares and its note whole, for an agent too', async () => {
+  const { l, made } = await chain();
+  const long = `${'A long note. '.repeat(40)}The end.`;
+  await make(l, [{ op: 'update', id: made.a, body: long, props: { priority: 'high', tokens_estimated: 4000 } }]);
+  const params = { filter: { find: [`part_of ${made.p}`] } };
+  const shown = await queryFlatPack.flatRead(kernelContext(l, 'query'), params);
+  const a = shown.items.find((i) => i.id === made.a)!;
+  assert.equal(a.fields, undefined, 'a field its type does not show is left out');
+  const all = await queryFlatPack.flatRead(kernelContext(l, 'query'), { ...params, fields: true });
+  const b = all.items.find((i) => i.id === made.a)!;
+  assert.deepEqual(b.fields, { priority: 'high', tokens_estimated: 4000 });
+  assert.equal(b.body, long);
+  assert.deepEqual([...all.whole!].sort(), all.items.map((i) => i.id).sort(), 'every note sent whole is named in whole');
+  assert.equal(all.items.find((i) => i.id === made.b)!.fields, undefined, 'an item with no field set has none');
+  const asked = (await callTool(l, agent, 'view', { name: 'flat', params: { ...params, fields: true } })) as { items: { id: string; body?: string; fields?: unknown }[] };
+  const c = asked.items.find((i) => i.id === made.a)!;
+  assert.equal(c.body, long, 'an agent is given the note whole');
+  assert.deepEqual(c.fields, { priority: 'high', tokens_estimated: 4000 });
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), { ...params, fields: 'all' }), /fields must be true/);
+});
+
 test('a walk back along works_on keeps the sessions it reaches under the default Not, and nothing else of the kernel', async () => {
   const { l, made } = await chain();
   const got = await make(l, [

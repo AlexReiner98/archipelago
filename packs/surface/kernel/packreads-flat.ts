@@ -53,8 +53,8 @@ export type FlatRead = {
     limit: number;
     /** On a time axis: a seed is open, or changed since the window began. */
     since?: string;
-    /** Notes whole for the first items sent. */
-    whole?: boolean;
+    /** Notes whole for the first items sent, or (`all`) for every item sent. */
+    whole?: boolean | 'all';
     me: string | null;
     /** A term offered, read before it is added: what it would find (find), or which drawn items it would leave out. */
     preview?: { part: 'find' | 'only' | 'not'; terms: { raw: string; term: FlatTerm }[]; ids: string[] };
@@ -332,7 +332,7 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
 
   const cut = sent.size > lens.limit;
   const keptIds = [...sent].slice(0, lens.limit);
-  const wholeIds = lens.whole ? keptIds.slice(0, NOTES_WHOLE_MOST) : [];
+  const wholeIds = lens.whole === 'all' ? keptIds : lens.whole ? keptIds.slice(0, NOTES_WHOLE_MOST) : [];
   const { rows } = await l.db.query<{ id: string; type: string; props: Record<string, unknown> }>(`select id, type, title, case when id = any($2::text[]) then body else left(body, ${NOTE_START + 1}) end as body, visibility, status, is_open, owner, ${l.props}, created_at, updated_at from entity where id = any($1::text[])`, [keptIds, wholeIds]);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const items = keptIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
@@ -346,7 +346,7 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
   const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
   const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; pack: string | null }>(`select id, title, props->>'pack' as pack from entity where id = any($1::text[])`, [islandIds])).rows : [];
   return {
-    items, links, whole: items.filter((e) => wholeIds.includes(e.id)).map((e) => e.id),
+    items, links, whole: ((w) => items.filter((e) => w.has(e.id)).map((e) => e.id))(new Set(wholeIds)),
     found: Object.fromEntries(foundBy), terms: Object.fromEntries(termsBy), step: Object.fromEntries(stepOf),
     on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id) })),
     ...(cut && { cut: true }), ...(matched !== undefined && { matched }),
