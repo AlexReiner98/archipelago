@@ -22,7 +22,7 @@ For working on Archipelago itself, one person on one machine. It differs from
   `policy` in `pelago.config.json` says otherwise. Undo on the Changes screen
   still reverses a change set.
 - **Agents can restart the server** with the `restart` tool, to run code they
-  have just changed. The server is kept running by [src/dev.ts](../src/dev.ts):
+  have just changed. The server is kept running by [scripts/dev.ts](../scripts/dev.ts):
   if new code fails to start, it tries again when a file under `src/` or
   `packs/` changes. Its output is kept in `runs/dev-server.log`.
 

@@ -6,6 +6,20 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.observe": {
+        "in": {
+          "id": "id",
+          "status": "string",
+          "by": "string"
+        },
+        "out": {
+          "id": "id",
+          "status": "string"
+        },
+        "run": "root-services.ts#observe"
+      }
+    }
   }
 }

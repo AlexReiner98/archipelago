@@ -2,13 +2,25 @@
   "id": "connect",
   "version": "0.1.0",
   "title": "Connect",
-  "description": "How a person and their agents reach the server: the install scripts, sign-in pages, a token asked for and handed over, and the connections an operator drops. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "description": "How a person and their agents reach the server: the install scripts, a token asked for and handed over, the connections an operator drops and the check of whether each connection answers. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
   "uses": [
-    "service:root.server_packs"
+    "service:root.server_packs",
+    "service:root.observe"
   ],
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "hooks": {
+      "surface.act": "check-connections.ts#check_connections"
+    }
+  },
+  "reach": {
+    "items": [
+      {
+        "family": "connection",
+        "field": "url"
+      }
+    ]
   }
 }

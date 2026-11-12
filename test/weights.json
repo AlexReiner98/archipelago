@@ -59,6 +59,7 @@
   "test/canvas-pinch.test.ts": { "pglite": 15.5, "postgres": 13.3 },
   "test/canvas-replica.test.ts": { "pglite": 15, "postgres": 17.7 },
   "test/canvas-wires.test.ts": { "pglite": 26, "postgres": 26.5 },
+  "test/check-connections.test.ts": { "pglite": 0, "postgres": 0 },
   "test/canvas-zoom.test.ts": { "pglite": 12.7, "postgres": 5.5 },
   "test/capabilities.test.ts": { "pglite": 4, "postgres": 1.7 },
   "test/catch-up.test.ts": { "pglite": 2.5, "postgres": 0.9 },

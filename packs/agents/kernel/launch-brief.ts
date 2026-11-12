@@ -1,4 +1,4 @@
-// What a launched session is told and who it is started for: on this machine (src/launcher.ts).
+// What a launched session is told and who it is started for: on this machine (src/launcher.ts, the surface's).
 // Moved from src/launch-brief.ts; the old path adapts what took the map.
 
 import type { KernelContext } from '#pelago/kernel';
@@ -67,3 +67,9 @@ export const promptFor = (brief: Brief, mode: LaunchMode, run: string, instructi
     `Your Archipelago run id is ${run}; it is already registered and will be closed for you. Use the pelago report tool, action session_update (run ${run}), for anything the owner should know along the way.`,
     instructions ? `\n## Instructions from the owner\n${instructions}` : '',
   ].join('\n');
+
+/** The brief as a service (answer.launch_brief): the surface's launcher asks it by name. */
+export const launchBrief = (ctx: KernelContext, input: { actor: Actor; input: LaunchInput; by?: StartedBy }) => briefFor(ctx, input.actor, input.input, input.by);
+
+/** The prompt as a service (answer.launch_prompt), once the run is registered. */
+export const launchPrompt = (_ctx: KernelContext, input: { brief: Brief; mode: LaunchMode; run: string; instructions?: string }) => promptFor(input.brief, input.mode, input.run, input.instructions);

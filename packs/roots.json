@@ -6,7 +6,7 @@
     },
     {
       "id": "database",
-      "hash": "a5f22f3c14b26c9fdbec8726ed742054257653b63429155398989599af46a8bf"
+      "hash": "9b99576bed3c0f4f39a1d1943ab5f772530bb2c7c9e48a2a2e42bae17b8ac225"
     },
     {
       "id": "seal",
@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "e5c47339e617cc9155bee2a82c2f30248fd9d0a43b62004c308e463b710a858e"
+      "hash": "b03864798745eedfbfdb7d76762a3f24eeb84347d4bc418304c94a86fa8936ac"
     },
     {
       "id": "rules",
@@ -34,11 +34,11 @@
     },
     {
       "id": "write",
-      "hash": "a36234663854a2365c66c8abc925980a7973d06f8670b9be802ecd92d025d3fa"
+      "hash": "31c75527a58932684e3d1ffd5190764772ebe3ddda1fc8c862d6cd0e347cb461"
     },
     {
       "id": "surface",
-      "hash": "4f62bf63a01450673a768c35901e4ac24a1ff5d21b86f6393642c135c0c645c8"
+      "hash": "322964028b25138aaeaef6e8890e5c45f374751d9a01c7a772f05b70e5f3c093"
     }
   ],
   "calls": {
@@ -58,6 +58,9 @@
       "usage"
     ],
     "root.server_packs": [
+      "connect"
+    ],
+    "root.observe": [
       "connect"
     ]
   }

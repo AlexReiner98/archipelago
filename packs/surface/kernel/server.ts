@@ -475,6 +475,6 @@ If that process is not a pelago server, delete ${lock}.`);
   };
   process.on('SIGINT', () => stop());
   process.on('SIGTERM', () => stop()); alertOnCrash(hostname()); // a crash is mailed to the owner on the way down (src/alert.ts)
-  // Leave time for the answer to the restart call to be sent, then hand over to src/dev.ts.
+  // Leave time for the answer to the restart call to be sent, then hand over to scripts/dev.ts.
   if (config.dev) configureRestart(() => void setTimeout(() => stop(RESTART_EXIT), 200));
 }

@@ -257,14 +257,15 @@ export class Archipelago {
   }
 
   /**
-   * What a check of a connection saw (the connect pack's checkConnections, src/check-connections.ts, which calls out):
-   * kept as an observation, and the connection's status set, with a line in the activity, when it changed.
+   * What a check of a connection saw (the connect pack's checkConnections, which calls out, through the root service
+   * root.observe, ./root-services.ts): kept as an observation by who asked for the check (`by`, an actor's id), and
+   * the connection's status set, with a line in the activity, when it changed.
    */
-  async observed(actor: Actor, conn: Entity, status: 'available' | 'unavailable'): Promise<void> {
-    await this.record('observations', actorId(actor), [['+', conn.id, 'status', status]]);
+  async observed(by: string, conn: Entity, status: 'available' | 'unavailable'): Promise<void> {
+    await this.record('observations', by, [['+', conn.id, 'status', status]]);
     if (status === conn.status) return;
     await this.db.query(`update entity set status = $2, updated_at = now() where id = $1`, [conn.id, status]);
-    await this.log(this.db, { actor: actorId(actor), action: 'connection.check', target: conn.id, reason: 'Reachability changed', detail: { title: conn.title, from: conn.status, to: status } });
+    await this.log(this.db, { actor: by, action: 'connection.check', target: conn.id, reason: 'Reachability changed', detail: { title: conn.title, from: conn.status, to: status } });
   }
 
   // ---- settings --------------------------------------------------------

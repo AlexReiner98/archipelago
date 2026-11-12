@@ -5,6 +5,10 @@
 // What is held stays here, whoever names the command: the run, the token the process is given (and revoked when it
 // ends), the MCP config, the spawn, and what is recorded of each line it prints. The command and how its lines are
 // read come from a server pack's launcher (src/server-launch.ts, decision e_885ztqkv): the kernel names no agent's CLI.
+// The surface's since wave 6b (the owner, 12 Nov 2026, e_wuqn82rf): it writes runs as launched:<pack> past the rules,
+// spawns processes and holds tokens, which only a root may. The brief is the agents pack's (answer.launch_brief and
+// answer.launch_prompt, asked by name); the run's writes are the sessions pack's, handed in by the surface's session
+// acts (tool-acts.ts), which reach them already, until that pack offers them by name.
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -14,8 +18,9 @@ import { createInterface } from 'node:readline';
 import { createToken, revokeToken } from '../../../src/auth.ts';
 import { launchedMay, needHuman } from '../../../src/actor-checks.ts';
 import { actorId, type Actor, type Archipelago } from '../../../src/pelago.ts';
-import { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from '../../../src/sessions.ts';
-import { briefFor, promptFor, type LaunchInput, type LaunchMode, type StartedBy } from '../../../src/launch-brief.ts';
+import type { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from '../../../src/sessions.ts';
+import type { Brief, LaunchInput, LaunchMode, StartedBy } from '../../../src/launch-brief.ts';
+import { callAs } from '../../../src/kernel-context.ts';
 import { setPackLaunch } from '../../../src/pack-launch.ts';
 import { setActionLaunch } from '../../../src/pack-action-launch.ts';
 
@@ -83,6 +88,14 @@ export interface LauncherConfig {
   via: Launcher;
 }
 
+/** What a launched session's run is kept with: the sessions pack's run writes. */
+export interface RunWrites { sessionStart: typeof sessionStart; sessionUpdate: typeof sessionUpdate; sessionEnd: typeof sessionEnd; tell: typeof tell; recordUsage: typeof recordUsage }
+let writes: RunWrites | undefined;
+/** Hand in the run writes (tool-acts.ts does, as it loads). */
+export function keepRunsWith(next: RunWrites): void {
+  writes = next;
+}
+
 let config: LauncherConfig | undefined;
 const running = new Map<string, { child: ChildProcess; pack?: string }>();
 
@@ -95,9 +108,11 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
   needHuman(actor, 'Only a human can launch a session.');
   if (!config) throw new Error('Launching is off on this server. It starts an agent in a repository on the machine the server runs on, so it works only on a server that listens on that machine alone.');
   const at = config;
+  if (!writes) throw new Error('Launching is off: the sessions pack that keeps a launched run is not here.');
+  const { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } = writes;
   const via = at.via;
   const mode = input.mode ?? 'plan';
-  const { brief, started } = await briefFor(l, actor, input, by);
+  const { brief, started } = await callAs<{ brief: Brief; started?: StartedBy }>(l, 'answer.launch_brief', { actor, input, by });
   const cwd = brief.repo?.path;
   if (!cwd) throw new Error(`"${brief.task.title}" is not linked to a repository with a local path, so there is nowhere to run it.`);
   if (!existsSync(cwd)) throw new Error(`The repository path ${cwd} does not exist on this machine.`);
@@ -124,7 +139,7 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
   const mcpFile = join(at.dir, `${run}.mcp.json`);
   writeFileSync(mcpFile, JSON.stringify({ mcpServers: { pelago: { type: 'http', url: at.mcpUrl, ...(key && { headers: { Authorization: `Bearer ${key.token}` } }) } } }));
   const transcript = join(at.dir, `${run}.jsonl`);
-  const prompt = promptFor(brief, mode, run, input.instructions);
+  const prompt = await callAs<string>(l, 'answer.launch_prompt', { brief, mode, run, instructions: input.instructions });
   const close = async (summary: string) => {
     if (key) await revokeToken(l.db, key.id).catch(() => {});
     rmSync(mcpFile, { force: true });
