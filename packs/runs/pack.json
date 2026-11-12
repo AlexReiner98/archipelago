@@ -1,0 +1,76 @@
+{
+  "id": "runs",
+  "version": "0.1.0",
+  "title": "Runs",
+  "description": "The reads of core's run and works_on, which any pack may call: where a session stands (the frontier) and what sessions worked on, their states and turns, when they were at work, what they spent, what their turns tell, and the place a session is in. Required, so they answer on every map; what a session is told and kept is the sessions pack's.",
+  "uses": ["service:answer.attention", "service:answer.view_style"],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "answer.frontier": {
+        "in": { "run?": "id", "cwd?": "string", "remote?": "string", "limit?": "number", "said?": "boolean", "lines?": "boolean" },
+        "out": {
+          "place": { "repo?": { "id": "id", "title": "string" }, "folder?": "string" },
+          "before": { "sessions": "number", "last?": "any" },
+          "counts": "any",
+          "items": [{ "id": "id", "type": "string", "title": "string", "status": "string", "reasons": [{ "why": "string", "said?": "string" }] }],
+          "more?": "string",
+          "lines?": ["string"]
+        },
+        "run": "answers.ts#frontier"
+      },
+      "answer.worked_on": {
+        "in": { "runs": ["id"] },
+        "out": { "ids": ["id"] },
+        "run": "answers.ts#workedOn"
+      },
+      "answer.session_states": {
+        "in": { "runs": ["id"], "now?": "string" },
+        "out": { "states": "any" },
+        "run": "answers.ts#states"
+      },
+      "answer.session_marks": {
+        "in": { "runs": ["id"], "now?": "string" },
+        "out": { "marks": "any", "order": ["id"] },
+        "run": "answers.ts#marks"
+      },
+      "answer.run_spans": {
+        "in": { "runs": [{ "id": "id", "is_open": "boolean", "props": "any", "created_at": "any", "updated_at?": "any" }], "from": "number", "to": "number", "now?": "number" },
+        "out": { "spans": "any" },
+        "run": "answers.ts#spans"
+      },
+      "answer.spent": {
+        "in": { "days?": "number" },
+        "out": { "days": "number", "since": "string", "cost_usd": "number", "tokens": "number", "unpriced_tokens": "number", "by": [{ "surface": "string", "runs": "number", "tokens": "number", "cost_usd": "number", "unpriced_tokens": "number" }] },
+        "run": "answers.ts#spent"
+      },
+      "answer.session_measures": {
+        "in": { "since?": "string", "until?": "string", "stall_minutes?": "number" },
+        "out": { "since": "string", "until": "string", "stall_minutes": "number", "waiting": ["any"], "per_item": ["any"], "stalled": ["any"], "more?": "string" },
+        "run": "answers.ts#measures"
+      },
+      "answer.turns": {
+        "in": { "run": "string", "limit?": "number" },
+        "out": { "run": { "id": "id", "title": "string", "status": "string", "open": "boolean" }, "turns": ["any"], "more": "number", "names": "any" },
+        "run": "answers.ts#turns"
+      },
+      "answer.place_for": {
+        "in": { "remote?": "string", "cwd?": "string" },
+        "out": { "place": "any" },
+        "run": "answers.ts#placeFor"
+      },
+      "answer.lives_in": {
+        "in": { "type?": "string" },
+        "out": { "kinds": ["string"], "link?": "string" },
+        "run": "answers.ts#livesIn"
+      },
+      "answer.narrowed": {
+        "in": { "text": "string" },
+        "out": { "settled": [{ "id": "id", "title": "string", "status": "string", "chosen?": "string", "why?": "string" }], "open": [{ "id": "id", "title": "string", "status": "string" }] },
+        "run": "answers.ts#narrowed"
+      }
+    }
+  }
+}

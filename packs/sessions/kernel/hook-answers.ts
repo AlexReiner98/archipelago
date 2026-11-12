@@ -161,11 +161,11 @@ export async function sessionAnswer(event: string, call: HookCall): Promise<Neut
     if (looking) lines.push(looking);
     if (changes.length) lines.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${describeChanges(newest)}`);
     // The first thing the owner asks a session narrows where it stands: what the map has settled on it (src/frontier-prompt.ts).
-    const asked = (await import('./frontier-prompt.ts')).askedBy(body.prompt);
+    const asked = (await import('../../../src/frontier-prompt.ts')).askedBy(body.prompt);
     const narrowKey = `narrowed:${body.session_id ?? ''}`;
     if (asked && body.session_id && !(await kept(whole, narrowKey))) {
       await keep(whole, narrowKey, true, HEARD_MS);
-      const { narrowed, narrowedText } = await import('./frontier-prompt.ts');
+      const { narrowed, narrowedText } = await import('../../../src/frontier-prompt.ts');
       const found = await narrowed(pelago, asked).catch((err) => console.error(`hook narrow: ${(err as Error).message}`));
       const on = found ? narrowedText(found) : undefined;
       if (on) lines.push(on);

@@ -4,13 +4,10 @@
 // the runs they are about and what each worked on (by those runs' ids), and worked out with the same `turnsOf` the
 // session's page uses.
 
-import { type Archipelago } from '../../../src/pelago.ts';
-import { openOps } from '../../../src/opseal.ts';
-import { isSealed } from '../../../src/seal.ts';
-import type { Light, OpFact } from '../../../src/streams.ts';
-import { EVENT_FIELD, type SessionEvent } from './session-events.ts';
+import type { KernelContext } from '#pelago/kernel';
+import type { SessionEvent } from './session-state.ts';
 // @ts-ignore: a pack's plain module, typed by its use here (Turn below)
-import { turnsOf } from '../../core/sessions/turns.js';
+import { turnsOf } from './turns.js';
 
 /** A turn as `turnsOf` works it out (docs/sessions.md, "A turn"): the part read here. */
 interface Turn {
@@ -31,29 +28,10 @@ const ENTRIES = 20_000;
 /** Minutes of turns with no passing test and no commit before a session is called stalled. */
 const STALL_MINUTES = 60;
 
-type Row = { stream: Light['stream']; pos: number; at: Date; head: Omit<Light, 'stream' | 'pos' | 'at' | 'facts'>; facts: OpFact[] };
-
 /** The events kept in a range, by run: the entries recorded since its start (an event is recorded after it happens). */
-async function eventsIn(l: Archipelago, since: Date, until: Date) {
-  const { rows } = await l.db.query<Row>(
-    `select stream, pos::int as pos, at, head, facts from log_op where stream = 'sessions' and at >= $1 and at < $2
-     order by at desc, pos desc limit ${ENTRIES + 1}`,
-    [since.toISOString(), new Date(until.getTime() + 60_000).toISOString()],
-  );
-  const more = rows.length > ENTRIES;
-  const mine = rows.slice(0, ENTRIES).filter((r) => r.facts.some((f) => f[0] === '+' && f[2] === EVENT_FIELD)).reverse();
-  const opened = await openOps(l.db, mine.map((r): Light => ({ ...r.head, stream: r.stream, pos: r.pos, at: new Date(r.at).toISOString(), facts: r.facts })));
-  const byRun = new Map<string, SessionEvent[]>();
-  for (const e of opened) for (const f of e.facts) {
-    const ev = f[3] as SessionEvent;
-    if (f[0] !== '+' || f[2] !== EVENT_FIELD || isSealed(ev) || typeof ev?.kind !== 'string') continue;
-    const t = Date.parse(ev.at);
-    if (t < since.getTime() || t > until.getTime()) continue;
-    const list = byRun.get(f[1]) ?? byRun.set(f[1], []).get(f[1])!;
-    list.push(ev);
-  }
-  for (const list of byRun.values()) list.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-  return { byRun, more };
+async function eventsIn(ctx: KernelContext, since: Date, until: Date) {
+  const read = (await ctx.reads({ events_in: { since: since.toISOString(), until: until.toISOString(), most: ENTRIES } })) as { runs: Record<string, SessionEvent[]>; more: boolean };
+  return { byRun: new Map(Object.entries(read.runs)), more: read.more };
 }
 
 const minutes = (from: string | number, to: number) => Math.max(0, Math.round((to - (typeof from === 'number' ? from : Date.parse(from))) / 60_000));
@@ -90,22 +68,15 @@ export interface MeasuresInput {
  * run that worked on nothing is counted under the run); `stalled`, open runs with `stall_minutes` of turns or more
  * since a test last passed or a commit was made, longest first.
  */
-export async function sessionMeasures(l: Archipelago, input: MeasuresInput = {}) {
-  const until = input.until && !Number.isNaN(Date.parse(input.until)) ? new Date(input.until) : new Date();
+export async function sessionMeasures(ctx: KernelContext, input: MeasuresInput = {}) {
+  const until = input.until && !Number.isNaN(Date.parse(input.until)) ? new Date(input.until) : ctx.now();
   const since = input.since && !Number.isNaN(Date.parse(input.since)) ? new Date(input.since) : new Date(until.getTime() - WEEK);
   const stallAfter = typeof input.stall_minutes === 'number' && input.stall_minutes > 0 ? input.stall_minutes : STALL_MINUTES;
   const now = until.getTime();
-  const { byRun, more } = await eventsIn(l, since, until);
+  const { byRun, more } = await eventsIn(ctx, since, until);
   const ids = [...byRun.keys()];
-  const { rows: runs } = await l.db.query<{ id: string; title: string; is_open: boolean }>(
-    `select id, title, is_open from entity where id = any($1::text[]) and archived_at is null`,
-    [ids],
-  );
-  const { rows: links } = await l.db.query<{ run: string; item: string; title: string; type: string; valid_from: Date; valid_to: Date | null }>(
-    `select r.from_id as run, r.to_id as item, e.title, e.type, r.valid_from, r.valid_to from relation r join entity e on e.id = r.to_id
-     where r.from_id = any($1::text[]) and r.type = any($2::text[])`,
-    [ids, l.registry.relationFamily('works_on')],
-  );
+  const runs = (await ctx.reads({ run_open: ids })) as { id: string; title: string; is_open: boolean }[];
+  const links = (await ctx.reads({ run_links: { ids, works_on: ctx.registry.relationFamily('works_on') } })) as { run: string; item: string; title: string; type: string; valid_from: Date; valid_to: Date | null }[];
   const waiting = [], stalled = [];
   const items = new Map<string, { id: string; title: string; type: string; turns: number; tokens: { input: number; output: number }; runs: Set<string> }>();
   for (const run of runs) {

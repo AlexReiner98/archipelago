@@ -3,7 +3,7 @@
 // to another. Each span says what it was on: the work it had taken up, else the place it ran in. A session that was
 // only reported once it was over (a push read in GitHub Actions) has no length: it is one span that starts as it ends.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { KernelContext } from '#pelago/kernel';
 import { livesIn } from './places.ts';
 
 /** A session closed this long after it was last heard from was ended for it: it stopped when it went quiet. */
@@ -60,22 +60,17 @@ function activity(run: Run, began: number, ended: number, events: number[], now:
 }
 
 /** Where each session was at work between two instants, cut by the work it was on. */
-export async function runSpans(l: Archipelago, runs: Run[], from: number, to: number, now = Date.now()): Promise<Map<string, RunSpan[]>> {
+export async function runSpans(ctx: KernelContext, runs: Run[], from: number, to: number, now = ctx.now().getTime()): Promise<Map<string, RunSpan[]>> {
   const out = new Map<string, RunSpan[]>(runs.map((r) => [r.id, []]));
   // Only a session that began before the window ended and was heard from after it began can fall in it.
   const lastHeard = (r: Run) => Math.max(new Date(r.updated_at ?? r.created_at).getTime(), Date.parse(String(r.props.last_seen ?? '')) || 0, r.is_open ? now : 0);
   runs = runs.filter((r) => new Date(r.created_at).getTime() < to && lastHeard(r) >= from);
   if (!runs.length) return out;
   const ids = runs.map((r) => r.id);
-  const { rows: tasks } = await l.db.query<{ run: string; task: string; valid_from: Date; valid_to: Date | null }>(
-    `select from_id as run, to_id as task, valid_from, valid_to from relation where type = 'works_on' and from_id = any($1::text[]) order by valid_from`,
-    [ids],
-  );
-  const { rows: places } = await l.db.query<{ run: string; place: string }>(`select from_id as run, to_id as place from relation where from_id = any($1::text[]) and type = any($2::text[]) and valid_to is null`, [ids, livesIn(l)]);
+  const tasks = (await ctx.reads({ run_tasks: ids })) as { run: string; task: string; valid_from: Date; valid_to: Date | null }[];
+  const places = ((await ctx.reads({ links: { from: ids, types: livesIn(ctx) } })) as { from_id: string; to_id: string }[]).map((r) => ({ run: r.from_id, place: r.to_id }));
   // What else says when a session recorded before its stretches were kept was at work: what it did to its own record.
-  const { rows: signs } = await l.db.query<{ run: string; ts: Date }>(`select o.facts->0->>1 as run, o.at as ts from log_op o where o.seq = any(array(select pelago_op_about($1::text[]))) -- index log_op_about
-
-     union all select f.id, e.at from log_fact f join log_entry e on e.stream = f.stream and e.at = f.at and e.pos = f.pos where f.stream = 'facts' and f.id = any($1::text[])`, [ids]);
+  const signs = (await ctx.reads({ run_signs: ids })) as { run: string; ts: Date }[];
   const iso = (t: number) => new Date(t).toISOString();
   for (const run of runs) {
     const spans = out.get(run.id)!;

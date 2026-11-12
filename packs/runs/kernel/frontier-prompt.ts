@@ -4,8 +4,7 @@
 // agent does not reopen it; and what is still open to decide. Vector memory returns text like the prompt; this
 // returns decisions, with their reasons, tied to what the prompt is about.
 
-import type { Archipelago } from '../../../src/pelago.ts';
-import { searchMap } from '../../../src/search.ts';
+import type { KernelContext } from '#pelago/kernel';
 
 /** The links a step from a match walks, and their kinds: what it is part of, about, bears on, or waits for, either way. */
 const STEP = ['part_of', 'about', 'bears_on', 'depends_on'];
@@ -22,24 +21,16 @@ export function askedBy(prompt: unknown): string | undefined {
 }
 
 /** What the map has settled and left open on what the session was asked. */
-export async function narrowed(l: Archipelago, text: string) {
-  // A session is named by its first prompt (src/session-name.ts), so sessions are left out: they would match it best.
-  const matches = (await searchMap(l, { q: text, limit: MATCHES, except: ['run'] })) as { id: string }[];
+export async function narrowed(ctx: KernelContext, text: string) {
+  // A session is named by its first prompt (the sessions pack's names), so sessions are left out: they would match it best.
+  const matches = (await ctx.reads({ search_map: { q: text, limit: MATCHES, except: ['run'] } })) as { id: string }[];
   if (!matches.length) return { settled: [], open: [] };
   const ids = matches.map((m) => m.id);
-  const families = l.registry.relationFamily(...STEP);
-  const { rows: near } = await l.db.query<{ id: string }>(
-    `select case when from_id = any($1::text[]) then to_id else from_id end as id from relation
-     where valid_to is null and type = any($2::text[]) and (from_id = any($1::text[]) or to_id = any($1::text[]))`,
-    [ids, families],
-  );
-  const around = [...new Set([...ids, ...near.map((r) => r.id)])];
-  const settling = [...l.registry.types.values()].filter((t) => t.capabilities.settles).map((t) => t.id);
-  const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; is_open: boolean; props: Record<string, unknown>; updated_at: Date }>(
-    `select id, type, title, status, is_open, props, updated_at from entity where id = any($1::text[]) and type = any($2::text[]) and archived_at is null order by updated_at desc`,
-    [around, settling],
-  );
-  const field = (type: string, which: 'chosen' | 'why') => l.registry.type(type)?.capabilities.settles?.[which];
+  const near = (await ctx.reads({ steps_near: { ids, types: ctx.registry.relationFamily(...STEP) } })) as string[];
+  const around = [...new Set([...ids, ...near])];
+  const settling = [...ctx.registry.types.values()].filter((t) => t.capabilities.settles).map((t) => t.id);
+  const rows = (await ctx.reads({ settling: { ids: around, types: settling } })) as { id: string; type: string; title: string; status: string; is_open: boolean; props: Record<string, unknown>; updated_at: Date }[];
+  const field = (type: string, which: 'chosen' | 'why') => ctx.registry.type(type)?.capabilities.settles?.[which];
   const text_ = (v: unknown) => (typeof v === 'string' ? v : undefined);
   const settled = rows
     .filter((r) => !r.is_open)

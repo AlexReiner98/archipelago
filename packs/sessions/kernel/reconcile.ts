@@ -3,7 +3,7 @@
 
 import { blockGraph } from '../../../src/blocking.ts';
 import type { Archipelago, Entity, Op } from '../../../src/pelago.ts';
-import { livesIn, scopeOf } from './places.ts';
+import { livesIn, scopeOf } from '../../../src/places.ts';
 import { touchedBy } from './touched.ts';
 
 export type Item = { id: string; type: string; title: string; status: string; touched?: true };

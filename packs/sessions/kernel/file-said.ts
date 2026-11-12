@@ -4,7 +4,7 @@
 // them back; the server keeps nothing.
 
 import { FILE, instructionsFor } from '../../../src/instructions.ts';
-import { livesIn } from './places.ts';
+import { livesIn } from '../../../src/places.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
 import { resolveRun } from './sessions.ts';
 

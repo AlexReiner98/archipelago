@@ -1,17 +1,14 @@
 // The frontier: where a session stands on the map, and what there needs it. A new session is not told a story of the
 // last one; it is placed. Its place is read from where it runs (a repository the map knows, else the folder, a
 // worktree read as the checkout it was made from), the sessions that worked there before it, and what each changed
-// (the log: every change keeps its run), touched (src/touched.ts) or worked on. From that work, one step along part_of
+// (the log: every change keeps its run), touched (what the sessions pack keeps of it) or worked on. From that work, one step along part_of
 // either way, the open items are weighed by why each needs attention now, what is unfinished before what is recent:
 // what the owner corrected since an agent last touched it, what waits on someone, what was left mid-way, what is
 // blocked, what nobody has seen working, what is open. Nothing here is written for the next session: it is all read
 // off what is already true, and the same answer is the agent's start and the person's (query frontier).
 
-import { attention } from '../../../src/attention.ts';
-import { isKernel } from '../../../src/head.ts';
-import type { Archipelago, Entity } from '../../../src/pelago.ts';
+import type { KernelContext } from '#pelago/kernel';
 import { livesIn, placeFor } from './places.ts';
-import { touchedByAll } from './touched.ts';
 
 /** The strongest first: a reason's place in this list is its rank. Attention's reasons this view does not weigh are left out. */
 export const FRONTIER_REASONS = ['corrected', 'waits_on', 'to_confirm', 'unsettled', 'left', 'under_way', 'holding_up', 'blocked', 'moved', 'due', 'unseen', 'open'] as const;
@@ -45,14 +42,23 @@ export interface FrontierItem {
   reasons: { why: FrontierReason; [k: string]: unknown }[];
 }
 
+/** What attention answers of some items (packs/attention, answer.attention): the part read here. */
+type Weighed = { items: { id: string; type: string; title: string; status: string; reasons: { why: string; [k: string]: unknown }[] }[] };
+
+/** A run as the frontier reads it. */
+type Run = { id: string; title: string; props: Record<string, unknown>; created_at: Date; updated_at: Date };
+
+/** How long ago the sessions it reads may have last been heard from, as a moment. */
+const since = (ctx: KernelContext) => new Date(ctx.now().getTime() - DAYS * 86_400_000).toISOString();
+
 /** The place a session is in, and the sessions before it there, the newest first. */
-async function placed(l: Archipelago, input: FrontierInput) {
-  const self = input.run ? await l.entity(input.run) : undefined;
-  const cwd = input.cwd ?? (typeof self?.props.cwd === 'string' ? self.props.cwd : undefined);
-  const repo = await placeFor(l, { cwd, remote: input.remote });
+async function placed(ctx: KernelContext, input: FrontierInput) {
+  const self = input.run ? (((await ctx.reads({ get: input.run })) as Run | null) ?? undefined) : undefined;
+  const cwd = input.cwd ?? (typeof self?.props?.cwd === 'string' ? self.props.cwd : undefined);
+  const repo = await placeFor(ctx, { cwd, remote: input.remote });
   const here = cwd ? folderKey(cwd) : undefined;
-  const { rows } = await l.db.query<Entity>(`select * from entity where type = 'run' and archived_at is null and updated_at > $1 order by updated_at desc limit 300 -- index entity_type`, [new Date(Date.now() - DAYS * 86_400_000)]);
-  const inRepo = repo ? new Set((await l.db.query<{ id: string }>(`select from_id as id from relation where to_id = $1 and type = any($2::text[]) and valid_to is null`, [repo.id, livesIn(l)])).rows.map((r) => r.id)) : new Set<string>();
+  const rows = (await ctx.reads({ runs_lately: { since: since(ctx) } })) as Run[];
+  const inRepo = repo ? new Set(((await ctx.reads({ links: { to: [repo.id], types: livesIn(ctx) } })) as { from_id: string }[]).map((r) => r.from_id)) : new Set<string>();
   // Asked from nowhere in particular (a person's Home, or a chat with no folder: ChatGPT, Grok Bot), every place is
   // theirs: the workspace's recent sessions.
   const anywhere = !cwd && !input.remote;
@@ -61,44 +67,24 @@ async function placed(l: Archipelago, input: FrontierInput) {
 }
 
 /** What sessions worked on: what they changed (the log keeps each change's run), touched, or were set to work on. */
-export async function workedOn(l: Archipelago, ids: string[]): Promise<string[]> {
+export async function workedOn(ctx: KernelContext, ids: string[]): Promise<string[]> {
   if (!ids.length) return [];
-  // Three reads that wait on nothing of each other, asked together.
-  const [{ rows: changed }, { rows: on }, touched] = await Promise.all([
-    l.db.query<{ id: string }>(
-      `select distinct f.id from log_entry e join log_fact f on f.stream = e.stream and f.pos = e.pos and f.at = e.at
-       where e.stream = 'facts' and e.at > $2 and e.head->>'run' = any($1::text[]) and f.id like 'e\\_%' -- index log_entry_at`,
-      [ids, new Date(Date.now() - DAYS * 86_400_000)],
-    ),
-    l.db.query<{ id: string }>(`select to_id as id from relation where type = 'works_on' and from_id = any($1::text[])`, [ids]),
-    touchedByAll(l, ids),
-  ]);
-  return [...new Set([...changed.map((r) => r.id), ...on.map((r) => r.id), ...touched])];
+  // What they changed, were set to work on, and touched: three reads the reads API asks together.
+  return (await ctx.reads({ worked_on: { runs: ids, since: since(ctx) } })) as string[];
 }
 
 /** One step along part_of either way: the hub a piece is in, and the pieces of a hub, so what the owner added to an agent's plan is in it too. */
-async function around(l: Archipelago, ids: string[]): Promise<string[]> {
+async function around(ctx: KernelContext, ids: string[]): Promise<string[]> {
   if (!ids.length) return [];
-  const { rows } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null and (from_id = any($1::text[]) or to_id = any($1::text[]))`, [ids]);
-  return [...new Set([...ids, ...rows.flatMap((r) => [r.from_id, r.to_id])])];
+  return (await ctx.reads({ part_around: ids })) as string[];
 }
 
 /** What a person changed after an agent last did, item by item: who, when, and which fields. An item a person made inside an agent's work counts too. */
-async function corrections(l: Archipelago, ids: string[]) {
+async function corrections(ctx: KernelContext, ids: string[]) {
   // Only the facts a person said after the last an agent (or anyone not a person) said of the item are sent: the
   // rest of each item's history is weighed where it lies, not read back whole (a busy map's thousand items are
   // some ten thousand facts).
-  const { rows } = await l.db.query<{ id: string; field: string; actor: string; at: Date; added: boolean }>(
-    `with said as (
-       select f.id, f.seq, f.field, e.head->'actor'->>'id' as actor, e.at from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos and e.at = f.at
-        where f.stream = 'facts' and f.id = any($1::text[]) -- index log_fact_history
-     ), agent as (
-       select id, max(seq) filter (where actor is null or actor not like 'human:%') as seq from said group by id
-     )
-     select s.id, s.field, s.actor, s.at, a.seq is null as added from said s join agent a on a.id = s.id
-      where s.actor like 'human:%' and (a.seq is null or s.seq > a.seq) order by s.id, s.seq limit 20000`,
-    [ids],
-  );
+  const rows = (await ctx.reads({ corrections: ids })) as { id: string; field: string; actor: string; at: Date; added: boolean }[];
   const out = new Map<string, { by: string; at: Date; fields: string[]; added: boolean }>();
   for (const [id, after] of Map.groupBy(rows, (r) => r.id)) {
     const last = after.at(-1)!;
@@ -108,16 +94,14 @@ async function corrections(l: Archipelago, ids: string[]) {
 }
 
 /** Where a session stands, and the open items there with why each needs attention now, the strongest first. */
-export async function frontier(l: Archipelago, input: FrontierInput) {
-  const { repo, folder, runs } = await placed(l, input);
-  const reg = l.registry;
-  const worked = await workedOn(l, runs.map((r) => r.id));
-  const scope = await around(l, worked);
-  const { rows: rows } = await l.db.query<{ id: string; type: string; title: string; status: string; is_open: boolean; props: Record<string, unknown> }>(
-    `select id, type, title, status, is_open, props from entity where id = any($1::text[]) and archived_at is null`,
-    [scope],
-  );
-  const mine = rows.filter((e) => !isKernel(reg, e.type));
+export async function frontier(ctx: KernelContext, input: FrontierInput) {
+  const { repo, folder, runs } = await placed(ctx, input);
+  const reg = ctx.registry;
+  const worked = await workedOn(ctx, runs.map((r) => r.id));
+  const scope = await around(ctx, worked);
+  const rows = (await ctx.reads({ run_items: scope })) as { id: string; type: string; title: string; status: string; is_open: boolean; props: Record<string, unknown> }[];
+  // What the system keeps (a type the system's) is nobody's work.
+  const mine = rows.filter((e) => reg.types.get(e.type)?.system !== true);
   const live = new Map(mine.filter((e) => e.is_open).map((e) => [e.id, e]));
   const found = new Map<string, FrontierItem>();
   // Only what is open, but for what an agent settled and the owner has not confirmed: closed, and still theirs to look at.
@@ -135,11 +119,11 @@ export async function frontier(l: Archipelago, input: FrontierInput) {
   const all = new Map(mine.map((e) => [e.id, e]));
   // A closed one only while it is news: changed since the last session here began.
   const since = runs[0] ? new Date(runs[0].created_at).getTime() : 0;
-  for (const [id, c] of await corrections(l, [...all.keys()]))
+  for (const [id, c] of all.size ? await corrections(ctx, [...all.keys()]) : [])
     if (live.has(id) || new Date(c.at).getTime() > since) add(id, 'corrected', { by: c.by.slice('human:'.length), at: c.at, fields: c.fields, ...(c.added && { added: true }) }, all.get(id));
 
   // Attention's reasons, read among these items alone.
-  const weighed = await attention(l, { among: [...live.keys()], reasons: ['waits_on', 'to_confirm', 'unsettled', 'under_way', 'holding_up', 'blocked', 'moved', 'due', 'ready'], limit: 500 });
+  const weighed = await ctx.call<unknown, Weighed>('answer.attention', { among: [...live.keys()], reasons: ['waits_on', 'to_confirm', 'unsettled', 'under_way', 'holding_up', 'blocked', 'moved', 'due', 'ready'], limit: 500 });
   const blocked = new Set<string>();
   for (const item of weighed.items)
     for (const r of item.reasons) {
@@ -150,8 +134,7 @@ export async function frontier(l: Archipelago, input: FrontierInput) {
     }
   const busy = new Set(weighed.items.filter((i) => i.reasons.some((r) => r.why === 'under_way')).map((i) => i.id));
   // A hub with open parts is not itself next: its parts are.
-  const { rows: hubs } = await l.db.query<{ id: string }>(`select distinct to_id as id from relation where type = 'part_of' and valid_to is null and to_id = any($1::text[]) and from_id = any($1::text[])`, [[...live.keys()]]);
-  const hub = new Set(hubs.map((h) => h.id));
+  const hub = new Set((await ctx.reads({ hubs_among: [...live.keys()] })) as string[]);
 
   for (const e of live.values()) {
     const type = reg.type(e.type);

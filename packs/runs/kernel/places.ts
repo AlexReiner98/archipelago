@@ -2,12 +2,40 @@
 // and the kernel asks every type of place that declares where with an address or a folder which of its items those
 // keys name. Which packs ship such places the kernel does not know: with none, a session is tied to no place.
 
-import type { Entity, Archipelago } from '../../../src/pelago.ts';
+import type { KernelContext } from '#pelago/kernel';
 
-// What is a place's or an item's is read by the reads API, so it is surface's (packs/surface/kernel/packreads-scope.ts).
-export { livesIn, livesInFor, SCOPE, scopeOf } from '../../surface/kernel/packreads-scope.ts';
+/** What reads the registry alone: a pack's context, or anything that carries a registry as it does. */
+type Reg = Pick<KernelContext, 'registry'>;
+
+/** A place as the map keeps it: the fields read here. */
+export interface Place {
+  id: string;
+  type: string;
+  title: string;
+  props: Record<string, unknown>;
+  [column: string]: unknown;
+}
 
 const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+
+/** The link that ties a thing to this place: of the relations that are a kind of lives_in, the nearest one its type is made for (as packreads-scope reads it). */
+export function livesInFor(ctx: Reg, placeType: string): string {
+  const lineage = ctx.registry.type(placeType)?.lineage ?? [placeType];
+  const fits = ctx.registry
+    .relationFamily('lives_in')
+    .map((id) => ctx.registry.relations.get(id)!)
+    .map((r) => ({ id: r.id, at: Math.min(...r.to.map((t) => (t === '*' ? lineage.length : lineage.indexOf(t))).filter((i) => i >= 0)) }))
+    .filter((r) => Number.isFinite(r.at));
+  return fits.sort((a, b) => a.at - b.at)[0]?.id ?? 'lives_in';
+}
+
+/** The relations a thing lives in a place by, read whichever flavour tied it. */
+export const livesIn = (ctx: Reg) => ctx.registry.relationFamily('lives_in');
+
+/** The ids of everything that is a place's or an item's: itself, what lives in it, and all part of that or about it; open: only what is open and not the system's, and the item; among: only which of these. */
+export async function scopeOf(ctx: KernelContext, id: string, open = false, among?: string[]): Promise<Set<string>> {
+  return new Set((await ctx.reads({ within: { id, open, ...(among && { among }) } })) as string[]);
+}
 
 /**
  * An address as one key, however it was written: https://host/owner/name, git@host:owner/name.git and
@@ -29,12 +57,12 @@ export const sameAddress = (a: string, b: string) => {
 };
 
 /** The place these keys name, if the map holds one: by its address, which is the same on every machine, or failing that by the folder that holds the one given, the nearest first. */
-export async function placeFor(l: Archipelago, keys: { remote?: string; cwd?: string }): Promise<Entity | undefined> {
-  const types = [...l.registry.types.values()].filter((t) => t.capabilities.where?.address || t.capabilities.where?.folder);
+export async function placeFor(ctx: KernelContext, keys: { remote?: string; cwd?: string }): Promise<Place | undefined> {
+  const types = [...ctx.registry.types.values()].filter((t) => t.capabilities.where?.address || t.capabilities.where?.folder);
   if (!types.length || (!keys.remote && !keys.cwd)) return undefined;
-  const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null order by created_at, id`, [types.map((t) => t.id)]);
-  const where = (e: Entity) => l.registry.type(e.type)!.capabilities.where!;
-  const field = (e: Entity, name: string | undefined) => (name && typeof e.props[name] === 'string' ? (e.props[name] as string) : undefined);
+  const rows = (await ctx.reads({ places_of: types.map((t) => t.id) })) as Place[];
+  const where = (e: Place) => ctx.registry.type(e.type)!.capabilities.where!;
+  const field = (e: Place, name: string | undefined) => (name && typeof e.props[name] === 'string' ? (e.props[name] as string) : undefined);
   if (keys.remote) {
     const named = rows.find((e) => {
       const address = field(e, where(e).address);
@@ -51,8 +79,8 @@ export async function placeFor(l: Archipelago, keys: { remote?: string; cwd?: st
 }
 
 /** What a place is known by, as its own fields give it (address, folder): undefined for anything not known by either. */
-export function whereOf(l: Archipelago, e: Entity): { address?: string; folder?: string } | undefined {
-  const where = l.registry.type(e.type)?.capabilities.where;
+export function whereOf(ctx: Reg, e: { type: string; props: Record<string, unknown> }): { address?: string; folder?: string } | undefined {
+  const where = ctx.registry.type(e.type)?.capabilities.where;
   if (!where?.address && !where?.folder) return undefined;
   const field = (name: string | undefined) => (name && typeof e.props[name] === 'string' ? (e.props[name] as string) : undefined);
   return { address: field(where.address), folder: field(where.folder) };

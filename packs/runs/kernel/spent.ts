@@ -3,19 +3,16 @@
 // tokens. What else the work costs (hosting, a subscription) is a pack's to keep: the time pack's costs view adds
 // its payments to this.
 
-import type { Entity, Archipelago } from '../../../src/pelago.ts';
+import type { KernelContext } from '#pelago/kernel';
 
 const DAY = 86_400_000;
 const cents = (n: number) => Math.round(n * 100) / 100;
 
 /** What agents spent over the last days, by where they ran. */
-export async function spent(l: Archipelago, input: { days?: number }) {
+export async function spent(ctx: KernelContext, input: { days?: number }) {
   const days = Math.min(Math.max(Math.round(input.days ?? 30), 1), 366);
-  const since = Date.now() - days * DAY;
-  const { rows: runs } = await l.db.query<Entity>(`select id, title, props, created_at from entity where type = any($1::text[]) and archived_at is null and created_at >= $2::timestamptz`, [
-    l.registry.family('run'),
-    new Date(since).toISOString(),
-  ]);
+  const since = ctx.now().getTime() - days * DAY;
+  const runs = (await ctx.reads({ runs_made: { types: ctx.registry.family('run'), since: new Date(since).toISOString() } })) as { id: string; title: string; props: Record<string, unknown>; created_at: Date }[];
   const by = new Map<string, { surface: string; runs: number; tokens: number; cost_usd: number; unpriced_tokens: number }>();
   for (const run of runs) {
     const tokens = Number(run.props.tokens_used ?? 0);

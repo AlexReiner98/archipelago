@@ -87,6 +87,12 @@ export async function lastSaid(l: Archipelago, q: { ids: string[]; fields?: stri
   return opened(l, rows, Boolean(q.values));
 }
 
+/** The items each of some runs touched, as its hook kept them (the transient store, under touched:<run>), in the order the runs are given: read past row-level security, since the store is the server's, every run's in one read. */
+export async function touchedSets(l: Archipelago, runs: string[]): Promise<string[][]> {
+  const kept = await keptAll<string[]>((await bypassingRls(l)).db, runs.map((run) => `touched:${run}`));
+  return runs.map((run) => kept.get(`touched:${run}`) ?? []);
+}
+
 /**
  * The runs of a repository (those that live in it) or of a folder (started there, or in a folder under it), newest
  * first, a page at a time; each, if asked, with the items it touched that the asker may read (src/touched.ts).
@@ -116,8 +122,7 @@ export async function runsOf(l: Archipelago, q: { repo?: string; folder?: string
   if (!q.touched || !out.rows.length) return out;
   // The set the session's hook kept (the transient store, under touched:<run>) is read past row-level security (it is
   // the server's), every run's in one read; what is handed on is only what the asker may read now.
-  const kept = await keptAll<string[]>((await bypassingRls(l)).db, out.rows.map((r) => `touched:${r.id}`));
-  const sets = out.rows.map((r) => kept.get(`touched:${r.id}`) ?? []);
+  const sets = await touchedSets(l, out.rows.map((r) => r.id));
   const all = [...new Set(sets.flat())];
   const { rows: seen } = all.length ? await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and archived_at is null`, [all]) : { rows: [] };
   const may = new Set(seen.map((r) => r.id));
