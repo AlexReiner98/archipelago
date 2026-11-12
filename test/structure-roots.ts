@@ -30,9 +30,9 @@ function packOf(path: string): string | undefined {
   return at ?? (path.startsWith('src/') ? PACK_OF.get(posix.basename(path, '.ts')) : undefined);
 }
 
-/** Every value import of a file: static, re-exported or dynamic; `import type` is erased and does not count. */
+/** Every value import of a file: static, re-exported, dynamic or bare (for its side effects); `import type` is erased and does not count. */
 const imports = (text: string) =>
-  [...text.matchAll(/(?:^|;)[ 	]*(?:import|export)\s+(?!type\b)[^;]*?from\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/gm)].map((m) => m[1] ?? m[2]);
+  [...text.matchAll(/(?:^|;)[ 	]*(?:import|export)\s+(?!type\b)[^;]*?from\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|(?:^|;)[ 	]*import\s+['"]([^'"]+)['"]/gm)].map((m) => m[1] ?? m[2] ?? m[3]);
 
 /** The files of each root pack's code: its row's modules wherever they are, and what is under its kernel/. */
 function rootFiles(): [string, string][] {
