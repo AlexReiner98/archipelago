@@ -19,7 +19,7 @@ above it, never more.
 
 | Tier | Runs | May | May not |
 |---|---|---|---|
-| `root` | in the server process, started by the stub | open the database as its owner, write projections, bypass row-level security through a named `security definer` function, read the whole log, open hook points and slots | require a service name; import a root pack above it; change without the owner's word |
+| `root` | in the server process, started by the stub | open the database as its owner, write projections, bypass row-level security through a named `security definer` function, read the whole log, open hook points and slots, provide `root.*` service names to the packs roots.json names | require a service name; import a root pack above it; change without the owner's word |
 | `service` | in the server process, `internal: true` | read under row-level security, change through `change` as `system:<pack>`, keep the operational streams its rules declare, provide and require `service:` names, fill hook points | touch a table, the log or a key directly; import any kernel module; be carried on the map as code |
 | plain (no tier) | in the sandbox, as today (`src/packhost.ts`) | everything `docs/packs.md` gives a pack | anything in-process |
 
@@ -137,6 +137,35 @@ with `ctx.call`.
 The schema half of a closed list stays with the root pack that checks it
 (capabilities' check stays in loader); the behaviour moves to its provider.
 
+## Root services
+
+What only a root may do (read a workspace whole, write past the one write path, read the server's
+counters) a service pack asks for through the `root.*` family, and only the packs the owner listed
+may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
+
+- **Provided by a root.** A root pack's manifest names each under `kernel.provides` as
+  `root.<name>`, with its function (`<file>.ts#<export>`). A root provides no other name, and only a
+  root provides one (`kernelProblems`, `src/manifest.ts`). The function is handed a `RootCall` (who
+  calls, the map the caller's context is of, or for a server duty the server's workspaces) and the
+  input, and answers with values: never a handle on the database.
+- **Called only by the listed packs.** `packs/roots.json` holds `calls`, each name with the internal
+  service packs that may call it. The list is pinned with the roots: changing it is a change to
+  `roots.json`, which needs the owner's approved pull request. A caller also says it in its
+  manifest (`uses: ["service:root.<name>"]`).
+- **Checked at boot and at each call.** `checkRoots` (`src/boot.ts`) refuses a list that names a
+  pack not here or not an internal service pack, or a name no root provides. `ctx.call` refuses any
+  pack the list does not name for that name; a kernel caller (`callAs`) cannot ask one at all. A
+  server duty no map asks (backupAll) is handed `serverContext(pack, workspaces)`
+  (`src/kernel-context.ts`), which calls root services and nothing else.
+- **Narrow.** Each name is what one service pack needs, and no more:
+
+| Name | Root | For | Answers |
+|---|---|---|---|
+| `root.workspaces` | identity | backup | the workspaces the server holds |
+| `root.dump` | log | backup | a workspace's backup and its vault's, the workspace held open while read |
+| `root.merge` | log | backup | the writes a merge makes, and what they did |
+| `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
+
 ## Write-path hooks
 
 The write pack opens five hook points; service packs fill them. Each runs in
@@ -228,13 +257,13 @@ Started in this order; each needs only those above it in the table.
 | 0 | core | words: starter types, shared set, core's rules | none: data |
 | 1 | database | storage, row-level security, the shared lock | `open(ws)`, `scoped(viewer)`, `anyone()`, `asOwner(tx, sql)` (roots only), `definer(name)`, `tables(pack, spec)`, `migrate()`, `leading()` |
 | 2 | seal | keys, and what forget destroys of them | `seal(id, text)`, `openSaid(id, bytes)`, `destroyKey(id)`, `secret(key)`, `setSecret(key, v)`, `opseal` |
-| 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended` |
-| 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited` |
+| 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended`; `root.dump`, `root.merge` |
+| 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited`; `root.workspaces` |
 | 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate` |
 | 6 | loader | packs, versions, islands, the sandbox, the in-process tier | `Registry`, pack states, pins, island guards, `reach`, `host` (sandbox), `context(pack)` (the `KernelContext`), `call(service)`, `fillings(point)`, `packreads` |
 | 7 | rules | who decides what applies | `decide(who, ops, runs)`, `judge`, `mayDo`, `authorityOf`, actor checks, `standing` (still writable, room to store), private deps, layout changes; slot `rules.reply_ended` |
 | 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*` |
-| 9 | surface | the ten verbs, who may call them, the HTTP host | tools, MCP, CLI, the hook host, the server's routes and gates, the kernel reads (`get`, `search`, `schema`, `events`, `proposals`); slots `surface.*` |
+| 9 | surface | the ten verbs, who may call them, the HTTP host | tools, MCP, CLI, the hook host, the server's routes and gates, the kernel reads (`get`, `search`, `schema`, `events`, `proposals`); slots `surface.*`; `root.counters` |
 
 The `Archipelago` class (`src/pelago.ts`) is taken apart on the way: change
 and apply go to write, `search`, `get`, `trail` and `events` to surface,
@@ -254,13 +283,13 @@ moves with a shim to the pack named.
 |---|---|
 | database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), deploy, move, leader |
 | seal | seal, opseal, vault, secrets, backup-seal |
-| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore; the rest to backup), backup-log |
+| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage) |
 | identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
 | walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail |
 | loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packreads, packreads-kernel, packreads-log, packreads-pin, packreads-rows, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
-| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools, search, transient, view-address, listing |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing |
 
 ### Service
 
@@ -282,8 +311,8 @@ moves with a shim to the pack named.
 | claude_code (exists) | hook-tool, session-hook |
 | publish | published, published-data, published-frames, published-live, published-pictures, published-preview, public-bake, public-route, public-view, site, share-tools, drawing-files, pictures, pack-counts |
 | mcp_apps | mcp-view |
-| backup | backup-tools, and backup's backupAll, upload and merge |
-| usage | usage, bytes, workspace-use, pack-touches, pack-use, uses |
+| backup | backup's backupAll, upload and merge (through root services) |
+| usage | usage (through root.counters), pack-touches, pack-use, uses |
 | notifications | notify |
 | mail | mail, smtp, bounces |
 | alerts | alert |

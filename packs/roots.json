@@ -14,7 +14,7 @@
     },
     {
       "id": "log",
-      "hash": "ae95df5cbe7fb53493a87d619cd6f6b86b213c04322db49d585909c5e4680785"
+      "hash": "46a67b97e1a3476ed8c33533ef5e2550843c45210b60cddffa4c22136b4073d0"
     },
     {
       "id": "identity",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "c8c866a2ded832da6bb62322f0f3b1a7f5121fa107298dbb3c9c7e8b7a85a6ca"
+      "hash": "4d93f899cf1aedaf8b65af888217e5853974e05ede0194919dade9566a0c321f"
     }
   ],
   "calls": {
@@ -50,6 +50,9 @@
     ],
     "root.merge": [
       "backup"
+    ],
+    "root.counters": [
+      "usage"
     ]
   }
 }

@@ -1,6 +1,5 @@
 [
   "packs/rules/kernel/rule-fillings.ts -> src/reply-rules.ts",
-  "src/backup.ts -> src/bytes.ts",
   "src/backup.ts -> src/control-index.ts",
   "src/backup.ts -> src/control.ts",
   "src/backup.ts -> src/eventlog.ts",
@@ -18,7 +17,6 @@
   "src/declared.ts -> src/services.ts",
   "src/deploy.ts -> src/control.ts",
   "src/islands.ts -> src/link-ends.ts",
-  "src/log.ts -> src/bytes.ts",
   "src/mcp.ts -> src/askview.ts",
   "src/mcp.ts -> src/mcp-view.ts",
   "src/members.ts -> src/actor-checks.ts",
@@ -194,7 +192,6 @@
   "src/workspace-tools.ts -> src/reply-rules.ts",
   "src/workspace-tools.ts -> src/services.ts",
   "src/workspace-tools.ts -> src/sessions.ts",
-  "src/workspace-tools.ts -> src/workspace-use.ts",
   "src/workspaces.ts -> src/island-start.ts",
   "src/workspaces.ts -> src/lifecycle.ts",
   "src/workspaces.ts -> src/open-steps.ts",

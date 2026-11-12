@@ -6,6 +6,38 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.counters": {
+        "in": {
+          "admin?": "boolean",
+          "runs": [
+            "string"
+          ],
+          "largest": "number"
+        },
+        "out": {
+          "limits": "any",
+          "near": "number",
+          "order": [
+            "string"
+          ],
+          "used": "any",
+          "allowed": "any",
+          "storage_parts": "any",
+          "bytes_by_type": "any",
+          "largest": "any",
+          "requests_by": "any",
+          "looks_by": "any",
+          "awake": [
+            "id"
+          ],
+          "members?": [
+            "id"
+          ]
+        },
+        "run": "workspace-tools.ts#countersOf"
+      }
+    }
   }
 }

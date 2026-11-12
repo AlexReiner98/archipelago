@@ -3,11 +3,13 @@
 // own, a pack may provide a setting (setting.<key>, docs/kernel-packs.md): set here by its key, checked by its shape.
 
 import { z } from 'zod';
-import { endedOf, useOf, type Limits } from '../../../src/standing.ts';
+import { endedOf, LIMITS, NEAR, useOf, type LimitName, type Limits } from '../../../src/standing.ts';
 import { limitOf, renameWorkspace } from '../../../src/members.ts';
-import { looksThisHour } from '../../../src/looks.ts';
+import { looksBy, looksThisHour } from '../../../src/looks.ts';
 import { sessionsAwake } from '../../../src/sessions.ts';
-import { requestsThisMinute, storageOf } from '../../../src/workspace-use.ts';
+import { awakeSessions, requestsBy, requestsThisMinute, SESSION_AWAKE_MS, storageOf, storageParts } from './workspace-use.ts';
+import { bytesByType, largestItems } from '../../../src/bytes.ts';
+import type { RootCall } from '../../../src/root-calls.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import { actorId, type Archipelago } from '../../../src/pelago.ts';
 import { askedLately } from '../../../src/replies.ts';
@@ -82,6 +84,36 @@ async function limitUse(l: Archipelago, limits: Limits) {
   const { db } = await bypassingRls(l);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
   return useOf(limits, { members: rows[0].n, storage: await storageOf(l.workspace), requests: requestsThisMinute(l.workspace), sessions: await sessionsAwake(l), looks: looksThisHour(l.workspace) });
+}
+
+/**
+ * root.counters (docs/kernel-packs.md, "Root services"): what the server counts of the workspace whose map asks, for
+ * the usage pack's view: its limits and the use of each, and what that use is made of. Counted whole, as the server
+ * counts it: the ids it names are read by the view as its reader, who is told only what they may see.
+ */
+export async function countersOf(call: RootCall, input: { admin?: boolean; runs: string[]; largest: number }) {
+  const l = call.map;
+  if (!l) throw new Error('root.counters counts a workspace: call it from its map');
+  const whole = await bypassingRls(l);
+  const limits = await limitOf(l.workspace);
+  const used = {} as Record<LimitName, number>;
+  used.storage = await storageOf(l.workspace);
+  used.sessions = await awakeSessions(whole.db, input.runs);
+  used.requests = requestsThisMinute(l.workspace);
+  used.looks = looksThisHour(l.workspace);
+  const members = input.admin ? (await whole.db.query<{ person_id: string | null }>(`select person_id from member where removed_at is null`)).rows : undefined;
+  if (members) used.members = members.length;
+  const since = new Date(Date.now() - SESSION_AWAKE_MS).toISOString();
+  const { rows: awake } = await whole.db.query<{ id: string }>(
+    `select id from entity where type = any($2::text[]) and is_open and archived_at is null and props->>'last_seen' >= $1 order by props->>'last_seen' desc`,
+    [since, input.runs],
+  );
+  return {
+    limits: limits ?? null, near: NEAR, order: [...LIMITS], used, allowed: limits ? useOf(limits, used) : [],
+    storage_parts: await storageParts(whole.db), bytes_by_type: await bytesByType(whole.db), largest: await largestItems(whole.db, input.largest),
+    requests_by: [...requestsBy(l.workspace)], looks_by: [...looksBy(l.workspace)], awake: awake.map((r) => r.id),
+    ...(members && { members: members.flatMap((m) => (m.person_id ? [m.person_id] : [])) }),
+  };
 }
 
 export const WORKSPACE_TOOLS: Record<string, Tool> = {

@@ -1,2 +1,2 @@
-// Moved to the usage pack (docs/kernel-packs.md, "Where each module goes").
-export * from '../packs/usage/kernel/bytes.ts';
+// Moved to the log root (docs/kernel-packs.md, "Where each module goes"): what each item adds to the log.
+export * from '../packs/log/kernel/bytes.ts';

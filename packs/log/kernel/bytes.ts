@@ -1,11 +1,12 @@
 // What each item adds to the log, in bytes: so a workspace on a plan can see what its storage is made of (the usage
-// view, src/usage.ts). Each append adds a row for each item or link its facts are about, the length of those facts'
-// JSON as they are stored (sealed, compressed): rows only ever inserted, so writers at once never wait on each other.
-// They are folded into the counts by item and by type (links as one, the packs' manifests as one) before the counts
-// are read, under one lock. A count, not a record: made again whole from the log after a restore (recountBytes), and a
-// forget leaves the bytes its item had added (the log keeps a fact for each change, its words gone).
+// view, packs/usage). Each append adds a row for each item or link its facts are about, the length of those facts' JSON
+// as they are stored (sealed, compressed), through pelago_bytes_add: the usage pack's filling of the log's slot
+// log.appended calls it. Rows only ever inserted, so writers at once never wait on each other. They are folded into the
+// counts by item and by type (links as one, the packs' manifests as one) before the counts are read, under one lock. A
+// count, not a record: made again whole from the log after a restore (recountBytes), and a forget leaves the bytes its
+// item had added (the log keeps a fact for each change, its words gone). The tables and their reads are the log's; the
+// server's counters read them (root.counters, packs/surface/kernel/workspace-tools.ts).
 
-import type { KernelContext } from '#pelago/kernel';
 import type { Q } from '../../../src/db.ts';
 
 /** A fact as the log stores it, as JSON: what each is counted by, in an append and in a count made again. */
@@ -49,33 +50,6 @@ delete from type_bytes;
 insert into item_bytes (id, type, bytes)
   select s.id, ${TYPE_OF}, s.n from (select f.id, sum(octet_length((${STORED})::text))::bigint as n from log_fact f group by f.id) s left join entity e on e.id = s.id;
 insert into type_bytes (type, bytes) select type, sum(bytes) from item_bytes group by type;`;
-}
-
-/** What the log's slot log.appended hands a filling (docs/kernel-packs.md, "Slots"): an append's facts as they were stored. */
-export interface Appended { facts: unknown[] }
-/** The writer the slot hands with it, inside the append's transaction: a function of the filling's own pack, by name. */
-export interface AppendedRows { definer(name: string, arg: unknown): Promise<void> }
-
-/** The filling of log.appended: an append's stored facts, added to what is to be counted. */
-export async function appended(_ctx: KernelContext, entry: Appended, rows: AppendedRows): Promise<void> {
-  if (entry.facts.length) await rows.definer('pelago_bytes_add', entry.facts);
-}
-
-/** The functions the filling writes through, as the log's slot would call them in its transaction. */
-const DEFINERS = ['pelago_bytes_add'];
-const definerOn = (tx: Q): AppendedRows => ({
-  definer: async (name, arg) => {
-    if (!DEFINERS.includes(name)) throw new Error(`The usage pack writes through ${DEFINERS.join(', ')}, not ${name}`);
-    await tx.query(`select ${name}($1::jsonb)`, [JSON.stringify(arg)]);
-  },
-});
-
-/**
- * Add an append's stored facts to what is to be counted: what src/log.ts calls inside append until the log's slot
- * log.appended runs the filling above, which counts the same.
- */
-export async function countBytes(tx: Q, facts: unknown[]): Promise<void> {
-  await appended({} as KernelContext, { facts }, definerOn(tx));
 }
 
 /** What appends have added, folded into the counts: before they are read. */
