@@ -183,7 +183,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       const answer = await tell(l, actor, input);
       const { db } = await bypassingRls(l);
-      await tellStamp(db, l.workspace);
+      await tellStamp(db, l);
       await took(db, l, { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}`, run: answer.run }, true);
       return answer;
     },

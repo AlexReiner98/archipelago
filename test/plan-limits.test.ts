@@ -76,9 +76,9 @@ test('over each limit what would add to it is refused, in the pack’s words, an
 
   // Looks an hour: past the plan's, the next is refused (a look's drawing needs Chrome: here only its count).
   await limit({ looks: 2 });
-  await countLook(ws.id);
-  await countLook(ws.id);
-  await assert.rejects(countLook(ws.id), (err: Error) => /room for 2 looks an hour, and has 2: read one again/.test(err.message) && NAMES_PLAN.test(err.message));
+  await countLook(ws.pelago);
+  await countLook(ws.pelago);
+  await assert.rejects(countLook(ws.pelago), (err: Error) => /room for 2 looks an hour, and has 2: read one again/.test(err.message) && NAMES_PLAN.test(err.message));
 
   // Members, as before, and the Limits card at 80% of a limit.
   await limit({ members: 1, storage: 10e9 });

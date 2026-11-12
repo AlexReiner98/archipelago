@@ -147,7 +147,7 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   if (req.method === 'POST' && path === '/connect/bounce') {
     if (!fromRelay(req.headers.authorization)) return reply(res, 403, { error: 'Only the relay hands over bounces.' });
     const failed = failedFor((await at.raw()).toString('utf8'));
-    await noteBounced((await at.workspaces.get(at.fallback)).pelago.db, failed);
+    await noteBounced((await at.workspaces.get(at.fallback)).pelago, failed);
     if (failed.length) console.log(`bounced for good, not mailed for ${BOUNCED_DAYS} days: ${failed.length} address${failed.length === 1 ? '' : 'es'}`);
     return reply(res, 200, { kept: failed.length });
   }

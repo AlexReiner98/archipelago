@@ -63,6 +63,6 @@ export async function askOnReply(whole: Q, l: Archipelago, run: Entity | undefin
       console.error(`reply rule ${rule.id}: not kept in the story (${(err as Error).message})`),
     );
   }
-  await tellStamp(whole, l.workspace);
+  await tellStamp(whole, l);
   return asking.map((r) => r.say).join('\n');
 }

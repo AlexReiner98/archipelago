@@ -66,7 +66,7 @@ test('a token revoked while it waits on watch is told nothing more', async () =>
   const { latest } = (await callTool(l, robot, 'watch', {})) as { latest: number };
   // Its refusal is expected from the start: it can come while the next lines still run, before anything awaits it.
   const refused = assert.rejects(callTool(l, robot, 'watch', { after: latest, wait_seconds: 10 }), /revoked while it waited/);
-  assert.ok(await until(async () => (await presence(l.db, { workspace: l.workspace })).listening > 0, 10_000), 'it is waiting, its token good');
+  assert.ok(await until(async () => (await presence(l.db, l)).listening > 0, 10_000), 'it is waiting, its token good');
   await revokeToken(l.db, made.id);
   await make(l, [{ op: 'create', type: 'task', title: 'Said after the revoke' }]);
   await refused;

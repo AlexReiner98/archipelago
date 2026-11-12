@@ -4,13 +4,15 @@
 // The relay that sends our mail is where a failure comes back to, as a delivery status notification (RFC 3464) to
 // the sender's address. It hands each one to this server (POST /connect/bounce, with PELAGO_BOUNCE_SECRET as its
 // bearer), which reads the addresses that failed for good (Action: failed, a 5.x.x status) and keeps them in the
-// server's transient store (src/transient.ts) for BOUNCED_DAYS. A delay, or a failure that may pass, is not kept.
+// server's transient store (root.transient, packs/surface) for BOUNCED_DAYS: the default workspace's. A delay, or a failure that may pass, is not kept.
 
 import { timingSafeEqual } from 'node:crypto';
-import type { Q } from '../../../src/db.ts';
-import { env } from '../../../src/env.ts';
+import type { KernelContext } from '#pelago/kernel';
 import { normalEmail } from './mail.ts';
-import { keep, kept } from '../../../src/transient.ts';
+import { keep, kept } from './store.ts';
+
+/** A setting from the environment, PELAGO_ and the name (as src/env.ts reads one). */
+const env = (name: string): string | undefined => process.env[`PELAGO_${name}`];
 
 export const BOUNCED_DAYS = 90;
 const KEY = 'bounced:';
@@ -32,13 +34,13 @@ export function failedFor(dsn: string): string[] {
   return [...out];
 }
 
-/** Keep each address as bounced, for BOUNCED_DAYS from now. */
-export async function noteBounced(control: Q, emails: string[]): Promise<void> {
-  for (const email of emails) await keep(control, KEY + email, { at: new Date().toISOString() }, BOUNCED_DAYS * 86_400_000);
+/** Keep each address as bounced, for BOUNCED_DAYS from now, in the store of the map the context is of. */
+export async function noteBounced(ctx: KernelContext, emails: string[]): Promise<void> {
+  for (const email of emails) await keep(ctx, KEY + email, { at: new Date().toISOString() }, BOUNCED_DAYS * 86_400_000);
 }
 
 /** Whether mail to this address bounced lately, so is not sent. */
-export const hasBounced = async (control: Q, email: string) => (await kept(control, KEY + email)) !== undefined;
+export const hasBounced = async (ctx: KernelContext, email: string) => (await kept(ctx, KEY + email)) !== undefined;
 
 /** Whether a request carries the relay's secret: none is taken where the server has none set. */
 export function fromRelay(authorization: string | undefined): boolean {

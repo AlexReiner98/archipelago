@@ -6,6 +6,16 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "act.report.reading": {
+        "in": {
+          "given": "any",
+          "by": "string"
+        },
+        "out": "any",
+        "run": "report.ts#health"
+      }
+    }
   }
 }

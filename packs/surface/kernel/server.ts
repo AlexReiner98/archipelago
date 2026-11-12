@@ -38,7 +38,7 @@ import { loadConfig, RESTART_EXIT, startedFrom } from '../../../src/config.ts'; 
 import { SHORT, serveConnect } from '../../../src/connect.ts'; import { challenge, mcpAddress } from '../../../src/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
 import { stopAllLaunched } from '../../../src/launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
-import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from '../../../src/looks.ts'; import { pageMay } from './may.ts';
+import { setLookOrigin } from '../../../src/looks.ts'; import { LOOK_READS, passWorkspace, readPass } from '../../../src/look-pass.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { configureOutbox } from '../../../src/outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from '../../../src/control-index.ts'; import { isPersonToken, personAt } from '../../../src/person-tokens.ts';
 import { serverPacksOf } from './server-host.ts'; import { configureConnections } from '../../../src/connection-tools.ts'; import { configureHookTool } from '../../../src/hook-tool.ts'; import { setReach } from '../../../src/pack-reach.ts';
@@ -47,7 +47,7 @@ import { serverDuties } from '../../../src/duties.ts'; import { keepCounts } fro
 import { clientAddress, trustedProxies } from '../../../src/address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from '../../../src/public-route.ts'; import { siteNav } from '../../../src/site.ts'; import { ICON, serveIcon } from '../../../src/icon.ts';
-import { previewOf } from '../../../src/published-preview.ts'; import { lengthsSheet, pageLook } from '../../../src/styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
+import { previewOf } from '../../../src/published-preview.ts'; import { iconOf, lengthsSheet, pageLook } from '../../../src/styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
 import { configureSecrets } from '../../../src/secrets.ts'; import { serveFilled } from './surface-slots.ts';
 import { adapterBefore, answerAt, hookAt } from '../../../src/server-adapter.ts'; import { mountOf, serveMounted } from '../../../src/server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
@@ -102,7 +102,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : origins[0];
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token); setBounced(async (email) => hasBounced((await workspaces.get(DEFAULT_WORKSPACE)).pelago.db, email)); // a bounced address is sent nothing (src/bounces.ts)
+  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token); setBounced(async (email) => hasBounced((await workspaces.get(DEFAULT_WORKSPACE)).pelago, email)); // a bounced address is sent nothing (src/bounces.ts)
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
   const running = { commit: startedFrom(), started: new Date().toISOString(), roots: options.roots }; configureHookTool(serverPacks, running);
@@ -213,7 +213,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // A domain that serves a workspace's public site: its pages by the reader pack (packs/reader), its icon; the rest as on any name.
       const mount = req.method === 'GET' ? mountOf(url.pathname, site) : undefined; // an address a server pack took from the kernel's list (src/server-mounts.ts)
       if (mount && (await serveMounted(req, res, mount, url.pathname, { packs: serverPacks, site, tokens, workspaces, named, sites, host, from: addressOf(req), tooOften: () => tooOften(req, res, open) }))) return;
-      if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || (await serveIcon(res, (await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
+      if (req.method === 'GET' && ICON.test(url.pathname)) return tooOften(req, res, open) || serveIcon(res, await iconOf((await workspaces.get(site ?? DEFAULT_WORKSPACE)).pelago));
       // The routes the packs above the surface fill (src/surface-slots.ts, surface.route): each counts its own requests.
       if (await serveFilled(req, res, url.pathname, { workspaces, tooOften: (limit) => tooOften(req, res, { open, deliveries, signIn }[limit]) })) return;
       // What a project needs to work with this server, and a running system's request for its token: no token needed.

@@ -1,5 +1,5 @@
 // Where agents have pointed the owner's screen, and the steps they took, kept where any server can read them: in the
-// workspace's transient table (src/transient.ts), so a page that polls one server follows a show made on another. A
+// workspace's transient table (root.transient, packs/surface), so a page that polls one server follows a show made on another. A
 // show, a change and a told beat are kept at once, as they come with a write of their own; the steps of read tools
 // are gathered in this process and kept at most once a FLUSH_MS, so reading the map costs no write per call. A page
 // asking this process sees its own steps as they are taken, and another server's within FLUSH_MS. The agents waiting in
@@ -8,8 +8,8 @@
 // show can say whether it landed.
 
 import { randomBytes } from 'node:crypto';
-import type { Q } from '../../../src/db.ts';
-import { keep } from '../../../src/transient.ts';
+import type { KernelContext } from '#pelago/kernel';
+import { keep, scan } from './store.ts';
 
 /** Where an agent last pointed the human's screen: a place in the web UI. */
 export interface Focus {
@@ -84,26 +84,26 @@ const mine = new Map<string, Step[]>();
 // The session each agent last named on this screen, for its steps that name none (a change, a read): sessions of one
 // agent that each give a name of their own are told apart; two that go by one name are as one, but for what they name.
 const runs = new Map<string, string>();
-const unkept = new Map<string, Q>();
+const unkept = new Map<string, KernelContext>();
 let timer: NodeJS.Timeout | undefined;
 
 /** Point the screen there. */
-export async function point(db: Q, w: Whose, focus: Focus): Promise<void> {
-  await keep(db, `focus:${whose(w)}`, focus, KEPT_MS);
+export async function point(ctx: KernelContext, w: Whose, focus: Focus): Promise<void> {
+  await keep(ctx, `focus:${whose(w)}`, focus, KEPT_MS);
 }
 
 /** A step taken: kept at once when `now`, else with the next flush. */
-export async function took(db: Q, w: Whose, step: Omit<Step, 'at'>, now = false): Promise<void> {
+export async function took(ctx: KernelContext, w: Whose, step: Omit<Step, 'at'>, now = false): Promise<void> {
   const key = whose(w);
   const named = `${key}|${step.actor}`;
   if (step.run) runs.set(named, step.run);
   const run = step.run ?? runs.get(named);
-  const called = run ? { ...(await namesOf(db, run)), ...(await withinOf(db, run)) } : {};
+  const called = run ? { ...(await namesOf(ctx, run)), ...(await withinOf(ctx, run)) } : {};
   const list = mine.get(key) ?? [];
   // Two steps in one millisecond are still two.
   list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step, ...(run && { run }), ...called });
   mine.set(key, list.slice(-STEPS_KEPT));
-  unkept.set(key, db);
+  unkept.set(key, ctx);
   if (now) return flush(key);
   timer ??= setTimeout(() => void flushAll().catch(() => {}), FLUSH_MS).unref();
 }
@@ -112,10 +112,11 @@ export async function took(db: Q, w: Whose, step: Omit<Step, 'at'>, now = false)
 export const runNamed = (w: Whose, actor: string) => runs.get(`${whose(w)}|${actor}`);
 
 /** A session's word and what its chat is called, which may change while it runs: read each time, by its id. */
-async function namesOf(db: Q, run: string): Promise<{ name?: string; title?: string; label?: string }> {
-  type Row = { name: string | null; title: string | null; label: string | null };
-  const { rows } = await db.query<Row>(`select props->>'name' as name, title, props->>'label' as label from entity where id = $1`, [run]).catch(() => ({ rows: [] as Row[] }));
-  const { name, title, label } = rows[0] ?? {};
+async function namesOf(ctx: KernelContext, run: string): Promise<{ name?: string; title?: string; label?: string }> {
+  type Row = { title?: string | null; props?: Record<string, unknown> | null };
+  const rows = ((await ctx.reads({ ids: [run] }).catch(() => [])) ?? []) as Row[];
+  const text = (v: unknown) => (typeof v === 'string' ? v : undefined);
+  const name = text(rows[0]?.props?.name), title = text(rows[0]?.title), label = text(rows[0]?.props?.label);
   return { ...(name && { name }), ...(title && { title }), ...(label && { label }) };
 }
 
@@ -123,22 +124,16 @@ async function namesOf(db: Q, run: string): Promise<{ name?: string; title?: str
  * What session `run` works on now and what holds each of those, read by its id through the part_of closure, so the
  * owner's page can tell a session working inside a plan it watches.
  */
-async function withinOf(db: Q, run: string): Promise<{ within?: string[] }> {
-  const { rows } = await db
-    .query<{ id: string }>(
-      `with task as (select to_id as id from relation where from_id = $1 and type = 'works_on' and valid_to is null)
-       select id from task union select c.ancestor from part_closure c join task on c.descendant = task.id`,
-      [run],
-    )
-    .catch(() => ({ rows: [] as { id: string }[] }));
-  return rows.length ? { within: rows.map((r) => r.id) } : {};
+async function withinOf(ctx: KernelContext, run: string): Promise<{ within?: string[] }> {
+  const ids = ((await ctx.reads({ run_within: run }).catch(() => [])) ?? []) as string[];
+  return ids.length ? { within: ids } : {};
 }
 
 async function flush(key: string): Promise<void> {
-  const db = unkept.get(key);
-  if (!db) return;
+  const ctx = unkept.get(key);
+  if (!ctx) return;
   unkept.delete(key);
-  await keep(db, `steps:${key}:${PROCESS}`, mine.get(key) ?? [], KEPT_MS);
+  await keep(ctx, `steps:${key}:${PROCESS}`, mine.get(key) ?? [], KEPT_MS);
 }
 
 /** Keep every step not yet kept. */
@@ -149,13 +144,14 @@ export async function flushAll(): Promise<void> {
 }
 
 // The agents waiting in watch on this process, per workspace.
-const waiting = new Map<string, { db: Q; count: number }>();
+const waiting = new Map<string, { ctx: KernelContext; count: number }>();
 let beat: NodeJS.Timeout | undefined;
-const keepWaiting = (workspace: string, w: { db: Q; count: number }) => keep(w.db, `listening:${workspace}:${PROCESS}`, w.count, LISTEN_MS);
+const keepWaiting = (workspace: string, w: { ctx: KernelContext; count: number }) => keep(w.ctx, `listening:${workspace}:${PROCESS}`, w.count, LISTEN_MS);
 
 /** An agent begins (1) or stops (-1) waiting in watch on this process. */
-export async function listening(db: Q, workspace: string, by: 1 | -1): Promise<void> {
-  const w = waiting.get(workspace) ?? { db, count: 0 };
+export async function listening(ctx: KernelContext, by: 1 | -1): Promise<void> {
+  const workspace = ctx.workspace;
+  const w = waiting.get(workspace) ?? { ctx, count: 0 };
   w.count += by;
   if (w.count > 0) waiting.set(workspace, w);
   else waiting.delete(workspace);
@@ -168,8 +164,8 @@ export async function listening(db: Q, workspace: string, by: 1 | -1): Promise<v
 }
 
 /** A beat told in a workspace: the stamp a page watches moves with it. */
-export async function tellStamp(db: Q, workspace: string): Promise<void> {
-  await keep(db, `told:${workspace}`, Date.now(), KEPT_MS);
+export async function tellStamp(ctx: KernelContext): Promise<void> {
+  await keep(ctx, `told:${ctx.workspace}`, Date.now(), KEPT_MS);
 }
 
 /** How long a page counts as open after it last looked: it looks every two seconds while it is in sight. */
@@ -186,7 +182,7 @@ const pagesKept = new Map<string, { value: string; at: number }>();
 const openNow = (key: string) => [...(pages.get(key)?.values() ?? [])].filter((p) => Date.now() - p.at < PAGE_MS);
 
 /** A page looked: kept for the other servers only when whether it takes shows changed, or before the last keeping runs out. */
-export async function looked(db: Q, w: Whose, page: Omit<Page, 'at'>): Promise<void> {
+export async function looked(ctx: KernelContext, w: Whose, page: Omit<Page, 'at'>): Promise<void> {
   const key = whose(w);
   const list = pages.get(key) ?? new Map<string, Page>();
   list.set(page.page, { ...page, at: Date.now() });
@@ -197,25 +193,22 @@ export async function looked(db: Q, w: Whose, page: Omit<Page, 'at'>): Promise<v
   const last = pagesKept.get(key);
   if (last?.value === value && Date.now() - last.at < PAGE_MS / 2) return;
   pagesKept.set(key, { value, at: Date.now() });
-  await keep(db, `pages:${key}:${PROCESS}`, open, PAGE_MS);
+  await keep(ctx, `pages:${key}:${PROCESS}`, open, PAGE_MS);
 }
 
 /** The pages open on this screen, on any server, and how many of them take a show. */
-export async function watching(db: Q, w: Whose): Promise<{ open: number; following: number }> {
+export async function watching(ctx: KernelContext, w: Whose): Promise<{ open: number; following: number }> {
   const key = whose(w);
-  const { rows } = await db.query<{ value: Page[] }>(`select value from transient where until >= now() and starts_with(key, $1) and key <> $2`, [`pages:${key}:`, `pages:${key}:${PROCESS}`]);
+  const rows = (await scan(ctx, [], [`pages:${key}:`], [`pages:${key}:${PROCESS}`])) as { value: Page[] }[];
   // Another server's pages are as it last kept them, for as long as that keeping lasts.
   const open = [...rows.flatMap((r) => r.value), ...openNow(key)];
   return { open: open.length, following: open.filter((p) => p.on).length };
 }
 
 /** What a page polling for this screen is given: where it was pointed, the last steps on any server, the tell stamp and how many agents are listening. */
-export async function presence(db: Q, w: Whose): Promise<{ focus?: Focus; steps: Step[]; told: number; listening: number }> {
+export async function presence(ctx: KernelContext, w: Whose): Promise<{ focus?: Focus; steps: Step[]; told: number; listening: number }> {
   const key = whose(w);
-  const { rows } = await db.query<{ key: string; value: unknown }>(
-    `select key, value from transient where until >= now() and (key = $1 or key = $2 or (starts_with(key, $3) and key <> $4) or (starts_with(key, $5) and key <> $6))`,
-    [`focus:${key}`, `told:${w.workspace}`, `steps:${key}:`, `steps:${key}:${PROCESS}`, `listening:${w.workspace}:`, `listening:${w.workspace}:${PROCESS}`],
-  );
+  const rows = await scan(ctx, [`focus:${key}`, `told:${w.workspace}`], [`steps:${key}:`, `listening:${w.workspace}:`], [`steps:${key}:${PROCESS}`, `listening:${w.workspace}:${PROCESS}`]);
   const value = (k: string) => rows.find((r) => r.key === k)?.value;
   const theirs = rows.filter((r) => r.key.startsWith('steps:')).flatMap((r) => r.value as Step[]);
   const steps = [...theirs, ...(mine.get(key) ?? [])].sort((a, b) => a.at - b.at).slice(-STEPS_KEPT);

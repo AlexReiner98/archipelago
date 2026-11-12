@@ -1,24 +1,26 @@
 // What a view looks like, for an agent: drawn by the server, in its headless Chrome (look-draw.ts), from the
 // app's own page, as the agent sees the map, whatever page of the owner's is open or not (decision e_wsz3wdzp). The
-// page reads with a look pass (src/look-pass.ts, the trusted half, kept in the kernel): a token for one look, minted
+// page reads with a look pass (src/look-pass.ts, the trusted half, kept in the walls): a token for one look, minted
 // for the asking agent's own person (never an admin), good for one drawing and for the reads a canvas makes
 // (LOOK_READS) and nothing else. So private items are drawn exactly as query shows them to that agent. The picture
 // is kept in the transient table for LOOK_MS, under the screen it was asked for, and read again with query picture;
 // the same view at the same size, the map, the UI's files and this process unchanged since, is that kept picture
 // again rather than a second drawing, and says when it was drawn.
 
-import { randomHex, sha256Hex } from '../../../src/hashes.ts';
-import type { Q } from '../../../src/db.ts';
+import { createHash, randomBytes } from 'node:crypto';
+import type { KernelContext } from '#pelago/kernel';
 import { drawLook, type Marks } from './look-draw.ts';
-import { passFor } from '../../../src/look-pass.ts';
-import { whose, type Whose } from '../../../src/presence.ts';
-import { looksAllowed, overLimit } from '../../../src/standing.ts';
-import { headPos } from '../../../src/tail.ts';
-import { keep, kept, keptWith } from '../../../src/transient.ts';
-import { uiVersion } from '../../../src/ui-files.ts';
+import { keep, kept, keptWith } from './store.ts';
 
-// What reads the pass through looks still finds it here.
-export { LOOK_READS, passFor, passWorkspace, readPass, type Pass } from '../../../src/look-pass.ts';
+// What the roots do for a look (root.look, packs/surface): the UI's version, the pass the drawing reads with (minted by
+// the walls, src/look-pass.ts, where the server's gate reads it) and the room the workspace has for another look.
+type Look = { ui: string } & { pass: string } & { most: number; refused?: string };
+const ofRoots = (ctx: KernelContext, ask: Record<string, unknown>) => ctx.call<Record<string, unknown>, Look>('root.look', ask);
+
+/** Whose screen: per workspace and per person (as presence keys it). */
+export type Whose = { workspace: string; viewer?: string };
+const whose = (w: Whose) => `${w.workspace}:${w.viewer ?? ''}`;
+const sha256Hex = (s: string) => createHash('sha256').update(s).digest('hex');
 
 /** How long a look's picture is kept. */
 export const LOOK_MS = 30 * 60_000;
@@ -44,10 +46,11 @@ export function looksBy(workspace: string): Map<string, number> {
   return by;
 }
 /** Another look for this workspace, asked by `by`, unless it has had its limit (else PER_HOUR) in the last hour. */
-export async function countLook(workspace: string, by = '') {
-  const { most, limits } = await looksAllowed(workspace, PER_HOUR);
+export async function countLook(ctx: KernelContext, by = '') {
+  const workspace = ctx.workspace;
   const now = Date.now(), had = lastHour(workspace, now);
-  if (had.length >= most) throw limits ? await overLimit(workspace, limits, 'looks', had.length, 'read one again with query picture, or wait') : new Error(`This workspace has had ${most} looks in the last hour: read one again with query picture, or wait.`);
+  const { most, refused } = await ofRoots(ctx, { room: { had: had.length, otherwise: PER_HOUR } });
+  if (had.length >= most) throw new Error(refused ?? `This workspace has had ${most} looks in the last hour: read one again with query picture, or wait.`);
   drawn.set(workspace, [...had, { t: now, by }]);
 }
 
@@ -90,34 +93,34 @@ const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
  * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>; or preview/<id>, a document as it
  * would publish) for the asking agent and keep the picture. `fresh` draws it again whatever has changed or not.
  */
-export async function takeLook(db: Q, mapDb: Q, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean } = {}) {
+export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean } = {}) {
   const width = Math.min(1920, Math.max(320, Math.round(size.width ?? 1200)));
   const height = Math.min(1600, Math.max(240, Math.round(size.height ?? 750)));
   const scheme = size.scheme ?? 'dark';
   // Marks are a canvas's: an item's page is a page, and is a picture.
   const marks = Boolean(size.marks) && hash.startsWith('v');
-  const pos = await headPos(mapDb);
-  const same = `lookof:${whose(w)}:${sha256Hex(JSON.stringify([hash, width, height, scheme, pos, marks, await uiVersion(), BEGAN])).slice(0, 32)}`;
+  const pos = await ctx.reads({ log_head: true });
+  const same = `lookof:${whose(w)}:${sha256Hex(JSON.stringify([hash, width, height, scheme, pos, marks, (await ofRoots(ctx, { ui: true })).ui, BEGAN])).slice(0, 32)}`;
   if (!size.fresh) {
-    const was = await kept<{ look: string }>(db, same);
-    const had = was && (await keptWith<Kept>(db, `look:${whose(w)}:${was.look}`));
+    const was = await kept<{ look: string }>(ctx, same);
+    const had = was && (await keptWith<Kept>(ctx, `look:${whose(w)}:${was.look}`));
     if (was && had?.data) return answer(was.look, had.value, had.data, true);
   }
-  await countLook(w.workspace, w.viewer || actor);
-  const pass = await passFor(db, w, actor);
+  await countLook(ctx, w.viewer || actor);
+  const { pass } = await ofRoots(ctx, { pass: { actor } });
   const address = hash.startsWith('preview/') ? `${origin}/${hash}?look` : `${origin}/?look#/${hash}`;
   const got = await drawLook(address, pass, width, height, scheme, marks);
-  const look = `l_${randomHex(6)}`;
+  const look = `l_${randomBytes(6).toString('hex')}`;
   const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }) };
-  await keep(db, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
-  await keep(db, same, { look }, LOOK_MS);
+  await keep(ctx, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
+  await keep(ctx, same, { look }, LOOK_MS);
   return answer(look, k, got.data);
 }
 
 /** A look taken on this screen in the last LOOK_MS, again. */
-export async function lookAt(db: Q, w: Whose, look: string) {
+export async function lookAt(ctx: KernelContext, w: Whose, look: string) {
   if (!LOOK.test(look)) throw new Error(`"${look}" is not a look: query look or show with look: true names one.`);
-  const got = await keptWith<Kept>(db, `look:${whose(w)}:${look}`);
+  const got = await keptWith<Kept>(ctx, `look:${whose(w)}:${look}`);
   if (!got?.data) throw new Error(`No look "${look}" was taken on this screen in the last ${LOOK_MS / 60_000} minutes.`);
   return answer(look, got.value, got.data, true);
 }

@@ -189,6 +189,8 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.merge` | log | backup | the writes a merge makes, and what they did |
 | `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
 | `root.uses` | surface | usage | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`) |
+| `root.transient` | surface | looks, presence, mail | the transient store, kept and read (a key, a key with its bytes, keys and prefixes at once) as the whole workspace of the calling map |
+| `root.look` | surface | looks | the UI's version, a look pass for the calling map's screen (walls), the room for another look this hour (rules) |
 
 ## Write-path hooks
 
@@ -248,7 +250,7 @@ are slots of the write and log packs; the others:
 | `rules.reply_ended` | rules | sessions | `rules.ts` importing `reply-rules.ts` |
 | `walls.pass_store` | walls | surface (`transient`) | `look-pass.ts` importing `transient.ts` (a look pass kept in the transient store) |
 | `loader.reads` | loader | surface | `packhost.ts` and `kernel-context.ts` importing `packreads.ts` (the sandbox's reads, and a kernel pack's `ctx.reads`, which names the pack asking); the surface root's `open.ts` loads it before any workspace opens |
-| `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
+| `identity.invited` | identity | mail (`member-mail.ts#invited`, in `kernel.hooks`), filled when the server starts (`packs/loader/kernel/server-slots.ts`, loaded by the surface's server start) | `members.ts` importing `mail.ts` |
 | `open.<phase>` | identity (`src/lifecycle.ts`) | each root, by its `kernel/open.ts` (`OPEN`, and `LEADING` for what runs while the server leads), read in roots.json's order; an internal pack by `kernel.hooks`; what a service module still does there, `src/open-steps.ts` until its pack takes it | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
 | `surface.reads` | surface | agents (`instructions`), usage (`told`); the kernel until their packs hold their modules: eventlog (`events`), views and askview (`view`), timeaxis (`placed`) | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
@@ -365,13 +367,13 @@ moves with a shim to the pack named.
 | backup | backup's backupAll, upload and merge (through root services) |
 | usage | usage (through root.counters), pack-touches, pack-use (reads `type_counts`, `uses_lately`; root.uses), uses (root.uses) |
 | notifications | notify |
-| mail | mail, smtp, bounces |
+| mail (`packs/mailer`) | mail, smtp, bounces, member-mail |
 | alerts | alert |
 | looks | chrome, look-draw, icon, looks (`passFor` stays in walls) |
 | launch | launcher (the token stays in identity) |
 | connect | install, connect, token-ask, connection-tools, server-pack-tools |
 | presence | presence, seeing |
-| monitoring | report |
+| monitoring | report (the health tool stays the surface's, `report-tool.ts`, applying what `act.report.reading` says) |
 | devtools | dev, pull |
 
 Frontier goes to sessions, the pack whose types (`run`, `works_on`) it names,
@@ -595,6 +597,12 @@ At the old path, `src/<m>.ts`:
   The import is dynamic: `kernel-context.ts` reaches `packreads.ts`, which
   imports the query modules, which import shims, and a static import would be a
   cycle.
+
+As built (wave 6b, looks, presence, mail, monitoring): a function that took the whole database and a screen
+(presence, seeing, looks, bounces) is adapted to take the screen's map, and the database it is still handed is not
+read: the pack's context of that map reaches the transient store through `root.transient`, which reads it as the
+whole workspace, as its callers did. Notifications and alerts still import the kernel: a notification is applied past
+the rules as the asker's actor, and an alert mails, which no context does yet (the report of e_jxdxg89p).
 
 ### Tests
 
