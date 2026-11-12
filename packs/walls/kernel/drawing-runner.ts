@@ -1,4 +1,4 @@
-// What runs inside the process a drawing's first frame is made in (src/drawing-box.ts): started under node
+// What runs inside the process a drawing's first frame is made in (./drawing-box.ts, which spawns it by its path here; nothing else does): started under node
 // --permission with an empty environment and read access to the drawing's folder and this file only, so its code
 // writes no file, starts no process or worker and reads nothing of the server's. Node 24 has no wall for the network,
 // so this file puts one up before the drawing loads: a module may import only files of its own folder (no node:

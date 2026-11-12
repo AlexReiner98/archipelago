@@ -16,5 +16,7 @@ export function start(_ctx: RootContext): RootStarted {
     unscopedRead: () => import('./outbox.ts'),
     outside: () => import('./outside.ts'),
     mailGate: () => import('./notify-mail.ts'),
+    drawingBox: () => import('./drawing-box.ts'),
+    lookPass: () => import('./look-pass.ts'),
   };
 }
