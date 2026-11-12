@@ -32,6 +32,7 @@ function appendedContext(reg: Registry, pack: Manifest): KernelContext {
     registry: reg,
     call: none('calls a service'),
     change: none('makes a change'),
+    move: none('moves what it keeps'),
     record: none('records on a stream'),
     secret: none('asks for a secret'),
     fetch: none('calls out'),

@@ -36,8 +36,7 @@ export const LAYOUTS_MOVED = 'A layout is its own type: each style with code, or
 
 /**
  * The migration, planned: the facts that make each such style a layout, and the styles that become layouts. What it
- * reads is the styles pack's read (layout_moves); the kernel appends the facts as the system's move
- * (src/layout-move.ts), which a service pack may not.
+ * reads is the styles pack's read (layout_moves).
  */
 export async function planLayouts(ctx: KernelContext): Promise<{ facts: Fact[]; layouts: string[] }> {
   if (!ctx.registry.types.has('layout')) return { facts: [], layouts: [] };
@@ -45,4 +44,12 @@ export async function planLayouts(ctx: KernelContext): Promise<{ facts: Fact[]; 
   const rows = (await ctx.reads({ layout_moves: [...drawings] })) as { id: string; props: Props }[];
   const facts = layoutsMoved(rows, drawings);
   return { facts, layouts: facts.length ? rows.filter((r) => isLayout(r.props, drawings)).map((r) => r.id) : [] };
+}
+
+/** The migration: the planned facts appended as the system's move (ctx.move); the styles that became layouts. */
+export async function moveLayouts(ctx: KernelContext): Promise<string[]> {
+  const { facts, layouts } = await planLayouts(ctx);
+  if (!facts.length) return [];
+  await ctx.move('layout.moved', LAYOUTS_MOVED, facts);
+  return layouts;
 }
