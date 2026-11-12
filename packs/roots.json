@@ -7,6 +7,10 @@
     {
       "id": "database",
       "hash": "9e99e898b87d65539835d0d9f91198869d1d7c4a83efc2a9e401310d9470944b"
+    },
+    {
+      "id": "seal",
+      "hash": "69b93ded241f496499d0d548bb3333a918ef648686b57b5dacaf84e635a645ee"
     }
   ]
 }
