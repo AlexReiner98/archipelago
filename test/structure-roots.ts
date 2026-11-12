@@ -4,6 +4,7 @@
 // was owed (test/fixtures/root-imports.json); every owed import is cut, the list is empty, and nothing is added to it.
 
 import { posix } from 'node:path';
+import { valueImports } from '../packs/anatomy_sync/reader.ts';
 import { raw, rawWalk } from './structure-kit.ts';
 
 const CONTRACT = raw('docs/kernel-packs.md').replace(/\r\n/g, '\n');
@@ -28,8 +29,7 @@ function packOf(path: string): string | undefined {
 }
 
 /** Every value import of a file: static, re-exported, dynamic or bare (for its side effects); `import type` is erased and does not count. */
-const imports = (text: string) =>
-  [...text.matchAll(/(?:^|;)[ 	]*(?:import|export)\s+(?!type\b)[^;]*?from\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|(?:^|;)[ 	]*import\s+['"]([^'"]+)['"]/gm)].map((m) => m[1] ?? m[2] ?? m[3]);
+const imports = (text: string) => valueImports(text).filter((i) => i.kind !== 'require').map((i) => i.spec);
 
 /** The files of each root pack's code: what is under its kernel/, where every module of its row lives. */
 function rootFiles(): [string, string][] {
