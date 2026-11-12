@@ -1,0 +1,379 @@
+# Kernel code as packs
+
+Every part of `src/` becomes a pack, and what is trusted is a declared tier,
+not a place in the tree (decision e_3pxvwdn7, the owner, 12 Nov 2026). Nine
+**root packs** hold control: changed only with the owner's word, pinned by
+hash, needing nothing above them. Twenty-seven **service packs** run
+in-process beside them through one narrow, typed context, and fill hook
+points the root packs open. One **boot stub** that is no pack loads the
+roots. What stays in `src/` is the stub and nine plumbing modules.
+
+This is the contract every session of the wave builds against: task
+e_st5s6rj7 under the plan e_ykymc952. The choices it makes that are the
+owner's to confirm are listed last.
+
+## Three tiers
+
+A pack's tier is read from its manifest. Each tier can do less than the one
+above it, never more.
+
+| Tier | Runs | May | May not |
+|---|---|---|---|
+| `root` | in the server process, started by the stub | open the database as its owner, write projections, bypass row-level security through a named `security definer` function, read the whole log, open hook points and slots | require a service name; import a root pack above it; change without the owner's word |
+| `service` | in the server process, `internal: true` | read under row-level security, change through `change` as `system:<pack>`, keep the operational streams its rules declare, provide and require `service:` names, fill hook points | touch a table, the log or a key directly; import any kernel module; be carried on the map as code |
+| plain (no tier) | in the sandbox, as today (`src/packhost.ts`) | everything `docs/packs.md` gives a pack | anything in-process |
+
+Core stays what it is, the pack of words every map starts with (starter
+types, the shared set, core's rules). It joins the root list, so it is pinned
+by hash too, and holds no code.
+
+## The manifest key `kernel`
+
+One key is added to the seventeen: `kernel`, read by `src/manifest.ts` and
+refused on any pack outside the server's own folders (a pack kept as an item,
+a version, a hosted folder that `PELAGO_PACKS` names without listing it as
+trusted).
+
+```json
+"kernel": {
+  "trust": "service",
+  "internal": true,
+  "modules": "kernel/",
+  "provides": { "answer.attention": { "in": { "viewer": "id", "limit?": "number" }, "out": [{ "id": "id", "why": "string" }] } },
+  "hooks": { "write.follow": "waits.ts#follow", "open.ready": "start.ts#open" },
+  "tables": { "mention": { "item": "id", "names": "id", "at": "number" } },
+  "timers": [{ "run": "clock.ts#tick", "every_ms": 60000, "leading": true }]
+}
+```
+
+- **`trust`**: `root` or `service`. Absent, the pack is plain.
+- **`internal`**: not offered on the Packs screen, never taken out, versioned
+  with the server. It replaces the hardcoded `KERNEL_PACKS` and the `core.x`
+  naming (`src/packorder.ts`). A service pack is always internal; a root
+  pack always is.
+- **`modules`**: its code, TypeScript under the pack's folder
+  (`packs/<id>/kernel/`), loaded with `import()` by the loader. Never a file
+  a pack item or a version carries: `pack_code` stays the sandbox's alone.
+- **`provides`**, **`hooks`**, **`tables`**, **`timers`**: below.
+
+Every root and service pack lives in this repository's `packs/`, as
+`packs/<id>/pack.json` and `packs/<id>/kernel/*.ts`.
+
+## The in-process context
+
+A service pack's module exports functions; each is handed one
+`KernelContext` and nothing else. It imports types alone
+(`import type { KernelContext } from '#pelago/kernel'`); a value import of
+anything under `src/` or another pack is refused by `test/structure.test.ts`.
+
+```ts
+interface KernelContext {
+  pack: { id: string; version: string; hash: string };
+  workspace: string;
+  reads: Reads;                  // under row-level security, bounded, as packreads.ts answers
+  registry: RegistryRead;        // types, links, capabilities, rules: read only
+  call<I, O>(name: string, input: I): Promise<O>;     // a service: name it requires or uses
+  change(input: ChangeInput): Promise<ChangeAnswer>;  // as system:<pack>
+  record(stream: string, facts: OpFact[]): Promise<void>; // only a stream its rules keep
+  secret(key: string): Promise<string | undefined>;   // only reach.secrets
+  fetch(url: string, init?: RequestInit): Promise<Response>; // only reach.hosts, through walls
+  now(): Date;
+  said(message: string): void;   // the server's error stream (logged.ts)
+}
+```
+
+`Reads` is the reads API the sandbox already has (`src/packreads.ts`), with
+what task e_exet8395 adds: bounded log reads (facts by run, the last
+authority and actor per field), runs by repository or folder, held proposals
+and confirm questions, a cursor past 500 rows, and a pinned version for one
+view reading another. In-process it is a function call, not a pipe; the
+answers are the same.
+
+### System authority
+
+A service pack's change carries the actor `system:<pack>` and
+`authority: { of: "system", basis: "<what of the pack>" }`, kept apart from
+human and agent in the log. It goes through `change` and `decide` like any
+other; nothing in code skips the rules.
+
+- Core's rule `system_reach` refuses a system change outside the pack's
+  reach (as `pack_reach` does for a plain pack's action).
+- A system change never settles a question, never forgets, and never touches
+  a root pack's items (`settle_said`, `forget`, `root`).
+- Core's `agent_changes` does not hold it. A pack that wants its own
+  bookkeeping held, or spared another hold, declares the rule (sessions'
+  writes, which today skip the proposal step in code, become the rule
+  `sessions.bookkeeping`).
+
+## Service names
+
+`service:<name>` joins `has:`, `type:`, `event:` and the shaped names
+(`src/packorder.ts`). It names a function one pack provides and others call
+with `ctx.call`.
+
+- **One owner.** Two active packs providing one name stop the registry
+  loading, as two packs declaring one type do. Swapping a provider is taking
+  one out and adding the other.
+- **Checked by shape.** A provider's `in` may require no field the caller's
+  declared `in` lacks, and its `out` must hold every field the caller's
+  declared `out` reads: more, never less, as `field:` is checked today. A
+  shape is a JSON sketch: `"string"`, `"number"`, `"boolean"`, `"id"`,
+  `"any"`, `[shape]`, `{ "key": shape, "key?": shape }`. A caller whose need
+  the provider does not meet waits, saying which field.
+- **A family per closed list.** Each closed list in the kernel opens as a
+  family, its entries provided by packs:
+
+| Family | Opens | Now in |
+|---|---|---|
+| `answer.<name>` | a lens preset's answer (attention, brief, frontier...) | `LENS_ANSWERS`, `src/declared.ts`; `READINGS`, `src/query-presets.ts` |
+| `term.<word>` | a lens term (frontier, worked, moved, island, held) | `src/query-terms.ts` |
+| `capability.<name>` | a capability's behaviour (`occurs`, `capacityOf`) | `CAPABILITIES`, `src/capabilities.ts` |
+| `setting.<key>` | a workspace setting and who may read it | the `member_setting_read` policy, `src/schema.ts`; `src/workspace-tools.ts` |
+| `piece.<name>`, `page.<name>` | what the page draws | `PIECES`, `PAGES`, `src/declared.ts` |
+| `act.<verb>.<action>` | an action whose code is in-process | `ACT_TOOLS`, `src/tool-acts.ts` |
+
+The schema half of a closed list stays with the root pack that checks it
+(capabilities' check stays in loader); the behaviour moves to its provider.
+
+## Write-path hooks
+
+The write pack opens five hook points; service packs fill them. Each runs in
+pack order (`orderPacks`), each pack's in the order it declares. With none
+filled, the write path works as it does on a map with only core.
+
+```
+change(actor, input)
+  currentNames
+  write.rewrite    ops in, ops out          (placement: subject, islands)
+  standing, mayWrite
+  write.validate   ops in, refusals out     (lenses: twins; automations: checks)
+  write.follow     ops in, more ops out     (waits: unwait; sources)
+  plan, decide                              (the verdict covers every op above)
+  apply  ── one transaction ──
+    facts, root projection
+    log.project    facts in, own rows out   (mentions)
+    append, projectDecision
+  write.after      entry in, nothing out    (types applied, supersede)
+  write.retype     from, to                 (lenses: the retype rename)
+```
+
+| Point | Signature | Bounds |
+|---|---|---|
+| `write.rewrite` | `(ctx, ops) => ops` | Same ops, same order, same op, id, type and ends. It sets only the props its pack names in `fills`. Visibility may narrow, never widen. The write pack checks each answer and refuses the change, naming the pack, if any bound is broken. |
+| `write.validate` | `(ctx, ops, who) => { refusals, warnings }` | Pure: reads only, records nothing. Run before decide and again when a held change is approved. |
+| `write.follow` | `(ctx, ops) => Op[]` | Extra ops, refs allowed, tagged with the pack in the entry's header. Run before decide, so the verdict covers them, and again inside the apply transaction: if the second run differs, the new ops are judged there, and a change they would hold is refused as "the map moved, send again". |
+| `log.project` | `(ctx, facts, rows) => void` | Writes only the rows of its own `tables`, which the database pack makes with row-level security read from the item each row names. Run in the transaction, after the root projection, and in every rebuild. The snapshot keeps each projector's hash; a new hash rebuilds its table from the log at open. |
+| `write.after` | `(ctx, entry) => void` | After the entry is on the log. A failure is a warning, never an error (`afterLog`). |
+| `write.retype` | `(ctx, from, to) => Op[]` | After a type or link type is renamed. |
+
+What follows an op at the level of facts (the owner's link, `ownerFollows`)
+stays in the write pack: facts-level followers are root code alone.
+
+## Slots
+
+A root pack never imports one above it. Where it must ask something of a
+higher pack, it opens a **slot**: a list of functions the loader fills at
+workspace open, read in pack order, empty by default. The hook points above
+are slots of the write and log packs; the others:
+
+| Slot | Opened by | Filled by | Replaces |
+|---|---|---|---|
+| `log.appended` | log | usage | `bytes` called inside `log.append` |
+| `rules.reply_ended` | rules | sessions | `rules.ts` importing `reply-rules.ts` |
+| `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
+| `open.<phase>` | the stub | any | the fixed order in `Workspaces.load` |
+| `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
+
+This is also the fix for bug e_wpww27fm (trusted modules import services):
+each import it names becomes a slot, cut by the step that moves the
+importing module.
+
+## The boot stub
+
+`src/boot.ts`, a few hundred lines with no SQL, no route and no type name.
+It is the server's entry point (`npm start`, `npm run dev`).
+
+1. Reads `packs/roots.json`: the root packs in order, each with its hash.
+2. Hashes each root pack's folder (`pack.json` and `kernel/**`, canonical
+   JSON and SHA-256, `src/jcs.ts`, `src/hashes.ts`) and refuses to start on
+   a difference, naming the pack and both hashes.
+3. Starts the roots in order, handing each a context of the roots before it,
+   by id. A root that asks for one after it stops the start.
+4. Asks the loader for the hook points' and slots' fillings and hands them
+   to the roots that opened them.
+5. Opens a workspace: each root's `open` in order, then the `open.<phase>`
+   slots (`restore`, `packs`, `types`, `begin`, `islands`, `ready`), then,
+   on the server that leads, the declared `timers`.
+6. Holds the one rule (core's `root`, which no setting lifts): no change on a
+   map turns a root pack off, versions it on an island, gives it code, or
+   makes a pack item with a root pack's id.
+7. Records the root hashes on the control log at each start, and answers
+   them in `GET /health` beside `commit` and `started`.
+8. Stops the roots in reverse order.
+
+**The owner's word for a root change** is their approval of the pull request
+that changes `packs/roots.json`: a CI check refuses a change to a root pack's
+folder that does not bring a new hash in `roots.json`, and refuses a change
+to `roots.json` the repository's owner has not approved. An agent may
+propose one; the refiner never applies one.
+
+## The root packs
+
+Started in this order; each needs only those above it in the table.
+
+| # | Pack | Holds | Interface |
+|---|---|---|---|
+| 0 | core | words: starter types, shared set, core's rules | none: data |
+| 1 | database | storage, row-level security, the shared lock | `open(ws)`, `scoped(viewer)`, `anyone()`, `asOwner(tx, sql)` (roots only), `definer(name)`, `tables(pack, spec)`, `migrate()`, `leading()` |
+| 2 | seal | keys, and what forget destroys of them | `seal(id, text)`, `openSaid(id, bytes)`, `destroyKey(id)`, `secret(key)`, `setSecret(key, v)`, `opseal` |
+| 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended` |
+| 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited` |
+| 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate` |
+| 6 | loader | packs, versions, islands, the sandbox, the in-process tier | `Registry`, pack states, pins, island guards, `reach`, `host` (sandbox), `context(pack)` (the `KernelContext`), `call(service)`, `fillings(point)`, `packreads` |
+| 7 | rules | who decides what applies | `decide(who, ops, runs)`, `judge`, `mayDo`, `authorityOf`, actor checks, `standing` (still writable, room to store), private deps, layout changes; slot `rules.reply_ended` |
+| 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*` |
+| 9 | surface | the ten verbs, who may call them, the HTTP host | tools, MCP, CLI, the hook host, the server's routes and gates, the kernel reads (`get`, `search`, `schema`, `events`, `proposals`); slots `surface.*` |
+
+The `Archipelago` class (`src/pelago.ts`) is taken apart on the way: change
+and apply go to write, `search`, `get`, `trail` and `events` to surface,
+`secret` to seal, `claim` and `release` to write as ops, `checkConnections`
+to the connect pack.
+
+## Where each module goes
+
+Every one of the 272 modules in `src/` at a0438797 is in exactly one row
+(checked against the audit's import graph). A mixed module goes whole to the
+pack named first; the half in brackets is split off in the same step and
+moves with a shim to the pack named.
+
+### Root
+
+| Pack | Modules |
+|---|---|
+| database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), deploy, move, leader |
+| seal | seal, opseal, vault, secrets, backup-seal |
+| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore; the rest to backup), backup-log |
+| identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
+| walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail |
+| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packreads, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
+| rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
+| write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools, search, transient, view-address, listing |
+
+### Service
+
+| Pack | Modules |
+|---|---|
+| query | query-flat, query-terms, query-steps, query-only, query-held, query-presets, askview, views, region, blocking, altitude, timeaxis, summary |
+| lenses | query-kept, query-saved, saved-views, view-life, view-twins, query-names |
+| views | view-graph, view-tree, inside, brief, eventlog, moved, timelanes, documents, plan-note |
+| attention | attention, bounds, confirm |
+| findings (exists) | findings |
+| styles | styles, style-move, layout-move, screens, colours |
+| agents | instructions, launch-brief, schema-brief |
+| placement | subject, island-start, `placeOnIslands`; `ensureSource` from change-apply |
+| waits | unwait |
+| mentions | mentions |
+| automations (exists) | automation-rules, due-on |
+| clocks | due, duties |
+| sessions (exists) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-measures, session-name, session-parent, session-quiet, session-state, session-turns, sessiontime, touched, stands, spent, audit, working-rules, close-offer, file-said, frontier, frontier-prompt, places |
+| claude_code (exists) | hook-tool, session-hook |
+| publish | published, published-data, published-frames, published-live, published-pictures, published-preview, public-bake, public-route, public-view, site, share-tools, drawing-files, pictures, pack-counts |
+| mcp_apps | mcp-view |
+| backup | backup-tools, and backup's backupAll, upload and merge |
+| usage | usage, bytes, workspace-use, pack-touches, pack-use, uses |
+| notifications | notify |
+| mail | mail, smtp, bounces |
+| alerts | alert |
+| looks | chrome, look-draw, icon, looks (`passFor` stays in walls) |
+| launch | launcher (the token stays in identity) |
+| connect | install, connect, token-ask, connection-tools, server-pack-tools |
+| presence | presence, seeing |
+| monitoring | report |
+| devtools | dev, pull |
+
+Frontier goes to sessions, the pack whose types (`run`, `works_on`) it names,
+which ends that part of bug e_j3a8ghe4.
+
+### Plumbing, kept in `src/`
+
+env, ids, hashes, jcs, logged, text-widths, workspace-id, item-address,
+phases: pure, no state, no map. Any tier may import them.
+
+## Hot files: one owner each
+
+Five files are touched by nearly every move. Each has one owning step at a
+time; any other step may change only an `import` line in it, and the gather
+step resolves those.
+
+| File | First owner (wave 1b) | Then (wave 2) |
+|---|---|---|
+| `src/pelago.ts` | Write-path hooks (e_cusfdw68): turns each inline call (placement, twins, unwait, sources, automation checks) into a filling of a hook point, the code left where it is | Root pack: write (e_da3s6xtx) |
+| `src/change-apply.ts` | Write-path hooks | Root pack: write |
+| `src/workspaces.ts` | Workspace lifecycle hooks (e_kzw9bwq6): the load order becomes `open.<phase>` fillings, the clocks become timers | Root pack: identity (e_m2jd67rd) |
+| `src/server.ts` | Acts and routes as fillings (new): the route and act tables become `surface.*` fillings | Root pack: tool surface (e_g45hh86u) |
+| `src/tool-acts.ts` | Acts and routes as fillings | Root pack: tool surface |
+
+The pattern for every hot file: its first owner turns what it calls inline
+into fillings registered from the module that holds the code, without moving
+anything; a later step then moves the module and its filling together and
+never opens the hot file.
+
+## How a step moves a module
+
+- `git mv src/<m>.ts packs/<pack>/kernel/<m>.ts`, and leave a shim at the
+  old path: `export * from '../packs/<pack>/kernel/<m>.ts';`. No importer
+  changes in the wave, so steps do not collide. `test/structure.test.ts`
+  keeps a list of the shims (`SHIMS`) that only shrinks after the wave.
+- A service module's value imports of the kernel become `ctx` calls in the
+  same step; a root module may import only plumbing and the `index.ts` of a
+  root below it.
+- Its tests stay in `test/` during the wave and reach it through the shim.
+- Run the tests of the moved modules, the structure test and typecheck,
+  as for any change (CLAUDE.md, Checks before committing).
+
+## The order of the wave
+
+Each wave is merged onto one branch, `kernel-packs`, before the next starts;
+inside a wave every step runs at once, each in its own session and worktree.
+
+| Wave | Steps (map task) | Owns |
+|---|---|---|
+| 0 | This contract (e_st5s6rj7) | `docs/kernel-packs.md` |
+| 1a | The boot stub (e_em6mq8mx) | `src/boot.ts`, `packs/roots.json`, the start scripts, the CI check |
+| 1a | Internal packs run in-process (e_bueph9jh) | `src/manifest.ts`, `src/packs.ts`, `src/packhost.ts`, a new `src/kernel-context.ts`; the `KERNEL_PACKS` line of `src/packorder.ts` |
+| 1a | Open service names (e_dw8p6fyu) | the rest of `src/packorder.ts`, `src/capabilities.ts`, `src/declared.ts`, `src/query-presets.ts`, `src/query-terms.ts`, the setting policy in `src/schema.ts`, `src/workspace-tools.ts` |
+| 1a | Reads API for kernel views (e_exet8395) | `src/packreads.ts` |
+| 1a | A server pack carries a workspace half (e_jpcsbt48) | `src/pack-folders.ts`, `src/server-packs.ts` |
+| 1b | Write-path hooks (e_cusfdw68), proved on mentions | `src/pelago.ts`, `src/change-apply.ts`, `src/change-plan.ts`, `src/replay.ts` |
+| 1b | Workspace lifecycle hooks (e_kzw9bwq6), proved on clocks | `src/workspaces.ts`, `src/due.ts`, `src/duties.ts` |
+| 1b | Acts and routes as fillings (new) | `src/server.ts`, `src/tool-acts.ts`, `src/tool-reads.ts`, `src/tools.ts` |
+| 2 | The nine root packs, one step each (database, seal, log, identity, walls, loader, rules, write, tool surface) | the modules of their row |
+| 2 | Query engine as a pack (new); Kept views and lenses (e_gdzjg96w); Kernel views (e_8f8m2xtf: views, attention, findings); Style resolution (e_eveqf4dt: styles, agents); Placement and waits (e_mhqvdzj6: placement, waits, sources); Automation behaviour (e_469wuqa3); Sessions behaviour (e_xzwgetrg); Publishing and baking (e_5fqwc5qh: publish, mcp_apps; after bugs e_xqq6vcec and e_fapdjf5b); Backup and usage (e_jjvdu795); Server-level services (e_n6s2ypa3: mail, alerts, looks, launch, connect, presence, monitoring, devtools, notifications) | the modules of their row |
+| 2b | Claude Code hooks (e_c35gg6nh), after sessions | hook-tool, session-hook |
+| 3 | Gather the kernel packs (e_j9gszd4j): drop the shims, rewrite imports by script, `src/` down to the stub and plumbing, tried on a pulled copy of the live map | everything; one public and one hosted PR |
+
+Wave 2 is nineteen sessions; no two own the same module. A root step and a
+service step that split one mixed module agree by the bracket in the table:
+the root step leaves the service half in place behind a shim, and the
+service step takes it.
+
+## For the owner to confirm
+
+- **An eighteenth manifest key, `kernel`**, allowed only on the server's own
+  packs, rather than spreading trust over `reach` and `handlers`.
+- **Nine code root packs and core**, not eight: the map lists nine root
+  tasks, and walls and surface do not merge without a cycle.
+- **Proposals, withdraw, undo, merge and forget go to write**, not to rules
+  and seal as the map's tasks say: each applies a change, and rules sits
+  below write. Backup's dump and restore go to log, beside the record they
+  copy; leader goes to database, since it is a lock there.
+- **The query engine is a service pack**, not root: it reads under
+  row-level security and cannot change what control decides.
+- **A system change applies unless a rule holds it**: `agent_changes` does
+  not hold a service pack's own changes; `system_reach` and the pack's
+  rules do.
+- **The owner's word for a root change is their pull-request approval**,
+  checked in CI with `packs/roots.json`.
+- **Shims during the wave**, removed by the gather step, so nineteen sessions
+  can move code without rewriting each other's imports.
