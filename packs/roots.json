@@ -40,5 +40,19 @@
       "id": "surface",
       "hash": "fec9a912aabe0feb667ed60afb2c4c313e1ac87d549e23a0b713f3c90e223335"
     }
-  ]
+  ],
+  "calls": {
+    "root.workspaces": [
+      "backup"
+    ],
+    "root.dump": [
+      "backup"
+    ],
+    "root.merge": [
+      "backup"
+    ],
+    "root.counters": [
+      "usage"
+    ]
+  }
 }
