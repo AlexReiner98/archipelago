@@ -21,5 +21,21 @@
     { "id": "core.bumps", "type": "instruction", "title": "Record what gets in the way", "body": "When Archipelago itself gets in your way (a tool that fails or misleads, a workaround, an answer that is stale or too big, something the owner finds bad in its screens), record it on the map when it happens, after searching for it: a finding about the item it concerns, saying what you were doing, what happened, and what would have made it smooth. That is how it gets fixed.", "props": { "for": ["session_start"], "order": 30 } },
     { "id": "core.authority", "type": "instruction", "title": "Say on whose authority", "body": "Every change takes authority: of \"human\" with what the owner said and where, when they told you to or decided it; of \"agent\" for your own reading of the work. Never claim the owner’s word for your own judgment.", "props": { "for": ["working_rules"], "order": 50 } },
     { "id": "core.held", "type": "lens", "title": "Held for you", "props": { "filter": { "find": ["held"], "not": ["type run"] }, "walk": { "over": "all", "steps": 1 } } }
+  ],
+  "moved_from": ["core"],
+  "views": [
+    {
+      "form": "screen",
+      "id": "home",
+      "title": "For you",
+      "at": "home",
+      "start": true,
+      "pieces": [
+        { "piece": "start", "title": "Start here" },
+        { "piece": "token_ask" },
+        { "piece": "held", "title": "Held for you" },
+        { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "moved", "unsettled"], "limit": 5 }
+      ]
+    }
   ]
 }

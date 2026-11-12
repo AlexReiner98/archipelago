@@ -1,7 +1,8 @@
 // Screens as the page meets them: what the packs ship as presets, under what the owner has kept on the map. A screen
 // item with a preset's id is the owner's version of it (its fields over the preset's, retired to take it away); one
 // with none is the owner's own. A screen with a place in the nav is a page there; one on kinds or types is drawn on
-// the page of every such item; one on Home is drawn there, after those before it. A pack's screen for Home is on it
+// the page of every such item; one on Home is drawn there, after those before it. The map's start page (a screen that
+// declares start: practice's For you) is on Home from the start, drawn first. Any other pack's screen for Home is on it
 // once the workspace holds something of that pack's types, until the owner takes it off (home: false on their
 // version), and can be put back; the owner putting it there (home: true) needs no such thing. Read each time the schema is asked for, so a change shows on the next look.
 
@@ -24,6 +25,8 @@ export interface Screen {
   offered?: boolean;
   /** One of the kernel's own pages it is drawn on: Home. */
   at?: 'home';
+  /** The map's start page (a preset that declares start): drawn first on Home. */
+  start?: boolean;
   /** A preset the pack made for Home, on it or taken off. */
   homeable?: boolean;
   /** A preset for Home whose pack nothing here uses yet: it waits for the first such item. */
@@ -46,9 +49,9 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[],
   for (const p of presets) {
     const k = byPreset.get(p.id);
     if (k && !k.is_open) continue;
-    const idle = p.at === 'home' && p.pack !== 'core' && used !== undefined && !used.has(p.pack);
-    // Home is the owner's move (docs/ui-strategy.md): only the core pack's screen is on it until the owner adds another.
-    const home = typeof k?.props.home === 'boolean' ? k.props.home : p.at === 'home' && p.pack === 'core';
+    const idle = p.at === 'home' && !p.start && used !== undefined && !used.has(p.pack);
+    // Home is the owner's move (docs/ui-strategy.md): only the map's start page is on it until the owner adds another.
+    const home = typeof k?.props.home === 'boolean' ? k.props.home : p.at === 'home' && p.start === true;
     out.push({
       id: p.id,
       pack: p.pack,
@@ -60,6 +63,7 @@ export function overlay(presets: (ScreenDef & { pack: string })[], kept: Kept[],
       ...(p.nav && { offered: true }),
       ...(home && { at: 'home' as const }),
       ...(p.at === 'home' && { homeable: true }),
+      ...(p.at === 'home' && p.start && { start: true }),
       ...(idle && !home && { idle: true }),
     });
   }

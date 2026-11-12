@@ -240,6 +240,8 @@ export interface ScreenDef {
   nav?: boolean;
   /** One of the kernel's own pages it is drawn on: Home, after the screens before it, until the owner takes it off. */
   at?: 'home';
+  /** The map's start page: on Home from the start and drawn first there, until the owner takes it off (Home's For you). */
+  start?: boolean;
   pieces: PieceDef[];
 }
 
@@ -342,6 +344,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     if (!screen.title || !(screen.on?.length || screen.nav || screen.at) || !screen.pieces?.length) problems.push(`${at} needs a title, the kinds or types it is on or a place offered in the nav, and its pieces`);
     for (const t of screen.on ?? []) if (!types.has(t)) problems.push(`${at} is on unknown type "${t}"`);
     if (screen.at !== undefined && screen.at !== 'home') problems.push(`${at}: at is "home", the one kernel page a screen is drawn on`);
+    if (screen.start !== undefined && (screen.start !== true || screen.at !== 'home')) problems.push(`${at}: start is true, on a screen at "home": the map's start page`);
     for (const piece of screen.pieces ?? []) {
       const needs: readonly string[] | undefined = PIECES[piece.piece];
       if (!needs) problems.push(`${at}: "${piece.piece}" is not a piece: one of ${Object.keys(PIECES).join(', ')}`);
