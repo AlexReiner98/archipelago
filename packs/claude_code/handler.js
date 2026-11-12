@@ -10,9 +10,17 @@ const HOOK_EVENT = { 'session-start': 'SessionStart', prompt: 'UserPromptSubmit'
 
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
-/** A hook's body to the kernel's: the same, as the hook script sends it; an event the kernel does not answer is not asked. */
+/** The surface a Claude Code session is recorded under, as it has been since before there were surfaces. */
+const SURFACE = 'claude-code';
+
+/**
+ * A hook's body to the kernel's: the same, as the hook script sends it, and at a session's start the surface it is
+ * recorded under; an event the kernel does not answer is not asked.
+ */
 export function hookIn({ event, body }) {
-  return EVENTS.includes(event) ? { event, body: isObject(body) ? body : {} } : {};
+  if (!EVENTS.includes(event)) return {};
+  const said = isObject(body) ? body : {};
+  return { event, body: event === 'session-start' ? { ...said, surface: SURFACE } : said };
 }
 
 /** The kernel's neutral answer in Claude Code's shape: told as the hook's additional context, go_on as a Stop hook's block, the rest beside. */
