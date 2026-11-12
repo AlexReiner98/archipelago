@@ -13,9 +13,9 @@
 // Run it with no server on the database. It refuses one that already holds items.
 
 import { readdirSync, readFileSync } from 'node:fs';
-import { openDb } from '../src/db.ts';
-import { regatherAll } from '../src/closure.ts';
-import { mentionedAll } from '../src/mentions.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { regatherAll } from '../packs/log/kernel/closure.ts';
+import { projectAgainAtOpen } from '../packs/log/kernel/log-project.ts';
 
 const args = process.argv.slice(2);
 const opt = (name: string, dflt: string) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : dflt);
@@ -52,7 +52,7 @@ const weighted = <T extends string>(w: Record<T, number>): T => {
   return Object.keys(w)[0] as T;
 };
 
-// Ids as the server makes them (src/db.ts newId), but each a step of a permutation of the id space: unique, and the same for the same seed.
+// Ids as the server makes them (packs/database/kernel/db.ts newId), but each a step of a permutation of the id space: unique, and the same for the same seed.
 const ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 const SPACE = 31n ** 8n;
 const made: Record<string, bigint> = {};
@@ -396,10 +396,10 @@ for (today = 0; today < DAYS; today++) {
 for (const c of components) buffers.entity.push([c.id, c.type, kindOf(c.type), c.title, '', c.status, true, null, 'shared', null, '{}', null, iso(START), iso(c.at), null]);
 await flush(true);
 await db.query(`insert into setting (key, value) values ('me', $1::jsonb) on conflict (key) do update set value = excluded.value`, [json(person[0].id)]);
-// What the projector keeps beside the rows (src/closure.ts, src/mentions.ts), made whole from them as a restore does.
+// What the projector keeps beside the rows (packs/log/kernel/closure.ts; the packs' tables, packs/log/kernel/log-project.ts), made whole as a restore does.
 process.stderr.write('projecting what is inside what, and what names what\n');
 await regatherAll(db, ['part_of']);
-await mentionedAll(db);
+await projectAgainAtOpen(db); // what names what: made by the packs' projectors when the server first opens it
 process.stderr.write('analysing\n');
 await db.query('analyze');
 const counts = (await db.query<Record<string, number>>(`select (select count(*) from entity)::int as items, (select count(*) from relation)::int as links, (select count(*) from log_op where stream = 'activity')::int as events, (select count(*) from proposal)::int as proposals`)).rows[0];

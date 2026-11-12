@@ -1,0 +1,74 @@
+{
+  "id": "agents",
+  "version": "0.1.0",
+  "title": "Agents",
+  "description": "What agents are told: the instructions the packs ship under those the map keeps, said where each is for (a session's start, the working rules, a tool, a file); the brief a launched session starts from; and the schema an agent is given unless it asks for more.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "answer.launch_brief": {
+        "in": {
+          "actor": "any",
+          "input": "any",
+          "by?": "any"
+        },
+        "out": {
+          "brief": "any",
+          "started?": "any"
+        },
+        "run": "launch-brief.ts#launchBrief"
+      },
+      "answer.launch_prompt": {
+        "in": {
+          "brief": "any",
+          "mode": "string",
+          "run": "id",
+          "instructions?": "string"
+        },
+        "out": "string",
+        "run": "launch-brief.ts#launchPrompt"
+      },
+      "answer.instructions": {
+        "in": {
+          "for?": "string",
+          "about?": "string",
+          "island?": "string",
+          "where?": "string",
+          "fill?": "any"
+        },
+        "out": {
+          "said": [
+            "any"
+          ]
+        },
+        "run": "query-answers.ts#told"
+      },
+      "answer.schema_brief": {
+        "in": {},
+        "out": {
+          "packs": [
+            "string"
+          ],
+          "types": [
+            "any"
+          ],
+          "relations": "any"
+        },
+        "run": "schema-answers.ts#brief"
+      },
+      "answer.schema_of": {
+        "in": {
+          "described": "any",
+          "type": "string"
+        },
+        "out": "any",
+        "run": "schema-answers.ts#one"
+      }
+    },
+    "hooks": {
+      "surface.reads": "reads.ts#instructions"
+    }
+  }
+}

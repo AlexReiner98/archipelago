@@ -1,18 +1,18 @@
-// The log cut by time (src/partitions.ts): a chain that runs through several years verifies and replays into the
+// The log cut by time (packs/log/kernel/partitions.ts): a chain that runs through several years verifies and replays into the
 // rows the map has, every partition refuses what the log refuses, one made after the schema too, and an entry that
 // does not follow the one before is refused by the database, whichever partition it lands in.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Archipelago } from '../src/pelago.ts';
-import { openDb, type Q } from '../src/db.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { openDb, type Q } from '../packs/database/kernel/db.ts';
 import { entryHash, GENESIS } from '../src/jcs.ts';
-import { entries, factAt, stored, verify, type Entry } from '../src/log.ts';
-import { makePartitions } from '../src/partitions.ts';
-import { rebuild } from '../src/replay.ts';
-import { dumpVault, restoreVault } from '../src/vault.ts';
-import { record } from '../src/streams.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { entries, factAt, stored, verify, type Entry } from '../packs/log/kernel/log.ts';
+import { makePartitions } from '../packs/log/kernel/partitions.ts';
+import { rebuild } from '../packs/log/kernel/replay.ts';
+import { dumpVault, restoreVault } from '../packs/seal/kernel/vault.ts';
+import { record } from '../packs/log/kernel/streams.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { fresh, make, replayed } from './map.ts';
 
 const monthsAgo = (n: number, day = 3) => {
@@ -54,7 +54,7 @@ async function aged() {
     await makePartitions(tx, monthsAgo(30));
     let prev = GENESIS;
     for (const [i, e] of old.entries()) prev = await lay(tx, e, monthsAgo(Math.max(30 - 10 * i, 1)), prev);
-    // Words are opened for whoever may see the item (src/seal.ts): projected once to have the items, then again in clear.
+    // Words are opened for whoever may see the item (packs/seal/kernel/seal.ts): projected once to have the items, then again in clear.
     await rebuild(tx, l.registry, await stored(tx));
     await rebuild(tx, l.registry, await entries(tx));
   });

@@ -2,9 +2,9 @@
 // on PGlite's one connection they hold trivially.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { heldResources } from '../src/blocking.ts';
+import { heldResources } from '../packs/surface/kernel/blocking.ts';
 import { agent, fresh, make } from './map.ts';
-import { append, verify } from '../src/log.ts';
+import { append, verify } from '../packs/log/kernel/log.ts';
 import { wait } from './wait.ts';
 
 test('an exclusive resource taken by many at once has one holder', async () => {

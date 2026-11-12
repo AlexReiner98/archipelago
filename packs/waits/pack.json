@@ -1,0 +1,34 @@
+{
+  "id": "waits",
+  "version": "0.1.0",
+  "title": "Waits",
+  "description": "An item closed on a person's word no longer waits on them: the change that closes it takes back its waits_on to that person, and its answer says so.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": {
+      "write.follow.rides": "unwait.ts#follow"
+    },
+    "provides": {
+      "answer.waiting_on": {
+        "in": {
+          "items": [
+            "id"
+          ],
+          "authority": "any"
+        },
+        "out": {
+          "person?": "id",
+          "waits": [
+            {
+              "id": "id",
+              "from_id": "id"
+            }
+          ]
+        },
+        "run": "unwait.ts#waitingOn"
+      }
+    }
+  }
+}

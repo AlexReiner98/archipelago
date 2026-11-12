@@ -1,4 +1,4 @@
-// A published picture's first frame (src/published-frames.ts) and the page it is sent in (src/published-page.ts): at
+// A published picture's first frame (packs/publish/kernel/published-frames.ts) and the page it is sent in (src/published-page.ts): at
 // publish the server runs a drawing that is the pack's own and keeps the scene it opens on; the page carries its data
 // and hints every module it starts with; a drawing's code is fetched by its hash. In a real browser (skipped where
 // there is no Chrome): the page's text and the picture's first frame are on the page together, and the drawing then

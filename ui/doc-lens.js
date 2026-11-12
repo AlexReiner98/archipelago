@@ -33,7 +33,7 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onIte
   const body = h('div', { class: 'lens-view' });
   host.replaceChildren(body);
   dress(body, style);
-  // Every picture has a drawing: src/published.ts gives one to a picture frozen without.
+  // Every picture has a drawing: packs/publish/kernel/published.ts gives one to a picture frozen without.
   if (style.drawing) drawWith(body, answer, style, () => {});
   else body.replaceChildren(h('div', { class: 'empty' }, 'This view cannot be drawn here.'));
   // A link leaves out what is private; the page says so, rather than reading as a view with nothing in it.

@@ -1,4 +1,4 @@
-// What a picture is sent (src/layouts.ts, src/query-steps.ts): the drawing its shape is drawn by, once, the owner's
+// What a picture is sent (packs/loader/kernel/layouts.ts, packs/query/kernel/query-steps.ts): the drawing its shape is drawn by, once, the owner's
 // version standing in for the pack's module by module; and its steps, checked, naming only what it shows. No browser:
 // how drawings draw is test/layouts.test.ts and the files beside it.
 
@@ -6,10 +6,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { readSteps, stepsShown } from '../src/query-steps.ts';
-import { keptPicture } from '../src/query-saved.ts';
+import { readSteps, stepsShown } from '../packs/query/kernel/query-steps.ts';
+import * as querySavedPack from '../packs/lenses/kernel/query-saved.ts';
 import { fresh, make } from './map.ts';
 import { serve } from './serve.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A small system on the map, its picture kept as a view drawn as a map, and a style about it saying so. */
 async function system(call: (path: string, token?: string, body?: unknown) => Promise<any>) {
@@ -80,13 +81,13 @@ test('a picture with steps is sent them, and the finished parts they name, whate
   ]);
   const steps = [{ chapter: { name: 'Then', when: '7 Oct', count: 1 }, add: [made.a, made.o], titles: { [made.a]: 'Old doors' }, lines: [{ by: 'Alex', text: 'Back it up.' }] }, { remove: [made.o], lines: [{ by: 'Agent', text: 'It is gone.' }] }];
   Object.assign(made, await make(l, [{ op: 'create', ref: 'l', type: 'lens', title: 'What talks to what', props: { filter: { find: [`part_of ${made.p}`], not: ['done', 'kind system'] }, steps } }]));
-  const answer = await keptPicture(l, made.l);
+  const answer = await querySavedPack.keptPicture(kernelContext(l, 'lenses'), made.l);
   assert.deepEqual(answer.steps, steps);
   assert.ok(answer.items.some((i) => i.id === made.o && !i.open), 'the retired part is sent');
   assert.ok(answer.links.some((k) => k.from === made.a && k.to === made.o), 'and its wire');
   // Steps that cannot be read are not played, and the picture says why beside them.
   await make(l, [{ op: 'update', id: made.l, props: { steps: [{ add: 'all of it' }] } }]);
-  const wrong = await keptPicture(l, made.l);
+  const wrong = await querySavedPack.keptPicture(kernelContext(l, 'lenses'), made.l);
   assert.equal(wrong.steps, undefined);
   assert.match(wrong.steps_wrong ?? '', /add and remove are lists of ids/);
 });

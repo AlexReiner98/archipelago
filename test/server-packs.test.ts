@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { createToken } from '../src/auth.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
 import { freeId } from '../src/workspace-id.ts';
-import { checkServerPack, loadServerPacks } from '../src/server-packs.ts';
+import { checkServerPack, loadServerPacks } from '../packs/loader/kernel/server-packs.ts';
 import { signedWith as signedBy } from '../src/hashes.ts';
 import { serve } from './serve.ts';
 

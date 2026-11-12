@@ -1,13 +1,14 @@
-// A run's turns as a read (src/session-turns.ts, docs/sessions.md "Wired"): the events its adapter sent, worked out
+// A run's turns as a read (packs/sessions/kernel/session-turns.ts, docs/sessions.md "Wired"): the events its adapter sent, worked out
 // into turns, newest first, with the name of a session that started one, and a limit that counts what it left out.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fresh, make } from './map.ts';
 import { answerHook } from './claude-hook.ts';
-import { VIEWS } from '../src/views.ts';
-import '../src/session-turns.ts';
-import type { Archipelago } from '../src/pelago.ts';
+import { VIEWS } from '../packs/query/kernel/views.ts';
+import '../packs/sessions/kernel/session-turns.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const hook = (l: Archipelago, body: Record<string, unknown>) => answerHook('events', { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' }) as Promise<Record<string, unknown>>;
 const at = (s: number) => new Date(Date.UTC(2026, 10, 4, 0, 0, s)).toISOString();
@@ -30,7 +31,7 @@ test('a run’s turns are read newest first, each with who started it and how it
   ];
   assert.equal((await hook(l, { session_id: 's1', source: 'claude-code', events })).kept, events.length);
 
-  const read = (params: Record<string, unknown>) => VIEWS.turns.run(l, params) as Promise<{ run: { id: string }; turns: Record<string, any>[]; more: number; names: Record<string, { title: string; name?: string }> }>;
+  const read = (params: Record<string, unknown>) => VIEWS.turns.run(kernelContext(l, 'query'), params) as Promise<{ run: { id: string }; turns: Record<string, any>[]; more: number; names: Record<string, { title: string; name?: string }> }>;
   const all = await read({ run });
   assert.equal(all.run.id, run);
   assert.deepEqual(all.turns.map((t) => t.turn), ['t2', 't1'], 'newest first');
@@ -58,7 +59,7 @@ test('a run’s turns are read newest first, each with who started it and how it
 test('a run with no events has no turns', async () => {
   const l = await fresh();
   const { run } = await make(l, [{ op: 'create', ref: 'run', type: 'run', title: 'Quiet', props: { session_id: 's2' } }]);
-  const answer = (await VIEWS.turns.run(l, { run })) as { turns: unknown[]; more: number };
+  const answer = (await VIEWS.turns.run(kernelContext(l, 'query'), { run })) as { turns: unknown[]; more: number };
   assert.deepEqual(answer.turns, []);
   assert.equal(answer.more, 0);
 });

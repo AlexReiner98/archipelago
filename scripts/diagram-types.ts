@@ -4,7 +4,7 @@
 
 import { html, legend, style, type Edge, type Page, type Vertex } from './diagram-xml.ts';
 
-/** What a pack's manifest says, as far as the diagrams read it (src/manifest.ts). */
+/** What a pack's manifest says, as far as the diagrams read it (packs/loader/kernel/manifest.ts). */
 export interface PackFile {
   id: string;
   title?: string;

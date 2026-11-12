@@ -8,7 +8,7 @@ design, the canvas's look and the rest) is the hosted service's, kept in
 `archipelago-hosted` and read from a folder `PELAGO_PACKS` names (decision
 e_8jd82drh, 9 Nov 2026). A pack's tests live beside it and reach the kernel
 only through `#pelago/test`. The manifest says what the pack declares, in
-seventeen keys and no others (Rule 8 of the target model; `src/manifest.ts`
+seventeen keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
 reads it, `test/structure.test.ts` refuses any other key).
 
 ## The keys
@@ -20,41 +20,41 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `uses` | Names it works with while they are provided, as `requires` names them. |
 | `types` | Its types. An entry with `of` and `fields` adds fields to another pack's type. A type's `statuses` may say where each stands in its course (`phases`: not_started, under_way, finished, ended, trouble or standing), which every drawing reads; unsaid, it is read from its place in the lists (`src/phases.ts`). |
 | `links` | Its link types: each extends a root, or extends nothing and is its own. An end is `*`, a type (with its flavours) or `has:<capability>`, any type that declares it. |
-| `rules` | What decides a write (`src/rules.ts`), and what asks an agent to go on when its reply ends (`on: "reply_ended"`, `src/reply-rules.ts`). |
+| `rules` | What decides a write (`packs/rules/kernel/rules.ts`), and what asks an agent to go on when its reply ends (`on: "reply_ended"`, `packs/sessions/kernel/reply-rules.ts`). |
 | `views` | Reads (a `shape` or a `lens`), trees (`form: "tree"`), screens on an item's page (`form: "screen"`; what a pack shows of one item is a lens preset `on` its type instead, under `styles`; a piece `button` stands in the page's head beside Walk from it, its `label` and `tip` with what it does: the pack's `action`, or `draw`, how the canvas up is drawn, "{here}" being the item), and reasons attention gives (`form: "attention"`: items `of` a type whose fields hold `where`'s values, weighed with the kernel's reason it `joins`). |
 | `actions` | What people and agents can do through it, each under a verb. Core's six verbs are its actions marked `kernel`. |
-| `handlers` | Code run by itself: `{ event, records }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`: `records` names the kinds of event its answers may log (a `log` entry of another kind is refused). An event is one another pack records, or the kernel's: `notification.made`, whose hearer may answer one `mail` about that notification, sent by the kernel to the person it is for at the address they sign in with, never one the pack names (`src/notify-mail.ts`; the `email` pack). `{ event: "item.due" }` hears the kernel's clock: each occurrence of an item whose type has `when` (a moment, or a repeat's hour on its days, in the workspace's zone), with the item as `target`, the event's `seq`, and its `type`, `at` and `version` (the item's last position in the fact stream) in `detail` (`src/due.ts`). A `log` entry names a notification of the same answer by its `ref` as `{ref}`, filled with its id, and may say what is recorded `otherwise`, should it not be made (`{error}` the reason; the `automations` pack's firing fact). |
-| `layouts`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`src/instructions.ts`), and (an entry with `type: "lens"`, its props a flat query and a style: `filter`, `walk`, `limit`, `style`) a view the pack ships, listed in the bar's picker and on Home until the owner saves their own version of it (`props.preset`); one `on` types, its query naming the item as `{here}`, is a view of each such item (a project's roadmap, an event's gate), offered on that item's page and drawn on the canvas (decision e_2mndpgdj: what a pack shows of an item is a view, not a screen). A style preset on nothing is used on every page; with `over: "workspace"` it lies over the workspace's own style; with `over: "chosen"` (a theme) only once the owner keeps a version of it. |
-| `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`. |
+| `handlers` | Code run by itself: `{ event, records }`, `{ schedule, every_minutes, at_start }` or `{ webhook, records }`: `records` names the kinds of event its answers may log (a `log` entry of another kind is refused). An event is one another pack records, or the kernel's: `notification.made`, whose hearer may answer one `mail` about that notification, sent by the kernel to the person it is for at the address they sign in with, never one the pack names (`packs/walls/kernel/notify-mail.ts`; the `email` pack). `{ event: "item.due" }` hears the kernel's clock: each occurrence of an item whose type has `when` (a moment, or a repeat's hour on its days, in the workspace's zone), with the item as `target`, the event's `seq`, and its `type`, `at` and `version` (the item's last position in the fact stream) in `detail` (`packs/clocks/kernel/due.ts`). A `log` entry names a notification of the same answer by its `ref` as `{ref}`, filled with its id, and may say what is recorded `otherwise`, should it not be made (`{error}` the reason; the `automations` pack's firing fact). |
+| `layouts`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`packs/agents/kernel/instructions.ts`), and (an entry with `type: "lens"`, its props a flat query and a style: `filter`, `walk`, `limit`, `style`) a view the pack ships, listed in the bar's picker and on Home until the owner saves their own version of it (`props.preset`); one `on` types, its query naming the item as `{here}`, is a view of each such item (a project's roadmap, an event's gate), offered on that item's page and drawn on the canvas (decision e_2mndpgdj: what a pack shows of an item is a view, not a screen). A style preset on nothing is used on every page; with `over: "workspace"` it lies over the workspace's own style; with `over: "chosen"` (a theme) only once the owner keeps a version of it. |
+| `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`; an internal pack also `items`, the addresses the map's own items keep (a type and its field: connect's check of each connection). |
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
 | `moved_from` | The packs it took declarations from, keeping their ids (below, In time): it may name a rule, view, style, action or layout `<pack>.<name>` for each, as well as its own. The kernel's packs it never needs to name. |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
 `pages`, `connect`, `aliases`, `gates`). There is no other kind of
-pack: it is read by the server (`src/server-packs.ts`), never by a workspace.
+pack: it is read by the server (`packs/loader/kernel/server-packs.ts`), never by a workspace.
 Its `gates` are where the kernel asks it before going ahead
-(`src/server-gates.ts`): `signin`, what a person agrees to before signing in,
+(`packs/surface/kernel/server-gates.ts`): `signin`, what a person agrees to before signing in,
 and `standing`, what a workspace it made may do (its limits, whether it has
 ended). It keeps what they answer from in its own store; with no gate, nothing
 is asked and nothing is limited.
 
 Since 10 Nov 2026 (e_nsruapq3) a server pack may also declare, each checked
-on load in `src/server-reach.ts` and acted on by the kernel alone:
+on load in `packs/loader/kernel/server-reach.ts` and acted on by the kernel alone:
 
 | Key | What the kernel does |
 |---|---|
-| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`src/server-mounts.ts`). Its entry answers a page, JSON, a picture, plain text or XML, a redirect on this server, the kernel's stream of a published document, or `pass` (the kernel answers). The open core's own reader (`packs/reader`) takes `public` and `site`; a pack the configuration names in its place replaces it. |
-| entries' `answers: "html"` | Sends what the entry answers as a page, with headers and policy the kernel sets (`src/server-routes.ts`). |
-| `counts` | Names the stream on a public site's map its counts are kept in (a plain word no kernel stream has, one pack's alone): it adds to a key's day with the act `count.add`, and a pack reads them back after a position with `count.read` (`src/pack-counts.ts`). How many, never of whom. The reader counts its visits so, in `visits`, kept by core's rule `counts:visits`. The entry of a `public` or `site` mount is handed what the request said too (`request`: query, host, referrer, agent, purpose), to read and forget. |
-| `streams` | Holds a stream at `/x/<pack>/<id>/<workspace>/<id>` and tells it when that document is `published` again (`src/server-streams.ts`). |
-| `files` | Serves a file of its `files/` folder at `/x/<pack>/files/<id>`, filled with `{origin}`, `{tokens}`, `{version}`, `{rules}`, and tells a session when its copy is behind (`src/server-files.ts`). |
-| `launchers` | Starts an agent with its argv (no shell; `{prompt}`, `{mcp_config}`, `{tools}`, `{model}`, `{mode}`, `{session_id}`), holding its token, when a person launches and the server's launch setting names the pack (PELAGO_LAUNCH_PACK; by default `claude_code`, which the open core ships in `packs/claude_code` with the Claude Code adapter and setup) (decision e_885ztqkv, `src/server-launch.ts`). |
-| `adapter` | Translates one surface's hooks, at `/hooks/<surface>/<event>`, with two functions of its handler, `in` and `out`; what a session is told stays the kernel's (decision e_6t8f46u6, `src/server-adapter.ts`). |
+| `mounts` | Hands it an address from a closed list (decision e_wptrr6tf): `public` (`/p/`), `site` (a domain's whole space), `setup` (`/connect/setup.mjs`), each to at most one pack (`packs/surface/kernel/server-mounts.ts`). Its entry answers a page, JSON, a picture, plain text or XML, a redirect on this server, the kernel's stream of a published document, or `pass` (the kernel answers). The open core's own reader (`packs/reader`) takes `public` and `site`; a pack the configuration names in its place replaces it. |
+| entries' `answers: "html"` | Sends what the entry answers as a page, with headers and policy the kernel sets (`packs/surface/kernel/server-routes.ts`). |
+| `counts` | Names the stream on a public site's map its counts are kept in (a plain word no kernel stream has, one pack's alone): it adds to a key's day with the act `count.add`, and a pack reads them back after a position with `count.read` (`packs/publish/kernel/pack-counts.ts`). How many, never of whom. The reader counts its visits so, in `visits`, kept by core's rule `counts:visits`. The entry of a `public` or `site` mount is handed what the request said too (`request`: query, host, referrer, agent, purpose), to read and forget. |
+| `streams` | Holds a stream at `/x/<pack>/<id>/<workspace>/<id>` and tells it when that document is `published` again (`packs/surface/kernel/server-streams.ts`). |
+| `files` | Serves a file of its `files/` folder at `/x/<pack>/files/<id>`, filled with `{origin}`, `{tokens}`, `{version}`, `{rules}`, and tells a session when its copy is behind (`packs/surface/kernel/server-files.ts`). |
+| `launchers` | Starts an agent with its argv (no shell; `{prompt}`, `{mcp_config}`, `{tools}`, `{model}`, `{mode}`, `{session_id}`), holding its token, when a person launches and the server's launch setting names the pack (PELAGO_LAUNCH_PACK; by default the launcher a pack marks `default: true`: the open core ships `packs/claude_code`'s, with the Claude Code adapter and setup) (decision e_885ztqkv, `packs/surface/kernel/server-launch.ts`). |
+| `adapter` | Translates one surface's hooks, at `/hooks/<surface>/<event>`, with two functions of its handler, `in` and `out`; what a session is told stays the kernel's (decision e_6t8f46u6, `packs/loader/kernel/server-adapter.ts`). The one surface that was before there were surfaces says so with `before: { actor, agent }`: its hooks are also `/hooks/<event>`, every hook acts under `actor` on the log, and an agent that gives no name on a server with no tokens acts as `agent`. |
 
 Acts `public.read`, `public.at`, `public.picture`, `public.drawing` and
-`public.list` read the public views a person made (`src/public-view.ts`), each
+`public.list` read the public views a person made (`packs/publish/kernel/public-view.ts`), each
 as it was frozen, through the security-definer reads alone
-(`src/server-published.ts`). A server pack still reads no map.
+(`packs/surface/kernel/server-published.ts`). A server pack still reads no map.
 
 ## The keys before
 
@@ -82,15 +82,15 @@ are. The owner keeps their version of one as an item of core's `type` or
 preset's, its `fields` added to the preset's, and retired, no new item or
 link is made of it while those there stay. One with a `name` and no preset
 is the workspace's own, in the `local` pack. The registry lays the items
-over the manifests before it reads them (`src/type-overlay.ts`), and a
+over the manifests before it reads them (`packs/loader/kernel/type-overlay.ts`), and a
 change that makes or changes one is checked against the registry as it
-will be, so a type made in a change can be used in it (`src/type-items.ts`).
+will be, so a type made in a change can be used in it (`packs/loader/kernel/type-items.ts`).
 
 ## What a pack requires
 
 A pack requires names, never packs (decision e_f9ybsuce): whichever active
 pack declares a name provides it, so a provider can be swapped and its
-consumers stay active (`src/packorder.ts`). A name is one of:
+consumers stay active (`packs/loader/kernel/packorder.ts`). A name is one of:
 
 | Name | Provided by |
 |---|---|
@@ -105,7 +105,7 @@ shape (task e_f9x7ddeh): the type as its provider declares it may have more,
 never less. A pack whose need the map's provider does not meet waits, saying
 what the type lacks, and an island may not run a version of a pack that drops
 what an active pack needs: the pin is refused, naming that pack and the name
-(`src/island-pin.ts`).
+(`packs/loader/kernel/island-pin.ts`).
 
 What a pack provides is read off what it declares: there is no key to claim
 it. A bare pack id is the old form, kept for a bundle's two halves.
@@ -125,7 +125,7 @@ screens and actions on them) is registered only while that pack is active.
 
 A workspace with the setting `islands` on (`workspace_set`; on for every new
 workspace) knows two kinds of pack, read off the file with no key of its own
-(`src/islands.ts`; decisions e_pp5mu6xd, e_rf6q3q34 and e_ubd8satd). The
+(`packs/loader/kernel/islands.ts`; decisions e_pp5mu6xd, e_rf6q3q34 and e_ubd8satd). The
 schema the page reads marks each pack's `kind`: `island`, `map`, or `kernel`
 for core. A pack that breaks its kind's rules is off there, and its state
 says why.
@@ -144,7 +144,7 @@ says why.
   change (what it is part of first, never a link that crosses), else on the
   island the action is given as its input `island`, else on the lone island
   it fits; else the change is refused, naming the islands it could go on
-  (`placeOnIslands`, `src/island-items.ts`).
+  (`placeOnIslands`, `packs/loader/kernel/island-items.ts`).
 - **Both is refused.** A pack with island types and a part that runs (tools,
   code, looks, computed views, uses, reach, or another pack required) is off,
   told to split into an island pack and a map pack.
@@ -169,7 +169,7 @@ Core, the kernel's pack, is never judged.
 ## Kept as an item
 
 A pack can also be authored on the map, by a person or their agent, with no
-access to the server: an item of core's `pack` type (`src/pack-items.ts`). Its
+access to the server: an item of core's `pack` type (`packs/loader/kernel/pack-items.ts`). Its
 `name` is the pack's id, its title and note the pack's, its `version` the
 pack's (0.1.0 unless said), and its `manifest` what it declares, as a
 `pack.json` holds it:
@@ -206,7 +206,7 @@ pack's (0.1.0 unless said), and its `manifest` what it declares, as a
 ## A version on one island
 
 A change to a pack can be tried on one island while the rest of the map keeps
-the pack as it is (task e_j4bzhegb, `src/island-pin.ts`).
+the pack as it is (task e_j4bzhegb, `packs/loader/kernel/island-pin.ts`).
 
 - **A version is a pack item** whose `version_of` names the pack (one the
   server has or one kept as an item; never core). It holds what a pack item
@@ -218,14 +218,14 @@ the pack as it is (task e_j4bzhegb, `src/island-pin.ts`).
   `<pack>.<what>`: it never leaves one out or renames it. It is checked when
   written, as an island would run it, and is never added as a pack of its own.
 - **What a version adds is the island's.** The map's registry keeps each type
-  and link type a version adds, dormant and retired (`src/version-types.ts`):
+  and link type a version adds, dormant and retired (`packs/loader/kernel/version-types.ts`):
   an item made of one is projected as its type says, on the write path and in
   a rebuild from the log, and nothing new is made of it but on an island that
   runs the version. A link is judged by the version its from item's island
   runs. Rolled back, the island's items of an added type stay, as a pack's do
   when it is turned off, and no more are made.
 - **A version of a server's pack may carry code** (task e_7vezatrt,
-  `src/pack-code.ts`): its field `code`, files by path (`handler.js`,
+  `packs/loader/kernel/pack-code.ts`): its field `code`, files by path (`handler.js`,
   `layouts/x.js`), each standing in for its pack's file of that path. It is
   laid out in a folder of its own, kept by the hash of the whole, and runs
   from there under the same walls as the pack's own, on the islands that run
@@ -249,7 +249,7 @@ the pack as it is (task e_j4bzhegb, `src/island-pin.ts`).
   else. A read that names no island is the map's, though it may cross
   islands: an item is not read through its own island's version one by one.
 
-- **Its rules decide there** (task e_tykp9yfc, `src/island-rules.ts`). Each
+- **Its rules decide there** (task e_tykp9yfc, `packs/loader/kernel/island-rules.ts`). Each
   op is judged by the rules of the version its island runs, for the pack the
   version is of; every other pack's rules, core's among them, stay the map's.
   A create is on the island it is made on, an update or archive on its item's,
@@ -273,7 +273,7 @@ it is found, so one moved between folders is the same pack to every
 workspace. The same id in two folders stops the server from starting.
 
 Which of them a workspace may have is the server's to say
-(`src/pack-allow.ts`). `PELAGO_ONLY_PACKS` (comma separated; `packs` in
+(`packs/loader/kernel/pack-allow.ts`). `PELAGO_ONLY_PACKS` (comma separated; `packs` in
 `pelago.config.json`) names the packs every workspace may have, core always
 among them; unset, every pack found. `PELAGO_WORKSPACE_PACKS`
 (`islands=canvas,code;site=work`; `workspacePacks`) names the packs one
@@ -291,18 +291,18 @@ SHA-256 of its `pack.json`, its `text` kept with it the first time the log
 meets that hash, and `["-", "pack:<id>", "pack"]` (docs/log.md, section 8).
 Adding a pack is the owner's: a new workspace starts with the kernel's
 (core), the packs that keep core's ids (`core.x`: canvas, sessions; what
-core shipped stays shipped, `keepsKernel` in `src/pack-moved.ts`), and those
+core shipped stays shipped, `keepsKernel` in `packs/loader/kernel/pack-moved.ts`), and those
 the server names (`PELAGO_START_PACKS`, a list or `all`), and a pack new to the server is off in a workspace until its owner
 adds it. A workspace that opens asserts again a pack it has whose manifest
 changed. A pack that holds now what a pack it names in `moved_from` declared once (a
 rule, view, style, action or layout, by its id or with `<that pack>.`
 renamed to its own prefix) is added, once, to a map that had that pack on and
 whose log keeps a manifest of it that declared it, so moving something between
-packs changes nothing a map does (`src/pack-moved.ts`; task e_qhtt4phv). The
+packs changes nothing a map does (`packs/loader/kernel/pack-moved.ts`; task e_qhtt4phv). The
 kernel's packs are in every pack's `moved_from` without being named (the core
 audit, e_sjhbyf52: the `findings` pack first, then `sessions` and `practice`). A
 declaration may keep its old id in the pack it moved to, so what names it (an
-owner's kept version) still does (`ownsId`, `src/packorder.ts`); a type or
+owner's kept version) still does (`ownsId`, `packs/loader/kernel/packorder.ts`); a type or
 link type keeps its id, or names its old one in its own `moved_from`, and
 moves by `takenOver`. Splitting a pack in two: its vocabulary half keeps
 the pack's id (an island speaks a pack by its id), and its practice half is a
@@ -324,7 +324,7 @@ an island map one way of working is often an island pack of words and the
 map pack that acts on them, as `replays` and `refine` are. It is a manifest
 of its own, `bundle.json` in a folder beside the packs (`packs/refinement/`):
 `{ id, title, description, packs }`, its id no pack's, and a pack in one
-bundle at most (`src/bundles.ts`). `pack_set` with a bundle's id, or any of
+bundle at most (`packs/loader/kernel/bundles.ts`). `pack_set` with a bundle's id, or any of
 its packs' ids, turns them all, in one change set; the Packs screen draws it
 as one plate with one switch, each pack a band in it. It is offered only
 where the server's list offers every pack in it; where one is left out, the

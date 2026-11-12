@@ -1,0 +1,78 @@
+{
+  "id": "query",
+  "version": "0.1.0",
+  "title": "Query",
+  "description": "The query engine: how a lens is read and answered (the flat query, its terms and words, held and placed in time), the standing views asked by name, a lens's steps, an item's altitude, and what changed summed up for an agent.",
+  "uses": [
+    "service:answer.frontier",
+    "service:answer.worked_on",
+    "service:answer.session_states",
+    "service:answer.session_marks",
+    "service:answer.run_spans",
+    "service:answer.spent",
+    "service:answer.session_measures",
+    "service:answer.lives_in",
+    "service:answer.moved",
+    "service:answer.time_lanes",
+    "service:answer.hubs_of",
+    "service:answer.saved_views",
+    "service:answer.usage",
+    "service:answer.page_style",
+    "service:answer.instructions",
+    "service:root.uses",
+    "service:root.pack_view"
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "answer.flat": {
+        "in": {},
+        "out": {
+          "items": [
+            {
+              "id": "id"
+            }
+          ],
+          "links": [
+            "any"
+          ]
+        },
+        "run": "answers.ts#flat"
+      },
+      "answer.flat_check": {
+        "in": {},
+        "out": {
+          "problem?": "string"
+        },
+        "run": "answers.ts#flatCheck"
+      },
+      "answer.flat_lens": {
+        "in": {},
+        "out": "any",
+        "run": "answers.ts#flatLens"
+      },
+      "answer.ask_view": {
+        "in": {
+          "actor": "any",
+          "name": "string",
+          "params?": "any"
+        },
+        "out": "any",
+        "run": "answers.ts#askedView"
+      }
+    },
+    "families": [
+      "answer",
+      "term"
+    ],
+    "hooks": {
+      "surface.views": "askview.ts#words",
+      "surface.reads": [
+        "reads.ts#view",
+        "reads.ts#placed"
+      ]
+    }
+  }
+}

@@ -1,11 +1,11 @@
-// Every listing of Archipelago says what listing.json says (src/listing.ts): the plugin and its marketplace, /llms.txt,
+// Every listing of Archipelago says what listing.json says (packs/surface/kernel/listing.ts): the plugin and its marketplace, /llms.txt,
 // the install page and the README. A directory filled in by hand is pasted from the same file.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { LIMITS, LISTING } from '../src/listing.ts';
-import { installPage, llmsTxt } from '../src/install.ts';
+import { LIMITS, LISTING } from '../packs/surface/kernel/listing.ts';
+import { installPage, llmsTxt } from '../packs/connect/kernel/install.ts';
 import { FOLDER, PLUGIN_ICON, pluginFiles } from '../scripts/plugin.ts';
 
 const ROOT = join(import.meta.dirname, '..');

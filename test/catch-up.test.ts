@@ -1,5 +1,5 @@
 // Catch-up (ui/catch-up.js): a page opened after time away works out, from the log alone, what the canvas held when
-// its reader last looked (every fact said of it up to then, src/tail.ts `was`, folded by the projector), what changed
+// its reader last looked (every fact said of it up to then, packs/log/kernel/tail.ts `was`, folded by the projector), what changed
 // since, and the steps it plays: chapters by who made them, island by island; played through the store, they end
 // where the map stands.
 
@@ -9,9 +9,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { uiFile } from '../src/ui-files.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { uiFile } from '../packs/surface/kernel/ui-files.ts';
 import { agent, fresh, human, make } from './map.ts';
 
 /** The page's pure modules as the server serves them, loaded from a folder of their own as the browser would. */

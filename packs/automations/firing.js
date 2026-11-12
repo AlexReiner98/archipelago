@@ -7,7 +7,7 @@
 export const FIRED = 'automation.fired';
 /** The ref a firing's notification is named by in its fact. */
 export const NOTICE = 'notice';
-/** The ref the session a firing launched is named by in its fact: the kernel fills in its run (src/packhost.ts). */
+/** The ref the session a firing launched is named by in its fact: the kernel fills in its run (packs/loader/kernel/packhost.ts). */
 export const RUN = 'run';
 const LONGEST = 200;
 

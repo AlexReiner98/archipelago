@@ -3,8 +3,8 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createToken, verifyToken } from '../src/auth.ts';
-import { TOKEN_SCOPE } from '../src/schema.ts';
+import { createToken, verifyToken } from '../packs/identity/kernel/auth.ts';
+import { TOKEN_SCOPE } from '../packs/database/kernel/schema.ts';
 import { packsWith } from './map.ts';
 import { serve } from './serve.ts';
 

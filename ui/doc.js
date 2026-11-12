@@ -5,6 +5,7 @@
 import { SignInNeeded, authHeaders, call, h } from './base.js';
 import { drawFrozen } from './doc-lens.js';
 import { openItem } from './doc-sheet.js';
+import { wholeRead } from './item-doc.js';
 import { carried } from './doc-ref.js';
 import { warmLayouts } from './layout.js';
 import { sayLook } from './look.js';
@@ -20,7 +21,7 @@ const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
 // Opened from the app (/read/<id>), the page reads the document with the reader's own sign-in;
 // made public (/p/<workspace>/<id>), as anyone. A preview (/preview/<id>) is drawn as the published page would be, from
-// what publishing it would give now (src/published-preview.ts), read with the reader's sign-in.
+// what publishing it would give now (packs/publish/kernel/published-preview.ts), read with the reader's sign-in.
 const own = /^\/read\/(e_[a-z0-9]{8})$/.exec(here)?.[1];
 const preview = /^\/preview\/e_[a-z0-9]{8}$/.test(here);
 const published = here.startsWith('/p/');
@@ -161,17 +162,26 @@ function invoiceHead(d) {
   );
 }
 
+/**
+ * The heads a style may give a page (page.head), by name: each draws the page's heading and says its title, and the
+ * page's body wears the head's name as a class (ui/doc.css). A page whose style names none has the plain heading.
+ */
+const HEADS = {
+  invoice: { draw: invoiceHead, title: (d) => (d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title) },
+};
+const headOf = (d) => (Object.hasOwn(HEADS, d.head ?? '') ? HEADS[d.head] : null);
+
 
 /** Whether a page ends with a way to start a map of one's own: read with no login, and the style gives it words. */
 const startsOwn = (d) => !own && !preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
-/** That way: where this server says a person with no account begins (src/connect.ts), else its front page. */
+/** That way: where this server says a person with no account begins (/connect/start, packs/surface/kernel/connect-routes.ts), else its front page. */
 function startLink(words) {
   const link = h('a', { class: 'start-own', href: '/' }, words);
   fetch('/connect/start').then((res) => (res.ok ? res.json() : null)).then((r) => r?.url && link.setAttribute('href', r.url), () => null);
   return link;
 }
 
-/** The address word of a site's front page (src/site.ts). */
+/** The address word of a site's front page (packs/publish/kernel/site.ts). */
 const FRONT = 'home';
 // A link followed takes what the page's data says it carries (data.carry), set as it is followed so every link drawn has it.
 let carryOn;
@@ -199,7 +209,8 @@ function draw(d) {
   if (d.carry) carryOn = d.carry;
   applyTheme(d);
   pageSheet.replaceSync(pageCss(d.page_css));
-  document.title = d.head === 'invoice' && d.fields?.number ? `${d.fields.number} ${d.title.replace(/^Invoice [^:]*:\s*/, '')}` : d.title;
+  const head = headOf(d);
+  document.title = head ? head.title(d) : d.title;
   const titles = new Map(d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]));
   away = new Map(Object.entries(d.links ?? {}));
   paths = d.paths ?? {};
@@ -247,16 +258,16 @@ function draw(d) {
   // The page's parts, lists and all, laid out in one flat row as the page takes them.
   const kids = [
     d.site && siteHead(d.site),
-    d.head === 'invoice' ? invoiceHead(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at, 'long')}` : `Updated ${day(d.updated_at, 'long')}`)),
+    head ? head.draw(d) : h('header', {}, h('h1', {}, d.title), h('p', { class: 'muted' }, d.published_at ? `Published ${day(d.published_at, 'long')}` : `Updated ${day(d.updated_at, 'long')}`)),
     parts(),
-    // A site's pages each end with what its footer page says (src/site.ts).
+    // A site's pages each end with what its footer page says (packs/publish/kernel/site.ts).
     d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, titles, 3)),
     // A public page is read on the web: only an invoice's has a way to print it. One read with no login, not on its
     // site's own domain, ends with a quiet way to start a map of one's own, in the style's words.
     ((!published && !d.site) || startsOwn(d)) && h('footer', { class: 'muted' }, !published && !d.site && h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF'), startsOwn(d) && startLink(d.start)),
   ];
   main.replaceChildren(...kids.flat(Infinity).filter(Boolean));
-  document.body.classList.toggle('invoice', d.head === 'invoice');
+  for (const name of Object.keys(HEADS)) document.body.classList.toggle(name, HEADS[name] === head);
   // Its pictures, with the text: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
   // On a public view, a part of a picture opens in a sheet, read only (ui/doc-sheet.js), as it was frozen.
   const onItem = published || d.site ? (id) => openItem(id, frozenItem(d), (text) => blocks(text, titles, 3)) : null;
@@ -274,7 +285,7 @@ if (!given) warmLayouts();
   : preview
   ? post(`${here}/data`, {})
   : own
-  ? Promise.all([api('document', { id: own, drawn: true }), api('view', { name: 'style', params: { of: own } })]).then(([d, { style: s }]) => ({ ...d, theme: s.theme, lengths: s.lengths, faces: s.faces, type: s.type, head: s.page?.head, share: s.page?.share }))
+  ? Promise.all([api('schema', { reads: true }).then((s) => api(wholeRead(s), { id: own, drawn: true })), api('view', { name: 'style', params: { of: own } })]).then(([d, { style: s }]) => ({ ...d, theme: s.theme, lengths: s.lengths, faces: s.faces, type: s.type, head: s.page?.head, share: s.page?.share }))
   : fetch(`${here}/data`).then(async (res) => {
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? 'This page does not open anything.');
@@ -282,10 +293,10 @@ if (!given) warmLayouts();
     })
 )
   .then(draw)
-  // Opened for an agent's look (src/looks.ts), it says when the page is drawn.
+  // Opened for an agent's look (packs/look_draw/kernel/looks.ts), it says when the page is drawn.
   .then(() => sayLook('drawn'), (err) => (main.replaceChildren(h('p', { class: 'error' }, err.message)), sayLook('error', err.message)));
 
-// Opened with ?live, a published page is drawn anew each time its document is published again (src/published-live.ts).
+// Opened with ?live, a published page is drawn anew each time its document is published again (packs/publish/kernel/published-live.ts).
 // It reads again once its stream is open too: a publish between the first read and the stream is not missed.
 if (given && new URLSearchParams(location.search).has('live')) {
   const fresh = () => fetch(`${here}/data`).then((res) => res.json()).then(draw, () => null);

@@ -2,15 +2,15 @@
 // packs, a change, a tool called as a person or an agent would. A pack's test tries the pack's own rules on a real map
 // through these, never the kernel's modules, so it runs wherever the pack lives (decision e_6bucpdtc, 9 Nov 2026).
 import assert from 'node:assert/strict';
-import type { Actor, Archipelago, Op } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
+import type { Actor, Archipelago, Op } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, PACKS } from './map.ts';
 
 export type { Actor, Archipelago, Op };
 export { agent, human, PACKS };
-/** How a style's colours are worked out, for a pack that adds colours or themes (src/colours.ts). */
-export { contrast, finishTheme, mergeTheme, mix, search } from '../src/colours.ts';
+/** How a style's colours are worked out, for a pack that adds colours or themes (packs/styles/kernel/colours.ts). */
+export { contrast, finishTheme, mergeTheme, mix, search } from '../packs/styles/kernel/colours.ts';
 
 /** A fresh map in memory with the kernel's packs and those in the folders given (a pack's own folder's parent). */
 export const mapWith = (...folders: string[]) => freshWith(new Registry([PACKS, ...folders.filter((f) => f !== PACKS)]));

@@ -1,12 +1,12 @@
-// Rules decided by an island's pack version (src/island-rules.ts, decide in src/rules.ts; task e_tykp9yfc): each op is
+// Rules decided by an island's pack version (packs/loader/kernel/island-rules.ts, decide in packs/rules/kernel/rules.ts; task e_tykp9yfc): each op is
 // judged by the rules of the version its island runs, an op on no island or the map's pack by the map's; a change
 // across islands is held or refused if any op is, and a held change names the rule and the version that held it.
 // Core's own rules are never a version's. Beside the table of every change (test/approvals.ts), which has no islands.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
-import type { Archipelago, ChangeInput } from '../src/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import type { Archipelago, ChangeInput } from '../packs/write/kernel/pelago.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
 
 const thing = { id: 'plain.thing', title: 'Thing', description: 'A thing.', extends: 'work' };

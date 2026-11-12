@@ -1,4 +1,4 @@
-// A site's home view baked (src/public-bake.ts, packs/reader/baked-site.js): where the view at /home is drawn by the
+// A site's home view baked (packs/publish/kernel/public-bake.ts, packs/reader/baked-site.js): where the view at /home is drawn by the
 // rails, / is one page of its stops' words and the map as SVG, each stop at its own address, JSON for an agent, and
 // nothing private on any of it.
 

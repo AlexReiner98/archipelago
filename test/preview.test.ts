@@ -1,15 +1,16 @@
-// A document's preview (src/published-preview.ts): what publishing it now would give, read before it is published,
+// A document's preview (packs/publish/kernel/published-preview.ts): what publishing it now would give, read before it is published,
 // with the site's header, for someone signed in. Nothing is published by reading it.
 
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { setIslands } from '../src/packstate.ts';
-import { createToken } from '../src/auth.ts';
-import { wouldPublish } from '../src/published.ts';
-import { Registry } from '../src/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import * as publishedPack from '../packs/publish/kernel/published.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { freshWith, make, PACKS } from './map.ts';
 import { serve } from './serve.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A pack with a document the kernel can publish: core keeps none of its own (test/fixtures/packs/pages). */
 const PAGES = [join(import.meta.dirname, 'fixtures', 'packs')];
@@ -65,7 +66,7 @@ test('a document is previewed as publishing it would give it, before it is publi
   // A private one is read as its reader sees it (ui/reader-frame.js), its page framed by this server's own alone.
   assert.match((await fetch(`${base}/read/${made.p}`)).headers.get('content-security-policy') ?? '', /frame-ancestors 'self'/);
   // Any item is read whole by its note, as a document is, for a Pages view of what is not one; it has no draft to
-  // preview, and it is shared as a page of one section, itself (src/public-view.ts).
+  // preview, and it is shared as a page of one section, itself (packs/publish/kernel/public-view.ts).
   const task = await api(mine, 'document', { id: made.t });
   assert.equal(task.title, 'Write it');
   assert.deepEqual(await api(mine, 'published', { id: made.t }), { published: false, publishable: false });
@@ -104,5 +105,5 @@ test('a private document has no preview: it says so, by name', async () => {
   const l = await freshWith(new Registry([PACKS, ...PAGES]));
   const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'page', title: 'Notes to self', visibility: 'private', body: 'Mine.' }]);
   await l.db.query(`update entity set private_to = 'e_owner' where id = $1`, [p]);
-  await assert.rejects(wouldPublish(l, p), /"Notes to self" is private: share it/);
+  await assert.rejects(publishedPack.wouldPublish(kernelContext(l, 'publish'), p), /"Notes to self" is private: share it/);
 });

@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Archipelago } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { sessionStart } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { human, agent, freshWith, make, packsWith } from './map.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A pack written for the test: a paper, read whole on its page, as a document is. */
 const PAPERS = {
@@ -27,11 +28,11 @@ test('a view kept on the map is drawn from its flat lens, with its pins, and can
     { op: 'create', ref: 'v', type: 'lens', title: 'Funding map', props: { filter: { find: [`id ${made.p}`, `id ${made.other}`] }, walk: { over: ['part_of'], steps: 1 }, style: { shape: 'map' } } },
     { op: 'link', type: 'about', from: 'v', to: made.p },
   ]));
-  const { keptPicture } = await import('../src/query-saved.ts');
-  const answer = await keptPicture(l, made.v);
+  const querySavedPack = await import('../packs/lenses/kernel/query-saved.ts');
+  const answer = await querySavedPack.keptPicture(kernelContext(l, 'lenses'), made.v);
   assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.p, made.irap, made.other].sort());
   assert.equal(answer.style.shape, 'map', 'drawn in the shape it keeps');
-  await assert.rejects(keptPicture(l, made.p), /not a view kept on the map/);
+  await assert.rejects(querySavedPack.keptPicture(kernelContext(l, 'lenses'), made.p), /not a view kept on the map/);
   const png = Buffer.from('89504e470d0a1a0a', 'hex').toString('base64');
   assert.equal(((await callTool(l, human, 'picture_put', { result: made.v, data: png, content_type: 'image/png' })) as { size: number }).size, 8);
 });
@@ -105,7 +106,7 @@ test('get of an item reads a view it is drawn in whose steps no longer pass, and
 });
 
 test('a session’s turns are kept as stretches of work: a prompt begins one, a stop ends it, a long quiet starts the next', async () => {
-  const { stretch, IDLE_MS } = await import('../src/sessions.ts');
+  const { stretch, IDLE_MS } = await import('../packs/sessions/kernel/sessions.ts');
   const t = (m: number) => new Date(Date.parse('2026-10-15T12:00:00Z') + m * 60_000).toISOString();
   let s = stretch([], t(0), 'at');
   s = stretch(s, t(40), 'until');
@@ -116,12 +117,12 @@ test('a session’s turns are kept as stretches of work: a prompt begins one, a 
   assert.equal(s.length, 2, 'after a long quiet, a new stretch');
   assert.deepEqual(stretch(s, t(600), 'close'), s, 'a session closed hours after it went quiet stopped when it went quiet');
   const l = await fresh();
-  await sessionStart(l, agent, { session_id: 'turns' });
-  const { sessionHeard } = await import('../src/sessions.ts');
-  await sessionHeard(l, 'turns', 'begin');
+  const sessionsPack = await import('../packs/sessions/kernel/sessions.ts');
+  await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as Parameters<typeof sessionsPack.sessionStart>[1], ({ session_id: 'turns' }));
+  await sessionsPack.sessionHeard(ownContext(l, 'sessions'), 'turns', 'begin');
   const run = (await l.db.query<{ props: Record<string, unknown> }>(`select props from entity where props->>'session_id' = 'turns'`)).rows[0];
   assert.deepEqual([(run.props.active as unknown[]).length, run.props.busy], [1, true]);
-  await sessionHeard(l, 'turns', 'until');
+  await sessionsPack.sessionHeard(ownContext(l, 'sessions'), 'turns', 'until');
   const after = (await l.db.query<{ props: Record<string, unknown> }>(`select props from entity where props->>'session_id' = 'turns'`)).rows[0];
   assert.equal(after.props.busy, false);
 });

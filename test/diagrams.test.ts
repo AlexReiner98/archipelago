@@ -14,6 +14,7 @@ const ROOT = join(import.meta.dirname, '..');
 const cells = (xml: string, attr: 'vertex' | 'edge') => (xml.match(new RegExp(`${attr}="1"`, 'g')) ?? []).length;
 
 test('imports are read: relative, dynamic and from a page; type-only imports and other folders are not', () => {
+  // The reader is tried on files of its own making: these paths name no module of this repository.
   const modules = readModules([
     { path: 'src/server.ts', text: "// One process.\nimport { a } from './pelago.ts';\nimport type { T } from './db.ts';\nconst m = await import('./db.ts');\nimport { z } from 'zod';\n" },
     { path: 'src/pelago.ts', text: "// The write path. More here.\nimport {\n  b,\n} from './db.ts';\n" },

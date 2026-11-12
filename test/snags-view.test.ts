@@ -5,12 +5,13 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { answerRead } from '../src/packreads.ts';
-import { Registry } from '../src/packs.ts';
-import { setPack } from '../src/packstate.ts';
-import { sessionStart } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
+import { answerRead } from '../packs/surface/kernel/packreads.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setPack } from '../packs/loader/kernel/packstate.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 type Group = { touches: string; count: number; snags: { id: string }[]; runs: { id: string; title?: string; packs?: unknown }[] };
 type Answer = { open: number; groups: Group[]; untouched: { count: number; snags: { id: string }[] }; within?: string };
@@ -37,7 +38,7 @@ test('query snags groups open bumps by what they touched, with the runs that wro
   const l = await mapWithRefine();
   const { friction } = await make(l, [{ op: 'create', ref: 'friction', type: 'task', title: 'Friction' }]);
 
-  const one = await sessionStart(l, agent, { session_id: 'one', cwd: 'C:/work/app' });
+  const one = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'one', cwd: 'C:/work/app' }));
   const filed = await l.change(agent, {
     run: one.run,
     reason: 'Record bumps',
@@ -54,7 +55,7 @@ test('query snags groups open bumps by what they touched, with the runs that wro
   const { a, b, c } = (filed as { created: Record<string, string> }).created;
 
   // A second session hits the same snag and adds to it.
-  const two = await sessionStart(l, agent, { session_id: 'two', cwd: 'C:/work/app' });
+  const two = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'two', cwd: 'C:/work/app' }));
   assert.equal((await l.change(agent, { run: two.run, reason: 'Seen again', ops: [{ op: 'update', id: b, append: 'Seen again.' }] })).status, 'applied');
 
   const all = (await callTool(l, agent, 'query', { name: 'snags' })) as Answer;

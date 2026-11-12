@@ -17,7 +17,7 @@ const BASE = `http://127.0.0.1:${PORT}`;
 if (process.argv.includes('--fresh')) rmSync(DIR, { recursive: true, force: true });
 mkdirSync(DIR, { recursive: true });
 
-const server = spawn(process.execPath, [join(ROOT, 'src', 'server.ts')], {
+const server = spawn(process.execPath, [join(ROOT, 'src', 'boot.ts')], {
   cwd: ROOT,
   stdio: 'inherit',
   env: { ...process.env, PELAGO_DATA: join(DIR, 'data'), PELAGO_PORT: String(PORT), PELAGO_HOST: '127.0.0.1', PELAGO_AUTH: 'off', PELAGO_DEV: '0' },

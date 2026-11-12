@@ -1,0 +1,73 @@
+{
+  "id": "attention",
+  "version": "0.1.0",
+  "title": "Attention",
+  "description": "What deserves attention, and why: the reasons each open item gives (waits on someone, to confirm, holding up, due, moved, unsettled, blocked, stale, under way, ready) and those packs declare, answered as the lens preset attention.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "answer.attention": {
+        "in": {
+          "person?": "string",
+          "within?": "id",
+          "among?": [
+            "id"
+          ],
+          "reasons?": [
+            "string"
+          ],
+          "days?": "number",
+          "stale_days?": "number",
+          "order?": "string",
+          "limit?": "number"
+        },
+        "out": {
+          "counts": "any",
+          "items": [
+            {
+              "id": "id",
+              "title": "string",
+              "reasons": [
+                "any"
+              ]
+            }
+          ]
+        },
+        "run": "attention.ts#answer"
+      },
+      "answer.moved": {
+        "in": {},
+        "out": {
+          "ids": [
+            "id"
+          ]
+        },
+        "run": "query-answers.ts#moved"
+      },
+      "answer.to_confirm": {
+        "in": {
+          "limit?": "number"
+        },
+        "out": {
+          "count": "number",
+          "upto": "number",
+          "questions": [
+            "any"
+          ]
+        },
+        "run": "confirm.ts#toConfirm"
+      }
+    }
+  },
+  "views": [
+    {
+      "id": "core.attention",
+      "shape": "data",
+      "lens": {},
+      "answer": "attention",
+      "description": "What deserves attention, and why: each item with its reasons, the strongest first. Reasons: waits_on (someone must answer or act), to_confirm (an agent settled it and the owner has not confirmed), holding_up (others are blocked by it), due (its bound is near or past), moved (a finding it reads has changed since it was last changed or said still true: which, from what to what, when; an update of only its id clears it), unsettled (a question not yet settled, and how it settles), blocked (and what has to move first), stale (nobody has changed or confirmed it for stale_days), under_way (a session is on it), ready (work nothing blocks). Each item says what it sits in at the top (top). Params: person (\"me\", or an id: only what is theirs), within (an item or place: only what is its): one of the two, since weighing every open item would read the whole map (for everyone, only to_confirm), reasons (some of the above), days (due within, 7), stale_days (14), order (latest: what changed most recently first), limit (100). With to_confirm, the answer has to_confirm.upto for the confirmed tool."
+    }
+  ]
+}

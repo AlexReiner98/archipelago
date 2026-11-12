@@ -10,14 +10,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { agent, fresh, human, make, replayed } from './map.ts';
-import { backupVault, dump, restore } from '../src/backup.ts';
-import { openDb } from '../src/db.ts';
-import { mentions } from '../src/forget.ts';
-import { entries, stored, verify, type Entry } from '../src/log.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { isSealed, open, openSaid, SealBroken, seal } from '../src/seal.ts';
-import { undo } from '../src/undo.ts';
-import { dumpVault, keysOf } from '../src/vault.ts';
+import { dump, restore } from '../packs/log/kernel/backup.ts';
+import { backupVault } from '../packs/backup/kernel/backup-run.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { mentions } from '../packs/write/kernel/forget.ts';
+import { entries, stored, verify, type Entry } from '../packs/log/kernel/log.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { isSealed, open, openSaid, SealBroken, seal } from '../packs/seal/kernel/seal.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
+import { dumpVault, keysOf } from '../packs/seal/kernel/vault.ts';
+import { searchMap } from '../packs/surface/kernel/search.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
 
 async function all(l: Archipelago, read = entries) {
   const out: Entry[] = [];
@@ -142,7 +146,7 @@ test('a forget destroys the keys, leaves digests where the words were, and the c
   assert.ok(!JSON.stringify(log).includes('Quill') && !JSON.stringify(log).includes('Salary'));
   assert.ok(head !== after.head);
   // What it left says nothing in an item's history: the digest of a forgotten reason is not a reason.
-  const history = (await l.events({ target: made.t })) as any[];
+  const history = (await readEvents(l.db, { target: made.t })) as any[];
   assert.ok(history.some((e) => e.changeset === made.said && e.reason === '' && e.authority?.basis === undefined), 'a forgotten reason reads as none');
   assert.ok(history.every((e) => e.changeset !== forgot.changeset || e.detail.forgot), 'a forget is marked, so no page offers to undo it');
 
@@ -160,10 +164,10 @@ test('a forgotten item is gone from every read', async () => {
   await make(l, [{ op: 'forget', id: made.sam, reasons: (await mentions(l.db, made.sam)).map((m) => m.id) }]);
 
   assert.equal(await l.entity(made.sam), undefined);
-  await assert.rejects(l.get(made.sam));
-  assert.deepEqual(await l.search({ q: 'Quill' }), []);
-  assert.deepEqual(await l.search({ q: 'Salary' }), []);
-  const task = (await l.get(made.t)) as { entity: { owner: string | null }; outgoing: { type: string }[] };
+  await assert.rejects(getItem(l, made.sam));
+  assert.deepEqual(await searchMap(l, { q: 'Quill' }), []);
+  assert.deepEqual(await searchMap(l, { q: 'Salary' }), []);
+  const task = (await getItem(l, made.t)) as { entity: { owner: string | null }; outgoing: { type: string }[] };
   assert.equal(task.entity.owner, null, 'what it owned is owned by no one');
   assert.deepEqual(task.outgoing.map((r) => r.type), ['part_of'], 'its links are gone with it');
   const tables = JSON.stringify((await l.db.query(`select (select jsonb_agg(p) from proposal p) as proposals, (select count(*) from picture) as pictures`)).rows);

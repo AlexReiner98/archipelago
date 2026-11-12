@@ -22,7 +22,7 @@ For working on Archipelago itself, one person on one machine. It differs from
   `policy` in `pelago.config.json` says otherwise. Undo on the Changes screen
   still reverses a change set.
 - **Agents can restart the server** with the `restart` tool, to run code they
-  have just changed. The server is kept running by [src/dev.ts](../src/dev.ts):
+  have just changed. The server is kept running by [scripts/dev.ts](../scripts/dev.ts):
   if new code fails to start, it tries again when a file under `src/` or
   `packs/` changes. Its output is kept in `runs/dev-server.log`.
 
@@ -37,9 +37,9 @@ Approving, launching and tokens stay with you. Dev mode refuses to start with
 | Web UI | You | Open `http://127.0.0.1:3100` while the server is running |
 | CLI | You | `npm run pelago -- <command>` (run with no command for the list) |
 
-All three call the tools in [src/tools.ts](../src/tools.ts). The web UI and CLI
+All three call the tools in [packs/surface/kernel/tools.ts](../src/tools.ts). The web UI and CLI
 have human authority and call each tool by its name; the MCP endpoint does not,
-and offers agents ten tools ([src/surface.ts](../src/surface.ts)): `query`
+and offers agents ten tools ([packs/surface/kernel/surface.ts](../src/surface.ts)): `query`
 reads (a view, a query, or a read such as `get`, `search`, `schema`, `events`),
 `change` writes, `undo` takes a change set back, and every other action is
 called under one of the six verbs the core pack declares (`capture`, `assign`,
@@ -205,7 +205,7 @@ rewritten:
   the part_of closure, mentions, the search index) are written from the
   log's facts in the same transaction as the append. A snapshot of them is
   kept daily; a rebuild starts from the newest one and swaps in what
-  differs, and any position can be read as it was (`src/snapshot.ts`).
+  differs, and any position can be read as it was (`packs/log/kernel/snapshot.ts`).
 - **Partitions.** The log's tables are partitioned by year, made ahead as
   time goes on, and every partition refuses an update or a delete.
 - **Activity and history** (an item's history, `changed_since`, `watch`,
@@ -340,30 +340,30 @@ There are more (`hubs`, `proof`, `changelog`, `recheck`, `agent_usage`,
 `notifications`, `graph`).
 
 The query is the flat query (`flat`): a filter, a walk and a limit, answered as
-items and the links among them (`src/query-flat.ts`). Its filter's text is
+items and the links among them (`packs/query/kernel/query-flat.ts`). Its filter's text is
 the `search` read's own search, ranked the same, and the find bar on the page
 sets it. A pack declares its views
 in its pack file (`views`): one with `lens` is answered by a read of the
-kernel's that its `answer` names (`src/query-presets.ts`), in the form that view
+kernel's that its `answer` names (`packs/query/kernel/query-presets.ts`), in the form that view
 has always had; any other is answered by the pack's own code. The core pack's
-are `flat`, `attention`, `brief`, `graph` (`src/view-graph.ts`) and `hubs`, each read on its
-own; `tree` (`src/view-tree.ts`) is declared by a practice pack (work_views). A view kept on the map
+are `flat`, `attention`, `brief`, `graph` (`packs/views/kernel/view-graph.ts`) and `hubs`, each read on its
+own; `tree` (`packs/views/kernel/view-tree.ts`) is declared by a practice pack (work_views). A view kept on the map
 (an item of type `lens`, a view on Home) is a flat query and a
-style (`src/query-saved.ts`): a document draws it where a line names it, and
+style (`packs/lenses/kernel/query-saved.ts`): a document draws it where a line names it, and
 publishing freezes its picture. `gate` is the software pack's, and reads around its event (the pack
 read `around`). No view reads the whole map: a read around an item reads only
-what is around it (`src/region.ts`), so what it costs follows what it answers;
+what is around it (`packs/surface/kernel/region.ts`), so what it costs follows what it answers;
 the flat query refuses a filter that includes nothing. `attention` reads what is a person's
 (`person`) or inside an item (`within`); for everyone, only `to_confirm`,
 from the log. `hubs` read within an item (`within`). A `graph` with no
 focus is drawn from the newest links of each kind. What is inside what, all
 the way down, is the part_of closure, a projection the log keeps
-(`src/closure.ts`); `npm test` refuses a query of the items, links or log
+(`packs/log/kernel/closure.ts`); `npm test` refuses a query of the items, links or log
 with nothing to bound it. An agent is told what changed as counts and the
 newest five (`changed_since`, `watch`, the prompt hook), not the list. What the kernel still answers
 itself reads what keeps the map running, not the work (`sessions`,
 `notifications`, `spent`, `story`, `changed_since`, `style`, `saved_views`),
-and `src/operational.ts` names each; `npm test` refuses any other. Every view
+and `packs/log/kernel/operational.ts` names each; `npm test` refuses any other. Every view
 is asked by its short name, wherever it lives.
 
 Blockers are never stored. They are derived each time from `depends_on`,
@@ -475,12 +475,12 @@ it.
   separated, or `cloudflare` (as in the Render example, since Render is
   reached through Cloudflare). Private networks are always trusted. The caller is
   the last address in `x-forwarded-for` that is not a trusted proxy; what
-  stands before it he could have written himself (`src/address.ts`).
+  stands before it he could have written himself (`packs/walls/kernel/address.ts`).
 - `PORT` is honoured when `PELAGO_PORT` is not set.
 - `PELAGO_DATABASE_URL=postgres://…` keeps the databases on a Postgres
   server instead of the disk: the default workspace in that database, each
   other one in a database of its own beside it. The schema is applied in
-  numbered steps (`src/migrate.ts`), recorded in `schema_version`; run
+  numbered steps (`packs/database/kernel/migrate.ts`), recorded in `schema_version`; run
   `npm run migrate` as the deploy step, before the new server starts, so no
   server that is answering requests changes the schema under another. A
   server also applies the steps a database lacks as it opens it, so a
@@ -502,7 +502,7 @@ it.
   with an enabled automation or an open session stays open.
 - A hosted server does not launch sessions: launching starts Claude Code in a
   repository on the server's own machine.
-- What answers without a token is asked only so often (`src/limit.ts`): a
+- What answers without a token is asked only so often (`packs/surface/kernel/limit.ts`): a
   product's public page and the setup script, 120 requests a minute from one
   address and 1,200 from all together; a pack's webhook deliveries, 300 a
   minute from one address. Beyond that the answer is 429 with `Retry-After`. The count
@@ -519,7 +519,7 @@ A call the server makes to an address someone gave it (a connection checked,
 a client's sign-in) follows no redirect, and `PELAGO_PRIVATE_URLS=off` (or
 `PELAGO_MODEL_PRIVATE_URLS=off`, its first name) refuses one on the server's
 own network (loopback, private and link-local addresses), held to on every
-call by the address it connects to (`src/outbound.ts`).
+call by the address it connects to (`packs/walls/kernel/outbound.ts`).
 
 **An agent reads the push.** [examples/github/pelago.yml](../examples/github/pelago.yml)
 is a GitHub Actions workflow: on every push it runs Claude in the repository,
@@ -560,12 +560,12 @@ What the server knows and must not give up is of two kinds.
 - **What it only has to recognise is kept as a hash:** every token, and the
   operator secret. Each is shown once, when it is made, and cannot be read
   back out of the server or a backup.
-- **What the map says is sealed per item** (`src/seal.ts`): each item, link
+- **What the map says is sealed per item** (`packs/seal/kernel/seal.ts`): each item, link
   with fields and change set has its own key, kept in the workspace's key
-  vault (`src/vault.ts`) wrapped with the sealing key below. A forget deletes
+  vault (`packs/seal/kernel/vault.ts`) wrapped with the sealing key below. A forget deletes
   the key; vault backups are kept apart from the data and for 30 days only,
   so a forgotten item cannot be read back after that.
-- **What it has to use is sealed** (AES-256-GCM, `src/secrets.ts`): the
+- **What it has to use is sealed** (AES-256-GCM, `packs/seal/kernel/secrets.ts`): the
   secrets a pack's webhooks sign with, and a server pack's keys. The sealing
   key is
   `PELAGO_SECRETS_KEY` (32 bytes, base64) when that is set, and otherwise a
@@ -586,11 +586,11 @@ person can read it. Three things limit what a copied one is worth:
   item's page (a repository, an environment, a project), such a token reads
   the map as its person does and writes only what is that item's: what lives
   in it and all that is part of that or about it. What a change writes is
-  checked on the write path itself (`src/within.ts`, from
+  checked on the write path itself (`packs/write/kernel/within.ts`, from
   `Archipelago.change`), whichever tool sends it. What it makes has to be
   tied into that work in the same change. It cannot archive, merge or re-link
   anything else, define a type, or speak for another repository. What else
-  it may call is a list (`src/scope.ts`): beyond the tools that only read,
+  it may call is a list (`packs/surface/kernel/scope.ts`): beyond the tools that only read,
   it reports results for that work's tests, takes a resource that work needs
   or that no work is said to need, and notifies about that work. Everything
   else (a backup, the owner's word on settled questions, a tool added later)
@@ -612,7 +612,7 @@ person can read it. Three things limit what a copied one is worth:
   poll's secret as a bearer) is handed a token once: an agent's, acting for
   whoever approved it, within those items, that may only report. A request
   waits ten minutes and is operational state, not an item
-  (`src/token-ask.ts`). A deploy script can ask this way for a token to
+  (`packs/connect/kernel/token-ask.ts`). A deploy script can ask this way for a token to
   report which of its servers is live.
 - **Its owner hears of a new place.** Each token keeps the networks it has
   been used from. Used from one it has not been, a warning goes to the
@@ -702,7 +702,7 @@ change that:
   agent's. A human token can approve, launch and manage tokens; an agent token
   cannot, on any endpoint.
 - **A client can sign in through the browser** (OAuth for MCP,
-  `src/oauth.ts`). Point any client at `<server>/mcp`: it reads where to sign
+  `packs/identity/kernel/oauth.ts`). Point any client at `<server>/mcp`: it reads where to sign
   in from the 401, a person signs in and says Allow, and it is given an agent
   token acting for them. Tokens last an hour and rotate by a refresh token in
   the same row, so a connection is one row under Workspace → Agents with one

@@ -147,7 +147,7 @@ export function cssFor(id, text) {
 
 /**
  * A stylesheet as a drawing or a published page (`page`) may say it, comments taken out: refused if it could fetch
- * anything or reach out of where it is read, by the rules the server checks page_css by on write (src/css-check.ts).
+ * anything or reach out of where it is read, by the rules the server checks page_css by on write (packs/walls/kernel/css-check.ts).
  */
 export function checkedCss(text, page = false) {
   const problem = cssProblem(text, page);

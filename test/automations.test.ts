@@ -1,64 +1,69 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { QuietSessions } from '../src/session-quiet.ts';
-import { heldResources } from '../src/blocking.ts';
-import { Archipelago, type Op } from '../src/pelago.ts';
-import { sessionStart, sessionUpdate } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
-import { VIEWS } from '../src/views.ts';
-import { askView } from '../src/askview.ts';
+import { flagStaleSessions } from '../packs/sessions/kernel/session-quiet.ts';
+import { heldResources } from '../packs/surface/kernel/blocking.ts';
+import { Archipelago, type Op } from '../packs/write/kernel/pelago.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { VIEWS } from '../packs/query/kernel/views.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
 import { human, agent, fresh, make } from './map.ts';
+import { searchMap } from '../packs/surface/kernel/search.ts';
+import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
+
+/** One look for quiet sessions, as the leader's beat runs it (a failure thrown, not told). */
+const quietLook = (l: Archipelago) => flagStaleSessions(ownContext(l, 'sessions'));
 
 /** A view asked by its name, as the view tool asks it. */
-const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
+const ask = (l: Archipelago, name: string, params: Record<string, unknown> = {}) => askviewPack.askView(kernelContext(l, 'query'), ({ kind: 'human', name: 'test' }) as Parameters<typeof askviewPack.askView>[1], name, params);
 
 test('an agent can notify the human; a stale session raises one notification', async () => {
   const l = await fresh();
   const made = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Ship it' }]);
   await callTool(l, agent, 'notify', { title: 'Blocked on a certificate', level: 'warning', about: made.t });
-  assert.equal((await l.proposals()).length, 0);
-  let unread = (await VIEWS.notifications.run(l, {})) as any[];
+  assert.equal((await proposals(l)).length, 0);
+  let unread = (await VIEWS.notifications.run(kernelContext(l, 'query'), {})) as any[];
   assert.deepEqual([unread[0].title, unread[0].level, unread[0].from, unread[0].about_title], ['Blocked on a certificate', 'warning', 'agent:test', 'Ship it']);
 
   const lane = (await make(l, [{ op: 'create', ref: 'lane', type: 'place', props: { exclusive: true }, title: 'Live lane' }])).lane;
-  const { run } = await sessionStart(l, agent, { title: 'Quiet one' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ title: 'Quiet one' }));
   await l.claim(agent, { resource: lane, holder: run, reason: 'busy' });
   const silent = (id: string, hours: number) => l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text) where id = $1`, [id, new Date(Date.now() - hours * 3_600_000).toISOString()]);
   await silent(run, 1);
   // One that holds nothing is not worth a notice: it ends by itself.
-  const idle = (await sessionStart(l, agent, { title: 'Idle one' })).run;
+  const idle = (await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ title: 'Idle one' }))).run;
   await silent(idle, 1);
-  const autos = new QuietSessions(l);
-  await autos.tick();
-  await autos.tick();
-  unread = (await VIEWS.notifications.run(l, {})) as any[];
+  await quietLook(l);
+  await quietLook(l);
+  unread = (await VIEWS.notifications.run(kernelContext(l, 'query'), {})) as any[];
   const stale = unread.filter((n) => n.title.includes('gone quiet'));
   assert.equal(stale.length, 1, 'told once, not every pass');
   assert.match(stale[0].body, /still holds: Live lane/);
 
   // Heard from again, the notice is no longer true and leaves what there is to read; quiet again, it is told again; ended, it leaves again.
-  const quiet = async () => ((await VIEWS.notifications.run(l, {})) as any[]).filter((n) => n.title.includes('gone quiet')).length;
-  await sessionUpdate(l, agent, { run });
+  const quiet = async () => ((await VIEWS.notifications.run(kernelContext(l, 'query'), {})) as any[]).filter((n) => n.title.includes('gone quiet')).length;
+  await sessionsPack.sessionUpdate(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ run }));
   assert.equal(await quiet(), 0, 'withdrawn when the session reports in');
   await silent(run, 1);
-  await autos.tick();
+  await quietLook(l);
   assert.equal(await quiet(), 1, 'told again when it goes quiet again');
   // A day without a word (the house style's quiet_end_after), a session is ended for it: the notice goes, and what it held is given back.
   assert.equal((await l.entity(idle))!.is_open, true, 'an hour is not a day');
   await silent(run, 25);
   await silent(idle, 25);
-  await autos.tick();
+  await quietLook(l);
   const gone = (await l.entity(run))!;
   assert.deepEqual([gone.status, (await l.entity(idle))!.status], ['finished', 'finished']);
   assert.match(gone.body, /Not heard from for over 24 hours: ended for it/);
   assert.equal(await quiet(), 0, 'withdrawn when the session ends');
   assert.equal((await heldResources(l)).length, 0, 'the lane is free');
-  assert.equal(((await VIEWS.notifications.run(l, {})) as any[]).length, 1, 'other notifications are left alone');
+  assert.equal(((await VIEWS.notifications.run(kernelContext(l, 'query'), {})) as any[]).length, 1, 'other notifications are left alone');
 });
 
 test('an automation is checked on write, and what an agent makes or changes of one waits for the human', async () => {
   const l = await fresh();
-  // Each lives with what it is about (src/subject.ts).
+  // Each lives with what it is about (packs/placement/kernel/subject.ts).
   const { subject } = await make(l, [{ op: 'create', ref: 'subject', type: 'task', title: 'The map' }]);
   const about = (...refs: string[]): Op[] => refs.map((from) => ({ op: 'link', type: 'about', from, to: subject }));
   // What the old runner did and nothing does now (an interval, a logged event, a tool) is refused.
@@ -87,7 +92,7 @@ test('an automation is checked on write, and what an agent makes or changes of o
 });
 
 test('a note is added to, or one passage of it replaced, without sending it again', async () => {
-  const { undo } = await import('../src/undo.ts');
+  const { undo } = await import('../packs/write/kernel/undo.ts');
   const l = await fresh();
   const note = 'Seen\n- once, on Monday.\n\nWhat would help\nA smaller answer.';
   const { t } = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Trim the answer', body: note }]);
@@ -175,7 +180,7 @@ test('a refused change is kept and corrected by its one wrong op; history says a
   // The name finds it, whatever the session calls itself this time.
   const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'decision' } }] })) as any;
   assert.equal(sent.status, 'proposed');
-  const held = (await l.proposals()).at(-1)!;
+  const held = (await proposals(l)).at(-1)!;
   assert.equal(held.reason, 'A plan to draw');
   assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'decision', 'depends_on']);
   // Once it has gone through it is no longer kept; nor is it anyone else's to send.
@@ -200,14 +205,14 @@ test('a refused change is kept and corrected by its one wrong op; history says a
 });
 
 test('undo reverses a change set as a new change, and leaves later edits alone', async () => {
-  const { undo } = await import('../src/undo.ts');
+  const { undo } = await import('../packs/write/kernel/undo.ts');
   const l = await fresh();
   const base = await make(l, [
     { op: 'create', ref: 'p', type: 'aim', title: 'Proj' },
     { op: 'create', ref: 'old', type: 'task', title: 'Old task', body: 'x'.repeat(500), props: { priority: 'low' } },
     { op: 'link', type: 'part_of', from: 'old', to: 'p' },
   ]);
-  const rel = (await l.get(base.old)).outgoing[0] as any;
+  const rel = (await getItem(l, base.old)).outgoing[0] as any;
   const second = await l.change(human, {
     reason: 'Reshuffle',
     ops: [
@@ -231,8 +236,8 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   const old = (await l.entity(base.old))!;
   assert.deepEqual([old.status, old.body.length, old.props.priority, old.props.due], ['todo', 500, 'urgent', undefined], 'long text comes back whole');
   assert.equal((await l.entity(base.p))!.archived_at, null, 'the archived aim is restored');
-  assert.deepEqual((await l.get(base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
-  assert.deepEqual((await l.search({ type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
+  assert.deepEqual((await getItem(l, base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
+  assert.deepEqual((await searchMap(l, { type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
 
   await assert.rejects(undo(l, human, { changeset: set }), /already been undone/);
   await assert.rejects(undo(l, human, { changeset: 'c_nope' }), /No change set/);

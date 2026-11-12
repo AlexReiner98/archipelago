@@ -1,16 +1,16 @@
-// Packs moved out of the kernel (src/pack-moved.ts): a map that had core while core declared what a pack declares now
+// Packs moved out of the kernel (packs/loader/kernel/pack-moved.ts): a map that had core while core declared what a pack declares now
 // is given that pack, once; a map made after the move, or one whose owner took the pack out, is not.
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { packsOff, setPack, syncPacks } from '../src/packstate.ts';
-import { declaredIds, holdsMoved } from '../src/pack-moved.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { packsOff, setPack, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { declaredIds, holdsMoved } from '../packs/loader/kernel/pack-moved.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { human, packsWith } from './map.ts';
 
 const registries: Registry[] = [];

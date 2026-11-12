@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { factsAfter, headPos } from '../src/tail.ts';
-import { uiFile } from '../src/ui-files.ts';
+import { factsAfter, headPos } from '../packs/log/kernel/tail.ts';
+import { uiFile } from '../packs/surface/kernel/ui-files.ts';
 import { fresh, human, make } from './map.ts';
 
 /** ui/changes.js and the projector it imports, as the server serves them. */

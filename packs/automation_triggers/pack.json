@@ -1,0 +1,35 @@
+{
+  "id": "automation_triggers",
+  "version": "0.1.0",
+  "title": "Automation triggers",
+  "description": "What an automation's definition must say and when it comes due: a trigger daily or weekly at a time, or a watched query and the edge it fires on (first, each, first_per, crosses), and what a watched query's edge meets from one pass to the next, remembered under due_on:<automation>. On a map without the automations pack it does nothing. The automations pack does what one says once it is due.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "act.report.due_on": {
+        "in": {
+          "now": "number"
+        },
+        "out": "any",
+        "run": "due-on.ts#dueOn"
+      },
+      "answer.automation_problems": {
+        "in": {
+          "props": "any"
+        },
+        "out": {
+          "problems": [
+            "string"
+          ]
+        },
+        "run": "automation-rules.ts#problemsOf"
+      }
+    },
+    "hooks": {
+      "write.validate": "validate.ts#validate"
+    },
+    "memory": "due_on:"
+  }
+}

@@ -5,11 +5,13 @@ import { cpSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { callTool, toolsFor } from '../src/tools.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Archipelago, type Actor } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { callTool, toolsFor } from '../packs/surface/kernel/tools.ts';
+import { ATTENTION_REASONS } from '../packs/loader/kernel/declared.ts';
+import { REASONS } from '../packs/attention/kernel/attention.ts';
 import { human } from './map.ts';
 
 
@@ -106,4 +108,8 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'picture', lens: {}, style: { code: 'x' } }] }]), /a view's style has no code/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', pieces: [{ piece: 'note', text: 'Hi' }] }]), /the kinds or types it is on or a place offered in the nav/);
   assert.doesNotThrow(bad([{ id: 'demo.s', title: 'S', on: ['work'], pieces: [{ piece: 'note', text: 'Hello' }] }]));
+});
+
+test("the loader checks a pack's attention reasons against the very reasons attention gives", () => {
+  assert.deepEqual([...ATTENTION_REASONS], [...REASONS], 'a reason attention gives is one the loader knows: change both together');
 });

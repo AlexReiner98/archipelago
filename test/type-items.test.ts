@@ -2,8 +2,8 @@
 // preset, the owner's version laid over it; one with a name and no preset is the workspace's own.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ownPack, withVersions, type TypeItem } from '../src/type-overlay.ts';
-import type { PackFile } from '../src/packs.ts';
+import { ownPack, withVersions, type TypeItem } from '../packs/loader/kernel/type-overlay.ts';
+import type { PackFile } from '../packs/loader/kernel/packs.ts';
 import { agent, fresh, human, make } from './map.ts';
 
 const item = (props: Record<string, unknown>, more: Partial<TypeItem> = {}): TypeItem => ({ id: 'e_1', type: 'type', title: '', body: '', is_open: true, props, ...more });

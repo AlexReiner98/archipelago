@@ -199,7 +199,6 @@ const PIECES = {
     const node = h('div');
     return { node, later: () => canvasesPiece(node, p.title ?? p.screen.title) };
   },
-  // Drawn with the note: the item's page reads them by name.
   // A diagram made from the code: the boxes and wires the item keeps, with its draw.io file at the commit it came from.
   diagram: (ctx) => {
     const node = h('section', { class: 'card wide lens-card' });
@@ -215,6 +214,7 @@ const PIECES = {
     const node = h('div');
     return ctx.e && { node, later: () => findingsPiece(node, ctx.e, section) };
   },
+  // Drawn with the note: the item's page reads them by name.
   figure: () => null,
   document: () => null,
 };
@@ -246,7 +246,7 @@ const unknownPiece = (p) => {
 /** A piece drawn as the kernel draws it, or as a stub when this page does not know it. */
 const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, p) : unknownPiece(p));
 
-/** The pages the kernel still draws itself (src/declared.ts lists them). */
+/** The pages the kernel still draws itself (packs/loader/kernel/declared.ts lists them). */
 const PAGES = { time };
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
@@ -285,7 +285,7 @@ function packsUsed(data) {
   return used;
 }
 
-/** Whether a pack owns no type and no link: a map pack, whose pieces are the whole map's (src/islands.ts). */
+/** Whether a pack owns no type and no link: a map pack, whose pieces are the whole map's (packs/loader/kernel/islands.ts). */
 const mapPack = (pack) => !(pageSchema()?.types ?? []).some((t) => t.pack === pack) && !(pageSchema()?.relations ?? []).some((r) => r.pack === pack);
 
 /** A pack's pieces show on an item only once the item uses that pack; the core's, a map pack's and the owner's own always do. */

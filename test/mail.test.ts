@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash, createVerify, generateKeyPairSync } from 'node:crypto';
 import { createServer, type AddressInfo } from 'node:net';
 import { test } from 'node:test';
-import { compose, dkimSign, normalEmail, quotedPrintable, relaxedBody, sendMail } from '../src/mail.ts';
-import { deliver, dotStuff, relay } from '../src/smtp.ts';
+import { compose, dkimSign, normalEmail, quotedPrintable, relaxedBody, sendMail } from '../packs/mailer/kernel/mail.ts';
+import { deliver, dotStuff, relay } from '../packs/mailer/kernel/smtp.ts';
 
 test('an address is kept trimmed and in lower case, and what is not one is refused', () => {
   assert.equal(normalEmail(' Rosa@Acme.CA '), 'rosa@acme.ca');

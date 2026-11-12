@@ -1,0 +1,127 @@
+{
+  "roots": [
+    {
+      "id": "core",
+      "hash": "14b7308e9ba8dd00b371b57ecd62535d5b48ae9ef41e3b4973ab8f58af2fc12f"
+    },
+    {
+      "id": "database",
+      "hash": "c1bdee2ac26fefc1cadb57cbe7c830fa62354bae38dffac5698c329e89141b13"
+    },
+    {
+      "id": "seal",
+      "hash": "948d8676b07b5f1e10138e0df3d9928bc7e8cca42f7237742e23e655f59fcdf9"
+    },
+    {
+      "id": "log",
+      "hash": "3fbc9dbf0ba3bd9bfe62cdf27af78fba85197122e3af51f53ff56f6c2b5f975a"
+    },
+    {
+      "id": "identity",
+      "hash": "a122f4358541d1b3f06f053b4d25d2c631c7b41ce131edbc33b3b467348117d2"
+    },
+    {
+      "id": "walls",
+      "hash": "13f38e97b0b551b810f5b4c18ad822d713c03b261498061cf6c2d1f4b4a5619b"
+    },
+    {
+      "id": "loader",
+      "hash": "4d588a77b88307e0398c89a2f4ebac70cfcc7c0f47f9a0fe2f1f15b39ca26f90"
+    },
+    {
+      "id": "rules",
+      "hash": "258dd6a822364d32985855b7bc20187b09a9f6fba16579b963da972073c44238"
+    },
+    {
+      "id": "write",
+      "hash": "d80313e07702e1db740d6e2ef1c4faa78b042d163fe66fc9f94eda0589f8a008"
+    },
+    {
+      "id": "surface",
+      "hash": "7f5af2b41e9c3a91764880239c2d7cca1e15f0da3fb5680f07cf8d61d3d6a2c3"
+    }
+  ],
+  "calls": {
+    "root.workspaces": [
+      "backup"
+    ],
+    "root.dump": [
+      "backup"
+    ],
+    "root.merge": [
+      "backup"
+    ],
+    "root.counters": [
+      "usage"
+    ],
+    "root.uses": [
+      "usage",
+      "query",
+      "sessions"
+    ],
+    "root.server_packs": [
+      "connect"
+    ],
+    "root.due": [
+      "clocks"
+    ],
+    "root.publish": [
+      "publish"
+    ],
+    "root.may": [
+      "publish"
+    ],
+    "root.picture": [
+      "publish"
+    ],
+    "root.layout": [
+      "publish"
+    ],
+    "root.scene": [
+      "publish"
+    ],
+    "root.drawing": [
+      "publish"
+    ],
+    "root.public_product": [
+      "publish"
+    ],
+    "root.transient": [
+      "connect",
+      "look_draw",
+      "mailer",
+      "presence",
+      "sessions"
+    ],
+    "root.look": [
+      "look_draw"
+    ],
+    "root.observe": [
+      "connect"
+    ],
+    "root.notify": [
+      "notifications"
+    ],
+    "root.mail": [
+      "alerts"
+    ],
+    "root.token": [
+      "connect"
+    ],
+    "root.connections": [
+      "connect"
+    ],
+    "root.pack_view": [
+      "query"
+    ],
+    "root.bookkeep": [
+      "sessions"
+    ],
+    "root.sessions": [
+      "sessions"
+    ],
+    "root.hook": [
+      "claude_code_hooks"
+    ]
+  }
+}

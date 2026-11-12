@@ -4,8 +4,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { counted, limiter } from '../src/limit.ts';
-import { listen as listenTo, LIVE_EACH } from '../src/published-live.ts';
+import { counted, limiter } from '../packs/surface/kernel/limit.ts';
+import { listen as listenTo, LIVE_EACH } from '../packs/publish/kernel/published-live.ts';
 import { serve } from './serve.ts';
 import { until } from './wait.ts';
 
@@ -83,7 +83,7 @@ test('a backup link is counted as the open routes are: guessed keys cannot keep 
 });
 
 test('a pack sends a person back only to an address on this server', async () => {
-  const { onThisServer } = await import('../src/server-routes.ts');
+  const { onThisServer } = await import('../packs/surface/kernel/server-routes.ts');
   assert.equal(onThisServer('/#/workspace'), '/#/workspace');
   for (const away of ['//evil.example', '/\\evil.example', '/\t/evil.example', '/\n/evil.example', 'https://evil.example', 'javascript:alert(1)']) assert.equal(onThisServer(away), '/', JSON.stringify(away));
 });

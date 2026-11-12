@@ -6,10 +6,10 @@ import { createVerify, generateKeyPairSync } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { connectAct, samePlace } from '../src/server-connect.ts';
-import { checkServerPack, OWN_PACKS, loadServerPacks, type ServerPackFile } from '../src/server-packs.ts';
-import { hostRequest, serverSecret } from '../src/server-requests.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { connectAct, samePlace } from '../packs/surface/kernel/server-connect.ts';
+import { checkServerPack, OWN_PACKS, loadServerPacks, type ServerPackFile } from '../packs/loader/kernel/server-packs.ts';
+import { hostRequest, serverSecret } from '../packs/surface/kernel/server-requests.ts';
 
 const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const pem = privateKey.export({ type: 'pkcs1', format: 'pem' }) as string;

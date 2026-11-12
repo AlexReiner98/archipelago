@@ -1,0 +1,82 @@
+{
+  "id": "loader",
+  "version": "0.1.0",
+  "title": "Loader",
+  "description": "Packs, versions, islands, the sandbox and the in-process tier: the registry and its manifests, pack states and pins, island guards, reach, the pack host and the reads a pack is answered. A root pack, started after the database.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "root.server_packs": {
+        "in": {},
+        "out": {
+          "packs": [
+            {
+              "id": "string",
+              "version": "string",
+              "acts": [
+                "string"
+              ],
+              "pages": [
+                "string"
+              ],
+              "entries": [
+                "string"
+              ],
+              "webhooks": [
+                "string"
+              ]
+            }
+          ],
+          "refused": [
+            {
+              "folder": "string",
+              "why": [
+                "string"
+              ]
+            }
+          ]
+        },
+        "run": "root-services.ts#serverPacksShown"
+      },
+      "root.due": {
+        "in": {
+          "target": "id",
+          "reason": "string",
+          "detail": "any"
+        },
+        "out": {
+          "seq": "any"
+        },
+        "run": "due-event.ts#dueOf"
+      },
+      "root.layout": {
+        "in": {
+          "id": "string"
+        },
+        "out": "any",
+        "run": "layout-services.ts#layout"
+      },
+      "root.scene": {
+        "in": {
+          "id": "string",
+          "hash?": "string",
+          "input": "any"
+        },
+        "out": "any",
+        "run": "layout-services.ts#scene"
+      },
+      "root.pack_view": {
+        "in": {
+          "pack": "string",
+          "view": "string",
+          "params?": "any",
+          "actor": "any"
+        },
+        "out": "any",
+        "run": "pack-view.ts#packView"
+      }
+    }
+  }
+}

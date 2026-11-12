@@ -1,0 +1,21 @@
+{
+  "id": "write_probe",
+  "version": "0.1.0",
+  "title": "Write probe",
+  "description": "A service pack for testing the write path's hook points: it fills each one, by what a task's title asks.",
+  "requires": ["type:task"],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": {
+      "write.rewrite": "probe.ts#rewrite",
+      "write.validate": "probe.ts#validate",
+      "write.follow": "probe.ts#follow",
+      "log.project": "probe.ts#project",
+      "write.after": "probe.ts#after",
+      "write.retype": "probe.ts#retype"
+    },
+    "tables": { "probe_row": { "item": "id", "title": "string" } }
+  }
+}

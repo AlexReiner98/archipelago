@@ -1,0 +1,107 @@
+{
+  "id": "views",
+  "version": "0.1.0",
+  "title": "Views",
+  "description": "The kernel's own views as answers a lens preset names: the graph drawn of the map, a tree a pack declares over what is part of what, and the brief a session starts a task from.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "answer.graph": {
+        "in": {
+          "relations?": "string",
+          "focus?": "id",
+          "depth?": "number"
+        },
+        "out": {
+          "nodes": [
+            {
+              "id": "id"
+            }
+          ],
+          "edges": [
+            {
+              "from": "id",
+              "to": "id"
+            }
+          ]
+        },
+        "run": "answers.ts#graph"
+      },
+      "answer.tree": {
+        "in": {
+          "tree?": "string",
+          "root?": "id"
+        },
+        "out": {
+          "tree": {
+            "id": "string"
+          }
+        },
+        "run": "answers.ts#tree"
+      },
+      "answer.brief": {
+        "in": {
+          "task": "id"
+        },
+        "out": {
+          "task": {
+            "id": "id"
+          },
+          "text": "string"
+        },
+        "run": "answers.ts#brief"
+      },
+      "answer.time_lanes": {
+        "in": {
+          "items": [
+            {
+              "id": "id",
+              "type": "string",
+              "title": "string",
+              "owner": "any"
+            }
+          ],
+          "spans": "any",
+          "me": "any"
+        },
+        "out": {
+          "lane": "any",
+          "stream": "any",
+          "filed": "any",
+          "lanes": [
+            "any"
+          ],
+          "streams": [
+            "any"
+          ]
+        },
+        "run": "query-answers.ts#timeLanes"
+      }
+    },
+    "hooks": {
+      "surface.for_reader": "documents.ts#forReader",
+      "surface.sections": "documents.ts#sectionsOf"
+    }
+  },
+  "views": [
+    {
+      "id": "core.brief",
+      "shape": "data",
+      "lens": {
+        "over": [
+          "needs",
+          "lives_in",
+          "link",
+          "about",
+          "bears_on",
+          "depends_on",
+          "waits_on"
+        ]
+      },
+      "answer": "brief",
+      "description": "Everything a session needs to start on one task: context, repository, blockers, resources it needs, and the rules that apply. Params: task (required)."
+    }
+  ]
+}

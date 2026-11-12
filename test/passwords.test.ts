@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createToken } from '../src/auth.ts';
-import { PASSWORD_TRIES } from '../src/passwords.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import { PASSWORD_TRIES } from '../packs/identity/kernel/passwords.ts';
 import { serve } from './serve.ts';
 
 test('a member sets a password and signs in with it; it is changed, taken away, and never kept as given', async () => {

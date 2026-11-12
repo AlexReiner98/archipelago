@@ -1,4 +1,4 @@
-// An item lives on one island (src/island-items.ts, task e_xgpnmgp6): on a map with islands on, every item but the
+// An item lives on one island (packs/loader/kernel/island-items.ts, task e_xgpnmgp6): on a map with islands on, every item but the
 // kernel's own and actors names its island, its type is the island's pack's or of the shared set, and no link joins
 // two islands. The query term `island <island>` is what lives on one. With islands off, nothing changes.
 import assert from 'node:assert/strict';
@@ -6,12 +6,13 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
-import { Archipelago, type Op } from '../src/pelago.ts';
-import { linkOnLegend, typeOnLegend } from '../src/island-items.ts';
-import { flatRead } from '../src/query-flat.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago, type Op } from '../packs/write/kernel/pelago.ts';
+import { linkOnLegend, typeOnLegend } from '../packs/loader/kernel/island-items.ts';
+import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
 import { freshWith, human, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A pack of the island shape: one type of its own on work, a link type marked crosses (a stand-in for core's reading of a finding), and an instruction. */
 const pack = (id: string) => ({
@@ -123,13 +124,13 @@ test('the term island <island> is what lives on it, by id or name', async () => 
     { op: 'create', type: 'other_thing', title: 'Interview', props: { island: b } },
     { op: 'create', type: 'task', title: 'Billing', props: { island: b } }, // shares the island's name: the term reads islands only
   ]);
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`island ${a}`] } })), ['Invoice run', 'Pay the rent']);
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: ['island Billing'] } })), ['Invoice run', 'Pay the rent'], 'by its name');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`island ${a}`, `island ${b}`] } })), ['Billing', 'Interview', 'Invoice run', 'Pay the rent'], 'a view of several');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: ['task'], only: [`island ${b}`] } })), ['Billing'], 'in Only');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: ['task'], not: [`island ${b}`] } })), ['Pay the rent'], 'and in Not');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`island ${a}`] } }))), ['Invoice run', 'Pay the rent']);
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['island Billing'] } }))), ['Invoice run', 'Pay the rent'], 'by its name');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`island ${a}`, `island ${b}`] } }))), ['Billing', 'Interview', 'Invoice run', 'Pay the rent'], 'a view of several');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['task'], only: [`island ${b}`] } }))), ['Billing'], 'in Only');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['task'], not: [`island ${b}`] } }))), ['Pay the rent'], 'and in Not');
   // The answer hands on where each lives and each island's name, for a drawing to draw their borders (task e_auw7hb3v).
-  const both = await flatRead(l, { filter: { find: [`island ${a}`, `island ${b}`] } });
+  const both = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`island ${a}`, `island ${b}`] } }));
   assert.deepEqual(Object.fromEntries(both.items.map((i) => [i.title, i.island])), { Billing: b, Interview: b, 'Invoice run': a, 'Pay the rent': a });
   assert.deepEqual([...(both.islands ?? [])].sort((p, q) => p.title!.localeCompare(q.title!)).map(({ id, title }) => ({ id, title })), [{ id: a, title: 'Billing' }, { id: b, title: 'Hiring' }]);
   assert.ok(!('fields' in both.items[0] && 'island' in (both.items[0].fields ?? {})), 'kept on the item, not among its shown fields');
@@ -145,7 +146,7 @@ test('a flat answer says the pack each island speaks, and all of its vocabulary'
   const l = await islandMap();
   const { a } = await make(l, [{ op: 'create', ref: 'a', type: 'island', title: 'Billing', props: { pack: 'plain' } }]);
   await make(l, [{ op: 'create', type: 'plain_thing', title: 'Invoice run', props: { island: a } }]);
-  const answer = await flatRead(l, { filter: { find: [`island ${a}`] } });
+  const answer = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`island ${a}`] } }));
   const pack = answer.islands?.find((i: { id: string }) => i.id === a)?.pack;
   assert.equal(pack?.id, 'plain');
   assert.ok(pack.types.some((t: { id: string }) => t.id === 'plain_thing'), 'its own types');
@@ -160,7 +161,7 @@ test('a flat answer names, after its pack, every other type and link type in use
     { op: 'create', ref: 't', type: 'task', title: 'Send the invoices', props: { island: a } },
   ]);
   await make(l, [{ op: 'link', type: 'depends_on', from: t, to: p }]);
-  const pack = (await flatRead(l, { filter: { find: [`island ${a}`] } })).islands?.find((i: { id: string }) => i.id === a)?.pack;
+  const pack = (await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`island ${a}`] } }))).islands?.find((i: { id: string }) => i.id === a)?.pack;
   assert.ok(pack, 'the island says its pack');
   const types = pack.types.map((x: { id: string }) => x.id), links = pack.links.map((x: { id: string }) => x.id);
   assert.equal(types[0], 'plain_thing', 'its pack’s own come first');

@@ -1,10 +1,10 @@
-// A style's colours worked out from a few (src/colours.ts): run without a database. The themes pack's own checks (each
+// A style's colours worked out from a few (packs/styles/kernel/colours.ts): run without a database. The themes pack's own checks (each
 // theme's contrast and emblem) went with it to the hosted service (9 Nov 2026).
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { contrast, finishTheme, mergeTheme, mix, search } from '../src/colours.ts';
+import { contrast, finishTheme, mergeTheme, mix, search } from '../packs/styles/kernel/colours.ts';
 
 test('a colour is worked out from others: a name, a mix, a search, one for each scheme', () => {
   const t = finishTheme({

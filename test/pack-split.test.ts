@@ -1,19 +1,20 @@
 // A pack split into a vocabulary half and a practice half (task e_qhtt4phv, hub e_9hkt86s7): the vocabulary half keeps
 // the pack's id with its types and links, and the practice half names it in moved_from and keeps its views', styles'
-// and instructions' ids (src/pack-moved.ts, ownsId in src/packorder.ts). A map that had the pack on keeps both on, once;
+// and instructions' ids (packs/loader/kernel/pack-moved.ts, ownsId in packs/loader/kernel/packorder.ts). A map that had the pack on keeps both on, once;
 // an owner's taking the practice half out stands; every id still resolves, and the practice half, requiring the
 // vocabulary by type, waits while no pack declares it.
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { instructionsFor } from '../src/instructions.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { followPacks, packsOff, setPack, syncPacks } from '../src/packstate.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import * as instructionsPack from '../packs/agents/kernel/instructions.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { followPacks, packsOff, setPack, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { human, make, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
@@ -79,7 +80,7 @@ test('a map that had the pack keeps both halves on, once, and every id resolves'
   // The items of the vocabulary's type keep working, and the practice half's ids, garden's still, resolve.
   assert.equal((await now.entity(bean))?.type, 'plant');
   await make(now, [{ op: 'update', id: bean, status: 'picked' }]);
-  const said = (await instructionsFor(now, 'session_start', { fill: { run: 'r' } })).map((s) => s.preset);
+  const said = (await instructionsPack.instructionsFor(kernelContext(now, 'agents'), 'session_start', ({ fill: { run: 'r' } }))).map((s) => s.preset);
   assert.ok(said.includes('garden.tend'), said.join(', '));
   const listed = JSON.stringify(await callTool(now, human, 'query', {}));
   assert.ok(listed.includes('beds'), 'the view garden.beds is offered');

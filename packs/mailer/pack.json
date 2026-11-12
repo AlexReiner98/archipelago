@@ -1,0 +1,21 @@
+{
+  "id": "mailer",
+  "version": "0.1.0",
+  "title": "Mail",
+  "description": "Sends the server's mail: sign-in links, invitations and notices, straight to the recipient's mail server or through a relay, and reads what bounced. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "uses": [
+    "service:root.transient"
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": {
+      "identity.invited": "member-mail.ts#invited",
+      "walls.mail": "mail.ts#sender",
+      "surface.mail": "served.ts#served",
+      "surface.bounced": "bounces.ts#hasBounced",
+      "surface.note_bounced": "bounces.ts#noteBounced"
+    }
+  }
+}

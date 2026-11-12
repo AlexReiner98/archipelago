@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { agreementsFrom, type Agreement } from '../src/server-gates.ts';
-import { checkServerPack } from '../src/server-packs.ts';
+import { agreementsFrom, type Agreement } from '../packs/surface/kernel/server-gates.ts';
+import { checkServerPack } from '../packs/loader/kernel/server-packs.ts';
 import { mailbox, serve } from './serve.ts';
 
 const FIXTURES = join(import.meta.dirname, 'agreement-packs');

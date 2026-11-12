@@ -1,4 +1,4 @@
-// A pack's own drawing is drawn by a service worker on the drawing host (ui/draw-marks.js, src/drawing-files.ts), which
+// A pack's own drawing is drawn by a service worker on the drawing host (ui/draw-marks.js, packs/publish/kernel/drawing-files.ts), which
 // the browser keeps between pages: in a real browser (skipped where there is no Chrome), Home's picture is drawn there,
 // and a page opened again draws it in the same worker. The walls around it: the service worker reaches no network.
 // Code that tries what it may not is test/layouts.test.ts; a drawing kept on the map is never given a service worker

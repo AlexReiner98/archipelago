@@ -1,9 +1,11 @@
 // Views and layouts have a life (task e_gkv58kqb): working, an agent's; kept, only on the owner's word; retired.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { callTool } from '../src/tools.ts';
-import { lifeOf, moveLives, movePins, pinsMoved } from '../src/view-life.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { lifeOf, pinsMoved } from '../packs/lenses/kernel/view-life.ts';
+import * as viewLifePack from '../packs/lenses/kernel/view-life.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 test('a view or layout is made working, and only the owner’s word keeps it or retires a kept one', async () => {
   const l = await fresh();
@@ -56,10 +58,10 @@ test('the views kept before their life are sorted once: pinned or a layout kept,
   // As a workspace kept them before: each current (the status they had, set in place to stand for that past).
   await l.db.query(`update entity set status = 'current' where id = any($1::text[])`, [ids]);
   await l.db.query(`update entity set props = props || '{"pinned": true}'::jsonb where id = $1`, [made.p]);
-  assert.deepEqual(await moveLives(l), { kept: 2, working: 2, retired: 1 });
+  assert.deepEqual(await viewLifePack.moveLives(kernelContext(l, 'lenses')), { kept: 2, working: 2, retired: 1 });
   const status = async (id: string) => (await l.entity(id))?.status;
   assert.deepEqual(await Promise.all(ids.map(status)), ['kept', 'working', 'retired', 'working', 'kept']);
-  assert.deepEqual(await moveLives(l), {}); // once
+  assert.deepEqual(await viewLifePack.moveLives(kernelContext(l, 'lenses')), {}); // once
 });
 
 test('pins go: the ids a view held by hand are id terms of its filter, and pinned is taken off', async () => {
@@ -76,10 +78,10 @@ test('pins go: the ids a view held by hand are id terms of its filter, and pinne
   ]);
   // As a view kept them before: set in place to stand for that past.
   await l.db.query(`update entity set props = props || jsonb_build_object('pins', jsonb_build_array($2::text), 'pinned', true) where id = $1`, [made.v, made.t]);
-  assert.deepEqual(await movePins(l), [made.v]);
+  assert.deepEqual(await viewLifePack.movePins(kernelContext(l, 'lenses')), [made.v]);
   const props = (await l.entity(made.v))?.props as Record<string, unknown>;
   assert.deepEqual([props.filter, 'pins' in props, 'pinned' in props], [{ find: ['type decision', `id ${made.t}`] }, false, false]);
-  assert.deepEqual(await movePins(l), []); // once
+  assert.deepEqual(await viewLifePack.movePins(kernelContext(l, 'lenses')), []); // once
 });
 
 test('an agent’s view says what it shows, and one already there is reused, not made twice', async () => {

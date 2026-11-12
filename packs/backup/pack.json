@@ -1,0 +1,32 @@
+{
+  "id": "backup",
+  "version": "0.1.0",
+  "title": "Backup",
+  "description": "Backups kept off the map: every workspace written to a file each day and a copy sent off the server, the key vault's backups beside them, and a backup merged into a map that already holds one. Dump and restore are the log's, reached through root services; the download link is the surface's.",
+  "uses": [
+    "service:root.workspaces",
+    "service:root.dump",
+    "service:root.merge"
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "act.capture.backup_merge": {
+        "in": {
+          "dump": "any",
+          "session_types?": [
+            "string"
+          ],
+          "apply?": "boolean"
+        },
+        "out": "any",
+        "run": "backup-run.ts#mergeAct"
+      }
+    },
+    "hooks": {
+      "surface.backup": "served.ts#served"
+    }
+  }
+}

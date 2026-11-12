@@ -1,4 +1,4 @@
-// A client that signs in through the browser (src/oauth.ts). The first test is the whole path as a client walks it, by
+// A client that signs in through the browser (packs/identity/kernel/oauth.ts). The first test is the whole path as a client walks it, by
 // the MCP SDK's own OAuth client and nothing of ours; the rest are what must be refused.
 import assert from 'node:assert/strict';
 import { createHash, randomBytes } from 'node:crypto';
@@ -6,8 +6,8 @@ import { test } from 'node:test';
 import { Client as McpClient } from '@modelcontextprotocol/sdk/client/index.js';
 import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { createToken, listTokens, rotateGrant, grantToken } from '../src/auth.ts';
-import { clientOf, goodRedirect, listedRedirect, registerClient, returnsTo } from '../src/oauth-clients.ts';
+import { createToken, listTokens, rotateGrant, grantToken } from '../packs/identity/kernel/auth.ts';
+import { clientOf, goodRedirect, listedRedirect, registerClient, returnsTo } from '../packs/identity/kernel/oauth-clients.ts';
 import { serve } from './serve.ts';
 
 const CALLBACK = 'http://localhost:4567/callback';
@@ -231,7 +231,7 @@ test('a refresh rotates in one row; a replay ends the connection; a revoke ends 
 
 test('a browser-connected token raises no new-place warning', async () => {
   const { db, me, workspaces } = await signedIn();
-  const { verifyToken } = await import('../src/auth.ts');
+  const { verifyToken } = await import('../packs/identity/kernel/auth.ts');
   const made = await grantToken(db, 'default', { name: 'Claude', entity: me, client: 'cl_x' });
   const pasted = (await createToken(db, 'default', { kind: 'agent', name: 'p', entity: me })).token;
   const pelago = (await workspaces.get('default')).pelago;

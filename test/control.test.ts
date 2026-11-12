@@ -7,12 +7,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import pg from 'pg';
-import { hashSecret } from '../src/auth.ts';
-import { ADOPT_APP, setControlValue, storeGet } from '../src/control.ts';
-import { seal } from '../src/secrets.ts';
-import { connectionById, dropConnections } from '../src/server-connect.ts';
-import { serverSecret } from '../src/server-requests.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { hashSecret } from '../packs/identity/kernel/auth.ts';
+import { ADOPT_APP, setControlValue, storeGet } from '../packs/identity/kernel/control.ts';
+import { seal } from '../packs/seal/kernel/secrets.ts';
+import { connectionById, dropConnections } from '../packs/surface/kernel/server-connect.ts';
+import { serverSecret } from '../packs/surface/kernel/server-requests.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 import { human } from './map.ts';
 
 const SITE_VISIT = { id: 'local.site_visit', title: 'Site visit', description: 'A visit to a site.', extends: 'event' };
@@ -74,7 +74,7 @@ test('the operator secret is made once, and a reset prepared in the database is 
   const first = await w.ensureOperator();
   assert.ok(first);
   assert.equal(await w.ensureOperator(), undefined);
-  const { OPERATOR_RESET, setControlValue } = await import('../src/control.ts');
+  const { OPERATOR_RESET, setControlValue } = await import('../packs/identity/kernel/control.ts');
   const proof = 'reset_' + 'p'.repeat(48);
   await setControlValue(await w.control(), OPERATOR_RESET, hashSecret(proof));
   assert.equal(await w.resetOperator('reset_' + 'q'.repeat(48)), undefined, 'a wrong proof');
@@ -134,7 +134,7 @@ test('an ended workspace whose day has come is deleted from Postgres, its databa
     await a.create('acme', 'Acme');
     await (await b.get('acme')).pelago.db.query('select 1');
     assert.equal(await exists(`${name}_acme`), true);
-    // Its server pack says it ended, to be deleted in a day (src/server-gates.ts): here, as the leader is told.
+    // Its server pack says it ended, to be deleted in a day (packs/surface/kernel/server-gates.ts): here, as the leader is told.
     const deleteAt = Date.now() + 86_400_000;
     a.dueForDeletion = async (now) => (now.getTime() >= deleteAt && (await a.has('acme')) ? ['acme'] : []);
     assert.deepEqual(await a.deleteDue(), [], 'not before its day');

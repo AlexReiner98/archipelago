@@ -6,17 +6,17 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { entries } from '../src/log.ts';
-import { LEGACY, MANIFEST_KEYS, parts, readManifest } from '../src/manifest.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { packsOff, setPack, syncPacks } from '../src/packstate.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { decide } from '../src/rules.ts';
-import { loadServerPacks, OWN_PACKS } from '../src/server-packs.ts';
-import { callTool } from '../src/tools.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { entries } from '../packs/log/kernel/log.ts';
+import { LEGACY, MANIFEST_KEYS, parts, readManifest } from '../packs/loader/kernel/manifest.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { packsOff, setPack, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { decide } from '../packs/rules/kernel/rules.ts';
+import { loadServerPacks, OWN_PACKS } from '../packs/loader/kernel/server-packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { human, packsWith } from './map.ts';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -112,7 +112,7 @@ test("adding and taking out a pack is a fact on the log; its registrations follo
   const first = await syncPacks(l);
   assert.deepEqual(first.map((f) => f[1]).sort(), l.registry.found.map((p) => `pack:${p.id}`).sort(), 'every pack the server starts a workspace with is asserted when it opens');
   const reacher = first.find((f) => f[1] === 'pack:reacher')![3] as { version: string; manifest: string; text: string; code: string; files: Record<string, string>; texts: Record<string, string> };
-  // Its code is named by its files' hashes beside it, their texts kept the first time too (src/pack-code.ts).
+  // Its code is named by its files' hashes beside it, their texts kept the first time too (packs/loader/kernel/pack-code.ts).
   const code = { code: reacher.code, files: reacher.files };
   assert.deepEqual(Object.keys(reacher.texts).sort(), [...new Set(Object.values(reacher.files))].sort(), 'and its code, file by file');
   assert.deepEqual([reacher.version, reacher.manifest, createHash('sha256').update(reacher.text).digest('hex')], ['0.1.0', l.registry.hashes.get('reacher'), l.registry.hashes.get('reacher')], 'the log keeps the manifest itself, the first time it meets it');
@@ -189,8 +189,8 @@ test('a new workspace starts with the kernel and what keeps its ids, and a pack 
   delete process.env.PELAGO_START_PACKS;
   try {
     const l = await mapOf(packsWith(CLOCK, 'reacher'));
-    // The kernel, and the packs that keep what core shipped under core's ids (the house style and drawings, a session's marks, Held for you).
-    const kernel = ['pack:canvas', 'pack:core', 'pack:practice', 'pack:sessions'];
+    // The kernel, and the packs that keep what core shipped under core's ids (the house style and drawings, a session's marks, Held for you, what a Claude Code session is told when its folder is behind).
+    const kernel = ['pack:attention', 'pack:canvas', 'pack:claude_code', 'pack:core', 'pack:practice', 'pack:sessions', 'pack:views']; // attention and views: the core.attention and core.brief views
     assert.deepEqual((await syncPacks(l)).map((f) => f[1]).sort(), kernel, 'only the kernel and what keeps its ids are asserted');
     assert.deepEqual((await packsOff(l)).sort(), l.registry.found.map((p) => p.id).filter((p) => !kernel.includes(`pack:${p}`)).sort(), 'every other pack is off');
     assert.deepEqual(await syncPacks(l), [], 'and opening it again adds none');

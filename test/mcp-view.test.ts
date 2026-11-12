@@ -1,4 +1,4 @@
-// A view drawn inline in a chat (src/mcp-view.ts, the MCP Apps extension): what a client is offered through the MCP
+// A view drawn inline in a chat (packs/mcp_apps/kernel/mcp-view.ts, the MCP Apps extension): what a client is offered through the MCP
 // endpoint. The page itself, in a browser under a host of a test's own, is test/mcp-view-host.test.ts.
 
 import assert from 'node:assert/strict';
@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { createToken } from '../src/auth.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
 import { serve } from './serve.ts';
 
 const URI = 'ui://pelago/view';

@@ -1,14 +1,16 @@
 // A notification made is told to the packs that hear it, and the email pack's mail goes to the person it is for, at
-// the address they sign in with: never anywhere a pack names (src/notify-mail.ts).
+// the address they sign in with: never anywhere a pack names (packs/walls/kernel/notify-mail.ts).
 
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { setMailer, type Mail } from '../src/mail.ts';
-import { notify } from '../src/notify.ts';
-import { mailHeard, ownerOf } from '../src/notify-mail.ts';
-import { configureOutbox } from '../src/outbox.ts';
-import { hostFor } from '../src/packtools.ts';
+import { setMailer, type Mail } from '../packs/mailer/kernel/mail.ts';
+import '../packs/loader/kernel/server-slots.ts'; // the mailer fills the walls' slot walls.mail, as when the server starts
+import * as notifyPack from '../packs/notifications/kernel/notify.ts';
+import { mailHeard, ownerOf } from '../packs/walls/kernel/notify-mail.ts';
+import { configureOutbox } from '../packs/identity/kernel/outbox.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const OWNER = 'owner@example.com', OTHER = 'other@example.com';
 const sent: Mail[] = [];
@@ -36,8 +38,8 @@ test('a notification for a person who turned mail on is mailed to their address;
 
   // The other person has no channel: theirs is told to the pack first, and the owner's after it, one call at a time.
   const coming = nextMail();
-  await notify(l.as(other), agent, { title: 'For the other', body: 'Not to be mailed.' });
-  const { notification } = await notify(l, agent, { title: 'The build broke', body: 'main is red', level: 'urgent' });
+  await notifyPack.notify(kernelContext((l.as(other)), 'notifications'), agent, ({ title: 'For the other', body: 'Not to be mailed.' }));
+  const { notification } = await notifyPack.notify(kernelContext(l, 'notifications'), agent, ({ title: 'The build broke', body: 'main is red', level: 'urgent' }));
   await coming;
   assert.equal(sent.length, 1, 'one mail: the owner turned it on, the other did not');
   assert.equal(sent[0].to, OWNER);
@@ -48,7 +50,7 @@ test('a notification for a person who turned mail on is mailed to their address;
   // A reminder with no note, about an item: the mail carries that item's note and links to it, not to the notification.
   const { post } = await make(l, [{ op: 'create', ref: 'post', type: 'task', title: 'Post for 12 Nov', body: '## Facts\n- the mail landed' }]);
   const second = nextMail();
-  const reminder = await notify(l, agent, { title: "Today's post", about: post });
+  const reminder = await notifyPack.notify(kernelContext(l, 'notifications'), agent, ({ title: "Today's post", about: post }));
   await second;
   assert.equal(sent.length, 2);
   assert.equal(sent[1].subject, "Today's post");

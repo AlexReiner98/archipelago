@@ -1,0 +1,30 @@
+{
+  "id": "verb_probe",
+  "version": "0.1.0",
+  "title": "Verb probe",
+  "description": "A service pack for testing the surface: it declares a verb of its own, probe, and an action under it whose code runs in-process, filling surface.act.",
+  "actions": [
+    { "id": "probe", "title": "Probe", "description": "Poke the map to see it answer.", "kernel": true },
+    {
+      "id": "verb_probe.ping",
+      "title": "Ping",
+      "description": "Answer with what was said and who asked.",
+      "verb": "probe",
+      "input": { "type": "object", "properties": { "said": { "type": "string" } }, "required": ["said"], "additionalProperties": false }
+    },
+    {
+      "id": "verb_probe.hush",
+      "title": "Hush",
+      "description": "Only a person may hush.",
+      "verb": "probe",
+      "humanOnly": true,
+      "input": { "type": "object", "properties": {}, "additionalProperties": false }
+    }
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": { "surface.act": ["acts.ts#ping", "acts.ts#hush"] }
+  }
+}

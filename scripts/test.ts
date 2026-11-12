@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { blankImageFile } from '../src/db.ts';
+import { blankImageFile } from '../packs/database/kernel/db.ts';
 import { lock, unlock } from '../test/lock.ts';
 import { keys, passed, remember } from '../test/passes.ts';
 import { affected, allTests, fastTests, heaviestFirst, ROOT, shard, UNPRIVILEGED } from '../test/sets.ts';
@@ -47,7 +47,7 @@ if (process.env.PELAGO_TEST_TIMES) mkdirSync(dirname(join(ROOT, process.env.PELA
 // were written against did (test/manifest.test.ts checks the kernel alone).
 process.env.PELAGO_START_PACKS ??= 'all';
 
-// The blank database image is kept in the machine's temp folder, made once for many runs (src/db.ts).
+// The blank database image is kept in the machine's temp folder, made once for many runs (packs/database/kernel/db.ts).
 if (!process.env.PELAGO_TEST_DATABASE_URL) process.env.PELAGO_TEST_IMAGE ??= await blankImageFile();
 
 // One run on the machine at a time, whichever worktree it is in (test/lock.ts). CI's runners run one each.

@@ -2,10 +2,10 @@
 // follows, whichever way it was said.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Archipelago } from '../src/pelago.ts';
-import { linkOwners } from '../src/owner-link.ts';
-import { newId } from '../src/db.ts';
-import { undo } from '../src/undo.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { linkOwners } from '../packs/write/kernel/owner-link.ts';
+import { newId } from '../packs/database/kernel/db.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
 import { fresh, human, make } from './map.ts';
 
 const people = (l: Archipelago) =>

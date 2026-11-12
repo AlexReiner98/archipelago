@@ -1,4 +1,4 @@
-// A server pack launches an agent (src/server-launch.ts, task e_ukp2mqys): the pack names the command and reads its
+// A server pack launches an agent (packs/surface/kernel/server-launch.ts, task e_ukp2mqys): the pack names the command and reads its
 // lines; the kernel holds the run, the token and the spawn. The pack here (test/server-packs/launch/agent) starts a
 // stand-in agent, node printing JSON lines, as the claude_code pack will start Claude Code.
 
@@ -7,10 +7,10 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { configureLauncher, launch } from '../src/launcher.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { ServerPacks } from '../src/server-host.ts';
-import { configureLaunch, fillArgv, launchPackGone, packLauncher } from '../src/server-launch.ts';
+import { configureLauncher, launch } from '../packs/surface/kernel/launcher.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { ServerPacks } from '../packs/surface/kernel/server-host.ts';
+import { configureLaunch, fillArgv, launchPackGone, packLauncher } from '../packs/surface/kernel/server-launch.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
 
 const FIXTURES = join(import.meta.dirname, 'server-packs', 'launch');
@@ -91,7 +91,7 @@ test('a person launches the pack’s agent: its run registered, its tokens and w
 
 test('on Windows, an npm .cmd shim is run without a shell: the program it starts', async () => {
   const { mkdirSync, writeFileSync } = await import('node:fs');
-  const { withoutShell } = await import('../src/server-launch.ts');
+  const { withoutShell } = await import('../packs/surface/kernel/server-launch.ts');
   const bin = join(dir, 'bin');
   mkdirSync(join(bin, 'node_modules', 'tool'), { recursive: true });
   writeFileSync(join(bin, 'tool.cmd'), String.raw`@ECHO off

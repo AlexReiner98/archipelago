@@ -1,12 +1,15 @@
 // An item read whole, as its reader meets it (drawn by the reading page, ui/doc.js), and its public view: the item
-// made public by a person, frozen as they saw it, at an address anyone may open (src/public-view.ts).
+// made public by a person, frozen as they saw it, at an address anyone may open (packs/publish/kernel/public-view.ts).
 
-import { api, ask, h, may, tell } from './base.js';
+import { api, ask, h, may, state, tell } from './base.js';
 import { menu, when } from './words.js';
+
+/** The read that gives an item whole, as its reader meets it: the one the schema marks so (whole). */
+export const wholeRead = (schema) => schema?.reads?.find((r) => r.whole)?.name;
 
 /** The item as a reader meets it. */
 export async function readDocument(id) {
-  return { doc: await api('document', { id, drawn: true }).catch(() => null) };
+  return { doc: await api(wholeRead(state.schema), { id, drawn: true }).catch(() => null) };
 }
 
 /** The item's public view, when it has one: its address, who shared it and when. */

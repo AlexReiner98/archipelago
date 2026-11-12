@@ -53,7 +53,7 @@ reply ending) is `docs/agents.md`.
   Settling a question needs it said (the core rule `settle_said`).
 - **A rule decides what waits.** Whether a change applies, waits for a person
   or is refused is decided by rules as data alone (`rules` in a pack file,
-  judged by `decide` in `src/rules.ts`), and a held change names the rule
+  judged by `decide` in `packs/rules/kernel/rules.ts`), and a held change names the rule
   that held it (`held_by`, in the answer and on the proposal). The kernel's
   own are core's: an agent's change waits (`agent_changes`), settling a
   question is the owner's (`settle`), code that runs, what is public,
@@ -103,7 +103,7 @@ reply ending) is `docs/agents.md`.
 - **A throwaway server is for what the live one cannot take:** token identity,
   schema changes, launches, and anything that destroys or floods data. Always
   give it its own data folder:
-  `PELAGO_PORT=3199 PELAGO_DATA=<temp folder>/data node src/server.ts`
+  `PELAGO_PORT=3199 PELAGO_DATA=<temp folder>/data node src/boot.ts`
   (add `PELAGO_AUTH=tokens` to test identity). Delete it afterwards. Never
   point a second server at `data/`; the lock refuses it.
 - **Before changing the database schema, take a backup** with `capture` action `backup`
@@ -116,31 +116,31 @@ reply ending) is `docs/agents.md`.
   items and links goes through `Archipelago.change` / `apply`, which appends
   it to the workspace's log (`log_entry`, `log_fact`; `docs/log.md`) and
   projects its facts into `entity`, `relation`, `proposal`, the part_of
-  closure and mentions in the same transaction (`src/replay.ts`). Never write
+  closure and mentions in the same transaction (`packs/log/kernel/replay.ts`). Never write
   a projection any other way, and never treat one as the record: a rebuild
   from the log replaces it. What skips approval is operational state, kept in
   the operational streams (`log_op`) by its pack's retention rules, and every
-  store of it is named in `src/operational.ts` with its rule: add a new one
+  store of it is named in `packs/log/kernel/operational.ts` with its rule: add a new one
   there, or the structure test refuses it. Free text in the log is sealed
-  with its item's key (`src/seal.ts`): a read of `log_fact` opens it with
+  with its item's key (`packs/seal/kernel/seal.ts`): a read of `log_fact` opens it with
   `openSaid`, never reads the bytes as words.
 - **A forget cannot be undone.** It destroys the item's key, so its words
   leave the log, the projections and every backup that needs that key. An
   agent's forget waits for the owner (core's rule `forget`); never send one
   on the owner's map to test something.
 - **Visibility is enforced by the database** (row level security in
-  `src/db.ts`). Do not add application-side visibility filters; if something
+  `packs/database/kernel/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
 - **Types live in pack files** under `packs/`, each a manifest of seventeen keys
-  (`docs/packs.md`, read by `src/manifest.ts`). Fields the system maintains are
+  (`docs/packs.md`, read by `packs/loader/kernel/manifest.ts`). Fields the system maintains are
   marked `"system": true`.
 - **On an island map a pack is one of two kinds** (the owner, 10 Nov 2026,
-  e_ubd8satd; `src/islands.ts`, `docs/packs.md`). An island pack declares a
+  e_ubd8satd; `packs/loader/kernel/islands.ts`, `docs/packs.md`). An island pack declares a
   type that lives on an island, a link type or fields on another's type, and
   is words only on the shared set. A map pack owns no such type and brings
   looks, layouts, views, code and reach to the whole map, each under the gate
   it already has. A pack that is both is turned off: split it.
-- **An item is a small head and its fields** (`src/head.ts`). The head is id,
+- **An item is a small head and its fields** (`packs/loader/kernel/head.ts`). The head is id,
   kind, type, title, body, visibility and its times; everything else is a
   field its type declares, checked on write, and an undeclared one is
   refused. Status, owner, confidence and source are such fields, declared by
@@ -153,7 +153,7 @@ reply ending) is `docs/agents.md`.
   refuses a read of it. A value over 4000 characters needs a field declared
   `"large": true`, which only a type with the kernel flag may have. What a pack adds to the page of an item of a
   type is a screen there too (a view of `form: "screen"`: pieces the kernel draws, listed in
-  `src/declared.ts`); the item page (`ui/item.js`) names no pack's type.
+  `packs/loader/kernel/declared.ts`); the item page (`ui/item.js`) names no pack's type.
 - **The UI has no build step and no framework.** Plain files in `ui/`.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
@@ -171,7 +171,7 @@ reply ending) is `docs/agents.md`.
   proposes it, whatever the workspace lets agents do unreviewed. Do not give
   that code a page to touch, a way to the network, or anything typed. After
   changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
-  `src/server.ts`, run a hostile layout against it in a real browser (the
+  `packs/surface/kernel/server.ts` (and `packs/walls/kernel/page-policies.ts`), run a hostile layout against it in a real browser (the
   browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/layouts.test.ts`
   does, in headless Chrome. The owner can take both walls down for a layout's
   code, per workspace (`drawings_open`, the owner, 3 Nov 2026,
@@ -277,13 +277,13 @@ else a pack"). These rules keep it composable while that happens, and
 `test/structure.test.ts` checks each one in `npm test`:
 
 - **No file over 500 lines.** Split it into modules, each one thing.
-- **The kernel names no pack.** No pack's type or link type by name in `src/`
-  or `ui/`: ask the registry for a kind or a capability.
+- **The kernel names no pack.** No pack's type or link type by name in the
+  kernel (`src/`, the root packs' `kernel/`) or `ui/`: ask the registry for a kind or a capability.
 - **One write path, checked.** Items and links are written only in
-  `src/pelago.ts`, its apply loop (`src/change-apply.ts`) and the
-  projector it runs (`src/replay.ts`): through
+  `packs/write/kernel/pelago.ts`, its apply loop (`packs/write/kernel/change-apply.ts`) and the
+  projector it runs (`packs/log/kernel/replay.ts`): through
   `change`, or through the operational writes and the restore path
-  `src/operational.ts` names.
+  `packs/log/kernel/operational.ts` names.
 - **No read of the whole map.** Every SQL read of items, links, the log or
   the review queue is bounded (an id or set of ids, a subtree, a person, a
   cursor, a limit) or names an index the schema makes (`-- index <name>`).
@@ -295,11 +295,11 @@ else a pack"). These rules keep it composable while that happens, and
 - **Kernel modules import one way.** No cycles; type-only imports do not
   count.
 - **The UI loads as modules,** with no build step: each part of the page its
-  own module under `ui/`, served by name from `src/ui-files.ts`.
+  own module under `ui/`, served by name from `packs/surface/kernel/ui-files.ts`.
 - **Four dependencies,** as above.
 - **How anything looks is a style on the map, never kernel code,** the
   defaults included (the owner, 20 Oct 2026). A pack ships its defaults as
-  style presets (`styles` in its pack file, resolved in `src/styles.ts`);
+  style presets (`styles` in its pack file, resolved in `packs/styles/kernel/styles.ts`);
   the owner changes one by keeping their own version on the map. The UI
   keeps the mechanism (layouts, renderers, CSS rules reading variables) and
   no values: a colour, a length or a number constant in `ui/` is counted,
@@ -348,7 +348,7 @@ tests, the approvals table and the tests that move, back up, restore, migrate
 or pull a whole map (`SLOW` in `test/sets.ts`, each with why). The structure
 test is always in it. `npm run test:changed` runs only the files that may
 read what your branch changed (`reads` in `test/sets.ts`): a pack's code or a
-page picks a few dozen, but a change under `src/` still reaches nearly every
+page picks a few dozen, but a change to the kernel (`src/`, a root pack) still reaches nearly every
 file, since nearly every test imports the core. A run of a set skips the
 files that passed on the same code before, in any worktree
 (`test/passes.ts`); `--no-cache` runs them all.

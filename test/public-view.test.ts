@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Actor } from '../src/pelago.ts';
-import { publicView, publicViewAt, publicViews } from '../src/public-view-store.ts';
-import { callTool } from '../src/tools.ts';
+import type { Actor } from '../packs/write/kernel/pelago.ts';
+import { publicView, publicViewAt, publicViews } from '../packs/surface/kernel/public-views.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { fresh, freshWith, make, packsWith } from './map.ts';
-import { Registry } from '../src/packs.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 
 /** A map of two people: a view of the questions, one of them private to Ann, and a document with a private section. */
 async function shelf() {
@@ -94,7 +94,7 @@ test('a forget takes its public view with it', async () => {
 });
 
 test('step 41 makes each published revision its public view, as published, and nothing published that is not read', async () => {
-  const { PUBLISHED_TO_PUBLIC_VIEW } = await import('../src/public-schema.ts');
+  const { PUBLISHED_TO_PUBLIC_VIEW } = await import('../packs/database/kernel/public-schema.ts');
   const { l, mine, owner, made } = await shelf();
   const { o } = await make(l, [{ op: 'create', ref: 'o', type: 'writing', title: 'Old page', body: 'Gone private.', visibility: 'shared', props: { path: 'old' } }]);
   for (const id of [made.d, o]) await callTool(mine, owner, 'publish', { id });

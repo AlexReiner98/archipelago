@@ -3,14 +3,14 @@
 
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { checkCapabilities } from '../src/capabilities.ts';
-import { openDb } from '../src/db.ts';
-import { nextStatus, readKuma, sameAddress } from '../src/report.ts';
-import { Registry } from '../src/packs.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { readEvents } from '../src/eventlog.ts';
+import { checkCapabilities } from '../packs/loader/kernel/capabilities.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { nextStatus, readKuma, sameAddress } from '../packs/monitoring/kernel/report.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Archipelago, type Actor } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
 import { packsWith } from './map.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner' };

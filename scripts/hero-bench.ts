@@ -21,8 +21,8 @@ const HERO = process.env.HERO ?? 'e_dbnx3zwr';
 
 /** A server of its own, its default workspace holding the page as published from the data given. */
 async function local(file: string) {
-  const { createHttpServer } = await import('../src/server.ts');
-  const { Workspaces } = await import('../src/workspaces.ts');
+  const { createHttpServer } = await import('../packs/surface/kernel/server.ts');
+  const { Workspaces } = await import('../packs/identity/kernel/workspaces.ts');
   const root = join(import.meta.dirname, '..');
   const workspaces = new Workspaces({ dataDir: null, rootDir: mkdtempSync(join(tmpdir(), 'pelago-bench-')), packsDir: join(root, 'packs') });
   const probe = createHttpServer(workspaces, 0);
@@ -40,10 +40,11 @@ async function local(file: string) {
   const { theme: _t, lengths: _l, site: _s, published_at: _p, ...given } = live;
   const pelago = (await workspaces.get('default')).pelago;
   // Drawn by this checkout's drawings, as a page published here now would be.
-  const { layoutFor } = await import('../src/layouts.ts');
+  const { layoutFor } = await import('../packs/loader/kernel/layouts.ts');
   for (const lens of Object.values(given.lenses ?? {}) as { style: Record<string, unknown> }[]) if (lens.style.drawing) lens.style.drawing = layoutFor(pelago.registry, { shape: lens.style.shape }, []);
-  const atPublish = await import('../src/published-frames.ts').catch(() => null);
-  if (atPublish) await atPublish.framesFor(pelago, given.lenses);
+  const atPublish = await import('../packs/publish/kernel/published-frames.ts').catch(() => null);
+  const { kernelContext } = await import('../packs/loader/kernel/kernel-context.ts');
+  if (atPublish) await atPublish.framesFor(kernelContext(pelago, 'publish'), given.lenses);
   await pelago.db.query(`update published set given = $1::jsonb where entity_id = $2`, [JSON.stringify({ ...given, id }), id]);
   // Read over HTTP/2, as the live site is (its proxy speaks it): every file in one connection, none waiting for another.
   const dir = mkdtempSync(join(tmpdir(), 'pelago-bench-tls-'));

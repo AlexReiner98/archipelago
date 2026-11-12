@@ -22,7 +22,6 @@ const cursorInstall = () => `cursor://anysphere.cursor-deeplink/mcp/install?name
 // Each client's steps: its words, then what the row offers (copy, or open a place) and the rest of it in a tooltip.
 const CLIENTS = [
   {
-    id: 'claude-code',
     name: 'Claude Code',
     label: 'Claude Code',
     steps: () => [
@@ -34,7 +33,6 @@ const CLIENTS = [
     ].filter(Boolean),
   },
   {
-    id: 'claude',
     name: 'Claude',
     label: 'Claude (web or desktop app)',
     hosted: true,
@@ -47,7 +45,6 @@ const CLIENTS = [
     ],
   },
   {
-    id: 'claude-team',
     name: 'Claude',
     label: 'Claude for a Team or Enterprise plan',
     hosted: true,
@@ -60,7 +57,6 @@ const CLIENTS = [
     ],
   },
   {
-    id: 'cursor',
     name: 'Cursor',
     label: 'Cursor',
     steps: () => [
@@ -70,7 +66,6 @@ const CLIENTS = [
     ],
   },
   {
-    id: 'vscode',
     name: 'VS Code',
     label: 'VS Code',
     steps: () => [
@@ -81,7 +76,6 @@ const CLIENTS = [
     ],
   },
   {
-    id: 'chatgpt',
     name: 'ChatGPT',
     label: 'ChatGPT',
     hosted: true,
@@ -92,7 +86,6 @@ const CLIENTS = [
     ],
   },
   {
-    id: 'other',
     name: 'Your agent',
     label: 'Another client',
     steps: () => [
@@ -103,8 +96,8 @@ const CLIENTS = [
   },
 ];
 
-/** What the card remembers while the page is drawn again: whether it is open, the client chosen, and the name of one that has just landed. */
-const chosen = { open: false, client: 'claude-code', landed: null };
+/** What the card remembers while the page is drawn again: whether it is open, the client chosen (by its label; none is the first), and the name of one that has just landed. */
+const chosen = { open: false, client: null, landed: null };
 /** Open or shut the steps. */
 export const connecting = (open) => ((chosen.open = open), (chosen.landed = null));
 export const isConnecting = () => chosen.open;
@@ -143,9 +136,9 @@ function connectedRows(name) {
 export function connectCard({ tokens, then, workspace: id }) {
   workspace = id ?? workspace;
   const known = new Set(tokens.map((t) => t.id));
-  const client = CLIENTS.find((c) => c.id === chosen.client) ?? CLIENTS[0];
+  const client = CLIENTS.find((c) => c.label === chosen.client) ?? CLIENTS[0];
   const status = h('span', { class: 'grow' }, h('span', { class: 'muted gist' }, `Waiting for ${client.name}…`));
-  const pick = h('select', { title: 'The app your agent runs in', onchange: (e) => ((chosen.client = e.target.value), (chosen.landed = null), then()) }, CLIENTS.map((c) => h('option', { value: c.id, selected: c.id === client.id }, c.label)));
+  const pick = h('select', { title: 'The app your agent runs in', onchange: (e) => ((chosen.client = e.target.value), (chosen.landed = null), then()) }, CLIENTS.map((c) => h('option', { value: c.label, selected: c === client }, c.label)));
   if (!chosen.landed)
     watchFor(status, client, known, (fresh) => {
       chosen.landed = fresh.name;

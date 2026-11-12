@@ -1,0 +1,69 @@
+{
+  "id": "write",
+  "version": "0.1.0",
+  "title": "Write",
+  "description": "The one write path and the shape of an item: change, apply and plan, proposals (decide, withdraw, undo), merge and forget, the ops, an item's head and fields, link ends, the owner's link and who may write within a scope. Opens the write path's hook points. Started after rules.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "root.observe": {
+        "in": {
+          "id": "id",
+          "status": "string",
+          "by": "string"
+        },
+        "out": {
+          "id": "id",
+          "status": "string"
+        },
+        "run": "root-services.ts#observe"
+      },
+      "root.notify": {
+        "in": {
+          "actor": {
+            "kind": "string",
+            "name": "string"
+          },
+          "title": "string",
+          "body?": "string",
+          "level?": "string",
+          "about?": "id"
+        },
+        "out": {
+          "notification": "id"
+        },
+        "run": "root-notify.ts#notifyOf"
+      },
+      "root.bookkeep": {
+        "in": "any",
+        "out": "any",
+        "run": "root-bookkeep.ts#bookkeep"
+      },
+      "root.merge": {
+        "in": {
+          "dump": "any",
+          "session_types?": [
+            "string"
+          ],
+          "apply?": "boolean"
+        },
+        "out": {
+          "from": "any",
+          "taken": "string",
+          "plan": "any",
+          "relations": "any",
+          "proposals": "any",
+          "events": [
+            "number"
+          ],
+          "owner_set": "boolean",
+          "open_sessions": "number",
+          "holds": "number"
+        },
+        "run": "backup-merge.ts#mergeOf"
+      }
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { svgRefused } from '../src/svg-figure.ts';
+import { svgRefused } from '../packs/walls/kernel/svg-figure.ts';
 
 const DRAWN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10" stroke-linejoin="round"><rect width="10" height="10" fill="#161614"/><path d="M1 1h8l-4 7Z" fill="#7a3" fill-opacity="0.9" stroke="#222" stroke-width=".6"/></svg>';
 

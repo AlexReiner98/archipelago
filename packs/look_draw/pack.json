@@ -1,0 +1,54 @@
+{
+  "id": "look_draw",
+  "version": "0.1.0",
+  "title": "Looks",
+  "description": "What a view looks like, for an agent: drawn in the server's headless Chrome from the app's own page, with a pass for one drawing that the kernel mints (packs/walls/kernel/look-pass.ts). A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "uses": [
+    "service:root.transient",
+    "service:root.look"
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "answer.look": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "actor": "string",
+          "hash": "string",
+          "size?": "any"
+        },
+        "out": "any",
+        "run": "looks.ts#lookAnswer"
+      },
+      "answer.look_at": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "look": "string"
+        },
+        "out": "any",
+        "run": "looks.ts#lookAtAnswer"
+      },
+      "answer.looks_counted": {
+        "in": {},
+        "out": {
+          "hour": "number",
+          "by": [
+            "any"
+          ]
+        },
+        "run": "looks.ts#looksCounted"
+      }
+    },
+    "hooks": {
+      "surface.looks": "served.ts#served"
+    }
+  }
+}

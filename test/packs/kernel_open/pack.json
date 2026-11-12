@@ -1,0 +1,13 @@
+{
+  "id": "kernel_open",
+  "version": "0.1.0",
+  "title": "Kernel open probe",
+  "description": "A service pack for testing a workspace's lifecycle: it fills the open phases begin and ready, and runs a timer while the server leads.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": { "open.begin": "open.ts#begin", "open.ready": "open.ts#ready" },
+    "timers": [{ "run": "open.ts#tick", "every_ms": 60000, "leading": true }]
+  }
+}

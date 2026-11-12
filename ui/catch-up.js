@@ -11,7 +11,7 @@ import { sessionHue } from './words.js';
 // Where the log stood when the person last looked is kept in this browser, for each workspace, as the traces are
 // (ui/traces.js). A page opened later holds the map as it is now; what changed between the two positions on the
 // canvas it opens on is worked out from the log (the facts since, and every fact said of what is drawn up to then,
-// folded by the projector into what it was: src/tail.ts) and traced until seen, as a change that comes while the page
+// folded by the projector into what it was: packs/log/kernel/tail.ts) and traced until seen, as a change that comes while the page
 // is open is. Play takes the canvas back to where the person left it and replays the log from there through its
 // store (ui/replica.js), a step at a time, so each is a scene the transition engine moves into (ui/transition.js):
 // chapters by who made them, each played island by island. Every time and count is the style's (`catch_up_*`).

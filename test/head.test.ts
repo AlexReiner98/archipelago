@@ -3,8 +3,8 @@
 // large value is a system item's alone.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { LARGE } from '../src/head.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
+import { LARGE } from '../packs/loader/kernel/head.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { fresh, human, make, packsWith } from './map.ts';
 
 const pack = (types: PackFile['types']): PackFile => ({ id: 'x', version: '1', title: 'X', requires: ['core'], types });

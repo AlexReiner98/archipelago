@@ -1,19 +1,20 @@
-// The practice pack, moved out of core (decision e_2ane3hh4; src/pack-moved.ts): a map that had core while core
+// The practice pack, moved out of core (decision e_2ane3hh4; packs/loader/kernel/pack-moved.ts): a map that had core while core
 // declared the working habits is given the pack, once, and is still held to them; and the rules file a project is
-// handed says the words of every pack the server turns on, not core's alone (src/working-rules.ts).
+// handed says the words of every pack the server turns on, not core's alone (packs/loader/kernel/working-rules.ts).
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { instructionsFor } from '../src/instructions.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Registry } from '../src/packs.ts';
-import { packsOff, syncPacks } from '../src/packstate.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { syncTypes } from '../src/typetable.ts';
-import { checkoutPacks, serverPacks, shippedRules, workingRules } from '../src/working-rules.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import * as instructionsPack from '../packs/agents/kernel/instructions.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { packsOff, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
+import { checkoutPacks, serverPacks, shippedRules, workingRules } from '../packs/loader/kernel/working-rules.ts';
 import { human, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
@@ -46,7 +47,7 @@ test('a map that had core before the move is given practice, once, and is still 
   assert.deepEqual((await syncPacks(now)).filter((f) => /pack:practice$/.test(f[1])).map((f) => f[0]), ['+']);
   assert.ok(!(await packsOff(now)).includes('practice'));
   assert.deepEqual((await syncPacks(now)).filter((f) => /pack:practice$/.test(f[1])), [], 'once');
-  const said = (await instructionsFor(now, 'session_start', { fill: { run: 'r' } })).map((s) => s.preset);
+  const said = (await instructionsPack.instructionsFor(kernelContext(now, 'agents'), 'session_start', ({ fill: { run: 'r' } }))).map((s) => s.preset);
   assert.ok(said.includes('practice.draw_answers'), said.join(', '));
   assert.ok(said.includes('core.bumps'), 'a habit moved keeping core’s id is said under it');
   const rules = now.registry.rules.filter((r) => r.pack === 'practice').map((r) => r.id);

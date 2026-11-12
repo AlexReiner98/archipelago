@@ -3,9 +3,13 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { createToken, verifyToken } from '../src/auth.ts';
-import { openDb, type Database } from '../src/db.ts';
-import { LATEST, MIGRATIONS, versionOf } from '../src/migrate.ts';
+import { createToken, verifyToken } from '../packs/identity/kernel/auth.ts';
+import { openDb, type Database } from '../packs/database/kernel/db.ts';
+import { latest, migrations, versionOf } from '../packs/database/kernel/migrate.ts';
+
+// Each root's parts of the steps, read from the roots (packs/database/kernel/migrate.ts): the same array migrate runs.
+const MIGRATIONS = await migrations();
+const LATEST = await latest();
 
 const folder = () => mkdtempSync(join(tmpdir(), 'pelago-migrate-'));
 const steps = async (db: Database) => (await db.query<{ version: number; applied_at: Date }>(`select version, applied_at from schema_version order by version`)).rows;
@@ -88,7 +92,7 @@ test('a step that fails leaves nothing of itself and no record, and says which i
 
 test('step 27 drops the activity written before the log began, and keeps the rest', async () => {
   const { fresh, make } = await import('./map.ts');
-  const { PRE_LOG_ACTIVITY } = await import('../src/activity-steps.ts');
+  const { PRE_LOG_ACTIVITY } = await import('../packs/log/kernel/activity-steps.ts');
   const l = await fresh();
   await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'After the log began' }]);
   // The event table as it stood then: step 34 has dropped it since.
@@ -125,9 +129,9 @@ test('a database from before any-word search gets its function on opening', asyn
 });
 
 test('step 39 drops shares made out to a workspace, keeps the links, and a backup from before still restores', async () => {
-  const { WORKSPACE_SHARE } = await import('../src/schema.ts');
-  const { SHARE_PUBLISHABLE } = await import('../src/public-schema.ts');
-  const { dump, restore } = await import('../src/backup.ts');
+  const { WORKSPACE_SHARE } = await import('../packs/database/kernel/schema.ts');
+  const { SHARE_PUBLISHABLE } = await import('../packs/database/kernel/public-schema.ts');
+  const { dump, restore } = await import('../packs/log/kernel/backup.ts');
   const dir = folder();
   const made = await openDb(dir);
   // The map as it stood at step 38: a share may be made out to a workspace, and published there.
@@ -135,7 +139,7 @@ test('step 39 drops shares made out to a workspace, keeps the links, and a backu
   await made.exec(`insert into entity (id, type, title, status, is_open) values ('e_doc00000', 'task', 'A page', 'todo', true)`);
   await made.exec(`insert into share (id, hash, hint, entity_id, made_by) values ('s_link0000', 'h1', 'a link', 'e_doc00000', 'alex')`);
   await made.exec(`insert into share (id, hint, entity_id, made_by, to_workspace, to_item, publishable) values ('s_ws000000', 'acme', 'e_doc00000', 'alex', 'acme', 'e_there000', true)`);
-  const { dumpVault } = await import('../src/vault.ts');
+  const { dumpVault } = await import('../packs/seal/kernel/vault.ts');
   const before = { ...(await dump(made, { id: 'default', name: 'Default' })), vault: await dumpVault(made) };
   await made.close();
 

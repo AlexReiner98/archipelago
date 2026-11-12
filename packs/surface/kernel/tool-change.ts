@@ -1,0 +1,198 @@
+// The two tools that write facts: change, the one write path, and undo, which takes a change set back. And where an
+// agent's change points the owner's screen.
+
+import { z } from 'zod';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
+import { bodyAfter } from '../../write/kernel/ops.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
+import { type Noted, PLAN_SECTIONS, sections, structureAsText, tiedInChange, type TieTypes } from './plan-note.ts';
+import { transientOf } from './root-transient.ts';
+import { op, source, TITLE_MAX } from './tool-ops.ts';
+import type { Tool } from './tools.ts';
+import { undo } from '../../write/kernel/undo.ts';
+import { closeOffers, resolveRun } from './session-calls.ts';
+import { covering } from '../../write/kernel/withdraw.ts'; import { proposals } from './map-reads.ts';
+import { holdsOff } from '../../rules/kernel/rules.ts';
+import { logged } from '../../../src/logged.ts';
+
+/** Where an agent last pointed the human's screen (the presence pack's Focus). */
+type Focus = { at: number; hash: string; actor: string; note?: string };
+
+/** Whose screen a map's acts move: its workspace's, as the person it is read as (the presence pack keeps one per each). */
+export const whose = (l: Archipelago) => ({ workspace: l.workspace, ...(l.viewer !== undefined && { viewer: l.viewer }) });
+
+/** A step on the owner's screen, kept at once by the presence pack (act.report.took). */
+const took = (l: Archipelago, step: Record<string, unknown>) => callAs(l, 'act.report.took', { whose: whose(l), step });
+
+// Where an agent pointed the screen and the steps it took are kept for any server to read (the presence pack's act.report.point).
+export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string, focus?: boolean, watch?: boolean): Promise<Focus> {
+  const next = { at: Date.now(), hash, actor: actor.name, note };
+  const step = { kind, actor: actor.name, did: note, hash, ...(pane && { pane }), ...(run && { run }), ...(focus && { focus }), ...(watch && { watch }) };
+  await callAs(l, 'act.report.point', { whose: whose(l), focus: next, step });
+  return next;
+}
+
+/** A session began: the owner's page opens it a tab of its own, on what it is working on. A show cannot ask for this. */
+export async function sessionOpened(l: Archipelago, actor: Actor, run: string, task?: string, takes?: string): Promise<void> {
+  await took(l, { kind: 'show', actor: actor.name, hash: `e/${task ?? run}`, opens: true, canvas: true, run, ...(takes && { takes }) });
+}
+
+/** A session took up a task: the canvas of its tab moves to it. Nobody asked to read its page, so none opens. */
+export async function sessionTookUp(l: Archipelago, actor: Actor, run: string, task: string): Promise<void> {
+  await took(l, { kind: 'show', actor: actor.name, hash: `e/${task}`, canvas: true, run });
+}
+
+/** The transient store as the whole workspace of this map, as root.transient keeps it for the packs (./root-transient.ts). */
+const store = (l: Archipelago, ask: Parameters<typeof transientOf>[1]) => transientOf({ caller: 'surface', map: l }, ask);
+
+/**
+ * Changes an agent sent that were refused, kept for a few minutes so that correcting one op does not mean writing
+ * seventy out again. Kept in the workspace's database, so the retry may reach another server than the change did.
+ */
+const REFUSED_MINUTES = 10;
+type Refused = { who: string; input: Record<string, unknown> & { ops: unknown[] } };
+
+export const WRITE_TOOLS: Record<string, Tool> = {
+  change: {
+    description:
+      'The only way to change the map: a list of ops with a reason. ' +
+      'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
+      'To add to a note or change a passage, send append or replace, not the whole body. An update of only the id says it is still true. ' +
+      'A plan or findings are items with a view, not one note. ' +
+      'A published finding (type finding) is one line: its title the claim as a sentence, value the fact with its unit, confidence, as_of; its note how it was found, three lines at most. ' +
+      'Checked as a whole, then applied or held as a proposal for a human, by policy. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. ' +
+      'Closing a decision or hypothesis is held for the human, unless the workspace applies agents\u2019 changes: then a decision must carry props.outcome and props.rationale, and is put to the owner later (attention, to_confirm).',
+    input: {
+      ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
+      reason: z.string().min(1).optional().describe('Why, as the activity log shows it. Needed, except with retry.'),
+      retry: z.string().optional().describe('The name the refusal gave. Send only retry and fixes.'),
+      fixes: z
+        .array(z.object({ at: z.number().int().positive().describe('The op’s number in the refusal, from 1.'), op: z.record(z.string(), z.unknown()).nullable().describe('The whole op, as in ops; null to leave it out.') }))
+        .optional()
+        .describe('With retry: the ops that replace those that were wrong.'),
+      source: source.optional().describe('Where these facts came from.'),
+      authority: z
+        .object({
+          of: z.enum(['human', 'agent']).describe('"human" when a person told you or decided it; "agent" for your own judgment.'),
+          basis: z.string().optional().describe('For "human": what they said and where (required). For "agent": what it rests on.'),
+        })
+        .optional()
+        .describe('On whose authority. Left out, your own judgment; settling a decision or hypothesis needs it said.'),
+      hold: z.boolean().optional().describe('true to wait for the human even where agents\u2019 changes apply as made.'),
+      drawing: z.string().optional().describe('Sent by the page alone.'),
+      run: z.string().optional().describe('The run id from session_start, or the session id.'),
+    },
+    run: async (l, actor, { retry, fixes, ...given }) => {
+      // Whose it is: the token's, not the name a session gives itself, which it may leave out the second time.
+      const who = `${l.workspace}:${actor.token ?? ''}`;
+      let input = given;
+      if (retry) {
+        const kept = retry.length > 300 ? undefined : ((await store(l, { kept: `refused:${retry}` })) as Refused | undefined); // the store reads a key of 400 at most
+        if (!kept || kept.who !== who) throw new Error(`No refused change is kept as "${retry}": one is kept for ${REFUSED_MINUTES} minutes. Send the change whole.`);
+        const ops = [...kept.input.ops];
+        for (const fix of fixes ?? []) {
+          if (fix.at > ops.length) throw new Error(`Change rejected:\n- fixes: the change kept as "${retry}" has ${ops.length} ops, so there is no op ${fix.at}.`);
+          ops[fix.at - 1] = fix.op && op.parse(fix.op);
+        }
+        // What is said again (a reason, an authority) stands in for what was kept.
+        input = { ...kept.input, ...Object.fromEntries(Object.entries(given).filter(([, v]) => v !== undefined)), ops: ops.filter(Boolean) };
+      }
+      if (!input.ops?.length) throw new Error('A change needs ops, or retry with the name a refused change was kept under.');
+      if (!input.reason) throw new Error('Every change needs a reason.');
+      let result;
+      const noted: Noted[] = [];
+      try {
+        // Agents write sentences where a name is wanted, and every row and box then has to cut them. Held to a length here,
+        // where an agent names things; a person may name a thing as they like, and an undo puts back what was there.
+        if (actor.kind === 'agent') {
+          const long = (input.ops as { op: string; title?: string }[]).flatMap((o, i) =>
+            (o.op === 'create' || o.op === 'update') && o.title && o.title.trim().length > TITLE_MAX
+              ? [`op ${i + 1} (${o.op}): the title is ${o.title.trim().length} characters. A title is a name, not a sentence: ${TITLE_MAX} at most. Name the thing in a few words and put the rest in its note.`]
+              : [],
+          );
+          // A note every session adds to (a handoff) is read whole by every session after it. Its type may hold it to a length
+          // an agent can only keep by rewriting it (note_max); one that is already over may always be made shorter.
+          const all = input.ops as { op: string; ref?: string; type?: string; to?: string; id?: string; body?: string; append?: string; replace?: { find: string; with: string } }[];
+          const tie: TieTypes = l.registry.relationFamily('part_of', 'about', 'bears_on');
+          const holds = (t: ReturnType<typeof l.registry.type>) => !!t && !t.system && !t.deliverable;
+          for (const [i, o] of all.entries()) {
+            let before = 0;
+            let after = 0;
+            let type = o.op === 'create' ? l.registry.type(o.type ?? '') : undefined;
+            if (o.op === 'create') {
+              after = o.body?.length ?? 0;
+              if (o.body && holds(type)) noted.push({ at: i + 1, op: o.op, body: o.body, ties: tiedInChange(all, o.ref, tie) });
+            } else if (o.op === 'update' && (o.body !== undefined || o.append !== undefined || o.replace)) {
+              const target = await l.entity(o.id!);
+              if (!target || !(type = l.registry.type(target.type))) continue;
+              before = target.body.length;
+              let text: string;
+              try {
+                text = bodyAfter(target.body, o as Parameters<typeof bodyAfter>[1]);
+              } catch {
+                continue; // what is wrong with the op is said by the change itself
+              }
+              after = text.length;
+              if (holds(type) && sections(text) >= PLAN_SECTIONS && sections(text) > sections(target.body)) {
+                const { rows } = await l.db.query<{ n: number }>(
+                  `select count(*)::int as n from relation where to_id = $1 and type = any($2::text[]) and valid_to is null`,
+                  [target.id, tie],
+                );
+                noted.push({ at: i + 1, op: o.op, body: text, ties: (rows[0]?.n ?? 0) + tiedInChange(all, target.id, tie) });
+              }
+            }
+            if (type?.noteMax && after > type.noteMax.chars && after > before) long.push(`op ${i + 1} (${o.op}): the ${type.title.toLowerCase()} note would be ${after} characters: ${type.noteMax.chars} at most.${type.noteMax.say ? ` ${type.noteMax.say}` : ''}`);
+          }
+          if (long.length) throw new Error(`Change rejected:\n- ${long.join('\n- ')}`);
+        }
+        if (input.run) {
+          const run = await resolveRun(l, input.run, true);
+          if (!run) throw new Error(`Change rejected:
+- run: no open session "${input.run}". Send the run id session_start gave, or leave it out.`);
+          input = { ...input, run: run.id };
+        }
+        result = await l.change(actor, input);
+      } catch (err) {
+        const message = (err as Error).message;
+        if (actor.kind !== 'agent' || !message.startsWith('Change rejected')) throw err;
+        // A refused change is kept, so that what is wrong with one op is all that has to be sent again.
+        const name = retry ?? `k_${Math.random().toString(36).slice(2, 10)}`;
+        await store(l, { keep: { key: `refused:${name}`, value: { who, input } satisfies Refused, ms: REFUSED_MINUTES * 60_000 } });
+        throw new Error(
+          `${message}\nNothing was changed. The change is kept for ${REFUSED_MINUTES} minutes as "${name}": to correct it, send change with only retry: "${name}" and fixes: [{ at: <the op’s number>, op: <the whole op as it should be> }]. Every other op is sent as it was.`,
+        );
+      }
+      if (retry) await store(l, { take: `refused:${retry}` });
+      // A held change that sets again all an older one of the same proposer asked says so, so that one can be withdrawn.
+      const covers = result.status === 'proposed' ? covering(await proposals(l)).get(result.proposal) : undefined;
+      if (covers && result.status === 'proposed') result = { ...result, covers, note: `${result.note} It covers ${covers.join(', ')}, held before it: withdraw those (revise, action withdraw).` };
+      // A question an agent settled is not left for the human to come across: it is put to them by the next session
+      // they talk to (attention, reason to_confirm, and the handoff), all of them in one list, not a notification for each.
+      // The human's screen follows an agent's change: to Review when it waits
+      // there, otherwise to the first thing it made or touched.
+      if (actor.kind === 'agent') {
+        const made = 'created' in result ? Object.values(result.created as Record<string, string>)[0] : undefined;
+        const touched = (input.ops as { id?: string }[]).find((o) => o.id)?.id;
+        const target = made ?? touched;
+        // A lens or a style that was changed is seen in the picture it changes, not on its own page.
+        const picture = result.status !== 'proposed' && target ? (await callAs<{ hash?: string }>(l, 'answer.picture_of', { id: target })).hash : undefined;
+        await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason, undefined, input.run).catch(logged("change: the owner's page could not be pointed at it"));
+      }
+      // What it closes was meant to fix what is still open: the answer names each, with the op that closes it.
+      const offers = await closeOffers(l, input.ops as { op: string; id?: string; status?: string }[]);
+      if (offers) result = { ...result, still_open: offers };
+      // With holds off (packs/rules/kernel/rules.ts, HOLDS_OFF), the answer says so: no rule held it, and none will until the owner turns them on.
+      // A structure put in as one long note (a plan, findings, options) is said back, so its pieces are laid out as items (packs/surface/kernel/plan-note.ts).
+      const structure = structureAsText(noted);
+      if (structure) result = { ...result, structure };
+      if (actor.kind === 'agent' && result.status !== 'proposed' && (await holdsOff(l.db))) return { ...result, holds: 'off' };
+      return result;
+    },
+  },
+  undo: {
+    description:
+      'Reverse one change set (its id is on every event it logged) by applying the opposite as a new change: created items are archived, edits put back, links removed or restored. An edit changed again since is left alone and reported. Subject to the same policy as any change.',
+    input: { changeset: z.string() },
+    run: async (l, actor, input) => undo(l, actor, input),
+  },
+};

@@ -4,8 +4,8 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
+import { Archipelago, type Actor, type Op } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { freshWith, human } from './map.ts';
 
 const agent: Actor = { kind: 'agent', name: 'test' };
@@ -114,4 +114,19 @@ test('a drawing asks in data: inside the types its style writes it applies, anyt
   await assert.rejects(asked([{ op: 'create', type: 'shop.order', title: 'Oil' }], human, plain), /no layout with code/);
   await assert.rejects(asked([{ op: 'create', type: 'shop.order', title: 'Oil' }], agent), /sent by the page/);
   assert.equal((await change(l, human, [{ op: 'update', id: task, title: 'Count it all' }])).status, 'applied', 'the person, not through a drawing, waits for nobody');
+});
+
+test("core's rule root: no change names a root pack, whoever sends it, and no setting lifts it", async () => {
+  const { judge } = await import('../packs/rules/kernel/rules.ts');
+  const reg = (await map()).registry;
+  const refused = (who: { human: boolean }, w: { op: string; type?: string; props?: Record<string, unknown> }) => judge(reg.rules, reg, who, w, []).refusers.map((r) => r.rule);
+  for (const who of [{ human: true }, { human: false }]) {
+    assert.deepEqual(refused(who, { op: 'create', type: 'pack', props: { name: 'database' } }), ['root'], "a pack item with a root pack's id");
+    assert.deepEqual(refused(who, { op: 'create', type: 'pack', props: { version_of: 'rules' } }), ['root'], 'a version of a root pack, so no island runs one and none carries code');
+    assert.deepEqual(refused(who, { op: 'create', type: 'pack', props: { version_of: 'core' } }), ['root'], 'core is a root pack');
+    assert.deepEqual(refused(who, { op: 'pack_off', props: { pack: 'database' } }), ['root_off'], 'turning one off');
+    assert.deepEqual(refused(who, { op: 'create', type: 'pack', props: { name: 'shop' } }), [], 'any other pack');
+    assert.deepEqual(refused(who, { op: 'pack_off', props: { pack: 'shop' } }), []);
+  }
+  assert.ok(reg.rules.filter((r) => r.id?.startsWith('root')).every((r) => !r.lifted), 'no setting lifts it');
 });

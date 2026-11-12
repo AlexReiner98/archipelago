@@ -1,14 +1,15 @@
-// A version of a pack tried on one island (src/island-pin.ts, task e_j4bzhegb): an island that names a version in
+// A version of a pack tried on one island (packs/loader/kernel/island-pin.ts, task e_j4bzhegb): an island that names a version in
 // pack_version runs it, its types, fields and instructions; every other island keeps the pack as the map has it, and
 // unsetting the island's version brings the old back.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { instructionsFor } from '../src/instructions.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
-import type { Archipelago, Op } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
+import * as instructionsPack from '../packs/agents/kernel/instructions.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import type { Archipelago, Op } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const OLD = 'Keep things true.', NEW = 'Keep things true, and say why.';
 
@@ -39,7 +40,7 @@ async function map() {
 }
 
 const refused = (l: Archipelago, ops: Op[], said: RegExp) => assert.rejects(l.change(human, { reason: 'test', ops }), said);
-const told = async (l: Archipelago, island?: string) => (await instructionsFor(l, 'session_start', { ...(island && { island }) })).filter((s) => s.preset === 'plain.tending').map((s) => s.text);
+const told = async (l: Archipelago, island?: string) => (await instructionsPack.instructionsFor(kernelContext(l, 'agents'), 'session_start', ({ ...(island && { island }) }))).filter((s) => s.preset === 'plain.tending').map((s) => s.text);
 
 test('an island runs the version it names, the rest the pack as it is, and unsetting rolls back', async () => {
   const { l, trial, rest, v2 } = await map();

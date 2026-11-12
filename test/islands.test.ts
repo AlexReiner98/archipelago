@@ -1,17 +1,17 @@
-// Packs on an island map (src/islands.ts, decisions e_pp5mu6xd and e_rf6q3q34): with the workspace setting on, a pack
+// Packs on an island map (packs/loader/kernel/islands.ts, decisions e_pp5mu6xd and e_rf6q3q34): with the workspace setting on, a pack
 // is taken only if its file holds vocabulary, views and instructions and it builds on the shared set alone. Off is the
 // default, and with it off every pack is taken as before.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { islandProblems, packKind, sharedOf } from '../src/islands.ts';
-import { readManifest, type Manifest } from '../src/manifest.ts';
-import { Registry } from '../src/packs.ts';
-import { islandsOn, setIslands } from '../src/packstate.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { islandProblems, packKind, sharedOf } from '../packs/loader/kernel/islands.ts';
+import { readManifest, type Manifest } from '../packs/loader/kernel/manifest.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { islandsOn, setIslands } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { human, packsWith } from './map.ts';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -113,14 +113,14 @@ test('a pack with a handler is refused on an island map and taken without it', (
 
 test('core declares the shared set, so a pack on task and decision is taken beside one that is not', () => {
   const on = { types: [{ id: 'ontask_step', title: 'Step', extends: 'task' } as never, { id: 'ontask_call', title: 'Call', extends: 'decision' } as never] };
-  const looks = { styles: [{ id: 'looks.colours', title: 'Colours', props: {} }], types: [{ id: 'looks_memo', title: 'Memo', extends: 'record' } as never] }; // both kinds
-  const reg = new Registry(packsWith(island('ontask', on), island('looks', looks)));
+  const looks = { styles: [{ id: 'tinted.colours', title: 'Colours', props: {} }], types: [{ id: 'tinted_memo', title: 'Memo', extends: 'record' } as never] }; // both kinds
+  const reg = new Registry(packsWith(island('ontask', on), island('tinted', looks)));
   for (const id of ['task', 'decision', 'question']) assert.equal(reg.type(id)!.pack, 'core', `${id} is core’s`);
   reg.turnOff([], true);
-  assert.equal(reg.states.get('looks')?.state, 'off', 'a pack that carries looks is not taken');
+  assert.equal(reg.states.get('tinted')?.state, 'off', 'a pack that carries looks is not taken');
   assert.equal(reg.states.get('ontask')?.state, 'active');
   assert.ok(reg.types.has('task') && reg.types.has('decision') && reg.types.has('ontask_step'), 'task and decision stay with it off');
-  assert.ok(!reg.types.has('looks_memo'), 'its own types go with it');
+  assert.ok(!reg.types.has('tinted_memo'), 'its own types go with it');
   const without = { ...core(), types: core().types!.filter((t) => (t as { id?: string }).id !== 'decision') };
   assert.throws(() => readManifest(JSON.stringify(without), 'core'), /shared names decision: the shared set is of the types this pack declares/);
 });

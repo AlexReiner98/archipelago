@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { checkEvent } from '../src/session-events.ts';
+import { checkEvent } from '../packs/sessions/kernel/session-events.ts';
 
 const SCRIPTS = join(import.meta.dirname, '..', 'scripts');
 // Plain scripts with no types: what they answer is checked here, by value.

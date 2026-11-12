@@ -1,4 +1,4 @@
-// A map pack's writes land on an island (src/island-items.ts, task e_b8k453zf): what its action makes of an island
+// A map pack's writes land on an island (packs/loader/kernel/island-items.ts, task e_b8k453zf): what its action makes of an island
 // pack's types goes on the island of what it is tied to in the same change, else on the island the action is given,
 // else on the lone island it fits; with none of these, it is refused, naming the islands it could go on.
 import assert from 'node:assert/strict';
@@ -6,9 +6,9 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { PackHost } from '../src/packhost.ts';
-import { Registry } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
+import { PackHost } from '../packs/loader/kernel/packhost.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
 import { freshWith, human, make } from './map.ts';
 
 /** An island pack: a run and its results. */

@@ -1,11 +1,12 @@
 // An automation's weekly trigger: the days it names, and that it comes due once on each, at its time, by the clock
-// (src/due.ts); the automations pack hears it and tells the person, about what the automation is about.
+// (packs/clocks/kernel/due.ts); the automations pack hears it and tells the person, about what the automation is about.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkAutomation, weekdays } from '../src/automation-rules.ts';
-import { duePass } from '../src/due.ts';
-import { dayStart } from '../src/timeaxis.ts';
+import { checkAutomation, weekdays } from '../packs/automation_triggers/kernel/automation-rules.ts';
+import * as duePack from '../packs/clocks/kernel/due.ts';
+import { dayStart } from '../packs/query/kernel/timeaxis.ts';
 import { fresh, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 // 7 Jan 2030 is a Monday, after anything the test makes; times are in Toronto, the workspace zone.
 const at = (day: string, h: number, m = 0) => dayStart(day, 'America/Toronto') + (h * 60 + m) * 60_000;
@@ -28,7 +29,7 @@ test('it comes due once on each of its days, at its time, and the person is told
     { op: 'create', ref: 'off', type: 'automation', title: 'Paused one', status: 'paused', props: { trigger: 'weekly', days: [1], at: '09:00', action: 'notify' } },
     { op: 'link', type: 'about', from: 'w', to: 'loop' }, { op: 'link', type: 'about', from: 'off', to: 'loop' },
   ]);
-  const due = async (when: number) => (await duePass(l, when)).map((d) => d.item);
+  const due = async (when: number) => (await duePack.duePass(kernelContext(l, 'clocks'), when)).map((d) => d.item);
   assert.deepEqual(await due(at('2030-01-07', 8)), [], 'the first pass only sets where the clock starts');
   assert.deepEqual(await due(at('2030-01-07', 8, 59)), [], 'not before its time');
   assert.deepEqual((await due(at('2030-01-07', 9))).sort(), [made.w, made.off].sort(), 'at its time: the clock decides nothing, so a paused one is due too, and the pack lets it be');

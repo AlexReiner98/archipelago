@@ -1,5 +1,5 @@
 // A web page an agent shows in a pane (report show with url): framed beside the map, so the owner watches a build as
-// it is built (the owner, 3 Nov 2026, e_qenq3hxg). Its address is `w?url=…` (src/view-address.ts). The frame is
+// it is built (the owner, 3 Nov 2026, e_qenq3hxg). Its address is `w?url=…` (packs/surface/kernel/view-address.ts). The frame is
 // sandboxed and sends no referrer; this server's own pages are drawn as what they are, never framed; and a site that
 // refuses to be framed stays blank, so the pane's ↗ opens it in a window of its own.
 

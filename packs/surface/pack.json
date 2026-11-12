@@ -1,0 +1,98 @@
+{
+  "id": "surface",
+  "version": "0.1.0",
+  "title": "Tool surface",
+  "description": "The ten verbs and who may call them, the HTTP host and its routes and gates, MCP, the CLI and the hook host: how people and agents reach the map. The last root pack, started after write; it opens the slots surface.act, surface.read and surface.route.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "root.counters": {
+        "in": {
+          "admin?": "boolean",
+          "runs": [
+            "string"
+          ],
+          "largest": "number"
+        },
+        "out": {
+          "limits": "any",
+          "near": "number",
+          "order": [
+            "string"
+          ],
+          "used": "any",
+          "allowed": "any",
+          "storage_parts": "any",
+          "bytes_by_type": "any",
+          "largest": "any",
+          "requests_by": "any",
+          "looks_by": "any",
+          "awake": [
+            "id"
+          ],
+          "members?": [
+            "id"
+          ]
+        },
+        "run": "workspace-tools.ts#countersOf"
+      },
+      "root.uses": {
+        "in": {
+          "workspace?": "string",
+          "add?": "any",
+          "held?": "boolean"
+        },
+        "out": "any",
+        "run": "server-acts.ts#usesOf"
+      },
+      "root.drawing": {
+        "in": {
+          "hash": "string",
+          "file?": "string",
+          "worker?": "boolean"
+        },
+        "out": "any",
+        "run": "publish-services.ts#drawing"
+      },
+      "root.public_product": {
+        "in": {
+          "id": "string",
+          "what?": "string",
+          "extra?": "string",
+          "build?": "string"
+        },
+        "out": {
+          "guard": "any"
+        },
+        "run": "publish-services.ts#publicProduct"
+      },
+      "root.transient": {
+        "in": "any",
+        "out": "any",
+        "run": "root-transient.ts#transientOf"
+      },
+      "root.look": {
+        "in": "any",
+        "out": "any",
+        "run": "root-looks.ts#lookOf"
+      },
+      "root.connections": {
+        "in": "any",
+        "out": "any",
+        "run": "root-connections.ts#connectionsOf"
+      },
+      "root.hook": {
+        "in": "any",
+        "out": "any",
+        "run": "root-hook.ts#hookAnswer"
+      },
+      "root.sessions": {
+        "in": "any",
+        "out": "any",
+        "run": "root-sessions.ts#sessionRoom"
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { READER_POLICY } from '../src/public-document.ts';
+import { READER_POLICY } from '../packs/walls/kernel/public-document.ts';
 import { serve } from './serve.ts';
 
 before(() => Object.assign(process.env, { PELAGO_SERVER_PACKS: join(import.meta.dirname, 'server-packs', 'made') }));

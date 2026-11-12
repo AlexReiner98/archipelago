@@ -4,12 +4,13 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { REPLACED } from '../src/attention.ts';
-import { type Actor, type Op } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { sessionStart } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
+import { REPLACED } from '../packs/attention/kernel/attention.ts';
+import { type Actor, type Op } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { freshWith, human, packsWith } from './map.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const agent: Actor = { kind: 'agent', name: 'test' };
 
@@ -55,7 +56,7 @@ test('attention finds every reason, for the right person, within a scope, and th
   // workspace that applies agents' changes as made.
   await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"') on conflict (key) do update set value = excluded.value`);
   await l.db.query(`update entity set updated_at = now() - interval '30 days' where id = $1`, [made.chore]);
-  await sessionStart(l, agent, { task: made.news, session_id: 'att' });
+  await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ task: made.news, session_id: 'att' }));
   await l.change(agent, { reason: 'test: settled', authority: { of: 'agent', basis: 'Read the docs' }, ops: [{ op: 'update', id: made.cms, status: 'decided', props: { outcome: 'Static files', rationale: 'Nothing to run' } }] });
 
   const ask = async (params: Record<string, unknown>) => (await callTool(l, human, 'view', { name: 'attention', params })) as Answer;

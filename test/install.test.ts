@@ -1,4 +1,4 @@
-﻿// Installing Archipelago by one line or by asking an agent (src/install.ts, scripts/pelago-install.mjs): the page says
+﻿// Installing Archipelago by one line or by asking an agent (packs/connect/kernel/install.ts, scripts/pelago-install.mjs): the page says
 // each client's step, the line fetches the installer with this server's address in it, and the installer connects the
 // clients it is told to, keeping what was there.
 import assert from 'node:assert/strict';
@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { promptTitle } from '../src/session-name.ts';
+import { promptTitle } from '../packs/sessions/kernel/session-name.ts';
 import { serve } from './serve.ts';
 
 const runInstaller = (base: string, home: string, flags: string[]) =>

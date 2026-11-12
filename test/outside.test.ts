@@ -2,7 +2,7 @@
 // sees, an act held for a person and made once allowed, a webhook checked by its signature, a schedule, and an undo
 // that says which acts it could not reach.
 import assert from 'node:assert/strict';
-import { doneEvents } from '../src/activity.ts';
+import { doneEvents } from '../packs/log/kernel/activity.ts';
 import { createHmac } from 'node:crypto';
 import { cpSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
@@ -10,14 +10,14 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { runSchedule, serveHook } from '../src/hooks.ts';
-import { decideAct, setPackSecret, type Outcome } from '../src/outside.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { readEvents } from '../src/eventlog.ts';
-import { undo } from '../src/undo.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { runSchedule, serveHook } from '../packs/surface/kernel/hooks.ts';
+import { decideAct, setPackSecret, type Outcome } from '../packs/loader/kernel/outside.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
 import { human } from './map.ts';
 
 const closers: (() => unknown)[] = [];

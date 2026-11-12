@@ -118,8 +118,8 @@ export async function readHere(root: string): Promise<Read[]> {
       return [];
     }
   });
-  const { KERNEL_VERBS } = await import('../src/declared.ts');
-  const { TOOLS } = await import('../src/tools.ts');
+  const { KERNEL_VERBS } = await import('../packs/loader/kernel/declared.ts');
+  const { TOOLS } = await import('../packs/surface/kernel/tools.ts');
   const kernel = Object.entries(KERNEL_VERBS)
     .filter(([name]) => TOOLS[name] && !TOOLS[name].humanOnly)
     .map(([name, verb]) => ({ name, verb, description: TOOLS[name].description }));

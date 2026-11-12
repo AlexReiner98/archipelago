@@ -1,10 +1,10 @@
-// An automation lives with what it is about (src/subject.ts, task e_ehwndqcw): it is made with an about link to its
+// An automation lives with what it is about (packs/placement/kernel/subject.ts, task e_ehwndqcw): it is made with an about link to its
 // subject, keeps one while it is live, lands on its subject's island and is as visible as it. One about an item that
 // lives on no island stays map-wide.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { setIslands } from '../src/packstate.ts';
-import type { Archipelago, Op } from '../src/pelago.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import type { Archipelago, Op } from '../packs/write/kernel/pelago.ts';
 import { fresh, human, make } from './map.ts';
 
 const nightly = (extra: Partial<Op> = {}): Op => ({ op: 'create', ref: 'a', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' }, ...extra }) as Op;

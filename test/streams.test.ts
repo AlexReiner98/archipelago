@@ -5,14 +5,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make } from './map.ts';
-import { entries, verify } from '../src/log.ts';
-import { compact, opEntries, readOps, record, seal, segments, verifySegments, type OpStream } from '../src/streams.ts';
-import { checkRetention, duration, kept, type OpEntry, type Retention } from '../src/retention.ts';
-import { checkRules } from '../src/rules.ts';
-import { createToken, verifyToken } from '../src/auth.ts';
-import { putPicture } from '../src/pictures.ts';
-import { callTool } from '../src/tools.ts';
-import type { Archipelago } from '../src/pelago.ts';
+import { entries, verify } from '../packs/log/kernel/log.ts';
+import { compact, opEntries, readOps, record, seal, segments, verifySegments, type OpStream } from '../packs/log/kernel/streams.ts';
+import { checkRetention, duration, kept, type OpEntry, type Retention } from '../packs/log/kernel/retention.ts';
+import { checkRules } from '../packs/rules/kernel/rules.ts';
+import { createToken, verifyToken } from '../packs/identity/kernel/auth.ts';
+import * as picturesPack from '../packs/publish/kernel/pictures.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import * as checkConnectionsPack from '../packs/connect/kernel/check-connections.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const DAY = 86_400_000;
 const facts = async (l: Archipelago, stream: OpStream) => (await readOps(l.db, stream)).flatMap((e) => e.facts.map((f) => [e.rule, ...f]));
@@ -35,10 +37,10 @@ test('each operational write lands in its stream, at once, with the light header
   await l.operational(n, { reach: { private_to: null, visibility: 'shared' } });
   await l.claim(agent, { resource: res, holder: task, reason: 'mine' });
   await l.release(agent, { resource: res, reason: 'done' });
-  await l.checkConnections(human);
+  await checkConnectionsPack.checkConnections(kernelContext(l, 'connect'), `${human.kind}:${human.name}`);
   await l.setSecret('model_key', 'sk-test');
   await callTool(l, { ...human, admin: true }, 'workspace_set', { default_visibility: 'shared' });
-  await putPicture(l, human, { result: drawn, data: Buffer.from('png').toString('base64'), content_type: 'image/png' });
+  await picturesPack.putPicture(kernelContext(l, 'publish'), human, { result: drawn, data: Buffer.from('png').toString('base64'), content_type: 'image/png' });
   const token = (await createToken(l.db, 'default', { kind: 'agent', name: 'bot' })).token;
   await verifyToken(l.db, token);
   await verifyToken(l.db, token); // used again within the hour: not again in the stream
@@ -105,7 +107,7 @@ test('a closed day is sealed in the fact stream and verifies', async () => {
   assert.equal(sealed.length, 2, 'one segment per day');
   assert.deepEqual(sealed.map((s) => [s.from, s.to, s.entries]), [[1, 2, 2], [3, 3, 1]]);
   assert.equal((await seal(l.db, 'default', now)).length, 0, 'a day is sealed once');
-  // Read opened: a change set's reason is sealed in the log (src/seal.ts).
+  // Read opened: a change set's reason is sealed in the log (packs/seal/kernel/seal.ts).
   const rows = (await entries(l.db)).flatMap((e) => e.facts.filter((f) => f[2] === 'segment').map((f) => ({ reason: e.reason, id: f[1] })));
   assert.deepEqual(rows.map((r) => r.reason), ['Day sealed', 'Day sealed']);
   assert.match(rows[0].id, /^seg_settings_\d{8}$/);

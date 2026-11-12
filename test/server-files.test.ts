@@ -1,4 +1,4 @@
-// A server pack hands out files of its files/ folder (src/server-files.ts): each filled with only the values it
+// A server pack hands out files of its files/ folder (packs/surface/kernel/server-files.ts): each filled with only the values it
 // names, sent public and kept by nobody, under a version that moves when any of its files does; a session's folder is
 // behind when its hook says another version than the setup pack's, and the kernel's own setup counts only while no
 // pack takes the setup mount.
@@ -9,9 +9,9 @@ import type { ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { filesVersion, handsOut, serveFile, setupBehind, setupPack, setupVersion } from '../src/server-files.ts';
-import { loadServerPacks } from '../src/server-packs.ts';
-import { workingRules } from '../src/working-rules.ts';
+import { filesVersion, handsOut, serveFile, setupBehind, setupPack, setupVersion } from '../packs/surface/kernel/server-files.ts';
+import { loadServerPacks } from '../packs/loader/kernel/server-packs.ts';
+import { workingRules } from '../packs/loader/kernel/working-rules.ts';
 
 const FIXTURES = join(import.meta.dirname, 'server-packs', 'setup');
 const dir = mkdtempSync(join(tmpdir(), 'pelago-files-'));

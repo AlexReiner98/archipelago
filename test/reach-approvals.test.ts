@@ -4,7 +4,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make } from './map.ts';
-import { callTool, describeChanges, humanChanges, latestSeq } from '../src/tools.ts';
+import { callTool, describeChanges, humanChanges, latestSeq } from '../packs/surface/kernel/tools.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
 
 test('an approved private create is the proposer\'s to see, not the approver\'s alone', async () => {
   const l = await fresh();
@@ -57,8 +58,8 @@ test('a get of an item the reader may not see says it is hidden, not missing', a
   const { me } = await make(l, [{ op: 'create', ref: 'me', type: 'person', title: 'Owner' }]);
   const owner = l.as(me), other = l.as('');
   const made = ((await owner.change(human, { reason: 'Private', ops: [{ op: 'create', ref: 'p', type: 'task', title: 'Mine alone', visibility: 'private' }] })) as { created: Record<string, string> }).created.p;
-  await assert.rejects(other.get(made), /private to someone else/, 'hidden, said so, and nothing more of it');
-  await assert.rejects(other.get(made), (err: Error) => !err.message.includes('Mine alone'));
-  await assert.rejects(other.get('e_zzzzzzzz'), /No item "e_zzzzzzzz"/, 'a wrong id is still missing');
-  assert.ok(await owner.get(made));
+  await assert.rejects(getItem(other, made), /private to someone else/, 'hidden, said so, and nothing more of it');
+  await assert.rejects(getItem(other, made), (err: Error) => !err.message.includes('Mine alone'));
+  await assert.rejects(getItem(other, 'e_zzzzzzzz'), /No item "e_zzzzzzzz"/, 'a wrong id is still missing');
+  assert.ok(await getItem(owner, made));
 });

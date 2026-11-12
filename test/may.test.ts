@@ -1,10 +1,10 @@
-// What a session may do on the page (src/may.ts, decision e_qpaqnmrc axis D): /whoami answers it, and the page draws a
+// What a session may do on the page (packs/surface/kernel/may.ts, decision e_qpaqnmrc axis D): /whoami answers it, and the page draws a
 // control only where it may. A person may everything they could; a look reads; a token that only reports writes nothing
 // from the page; a dev page may try a narrower session, never a wider one.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pageMay } from '../src/may.ts';
+import { pageMay } from '../packs/surface/kernel/may.ts';
 
 test('a person may read and write, and an admin also manage the workspace', () => {
   assert.deepEqual(pageMay({ kind: 'human', name: 'ann' }, false), ['read', 'write']);

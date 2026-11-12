@@ -1,0 +1,32 @@
+{
+  "id": "alerts",
+  "version": "0.1.0",
+  "title": "Alerts",
+  "description": "The owner hears when something breaks: a notification on the map it broke in (through the notifications pack) and, for the server's own map, a mail to the operator through the walls (root.mail), once an hour at most for each thing. Other internal packs alert by its name, act.report.alert. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "uses": [
+    "service:root.mail",
+    "service:act.report.notify"
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "act.report.alert": {
+        "in": {
+          "key": "string",
+          "title": "string",
+          "body": "string",
+          "level?": "string",
+          "from": "string",
+          "about?": "id"
+        },
+        "out": "any",
+        "run": "alert.ts#alertAct"
+      }
+    },
+    "hooks": {
+      "surface.crash": "alert.ts#crashMailed"
+    }
+  }
+}

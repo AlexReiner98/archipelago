@@ -1,5 +1,5 @@
 // Signing a machine's hooks in to Archipelago through the browser, so a plugin install needs no token copied by hand.
-// It is OAuth with PKCE and a redirect to this machine, as an MCP client does it (src/oauth.ts): the hook (pelago-hook.mjs)
+// It is OAuth with PKCE and a redirect to this machine, as an MCP client does it (packs/identity/kernel/oauth.ts): the hook (pelago-hook.mjs)
 // asks for the sign-in when the server answers 401 and no token is set, this file run on its own waits for the browser
 // to come back, and the token it is given is kept in a file of this person's (the plugin's data folder, else
 // ~/.pelago), never printed, and refreshed before it runs out. PELAGO_AGENT_TOKEN, where it is set, still wins.

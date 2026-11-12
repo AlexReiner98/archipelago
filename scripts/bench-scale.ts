@@ -25,8 +25,8 @@ const NODE = [process.execPath, '--max-old-space-size=8192'];
 // file): at this size it may run out of memory, and the bench goes on to say so.
 if (args[0] === '--backup') {
   const [, where, file] = args;
-  const { openDb } = await import('../src/db.ts');
-  const { dump } = await import('../src/backup.ts');
+  const { openDb } = await import('../packs/database/kernel/db.ts');
+  const { dump } = await import('../packs/log/kernel/backup.ts');
   const db = await openDb(where);
   const t = performance.now();
   const taken = await dump(db, { id: 'default', name: 'Bench' });
@@ -92,7 +92,7 @@ let server: ChildProcess | undefined;
 async function start() {
   const env = { ...process.env, PELAGO_PORT: String(PORT), PELAGO_DEV: '1', PELAGO_BACKUP_DIR: backups, PELAGO_IDLE_MINUTES: '0', ...(DB === 'postgres' ? { PELAGO_DATABASE_URL: where, PELAGO_DATA: join(dir, 'data') } : { PELAGO_DATA: where }) };
   const t = performance.now();
-  server = spawn(NODE[0], [...NODE.slice(1), 'src/server.ts'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
+  server = spawn(NODE[0], [...NODE.slice(1), 'src/boot.ts'], { cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe'] });
   const log = createWriteStream(join(dir, 'server.log'), { flags: 'a' });
   server.stdout!.pipe(log);
   server.stderr!.pipe(log);
@@ -181,7 +181,7 @@ await stop();
 // ---- with the server stopped: size, backup and restore ----
 const folderSize = (path: string): number => (statSync(path).isDirectory() ? readdirSync(path).reduce((n, f) => n + folderSize(join(path, f)), 0) : statSync(path).size);
 {
-  const { openDb } = await import('../src/db.ts');
+  const { openDb } = await import('../packs/database/kernel/db.ts');
   const db = await openDb(where);
   const sizes = (await db.query<Record<string, number>>(`select pg_database_size(current_database())::bigint as database, ${['entity', 'relation', 'log_op', 'proposal'].map((t) => `pg_total_relation_size('${t}')::bigint as ${t}`).join(', ')}`)).rows[0];
   const counts = (await db.query<Record<string, number>>(`select (select count(*) from entity)::int as items, (select count(*) from relation)::int as links, (select count(*) from log_op where stream = 'activity')::int as events`)).rows[0];
@@ -201,7 +201,7 @@ if (existsSync(file)) {
   await drop(target);
   if (DB === 'postgres') await admin(`create database ${dbName}_restored`);
   t = performance.now();
-  const restored = spawnSync(NODE[0], [...NODE.slice(1), 'src/backup.ts', 'restore', file, target], { cwd: ROOT, encoding: 'utf8' });
+  const restored = spawnSync(NODE[0], [...NODE.slice(1), 'packs/log/kernel/backup.ts', 'restore', file, target], { cwd: ROOT, encoding: 'utf8' });
   results.restore = restored.status === 0 ? { ms: Math.round(performance.now() - t) } : { failed: (restored.stderr || restored.stdout).trim().split('\n').slice(0, 2).join(' | '), after_ms: Math.round(performance.now() - t) };
   say(`restore: ${JSON.stringify(results.restore)}`);
   await drop(target);

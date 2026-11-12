@@ -5,10 +5,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fresh, make } from './map.ts';
 import { answerHook } from './claude-hook.ts';
-import { checkEvent, sessionEvents } from '../src/session-events.ts';
-import { opEntries } from '../src/streams.ts';
-import { kept } from '../src/retention.ts';
-import type { Archipelago } from '../src/pelago.ts';
+import { checkEvent } from '../packs/sessions/kernel/session-events.ts';
+import * as sessionEventsPack from '../packs/sessions/kernel/session-events.ts';
+import { opEntries } from '../packs/log/kernel/streams.ts';
+import { kept } from '../packs/log/kernel/retention.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const hook = (l: Archipelago, body: Record<string, unknown>) => answerHook('events', { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' }) as Promise<Record<string, unknown>>;
 
@@ -25,13 +27,13 @@ test('a batch is kept in order, a resend keeps nothing twice, and the words are 
   const { run } = await make(l, [{ op: 'create', ref: 'run', type: 'run', title: 'A session', props: { session_id: 's1' } }]);
 
   assert.deepEqual(await hook(l, { session_id: 's1', source: 'claude-code', events: BATCH }), { run, kept: 5, dropped: 0 });
-  const back = await sessionEvents(l, run);
+  const back = await sessionEventsPack.sessionEvents(kernelContext(l, 'sessions'), run);
   assert.deepEqual(back, BATCH.map((e) => ({ ...e, source: 'claude-code' })), 'the same events, in order');
 
   // Sent again with one new event, out of order: the old ones are dropped, the new one is read in its place.
   const late = { at: '2026-11-04T00:30:03.000Z', kind: 'tool.end', turn: 't1', tool: 'read', name: 'Read', ok: true };
   assert.deepEqual(await hook(l, { session_id: 's1', source: 'claude-code', events: [...BATCH, late, late] }), { run, kept: 1, dropped: 6 });
-  const again = await sessionEvents(l, run);
+  const again = await sessionEventsPack.sessionEvents(kernelContext(l, 'sessions'), run);
   assert.equal(again.length, 6);
   assert.deepEqual(again.map((e) => e.at), [...BATCH.map((e) => e.at), late.at].sort(), 'read by when they happened');
 
@@ -62,7 +64,7 @@ test('an event outside the vocabulary is refused, and the rest of its batch kept
   });
   assert.deepEqual((answer.refused as { at: number }[]).map((r) => r.at), [1, 2, 3, 4, 5]);
   assert.equal(answer.kept, 1);
-  assert.deepEqual((await sessionEvents(l, run)).map((e) => e.kind), ['turn.start']);
+  assert.deepEqual((await sessionEventsPack.sessionEvents(kernelContext(l, 'sessions'), run)).map((e) => e.kind), ['turn.start']);
   assert.equal((await hook(l, { session_id: 'nobody', source: 'claude-code', events: BATCH })).run, null, 'no run, nothing kept');
   assert.equal((await hook(l, { session_id: 's2', events: BATCH })).kept, 0, 'an adapter names itself');
 });

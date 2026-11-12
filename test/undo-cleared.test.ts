@@ -4,9 +4,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fresh, human, make } from './map.ts';
-import type { Archipelago } from '../src/pelago.ts';
-import { snapshotNow } from '../src/rebuild.ts';
-import { undo } from '../src/undo.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { snapshotNow } from '../packs/log/kernel/rebuild.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
 
 test('undo of an update that cleared a field brings its value back', async () => {
   const l = await fresh();

@@ -8,8 +8,8 @@
 
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { LISTING } from '../src/listing.ts';
-import { shippedRules } from '../src/working-rules.ts';
+import { LISTING } from '../packs/surface/kernel/listing.ts';
+import { shippedRules } from '../packs/loader/kernel/working-rules.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');

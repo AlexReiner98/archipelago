@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test } from 'node:test';
-import { drained } from '../src/drain.ts';
+import { drained } from '../packs/surface/kernel/drain.ts';
 
 /** A server whose /slow answers after `wait` ms, /held never, anything else at once. */
 async function serve(wait: number) {

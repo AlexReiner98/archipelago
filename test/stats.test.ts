@@ -3,11 +3,11 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { dump, restoreTo } from '../src/backup.ts';
-import { dumpVault } from '../src/vault.ts';
-import { openDb, type Q } from '../src/db.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { analyzeDue } from '../src/stats.ts';
+import { dump, restoreTo } from '../packs/log/kernel/backup.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
+import { openDb, type Q } from '../packs/database/kernel/db.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { analyzeDue } from '../packs/database/kernel/stats.ts';
 import { fresh, human } from './map.ts';
 
 const folders: string[] = [];

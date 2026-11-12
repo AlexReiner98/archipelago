@@ -3,9 +3,24 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { moveQueries, oldQuery, termQueries } from '../src/query-saved.ts';
-import { renamedQuery } from '../src/query-names.ts';
+import { oldQuery } from '../packs/lenses/kernel/query-saved.ts';
+import * as querySavedPack from '../packs/lenses/kernel/query-saved.ts';
+import { renamedQuery } from '../packs/lenses/kernel/query-names.ts';
 import { fresh, make } from './map.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+
+/** The move, as a workspace's open makes it: the lenses pack plans it, and its facts and the event that says what each view lost are appended in one transaction. */
+async function moveQueries(l: Archipelago): Promise<{ moved: number; retired: string[]; lost: Record<string, string[]> }> {
+  const { facts, ...out } = await querySavedPack.planQueries(kernelContext(l, 'lenses'));
+  if (!facts.length) return out;
+  await l.db.transaction(async (tx) => {
+    await l.moved(tx, 'lens.moved', querySavedPack.QUERIES_MOVED, facts);
+    await l.log(tx, { actor: 'system', action: 'lens.moved', reason: querySavedPack.QUERIES_MOVED, detail: { moved: out.moved, retired: out.retired, lost: out.lost } });
+  });
+  return out;
+}
 
 test('a view kept before the flat lens is translated once into the flat lens its fields say', async () => {
   const l = await fresh();
@@ -53,8 +68,8 @@ test('a view kept before the flat lens is translated once into the flat lens its
   assert.equal((await l.entity(made.none))!.status, 'retired', 'nothing a filter can include: retired');
   assert.deepEqual(await props(made.none), {});
   // What it draws now: the open task within P, two steps down, in P as its frame; not what is finished.
-  const { keptPicture } = await import('../src/query-saved.ts');
-  const about = await keptPicture(l, made.about);
+  const querySavedPack = await import('../packs/lenses/kernel/query-saved.ts');
+  const about = await querySavedPack.keptPicture(kernelContext(l, 'lenses'), made.about);
   assert.deepEqual([about.items.map((i) => i.title), about.lens.from], [['T'], made.p]);
   // Once: nothing is left to move, and the log says what did not translate.
   assert.deepEqual((await moveQueries(l)).moved, 0);
@@ -63,7 +78,7 @@ test('a view kept before the flat lens is translated once into the flat lens its
   await l.db.transaction((tx) => l.moved(tx, 'test', 'test: a time view', Object.entries(day).map(([k, v]): ['+', string, string, unknown] => ['+', made.cut, k, v])));
   assert.deepEqual((await moveQueries(l)).moved, 0);
   assert.deepEqual(await props(made.cut), day);
-  const said = (await l.events({ action: 'lens.moved' })) as unknown as { detail: { lost: Record<string, string[]> } }[];
+  const said = (await readEvents(l.db, { action: 'lens.moved' })) as unknown as { detail: { lost: Record<string, string[]> } }[];
   assert.deepEqual(said[0].detail.lost[made.whole], ['kinds nothing.like_it', 'leaving out what is linked to nothing']);
 });
 
@@ -124,7 +139,7 @@ test('views that kept types inside an item draw only what they drew under the ol
     ]),
   );
   const moved = await moveQueries(l);
-  const { keptPicture } = await import('../src/query-saved.ts');
+  const querySavedPack = await import('../packs/lenses/kernel/query-saved.ts');
   const old: Record<string, string[]> = {
     oq: ['D open', 'H deep', 'P'],
     fe: ['F1', 'F3 outside', 'P'],
@@ -132,7 +147,7 @@ test('views that kept types inside an item draw only what they drew under the ol
   };
   const now: Record<string, string[]> = {};
   for (const view of Object.keys(old)) {
-    const picture = await keptPicture(l, m[view]);
+    const picture = await querySavedPack.keptPicture(kernelContext(l, 'lenses'), m[view]);
     assert.equal(picture.lens.from, m.p, `${view}: drawn in P, its frame, as the old lens drew it`);
     now[view] = [...picture.items.map((i) => i.title), 'P'].sort();
     for (const title of now[view]) assert.ok(old[view].includes(title), `${view} draws ${title}, which the old lens did not`);
@@ -152,11 +167,11 @@ test('a view kept in the old words is said in terms once, and the log keeps what
     { op: 'create', ref: 'q', type: 'lens', title: 'Already', props: { filter: { find: ['type task'] } } },
   ]);
   assert.ok(p);
-  assert.equal(await termQueries(l), 1);
-  assert.equal(await termQueries(l), 0, 'it runs once');
+  assert.equal(await querySavedPack.termQueries(kernelContext(l, 'lenses')), 1);
+  assert.equal(await querySavedPack.termQueries(kernelContext(l, 'lenses')), 0, 'it runs once');
   assert.deepEqual((await l.entity(v))!.props.filter, { find: ['type task'], only: ['in e_aaaaaaaa'], not: ['done'] });
   assert.deepEqual((await l.entity(q))!.props.filter, { find: ['type task'] });
   const { sc } = await make(l, [{ op: 'create', ref: 'sc', type: 'screen', title: 'A page', props: { on: ['task'], pieces: [{ piece: 'picture', lens: { filter: { links: ['part_of {here}'], exclude: ['closed'] } } }, { piece: 'note', text: 'x' }] } }]);
-  assert.equal(await termQueries(l), 1, 'a screen with a lens of its own too');
+  assert.equal(await querySavedPack.termQueries(kernelContext(l, 'lenses')), 1, 'a screen with a lens of its own too');
   assert.deepEqual((await l.entity(sc))!.props.pieces, [{ piece: 'picture', lens: { filter: { find: ['part_of {here}'], only: [], not: ['done'] } } }, { piece: 'note', text: 'x' }]);
 });

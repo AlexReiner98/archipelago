@@ -1,13 +1,27 @@
 // What the Packs screen shows of a pack: every declaration its manifest makes, nothing filtered out, and beside each
-// what can be counted of its use on the map (src/pack-touches.ts, src/pack-use.ts): items of a type, links of a link
-// type, a view's reads, a rule's refusals and holds, counted as they happen (src/uses.ts).
+// what can be counted of its use on the map (packs/loader/kernel/pack-touches.ts, packs/usage/kernel/pack-use.ts): items of a type, links of a link
+// type, a view's reads, a rule's refusals and holds, counted as they happen (packs/usage/kernel/uses.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { packTouches, whenWords } from '../src/pack-touches.ts';
-import { packStates } from '../src/packstate.ts';
-import { withUse } from '../src/pack-use.ts';
-import { askView } from '../src/askview.ts';
+import { gist, packTouches, whenWords } from '../packs/loader/kernel/pack-touches.ts';
+import { packStates } from '../packs/loader/kernel/packstate.ts';
+import * as packUsePack from '../packs/usage/kernel/pack-use.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
+import { flushCounts } from '../packs/publish/kernel/pack-counts.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
+
+const PINNED = [
+  'core/links/depends on: 1 (1 link here, 1 made in 30 days)',
+  'core/rules/Agent changes: 1 (held 1 change in 30 days)',
+  'core/rules/Asked: 1 (held 1 change in 30 days)',
+  'core/shared/Question: 1 (1 item here, 1 made in 30 days)',
+  'core/shared/Task: 2 (2 items here, 2 made in 30 days)',
+  'core/types/Question: 1 (1 item here, 1 made in 30 days)',
+  'core/types/Task: 2 (2 items here, 2 made in 30 days)',
+  'core/views/Frontier: 3 (read 3 times in 30 days)',
+  'findings/rules/Finding value: 1 (refused 1 change in 30 days)',
+];
 
 const group = (touches: ReturnType<typeof packTouches>, key: string) => touches.find((g) => g.key === key)!;
 
@@ -31,12 +45,12 @@ test('a pack’s plate lists all it declares: shared words, kernel actions and r
 test('beside each, its use here: items, links, a view’s reads, a rule’s refusals and holds, and what was never used', async () => {
   const l = await fresh();
   await make(l, [{ op: 'create', ref: 'a', type: 'task', title: 'One' }, { op: 'create', ref: 'b', type: 'task', title: 'Two' }, { op: 'link', type: 'depends_on', from: 'a', to: 'b' }]);
-  await askView(l, human, 'frontier', {});
+  await askviewPack.askView(kernelContext(l, 'query'), human as Parameters<typeof askviewPack.askView>[1], 'frontier', ({}));
   await assert.rejects(l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'finding', title: 'A finding with no value' }] }));
   const held = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Held' }], hold: true });
   assert.equal(held.status, 'proposed');
 
-  const states = await withUse(l, packStates(l));
+  const states = await packUsePack.withUse(kernelContext(l, 'usage'), (packStates(l)));
   const core = states.find((p) => p.id === 'core')!;
   const of = (pack: typeof core) => (key: string, pred: (t: { def: unknown }) => boolean) => pack.touches.find((g) => g.key === key)!.items.find(pred)!;
   const item = of(core);
@@ -53,4 +67,33 @@ test('beside each, its use here: items, links, a view’s reads, a rule’s refu
   const types = core.touches.find((g) => g.key === 'types')!;
   assert.equal(types.unused, types.items.filter((t) => t.used === 0).length);
   assert.ok(types.unused > 0);
+});
+
+// Pinned before the usage pack's modules took their reads through the context (wave 5, e_knnqyhn7), and kept after:
+// on a small map, with some uses written down in the stream and some still held, every thing used and what is said of it.
+test('the Packs screen’s use, pinned: written-down and held uses summed, items and links counted', async () => {
+  const gone = await fresh();
+  await flushCounts(async () => ({ pelago: gone }) as never); // what the tests before counted, out of the way
+  const l = await fresh();
+  await make(l, [{ op: 'create', ref: 'a', type: 'task', title: 'One' }, { op: 'create', ref: 'b', type: 'task', title: 'Two' }, { op: 'create', ref: 'c', type: 'question', title: 'Why?' }, { op: 'link', type: 'depends_on', from: 'a', to: 'b' }]);
+  await askviewPack.askView(kernelContext(l, 'query'), human as Parameters<typeof askviewPack.askView>[1], 'frontier', ({}));
+  await askviewPack.askView(kernelContext(l, 'query'), human as Parameters<typeof askviewPack.askView>[1], 'frontier', ({}));
+  await assert.rejects(l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'finding', title: 'A finding with no value' }] }));
+  await flushCounts(async () => ({ pelago: l }) as never); // these are written down in the uses stream
+  await askviewPack.askView(kernelContext(l, 'query'), human as Parameters<typeof askviewPack.askView>[1], 'frontier', ({})); // and these held in memory still
+  await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Held' }], hold: true });
+  const states = await packUsePack.withUse(kernelContext(l, 'usage'), (packStates(l)));
+  const used = states.flatMap((p) => p.touches.flatMap((g) => g.items.filter((t) => t.used).map((t) => `${p.id}/${g.key}/${t.name}: ${t.used} (${t.said})`))).sort();
+  assert.deepEqual(used, PINNED);
+  assert.ok(states.every((p) => p.use_days === 30));
+});
+
+test('what a pack touches is read from its manifest alone, each counted thing saying how', () => {
+  const groups = packTouches({ id: 'p', version: '1', types: [{ id: 'task', title: 'Task', fields: { due: {} } }], views: [{ id: 'p.v', lens: {} }], rules: [{ id: 'r', then: 'hold', when: { actor: 'agent' } }] } as never);
+  const of = (key: string) => groups.find((g) => g.key === key)!;
+  assert.deepEqual(of('types').items[0].counts, { by: 'items', type: 'task' });
+  assert.deepEqual(of('views').items[0].counts, { by: 'view', id: 'p.v' });
+  assert.deepEqual(of('rules').items[0].counts, { by: 'ruling', id: 'p.r' });
+  assert.equal(of('rules').items[0].sort, 'holds');
+  assert.equal(gist('Holds a change. And more.'), 'Holds a change');
 });

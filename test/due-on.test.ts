@@ -1,14 +1,15 @@
-// The clock's query triggers (src/due-on.ts): an automation whose `on` names a query comes due when that query starts
+// The clock's query triggers (packs/automation_triggers/kernel/due-on.ts): an automation whose `on` names a query comes due when that query starts
 // to match, by its edge, once: what matched when it was set does not fire, and a second pass or a restart fires nothing
-// again. A bad `on` is refused on write (src/automation-rules.ts).
+// again. A bad `on` is refused on write (packs/automation_triggers/kernel/automation-rules.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkOn } from '../src/automation-rules.ts';
-import { duePass } from '../src/due.ts';
-import { readEvents } from '../src/eventlog.ts';
-import { Registry } from '../src/packs.ts';
-import type { Archipelago } from '../src/pelago.ts';
+import { checkOn } from '../packs/automation_triggers/kernel/automation-rules.ts';
+import * as duePack from '../packs/clocks/kernel/due.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { freshWith, human, make, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const SIGNUPS = {
   id: 'signups', version: '0.1.0', title: 'Sign-ups', description: 'Made-up sign-ups for testing query triggers.', requires: ['core'],
@@ -17,8 +18,8 @@ const SIGNUPS = {
 const map = () => freshWith(new Registry(packsWith(SIGNUPS as never)));
 const NOW = Date.parse('2030-01-07T13:00:00Z');
 const signups = { query: { filter: { find: ['type signup'] } } };
-const pass = async (l: Archipelago, i: number) => (await duePass(l, NOW + i * 60_000)).filter((d) => d.edge);
-// An automation lives with what it is about (src/subject.ts): each is made about a task.
+const pass = async (l: Archipelago, i: number) => (await duePack.duePass(kernelContext(l, 'clocks'), (NOW + i * 60_000))).filter((d) => d.edge);
+// An automation lives with what it is about (packs/placement/kernel/subject.ts): each is made about a task.
 const ABOUT = [{ op: 'create', ref: 'subject', type: 'task', title: 'Regulated regions' }, { op: 'link', type: 'about', from: 'auto', to: 'subject' }] as never[];
 const automation = (on: unknown) => ({ op: 'create', ref: 'auto', type: 'automation', title: 'Watch', status: 'enabled', props: { on, action: 'notify', message: 'Started to match' } });
 

@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { createToken } from '../src/auth.ts';
-import { countLook } from '../src/looks.ts';
-import { standingFrom, useOf } from '../src/standing.ts';
-import { bytes, requestsThisMinute } from '../src/workspace-use.ts';
-import { runAct } from '../src/server-acts.ts';
-import { loadServerPacks } from '../src/server-packs.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import * as looksPack from '../packs/look_draw/kernel/looks.ts';
+import { standingFrom, useOf } from '../packs/identity/kernel/standing.ts';
+import { bytes, requestsThisMinute } from '../packs/surface/kernel/workspace-use.ts';
+import { runAct } from '../packs/surface/kernel/server-acts.ts';
+import { loadServerPacks } from '../packs/loader/kernel/server-packs.ts';
 import { serve } from './serve.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const FIXTURES = join(import.meta.dirname, 'server-packs');
 before(() => Object.assign(process.env, { PELAGO_SERVER_PACKS: FIXTURES }));
@@ -76,9 +77,9 @@ test('over each limit what would add to it is refused, in the pack’s words, an
 
   // Looks an hour: past the plan's, the next is refused (a look's drawing needs Chrome: here only its count).
   await limit({ looks: 2 });
-  await countLook(ws.id);
-  await countLook(ws.id);
-  await assert.rejects(countLook(ws.id), (err: Error) => /room for 2 looks an hour, and has 2: read one again/.test(err.message) && NAMES_PLAN.test(err.message));
+  await looksPack.countLook(kernelContext(ws.pelago, 'look_draw'), undefined);
+  await looksPack.countLook(kernelContext(ws.pelago, 'look_draw'), undefined);
+  await assert.rejects(looksPack.countLook(kernelContext(ws.pelago, 'look_draw'), undefined), (err: Error) => /room for 2 looks an hour, and has 2: read one again/.test(err.message) && NAMES_PLAN.test(err.message));
 
   // Members, as before, and the Limits card at 80% of a limit.
   await limit({ members: 1, storage: 10e9 });

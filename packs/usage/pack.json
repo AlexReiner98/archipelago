@@ -1,0 +1,50 @@
+{
+  "id": "usage",
+  "version": "0.1.0",
+  "title": "Usage",
+  "description": "What a workspace uses and what that use is made of: the bytes each item adds to the log, its storage, sessions at work, requests a minute and looks an hour against the limits a server sets (the server's counters, read through root.counters), and how much each thing a pack declares is used, for the Packs screen.",
+  "uses": [
+    "service:root.counters",
+    "service:root.uses"
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": {
+      "log.appended": "appended.ts#appended",
+      "surface.reads": "reads.ts#told"
+    },
+    "provides": {
+      "answer.pack_use": {
+        "in": {
+          "states": [
+            "any"
+          ]
+        },
+        "out": {
+          "states": [
+            "any"
+          ]
+        },
+        "run": "pack-use.ts#packUse"
+      },
+      "act.report.used": {
+        "in": {
+          "kind": "string",
+          "id": "string",
+          "n?": "number"
+        },
+        "out": "any",
+        "run": "uses.ts#usedAct"
+      },
+      "answer.usage": {
+        "in": {
+          "admin?": "boolean"
+        },
+        "out": "any",
+        "run": "query-answers.ts#usageOf"
+      }
+    }
+  }
+}

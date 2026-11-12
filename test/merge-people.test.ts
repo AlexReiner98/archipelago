@@ -3,7 +3,7 @@
 // and a new agent token could read none of it.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createToken, verifyToken } from '../src/auth.ts';
+import { createToken, verifyToken } from '../packs/identity/kernel/auth.ts';
 import { agent, fresh, human, make, replayed } from './map.ts';
 
 test('a merge of two people moves what is private to the dropped one, and its tokens act as the kept one', async () => {

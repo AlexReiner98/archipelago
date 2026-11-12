@@ -8,8 +8,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { gzipSync } from 'node:zlib';
-import { clientAddress, trustedProxies } from '../src/address.ts';
-import { createToken } from '../src/auth.ts';
+import { clientAddress, trustedProxies } from '../packs/walls/kernel/address.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
 import { packsWith } from './map.ts';
 import { serve, closers } from './serve.ts';
 
@@ -85,7 +85,7 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.equal((await call('/agent/search', good, {})).status, 200);
 
   // A file that unpacks to more than a backup is taken to be is refused before it is read.
-  const { parseBackup } = await import('../src/backup.ts');
+  const { parseBackup } = await import('../packs/log/kernel/backup.ts');
   assert.throws(() => parseBackup(gzipSync(Buffer.alloc(257_000_000, 0x20))), /unpacks to more than 256 MB/);
   assert.throws(() => parseBackup(Buffer.from('not a backup')), /not an Archipelago backup file/);
 
@@ -94,7 +94,7 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
   assert.match(page.headers.get('content-security-policy') ?? '', /default-src 'none'; script-src 'self'; style-src 'self';.*frame-ancestors 'none'/);
   assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
   assert.equal((await fetch(base + '/app.js')).headers.get('x-content-type-options'), 'nosniff');
-  // An answer in JSON is never sniffed either, refused or not (src/reply.ts).
+  // An answer in JSON is never sniffed either, refused or not (packs/identity/kernel/reply.ts).
   for (const r of [await fetch(base + '/agent/search', { method: 'POST', headers: { authorization: `Bearer ${good}`, 'content-type': 'application/json' }, body: '{}' }), await fetch(base + '/agent/search', { method: 'POST', body: '{}' })]) {
     assert.equal(r.headers.get('x-content-type-options'), 'nosniff', `${r.status}`);
     assert.match(r.headers.get('content-type') ?? '', /^application\/json/);

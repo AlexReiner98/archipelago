@@ -13,7 +13,7 @@
 // the pointer, use this cursor, put a text field here, change the map, and
 // what went wrong. A field is this page's own: what is typed in it stays here,
 // and the code is told only the field's value. A change goes to the page, which
-// sends it as the person looking and the rules judge (src/layout-changes.ts);
+// sends it as the person looking and the rules judge (packs/rules/kernel/layout-changes.ts);
 // the code is told what came of it. If it stops answering it is ended. Each
 // picture gets a new frame, so nothing is left running.
 //

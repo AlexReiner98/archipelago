@@ -11,10 +11,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { askView } from '../src/askview.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { sessionStart } from '../src/sessions.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const PINNED = join(import.meta.dirname, 'fixtures', 'standing-views.json');
 
@@ -98,7 +99,7 @@ async function fixture() {
   // Each made a minute apart, in the order of their titles: what is ordered by when it changed has one order.
   await l.db.query(`update entity e set created_at = t.at, updated_at = t.at from (select id, timestamptz '2026-10-01T00:00:00Z' + (row_number() over (order by title)) * interval '1 minute' as at from entity) t where t.id = e.id`);
   await l.init(human, { name: 'Owner' });
-  const { run } = await sessionStart(l, agent, { task: made.hover, session_id: 'pin', title: 'Pinning session' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ task: made.hover, session_id: 'pin', title: 'Pinning session' }));
   // Its minted name is picked at random; the frozen answers hold it to one.
   await l.apply('system', { ops: [{ op: 'update', id: run, title: 'Pinning session' }], reason: 'A fixed name for the frozen answers' });
   return { l, made: { ...made, run } as Record<string, string> };
@@ -107,7 +108,7 @@ async function fixture() {
 /** What each standing view answers on the fixture, by name. */
 async function answers() {
   const { l, made } = await fixture();
-  const ask = (name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'agent', name: 'test' }, name, params).catch((err: Error) => ({ refused: err.message }));
+  const ask = (name: string, params: Record<string, unknown> = {}) => askviewPack.askView(kernelContext(l, 'query'), ({ kind: 'agent', name: 'test' }) as Parameters<typeof askviewPack.askView>[1], name, params).catch((err: Error) => ({ refused: err.message }));
   const out: Record<string, unknown> = {
     'graph focus all closed 1': await ask('graph', { focus: made.installer, relations: 'all', include_closed: true, depth: 1 }),
     'graph focus all closed 2': await ask('graph', { focus: made.installer, relations: 'all', include_closed: true, depth: 2 }),

@@ -1,0 +1,119 @@
+{
+  "id": "presence",
+  "version": "0.1.0",
+  "title": "Presence",
+  "description": "Where agents have pointed the owner's screen and the steps they took, what each screen is seeing, and the agents waiting in watch. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "uses": [
+    "service:root.transient"
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "act.report.point": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "focus": "any",
+          "step": "any"
+        },
+        "out": "any",
+        "run": "acts.ts#pointAct"
+      },
+      "act.report.took": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "step": "any",
+          "told?": "boolean"
+        },
+        "out": "any",
+        "run": "acts.ts#tookAct"
+      },
+      "act.report.told": {
+        "in": {},
+        "out": "any",
+        "run": "acts.ts#toldAct"
+      },
+      "answer.seeing_line": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "run?": "string"
+        },
+        "out": {
+          "line": "any"
+        },
+        "run": "acts.ts#seeingLineAnswer"
+      },
+      "answer.sight": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "actor": "string",
+          "run?": "id",
+          "focus?": "boolean"
+        },
+        "out": {
+          "pages": {
+            "open": "number",
+            "following": "number"
+          },
+          "sight": {
+            "looking": "boolean",
+            "where": "string"
+          }
+        },
+        "run": "acts.ts#sightAnswer"
+      },
+      "act.report.screen": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "page?": "any"
+        },
+        "out": {
+          "focus?": "any",
+          "steps": [
+            "any"
+          ],
+          "told": "number",
+          "listening": "number"
+        },
+        "run": "acts.ts#screenAct"
+      },
+      "act.report.step": {
+        "in": {
+          "step": "any",
+          "viewer?": "string"
+        },
+        "out": "any",
+        "run": "surface-reads.ts#step"
+      },
+      "act.query.listening": {
+        "in": "number",
+        "out": "any",
+        "run": "presence.ts#listening"
+      },
+      "answer.seeing": {
+        "in": {
+          "run?": "string",
+          "viewer?": "string"
+        },
+        "out": "any",
+        "run": "surface-reads.ts#seeingNow"
+      }
+    }
+  }
+}

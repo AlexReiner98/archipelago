@@ -1,0 +1,68 @@
+{
+  "id": "placement",
+  "version": "0.1.0",
+  "title": "Placement",
+  "description": "Where a new item goes: on its subject's island and as visible as it, when it lives with what it is about, or on the island of what it is tied to, the one it was given, or the map's lone island that fits. Checks that an item with a subject keeps one. A source a change names is found by its uri, or made with the change.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": {
+      "write.rewrite": [
+        "subject.ts#rewrite",
+        "island-place.ts#rewrite"
+      ],
+      "write.follow.rides": "sources.ts#follow"
+    },
+    "fills": [
+      "island"
+    ],
+    "provides": {
+      "answer.island_blockers": {
+        "in": {},
+        "out": {
+          "why?": "string"
+        },
+        "run": "island-start.ts#blockers"
+      },
+      "answer.island_moves": {
+        "in": {},
+        "out": {
+          "reason": "string",
+          "ops": [
+            "any"
+          ],
+          "islands": "number",
+          "moved": "number"
+        },
+        "run": "island-start.ts#islandMoves"
+      },
+      "answer.subject_refusals": {
+        "in": {
+          "ops": [
+            "any"
+          ],
+          "registry": "any"
+        },
+        "out": {
+          "refusals": [
+            "string"
+          ]
+        },
+        "run": "subject.ts#refusals"
+      },
+      "answer.first_island": {
+        "in": {
+          "name": "string"
+        },
+        "out": {
+          "reason": "string",
+          "ops": [
+            "any"
+          ]
+        },
+        "run": "island-start.ts#firstIslandChange"
+      }
+    }
+  }
+}

@@ -11,16 +11,16 @@ import { createServer } from 'node:http';
 import { syncBuiltinESMExports } from 'node:module';
 import test, { mock } from 'node:test';
 import { agent, fresh, human, make } from './map.ts';
-import { parseBackup, parseVault } from '../src/backup.ts';
-import { takeBackup } from '../src/backup-tools.ts';
-import { openDb } from '../src/db.ts';
-import { configureOutbox } from '../src/outbox.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { connection, held, putInPlace, sameFolder, takeIn, takePulled } from '../src/pull.ts';
-import { configureSecrets } from '../src/secrets.ts';
-import { hashOf } from '../src/snapshot.ts';
-import { callTool } from '../src/tools.ts';
-import { keysOf } from '../src/vault.ts';
+import { parseBackup, parseVault } from '../packs/log/kernel/backup.ts';
+import { takeBackup } from '../packs/surface/kernel/backup-tools.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { configureOutbox } from '../packs/identity/kernel/outbox.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { connection, held, putInPlace, sameFolder, takeIn, takePulled } from '../scripts/pull.ts';
+import { configureSecrets } from '../packs/seal/kernel/secrets.ts';
+import { hashOf } from '../packs/log/kernel/snapshot.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { keysOf } from '../packs/seal/kernel/vault.ts';
 
 test('a named map is found from a folder under its project, nearest first, with its token read from the environment', () => {
   const home = mkdtempSync(join(tmpdir(), 'pelago-pull-'));

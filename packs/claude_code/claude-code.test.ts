@@ -11,7 +11,8 @@ import { made, OUT } from './sync.mjs';
 
 test('a hook comes in as the kernel’s event and body; one the kernel does not answer is not asked', () => {
   assert.deepEqual(hookIn({ event: 'prompt', body: { session_id: 's1', prompt: 'hi' } }), { event: 'prompt', body: { session_id: 's1', prompt: 'hi' } });
-  assert.deepEqual(hookIn({ event: 'session-start', body: null }), { event: 'session-start', body: {} });
+  assert.deepEqual(hookIn({ event: 'session-start', body: null }), { event: 'session-start', body: { surface: 'claude-code' } }, 'a session starts recorded under its surface');
+  assert.deepEqual(hookIn({ event: 'session-start', body: { session_id: 's1', surface: 'other' } }), { event: 'session-start', body: { session_id: 's1', surface: 'claude-code' } }, 'whatever the body says');
   assert.deepEqual(hookIn({ event: 'tool-used', body: {} }), {});
   assert.deepEqual(handler.hook_in({ event: 'stop', body: {} }), { answer: { event: 'stop', body: {} } }, 'the sandbox is answered under answer');
 });

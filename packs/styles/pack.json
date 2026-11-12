@@ -1,0 +1,60 @@
+{
+  "id": "styles",
+  "version": "0.1.0",
+  "title": "Styles",
+  "description": "How a picture or a page looks: the style presets the packs ship under the styles and layouts the map keeps, their colours finished, the look a public page is drawn in, the screens as the owner keeps them, and the moves that made views hold their own settings and styles with code layouts.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "answer.view_style": {
+        "in": {
+          "own?": "any",
+          "have?": "any"
+        },
+        "out": {
+          "style": "any"
+        },
+        "run": "view-style.ts#viewStyle"
+      },
+      "page.look": {
+        "in": "any",
+        "out": "any",
+        "run": "styles.ts#pageLook"
+      },
+      "answer.page_style": {
+        "in": {
+          "of?": "any",
+          "style?": "any",
+          "view?": "any",
+          "have?": "any",
+          "try?": "any",
+          "shape?": "any"
+        },
+        "out": "any",
+        "run": "query-answers.ts#pageStyleOf"
+      },
+      "answer.schema_styled": {
+        "in": {
+          "described": "any"
+        },
+        "out": {
+          "screens": [
+            "any"
+          ],
+          "styles": [
+            "any"
+          ]
+        },
+        "run": "schema-styled.ts#schemaStyled"
+      }
+    },
+    "hooks": {
+      "loader.moves": "moves.ts#moves",
+      "surface.icon": "styles.ts#iconOf",
+      "surface.page_style": "styles.ts#pageStyle",
+      "surface.lengths": "styles.ts#lengthsOf"
+    }
+  }
+}

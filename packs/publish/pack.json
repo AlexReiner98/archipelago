@@ -1,0 +1,58 @@
+{
+  "id": "publish",
+  "version": "0.1.0",
+  "title": "Publishing",
+  "description": "What goes out of the map and how it is drawn there: what publishing a document or sharing a view would freeze, its plan and state, a page's preview, the bake of a public view, live pages, a site's header and footer, a product's public page, the counts a server pack keeps, drawings' code as files, kept pictures, and the tools that share and publish. Publishing, sharing and taking down too: who may is the rules' (root.may), and the rows, events and visibility they write are the database's (root.publish), behind the walls.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "act.capture.picture": {
+        "in": {
+          "actor": {
+            "kind": "string",
+            "name": "string"
+          },
+          "result": "id",
+          "data": "string",
+          "content_type": "string"
+        },
+        "out": {
+          "result": "id",
+          "size": "number",
+          "content_type": "string"
+        },
+        "run": "pictures.ts#pictureAct"
+      },
+      "answer.picture": {
+        "in": {
+          "result": "id"
+        },
+        "out": "any",
+        "run": "pictures.ts#getPicture"
+      }
+    },
+    "hooks": {
+      "surface.published": "served.ts#served",
+      "surface.public": "public-route.ts#servePublic",
+      "surface.preview": "published-preview.ts#previewOf",
+      "surface.site_nav": "site.ts#siteNav",
+      "surface.bake": "public-bake.ts#bake",
+      "surface.counts_since": "pack-counts.ts#countsSince",
+      "surface.tools": "surface-tools.ts#tools"
+    }
+  },
+  "uses": [
+    "service:root.publish",
+    "service:root.may",
+    "service:root.picture",
+    "service:root.layout",
+    "service:root.scene",
+    "service:root.drawing",
+    "service:root.public_product",
+    "service:page.look",
+    "service:answer.kept_picture",
+    "service:act.report.notify"
+  ]
+}

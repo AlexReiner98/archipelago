@@ -1,4 +1,4 @@
-// Moving a map between PGlite and a Postgres server by replaying its log (src/move.ts): the chains verify on both
+// Moving a map between PGlite and a Postgres server by replaying its log (packs/log/kernel/move.ts): the chains verify on both
 // sides, the projections replayed are the source's row for row, and what is kept beside the log comes too. With
 // PELAGO_TEST_DATABASE_URL the map goes from PGlite to the server and back; without it, between two PGlite folders.
 
@@ -10,12 +10,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { agent, all, fresh, human, make, replayed } from './map.ts';
-import { openDb, type Database } from '../src/db.ts';
-import { verify } from '../src/log.ts';
-import { move } from '../src/move.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { undo } from '../src/undo.ts';
+import { openDb, type Database } from '../packs/database/kernel/db.ts';
+import { verify } from '../packs/log/kernel/log.ts';
+import { move } from '../packs/log/kernel/move.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
 
 const server = process.env.PELAGO_TEST_DATABASE_URL;
 
@@ -42,7 +43,7 @@ async function aMap(l: Archipelago) {
   await undo(l, human, { changeset: edit.changeset });
   const twin = (await make(l, [{ op: 'create', ref: 'x', type: 'task', title: 'Replay it' }, { op: 'link', type: 'part_of', from: 'x', to: made.p }])).x;
   await make(l, [{ op: 'merge', keep: made.t, drop: twin }]);
-  // A forget rewrites an operational entry that names Sam (src/opseal.ts), after the one that follows it: they still go across in their order.
+  // A forget rewrites an operational entry that names Sam (packs/seal/kernel/opseal.ts), after the one that follows it: they still go across in their order.
   await l.record('claims', 'human:test', [['+', made.sam, 'note', 'Reviews on Fridays']]);
   await l.record('claims', 'human:test', [['+', made.t, 'note', 'Mine now']]);
   await l.change(human, { reason: 'Sam asked to be forgotten', ops: [{ op: 'forget', id: made.sam }] });
@@ -69,7 +70,7 @@ async function same(a: Archipelago, b: Archipelago, id: string) {
     assert.deepEqual(w.problems, []);
     assert.deepEqual([w.entries, w.head], [v.entries, v.head], `the ${stream} stream is the same chain`);
   }
-  const [g, h] = [await a.get(id), await b.get(id)];
+  const [g, h] = [await getItem(a, id), await getItem(b, id)];
   assert.deepEqual([h.entity.title, h.entity.body, h.outgoing.length], [g.entity.title, g.entity.body, g.outgoing.length]);
   assert.deepEqual((await all(b)).map((e) => e.reason), (await all(a)).map((e) => e.reason), 'every reason opens there as here');
 }
@@ -128,7 +129,7 @@ test('a move refuses a target that holds anything, a source whose chain is broke
 
   const broken = await fresh();
   await make(broken, [{ op: 'create', type: 'task', title: 'One' }]);
-  // Forged as the next entry, as the chain's trigger asks (src/partitions.ts), with a hash its contents do not make.
+  // Forged as the next entry, as the chain's trigger asks (packs/log/kernel/partitions.ts), with a hash its contents do not make.
   await broken.db.query(
     `insert into log_entry (stream, pos, id, at, head, prev, hash)
      select 'facts', pos + 1, 'c_forged', greatest(now(), at), '{}'::jsonb, hash, '\\x00' from log_entry where stream = 'facts' order by at desc, pos desc limit 1`,

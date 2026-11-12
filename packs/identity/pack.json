@@ -1,0 +1,37 @@
+{
+  "id": "identity",
+  "version": "0.1.0",
+  "title": "Identity",
+  "description": "Who is asking: people, members, tokens, sign-ins and the workspaces a server holds, with the server's policy on agents' changes. A root pack, started after the log.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "root.workspaces": {
+        "in": {},
+        "out": [
+          {
+            "id": "id",
+            "name": "string"
+          }
+        ],
+        "run": "root-services.ts#workspacesOf"
+      },
+      "root.token": {
+        "in": {
+          "name": "string",
+          "person?": "id",
+          "within": [
+            "id"
+          ]
+        },
+        "out": {
+          "token": "string",
+          "name": "string"
+        },
+        "run": "root-token.ts#tokenOf"
+      }
+    }
+  }
+}

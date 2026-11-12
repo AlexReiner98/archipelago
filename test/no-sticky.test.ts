@@ -10,8 +10,8 @@ import { after, test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
-import { createHttpServer } from '../src/server.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { createHttpServer } from '../packs/surface/kernel/server.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
 const closers: (() => Promise<void>)[] = [];
 after(async () => {

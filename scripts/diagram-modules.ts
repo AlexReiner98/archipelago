@@ -6,7 +6,7 @@
 import { html, layers, legend, style, wrap, type Edge, type Page, type Vertex } from './diagram-xml.ts';
 
 export interface SourceFile {
-  /** Its path from the repository's root, with forward slashes: src/pelago.ts. */
+  /** Its path from the repository's root, with forward slashes: packs/write/kernel/pelago.ts. */
   path: string;
   text: string;
 }

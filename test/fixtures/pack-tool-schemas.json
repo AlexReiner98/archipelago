@@ -1,0 +1,688 @@
+{
+  "document": {
+    "description": "A document read whole, as its reader meets it (any other item is read the same way, by its note): its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. To write one, make an item of type document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its view, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "drawn": {
+          "description": "true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "drawn": {
+          "description": "true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "share_create": {
+    "description": "Make a view, a document or any item public as it stands now, frozen, at /p/<workspace>/<id> for anyone and for search engines (and at its path on its site, when it has one). What is private is left out; share_plan says what goes out first. Sharing it again replaces what is public. Only a person shares: an agent asks with the ask verb, action share_ask.",
+    "humanOnly": true,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The view, document or item."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The view, document or item."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "share_plan": {
+    "description": "What making a view, document or item public would take out with it (goes), what it leaves out because it is private, and whether it is public already: asked before it is shared, since it is frozen when shared.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The view, document or item."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The view, document or item."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "share_list": {
+    "description": "Every public view of this workspace, newest first, or with id the one of that item: what it is of, its address, who shared it and when.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Only the public view of this item.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "description": "Only the public view of this item.",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "share_revoke": {
+    "description": "Take a public view down, at once: its address answers nothing, and the item itself is left as it is.",
+    "humanOnly": true,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item whose public view to take down."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item whose public view to take down."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "share_ask": {
+    "description": "Ask the person to make a view, document or item public: they are notified about it, and share it from its page. Sharing is theirs; this never shares.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The view, document or item."
+        },
+        "reason": {
+          "description": "Why, in a sentence.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The view, document or item."
+        },
+        "reason": {
+          "description": "Why, in a sentence.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "publish": {
+    "description": "Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with the ask verb, action publish_ask.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The document."
+        },
+        "authority": {
+          "description": "On whose authority an agent publishes, kept on the event it logs. Left out, it is recorded as your own judgment.",
+          "type": "object",
+          "properties": {
+            "of": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent"
+              ],
+              "description": "\"human\" when a person told you to publish it; \"agent\" when it is your own judgment."
+            },
+            "basis": {
+              "description": "For \"human\": what they said and where (required). For \"agent\": what it rests on.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "of"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The document."
+        },
+        "authority": {
+          "description": "On whose authority an agent publishes, kept on the event it logs. Left out, it is recorded as your own judgment.",
+          "type": "object",
+          "properties": {
+            "of": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent"
+              ],
+              "description": "\"human\" when a person told you to publish it; \"agent\" when it is your own judgment."
+            },
+            "basis": {
+              "description": "For \"human\": what they said and where (required). For \"agent\": what it rests on.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "of"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "unpublish": {
+    "description": "Take a published document down: its address answers nothing, and it is shared with the workspace again.",
+    "humanOnly": true,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The document."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The document."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "publish_all": {
+    "description": "Publish every open document an item holds (part_of, at any depth), then publish them again so each links to the others at their addresses. One whose path is taken is named, and the rest go ahead. An agent may only where the owner allows it, as with publish.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "within": {
+          "type": "string",
+          "description": "The item that holds the documents, such as a site’s project."
+        },
+        "authority": {
+          "description": "On whose authority an agent publishes, kept on the event it logs. Left out, it is recorded as your own judgment.",
+          "type": "object",
+          "properties": {
+            "of": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent"
+              ],
+              "description": "\"human\" when a person told you to publish it; \"agent\" when it is your own judgment."
+            },
+            "basis": {
+              "description": "For \"human\": what they said and where (required). For \"agent\": what it rests on.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "of"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "within"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "within": {
+          "type": "string",
+          "description": "The item that holds the documents, such as a site’s project."
+        },
+        "authority": {
+          "description": "On whose authority an agent publishes, kept on the event it logs. Left out, it is recorded as your own judgment.",
+          "type": "object",
+          "properties": {
+            "of": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent"
+              ],
+              "description": "\"human\" when a person told you to publish it; \"agent\" when it is your own judgment."
+            },
+            "basis": {
+              "description": "For \"human\": what they said and where (required). For \"agent\": what it rests on.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "of"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "within"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "publish_plan": {
+    "description": "Which documents an item holds and whether each is published as it stands: those not yet published or changed since are counted in to_publish.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "within": {
+          "type": "string",
+          "description": "The item that holds the documents."
+        }
+      },
+      "required": [
+        "within"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "within": {
+          "type": "string",
+          "description": "The item that holds the documents."
+        }
+      },
+      "required": [
+        "within"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "publish_ask": {
+    "description": "Ask the person to publish an item’s documents: they are notified about the item, with what changed, and publish all of it with one click on its page. Publishing is theirs; this never publishes.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "within": {
+          "type": "string",
+          "description": "The item that holds the documents."
+        },
+        "reason": {
+          "description": "Why now, in a sentence.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "within"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "within": {
+          "type": "string",
+          "description": "The item that holds the documents."
+        },
+        "reason": {
+          "description": "Why now, in a sentence.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "within"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "published": {
+    "description": "Whether a document is published, when and by whom, and whether its draft now says something other than what is published (changed): then only a human publishing it again changes what anyone reads.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The document."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The document."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "token_requests": {
+    "description": "The systems that have asked for a token (POST /connect/request) and wait for a person to approve or refuse, each with its code and the item watched at each address it named. With answered, also those answered and not yet run out: state approved, refused, or handed (the system has collected its token). Only for humans.",
+    "humanOnly": true,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "within": {
+          "description": "Only the requests about this item.",
+          "type": "string"
+        },
+        "answered": {
+          "description": "Also the requests answered in their ten minutes.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "within": {
+          "description": "Only the requests about this item.",
+          "type": "string"
+        },
+        "answered": {
+          "description": "Also the requests answered in their ten minutes.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "token_request_answer": {
+    "description": "Approve or refuse a system’s request for a token. Approved, it is given an agent token that acts for you, within the items watched at the addresses it named, that may only report; the system collects it once, by its poll. Only for humans.",
+    "humanOnly": true,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "approve": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "approve"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "approve": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "approve"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "connections": {
+    "description": "What this server offers to connect a workspace to (each a server pack), whether each is ready, and whether this workspace has connected it (and to which account outside). start: where to go to connect one (choose there what it is given); setup: where to go to ready one for the whole server, once (an admin of the default workspace only); end: stop it here. Admins only for these.",
+    "humanOnly": true,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pack": {
+          "description": "The server pack to start, set up or end; not needed to see them all.",
+          "type": "string"
+        },
+        "start": {
+          "type": "boolean"
+        },
+        "setup": {
+          "type": "boolean"
+        },
+        "end": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "pack": {
+          "description": "The server pack to start, set up or end; not needed to see them all.",
+          "type": "string"
+        },
+        "start": {
+          "type": "boolean"
+        },
+        "setup": {
+          "type": "boolean"
+        },
+        "end": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "hook": {
+    "description": "A Claude Code hook, called by an mcp_tool hook rather than by an agent: event (session-start, prompt, stop) and what Claude Code hands the hook (session_id, cwd, prompt, source, stop_hook_active). Answers in the hook’s own shape. A session not yet started is started at its first prompt.",
+    "humanOnly": false,
+    "object": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "session-start",
+            "prompt",
+            "stop"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "stop_hook_active": {
+          "description": "As Claude Code passes it: true, or \"true\" when substituted into a string.",
+          "type": [
+            "boolean",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "event",
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "strict": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string",
+          "enum": [
+            "session-start",
+            "prompt",
+            "stop"
+          ]
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cwd": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "stop_hook_active": {
+          "description": "As Claude Code passes it: true, or \"true\" when substituted into a string.",
+          "type": [
+            "boolean",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "event",
+        "session_id"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

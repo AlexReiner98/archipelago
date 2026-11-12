@@ -5,9 +5,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make, replayed } from './map.ts';
-import { callTool, humanChanges, latestSeq } from '../src/tools.ts';
-import { readEvents } from '../src/eventlog.ts';
-import { undo } from '../src/undo.ts';
+import { callTool, humanChanges, latestSeq } from '../packs/surface/kernel/tools.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
+import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
 
 test('every projection made again from the log is the live one', async () => {
   const l = await fresh();
@@ -28,7 +29,7 @@ test('every projection made again from the log is the live one', async () => {
   await make(l, [{ op: 'update', id: made.t, status: 'doing' }, { op: 'update', id: made.t, append: 'Op by op.' }, { op: 'update', id: made.t, append: 'In order.' }]);
   assert.equal((await l.entity(made.t))!.body, 'Op by op.\n\nIn order.');
   const twice = await make(l, [{ op: 'create', ref: 's', type: 'task', title: 'Cited twice' }, { op: 'link', type: 'part_of', from: 's', to: made.p }, { op: 'link', type: 'part_of', from: 's', to: made.p }]);
-  assert.equal((await l.get(twice.s)).outgoing.length, 1, 'a link made twice in one change is made once');
+  assert.equal((await getItem(l, twice.s)).outgoing.length, 1, 'a link made twice in one change is made once');
 
   // A session at work, through the tools, as an agent does it.
   const run = (await callTool(l, agent, 'session_start', { task: made.t, title: 'Projections', cwd: 'C:\\code\\Apex' })) as { run: string };
@@ -47,9 +48,9 @@ test('every projection made again from the log is the live one', async () => {
   await undo(l, human, { changeset: edit.changeset });
   await make(l, [{ op: 'merge', keep: made.t, drop: twice.s }]);
 
-  const queue = await l.proposals({ status: 'pending' });
+  const queue = await proposals(l, { status: 'pending' });
   assert.deepEqual(queue.map((p) => p.id), [started.proposal, open.proposal], 'what is pending: the records nothing has decided');
-  const decided = Object.fromEntries((await Promise.all(['approved', 'rejected', 'superseded'].map((status) => l.proposals({ status })))).flat().map((p) => [p.id, [p.status, p.note]]));
+  const decided = Object.fromEntries((await Promise.all(['approved', 'rejected', 'superseded'].map((status) => proposals(l, { status })))).flat().map((p) => [p.id, [p.status, p.note]]));
   assert.deepEqual(decided[asked.proposal], ['approved', 'Yes']);
   assert.deepEqual(decided[no.proposal], ['rejected', 'Keep it']);
   assert.equal(decided[moot.proposal][0], 'superseded');
@@ -77,14 +78,14 @@ test('what is inside what, all the way down, follows every link made, ended and 
   ]);
   const above = async (id: string) => (await l.db.query<{ ancestor: string }>(`select ancestor from part_closure where descendant = $1 order by ancestor`, [id])).rows.map((r) => r.ancestor);
   assert.deepEqual(await above(made.b), [made.a, made.mid, made.top].sort(), 'held at every depth');
-  assert.deepEqual((await l.get(made.mid)).mentioned_in.map((m) => m.id), [made.a], 'what names it, by the mention projection');
+  assert.deepEqual((await getItem(l, made.mid)).mentioned_in.map((m) => m.id), [made.a], 'what names it, by the mention projection');
   // Moved: the middle leaves the top for another, and everything below it goes with it.
-  const link = ((await l.get(made.mid)).outgoing as { type: string; id: string; relation: string }[]).find((o) => o.type === 'part_of')!;
+  const link = ((await getItem(l, made.mid)).outgoing as { type: string; id: string; relation: string }[]).find((o) => o.type === 'part_of')!;
   await make(l, [{ op: 'unlink', relation: link.relation }, { op: 'link', type: 'part_of', from: made.mid, to: made.other }]);
   assert.deepEqual(await above(made.b), [made.a, made.mid, made.other].sort());
   // Held twice, it keeps the other way up when one ends.
   await make(l, [{ op: 'link', type: 'part_of', from: made.a, to: made.top }]);
-  const twice = ((await l.get(made.a)).outgoing as { type: string; id: string; relation: string }[]).find((o) => o.type === 'part_of' && o.id === made.mid)!;
+  const twice = ((await getItem(l, made.a)).outgoing as { type: string; id: string; relation: string }[]).find((o) => o.type === 'part_of' && o.id === made.mid)!;
   await make(l, [{ op: 'unlink', relation: twice.relation }]);
   assert.deepEqual(await above(made.b), [made.a, made.top].sort());
   const { live, replay } = await replayed(l);
@@ -102,7 +103,7 @@ test('what a change set did is read from the log, not kept a second time as even
   await l.change(human, { reason: 'Started', ops: [{ op: 'update', id: made.t, status: 'doing', title: 'Read it back from the log' }] });
 
   // An item's history: its making, its link, its edit with the values before, its title as it was then.
-  const history = (await l.get(made.t)).recent_events;
+  const history = (await readEvents(l.db, { target: made.t, limit: 8 })) as any[];
   assert.deepEqual(history.map((e) => e.action), ['entity.update', 'relation.link', 'entity.create']);
   assert.deepEqual(history[0].detail.changes, { title: { from: 'Read it back', to: 'Read it back from the log' }, status: { from: 'todo', to: 'doing' } });
   assert.equal(history[2].detail.title, 'Read it back', 'the title as it was when it was made');

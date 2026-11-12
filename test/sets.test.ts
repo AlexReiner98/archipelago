@@ -24,7 +24,7 @@ test('the fast set holds no file past LONG seconds, and SLOW names none for its 
 });
 
 test('a change runs the tests that import it or name it, the structure test, and more where it cannot tell', () => {
-  const rules = affected(['src/rules.ts']).files;
+  const rules = affected(['packs/rules/kernel/rules.ts']).files;
   for (const f of ['test/rules.test.ts', 'test/approvals.test.ts', 'test/approvals-mixed-1.test.ts', 'test/structure.test.ts']) assert.ok(rules.includes(f), f);
 
   assert.deepEqual(affected(['test/kinds.test.ts']).files, ['test/kinds.test.ts', 'test/sets.test.ts', 'test/structure.test.ts'], 'a test alone, with the structure test (and this one, which names it)');

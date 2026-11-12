@@ -1,12 +1,12 @@
 // A page stays still while the map changes under it. It reads the log forward on what it shows (`tail`,
-// src/tail.ts); in a real browser (skipped where there is no Chrome), an item's page left open while three agents
+// packs/log/kernel/tail.ts); in a real browser (skipped where there is no Chrome), an item's page left open while three agents
 // write elsewhere is not drawn again, is not taken to what they changed, and a change to an item on it shows in place,
 // with nothing reloaded and an open fold left open. A store holding a flat lens's answer (ui/replica.js) is brought up
 // to date by an agent's change with no lens read.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { callTool } from '../src/tools.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { chrome, open } from './browser.ts';
 import { heard } from './tab-page.ts';
 import { fresh, human, make } from './map.ts';

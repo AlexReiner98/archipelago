@@ -63,7 +63,7 @@ the key vault and the **transient** table of short-lived values.
 | `id` | string | The change set id (`c_…`), as undo and the UI name it today. Random, not derived. |
 | `at` | string | Server time of the append, UTC, ISO 8601 with milliseconds. Never earlier than the previous entry's `at` (clamped), so time order and position order agree. |
 | `actor` | object | Who made the change: `{ "id": "e_…", "token": "t_…" }`. `id` is the actor's item (a person or an agent), never a name, so forgetting a person forgets their name in the log too; `token` is the token in use, when there is one. The system is `{ "id": "system" }`. |
-| `authority` | object | On whose authority: `{ "of": "human" \| "agent", "who": "e_…", "basis": sealed, "stated_by": "e_…" }`, as `Authority` in `src/pelago.ts` today. `basis` is free text and sealed. |
+| `authority` | object | On whose authority: `{ "of": "human" \| "agent", "who": "e_…", "basis": sealed, "stated_by": "e_…" }`, as `Authority` in `packs/write/kernel/pelago.ts` today. `basis` is free text and sealed. |
 | `rule` | object | What decided it (section 3): `{ "outcome": "apply", "spared": [{rule, pack, lifted}] }` for a change applied at once (the rules a setting lifted for it, if any), or, for an approved proposal, `{ "outcome": "approved", "held_by": {rule, pack}, "proposal": "p_…", "proposal_hash": "…", "by": "e_…", "revised": false, "except": [] }`. |
 | `reason` | sealed | Why. Required, as today. |
 | `source` | string \| null | The source item (`source`) the facts came from. The source item's own facts are in this same entry when it is new. A fact with a different source says so itself. |
@@ -465,9 +465,10 @@ rewritten; it is dropped whole, by rule, and the drop is in the chain:
 ```
 
 The segments that stand are those asserted and not since retracted;
-`verifySegments` (`src/streams.ts`) hashes each one's entries again. Only
+`verifySegments` (`packs/log/kernel/streams.ts`) hashes each one's entries again. Only
 sealed days are compacted, neighbouring segments that lost entries become one,
-and the server does both once a day for every workspace (`src/duties.ts`).
+and the server does both once a day for every workspace it leads, while it is open (the log root's
+`LEADING`, `packs/log/kernel/open.ts`).
 
 The compacted streams are kept in their own table, `log_op (stream, pos, at,
 head, facts)`: the light header in `head`, the facts inline. Its trigger
@@ -477,7 +478,7 @@ role may delete, and may change a row in one way only: a sealed value, or a
 sealed reason, put as its digest, which is what a forget asks of it. The fact
 stream's tables let no one through.
 
-The streams keep the fact stream's guarantees (`src/opseal.ts`, step 24): a
+The streams keep the fact stream's guarantees (`packs/seal/kernel/opseal.ts`, step 24): a
 fact's value about an item or a link is sealed with that item's key, as in
 section 5, and `CLEAR` stays clear; an entry's reason is sealed with the key
 of the first item it names, or with its stream's own (`op:<stream>`) when it
@@ -562,7 +563,7 @@ last one; a forget deletes the blobs of the item forgotten. Pack manifests
 
 In memory only, gone on restart, never in a backup: presence, a run's
 heartbeat (`last_seen`, `active`, `busy`), where a page stands in the log (`tail`), live
-cursors, the throttle state of `src/limit.ts`.
+cursors, the throttle state of `packs/surface/kernel/limit.ts`.
 
 ### The transient table
 
@@ -570,13 +571,13 @@ Short-lived values that several servers on one Postgres must share (login
 codes, OAuth state) go in an **unlogged** Postgres table, `transient (key,
 value, expires_at)`, its entries expiring and swept, never backed up and
 never part of the log (`e_a7fjzcwv`). It is the one store outside the log
-besides the key vault, named so in `src/operational.ts`.
+besides the key vault, named so in `packs/log/kernel/operational.ts`.
 
 ### Partitions by time
 
 `log_entry`, `log_fact` and `log_op` are each range-partitioned on `at`, one
 partition a year (UTC), in the workspace's own database (`e_m6a2uw2f`,
-`src/partitions.ts`). A fact carries its entry's `at`, so it lives with its
+`packs/log/kernel/partitions.ts`). A fact carries its entry's `at`, so it lives with its
 entry; a segment's days never cross a year, so a segment and a compacted one
 live in one partition, and reading one reads only it.
 
@@ -608,7 +609,7 @@ forget, carried in backups and by a move, and partitioned by year, as the
 fact stream is. Each write the table of section 10 sends to a compacted
 stream appends there as it is made, beside today's tables, which are still
 written and read until the projections read the streams: `operational`, `claim`, `release` and
-`checkConnections` in `src/pelago.ts`, settings and secrets by name, the
+`checkConnections` in `packs/write/kernel/pelago.ts`, settings and secrets by name, the
 event and audit cursors, a token's use (hourly), backup
 downloads, audit imports and a picture's hash. Not yet: the notification item
 itself (still facts through `apply`), a run's heartbeat (still on the run's
@@ -621,7 +622,7 @@ said again of a change set (`proposal.*`, `changeset.undo`, `type.moved`,
 `lens.moved`, `types.sync`) is read from the log; what it said again of a
 stream's state (a setting, `changes.seen`, a claim, a backup download, a
 picture, a firing, a session gone quiet) is read from that stream; the rest
-is the `activity` stream (`src/activity.ts`). Every `log_op` entry is
+is the `activity` stream (`packs/log/kernel/activity.ts`). Every `log_op` entry is
 numbered from the sequence `log_fact` is (step 33), so the activity log
 reads all of them in one order. The table's rows were carried into the
 `activity` stream when each workspace opened, with their numbers and times,
@@ -718,7 +719,7 @@ forgotten with an item without the person choosing it.
   `settings` stream by name only, never its value.
 - Each key is wrapped (AES-256-GCM) with the **vault key**, which is never in
   the database: `PELAGO_SECRETS_KEY`, or the key file beside the workspaces, as
-  `src/secrets.ts` seals secrets today.
+  `packs/seal/kernel/secrets.ts` seals secrets today.
 - Rotation of one item's key writes a new version; values sealed with the old
   version keep their `$k` and stay readable until the item is forgotten,
   which deletes every version.
@@ -734,20 +735,20 @@ forgotten with an item without the person choosing it.
 
 ### As built
 
-The vault is `src/vault.ts`, sealing `src/seal.ts`, the forget `src/forget.ts`
+The vault is `packs/seal/kernel/vault.ts`, sealing `packs/seal/kernel/seal.ts`, the forget `packs/write/kernel/forget.ts`
 (step 20). Where the build had to choose:
 
 - A held change's `ops`, `warnings` and `source` are sealed with a key of
   their own, `<p_…>/ops`, beside the one for its reason: forgetting an item
   it touches takes what it asked and leaves why, which goes only if chosen.
   The proposal leaves the queue as superseded.
-- Backups are sealed as the log is (format 2 at first, `src/backup-seal.ts`;
+- Backups are sealed as the log is (format 2 at first, `packs/seal/kernel/backup-seal.ts`;
   format 3 now, the log and a snapshot, section 7). A restore opens them with
   the vault as it is then, or with a vault backup given beside the file, on a
   server with the same sealing key; a row with no key stays out. Vault
   backups are written to `backups/<ws>/vault/`, deleted after 30 days, and
   never sent off the server.
-- An operational entry is sealed the same way (`src/opseal.ts`): a value
+- An operational entry is sealed the same way (`packs/seal/kernel/opseal.ts`): a value
   about an item or link with that item's key, the entry's reason with the
   key of the first item it names, else its stream's own (`op:<stream>`;
   `e_jax9w54n`). A forget turns them into digests through the compaction
@@ -815,7 +816,7 @@ never sees the log ahead of them.
 
 ### As built
 
-- **The projector** is `src/replay.ts`. The write path plans each op into
+- **The projector** is `packs/log/kernel/replay.ts`. The write path plans each op into
   facts and projects them at once, under the fact stream's lock, so the next
   op reads what it did; the entry is appended at the end of the same
   transaction. `rebuild` projects a log into empty tables the same way, and
@@ -823,7 +824,7 @@ never sees the log ahead of them.
 - **An item's kind is not a fact.** It is read from its type, as `is_open`
   is from its status, so a field a pack calls `kind` is the pack's own. A
   link is known by its id (`r_…`), so an item may have a field called `link`.
-- **The activity log** reads change sets from the log (`src/eventlog.ts`):
+- **The activity log** reads change sets from the log (`packs/log/kernel/eventlog.ts`):
   one event per item or link an entry touched, the before-values and the
   title then from the history index. Facts are numbered from the event
   table's sequence (`log_fact.seq`, not hashed), so one cursor runs over
@@ -832,10 +833,10 @@ never sees the log ahead of them.
   the events they read as.
 - **The review queue** (`proposal`) is projected: a pending record makes its
   row, the entry that decides it says what became of it.
-- **The search index** is the indexes on `entity` (`src/search.ts`), kept
+- **The search index** is the indexes on `entity` (`packs/surface/kernel/search.ts`), kept
   current by the projector's writes.
-- **The part_of closure and mentions** are projections too (`src/closure.ts`,
-  `src/mentions.ts`, step 25), kept in the append's transaction through
+- **The part_of closure and mentions** are projections too (`packs/log/kernel/closure.ts`,
+  `packs/mentions/kernel/mentions.ts`, step 25), kept in the append's transaction through
   definer functions, since the closure must hold links a member cannot see.
   They were added when the 10-million-event benchmark showed every
   whole-map read too slow, and every view now reads a subtree through the
@@ -867,7 +868,7 @@ never sees the log ahead of them.
 - A snapshot is taken every 100,000 fact entries or daily, whichever comes
   first; it is not part of the log and can be deleted and taken again.
 
-### As built (`src/snapshot.ts`, `src/rebuild.ts`, `src/backup-log.ts`)
+### As built (`packs/log/kernel/snapshot.ts`, `packs/log/kernel/rebuild.ts`, `packs/log/kernel/backup-log.ts`)
 
 - **Where kept.** `log_snapshot`, one row per snapshot in the workspace's
   database (step 23), its rows gzipped JSON sealed per item as a backup's
@@ -876,7 +877,7 @@ never sees the log ahead of them.
   replaced. The newest three of the running code are kept.
 - **The code's version.** `PROJECTION_VERSION` is raised by hand when what
   the projector makes changes in meaning; beside it the snapshot keeps the
-  digest of the projector's source (`src/replay.ts`, `src/facts.ts`), so a
+  digest of the projector's source (`packs/log/kernel/replay.ts`, `packs/log/kernel/facts.ts`), so a
   projector changed without raising it is still not built on. A snapshot
   whose version or code is not the running one, whose anchor is not the fact
   entry at its position, or whose rows do not hash to its hash, is passed
@@ -901,7 +902,7 @@ never sees the log ahead of them.
   swapped in.
 - **Older than the log.** A map from before 24 Oct 2026 holds items, links
   and held changes no entry made. A walk from the log's start begins with
-  them as they stand today (`beforeTheLog`, `src/replay.ts`), and what the
+  them as they stand today (`beforeTheLog`, `packs/log/kernel/replay.ts`), and what the
   log says of them goes on top: the head is right, and a past position shows
   a value the log has not said yet as it stands today.
 - **As of a position.** The nearest snapshot at or before it, then the
@@ -985,7 +986,7 @@ at a position and each one's manifest blob, with the workspace's own
   to how manifests are read rebuilds it, and the manifests themselves never
   change.
 
-### As built: the registry as of P (11 Nov 2026, `src/registry-at.ts`)
+### As built: the registry as of P (11 Nov 2026, `packs/loader/kernel/registry-at.ts`)
 
 - `registryAt` reads the last pack fact of each pack up to fact position P and the manifest texts the log keeps by
   hash, and builds a `Registry` from those manifests (given to it in place of folders). `asOf` projects under it
@@ -996,7 +997,7 @@ at a position and each one's manifest blob, with the workspace's own
   today's registry. Before any pack fact there is no past registry. The islands setting is today's.
 - Manifests that no longer load under this server's code leave the read under today's registry, and `asOf` says
   why (`past_refused`).
-- A pack's code is on the log beside its manifest (11 Nov 2026, `src/pack-code.ts`): the files of its folder that
+- A pack's code is on the log beside its manifest (11 Nov 2026, `packs/loader/kernel/pack-code.ts`): the files of its folder that
   run or are served (not `pack.json`, words or tests), each by the SHA-256 of its text. A pack fact names `code`,
   the hash of the whole, and `files`, each path's hash, and `texts` holds a file's text the first time the log
   meets its hash, so a deploy adds the files it changed alone; a change of code alone asserts the pack again. The
@@ -1136,13 +1137,13 @@ streams in the mix above (and the hosted Postgres as well as PGlite):
 
 ## 10. Every write today, and where it goes
 
-Every write in `src/pelago.ts` and every store `src/operational.ts` names,
+Every write in `packs/write/kernel/pelago.ts` and every store `packs/log/kernel/operational.ts` names,
 with the entry or stream it becomes: the plan, as written before the build.
 What is built is in each section's As built; what has not moved yet is in
 section 4, Where this stands. Nothing else writes the map today
 (`test/structure.test.ts` checks it).
 
-### Writes in `src/pelago.ts`
+### Writes in `packs/write/kernel/pelago.ts`
 
 | write today | becomes |
 | --- | --- |
@@ -1174,14 +1175,14 @@ section 4, Where this stands. Nothing else writes the map today
 | `init`: owner person created through `apply`; `insert into setting` (`me`, and `agent_changes` when it begins the workspace) | facts for the person; `settings` stream |
 | `restoreRows` (restore from a backup) | gone: restoring is verifying a copied log and replaying it; a copy that diverged from this one has its later entries proposed here, rebased by section 3 (`e_u7a3ubgy`) |
 
-### Stores named in `src/operational.ts`
+### Stores named in `packs/log/kernel/operational.ts`
 
 | store | becomes |
 | --- | --- |
 | `MAP_TABLES`: `entity`, `relation`, `event` | the log (`log_entry`, `log_fact`, `log_blob`); `entity` and `relation` become projections; `event` goes |
 | `ON_THE_MAP.sessions` | a run's start, end and the task it is on: facts (`e_fst4wzsv`); its story, tokens and stale flag: `sessions` stream; its heartbeat: memory |
 | `ON_THE_MAP.claims` | `claims` stream |
-| `ON_THE_MAP.notifications` | `notifications` stream; `src/notify.ts`'s `apply` and `src/outbox.ts`'s delivery write there |
+| `ON_THE_MAP.notifications` | `notifications` stream; `packs/notifications/kernel/notify.ts`'s `apply` and `packs/identity/kernel/outbox.ts`'s delivery write there |
 | `ON_THE_MAP.automations` | `automations` stream; `automation.fire` and `run.stale` are entries there |
 | `ON_THE_MAP.rechecks` | `automations` stream; `recheck.done` an entry there |
 | `ON_THE_MAP.kinds` | the `kind` fact at creation |
@@ -1200,29 +1201,29 @@ section 4, Where this stands. Nothing else writes the map today
 | `control_workspace`, `control_value`, `github_installation` | the server's own log, in this format, outside any workspace (`e_8g9feum7`); server packs added and removed are `pack` facts there |
 | `schema_version` | gone: entries carry `v`, snapshots `projection_version` |
 
-### Events written outside `src/pelago.ts`
+### Events written outside `packs/write/kernel/pelago.ts`
 
 | action | becomes |
 | --- | --- |
-| `changeset.undo` (`src/undo.ts`) | the undo change set itself, with `undoes` |
-| `audit.import` (`src/audit.ts`) and its cursor setting | `observations` stream; cursor in `automations` |
+| `changeset.undo` (`packs/write/kernel/undo.ts`) | the undo change set itself, with `undoes` |
+| `audit.import` (`packs/sessions/kernel/audit.ts`) and its cursor setting | `observations` stream; cursor in `automations` |
 | `workspace.import`, backup restores (`src/backup.ts`: `insert into event`, `proposal`, `setting`, `update token`) | replaying a log; imported entries keep their own positions and hashes in their own chain; a diverged copy's later entries become proposals (`e_u7a3ubgy`) |
 | `workspace.backup_download` | `access` stream |
 | `share.create`, `share.revoke`, `share.workspace` | facts, kept forever (`e_x9wxnqz4`) |
-| token made, moved, revoked (`src/auth.ts`, `src/members.ts`, `src/tools.ts`) | facts, kept forever; last use in `access` |
-| `PACKS_OFF` (`src/packstate.ts`) | `pack` facts: a pack added or removed (section 8) |
-| `workspace.set` (`src/workspace-tools.ts`), `me` (`src/tools.ts`) | `settings` stream |
+| token made, moved, revoked (`packs/identity/kernel/auth.ts`, `packs/identity/kernel/members.ts`, `packs/surface/kernel/tools.ts`) | facts, kept forever; last use in `access` |
+| `PACKS_OFF` (`packs/loader/kernel/packstate.ts`) | `pack` facts: a pack added or removed (section 8) |
+| `workspace.set` (`packs/surface/kernel/workspace-tools.ts`), `me` (`packs/surface/kernel/tools.ts`) | `settings` stream |
 | `changes.seen`, `questions.confirmed` | `settings` stream, per person |
 | the automation cursor (`src/automations.ts`, now a fact position) | `automations` stream |
-| pack secrets (`src/outside.ts`) | the key vault (`e_7cv7xefh`) |
+| pack secrets (`packs/loader/kernel/outside.ts`) | the key vault (`e_7cv7xefh`) |
 | `act.done`, `act.refused` | fact entries, as above |
 | `picture.stored`, `picture.removed` | a blob and its hash in `observations` |
 | `document.publish`, `document.unpublish` | fact entries (`published` above) |
-| `types.sync` (`src/typetable.ts`) | the `pack` fact asserted again with the new manifest hash, only when a manifest changed |
+| `types.sync` (`packs/loader/kernel/typetable.ts`) | the `pack` fact asserted again with the new manifest hash, only when a manifest changed |
 | `connection.made`, `connection.ended` | facts on the connection item (it is a thing on the map); its reachability in `observations` |
 | `workspace.notify` (retired 10 Nov 2026; older entries stay as written) | `notifications` stream |
 | `server.workspace.add`, `server.workspace.deliver` | the server's own log (`e_8g9feum7`) |
-| migrations (`src/schema.ts`: `update event`, `update token`) | gone: a format change is an upcaster |
+| migrations (`packs/database/kernel/schema.ts`: `update event`, `update token`) | gone: a format change is an upcaster |
 
 ---
 
@@ -1264,7 +1265,7 @@ Where a map should move is the owner's question `e_fcusktmz`.
 ### The move
 
 `node src/cli.ts move <from> <to>`, each a data folder or a `postgres://`
-address of one database, with no server on either (src/move.ts):
+address of one database, with no server on either (packs/log/kernel/move.ts):
 
 1. **Verify** the source: both chains and every sealed segment.
 2. **Replay**: the key vault is carried first, then every entry of both
@@ -1285,7 +1286,7 @@ do not open with the key it is given.
 ### The hosted product
 
 Every hosted workspace is its own database on the server (`databaseFor` in
-src/pg.ts), so a workspace is the unit that is sharded: placed on another
+packs/database/kernel/pg.ts), so a workspace is the unit that is sharded: placed on another
 server by moving that one database, with nothing joined across workspaces.
 
 ---

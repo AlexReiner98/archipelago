@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { stylesMoved } from '../src/style-move.ts';
+import { stylesMoved } from '../packs/styles/kernel/style-move.ts';
 
 const isView = (type: string) => type === 'lens';
 const tie = (style: string, to: string, to_type: string, gone = false) => ({ style, to, to_type, gone });

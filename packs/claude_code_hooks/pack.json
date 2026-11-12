@@ -1,0 +1,15 @@
+{
+  "id": "claude_code_hooks",
+  "version": "0.1.0",
+  "title": "Claude Code hooks",
+  "description": "A Claude Code session's hooks called over MCP (report, action hook), as a plugin from the plugin directory calls them: answered as /hooks/<event> answers them, through the claude_code pack's adapter. Split from claude_code, which keeps the adapter and the launcher as a plain pack. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "uses": ["service:root.hook"],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": {
+      "surface.tools": "hook-tool.ts#tools"
+    }
+  }
+}

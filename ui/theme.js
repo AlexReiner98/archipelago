@@ -1,6 +1,6 @@
 // The one painter of every page, the app's, a document's and a product's public page: the colours (theme), lengths,
 // typefaces (faces) and text roles (type) the server sends, each set on the page as --<name>, the colours for the
-// scheme the reader's system is in, set again when that changes. The server finishes the colours (src/colours.ts):
+// scheme the reader's system is in, set again when that changes. The server finishes the colours (packs/styles/kernel/colours.ts):
 // the page works none out, it only paints. Only a plain hex colour, a plain length and a plain list of families are
 // painted: a style is written by anyone who can change the map.
 

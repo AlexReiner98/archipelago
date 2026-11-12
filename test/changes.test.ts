@@ -3,10 +3,14 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { importAudit } from '../src/audit.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import * as auditPack from '../packs/sessions/kernel/audit.ts';
 import { human, agent, fresh, make } from './map.ts';
+import { searchMap } from '../packs/surface/kernel/search.ts';
+import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A flavour of task with a field of its own, defined on the map as the owner would. */
 const EXPERIMENT = { id: 'local.experiment', title: 'Experiment', description: 'A test of a guess.', extends: 'task', fields: { method: { type: 'string' } } } as const;
@@ -28,8 +32,8 @@ test('flavours inherit fields and statuses, and are found through the parent', a
     { op: 'create', type: 'local.experiment', title: 'Shadows at noon', props: { priority: 'high' } },
     { op: 'create', type: 'task', title: 'Slow builds' },
   ]);
-  assert.equal((await l.search({ type: 'task' })).length, 2);
-  assert.equal((await l.search({ type: 'local.experiment' })).length, 1);
+  assert.equal((await searchMap(l, { type: 'task' })).length, 2);
+  assert.equal((await searchMap(l, { type: 'local.experiment' })).length, 1);
 });
 
 test('a flavour can override an inherited default', async () => {
@@ -62,7 +66,7 @@ test('invalid changes are rejected whole, with every problem listed', async () =
       return true;
     },
   );
-  assert.equal((await l.search({})).length, 0, 'nothing was written');
+  assert.equal((await searchMap(l, {})).length, 0, 'nothing was written');
   await assert.rejects(make(l, [
     { op: 'create', ref: 'a', type: 'task', title: 'A' },
     { op: 'create', ref: 'c', type: 'company', title: 'C' },
@@ -86,7 +90,7 @@ test('an agent change becomes a proposal; a human approves it, minus exclusions'
     ],
   });
   assert.equal(proposed.status, 'proposed');
-  assert.equal((await l.search({})).length, 0, 'nothing applied yet');
+  assert.equal((await searchMap(l, {})).length, 0, 'nothing applied yet');
 
   const id = (proposed as { proposal: string }).proposal;
   await assert.rejects(l.decide(agent, { proposal: id, approve: true }), /Only a human/);
@@ -94,14 +98,14 @@ test('an agent change becomes a proposal; a human approves it, minus exclusions'
 
   const decided = await l.decide(human, { proposal: id, approve: true, except: ['b'] });
   assert.equal(decided.status, 'approved');
-  const tasks = await l.search({ type: 'task' });
+  const tasks = await searchMap(l, { type: 'task' });
   assert.deepEqual(tasks.map((t) => t.title), ['Fix parity']);
-  const task = await l.get(tasks[0].id);
+  const task = await getItem(l, tasks[0].id);
   assert.deepEqual(task.outgoing.map((r: any) => r.type), ['part_of'], 'links to the excluded entity were dropped');
   assert.equal(task.source?.uri, 'docs/handoff.md');
 
   // The log says who proposed and who approved.
-  const created = (await l.events({ target: tasks[0].id })) as any[];
+  const created = (await readEvents(l.db, { target: tasks[0].id })) as any[];
   assert.equal(created[0].actor, 'agent:test');
   assert.equal(created[0].detail.approved_by, 'human:test');
   assert.equal(created[0].reason, 'Read the handoff doc');
@@ -171,11 +175,11 @@ test('merge moves relations to the kept entity and archives the other', async ()
     { op: 'link', type: 'works_at', from: 's1', to: 'co' },
   ]);
   await make(l, [{ op: 'merge', keep: made.s1, drop: made.s2 }]);
-  const sam = await l.get(made.s1);
+  const sam = await getItem(l, made.s1);
   assert.deepEqual(sam.entity.props, { email: 'sam@example.com', role: 'Planner' });
   assert.deepEqual(sam.outgoing.map((r: any) => r.title), ['Acme']);
   assert.equal((await l.entity(made.t))!.owner, made.s1);
-  assert.deepEqual((await l.search({ type: 'person' })).map((p) => p.title), ['Sam Patel']);
+  assert.deepEqual((await searchMap(l, { type: 'person' })).map((p) => p.title), ['Sam Patel']);
 });
 
 test('an approved type proposal becomes a flavour in the local pack', async () => {
@@ -189,10 +193,10 @@ test('an approved type proposal becomes a flavour in the local pack', async () =
   await l.decide(human, { proposal: (proposed as { proposal: string }).proposal, approve: true });
   assert.deepEqual(l.registry.type('local.site_visit')!.lineage, ['local.site_visit', 'event', 'occurrence']);
   await make(l, [{ op: 'create', type: 'local.site_visit', title: 'Snowdon', props: { address: '1 High St', at: '2026-11-01T10:00:00Z' } }]);
-  assert.equal((await l.search({ type: 'event' })).length, 1);
+  assert.equal((await searchMap(l, { type: 'event' })).length, 1);
   // One way to make a type: define_type keeps it as a type item on the map, not in the old table of local types.
-  const kept = (await l.search({ type: 'type' })).find((e) => e.title === 'Site visit')!;
-  const item = (await l.get(kept.id)).entity;
+  const kept = (await searchMap(l, { type: 'type' })).find((e) => e.title === 'Site visit')!;
+  const item = (await getItem(l, kept.id)).entity;
   assert.deepEqual([item.props.name, item.props.extends, item.body], ['local.site_visit', 'event', 'A visit to a site.']);
   assert.equal((await l.db.query<{ n: number }>(`select count(*)::int as n from local_type`)).rows[0].n, 0);
   await assert.rejects(make(l, [{ op: 'define_type', type: { id: 'thing', title: 'T', description: '' } }]), /must be named "local.<name>"/);
@@ -205,11 +209,11 @@ test('a connection\'s tool-call log is imported once into the activity log', asy
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), 'not json', line('2026-10-01T10:00:05.000Z', 'run_command')].join('\n'));
   const made = await make(l, [{ op: 'create', ref: 'c', type: 'connection', title: 'Apex', props: { audit_log: log } }]);
 
-  assert.deepEqual(await importAudit(l, agent, { connection: made.c }), { imported: 2, skipped: 1, path: log });
+  assert.deepEqual(await auditPack.importAudit(kernelContext(l, 'sessions'), agent, ({ connection: made.c })), { imported: 2, skipped: 1, path: log });
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), line('2026-10-01T10:00:09.000Z', 'form_snapshot')].join('\n'));
-  assert.equal((await importAudit(l, agent, { connection: made.c })).imported, 1, 'only entries after the cursor');
+  assert.equal((await auditPack.importAudit(kernelContext(l, 'sessions'), agent, ({ connection: made.c }))).imported, 1, 'only entries after the cursor');
 
-  const external = (await l.events({ origin: 'external' })) as any[];
+  const external = (await readEvents(l.db, { origin: 'external' })) as any[];
   assert.deepEqual(external.map((e) => e.action), ['form_snapshot', 'run_command', 'nodegraph_add_node']);
   assert.equal(external[0].actor, 'external:Apex');
   assert.equal(new Date(external[0].ts).toISOString(), '2026-10-01T10:00:09.000Z');
@@ -235,9 +239,9 @@ test('each fact can carry its own source within one change', async () => {
     ],
   });
   const made = (result as { created: Record<string, string> }).created;
-  assert.equal((await l.get(made.a)).source?.uri, 'docs/roadmap.md');
-  assert.equal((await l.get(made.b)).source?.uri, 'README.md');
-  assert.equal((await l.search({ type: 'source' })).length, 2, 'the same uri is recorded once');
+  assert.equal((await getItem(l, made.a)).source?.uri, 'docs/roadmap.md');
+  assert.equal((await getItem(l, made.b)).source?.uri, 'README.md');
+  assert.equal((await searchMap(l, { type: 'source' })).length, 2, 'the same uri is recorded once');
 });
 
 test('a reviewer can correct a proposal while approving it', async () => {
@@ -251,12 +255,12 @@ test('a reviewer can correct a proposal while approving it', async () => {
     l.decide(human, { proposal: id, approve: true, ops: [{ op: 'create', type: 'task', title: 'Presets', status: 'nonsense' }] }),
     /status "nonsense"/,
   );
-  assert.equal((await l.proposals()).length, 1, 'a rejected correction leaves the proposal pending');
+  assert.equal((await proposals(l)).length, 1, 'a rejected correction leaves the proposal pending');
 
   await l.decide(human, { proposal: id, approve: true, ops: [{ op: 'create', ref: 'f', type: 'task', title: 'Presets', status: 'done' }] });
-  const [feature] = await l.search({ type: 'task' });
+  const [feature] = await searchMap(l, { type: 'task' });
   assert.equal(feature.status, 'done');
-  const [event] = (await l.events({ target: feature.id })) as any[];
+  const [event] = (await readEvents(l.db, { target: feature.id })) as any[];
   assert.equal(event.actor, 'agent:test');
   assert.equal(event.detail.revised_by, 'human:test');
 });

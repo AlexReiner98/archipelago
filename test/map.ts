@@ -3,14 +3,15 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openDb } from '../src/db.ts';
-import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
-import { syncTypes } from '../src/typetable.ts';
-import { entries, type Entry } from '../src/log.ts';
-import { rebuild } from '../src/replay.ts';
-import { KEPT_FIELDS } from '../src/operational.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { Archipelago, type Actor, type Op } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import '../packs/surface/kernel/packreads.ts'; // the reads API fills the loader's slot loader.reads, as the surface root loads it at a workspace's open
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
+import { entries, type Entry } from '../packs/log/kernel/log.ts';
+import { rebuild } from '../packs/log/kernel/replay.ts';
+import { KEPT_FIELDS } from '../packs/log/kernel/operational.ts';
 
 export const human: Actor = { kind: 'human', name: 'test' };
 export const agent: Actor = { kind: 'agent', name: 'test' };

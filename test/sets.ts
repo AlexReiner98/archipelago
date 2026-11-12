@@ -75,12 +75,8 @@ export const SLOW: Record<string, string> = {
   'packs/canvas/map-routing.test.ts': 'long',
   // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
   'test/sessions.test.ts': 'long',
-  'test/oauth.test.ts': 'long',
-  'test/server-auth.test.ts': 'long',
-  'test/query-flat.test.ts': 'long',
   'test/new-workspace.test.ts': 'long',
   'test/seeing.test.ts': 'long',
-  'test/handoff.test.ts': 'long',
   'test/setup.test.ts': 'long',
 };
 
@@ -90,8 +86,8 @@ export const LONG = 15;
 const walk = (dir: string): string[] =>
   !existsSync(join(ROOT, dir)) ? [] : readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(`${dir}/${e.name}`)) : [`${dir}/${e.name}`]));
 
-/** Every test file npm test:full runs, as paths from the repository's root. */
-export const allTests = () => [...walk('test').filter((f) => /^test\/[^/]+\.test\.ts$/.test(f)), ...walk('packs').filter((f) => /^packs\/[^/]+\/[^/]+\.test\.ts$/.test(f))].sort();
+/** Every test file npm test:full runs, as paths from the repository's root: an internal pack's beside its modules too (packs/<id>/kernel/). */
+export const allTests = () => [...walk('test').filter((f) => /^test\/[^/]+\.test\.ts$/.test(f)), ...walk('packs').filter((f) => /^packs\/[^/]+\/(?:kernel\/)?[^/]+\.test\.ts$/.test(f))].sort();
 
 export const fastTests = () => allTests().filter((f) => !(f in SLOW));
 
@@ -234,7 +230,7 @@ export function reads(test: string, file: string, wide = false): boolean {
 
 /**
  * The test files a change to these files can reach: each test that reads one (reads), and the structure test always.
- * Nearly every test imports the kernel's core (src/pelago.ts), so a change there reaches nearly all of them; this
+ * Nearly every test imports the kernel's core (packs/write/kernel/pelago.ts), so a change there reaches nearly all of them; this
  * mode saves most for a change to a pack's code, a page, a script, the docs or a test. What every test reads (shared),
  * and a file under src/, ui/ or packs/ no test is seen to read (a handler the server loads by its path), could be read
  * by any test, so it runs the fast set with them. CI runs every file before main deploys, so what this misses is

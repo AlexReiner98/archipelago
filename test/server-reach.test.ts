@@ -1,4 +1,4 @@
-// The keys a server pack declares for the second round (src/server-reach.ts): each is checked on load, so a pack that
+// The keys a server pack declares for the second round (packs/loader/kernel/server-reach.ts): each is checked on load, so a pack that
 // takes an address off the list, fills a file or a command with what the kernel does not give, or names a function
 // twice is left out and said why.
 
@@ -7,10 +7,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { checkServerPack, loadServerPacks } from '../src/server-packs.ts';
-import { hookAt } from '../src/server-adapter.ts';
-import { mountOf } from '../src/server-mounts.ts';
-import { setupBehind } from '../src/server-files.ts';
+import { checkServerPack, loadServerPacks } from '../packs/loader/kernel/server-packs.ts';
+import { hookAt } from '../packs/loader/kernel/server-adapter.ts';
+import { mountOf } from '../packs/surface/kernel/server-mounts.ts';
+import { setupBehind } from '../packs/surface/kernel/server-files.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'pelago-reach-'));
 after(() => rmSync(dir, { recursive: true, force: true }));

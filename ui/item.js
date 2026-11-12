@@ -63,7 +63,7 @@ export async function entity(id, here) {
     e.owner ? api('get', { id: e.owner }).then((r) => r.entity, () => null) : null,
     readWhole(e.type) ? readDocument(id) : { doc: null },
     !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? api('publish_plan', { within: id }).catch(() => null) : null,
-    // Its public view, when a person shared it (src/public-view.ts).
+    // Its public view, when a person shared it (packs/publish/kernel/public-view.ts).
     publicOf(id),
   ]);
   // A document is read in public as it was last published: whether it is, and whether its draft says something else now.
@@ -83,7 +83,7 @@ export async function entity(id, here) {
   const endSession = async () => {
     if (!(await ask({ title: `End "${e.title}"?`, message: 'Anything it holds is released.', action: 'End session', danger: true }))) return;
     try {
-      await api('session_end', { run: id, outcome: 'cancelled', summary: 'Ended from the UI' });
+      await api(state.schema.acts.ends, { run: id, outcome: 'cancelled', summary: 'Ended from the UI' });
     } catch (err) {
       await tell('The session was not ended', err.message);
     }

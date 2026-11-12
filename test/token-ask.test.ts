@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createToken } from '../src/auth.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
 import { packsWith } from './map.ts';
 import { serve } from './serve.ts';
 

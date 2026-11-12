@@ -1,4 +1,4 @@
-// The log at size (docs/log.md, section 9), read and written through src/log.ts as the server does: a fact stream of
+// The log at size (docs/log.md, section 9), read and written through packs/log/kernel/log.ts as the server does: a fact stream of
 // ENTRIES change sets laid down over three years, then the reads that partitioning by time is for (an as-of value,
 // a page from a past position, a stretch of time, the newest activity, a change set by id) and an append on top.
 //   node scripts/bench-log.ts [--entries 1000000] [--runs 30] [--seed 1] [--dir <folder>] [--fresh] [--unit year | month]
@@ -37,10 +37,10 @@ if (URL_) {
   await admin.end();
 }
 
-const { openDb } = await import('../src/db.ts');
+const { openDb } = await import('../packs/database/kernel/db.ts');
 const { entryHash, GENESIS } = await import('../src/jcs.ts');
-const log = await import('../src/log.ts');
-const { readEvents } = await import('../src/eventlog.ts');
+const log = await import('../packs/log/kernel/log.ts');
+const { readEvents } = await import('../packs/log/kernel/eventlog.ts');
 
 const say = (line: string) => console.log(line);
 const results: Record<string, unknown> = { db: URL_ ? 'postgres' : 'pglite', entries: ENTRIES, seed: SEED, runs: RUNS, at: new Date().toISOString() };

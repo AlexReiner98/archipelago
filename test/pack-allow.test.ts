@@ -6,10 +6,11 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { packsFor, readOnlyPacks, readWorkspacePacks } from '../src/pack-allow.ts';
-import { packStates, setPack } from '../src/packstate.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { packsFor, readOnlyPacks, readWorkspacePacks } from '../packs/loader/kernel/pack-allow.ts';
+import { packStates, setPack } from '../packs/loader/kernel/packstate.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 import { human, packsWith } from './map.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
 
 test('the lists are read from the environment, the kernel always on them', () => {
   assert.equal(readOnlyPacks(undefined), undefined);
@@ -45,7 +46,7 @@ test('a pack off the list is off in a workspace, its items kept, and back when t
   const two = new Workspaces({ ...base, packs: ['themes'], workspacePacks: { islands: ['tally'] } });
   const w2 = await two.get('default');
   assert.deepEqual(state(w2), { state: 'off', why: 'not enabled on this server' });
-  assert.equal((await w2.pelago.get(entry))?.entity.title, 'Drafting', 'its item is still there');
+  assert.equal((await getItem(w2.pelago, entry))?.entity.title, 'Drafting', 'its item is still there');
   assert.equal(w2.pelago.registry.states.get('core')?.state, 'active', "the kernel's pack is never off the list");
   await assert.rejects(setPack(w2.pelago, human, { pack: 'tally', on: true }), /not offered to this workspace/);
   const listed = (w: Awaited<ReturnType<Workspaces['get']>>) => packStates(w.pelago).map((p) => p.id);

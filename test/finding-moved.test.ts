@@ -1,13 +1,14 @@
-// A moved finding tells its readers (src/moved.ts, task e_svdkhdey): what reads a finding by a link that crosses is
+// A moved finding tells its readers (packs/attention/kernel/moved.ts, task e_svdkhdey): what reads a finding by a link that crosses is
 // in attention as `moved` once the finding's value or as of changes after the reader last changed or was said still
 // true, with what moved, from what to what, and when; until whoever tends it changes it or says it still holds.
 // Read from the log and the links: nothing runs when the finding moves.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkCapabilities } from '../src/capabilities.ts';
-import { setIslands } from '../src/packstate.ts';
-import { flatRead } from '../src/query-flat.ts';
+import { checkCapabilities } from '../packs/loader/kernel/capabilities.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
 import { attend, fresh, human, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 async function twoIslands() {
   const l = await fresh();
@@ -79,7 +80,7 @@ test('promised names fields the type has', () => {
 
 test('the term moved finds what reads a moved finding, in find, only and not; a view of it walks to the finding', async () => {
   const { l, f, budget } = await twoIslands();
-  const titles = async (filter: object, walk?: object) => (await flatRead(l, { filter, ...(walk && { walk }) })).items.map((i: { title: string }) => i.title).sort();
+  const titles = async (filter: object, walk?: object) => (await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter, ...(walk && { walk }) }))).items.map((i: { title: string }) => i.title).sort();
   assert.deepEqual(await titles({ find: ['moved'] }), [], 'nothing moved');
   await make(l, [{ op: 'update', id: f, props: { value: 450 } }]);
   assert.deepEqual(await titles({ find: ['moved'] }), ['Set the budget']);

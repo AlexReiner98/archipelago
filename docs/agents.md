@@ -37,7 +37,7 @@ asked, and the asking is kept as a beat of the run's story. The owner sees
 each rule on the Workspace page's Checks card, with how often it asked in
 the last week and a switch that lifts it. Such a rule has no say over a
 change: `judge` skips it, and what applies or waits stays the other rules'
-(`decide` in `src/rules.ts`).
+(`decide` in `packs/rules/kernel/rules.ts`).
 - `test/replies.test.ts`: "a rule on a reply ending is checked as data"; "a
   rule on a reply ending has no say over a change"; "a reply that did what a
   rule names is asked once a turn, the asking kept in its story, until the
@@ -136,13 +136,13 @@ SessionStart's `source` and SessionEnd's `reason`.
 ### On the server
 | Module | What it is |
 | --- | --- |
-| `src/instructions.ts` | what is said where: presets under the workspace's under a repository's (core view `instructions`) |
-| `src/working-rules.ts` | the rules file a project is handed: `examples/working-rules.md` with the `working_rules` presets at its marker |
-| `src/hook-answers.ts` | what each hook is answered; keeps what was touched, asks the reply rules at stop |
-| `src/sessions.ts` | session start and end; the session-start text |
-| `src/reply-rules.ts`, `src/replies.ts` | a reply rule checked as data and when it holds; asking once a turn, kept in the story; how often each asked |
-| `src/touched.ts`, `src/reconcile.ts` | the set a run touched; what a session has left unsaid when it ends |
-| `src/workspace-tools.ts`, `ui/workspace-cards.js` | `workspace_info.reply_rules`, and the Checks card that draws it with its switches |
+| `packs/agents/kernel/instructions.ts` | what is said where: presets under the workspace's under a repository's (core view `instructions`) |
+| `packs/loader/kernel/working-rules.ts` | the rules file a project is handed: `examples/working-rules.md` with the `working_rules` presets at its marker |
+| `packs/sessions/kernel/hook-answers.ts` | what each hook is answered; keeps what was touched, asks the reply rules at stop |
+| `packs/sessions/kernel/sessions.ts` | session start and end; the session-start text |
+| `packs/sessions/kernel/reply-rules.ts`, `packs/sessions/kernel/replies.ts` | a reply rule checked as data and when it holds; asking once a turn, kept in the story; how often each asked |
+| `packs/sessions/kernel/touched.ts`, `packs/sessions/kernel/reconcile.ts` | the set a run touched; what a session has left unsaid when it ends |
+| `packs/surface/kernel/workspace-tools.ts`, `ui/workspace-cards.js` | `workspace_info.reply_rules`, and the Checks card that draws it with its switches |
 
 ### In `packs/`
 | Pack | What it adds |
@@ -161,7 +161,7 @@ SessionStart's `source` and SessionEnd's `reason`.
 3. The rules file (`.claude/pelago.md`) is the frame in
    `examples/working-rules.md` with each `working_rules` preset as one
    bullet, of every pack the server turns on (`serverPacks`; a plugin ships
-   every pack's), handed out by `src/connect.ts`.
+   every pack's), handed out by `packs/connect/kernel/connect.ts`.
 
 ## How a reply is checked
 1. At each turn's end the stop hook reads the transcript since the owner's
@@ -184,7 +184,7 @@ SessionStart's `source` and SessionEnd's `reason`.
 ## Which workspace an agent acts in
 1. A workspace's token (`pel_<workspace>_…`) acts in that workspace alone, for
    one person there; a call naming another is refused.
-2. A person token (`pep_…`, `src/person-tokens.ts`) reaches every workspace
+2. A person token (`pep_…`, `packs/identity/kernel/person-tokens.ts`) reaches every workspace
    its person is a member of, as their member record in each, so it sees what
    is private to them (the owner, 9 Nov 2026, bug e_94ag6443). It is kept in
    the server's own database, holds the sign-in addresses it acts for, and is
