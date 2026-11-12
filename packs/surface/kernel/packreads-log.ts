@@ -8,9 +8,8 @@
 
 import type { Archipelago } from '../../../src/pelago.ts';
 import { openSaid } from '../../../src/seal.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
 import { livesIn } from './packreads-scope.ts';
-import { keptAll } from './transient.ts';
+import { transientOf } from './root-transient.ts';
 import { pageOf, paged, READ_LIMIT, shapes, type Page, type Paged } from './packreads-rows.ts';
 
 /** A fact is the asker's when what it is about is: an item, or a link, they may read now. */
@@ -115,8 +114,9 @@ export async function runsOf(l: Archipelago, q: { repo?: string; folder?: string
   const out = paged(rows, page.size, (r) => typed(r as { id: string; type: string; props?: Record<string, unknown>; body?: string }));
   if (!q.touched || !out.rows.length) return out;
   // The set the session's hook kept (the transient store, under touched:<run>) is read past row-level security (it is
-  // the server's), every run's in one read; what is handed on is only what the asker may read now.
-  const kept = await keptAll<string[]>((await bypassingRls(l)).db, out.rows.map((r) => `touched:${r.id}`));
+  // the server's) through root.transient's own read, a hundred runs at a time; what is handed on is only what the asker may read now.
+  const keys = out.rows.map((r) => `touched:${r.id}`), kept = new Map<string, string[]>();
+  for (let i = 0; i < keys.length; i += 100) for (const r of (await transientOf({ caller: 'surface', map: l }, { scan: { keys: keys.slice(i, i + 100) } })) as { key: string; value: string[] }[]) kept.set(r.key, r.value);
   const sets = out.rows.map((r) => kept.get(`touched:${r.id}`) ?? []);
   const all = [...new Set(sets.flat())];
   const { rows: seen } = all.length ? await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and archived_at is null`, [all]) : { rows: [] };
