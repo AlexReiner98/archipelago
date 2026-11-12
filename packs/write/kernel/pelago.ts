@@ -143,7 +143,7 @@ export class Archipelago {
       const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say, ...(verdict.by.version && { version: verdict.by.version }) };
       // The queue is a projection of the pending stream: the record makes its row (packs/log/kernel/replay.ts).
       await this.db.transaction(async (tx) =>
-        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),
+        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),
       );
       return {
         status: 'proposed' as const,
