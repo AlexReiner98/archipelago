@@ -1,15 +1,17 @@
 // Keeps the Pack anatomy island true to the packs: reads every pack.json and bundle.json at a git ref (origin/main by
-// default) of this repository and, given --hosted <folder>, of the hosted one; works out what the island should hold
-// (scripts/anatomy-model.ts); reads what it holds; and sends the difference as changes: new items and links, items
-// whose title, note or fields moved, and what no manifest declares any more archived or unlinked. Run it after a push:
+// default) of this repository and of the hosted one (archipelago-hosted beside the main checkout, or --hosted <folder>);
+// works out what the island should hold (scripts/anatomy-model.ts); reads what it holds; and sends the difference as
+// changes: new items and links, items whose title, note or fields moved, and what no manifest declares any more
+// archived or unlinked. Run it after a push, from any worktree (git fetch both repositories first):
 //
-//   node scripts/anatomy.ts --hosted ../archipelago-hosted [--ref origin/main] [--dry]
+//   node scripts/anatomy.ts [--dry] [--ref origin/main] [--hosted <folder>] [--run <run id>]
 //
 // It acts on the map PELAGO_URL names with PELAGO_AGENT_TOKEN (never printed), on the island that speaks the anatomy
 // pack. What a person added there (principles, their modules) is left alone: only the model's own kinds are archived,
 // only its own link types between its own items unlinked, and a module is never archived.
 
 import { execFileSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { keyOf, MADE_LINKS, model, type Bundle, type PackFile, type Want, type WantLink } from './anatomy-model.ts';
 
@@ -17,9 +19,14 @@ const arg = (name: string) => { const i = process.argv.indexOf(`--${name}`); ret
 const DRY = process.argv.includes('--dry');
 const REF = arg('ref') ?? 'origin/main';
 const RUN = arg('run') ?? process.env.PELAGO_RUN;
-const repos: [string, PackFile['home']][] = [[resolve(import.meta.dirname, '..'), 'open_core'], ...(arg('hosted') ? [[resolve(arg('hosted')!), 'hosted'] as [string, PackFile['home']]] : [])];
-
 const git = (repo: string, ...a: string[]) => execFileSync('git', ['-C', repo, ...a], { encoding: 'utf8', maxBuffer: 1 << 26 });
+const CORE = resolve(import.meta.dirname, '..');
+// The hosted repository: --hosted, else archipelago-hosted beside the main checkout (a worktree's main checkout too).
+const beside = resolve(git(CORE, 'rev-parse', '--path-format=absolute', '--git-common-dir').trim(), '..', '..', 'archipelago-hosted');
+const HOSTED = arg('hosted') ? resolve(arg('hosted')!) : existsSync(beside) ? beside : undefined;
+if (arg('hosted') && !existsSync(HOSTED!)) throw new Error(`No hosted repository at ${HOSTED}: give --hosted the folder it is in, or leave it out to use ${beside}.`);
+if (!HOSTED) throw new Error(`No hosted repository at ${beside}: give --hosted its folder. Without it every hosted pack on the island would be archived.`);
+const repos: [string, PackFile['home']][] = [[CORE, 'open_core'], ...(HOSTED ? [[HOSTED, 'hosted'] as [string, PackFile['home']]] : [])];
 function readPacks() {
   const packs: PackFile[] = [], bundles: Bundle[] = [];
   const roots = JSON.parse(git(repos[0][0], 'show', `${REF}:packs/roots.json`));
