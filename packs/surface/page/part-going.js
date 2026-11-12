@@ -1,7 +1,7 @@
 // A change a part sends on its own, shown as it goes out (decision e_3mdf9gn8: nobody's map changes unseen). One quiet
 // line at the canvas's foot for each, naming the part and its action, then a mark for what came of it: sent, held for
 // a person (the rule's words in its tooltip) or refused (why, in its tooltip). It goes a moment later. The bridge
-// (ui/part-bridge.js) sends a part's changes one at a time, so a part cannot stack lines here.
+// (packs/surface/page/part-bridge.js) sends a part's changes one at a time, so a part cannot stack lines here.
 
 import { h } from './base.js';
 import { pageSchema } from './page-schema.js';

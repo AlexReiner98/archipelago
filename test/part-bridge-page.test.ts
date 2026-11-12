@@ -1,4 +1,4 @@
-// The bridge, in a real browser (ui/part-bridge.js, ui/part-going.js; task e_9ests3je): a part in its version's walled
+// The bridge, in a real browser (packs/surface/page/part-bridge.js, packs/surface/page/part-going.js; task e_9ests3je): a part in its version's walled
 // worker sends its pack's action over its port, and the page sends it as the person looking. One it sends on its own is
 // shown going out at the canvas's foot; one after a press is not; one its pack does not declare for it is refused
 // before anything is sent. The server's side is test/part-bridge.test.ts.

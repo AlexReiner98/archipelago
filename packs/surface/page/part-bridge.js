@@ -7,7 +7,7 @@
 //
 // A part may send on its own, not only from a press. The host tells the two apart itself: each press it passes the
 // part lets it send one action as that press's, for a moment; anything else is the part's own, and is shown as it goes
-// out (ui/part-going.js), so nobody's map changes unseen. A part cannot claim a press it was not given.
+// out (packs/surface/page/part-going.js), so nobody's map changes unseen. A part cannot claim a press it was not given.
 
 import { api, may } from './base.js';
 import { goingOut } from './part-going.js';

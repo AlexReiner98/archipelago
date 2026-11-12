@@ -1,7 +1,7 @@
 // The way back to shipped parts (task e_f7tbyj8u, decision e_fxayrhma). A refiner may change any part of the page, on
 // one island (a pinned version, packs/loader/kernel/island-pin.ts) or the whole map (the owner's `part` items), and a
 // broken one must never strand the person looking. So the host keeps the parts as each pack ships them in git, and one
-// press, which the host draws where no part reaches (ui/way-back.js), draws the island with them and unpins it.
+// press, which the host draws where no part reaches (packs/surface/page/way-back.js), draws the island with them and unpins it.
 //
 // This module is in the loader, a root pack pinned by hash (packs/roots.json): no version of a pack reaches it. What
 // it reads is the map's own registry, never an island's, with no kept items, and from the folder a pack was found in

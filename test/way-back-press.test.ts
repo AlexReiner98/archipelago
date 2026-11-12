@@ -1,4 +1,4 @@
-// The way back's press in a real browser (ui/way-back.js, task e_f7tbyj8u; skipped where there is no Chrome): it is
+// The way back's press in a real browser (packs/surface/page/way-back.js, task e_f7tbyj8u; skipped where there is no Chrome): it is
 // drawn in the top layer, so even an element over the whole page at the highest z-index leaves it in sight and
 // pressable; a press draws the island shipped, unpins it and is kept for the island; pressed again it draws its own.
 
