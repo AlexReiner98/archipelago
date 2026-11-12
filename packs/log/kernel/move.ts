@@ -11,15 +11,15 @@
 // the target must have the sealing key the source's had (src/secrets.ts).
 
 import { createHash } from 'node:crypto';
-import type { Db, Q } from './db.ts';
+import type { Db, Q } from '../../database/kernel/db.ts';
 import { jcs } from '../../../src/jcs.ts';
-import { stored, verify, type Entry, type Stream } from '../../../src/log.ts';
-import { KEPT_FIELDS } from '../../../src/operational.ts';
+import { stored, verify, type Entry, type Stream } from './log.ts';
+import { KEPT_FIELDS } from './operational.ts';
 import type { Registry } from '../../../src/packs.ts';
-import { keepFields, PROJECTED, projectEntry } from '../../../src/replay.ts';
+import { keepFields, PROJECTED, projectEntry } from './replay.ts';
 import { openEntries, openSaid } from '../../../src/seal.ts';
-import { verifySegments } from '../../../src/streams.ts';
-import { makePartitions } from '../../../src/partitions.ts';
+import { verifySegments } from './streams.ts';
+import { makePartitions } from './partitions.ts';
 
 /** The log's own tables: carried entry by entry, never as plain rows. */
 const LOG_TABLES = ['log_entry', 'log_fact'];

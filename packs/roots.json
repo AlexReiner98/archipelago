@@ -6,19 +6,19 @@
     },
     {
       "id": "database",
-      "hash": "b513113b25a9a8b4fbd60af2c3cb1684736d7823609fd332989e6f4afa471e6e"
+      "hash": "d8cfe9b2d929d7a2479a3ecf940762f2c213f73c8dc80bd1128ce41a7151e514"
     },
     {
       "id": "seal",
-      "hash": "3c571a877ee3307df41085564594ff6f5ea5c2c1e32c1bc39527fe111b256fc6"
+      "hash": "1ec2b2ad6bda6dd079038ed93a6a2f86cb51c6f41bea9cd9c0c4025685940793"
     },
     {
       "id": "log",
-      "hash": "0fa9aeca2feab7292c3b4e4b989e7ea180b74122b15f2b09c59f22e6cc203971"
+      "hash": "009b096e62208cbb070b4cf2de1874ce2f16b46ad18b1ea0a644c79c7e79317b"
     },
     {
       "id": "identity",
-      "hash": "c3f62b9ade96cdd96adf038a88ed255905635ea118beec3dcf421f28938815d2"
+      "hash": "b26626ba4ad45fcecbeaff5c0fd16c63b63c5ff85320b0803dd1aa2674421b6e"
     },
     {
       "id": "walls",
@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "2423d9cdfdf38b44dcf76115394e9d03945125880d6ef6b6b8557d2b2f502a15"
+      "hash": "488f92ddf2c560d9d420558a4c35bc8de232e62f211e213d9f1418adcf93b330"
     },
     {
       "id": "rules",
@@ -34,11 +34,11 @@
     },
     {
       "id": "write",
-      "hash": "ba91fc8296908cfa3cfdde8579a29a4d1092290ad7ab900c58c9f73ce2337651"
+      "hash": "6b749307fa84a1cf0e86b1612dd6375db59418d7dcad7d4f6e700fdf4f462c0c"
     },
     {
       "id": "surface",
-      "hash": "3eaca9274d9c9627c6bccace1d06558e1b5e690123e2679d3aabde80ee199701"
+      "hash": "4da12b5f6b7edb8bee7c291b49bfaa798364aba5ef697bab269350ab9fc4bb1a"
     }
   ],
   "calls": {

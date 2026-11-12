@@ -66,7 +66,7 @@ export async function factsAfter(db: Q, input: { after: number; ids: string[]; i
   const limit = Math.min(input.limit ?? ENTRIES, ENTRIES);
   // The entries after the position, bounded by its time too, so the partitions before it are not read.
   const { rows: window } = await db.query<{ pos: number; at: Date; action: string | null; head: Record<string, unknown> }>(
-    `select pos::int as pos, at, head->>'action' as action, jsonb_build_object('id', head->'id', 'actor', head->'actor', 'run', head->'run', 'authority', head->'authority', 'reason', head->'reason', 'keys', head->'keys') as head from log_entry where stream = 'facts' and pos > $1
+    `select pos::int as pos, at, head #>> '{action}' as action, jsonb_build_object('id', head->'id', 'actor', head->'actor', 'run', head->'run', 'authority', head->'authority', 'reason', head->'reason', 'keys', head->'keys') as head from log_entry where stream = 'facts' and pos > $1
        and at >= coalesce((select at from log_entry where stream = 'facts' and pos = $1), '-infinity') order by pos limit $2`,
     [input.after, limit + 1],
   );

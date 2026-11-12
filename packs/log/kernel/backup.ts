@@ -23,23 +23,29 @@ import { existsSync, readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { resolve } from 'node:path';
 import { isServer, openDb, type Db, type Q } from '../../../src/db.ts';
-import { addLocalType, addWorkspace } from '../../../src/control.ts';
-import { indexWorkspace } from '../../../src/control-index.ts';
+import { rootFills } from '../../database/kernel/root-fills.ts';
 import type { Registry } from '../../../src/packs.ts';
 import { regatherAll } from './closure.ts';
 import { recountBytes } from '../../../src/bytes.ts';
-import { projectAgain, projectAgainAtOpen } from './log-project.ts';
+import { projectAgainAtOpen } from './log-project.ts';
 import { databaseFor } from '../../../src/pg.ts';
-import { analyzeAll, analyzeDue } from '../../../src/stats.ts';
+import { analyzeAll } from '../../../src/stats.ts';
 import { FACT_ACTIONS, factEvents } from '../../../src/eventlog.ts';
-import { bringIn, CARRIED, carryRows, doneEvents, type EventRow } from './activity.ts';
+import { CARRIED, carryRows, doneEvents, type EventRow } from './activity.ts';
 import { openTables, sealTables, sealedDump } from '../../../src/backup-seal.ts';
 import { projectBackup } from './backup-log.ts';
 import { liveSnapshot } from './snapshot.ts';
 import { dumpVault, restoreVault, type VaultDump } from '../../../src/vault.ts';
-import { restoreRows } from '../../../src/pelago.ts';
 import type { RootCall } from '../../../src/root-calls.ts';
 import { makePartitions } from './partitions.ts';
+
+/** The slot log.restored: what a root above the log keeps of a backup in the restore's transaction, once its rows are in (its kernel/fills.ts, RESTORED). */
+export type RootRestored = ((tx: Q, given: Dump) => Promise<unknown>)[];
+/**
+ * The slot log.restored_to: what a root above the log keeps when a backup is restored onto a Postgres server from the
+ * command line (restoreTo), in `control`, the default workspace's database (its kernel/fills.ts, RESTORED_TO).
+ */
+export type RootRestoredTo = ((r: { control: Db; id: string; name: string; db: Db }) => Promise<unknown>)[];
 
 /** Every table, parents before the rows that point at them. */
 const TABLES = ['entity', 'relation', 'proposal', 'token', 'share', 'setting', 'picture', 'type_def', 'act', 'member', 'published', 'public_view', 'log_entry', 'log_fact', 'log_op'] as const;
@@ -148,8 +154,9 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
     await regatherAll(tx, ['part_of']);
     await projectAgainAtOpen(tx); // what names what: made again by the packs' projectors, once the map's packs are read
     await recountBytes(tx);
-    // The types it defined for itself go in its database, where the server looks for them.
-    for (const def of (given.local_pack as { types?: { id: string }[] } | null)?.types ?? []) await addLocalType(tx, def);
+    // What the roots above the log keep of it (the slot log.restored): the identity root, the types it defined for
+    // itself in its database, where the server looks for them.
+    for (const { value } of await rootFills<RootRestored>('fills.ts', 'RESTORED')) for (const run of value) await run(tx, given);
     if (as !== undefined && as !== given.workspace?.id) {
       for (const table of ['entity', 'relation', 'proposal', 'share', 'picture', 'act', 'published', 'public_view']) await tx.query(`update ${table} set workspace = $1`, [as]);
       await tx.query(`update token set revoked_at = now() where revoked_at is null`);
@@ -204,13 +211,13 @@ export async function restoreTo(backup: Dump, target: string): Promise<{ where: 
   const db = await openDb(where);
   try {
     const counts = await restore(db, backup);
-    // Another workspace is listed in the default one's database, where every server on it looks; and there its members
-    // and tokens are noted, so they sign in (src/control-index.ts). A new folder has no index yet, and makes it whole.
+    // On a server, the default one's database is where every server on it looks: the roots above the log keep what
+    // they keep there (the slot log.restored_to). The identity root lists another workspace, and notes its members and
+    // tokens, so they sign in (src/control-index.ts). A new folder has no index yet, and makes it whole.
     if (isServer(target)) {
       const control = id === 'default' ? db : await openDb(target);
       try {
-        if (id !== 'default') await addWorkspace(control, { id, name: backup.workspace?.name ?? id });
-        await indexWorkspace(control, id, db);
+        for (const { value } of await rootFills<RootRestoredTo>('fills.ts', 'RESTORED_TO')) for (const run of value) await run({ control, id, name: backup.workspace?.name ?? id, db });
       } finally {
         if (control !== db) await control.close();
       }
@@ -221,8 +228,9 @@ export async function restoreTo(backup: Dump, target: string): Promise<{ where: 
   }
 }
 
-// The log's root services (docs/kernel-packs.md, "Root services"), called only by the packs packs/roots.json names
-// for each (the backup pack): values in, values out, never a handle on the database.
+// The log's root service (docs/kernel-packs.md, "Root services"), called only by the packs packs/roots.json names
+// for it (the backup pack): values in, values out, never a handle on the database. root.merge, which writes the rows of
+// a backup into a map, is the write root's (src/backup-merge.ts).
 
 /**
  * root.dump: a workspace's backup and its vault's, for a server duty that walks every workspace. The workspace is held
@@ -242,79 +250,6 @@ export async function dumpOf(call: RootCall, input: { workspace: string; name: s
     release();
     if (!wasOpen) await ws.closeIfUnused(input.workspace).catch(() => false);
   }
-}
-
-/** What merging a backup did to the map's rows, or would do: the backup pack makes its report from it. */
-export interface Merged {
-  from: { id: string; name: string };
-  taken: string;
-  /** Each item of the file, newest first, and what becomes of it here. */
-  plan: { title: string; what: 'added' | 'updated' | 'kept_newer_here' | 'same' }[];
-  relations: { added: boolean }[];
-  proposals: { added: boolean }[];
-  /** The positions its events took in this map's activity stream. */
-  events: number[];
-  owner_set: boolean;
-  open_sessions: number;
-  holds: number;
-}
-
-class Preview extends Error {}
-
-/**
- * root.merge: a dump merged into the map that asks, matching rows by id. Nothing is deleted. An entity on both sides
- * keeps whichever was edited later, as a whole. A relation ended on either side is ended; a proposal decided on either
- * side is decided. Events the map does not have are added after its own, keeping their times. Tokens and settings stay
- * as they are here, except that a map with no owner takes the file's. Sessions still open in the file (of
- * `session_types`), and what they hold, are left out. Without `apply` it changes nothing. The map is the whole one.
- */
-export async function mergeOf(call: RootCall, input: { dump: Dump; session_types?: string[]; apply?: boolean }): Promise<Merged> {
-  const l = call.map;
-  if (!l || l.viewer !== undefined) throw new Error('root.merge writes the whole map: call it from the whole map, not one person’s view');
-  const { db, workspace } = l;
-  const backup = await db.transaction((tx) => opened(tx, input.dump, Boolean(input.apply)));
-  const here = (rows: Record<string, unknown>[] = []) => rows.map((row) => ({ ...row, workspace }));
-  const openSession = (e: Record<string, unknown>) => Boolean(input.session_types?.includes(e.type as string) && e.is_open);
-  const all = backup.tables.entity ?? [];
-  const entities = JSON.stringify(here(all.filter((e) => !openSession(e))));
-  const held = (r: Record<string, unknown>) => r.type === 'holds' && r.valid_to == null;
-  const relations = backup.tables.relation ?? [];
-  const me = backup.tables.setting?.find((s) => s.key === 'me')?.value ?? null;
-  let merged!: Merged;
-  try {
-    await db.transaction(async (tx) => {
-      const { rows: plan } = await tx.query<Merged['plan'][number]>(
-        `select i.title, case when e.id is null then 'added' when i.updated_at > e.updated_at then 'updated' when e.updated_at > i.updated_at then 'kept_newer_here' else 'same' end as what
-         from jsonb_populate_recordset(null::entity, $1::jsonb) i left join entity e on e.id = i.id order by i.updated_at desc`,
-        [entities],
-      );
-      const rels = await restoreRows(tx, entities, JSON.stringify(here(relations.filter((r) => !held(r)))));
-      await regatherAll(tx, ['part_of']);
-      await projectAgain(tx, l.registry);
-      await recountBytes(tx);
-      const { rows: props } = await tx.query<{ added: boolean }>(
-        `insert into proposal select * from jsonb_populate_recordset(null::proposal, $1::jsonb)
-         on conflict (id) do update set status = excluded.status, decided_by = excluded.decided_by, decided_at = excluded.decided_at, note = excluded.note
-         where proposal.status = 'pending' and excluded.status <> 'pending'
-         returning (xmax = 0) as added`,
-        [JSON.stringify(here(backup.tables.proposal))],
-      );
-      // Its events go in the activity stream, after this map's own (src/activity.ts): each once.
-      const events = await bringIn(tx, workspace, [], backup.tables.event ?? []);
-      // The file's owner, if this map has none and the person is on it: read by the id, as only an id names an item.
-      const { rows: owner } = await tx.query(
-        `insert into setting (key, value) select 'me', $1::jsonb where exists (select 1 from entity where id = $2) on conflict (key) do nothing returning key`,
-        [JSON.stringify(me), typeof me === 'string' ? me : null],
-      );
-      merged = { from: backup.workspace, taken: backup.taken, plan, relations: rels, proposals: props, events, owner_set: owner.length > 0, open_sessions: all.filter(openSession).length, holds: relations.filter(held).length };
-      // Looking only: undo all of it.
-      if (!input.apply) throw new Preview();
-    });
-  } catch (err) {
-    if (!(err instanceof Preview)) throw err;
-  }
-  if (input.apply) await analyzeDue(db);
-  return merged;
 }
 
 // Run as `node src/backup.ts restore ...` too, through the shim the wave leaves there.

@@ -30,7 +30,7 @@ export async function openPg(url: string, prepare: (db: Database) => Promise<unk
       try {
         await client.query('begin');
         const done = await fn({ query: <R>(sql: string, params?: unknown[]) => rowsOf<R>(client, sql, params) });
-        await client.query('commit');
+        await client.query('commit transaction');
         return done;
       } catch (err) {
         await client.query('rollback').catch(() => {});
