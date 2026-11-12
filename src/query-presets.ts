@@ -1,12 +1,14 @@
 // Standing views a pack declares as data (a view with `lens` in its pack.json), each answered by its own read, in
 // the form it has always had: the flat lens (src/query-flat.ts), the graph (src/view-graph.ts), the tree
-// (src/view-tree.ts), the hubs, attention and the brief.
+// (src/view-tree.ts), the hubs, attention and the brief. Any other answer is the service answer.<name> a pack provides
+// (src/services.ts), asked with the view's params and answering for itself.
 
 import { attention, type Input } from './attention.ts';
 import { brief, briefRead } from './brief.ts';
 import type { LENS_ANSWERS, ViewDef } from './declared.ts';
 import type { FrontierInput } from './frontier.ts';
 import { HUB_AT, hubs } from './query-kept.ts';
+import { callService } from './services.ts';
 import { flatRead } from './query-flat.ts';
 import type { Archipelago } from './pelago.ts';
 import { graph } from './view-graph.ts';
@@ -43,7 +45,9 @@ const READINGS: Record<(typeof LENS_ANSWERS)[number], Reading> = {
   frontier: frontierOf,
 };
 
-/** Answer a standing view a pack declares as data: read as its answer says. */
+/** Answer a standing view a pack declares as data: read as its answer says, by the kernel or by the pack that provides it. */
 export function answerPreset(l: Archipelago, def: ViewDef, params: Record<string, unknown>): Promise<unknown> {
-  return READINGS[(def.answer ?? 'flat') as keyof typeof READINGS](l, def, params);
+  const answer = def.answer ?? 'flat';
+  if (Object.hasOwn(READINGS, answer)) return READINGS[answer as keyof typeof READINGS](l, def, params);
+  return callService(l.registry, `answer.${answer}`, { ...params, ...(def.lens && { lens: def.lens }) });
 }

@@ -458,6 +458,12 @@ create policy member_setting_read on setting for select to pelago_member
   using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish', 'agent_code', 'holds_off'));
 `;
 
+/** Step 45 (src/migrate.ts): a pack's setting members read, kept as member.<key> (src/workspace-tools.ts); reading only. */
+export const SETTING_READ_OPEN = `drop policy if exists member_setting_read on setting;
+create policy member_setting_read on setting for select to pelago_member
+  using (key in ('me', 'default_visibility', 'agent_changes', 'agent_backups', 'agent_publish', 'agent_code', 'holds_off') or key like 'member.%');
+`;
+
 export const AGENT_PUBLISH_READ = `
 drop policy if exists member_setting_read on setting;
 create policy member_setting_read on setting for select to pelago_member
