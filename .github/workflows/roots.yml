@@ -1,0 +1,59 @@
+# The owner's word for a root pack (docs/kernel-packs.md, "The boot stub"). Two checks:
+#
+# - pinned: every root pack's folder hashes to what packs/roots.json pins (node src/boot.ts --check). A change
+#   to a root pack's folder that brings no new hash fails here, as the server would refuse to start on it.
+# - approved: a pull request that changes packs/roots.json passes only once the repository's owner has
+#   approved its latest commit. A review on an older commit does not count: approve again after a push.
+#
+# Make roots-approved a required check on main, beside pglite and postgres. It runs again on each review, so an
+# approval turns it green without a push.
+
+name: Roots
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  pull_request_review:
+    types: [submitted, dismissed]
+
+concurrency:
+  group: roots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  pinned:
+    name: roots-pinned
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24 # package.json: engines
+      - run: node src/boot.ts --check
+
+  approved:
+    name: roots-approved
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: The owner approved a change to the root list
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          OWNER: ${{ vars.ROOTS_APPROVER || github.repository_owner }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[].filename' | grep -cx 'packs/roots.json' || true)
+          if [ "$changed" = "0" ]; then echo "packs/roots.json is not changed: nothing to approve."; exit 0; fi
+          approved=$(gh api --paginate "repos/$REPO/pulls/$PR/reviews" --jq "[.[] | select(.user.login == \"$OWNER\" and .commit_id == \"$HEAD\")] | last | .state // \"\"")
+          if [ "$approved" = "APPROVED" ]; then echo "$OWNER approved the root list at $HEAD."; exit 0; fi
+          echo "::error file=packs/roots.json::This pull request changes the root packs. It merges once $OWNER approves its latest commit ($HEAD)."
+          exit 1

@@ -36,7 +36,7 @@ function start(): void {
     note(`the pulled copy could not go in place yet (${(err as Error).message}); the server starts on the map it had`);
   }
   note('starting the server');
-  const child = spawn(process.execPath, [join(ROOT, 'src', 'server.ts')], { cwd: ROOT, env: { ...process.env, PELAGO_DEV: '1' }, stdio: ['inherit', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [join(ROOT, 'src', 'boot.ts')], { cwd: ROOT, env: { ...process.env, PELAGO_DEV: '1' }, stdio: ['inherit', 'pipe', 'pipe'] });
   child.stdout.on('data', say);
   child.stderr.on('data', say);
   child.on('exit', (code) => {

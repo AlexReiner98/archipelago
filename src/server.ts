@@ -34,7 +34,7 @@ import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from './auth.ts'; import { firstStart } from './first-start.ts';
 import { notify } from './notify.ts'; import { alertOnCrash } from './alert.ts';
 import { backupAll, parseBackup, parseVault } from './backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from './members.ts'; import { requestWait } from './standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
-import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts';
+import { loadConfig, RESTART_EXIT, startedFrom } from './config.ts'; import { env } from './env.ts'; import type { Booted } from './boot.ts';
 import { SHORT, serveConnect } from './connect.ts'; import { challenge, mcpAddress } from './oauth.ts'; import { itemAddress } from './item-address.ts';
 import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
@@ -87,7 +87,7 @@ class Refused extends Error {
 }
 export { lenient } from './mcp.ts';
 
-export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean; draw?: DrawHostOptions } = {}): Server {
+export function createHttpServer(workspaces: Workspaces, port: number, options: { auth?: 'off' | 'tokens'; publicHosts?: string[]; sites?: Record<string, string>; limits?: { open?: Limit; deliveries?: Limit; refused?: Limit; token?: Limit; signIn?: Limit }; proxies?: string; leading?: () => boolean; unsandboxed?: boolean; draw?: DrawHostOptions; roots?: Record<string, string> } = {}): Server {
   // The names this server answers to. A request for any other host is refused,
   // which is what stops another web page from reaching it through the browser.
   // The server's own Chrome may reach it by another name, from a container beside it (src/looks.ts).
@@ -105,7 +105,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token); setBounced(async (email) => hasBounced((await workspaces.get(DEFAULT_WORKSPACE)).pelago.db, email)); // a bounced address is sent nothing (src/bounces.ts)
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
-  const running = { commit: startedFrom(), started: new Date().toISOString() }; configureHookTool(serverPacks, running);
+  const running = { commit: startedFrom(), started: new Date().toISOString(), roots: options.roots }; configureHookTool(serverPacks, running);
 
   // What answers without a token is counted by address: the public pages and the setup script, and GitHub's deliveries.
   const open = limiter(options.limits?.open ?? PUBLIC_LIMIT);
@@ -384,7 +384,12 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   });
 }
 
+// Started through the boot stub (src/boot.ts), which checks and starts the root packs first; run directly, this goes through it too.
 if (import.meta.main) {
+  try { serve(await (await import('./boot.ts')).boot()); } catch (err) { console.error((err as Error).message); process.exit(1); }
+}
+
+export function serve(booted: Booted): void {
   const config = loadConfig();
   const rootDir = join(config.dataDir, '..', 'workspaces');
   // Before anything reads a secret: where the key they are sealed with is kept.
@@ -417,7 +422,7 @@ If that process is not a pelago server, delete ${lock}.`);
   // Drawings with one wall, the worker: for a browser that loads no sandboxed frame. A dev server with no tokens only.
   const unsandboxed = config.dev && config.auth !== 'tokens' && env('UNSANDBOXED') === '1';
   if (unsandboxed) console.log('unsandboxed: drawing frames share the page’s origin (PELAGO_UNSANDBOXED=1)');
-  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, proxies: config.trustedProxies, leading: () => leader?.leading ?? false, unsandboxed, draw: { host: config.drawHost, loopback: config.dev } });
+  const server = createHttpServer(workspaces, config.port, { auth: config.auth, publicHosts: config.publicHosts, sites: config.sites, proxies: config.trustedProxies, leading: () => leader?.leading ?? false, unsandboxed, draw: { host: config.drawHost, loopback: config.dev }, roots: booted.hashes });
   // The port is taken before any database is opened: a second server started
   // by mistake must fail here, never open data another server is writing.
   server.on('error', (err: NodeJS.ErrnoException) => {
@@ -427,6 +432,7 @@ If that process is not a pelago server, delete ${lock}.`);
   server.listen(config.port, config.host, async () => {
     writeFileSync(lock, me);
     const main = await workspaces.get(DEFAULT_WORKSPACE);
+    await booted.started(await workspaces.control(), startedFrom()).catch((err) => console.error(`recording the root packs: ${(err as Error).message}`)); // on the control log, each start
     console.log(`pelago listening on http://${config.host}:${config.port}  (MCP at /mcp)`);
     if (config.publicHosts.length) console.log(`answering to: ${config.publicHosts.join(', ')}${config.drawHost ? `, and drawings at ${config.drawHost}` : ''}`);
     if (config.trustedProxies) console.log(`proxies trusted for a caller's address: private networks, ${config.trustedProxies}`);
@@ -464,6 +470,7 @@ If that process is not a pelago server, delete ${lock}.`);
     await drained(server, config.dev ? 1_000 : undefined); // the requests in hand answered before their databases close (src/drain.ts)
     await stopCounts();
     await workspaces.closeAll();
+    await booted.stop(); // the root packs, in reverse order
     rmSync(lock, { force: true });
     process.exit(code);
   };
