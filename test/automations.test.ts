@@ -8,6 +8,7 @@ import { callTool } from '../src/tools.ts';
 import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
 import { human, agent, fresh, make } from './map.ts';
+import { searchMap } from '../src/search.ts';
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
@@ -232,7 +233,7 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   assert.deepEqual([old.status, old.body.length, old.props.priority, old.props.due], ['todo', 500, 'urgent', undefined], 'long text comes back whole');
   assert.equal((await l.entity(base.p))!.archived_at, null, 'the archived aim is restored');
   assert.deepEqual((await l.get(base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
-  assert.deepEqual((await l.search({ type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
+  assert.deepEqual((await searchMap(l, { type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
 
   await assert.rejects(undo(l, human, { changeset: set }), /already been undone/);
   await assert.rejects(undo(l, human, { changeset: 'c_nope' }), /No change set/);

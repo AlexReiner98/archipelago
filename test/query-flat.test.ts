@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import { flatRead } from '../src/query-flat.ts';
 import { callTool } from '../src/tools.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { searchMap } from '../src/search.ts';
 
 const titles = (answer: { items: { title: string }[] }) => answer.items.map((i) => i.title).sort();
 
@@ -211,7 +212,7 @@ test('a word with two letters swapped finds what it was meant to', async () => {
   const { l } = await chain();
   assert.deepEqual(titles(await flatRead(l, { filter: { find: ['text qurey bar'] } })), ['Query bar']);
   assert.deepEqual(titles(await flatRead(l, { filter: { find: ['text qurey'] } })), ['Query bar']);
-  assert.deepEqual((await l.search({ q: 'qurey' })).map((e) => e.title), ['Query bar']);
+  assert.deepEqual((await searchMap(l, { q: 'qurey' })).map((e) => e.title), ['Query bar']);
 });
 
 test('Not takes away what it says, an item named by id too; the default hides nothing named', async () => {

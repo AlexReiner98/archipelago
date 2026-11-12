@@ -13,6 +13,7 @@ import { createToken, verifyToken } from '../src/auth.ts';
 import { putPicture } from '../src/pictures.ts';
 import { callTool } from '../src/tools.ts';
 import type { Archipelago } from '../src/pelago.ts';
+import { checkConnections } from '../src/check-connections.ts';
 
 const DAY = 86_400_000;
 const facts = async (l: Archipelago, stream: OpStream) => (await readOps(l.db, stream)).flatMap((e) => e.facts.map((f) => [e.rule, ...f]));
@@ -35,7 +36,7 @@ test('each operational write lands in its stream, at once, with the light header
   await l.operational(n, { reach: { private_to: null, visibility: 'shared' } });
   await l.claim(agent, { resource: res, holder: task, reason: 'mine' });
   await l.release(agent, { resource: res, reason: 'done' });
-  await l.checkConnections(human);
+  await checkConnections(l, human);
   await l.setSecret('model_key', 'sk-test');
   await callTool(l, { ...human, admin: true }, 'workspace_set', { default_visibility: 'shared' });
   await putPicture(l, human, { result: drawn, data: Buffer.from('png').toString('base64'), content_type: 'image/png' });

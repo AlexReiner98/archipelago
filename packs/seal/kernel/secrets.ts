@@ -21,6 +21,8 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { env } from '../../../src/env.ts';
+import type { Q } from '../../../src/db.ts';
+import type { OpFact } from '../../../src/streams.ts';
 
 const MARK = 'sealed:v1:';
 let dir: string | null = null;
@@ -110,4 +112,33 @@ export function unseal(stored: string | undefined | null): string | undefined {
     }
   }
   return undefined;
+}
+
+/**
+ * Where a map keeps its settings, as a secret among them is read and written: the map hands itself (the write root's
+ * Archipelago, whose `secret` and `setSecret` are these). The seal keeps what a secret is; the map keeps the row.
+ */
+export interface SecretSettings {
+  db: Pick<Q, 'query'>;
+  setting<T>(key: string): Promise<T | undefined>;
+  record(stream: 'settings', actor: string, facts: OpFact[]): Promise<unknown>;
+}
+
+/**
+ * A setting that is a secret the server has to use (a key, a signing secret): stored sealed, so the database and its
+ * backups do not hold it. One stored before secrets were sealed is sealed the first time it is read. One that cannot
+ * be opened here reads as not set.
+ */
+export async function readSecret(map: SecretSettings, key: string): Promise<string | undefined> {
+  const stored = await map.setting<string>(key);
+  if (typeof stored !== 'string' || !stored) return undefined;
+  if (!isSealed(stored)) await writeSecret(map, key, stored);
+  return unseal(stored);
+}
+
+/** Keep a secret sealed in the map's settings, or take it out; the settings stream is told its name only. */
+export async function writeSecret(map: SecretSettings, key: string, value: string | undefined): Promise<void> {
+  if (!value) await map.db.query(`delete from setting where key = $1`, [key]);
+  else await map.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(seal(value))]);
+  await map.record('settings', 'system', [value ? ['+', 'secret', key, true] : ['-', 'secret', key]]); // the name only: the value is the vault's
 }

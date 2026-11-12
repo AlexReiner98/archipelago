@@ -83,7 +83,7 @@ test('the kernel names no surface', () => {
 
 // The sessions' actions, named here until the sessions pack declares them (e_xzwgetrg): the kernel switches on none.
 const NAMES_SESSION_ACTS: Owed = {
-  'src/scope.ts': [3, SESSIONS], 'src/session-hook.ts': [1, SESSIONS], 'src/tool-acts.ts': [1, SESSIONS], 'src/tools.ts': [2, SESSIONS],
+  'src/session-hook.ts': [1, SESSIONS], 'src/tool-acts.ts': [1, SESSIONS],
   'src/views.ts': [1, SESSIONS], 'ui/item.js': [1, VIEWS],
 };
 test("the kernel names no session's action", () => {

@@ -1,5 +1,4 @@
 [
-  "packs/rules/kernel/rule-fillings.ts -> src/reply-rules.ts",
   "src/backup.ts -> src/control-index.ts",
   "src/backup.ts -> src/control.ts",
   "src/backup.ts -> src/eventlog.ts",
@@ -139,7 +138,6 @@
   "src/tool-acts.ts -> src/presence.ts",
   "src/tool-acts.ts -> src/seeing.ts",
   "src/tool-acts.ts -> src/sessions.ts",
-  "src/tool-acts.ts -> src/surface-slots.ts",
   "src/tool-acts.ts -> src/unwait.ts",
   "src/tool-change.ts -> src/close-offer.ts",
   "src/tool-change.ts -> src/plan-note.ts",

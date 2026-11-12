@@ -18,7 +18,7 @@ import { schemaBrief, schemaOf } from '../../../src/schema-brief.ts';
 import { NOW_MS, seeing, seenNow } from '../../../src/seeing.ts';
 import { withStyles } from '../../../src/styles.ts';
 import { LARGE, sizeOf } from '../../../src/head.ts';
-import { props } from './tool-ops.ts';
+import { props } from './tool-ops.ts'; import { searchMap } from './search.ts';
 import type { Tool } from './tools.ts';
 import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
 import { withCovers } from '../../../src/withdraw.ts';
@@ -234,7 +234,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       full: z.boolean().optional().describe('true for every field whole. Left out, an agent is given long fields cut, with their length; get has one item whole.'),
     },
     run: async (l, actor, { full, ...input }) => {
-      const found = await l.search(input);
+      const found = await searchMap(l, input);
       return actor.kind !== 'agent' || full ? found : found.map((row) => ({ ...row, props: Object.fromEntries(Object.entries(row.props).map(([k, v]) => [k, shorter(v, 'get has it')])) }));
     },
   },

@@ -118,6 +118,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => withdraw(l, actor, input),
   },
   session_start: {
+    begins: true,
+    within: { task: 'take it on' },
     description: 'Register this agent session in the map so the human can see it: their page opens it a tab of its own, named by your chat’s title, and closes it when the chat ends (report session_end with reason; a chat that goes quiet for 12 hours is ended for it). Safe to call again on resume: the same session_id takes up the same session. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Its answer names the workspace your token acts in (workspace: id and name): check it is the one you mean before you write. Takes effect at once.',
     input: {
       title: z.string().optional().describe('What your chat is called, as your client shows it; else a few words on what this session is for. Renamed later: report session_update with title.'),
@@ -146,6 +148,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
     },
   },
   session_update: {
+    quiet: (input) => !input.task && !input.note,
+    within: { task: 'take it on' },
     description: 'Report in from a registered session: a note worth keeping, a change to waiting or running, a task you have picked up, or the git branch you moved to. With only the run, it is a heartbeat.',
     input: {
       run: z.string().describe('The run id from session_start, or the session id.'),
@@ -211,6 +215,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => putPicture(l, actor, input),
   },
   session_end: {
+    within: { still_true: 'vouch for it' },
     description:
       'Say a registered session is done, with its outcome and a summary. Everything it held is released. A session a chat keeps stays open until the chat ends. A session that finishes in a repository is first shown that repository\'s open work nobody has changed since it began (answer: ended false, with the list): change what is done or no longer as written, name what you checked and found still true in still_true, name what this session had nothing to do with and cannot check in cannot_tell (cannot_tell_rest: true for all the rest), and call again. What waits on a person’s answer (waits_on), or has a change of its own waiting for the human, is not asked about.',
     input: {
@@ -244,7 +249,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   check_connections: {
     description: 'Ping every connection (external tool) and record whether it is reachable. Work that needs an unreachable connection shows as blocked.',
     input: {},
-    run: async (l, actor) => l.checkConnections(actor),
+    run: slotted('surface.act', 'check_connections'), // what it does is the connect pack's filling (src/check-connections.ts)
   },
   rechecked: {
     description:

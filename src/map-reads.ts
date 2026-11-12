@@ -6,13 +6,7 @@
 
 import type { Archipelago, Proposal } from './pelago.ts';
 import { readEvents, type EventQuery } from './eventlog.ts';
-import { search, type SearchInput } from './search.ts';
-
-/** Search over titles and notes (src/search.ts), the type named checked against the registry first. */
-export async function searchMap(l: Archipelago, input: SearchInput) {
-  if (input.type && !l.registry.type(l.registry.canonical(input.type))) throw new Error(`Unknown type "${input.type}"`);
-  return search(l.db, (type) => l.registry.family(type), input);
-}
+// search is surface's own read (searchMap, src/search.ts), asked there, not through the class.
 
 /** Whether an item is there though the reader may not see it (pelago_item_hidden, src/schema.ts). */
 export async function hidden(l: Archipelago, id: string): Promise<boolean> {

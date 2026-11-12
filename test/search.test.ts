@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import type { Q } from '../src/db.ts';
 import type { Archipelago } from '../src/pelago.ts';
 import { fresh, make } from './map.ts';
+import { searchMap } from '../src/search.ts';
 
 /** Search as it was before the index (to 23 Oct 2026): every row's words read on each call. */
 async function before(db: Q, input: { q: string; type?: string[]; limit?: number }) {
@@ -65,13 +66,13 @@ test('search through the indexes answers as reading every row did, for each view
   for (const [who, view] of viewers)
     for (const q of queries)
       for (const input of [{ q }, { q, limit: 5 }, { q, type: 'task' }]) {
-        const ids = (await view.search(input)).map((e) => e.id);
+        const ids = (await searchMap(view, input)).map((e) => e.id);
         found += ids.length;
         assert.deepEqual(ids, await before(view.db, { ...input, type: input.type ? l.registry.family(input.type) : undefined }), `${who}: ${JSON.stringify(input)}`);
       }
   assert.ok(found > 1000, 'the queries find things');
-  assert.ok(!(await l.as('e_someone').search({ q: 'Bo private' })).some((e) => e.title === 'Bo private roof review'), "Bo's own item is his alone");
-  assert.equal((await l.as(bo).search({ q: 'Bo private' })).length, 1);
+  assert.ok(!(await searchMap(l.as('e_someone'), { q: 'Bo private' })).some((e) => e.title === 'Bo private roof review'), "Bo's own item is his alone");
+  assert.equal((await searchMap(l.as(bo), { q: 'Bo private' })).length, 1);
 });
 
 test('a search whose words are not all in one item finds those with any of them, the most words first', async () => {
@@ -81,8 +82,8 @@ test('a search whose words are not all in one item finds those with any of them,
     { op: 'create', type: 'finding', title: 'Work left unpushed', body: 'Seen when commits are stale.', visibility: 'shared' },
     { op: 'create', type: 'task', title: 'Draw the map', visibility: 'shared' },
   ]);
-  const titles = (await l.search({ q: 'stale map unpushed commits' })).map((e) => e.title);
+  const titles = (await searchMap(l, { q: 'stale map unpushed commits' })).map((e) => e.title);
   assert.deepEqual(titles, ['Work left unpushed', 'The map goes stale outside its sessions', 'Draw the map']);
-  assert.deepEqual((await l.search({ q: 'stale map unpushed commits', type: 'task' })).map((e) => e.title), ['Draw the map']);
-  assert.equal((await l.search({ q: 'zzz qqq' })).length, 0, 'no word found, nothing found');
+  assert.deepEqual((await searchMap(l, { q: 'stale map unpushed commits', type: 'task' })).map((e) => e.title), ['Draw the map']);
+  assert.equal((await searchMap(l, { q: 'zzz qqq' })).length, 0, 'no word found, nothing found');
 });

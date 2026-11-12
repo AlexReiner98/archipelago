@@ -5,6 +5,7 @@
 // returns decisions, with their reasons, tied to what the prompt is about.
 
 import type { Archipelago } from '../../../src/pelago.ts';
+import { searchMap } from '../../../src/search.ts';
 
 /** The links a step from a match walks, and their kinds: what it is part of, about, bears on, or waits for, either way. */
 const STEP = ['part_of', 'about', 'bears_on', 'depends_on'];
@@ -23,7 +24,7 @@ export function askedBy(prompt: unknown): string | undefined {
 /** What the map has settled and left open on what the session was asked. */
 export async function narrowed(l: Archipelago, text: string) {
   // A session is named by its first prompt (src/session-name.ts), so sessions are left out: they would match it best.
-  const matches = (await l.search({ q: text, limit: MATCHES, except: ['run'] })) as { id: string }[];
+  const matches = (await searchMap(l, { q: text, limit: MATCHES, except: ['run'] })) as { id: string }[];
   if (!matches.length) return { settled: [], open: [] };
   const ids = matches.map((m) => m.id);
   const families = l.registry.relationFamily(...STEP);

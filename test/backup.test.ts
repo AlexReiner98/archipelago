@@ -13,6 +13,7 @@ import { sessionEnd, sessionStart } from '../src/sessions.ts';
 import { Workspaces } from '../src/workspaces.ts';
 import { dumpVault } from '../src/vault.ts';
 import { human, agent, fresh, make } from './map.ts';
+import { searchMap } from '../src/search.ts';
 
 test('a backup merges into a map that has moved on: nothing is lost, the later edit wins, and twice is the same as once', async () => {
   const a = await fresh();
@@ -58,7 +59,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   assert.deepEqual([await title(b, made.t), await title(b, made.p)], ['Task, renamed in a', 'Proj, renamed in b'], "each side's edit survives");
   assert.ok((await b.entity(made.u))!.archived_at, 'archived there, archived here');
   assert.deepEqual(((await b.get(made.t)) as any).outgoing, [], 'unlinked there, unlinked here');
-  assert.equal((await b.search({ q: 'Only in b' })).filter((e) => e.title === 'Only in b').length, 1, 'and what b made is still there');
+  assert.equal((await searchMap(b, { q: 'Only in b' })).filter((e) => e.title === 'Only in b').length, 1, 'and what b made is still there');
   assert.equal(await b.entity(session.run), undefined, 'a session still open there stays there');
   assert.equal((await b.proposals()).length, 0);
   assert.ok(((await b.get(made.t)) as any).recent_events.some((e: any) => e.action === 'entity.update'), 'with the history of what changed');
@@ -130,7 +131,7 @@ test('search puts the best match first and forgives a slip of the keys', async (
     { op: 'create', type: 'finding', title: 'Unrelated', body: 'Mentions hosting once, in passing, among many other words about something else entirely.' },
     { op: 'create', type: 'finding', title: 'Nothing to do with it' },
   ]);
-  const titles = async (q: string) => (await l.search({ q })).map((e) => e.title);
+  const titles = async (q: string) => (await searchMap(l, { q })).map((e) => e.title);
   assert.deepEqual(await titles('hosting'), ['Hosting', 'Unrelated'], 'a title match outranks a newer mention in the notes');
   assert.deepEqual(await titles('deployments'), ['Hosting'], 'another form of a word in the notes');
   assert.deepEqual(await titles('roadmp'), ['Roadmap for the garden app'], 'a typo in a title word');
@@ -153,7 +154,7 @@ test('a workspace nobody is using is closed, and opens again with its data', asy
   assert.deepEqual([workspaces.isOpen('acme'), workspaces.isOpen('default')], [false, true]);
 
   const again = await workspaces.get('acme');
-  assert.deepEqual((await again.pelago.search({ type: 'task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
+  assert.deepEqual((await searchMap(again.pelago, { type: 'task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
   const session = await sessionStart(again.pelago, agent, { title: 'Working' });
   assert.deepEqual(await workspaces.closeIdle(0), [], 'a workspace with an open session stays open, so the session can be seen to go quiet');
   await sessionEnd(again.pelago, agent, { run: session.run, outcome: 'finished', summary: 'done' });
