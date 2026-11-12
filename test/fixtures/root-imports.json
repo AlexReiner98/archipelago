@@ -68,6 +68,7 @@
   "src/packreads-kernel.ts -> src/pelago.ts",
   "src/packreads-kernel.ts -> src/places.ts",
   "src/packreads-kernel.ts -> src/region.ts",
+  "src/packreads-kernel.ts -> src/uses.ts",
   "src/packreads-log.ts -> src/places.ts",
   "src/packreads-log.ts -> src/touched.ts",
   "src/packreads-pin.ts -> src/views.ts",

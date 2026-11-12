@@ -1,5 +1,6 @@
 {
  "files": {
+  "packs/agents/kernel/agents.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/attention/kernel/attention.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/automation_triggers/kernel/automation-rules.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/canvas/flow-lines.test.ts": { "pglite": 0, "postgres": 0 },
@@ -20,6 +21,7 @@
   "packs/mentions/kernel/mentions.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/placement/kernel/placement.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/query/kernel/query.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/styles/kernel/styles.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/views/kernel/views.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/waits/kernel/unwait.test.ts": { "pglite": 0, "postgres": 0 },
   "test/activity.test.ts": { "pglite": 4.2, "postgres": 1.7 },
@@ -185,6 +187,7 @@
   "test/structure.test.ts": { "pglite": 2.3, "postgres": 1.8 },
   "test/style-items.test.ts": { "pglite": 8.6, "postgres": 5.9 },
   "test/style-move.test.ts": { "pglite": 0.1, "postgres": 0.1 },
+  "test/styles-css.test.ts": { "pglite": 0, "postgres": 0 },
   "test/surface.test.ts": { "pglite": 7.6, "postgres": 3.8 },
   "test/svg-figure.test.ts": { "pglite": 0, "postgres": 0 },
   "test/sweep.test.ts": { "pglite": 0.2, "postgres": 0.2 },

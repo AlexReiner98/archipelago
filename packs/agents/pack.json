@@ -1,0 +1,11 @@
+{
+  "id": "agents",
+  "version": "0.1.0",
+  "title": "Agents",
+  "description": "What agents are told: the instructions the packs ship under those the map keeps, said where each is for (a session's start, the working rules, a tool, a file); the brief a launched session starts from; and the schema an agent is given unless it asks for more.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
