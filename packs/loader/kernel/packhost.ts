@@ -16,10 +16,21 @@ import { launchHeard, type LaunchAsked } from './pack-launch.ts';
 import { launchesAsked, launchesRefused, type LaunchesAsked } from './pack-action-launch.ts';
 import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
-import { answerRead, type Read } from './packreads.ts';
+import type { Read } from '../../surface/kernel/packreads.ts';
 import { actorId, type Actor, type Archipelago, type Op, type SourceSpec } from '../../../src/pelago.ts';
 // Anyone with no login cannot read the workspace's settings: a public page is counted in the default zone.
 import { DEFAULT_ZONE, zoneOf } from '../../../src/timeaxis.ts';
+
+/**
+ * The slot `loader.reads` (docs/kernel-packs.md, "Slots"): the reads API is surface's (packs/surface/kernel/packreads.ts),
+ * which fills this when it loads, so a sandboxed pack's reads are answered without the loader importing above it.
+ */
+let reads: ((l: Archipelago, read: Read) => Promise<unknown>) | undefined;
+export const fillReads = (answer: (l: Archipelago, read: Read) => Promise<unknown>): void => void (reads = answer);
+const answerRead = async (l: Archipelago, read: Read): Promise<unknown> => {
+  if (!reads) throw new Error('No reads API is loaded: the loader slot loader.reads is filled by surface (src/packreads.ts).');
+  return reads(l, read);
+};
 
 const RUNNER = join(import.meta.dirname, 'pack-runner.ts');
 /** How long a call may take unless its pack says otherwise, and the most it may say. */

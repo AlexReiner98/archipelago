@@ -3,8 +3,8 @@
 // view an answer of a shape it was not made for (task e_exet8395). A pin says the pack, and its version, the SHA-256
 // of its manifest (src/pack-versions.ts), or both.
 
-import { parts } from './manifest.ts';
-import { KERNEL_PACKS } from './packorder.ts';
+import { parts } from '../../loader/kernel/manifest.ts';
+import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
 import { VIEWS } from '../../../src/views.ts';
 
