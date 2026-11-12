@@ -14,6 +14,7 @@ import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../packs/log/kernel/operational.ts';
 import { spacing } from './spacing.ts';
 import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, VENDORED, walk } from './structure-kit.ts';
+import { history, RELEASED, RELEASED_KEY, releasedKey } from './structure-history.ts';
 import { rootImports } from './structure-roots.ts';
 import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
@@ -38,22 +39,32 @@ test('the kernel names no pack', () => {
 
 // A type or link type is named by what it is, not by its pack (decided 27 Oct 2026), so a pack's type is caught by its
 // bare name too. What was counted on that day is words that are also some pack's type name (a capability, a view, a
-// verb's action): no new one may be added. SQL strings count too (`type = 'run'`); run, works_on, notification, about are core's.
-const NAMES_PACK_TYPES: Record<string, number> = {
-  'packs/loader/kernel/altitude.ts': 1, 'packs/loader/kernel/capabilities.ts': 2, 'packs/loader/kernel/declared.ts': 3, 'packs/walls/kernel/look-pass.ts': 1, 'packs/loader/kernel/manifest.ts': 1, 'packs/loader/kernel/outside.ts': 1,
-  'packs/loader/kernel/packhost.ts': 4, 'packs/surface/kernel/packreads.ts': 1, 'packs/loader/kernel/packs.ts': 3, 'packs/loader/kernel/packtools.ts': 3, 'packs/write/kernel/pelago.ts': 2, 'packs/walls/kernel/public-document.ts': 1,
-  'packs/rules/kernel/rules.ts': 1, 'packs/database/kernel/schema.ts': 1, 'packs/surface/kernel/scope.ts': 2, 'packs/surface/kernel/ui-files.ts': 1,
-};
+// verb's action): no new one may be added. SQL strings count too (`type = 'run'`); run, works_on, notification, about are
+// core's. A released schema step's SQL is history and counts nothing (test/structure-history.ts).
+const NAMES_PACK_TYPES: Record<string, number> = {};
 
 // Core's words until 11 Nov 2026 (people and calendar packs, e_wrdg6udh); `event` is also the kernel's for a log event.
 const LEFT_CORE = ['company', 'works_at', 'event'];
+// The kernel's own words that are also some pack's type (the owner, 12 Nov 2026, e_m8arpfew): the rule leaves them out.
+const KERNEL_WORDS: Record<string, string> = {
+  action: "a piece a screen declares, and a pack's call kind (packhost's Call)",
+  settles: 'a capability a type declares (capabilities.ts)',
+  document: "a kernel read, and the piece an item read whole is drawn with",
+  commit: "the watch capability's field a deploy keeps its commit in",
+  project: 'an altitude, one of the four a type stands at (altitude.ts)',
+  requires: "a manifest key (manifest.ts)",
+  release: "the resource verb's action, beside claim (scope.ts)",
+  diagram: 'a module of the page (ui/diagram.js), served by name',
+  note: "the item page's note: its section and the class it wears",
+  file: "an HTML input's type, the page's file chooser",
+};
 
 test("the kernel names no pack's type by its bare name", () => {
   const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
     const m = JSON.parse(read(`packs/${p}/pack.json`)) as { types?: { id?: string }[]; links?: { id: string }[] };
     return [...(m.types ?? []), ...(m.links ?? [])].flatMap((t) => (t.id && !LEFT_CORE.includes(t.id) ? [t.id] : []));
-  }).concat(Object.values(LEFT).flat());
-  const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'));
+  }).concat(Object.values(LEFT).flat()).filter((id) => !Object.hasOwn(KERNEL_WORDS, id));
+  const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'), history);
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
 });
 
@@ -87,11 +98,11 @@ test("the kernel imports no pack's code", () => {
 
 // The kernel reads no kind (the owner, e_w46v6jf9): core's eight are starter types, and what an item is comes from its type
 // (its starter, lineage, capabilities). The kind column is written from the starter, the `kind <k>` term read through the type;
-// left: the database's own fill of the column, a released schema step that is never edited (packs/loader/kernel/head.ts, ITEM_KIND).
-const READS_KINDS: Record<string, number> = { 'packs/loader/kernel/head.ts': 1 };
+// the database's own fill of the column is a released schema step (step 15, ITEM_KIND), history that counts nothing.
+const READS_KINDS: Record<string, number> = {};
 const KIND_READ = /\bkindsOf\b|\.kinds\(\)|\b(?:type|get)\([^)]*\)\??\.kind\b|\b(?:type|def|parent|resolved|item|entity)\??\.kind\b|\bkind\s*(?:[!=]==?|<>)\s*['"](?:actor|aim|work|question|record|occurrence|place|system)['"]|\be\.kind\s*(?:=|<>|!=)\s|def->>'kind'/g;
 test('the kernel reads no kind', () => {
-  assert.deepEqual(ratchet(count(kernelFiles, KIND_READ), READS_KINDS), [], "Read the type: its starter, its lineage (registry.isA) or a capability it declares, never an item's kind.");
+  assert.deepEqual(ratchet(count(kernelFiles, KIND_READ, history), READS_KINDS), [], "Read the type: its starter, its lineage (registry.isA) or a capability it declares, never an item's kind.");
 });
 
 // 3. Writes to items and relations go through the write path (packs/write/kernel/pelago.ts, its apply loop in packs/write/kernel/change-apply.ts):
@@ -342,10 +353,8 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // links, log or queue with nothing to bound it reads them all: each is bounded by an id or a set of them, a subtree
 // (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
 // (`-- index <name>`), one the schema makes (packs/database/kernel/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
-const WHOLE_READS: Record<string, number> = {
-  'packs/database/kernel/mentions.ts': 1,
-  'packs/surface/kernel/search.ts': 1,
-};
+// A released schema step's SQL is history and counts nothing (mentions' fill in step 25, search's index in step 17).
+const WHOLE_READS: Record<string, number> = {};
 
 /** The tables that grow with the map. */
 const GROWS = /\b(?:from|join)\s+(?:entity|relation|event|log_entry|log_fact|log_op|proposal)\b(?!\s*\()/i;
@@ -358,7 +367,7 @@ test('no read of the whole map', () => {
   const files = srcCode.filter((f) => f !== 'packs/database/kernel/read-indexes.ts');
   const named = files.flatMap((f) => queries(read(f)).flatMap((q) => [...q.matchAll(/--\s*index\s+([a-z_, ]+)/g)].flatMap((m) => m[1].split(',').map((n) => n.trim()).filter(Boolean)))).filter((name) => !indexes.has(name));
   assert.deepEqual(named, [], 'A read names an index the schema makes.');
-  const counted = Object.fromEntries(files.map((f) => [f, queries(read(f)).filter((q) => !BOUND.test(q)).length]).filter(([, n]) => (n as number) > 0));
+  const counted = Object.fromEntries(files.map((f) => [f, queries(history(f)).filter((q) => !BOUND.test(q)).length]).filter(([, n]) => (n as number) > 0));
   assert.deepEqual(ratchet(counted, WHOLE_READS), [], 'Bound the read: by an id, a subtree (part_closure), a person, a time or a limit; or name the index it goes by (-- index <name>).');
 });
 
@@ -477,6 +486,8 @@ test("a root pack's code imports only plumbing and the roots before it", () => {
   const owed = new Set(JSON.parse(read('test/fixtures/root-imports.json')) as string[]), added = rootImports().filter((e) => !owed.has(e));
   assert.deepEqual(added, [], 'Open a slot the higher pack fills, or hand the value in (docs/kernel-packs.md, "Slots").');
 });
+// 24. A released schema step is never edited (packs/database/kernel/migrate.ts), so the rules above read its SQL as history.
+test('a released schema step is never edited', async () => assert.equal(await releasedKey(), RELEASED_KEY, `A step at or below ${RELEASED} changed: add a new step instead (test/structure-history.ts).`));
 // 23. A service name is answered as the map that asks it (callAs, packs/loader/kernel/kernel-context.ts): callService ran its provider as the map the names were filled for, and is gone (wave 6); none comes back.
 const CALLS_SERVICE: Record<string, number> = {}, servicePacks = walk('packs').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
 test('a service name is answered as the map that asks it', () => assert.deepEqual(ratchet(count([...kernelFiles, ...servicePacks], /(?<!function )\bcallService\s*[<(]/g), CALLS_SERVICE), [], 'Call it with callAs(l, name, input): its provider reads as the asker, under row-level security.'));

@@ -668,3 +668,13 @@ with no map as a server duty (`serverContext`).
 - The kernel (`src/` and the root packs' code) imports no service pack's code: "the kernel imports no pack's code"
   counts a value import of any pack that is not a root.
 - A ratchet's entries name a module where it lives; when a step brings a count down, it lowers or removes the entry.
+- **As built (12 Nov 2026), the lists are empty**: NAMES_PACK_TYPES, NAMES_SURFACES, NAMES_SESSION_ACTS, READS_KINDS,
+  WHOLE_READS, CALLS_SERVICE and `test/fixtures/root-imports.json`.
+- **The kernel's own words** (e_m8arpfew): "the kernel names no pack's type by its bare name" leaves out
+  `KERNEL_WORDS`, beside `LEFT_CORE`, each with why: action, settles, document, commit, project, requires, release,
+  diagram, note, file. The page says them plainly again (Home's project level, the file chooser, the note's class,
+  the document and figure pieces).
+- **A released schema step is history** (e_2tmdv4p9, `test/structure-history.ts`): the steps at or below `RELEASED`
+  (44, main's latest) are read with their SQL blanked, the constants a root's `steps.ts` names for them and what only
+  they use, so the bare-name, kind and whole-read rules count nothing there. "A released schema step is never edited"
+  pins their hash (`RELEASED_KEY`); a step that reaches main raises both.
