@@ -1,7 +1,8 @@
 // What the structure test reads the code with: the files, by part, and the ratchet each rule keeps.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, posix } from 'node:path';
+import { join } from 'node:path';
+import { kernelCodeOf, packOf, resolve, rootCodeOf, rootPacksOf, valueImports, walkFiles } from '../packs/anatomy_sync/reader.ts';
 
 export const ROOT = join(import.meta.dirname, '..');
 const CODE = /\.(ts|js|mjs|css|html)$/;
@@ -9,13 +10,7 @@ const CODE = /\.(ts|js|mjs|css|html)$/;
 export const VENDORED = ['ui/three.module.min.js'];
 
 /** Every file under a folder, as it is on disk. */
-export const rawWalk = (dir: string): string[] =>
-  !existsSync(join(ROOT, dir))
-    ? []
-    : readdirSync(join(ROOT, dir)).flatMap((name) => {
-        const path = `${dir}/${name}`;
-        return statSync(join(ROOT, path)).isDirectory() ? rawWalk(path) : [path];
-      });
+export const rawWalk = (dir: string): string[] => walkFiles(ROOT, dir);
 /** A file's text as it is on disk. */
 export const raw = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 
@@ -27,24 +22,25 @@ export const raw = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 export const walk = rawWalk;
 /** A file's text. */
 export const read = raw;
+// How a file's pack, imports and their targets are read is the anatomy sync's reader (packs/anatomy_sync/reader.ts),
+// so the structure rules and the map of the code read code alike.
 /** The pack a path is in, if it is under packs/. */
-export const packOfPath = (path: string) => /^packs\/([\w-]+)\//.exec(path)?.[1];
+export const packOfPath = packOf;
 /** A relative import's target, as a path from the repository's root. */
-export const target = (from: string, spec: string) => posix.normalize(posix.join(posix.dirname(from), spec));
+export const target = resolve;
 export const lines = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
 export const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory());
 const manifest = (p: string) => (existsSync(join(ROOT, 'packs', p, 'pack.json')) ? JSON.parse(raw(`packs/${p}/pack.json`)) : {}) as { kernel?: { trust?: string } };
 /** The packs whose manifest says they are root: their code is the kernel's, under every rule the kernel keeps. */
-export const rootPacks = packIds.filter((p) => manifest(p).kernel?.trust === 'root');
+export const rootPacks = rootPacksOf(Object.fromEntries(packIds.map((p) => [p, manifest(p)])));
 /** A root pack's code: every module under its kernel/ but its tests. */
-export const rootCode = rootPacks.flatMap((p) => walk(`packs/${p}/kernel`)).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+export const rootCode = rootCodeOf(rootPacks.flatMap((p) => walk(`packs/${p}/kernel`)), rootPacks);
 /** The kernel's TypeScript: src/, and the root packs' code. */
-export const srcCode = [...walk('src').filter((f) => f.endsWith('.ts')), ...rootCode];
+export const srcCode = kernelCodeOf([...walk('src'), ...rootCode], rootPacks);
 export const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
-const VALUE_IMPORT = /(?:^|;)[ \t]*(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+['"`]([^'"`]+)['"`]|\bimport\s*\(\s*['"`]([^'"`]+)['"`]/gm;
-/** How many value imports of a file name a pack that is not a root (a service pack's code, or a plain pack's). */
-export const serviceImports = (f: string) => [...read(f).matchAll(VALUE_IMPORT)].filter((m) => {
-  const spec = m[1] ?? m[2], pack = spec.startsWith('.') ? packOfPath(target(f, spec)) : undefined;
+/** How many value imports of a file (static, re-exported or dynamic) name a pack that is not a root (a service pack's code, or a plain pack's). */
+export const serviceImports = (f: string) => valueImports(read(f), f).filter(({ kind, to }) => {
+  const pack = kind !== 'bare' && kind !== 'require' && to ? packOfPath(to) : undefined;
   return pack !== undefined && !rootPacks.includes(pack);
 }).length;
 export const kernelFiles = [...walk('src'), ...walk('ui'), ...rootCode].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));

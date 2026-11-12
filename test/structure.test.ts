@@ -12,6 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../packs/log/kernel/operational.ts';
+import { valueImports } from '../packs/anatomy_sync/reader.ts';
 import { spacing } from './spacing.ts';
 import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, VENDORED, walk } from './structure-kit.ts';
 import { history, RELEASED, RELEASED_KEY, releasedKey } from './structure-history.ts';
@@ -171,7 +172,7 @@ test('kernel modules import one way', () => {
   // Each module by its path: a module imports another pack's at `../../<p>/kernel/<m>.ts`.
   const files = srcCode, known = new Set(files), edges = new Map(files.map((f) => [f, [] as string[]]));
   for (const f of files) {
-    for (const [, spec] of read(f).matchAll(/(?:^|;)[ \t]*import\s+(?!type\b)[^;]*?from\s+'(\.{1,2}\/[^']+\.ts)'/gm)) if (known.has(target(f, spec))) edges.get(f)!.push(target(f, spec));
+    for (const { kind, to } of valueImports(read(f), f)) if (kind === 'import' && to && known.has(to)) edges.get(f)!.push(to);
   }
   // Tarjan's strongly connected components: an edge inside one with more than one module is a cycle.
   const index = new Map<string, number>(), low = new Map<string, number>(), stack: string[] = [], on = new Set<string>();
