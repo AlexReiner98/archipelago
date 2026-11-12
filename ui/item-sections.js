@@ -8,7 +8,7 @@ import { choicesOf, empty } from './fields.js';
 import { ago, changeRow, eventLine, label, link, statusesOf, typeTitle } from './words.js';
 import { pageType } from './page-schema.js';
 
-/** Whether the page is a link's, read with no sign-in (ui/base.js marks it): its reader sees the item, not its keeping. */
+/** Whether the page is a link's, read with no sign-in (packs/surface/page/base.js marks it): its reader sees the item, not its keeping. */
 const reader = () => Boolean(document.documentElement.dataset.reader);
 
 /** One section: a heading, a count where it has one, and what it holds. */
@@ -30,7 +30,7 @@ export function headSection(e, owner, setStatus, setVisibility) {
       ['Type', typeTitle(e.type), e.type],
       ['Status', setStatus ? h('select', { class: 'mark-status', title: 'Status', disabled: Boolean(e.archived_at), onchange: (ev) => setStatus(ev.target.value) }, statusesOf(e.type).map((st) => h('option', { value: st, selected: st === e.status }, st))) : e.status],
       type?.columns?.owner && ['Owner', owner ? link(owner) : none()],
-      // Who may see it is a pick, made at once; a link's reader is not told how the map is kept (ui/base.js, link).
+      // Who may see it is a pick, made at once; a link's reader is not told how the map is kept (packs/surface/page/base.js, link).
       !reader() && ['Visibility', !setVisibility || e.archived_at || !['private', 'shared'].includes(seen) ? seen : h('select', { class: 'field-pick', title: 'Who can see it', onchange: (ev) => setVisibility(ev.target.value) }, ['private', 'shared'].map((v) => h('option', { value: v, selected: v === seen }, v)))],
       !reader() && type?.columns?.confidence && ['Confidence', String(e.confidence)],
       ['Created', ago(e.created_at)],

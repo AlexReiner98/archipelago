@@ -13,7 +13,7 @@ import { sessionHue } from './words.js';
 // canvas it opens on is worked out from the log (the facts since, and every fact said of what is drawn up to then,
 // folded by the projector into what it was: packs/log/kernel/tail.ts) and traced until seen, as a change that comes while the page
 // is open is. Play takes the canvas back to where the person left it and replays the log from there through its
-// store (ui/replica.js), a step at a time, so each is a scene the transition engine moves into (ui/transition.js):
+// store (packs/surface/page/replica.js), a step at a time, so each is a scene the transition engine moves into (ui/transition.js):
 // chapters by who made them, each played island by island. Every time and count is the style's (`catch_up_*`).
 // What left the canvas while it was closed is not among what it holds, and so is not played.
 
@@ -46,7 +46,7 @@ let tried = false;
 
 /**
  * Catch a canvas up (ui/canvas.js, the first it draws on a page): what changed on its view since the person last
- * looked is traced, and offered to play. The view's rows are in the page's one store (ui/replica.js).
+ * looked is traced, and offered to play. The view's rows are in the page's one store (packs/surface/page/replica.js).
  */
 export async function catchUp(view) {
   if (tried || !view?.store) return;
@@ -105,7 +105,7 @@ function play() {
   if (!o || o.view.store.playing) return;
   const { view, then, steps, from } = o;
   if (!view.listeners.size) return ((offered = null), (bar.hidden = true));
-  // The live beat leaves the store alone while it is played (ui/live.js); it catches up from where the play ends.
+  // The live beat leaves the store alone while it is played (packs/surface/page/live.js); it catches up from where the play ends.
   view.store.playing = true;
   rewind(view, then, from, steps);
   o.played = 0;

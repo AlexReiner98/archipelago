@@ -277,7 +277,7 @@ function draw(d) {
 }
 
 // A public page carries its data (src/published-page.ts); a signed-in reader's page fetches it, and
-// start the frame drawings run in while it is on its way (ui/layout.js).
+// start the frame drawings run in while it is on its way (packs/walls/page/layout.js).
 const given = document.getElementById('page-data');
 if (!given) warmLayouts();
 (given

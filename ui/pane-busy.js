@@ -1,7 +1,7 @@
 // Whether the reader is busy in a pane of the tab in sight (ui/panes.js), so that what an agent shows passes it by
 // (ui/pane-route.js): a press, a scroll, a wheel or a key in that pane within the last while, text selected there, or,
 // for the pane in focus, words typed into the sheet over it and not yet saved. Moving the pointer is watching, not working, and a
-// dial, a tick or a pick is not unsaved work (ui/live.js). A tab popped out into a window (ui/tab-bar.js) keeps when it
+// dial, a tick or a pick is not unsaved work (packs/surface/page/live.js). A tab popped out into a window (ui/tab-bar.js) keeps when it
 // was last worked in, for the main page to read; and the main page keeps the windows it popped out, so an agent's next
 // step can go to one.
 

@@ -1,8 +1,8 @@
 // The page as a replica of the log: the projector the page runs (packs/log/kernel/project.ts, as the server serves it, its types
 // stripped) makes the same rows from the log as the server's tables hold, row for row; the server reads the facts
 // after a position only on what the caller holds and the islands it follows, as the viewer may see them; and the
-// page's one store (ui/replica.js), shared by every view, folds an agent's change in once, tells every view holding
-// what changed, and tells a view whose query may find something else to ask the server again (ui/membership.js).
+// page's one store (packs/surface/page/replica.js), shared by every view, folds an agent's change in once, tells every view holding
+// what changed, and tells a view whose query may find something else to ask the server again (packs/surface/page/membership.js).
 
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -32,7 +32,7 @@ async function pageModules() {
   };
 }
 
-/** What the page's projector and views ask of the types, as ui/live.js answers it from the schema. */
+/** What the page's projector and views ask of the types, as packs/surface/page/live.js answers it from the schema. */
 const kindsOf = (l: Archipelago) => ({
   ...l.registry,
   isOpen: (t: string, s: string) => l.registry.isOpen(t, s),

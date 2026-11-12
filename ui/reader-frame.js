@@ -1,4 +1,4 @@
-// A document as its reader meets it, in a frame on the canvas: the `reader` mark a drawing may make (ui/marks.js), as
+// A document as its reader meets it, in a frame on the canvas: the `reader` mark a drawing may make (packs/walls/page/marks.js), as
 // the pages drawing does. Its draft is the preview, what publishing it would give now (/preview/<id>); its published
 // page is what visitors read (/p/<workspace>/<id>); one that cannot be published (a private one, or any item that is
 // not a document, read by its note) is read as the person looking sees it (/read/<id>). Each is drawn by the reader itself (ui/doc.js), so it reads and

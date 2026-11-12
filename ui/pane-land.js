@@ -1,4 +1,4 @@
-// Where an agent's step lands on the owner's page (ui/live.js): ui/pane-route.js works it out from whom each tab
+// Where an agent's step lands on the owner's page (packs/surface/page/live.js): ui/pane-route.js works it out from whom each tab
 // follows, whose each pane is and where the reader is busy (ui/pane-busy.js), and this does it: a pane of the tab in
 // sight drawn again or split, a tab brought into sight, a tab in the background given the step and marked (decision
 // e_xjrpyysn), a tab of its own opened, or the window a tab was popped out into moved. A pane a session's step lands in

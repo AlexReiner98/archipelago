@@ -2,7 +2,7 @@
 // worker (decision e_xeqhcums), so nothing it sends is trusted: it says what is on its screen in a small vocabulary of
 // marks, and the host alone makes them into the page (ui/part-render.js), under the workspace's style.
 //
-// A mark is [kind, attributes, ...what is in it], as a drawing's is (ui/marks.js); the attributes may be left out
+// A mark is [kind, attributes, ...what is in it], as a drawing's is (packs/walls/page/marks.js); the attributes may be left out
 // (['text', 'Hello']). Seven kinds, nothing richer:
 //   box     a group of marks, in a row or a column
 //   text    words

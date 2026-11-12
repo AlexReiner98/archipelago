@@ -69,7 +69,7 @@ export const mark = (here) => current?.mark(here);
 /**
  * Read every canvas's lens again, each drawn again only if its answer differs: after something made here, which a lens
  * may now reach. When the map only changed under the page (`tail`), a canvas held in a store is already kept current by
- * the facts (ui/replica.js), and is not read again.
+ * the facts (packs/surface/page/replica.js), and is not read again.
  */
 export const refreshCanvas = (tail = false) => all.forEach((c) => c.refresh(tail));
 /**
@@ -218,7 +218,7 @@ const keepLoose = () => {
 };
 /** Follow an item just started, loose: when a change ties it (its own, or an agent's once approved), it is the focus. */
 export const followLoose = (id) => id && (loose.add(id), keepLoose());
-// The pulse says which items changes touched (ui/live.js): one of these, now tied, becomes the focus of the pane in focus.
+// The pulse says which items changes touched (packs/surface/page/live.js): one of these, now tied, becomes the focus of the pane in focus.
 hooks.sessionsTold = refreshSessions;
 hooks.touched = async (touched) => {
   const ids = touched?.ids === null ? [...loose] : (touched?.ids ?? []).filter((id) => loose.has(id));

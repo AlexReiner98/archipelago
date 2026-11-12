@@ -1,6 +1,6 @@
 // ---- what a view's query reads, and whether a fact may change what it finds -----------------------------------
 //
-// The page's one store (ui/replica.js) brings every fact to the items it holds, but which items a view shows is the
+// The page's one store (packs/surface/page/replica.js) brings every fact to the items it holds, but which items a view shows is the
 // server's to judge (the owner, 5 Nov 2026, e_5cdm9bfg): the page never runs a query itself. What it does know is
 // what a query reads: the fields its terms name, the links it walks, the items it is anchored on, the islands it
 // looks at. A fact that touches one of those may change the answer, and the view asks the server for it again; any

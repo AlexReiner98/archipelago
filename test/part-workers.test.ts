@@ -1,4 +1,4 @@
-// The walls a pack version's parts run behind (the foot of ui/draw-marks.js, partInside in ui/draw-inside.js, partPort in ui/layout.js), in a real
+// The walls a pack version's parts run behind (the foot of packs/walls/page/draw-marks.js, partInside in packs/walls/page/draw-inside.js, partPort in packs/walls/page/layout.js), in a real
 // browser (skipped where there is no Chrome): one worker for each version, reached by the port the frame hands the
 // page; a part reaches nothing of the page and nothing on the network, cannot see another version, and is stopped
 // when it stops answering. What a drawing may not do is test/layouts.test.ts.

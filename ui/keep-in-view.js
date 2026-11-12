@@ -1,7 +1,7 @@
 // What a person makes on the canvas stays in sight, and the canvas stays the one they had (the owner, 10 Nov 2026):
 // its query is kept as it was, and only what it would not find is added to it, a term each (an item by its id, a new
 // island by `island <id>`), as a click adds to the filter. Whether the query finds it is the server's to judge (the
-// page never runs a query, ui/membership.js): it is asked once, and the canvas read again either way.
+// page never runs a query, packs/surface/page/membership.js): it is asked once, and the canvas read again either way.
 
 import { api } from './base.js';
 import { goQuery, queryNow, refreshCanvas } from './canvas.js';

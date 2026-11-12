@@ -4,7 +4,7 @@
 // e_mzer5m4t, e_q3amet26, e_ezb7s3a7, e_xjrpyysn). A chat has a tab of its own once it shows something, named by its
 // title and closed as it goes quiet or ends (ui/tab-life.js; the design e_p6fr4uye); the owner's own tabs follow nobody unless they
 // set one to follow a chat (e_jk6bnuh9):
-// - Only a show lands (ui/live.js sends no other). A change or a beat of a session's story moves nothing (the owner,
+// - Only a show lands (packs/surface/page/live.js sends no other). A change or a beat of a session's story moves nothing (the owner,
 //   29 Oct 2026, e_e7yfp2yg): with several sessions at work, the reader's canvas stays where they left it.
 // - A session working inside what a tab watches (a plan the owner approved: its tasks or what holds them, `within`) is
 //   drawn on that plan and its shows go to the one pane beside it that the plan's sessions share (`shown`), never to a

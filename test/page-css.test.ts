@@ -1,4 +1,4 @@
-// A style's page_css (packs/walls/kernel/css-check.ts): checked when it is written by the rules the page reads it by (ui/marks.js,
+// A style's page_css (packs/walls/kernel/css-check.ts): checked when it is written by the rules the page reads it by (packs/walls/page/marks.js,
 // checkedCss, imports the same file), refused there with what is wrong; and a published page keeps the look it was
 // published in until it is published again (packs/publish/kernel/published.ts, packs/styles/kernel/styles.ts pageLook).
 
@@ -25,7 +25,7 @@ test('a sheet is refused for what could fetch or reach out of where it is read, 
 });
 
 test('the page checks a sheet by the same file the server does', async () => {
-  const marks = await readFile(join(import.meta.dirname, '..', 'ui', 'marks.js'), 'utf8');
+  const marks = await readFile(join(import.meta.dirname, '..', 'packs', 'walls', 'page', 'marks.js'), 'utf8');
   assert.match(marks, /import \{ cssProblem, uncommented \} from '\.\/css-check\.js'/);
   const { base } = await serve('off');
   const served = await (await fetch(`${base}/css-check.js`)).text();

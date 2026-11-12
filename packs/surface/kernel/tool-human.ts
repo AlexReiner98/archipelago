@@ -11,6 +11,7 @@ import { bypassingRls } from '../../identity/kernel/outbox.ts';
 import type { TypeDef } from '../../loader/kernel/packs.ts';
 import { actorId } from '../../write/kernel/pelago.ts';
 import { whose } from './tool-change.ts';
+import { UI_DIRS } from './ui-files.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -19,8 +20,7 @@ import { typeItemsIn, typesTaken } from '../../loader/kernel/type-items.ts';
 import { movesAgain, syncTypes } from '../../loader/kernel/typetable.ts';
 
 /** Moves when any file of the web UI is saved (the projector it runs too), so an open page knows to load itself again. */
-const UI_DIR = join(import.meta.dirname, '..', '..', '..', 'ui');
-const uiStamp = () => Math.max(...readdirSync(UI_DIR).map((file) => statSync(join(UI_DIR, file)).mtimeMs), statSync(join(import.meta.dirname, '..', '..', 'log', 'kernel', 'project.ts')).mtimeMs);
+const uiStamp = () => Math.max(...UI_DIRS.flatMap((dir) => readdirSync(dir).map((file) => statSync(join(dir, file)).mtimeMs)), statSync(join(import.meta.dirname, '..', '..', 'log', 'kernel', 'project.ts')).mtimeMs);
 
 export const HUMAN_TOOLS: Record<string, Tool> = {
   tail: {

@@ -67,7 +67,7 @@ export const frameSandbox = () => (document.documentElement.dataset.drawSandbox 
 // At the drawing host the page was marked with (packs/walls/kernel/draw-host.ts), the frame keeps that host's origin, so it may keep a service
 // worker; never at the page's own, where an origin would be the page's: then it has none, as anywhere else.
 export const drawOrigin = () => { const at = document.documentElement.dataset.drawOrigin; return at && at !== location.origin ? at : null; };
-/** The frame every drawing runs in (ui/layout.js): at the drawing host with that host's origin, else at the page's with none. */
+/** The frame every drawing runs in (packs/walls/page/layout.js): at the drawing host with that host's origin, else at the page's with none. */
 export const drawFrame = () => {
   const at = drawOrigin(), walled = frameSandbox();
   return { src: `${at ?? ''}/draw.html`, sandbox: at && walled ? `${walled} allow-same-origin` : walled };
@@ -204,7 +204,7 @@ export function waitingOnSignIn() {
 
 /** The workspace a sign-in's token is of (pel_<workspace>_…), or undefined. */
 export const workspaceOf = (token) => /^pel_([a-z0-9][a-z0-9-]{0,39})_/.exec(token ?? '')?.[1];
-/** Where a link from outside the app (ui/item-link.js) was going when it asked for a sign-in to its workspace: for half an hour. */
+/** Where a link from outside the app (packs/surface/page/item-link.js) was going when it asked for a sign-in to its workspace: for half an hour. */
 const LANDING = 'pelago-link';
 export function keepLanding(ws, hash) {
   try {
@@ -249,7 +249,7 @@ async function answerOf(res) {
 /** A tool called at this address with these headers: its result, or an error saying why not. */
 export const call = async (path, input, headers) => answerOf(await postJson(path, input, headers));
 
-/** A read ui/early.js asked for as the page started, taken once, while the page would still ask it so: its response. */
+/** A read packs/surface/page/early.js asked for as the page started, taken once, while the page would still ask it so: its response. */
 function early(name) {
   const asked = globalThis.pelagoEarly;
   if (!asked?.[name] || asked.token !== store.token) return undefined;
@@ -257,7 +257,7 @@ function early(name) {
   delete asked[name];
   return res;
 }
-/** A tool's answer from the read ui/early.js asked for it (`name`), else from `ask`; one that failed is asked again. */
+/** A tool's answer from the read packs/surface/page/early.js asked for it (`name`), else from `ask`; one that failed is asked again. */
 export const apiFirst = (name, ask) => {
   const res = early(name);
   return res ? res.then(answerOf).catch(ask) : ask();
@@ -432,7 +432,7 @@ export async function showIdentity() {
     const me = await whoami();
     if (me?.auth !== 'tokens') return slot.replaceChildren();
     known.remember(me.workspace);
-    state.workspace = me.workspace; // a token made here names it (ui/workspace-cards.js)
+    state.workspace = me.workspace; // a token made here names it (packs/identity/page/workspace-cards.js)
     // Which workspace this is, where it cannot be missed: under the name at the top, and on the tab.
     // A workspace that has ended says so under its name on every page: until when, and where its backup is.
     const ended = me.actor.kind === 'human' ? await api('workspace_info').then((info) => info.ended, () => null) : null;

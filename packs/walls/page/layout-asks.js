@@ -1,4 +1,4 @@
-// What a drawing asks the page to change (`change` in ui/draw-marks.js, which its gestures use): ops as data, which the
+// What a drawing asks the page to change (`change` in packs/walls/page/draw-marks.js, which its gestures use): ops as data, which the
 // page puts to the person in its own words before anything is sent, and then sends through `change` as theirs
 // (decision e_h7he5guk: a drawing asks in data, the page acts as the person). A drawing never writes unseen: a link is
 // sent once the person has picked what it says (one of the link types that fit, as an item's Link to… reads them),

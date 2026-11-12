@@ -1,4 +1,4 @@
-// What runs in a drawing's worker, around its code: in the frame's dedicated worker (ui/draw-marks.js hands this
+// What runs in a drawing's worker, around its code: in the frame's dedicated worker (packs/walls/page/draw-marks.js hands this
 // function over as its text) and in a service worker the drawing host serves for a pack's own drawing
 // (/drawing/<hash>/sw.js, which imports the drawing and calls inside(null, made)). Not a module: the frame loads no
 // modules, so the server writes this file into the frame's script and into the service worker's (packs/surface/kernel/ui-files.ts).
@@ -78,7 +78,7 @@ function inside(home, given) {
       open: (id) => send({ type: 'open', id: String(id) }),
       // The page's next frame: a drawing that moves is moved in time with the page, and not at all while it is hidden.
       frame: () => new Promise((resolve) => (waiting.push(resolve), send({ type: 'frame?' }))),
-      // A surface, if its scene asked for one (ui/surface.js): a canvas here to paint, shown over its picture frame by
+      // A surface, if its scene asked for one (packs/walls/page/surface.js): a canvas here to paint, shown over its picture frame by
       // frame (show), its size as it changes, the page's colours and three.js. Null where there is none.
       surface: () => (surface ??= new Promise((resolve) => ((gotSurface = resolve), send({ type: 'surface?' })))),
     };
@@ -171,7 +171,7 @@ function inside(home, given) {
 
 /**
  * The parts of one pack version, in a worker of the frame's. The frame hands it each part's modules and one end of a
- * channel whose other end it gives the page (ui/draw-marks.js): from then on the page and the parts talk on it alone.
+ * channel whose other end it gives the page (packs/walls/page/draw-marks.js): from then on the page and the parts talk on it alone.
  *
  * The page says: mount { id, part, input }, update { id, input }, event { id, event }, unmount { id }, and
  * acted { asked, ... } (what came of an action). The parts say: marks { id, marks }, act { id, asked, action, params }

@@ -6,10 +6,10 @@ import { isLink, NOTE_START, project } from './project.js';
 //
 // The page keeps one store of items and links by id, shared by every view open on it (the owner, 5 Nov 2026,
 // e_5cdm9bfg): a view holds only the ids of its answer, and the rows are the store's. The store is kept current by
-// projecting the facts the server sends after its position (ui/live.js tails them, packs/log/kernel/tail.ts reads them), with the
+// projecting the facts the server sends after its position (packs/surface/page/live.js tails them, packs/log/kernel/tail.ts reads them), with the
 // projector the server runs (packs/log/kernel/project.ts, served as /project.js): a fact updates its item once, and every view
 // holding it is told. Which items a view shows is the server's to judge: a fact that may change what its query finds
-// (ui/membership.js) tells the view to ask for its answer again (`ask`), and the store never judges a filter itself.
+// (packs/surface/page/membership.js) tells the view to ask for its answer again (`ask`), and the store never judges a filter itself.
 // Each row keeps the position it is current to, so a view that read its answer later than the store stands brings
 // rows newer than the facts still to come, and those facts are not folded onto them twice. Beside the rows the store
 // keeps the changes held for the owner (`held`, the pending proposals, read again as the queue moves) and the links
@@ -313,7 +313,7 @@ export class View {
   }
 }
 
-/** A view kept current from the log from now on (ui/live.js tails for its store). */
+/** A view kept current from the log from now on (packs/surface/page/live.js tails for its store). */
 export const follow = (view) => view.store.keep(view);
 /** A view no longer drawn: it is no longer kept current, and what only it held is let go. */
 export const unfollow = (view) => view?.store?.drop(view);

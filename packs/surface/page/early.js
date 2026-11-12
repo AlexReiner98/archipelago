@@ -1,6 +1,6 @@
 // The reads every page of a workspace waits on before it can ask for what it shows (who is signed in, the schema and
 // the workspace's style), asked as the page starts: this runs as soon as it is fetched, while the page's styles and
-// its modules are still loading. ui/base.js takes each answer once (`early`); a page that finds none asks as before.
+// its modules are still loading. packs/surface/page/base.js takes each answer once (`early`); a page that finds none asks as before.
 // It imports nothing, so nothing holds it up. A narrower session tried on a dev server (?may=) reads otherwise, and
 // is left to ask for itself.
 

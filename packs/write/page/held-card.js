@@ -1,5 +1,5 @@
 // One held change opened whole: each part of it can be left out or corrected before it is applied, or the whole
-// declined (the Look of a held change's band on an item's sheet, ui/item-held.js).
+// declined (the Look of a held change's band on an item's sheet, packs/write/page/item-held.js).
 
 import { api, ask, h, may } from './base.js';
 import { ago, typeMark, gist, link, loadSchema, relations, statusesOf, typeTitle, who } from './words.js';

@@ -12,7 +12,7 @@ import { relations, starterOf, types } from './words.js';
 // ---- live updates --------------------------------------------------------
 
 // The page reads the log forward (`tail`, packs/log/kernel/tail.ts): the facts after where it stands on
-// what it holds. The page's one store (ui/replica.js), shared by every view open on it, projects
+// what it holds. The page's one store (packs/surface/page/replica.js), shared by every view open on it, projects
 // them itself; the sheet learns which of its items they touched. The page is drawn again, in place,
 // only when one of them is on it, unless that would throw away something half done
 // (typed text, ticked boxes, an open question, a graph being explored); then a notice
@@ -133,7 +133,7 @@ export const store = new Store(kinds);
 /**
  * A view of what `read` answers (a flat lens's answer, asked with `follow`), its rows in the page's one store and kept
  * current from the log from then on: the answer says where the log stood before the lens was read (`pos`), so nothing
- * said while it was read is missed, and nothing waits for a read of the log first. Stop with `unfollow` (ui/replica.js).
+ * said while it was read is missed, and nothing waits for a read of the log first. Stop with `unfollow` (packs/surface/page/replica.js).
  */
 export async function replicate(read) {
   const view = new View(store);
@@ -146,7 +146,7 @@ export async function replicate(read) {
 }
 /** The changes held for the owner, as this viewer may see them; none where they may not. */
 const heldNow = () => api('proposals').catch(() => []);
-/** The store holds what is held now, and the page is told (the call over the canvas, ui/item-held.js). */
+/** The store holds what is held now, and the page is told (the call over the canvas, packs/write/page/item-held.js). */
 const holdNow = (held) => (store.holdChanges(held), hooks.heldMoved?.(store.held));
 /** Where the queue of held changes stood when the stores last read it. */
 const heard = { queue: undefined };
@@ -238,7 +238,7 @@ export async function checkTail() {
   // it is on it (drawn again only where its answer changed).
   if (!bears(touched, now.split('.').slice(2).join() !== was.split('.').slice(2).join())) {
     for (const drawn of canvasViews()) {
-      // A canvas whose answer is held in a store is kept current by the facts themselves (ui/replica.js).
+      // A canvas whose answer is held in a store is kept current by the facts themselves (packs/surface/page/replica.js).
       if (drawn.store) continue;
       if (!touched || touched.ids === null || touched.made || touched.ids.some((id) => drawn.answer?.items.some((i) => i.id === id))) drawn.refresh?.();
     }

@@ -1,7 +1,7 @@
 // Panes: the canvases in sight at once in a tab (ui/tab-bar.js), docked side by side as a code editor's groups are;
 // they stay together in their tab (decision e_mzer5m4t). Every pane is the same: a canvas of its own (ui/canvas.js)
 // drawing the address it was given (a lens, a saved canvas, an item), held in its own store and kept current from the
-// log (ui/live.js), with its own back and forward, a step for each lens it was given, not for a page opened over it
+// log (packs/surface/page/live.js), with its own back and forward, a step for each lens it was given, not for a page opened over it
 // (e_ssnyd3ex), kept with its tab so a reload draws it as it was. The query bar and find act on the pane last touched
 // (decision e_h2pqjy2q), and the address is that pane's (ui/pane-address.js). Only the tab in sight is drawn; the
 // others keep where their panes stand (ui/tabs.js). An agent arranges them with report show and its `pane`; where a

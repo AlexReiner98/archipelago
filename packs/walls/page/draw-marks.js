@@ -1,19 +1,19 @@
 // Where a drawing a pack ships (or the owner's version of one) runs, in the frame draw.html makes (draw.js has the
-// walls): drawings that answer with marks (ui/layout.js), not pixels. Loaded before draw.js, which says the frame is
+// walls): drawings that answer with marks (packs/walls/page/layout.js), not pixels. Loaded before draw.js, which says the frame is
 // ready, so nothing the page sends finds it not yet listening.
 'use strict';
 
 // One frame for the whole page, and in it one worker for each drawing's code, kept while the page is open, so a
 // second picture drawn by the same code starts at once. The walls are the same: the frame has an origin of its own
 // and may send nothing anywhere; the worker has no page. Each picture talks to its worker over a channel of its own, which the page hands in here:
-// what it is shown goes in, marks and patches come out, and the page checks every one (ui/marks.js).
+// what it is shown goes in, marks and patches come out, and the page checks every one (packs/walls/page/marks.js).
 
 (() => {
   const home = new URL(location.href).origin;
   const say = (message) => parent.postMessage(message, '*');
 
   // A page with no origin may not start a worker every way a page can, and browsers differ in which: each is tried until one answers.
-  // The same worker serves a pack version's parts (partInside, in ui/draw-inside.js).
+  // The same worker serves a pack version's parts (partInside, in packs/walls/page/draw-inside.js).
   const source = `(${inside})(${JSON.stringify(home)});(${partInside})()`;
   // A classic worker first: it starts at once where a module worker from a blob is refused, and imports the drawing all the same.
   const WAYS = [
@@ -56,7 +56,7 @@
   self.takeWorker = take;
 
   // A drawing a pack ships is drawn, where this frame has an origin of its own (the drawing host's, never the page's),
-  // by a service worker the host serves for it (/drawing/<hash>/sw.js, around ui/draw-inside.js): the browser keeps
+  // by a service worker the host serves for it (/drawing/<hash>/sw.js, around packs/walls/page/draw-inside.js): the browser keeps
   // it between pages, so a page opened again finds the drawing's code started and already made fast by the runs
   // before. A drawing kept on the map has none (the host answers 404), nor has a frame with no origin: they are drawn
   // by a worker of the frame's own, as is one whose service worker stopped answering here.
@@ -156,7 +156,7 @@
 })();
 
 // Where the app's parts run: one worker for each pack version on screen, not one for each part, its parts' code given
-// as text (partInside in ui/draw-inside.js runs around it), started from the warm worker above.
+// as text (partInside in packs/walls/page/draw-inside.js runs around it), started from the warm worker above.
 //
 // The frame starts a version's worker and hands the page one end of a channel to it (part-port, the version named);
 // nothing goes through the frame after that, so the page knows which pack version speaks by the port alone (decision
@@ -201,7 +201,7 @@
     else if (said.type === 'part-end') end(said.version);
   });
 
-  // A version that stops answering is ended, as a drawing is (ui/draw-marks.js): six pings unanswered, counted, not
+  // A version that stops answering is ended, as a drawing is (packs/walls/page/draw-marks.js): six pings unanswered, counted, not
   // timed, and none asked while the page is hidden.
   setInterval(() => {
     for (const [version, v] of versions) {

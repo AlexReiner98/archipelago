@@ -2,12 +2,12 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { kernelCodeOf, packOf, resolve, rootCodeOf, rootPacksOf, valueImports, walkFiles } from '../packs/anatomy_sync/reader.ts';
+import { kernelCodeOf, packOf, resolve, resolveServed, rootCodeOf, rootPacksOf, servedNames, valueImports, walkFiles } from '../packs/anatomy_sync/reader.ts';
 
 export const ROOT = join(import.meta.dirname, '..');
 const CODE = /\.(ts|js|mjs|css|html)$/;
 /** Vendored as a file at the owner's asking (CLAUDE.md), not written here. */
-export const VENDORED = ['ui/three.module.min.js'];
+export const VENDORED = ['packs/walls/page/three.module.min.js'];
 
 /** Every file under a folder, as it is on disk. */
 export const rawWalk = (dir: string): string[] => walkFiles(ROOT, dir);
@@ -43,7 +43,15 @@ export const serviceImports = (f: string) => valueImports(read(f), f).filter(({ 
   const pack = kind !== 'bare' && kind !== 'require' && to ? packOfPath(to) : undefined;
   return pack !== undefined && !rootPacks.includes(pack);
 }).length;
-export const kernelFiles = [...walk('src'), ...walk('ui'), ...rootCode].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
+/** The order the roots start in (packs/roots.json): a root's page imports only from its own and those before it. */
+export const rootOrder = (JSON.parse(raw('packs/roots.json')) as { roots: { id: string }[] }).roots.map((r) => r.id);
+/** The files the page is served: the app's, in ui/, and the host's, in each root pack's page/. */
+export const uiFiles = [...walk('ui'), ...rootOrder.flatMap((p) => walk(`packs/${p}/page`))];
+/** A served file by the name the page asks for it by. */
+export const served = servedNames(uiFiles);
+/** A page module's value imports of other served files, as paths: by served name, as the browser loads them. */
+export const pageImports = (f: string) => valueImports(read(f)).filter((i) => i.kind !== 'bare' && i.kind !== 'require' && i.spec.startsWith('./')).map((i) => resolveServed(f, i.spec, served));
+export const kernelFiles = [...walk('src'), ...uiFiles, ...rootCode].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
 /** The packs gone to hosted (9 Nov 2026), with their type and link names. */
 export const LEFT = JSON.parse(read('test/fixtures/left-packs.json')) as Record<string, string[]>;
 /** The kernel's own packs: the kinds, the root relations and the system tier. */

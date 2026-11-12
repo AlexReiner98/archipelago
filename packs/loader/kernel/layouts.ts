@@ -1,7 +1,7 @@
 // Drawings: the code a picture is drawn by, shipped by a pack and changed on the map. A pack declares each in its
 // pack.json (`layouts`: the shape it draws and its modules, files in the pack's folder, entered at index.js); a
 // layout kept with a drawing's id as its preset is the owner's version, whose `modules` stand in for the pack's file
-// by file. The page runs it in the sandbox (ui/layout.js); the kernel draws no shape itself once a drawing draws it.
+// by file. The page runs it in the sandbox (packs/walls/page/layout.js); the kernel draws no shape itself once a drawing draws it.
 //
 // A drawing goes to the page with its hash, and its modules only when the page does not have them yet (`have`).
 

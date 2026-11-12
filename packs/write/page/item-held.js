@@ -73,7 +73,7 @@ export async function heldBand(p, again) {
 }
 
 // ---- The call over the canvas: while no sheet is open, what waits for the person's word is said above find, one press
-// from the band that decides it (Alex, 11 Nov 2026). What is held is told by the store (ui/live.js).
+// from the band that decides it (Alex, 11 Nov 2026). What is held is told by the store (packs/surface/page/live.js).
 
 const call = h('div', { class: 'held-call', hidden: true });
 document.getElementById('find')?.prepend(call);

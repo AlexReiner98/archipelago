@@ -1,5 +1,5 @@
 // Held for you: the changes that wait for the owner's word before they apply. Home keeps one line that leads to the
-// canvas of them (the owner, 31 Oct 2026: the canvas finds them, the item's sheet decides them, ui/item-held.js).
+// canvas of them (the owner, 31 Oct 2026: the canvas finds them, the item's sheet decides them, packs/write/page/item-held.js).
 
 import { api, ask, h, may, tell } from './base.js';
 import { canvasAt, savedCanvases } from './canvases.js';

@@ -13,7 +13,7 @@ export const relations = new Map();
 export async function loadSchema() {
   // The schema, and the workspace's style: what a page that is not a picture is drawn by, until it asks for its own;
   // with the theme being tried on this screen over it (ui/themes-card.js), which nothing keeps.
-  // The first time, as the page started (ui/early.js).
+  // The first time, as the page started (packs/surface/page/early.js).
   const style = state.trying ? api('view', { name: 'style', params: { try: state.trying } }) : apiFirst('style', () => api('view', { name: 'style', params: {} }));
   [state.schema, state.style] = await Promise.all([apiFirst('schema', () => api('schema')), style.then((r) => r.style)]);
   applyTheme(state.style);

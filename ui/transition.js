@@ -9,7 +9,7 @@
 // on the style (core's house style names them, `motion_*`). Past a few movers it cuts, as it does on less motion
 // asked for, on a picture of too many marks, and on one that shares no mark with what was there.
 //
-// A mark may say it is a pulse (its `pulse`, words the page keeps on it, ui/marks.js): unseen, it is never faded or
+// A mark may say it is a pulse (its `pulse`, words the page keeps on it, packs/walls/page/marks.js): unseen, it is never faded or
 // moved, and when its words change while its key stays, a dash of its own stroke runs along its line, start to end,
 // after what moves has moved (a finding's move carried to its readers, task e_fqhbp4yq). It runs even where the rest
 // is cut for too much, never where less motion is asked for.
@@ -145,7 +145,7 @@ function inUnits(el, dx, dy) {
 }
 
 /**
- * The hook where a scene is mounted (ui/layout.js): called before the marks are replaced, with the Map that collects
+ * The hook where a scene is mounted (packs/walls/page/layout.js): called before the marks are replaced, with the Map that collects
  * the new scene's keyed marks. It measures the marks there were, and once the new ones are mounted, and the view put
  * back where the reader left it (ui/canvas.js, on the mutation), it plays what changed before the frame is painted.
  */

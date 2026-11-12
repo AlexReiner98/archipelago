@@ -85,7 +85,7 @@ export function warmLayouts() {
 
 /**
  * The drawing with this hash, loaded in the frame. A picture's channel (`port`) goes with it at once: the frame keeps it
- * until the drawing is loaded (ui/draw-marks.js), so the picture waits for no word back from the frame.
+ * until the drawing is loaded (packs/walls/page/draw-marks.js), so the picture waits for no word back from the frame.
  */
 async function loaded(hash, modules, port) {
   const box = warmLayouts();
@@ -237,7 +237,7 @@ export function drawWith(host, answer, style, keep) {
       else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });
       else if (said.type === 'surface-frame') surface?.paint(said.image);
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
-      // A change it asks for is put to the person, and sent as theirs (ui/layout-asks.js); what came of it goes back.
+      // A change it asks for is put to the person, and sent as theirs (packs/walls/page/layout-asks.js); what came of it goes back.
       // What it made is not yet in the answer the canvas keeps, which follows only what it holds: the lens is read again.
       else if (said.type === 'change') drawingAsked(said).then((came) => (Object.keys(came.created ?? {}).length && host.dispatchEvent(new CustomEvent('lens-read', { bubbles: true })), !ended && port.postMessage({ type: 'changed', asked: said.asked, ...came })));
       else if (said.type === 'error') failed(said.message);
@@ -252,7 +252,7 @@ export function drawWith(host, answer, style, keep) {
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
   // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
   const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
-  // What the session may do (ui/base.js may): a drawing that opts into gestures draws no handle where it may not write.
+  // What the session may do (packs/surface/page/base.js may): a drawing that opts into gestures draws no handle where it may not write.
   const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, may: [...(state.may ?? [])] };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;
@@ -372,7 +372,7 @@ ${JSON.stringify(input)}`;
 }
 
 // How the page reaches a pack version's parts: this frame (warmLayouts) also starts a worker for the version and hands
-// back a port to it (the foot of ui/draw-marks.js; the words on it are partInside's, in ui/draw-inside.js). What checks
+// back a port to it (the foot of packs/walls/page/draw-marks.js; the words on it are partInside's, in packs/walls/page/draw-inside.js). What checks
 // and renders the marks that come back is the host's. Here, not a module of its own, while the page's files are pinned
 // with the surface root pack (packs/roots.json).
 

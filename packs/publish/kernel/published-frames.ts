@@ -3,7 +3,7 @@
 // so a reader's page mounts it with the page's text, before the sandbox has started. Only a drawing whose code is the
 // pack's own is run (the loader finds it by its id among what the packs ship, and its hash must be the pack's): a
 // version changed on the map is code anyone who may change the map wrote, and runs only in the reader's sandbox. The
-// page checks these marks as it checks any drawing's (ui/marks.js), and the sandbox takes the picture over once it
+// page checks these marks as it checks any drawing's (packs/walls/page/marks.js), and the sandbox takes the picture over once it
 // answers.
 
 import type { KernelContext } from '#pelago/kernel';
@@ -15,7 +15,7 @@ export type Drawn = { scene: Record<string, unknown> | null; css_ok: boolean };
 const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value ?? null));
 
 /**
- * What the page gives a drawing on a published page (ui/doc-lens.js, ui/layout.js): the answer without its style, and
+ * What the page gives a drawing on a published page (ui/doc-lens.js, packs/walls/page/layout.js): the answer without its style, and
  * the style held still, without its code.
  */
 export function openingInput(frozen: Frozen, words: Words = {}) {

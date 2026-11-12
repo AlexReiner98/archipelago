@@ -1,6 +1,6 @@
 // The projection of facts onto items and links as pure code: a run of facts on one id, and what that row was, in;
 // what becomes of the row, out. The server's projector (packs/log/kernel/replay.ts) writes it into its tables; the page runs the
-// same file (served as /project.js, its types stripped, packs/surface/kernel/ui-files.ts) over the rows it holds (ui/replica.js).
+// same file (served as /project.js, its types stripped, packs/surface/kernel/ui-files.ts) over the rows it holds (packs/surface/page/replica.js).
 // It imports nothing, so it runs in a browser as it is: keep it so.
 
 import type { Fact } from './log.ts';
@@ -145,7 +145,7 @@ const merged = (was: Row | null | undefined, props: Row, unset: string[]) => {
   return out;
 };
 
-/** Rows held in memory, by id: what the page keeps of the map (ui/replica.js), or a whole projection made again in a test. */
+/** Rows held in memory, by id: what the page keeps of the map (packs/surface/page/replica.js), or a whole projection made again in a test. */
 export interface Held {
   items: Map<string, Row>;
   links: Map<string, Row>;

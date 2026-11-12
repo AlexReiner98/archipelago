@@ -1,6 +1,7 @@
 // The files the web UI is served from, by the path a browser asks for, and the addresses a page names them by.
 
 import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
@@ -12,7 +13,7 @@ export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
   '/': 'index.html',
   '/app.js': 'app.js',
-  // The reads every page waits on, asked as it starts, before its modules have loaded (ui/base.js takes them).
+  // The reads every page waits on, asked as it starts, before its modules have loaded (packs/surface/page/base.js takes them).
   '/early.js': 'early.js',
   // The house style's lengths as a stylesheet, so the page is laid out before the workspace's style is read (packs/styles/kernel/styles.ts).
   '/layout.css': 'layout.css',
@@ -31,7 +32,7 @@ export const UI_FILES: Record<string, string> = {
   '/packs.js': 'packs.js',
   '/query-light.js': 'query-light.js',
   '/lit-by.js': 'lit-by.js',
-  // A scene mounted again moves into place, its marks matched by key (ui/layout.js mounts, ui/transition.js plays).
+  // A scene mounted again moves into place, its marks matched by key (packs/walls/page/layout.js mounts, ui/transition.js plays).
   '/transition.js': 'transition.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
   '/draw.html': 'draw.html',
@@ -39,7 +40,7 @@ export const UI_FILES: Record<string, string> = {
   '/draw-marks.js': 'draw-marks.js',
   // What runs in a drawing's worker: written in front of draw-marks.js, and into a drawing's service worker (drawInside).
   '/draw-inside.js': 'draw-inside.js',
-  // The projector's pure part, which the page runs on the facts it reads (ui/replica.js): served from the log pack's own file.
+  // The projector's pure part, which the page runs on the facts it reads (packs/surface/page/replica.js): served from the log pack's own file.
   '/project.js': 'project.js',
   // What a stylesheet from the map may say, which the page checks a sheet by and the server checks page_css by on write.
   '/css-check.js': 'css-check.js',
@@ -47,11 +48,23 @@ export const UI_FILES: Record<string, string> = {
   '/three.js': 'three.module.min.js',
 };
 
-const UI_DIR = join(import.meta.dirname, '..', '..', '..', 'ui');
+const PACKS = join(import.meta.dirname, '..', '..');
+const UI_DIR = join(PACKS, '..', 'ui');
+/**
+ * Where the files are: the app's, in ui/, and the host's, in each root pack's page/ (packs/roots.json), where its hash
+ * keeps them. A file is served by its name alone, whichever folder holds it, so a name is in one folder only.
+ */
+export const UI_DIRS = [UI_DIR, ...(JSON.parse(readFileSync(join(PACKS, 'roots.json'), 'utf8')) as { roots: { id: string }[] }).roots.map((r) => join(PACKS, r.id, 'page')).filter((d) => existsSync(d))];
+const DIR_OF = new Map<string, string>();
+for (const dir of UI_DIRS)
+  for (const f of readdirSync(dir)) {
+    if (DIR_OF.has(f)) throw new Error(`${f} is in both ${DIR_OF.get(f)} and ${dir}: a file of the UI is served by its name, so it is in one folder.`);
+    DIR_OF.set(f, dir);
+  }
 /** Files served to the page from the kernel's source, as the page names them: TypeScript of erasable syntax only, its types stripped. */
-const FROM_SOURCE: Record<string, string> = { 'project.js': join(import.meta.dirname, '..', '..', 'log', 'kernel', 'project.ts'), 'css-check.js': join(import.meta.dirname, '..', '..', 'walls', 'kernel', 'css-check.ts') };
-const pathOf = (f: string) => FROM_SOURCE[f] ?? join(UI_DIR, f);
-const readText = async (f: string) => (FROM_SOURCE[f] ? stripTypeScriptTypes(await readFile(FROM_SOURCE[f], 'utf8')) : readFile(join(UI_DIR, f), 'utf8'));
+const FROM_SOURCE: Record<string, string> = { 'project.js': join(PACKS, 'log', 'kernel', 'project.ts'), 'css-check.js': join(PACKS, 'walls', 'kernel', 'css-check.ts') };
+const pathOf = (f: string) => FROM_SOURCE[f] ?? join(DIR_OF.get(f) ?? UI_DIR, f);
+const readText = async (f: string) => (FROM_SOURCE[f] ? stripTypeScriptTypes(await readFile(FROM_SOURCE[f], 'utf8')) : readFile(pathOf(f), 'utf8'));
 /** The pages a browser opens, and so asks for again on every visit; read whole, with the files they name versioned. */
 const PAGES = ['index.html', 'doc.html', 'public.html', 'draw.html'];
 /** Made by the server from the packs, not read from a file: named as it is, and never kept. */
@@ -89,7 +102,7 @@ async function current() {
   return held;
 }
 
-/** What runs in a drawing's worker (ui/draw-inside.js) as served now: a drawing's service worker is built around it. */
+/** What runs in a drawing's worker (packs/walls/page/draw-inside.js) as served now: a drawing's service worker is built around it. */
 export const drawInside = async () => (await current()).text.get('draw-inside.js')!;
 
 /** The UI's version as served now: it moves when one of its files is saved. */
@@ -150,6 +163,6 @@ export async function drawPage(): Promise<{ html: string; hashes: string[] }> {
 /** One file of the UI as served now, and whether the address asked for may be kept (it names the current version). */
 export async function uiFile(file: string, version: string | null): Promise<{ body: string | Buffer; keep: boolean }> {
   const now = await current();
-  const body = now.text.get(file) ?? (await readFile(join(UI_DIR, file)));
+  const body = now.text.get(file) ?? (await readFile(pathOf(file)));
   return { body, keep: version === now.version };
 }
