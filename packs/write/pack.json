@@ -19,6 +19,22 @@
           "status": "string"
         },
         "run": "root-services.ts#observe"
+      },
+      "root.notify": {
+        "in": {
+          "actor": {
+            "kind": "string",
+            "name": "string"
+          },
+          "title": "string",
+          "body?": "string",
+          "level?": "string",
+          "about?": "id"
+        },
+        "out": {
+          "notification": "id"
+        },
+        "run": "root-notify.ts#notifyOf"
       }
     }
   }

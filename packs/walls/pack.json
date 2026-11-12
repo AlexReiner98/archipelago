@@ -6,6 +6,18 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.mail": {
+        "in": {
+          "subject": "string",
+          "text": "string"
+        },
+        "out": {
+          "sent": "boolean"
+        },
+        "run": "notify-mail.ts#mailOperator"
+      }
+    }
   }
 }

@@ -17,6 +17,7 @@
     "service:root.drawing",
     "service:root.public_product",
     "service:page.look",
-    "service:answer.kept_picture"
+    "service:answer.kept_picture",
+    "service:act.report.notify"
   ]
 }

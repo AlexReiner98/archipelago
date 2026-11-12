@@ -1,122 +1,145 @@
 // Ways to read from outside the map: a public view anyone may open (./public-view.ts), made, listed and taken down by
 // a person, and publishing a document. Links with a secret went with public views (the owner, 11 Nov 2026).
 //
-// The one module of the publish pack still on the map (wave 6b, e_pkytyzy7): a tool's input is a zod shape the
-// surface's table reads, and an agent's ask (share_ask, publish_ask) is a notification made as that agent, which the
-// notifications pack makes on the map, not on a context. It reaches the rest of the pack through the shims at src/.
+// On the publish pack's context, as the rest of it: each tool's input is a JSON shape the surface builds its schema
+// from (packs/surface/kernel/tool-input.ts), its run is handed the pack's context of the map it is called on (the
+// adapter at src/share-tools.ts), and an agent's ask (share_ask, publish_ask) is a notification made as that agent, by
+// the notifications pack's name (act.report.notify).
 
-import { z } from 'zod';
-import { readDocument } from '../../../src/documents.ts';
-import { notify } from '../../../src/notify.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import { share, unshare } from '../../../src/public-view.ts';
-import { sharedViews, sharePlan } from '../../../src/public-view-freeze.ts';
-import { publish, publishAll, unpublish } from '../../../src/published.ts';
-import { publishedState, publishPlan } from '../../../src/published-freeze.ts';
-import { picturesOf } from '../../../src/published-pictures.ts';
-import type { Tool } from '../../../src/tools.ts';
+import type { KernelContext } from '#pelago/kernel';
+import { readDocument } from './document-read.ts';
+import { itemOf, type Actor, type Said } from './map.ts';
+import { share, unshare } from './public-view.ts';
+import { sharedViews, sharePlan } from './public-view-freeze.ts';
+import { publish, publishAll, unpublish } from './published.ts';
+import { publishedState, publishPlan } from './published-freeze.ts';
+import { picturesOf } from './published-pictures.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 
+/** A notification for the person, made as the agent that asks. */
+const ask = (ctx: KernelContext, actor: Actor, title: string, body: string, about: string) => ctx.call('act.report.notify', { actor: { kind: actor.kind, name: actor.name }, title, body, about });
+
 /** An agent asks the person to make a view or an item public: a notification about it, which they share from its page. */
-export async function shareAsk(l: Archipelago, actor: Actor, id: string, reason?: string) {
-  const item = ID.test(id) ? await l.entity(id) : null;
+export async function shareAsk(ctx: KernelContext, actor: Actor, id: string, reason?: string) {
+  const item = ID.test(id) ? await itemOf(ctx, id) : null;
   if (!item) throw new Error(`"${id}" is not an item of this workspace you can read.`);
   if (item.archived_at) throw new Error(`"${item.title}" is archived.`);
-  await notify(l, actor, { title: `Make "${item.title}" public`.slice(0, 200), body: reason ?? '', about: id });
+  await ask(ctx, actor, `Make "${item.title}" public`.slice(0, 200), reason ?? '', id);
   return { asked: true, note: 'The person is notified; making it public is theirs.' };
 }
 
 /** An agent asks for an item's documents to be published: a notification about it for the person, who publishes with one click. */
-export async function publishAsk(l: Archipelago, actor: Actor, within: string, reason?: string) {
-  const plan = await publishPlan(l, within);
+export async function publishAsk(ctx: KernelContext, actor: Actor, within: string, reason?: string) {
+  const plan = await publishPlan(ctx, within);
   if (!plan.to_publish) return { asked: false, note: `Everything in "${plan.within.title}" is published as it stands.` };
   const n = plan.to_publish;
   const title = `${n} document${n === 1 ? '' : 's'} in "${plan.within.title}" to publish`.slice(0, 200);
-  await notify(l, actor, { title, body: [reason, plan.documents.filter((d) => d.changed).map((d) => `- ${d.title}`).join('\n')].filter(Boolean).join('\n\n'), about: within });
+  await ask(ctx, actor, title, [reason, plan.documents.filter((d) => d.changed).map((d) => `- ${d.title}`).join('\n')].filter(Boolean).join('\n\n'), within);
   return { asked: true, to_publish: n, note: 'The person is notified; publishing is theirs, with one click on the item’s page.' };
 }
 
-const authority = z
-  .object({
-    of: z.enum(['human', 'agent']).describe('"human" when a person told you to publish it; "agent" when it is your own judgment.'),
-    basis: z.string().optional().describe('For "human": what they said and where (required). For "agent": what it rests on.'),
-  })
-  .optional()
-  .describe('On whose authority an agent publishes, kept on the event it logs. Left out, it is recorded as your own judgment.');
+/** A tool as this pack declares it: its input a JSON shape, what each field is for in `says`, run on the pack's context. */
+export interface ShareTool {
+  description: string;
+  humanOnly?: boolean;
+  input: Record<string, unknown>;
+  says?: Record<string, string>;
+  run(ctx: KernelContext, actor: Actor, input: any): Promise<unknown>;
+}
 
-export const SHARE_TOOLS: Record<string, Tool> = {
+/** On whose authority an agent publishes: the shape, and what it and each of its fields is for. */
+const AUTHORITY = { 'authority?': { of: ['human', 'agent'], 'basis?': 'string' } };
+const AUTHORITY_SAYS = {
+  authority: 'On whose authority an agent publishes, kept on the event it logs. Left out, it is recorded as your own judgment.',
+  'authority.of': '"human" when a person told you to publish it; "agent" when it is your own judgment.',
+  'authority.basis': 'For "human": what they said and where (required). For "agent": what it rests on.',
+};
+const ITEM = 'The view, document or item.';
+const DOCUMENT = 'The document.';
+const WITHIN = 'The item that holds the documents.';
+
+export const SHARE_TOOLS: Record<string, ShareTool> = {
   document: {
     description:
       'A document read whole, as its reader meets it (any other item is read the same way, by its note): its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. ' +
       'To write one, make an item of type document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its view, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
-    input: {
-      id: z.string(),
-      drawn: z.boolean().optional().describe('true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft.'),
-    },
-    run: async (l, _actor, input) => {
-      const doc = await readDocument(l, input.id);
+    input: { id: 'string', 'drawn?': 'boolean' },
+    says: { drawn: 'true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft.' },
+    run: async (ctx, _actor, input: { id: string; drawn?: boolean }) => {
+      const doc = await readDocument(ctx, input.id);
       if (!input.drawn) return doc;
       const sections = doc.parts.flatMap((p) => ('section' in p ? [p.section] : []));
-      return { ...doc, ...(await picturesOf(l, sections, false)) };
+      return { ...doc, ...(await picturesOf(ctx, sections, false)) };
     },
   },
   share_create: {
     description: 'Make a view, a document or any item public as it stands now, frozen, at /p/<workspace>/<id> for anyone and for search engines (and at its path on its site, when it has one). What is private is left out; share_plan says what goes out first. Sharing it again replaces what is public. Only a person shares: an agent asks with the ask verb, action share_ask.',
     humanOnly: true,
-    input: { id: z.string().describe('The view, document or item.') },
-    run: async (l, actor, input) => share(l, actor, input.id),
+    input: { id: 'string' },
+    says: { id: ITEM },
+    run: async (ctx, actor, input: { id: string }) => share(ctx, actor, input.id),
   },
   share_plan: {
     description: 'What making a view, document or item public would take out with it (goes), what it leaves out because it is private, and whether it is public already: asked before it is shared, since it is frozen when shared.',
-    input: { id: z.string().describe('The view, document or item.') },
-    run: (l, _actor, input) => sharePlan(l, input.id),
+    input: { id: 'string' },
+    says: { id: ITEM },
+    run: (ctx, _actor, input: { id: string }) => sharePlan(ctx, input.id),
   },
   share_list: {
     description: 'Every public view of this workspace, newest first, or with id the one of that item: what it is of, its address, who shared it and when.',
-    input: { id: z.string().optional().describe('Only the public view of this item.') },
-    run: async (l, _actor, input) => sharedViews(l, input.id),
+    input: { 'id?': 'string' },
+    says: { id: 'Only the public view of this item.' },
+    run: async (ctx, _actor, input: { id?: string }) => sharedViews(ctx, input.id),
   },
   share_revoke: {
     description: 'Take a public view down, at once: its address answers nothing, and the item itself is left as it is.',
     humanOnly: true,
-    input: { id: z.string().describe('The item whose public view to take down.') },
-    run: async (l, actor, input) => unshare(l, actor, input.id),
+    input: { id: 'string' },
+    says: { id: 'The item whose public view to take down.' },
+    run: async (ctx, actor, input: { id: string }) => unshare(ctx, actor, input.id),
   },
   share_ask: {
     description: 'Ask the person to make a view, document or item public: they are notified about it, and share it from its page. Sharing is theirs; this never shares.',
-    input: { id: z.string().describe('The view, document or item.'), reason: z.string().optional().describe('Why, in a sentence.') },
-    run: async (l, actor, input) => shareAsk(l, actor, input.id, input.reason),
+    input: { id: 'string', 'reason?': 'string' },
+    says: { id: ITEM, reason: 'Why, in a sentence.' },
+    run: async (ctx, actor, input: { id: string; reason?: string }) => shareAsk(ctx, actor, input.id, input.reason),
   },
   publish: {
     description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with the ask verb, action publish_ask.',
-    input: { id: z.string().describe('The document.'), authority },
-    run: async (l, actor, input) => publish(l, actor, input.id, input.authority),
+    input: { id: 'string', ...AUTHORITY },
+    says: { id: DOCUMENT, ...AUTHORITY_SAYS },
+    run: async (ctx, actor, input: { id: string; authority?: Said }) => publish(ctx, actor, input.id, input.authority),
   },
   unpublish: {
     description: 'Take a published document down: its address answers nothing, and it is shared with the workspace again.',
     humanOnly: true,
-    input: { id: z.string().describe('The document.') },
-    run: async (l, actor, input) => unpublish(l, actor, input.id),
+    input: { id: 'string' },
+    says: { id: DOCUMENT },
+    run: async (ctx, actor, input: { id: string }) => unpublish(ctx, actor, input.id),
   },
   publish_all: {
     description: 'Publish every open document an item holds (part_of, at any depth), then publish them again so each links to the others at their addresses. One whose path is taken is named, and the rest go ahead. An agent may only where the owner allows it, as with publish.',
-    input: { within: z.string().describe('The item that holds the documents, such as a site’s project.'), authority },
-    run: async (l, actor, input) => publishAll(l, actor, input.within, input.authority),
+    input: { within: 'string', ...AUTHORITY },
+    says: { within: 'The item that holds the documents, such as a site’s project.', ...AUTHORITY_SAYS },
+    run: async (ctx, actor, input: { within: string; authority?: Said }) => publishAll(ctx, actor, input.within, input.authority),
   },
   publish_plan: {
     description: 'Which documents an item holds and whether each is published as it stands: those not yet published or changed since are counted in to_publish.',
-    input: { within: z.string().describe('The item that holds the documents.') },
-    run: async (l, _actor, input) => publishPlan(l, input.within),
+    input: { within: 'string' },
+    says: { within: WITHIN },
+    run: async (ctx, _actor, input: { within: string }) => publishPlan(ctx, input.within),
   },
   publish_ask: {
     description: 'Ask the person to publish an item’s documents: they are notified about the item, with what changed, and publish all of it with one click on its page. Publishing is theirs; this never publishes.',
-    input: { within: z.string().describe('The item that holds the documents.'), reason: z.string().optional().describe('Why now, in a sentence.') },
-    run: async (l, actor, input) => publishAsk(l, actor, input.within, input.reason),
+    input: { within: 'string', 'reason?': 'string' },
+    says: { within: WITHIN, reason: 'Why now, in a sentence.' },
+    run: async (ctx, actor, input: { within: string; reason?: string }) => publishAsk(ctx, actor, input.within, input.reason),
   },
   published: {
     description: 'Whether a document is published, when and by whom, and whether its draft now says something other than what is published (changed): then only a human publishing it again changes what anyone reads.',
-    input: { id: z.string().describe('The document.') },
-    run: async (l, _actor, input) => publishedState(l, input.id),
+    input: { id: 'string' },
+    says: { id: DOCUMENT },
+    run: async (ctx, _actor, input: { id: string }) => publishedState(ctx, input.id),
   },
 };

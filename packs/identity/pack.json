@@ -17,6 +17,20 @@
           }
         ],
         "run": "root-services.ts#workspacesOf"
+      },
+      "root.token": {
+        "in": {
+          "name": "string",
+          "person?": "id",
+          "within": [
+            "id"
+          ]
+        },
+        "out": {
+          "token": "string",
+          "name": "string"
+        },
+        "run": "root-token.ts#tokenOf"
       }
     }
   }

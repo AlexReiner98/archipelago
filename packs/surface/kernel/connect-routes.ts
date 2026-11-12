@@ -29,8 +29,8 @@ export interface ConnectRoutes extends OpenRoutes {
   /** The connect pack's answers: the install pages, and a system's request for its token and its poll. */
   connect: {
     installed(path: string, origin: string): { type: string; text: string } | undefined;
-    asked(db: Q, body: unknown, origin: string, workspace: string): Promise<{ status: number; body: unknown }>;
-    polled(db: Q, workspace: string, id: string, secret: string): Promise<{ status: number; body: unknown }>;
+    asked(l: Archipelago, body: unknown, origin: string, workspace: string): Promise<{ status: number; body: unknown }>;
+    polled(l: Archipelago, workspace: string, id: string, secret: string): Promise<{ status: number; body: unknown }>;
   };
 }
 
@@ -112,7 +112,7 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   const workspace = poll ? poll[1] : typeof body?.workspace === 'string' ? body.workspace : at.fallback;
   if (!(await at.workspaces.has(workspace))) return reply(res, 404, { error: `No workspace "${workspace}".` });
   res.once('close', at.workspaces.hold(workspace));
-  const db = (await at.workspaces.get(workspace)).pelago.db;
-  const answer = poll ? await at.connect.polled(db, workspace, poll[2], bearer(req.headers.authorization) ?? '') : await at.connect.asked(db, body, origin, workspace);
+  const map = (await at.workspaces.get(workspace)).pelago;
+  const answer = poll ? await at.connect.polled(map, workspace, poll[2], bearer(req.headers.authorization) ?? '') : await at.connect.asked(map, body, origin, workspace);
   return reply(res, answer.status, answer.body);
 }

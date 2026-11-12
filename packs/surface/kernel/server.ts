@@ -41,7 +41,7 @@ import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { setLookOrigin } from '../../../src/looks.ts'; import { LOOK_READS, passWorkspace, readPass } from '../../../src/look-pass.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { configureOutbox } from '../../../src/outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from '../../../src/control-index.ts'; import { isPersonToken, personAt } from '../../../src/person-tokens.ts';
-import { serverPacksOf } from './server-host.ts'; import { configureConnections } from '../../../src/connection-tools.ts'; import { configureHookTool } from '../../../src/hook-tool.ts'; import { setReach } from '../../../src/pack-reach.ts';
+import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './root-connections.ts'; import { configureHookTool } from '../../../src/hook-tool.ts'; import { setReach } from '../../../src/pack-reach.ts';
 import { pgLeader, soleLeader, whileLeads, type Leader } from '../../../src/leader.ts'; import { drained } from './drain.ts';
 import { keepCounts } from '../../../src/pack-counts.ts';
 import { clientAddress, trustedProxies } from '../../../src/address.ts';

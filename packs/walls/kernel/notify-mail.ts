@@ -9,6 +9,8 @@ import { normalEmail, sendMail } from '../../../src/mail.ts';
 import { itemLink } from '../../../src/members.ts';
 import { bypassingRls } from './outbox.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
+import { env } from '../../../src/env.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
 
 /** The event the kernel tells packs when a notification is made. */
 export const NOTIFICATION_MADE = 'notification.made';
@@ -80,5 +82,19 @@ export async function mailHeard(l: Archipelago, pack: string, input: unknown, as
   const link = itemLink(l.workspace).replace('{id}', (await subjectOf(await bypassingRls(l), heard.target)) ?? heard.target);
   await sendMail({ to, subject, text: `${text.replace(/\n+$/, '')}\n\n${link}\n` });
   console.log(`${pack}: mailed notification ${heard.target}`);
+  return { sent: true };
+}
+
+/**
+ * root.mail (docs/kernel-packs.md, "Root services"): a mail to the server's operator, at the address the server is
+ * given for them (PELAGO_ALERT_TO), and to no one else: what an internal pack may send when something breaks, with or
+ * without a map (a crash has none). Answers whether it went; without an address nothing is sent. A failure to send is
+ * thrown, for the caller to say.
+ */
+export async function mailOperator(_call: RootCall, ask: { subject: string; text: string }): Promise<{ sent: boolean }> {
+  if (typeof ask?.subject !== 'string' || typeof ask.text !== 'string' || !ask.subject.trim()) throw new Error('root.mail sends a subject and a text');
+  const to = normalEmail(env('ALERT_TO'));
+  if (!to) return { sent: false };
+  await sendMail({ to, subject: ask.subject, text: ask.text });
   return { sent: true };
 }

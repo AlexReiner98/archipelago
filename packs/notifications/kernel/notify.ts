@@ -1,27 +1,29 @@
-import { ownerOf } from '../../../src/notify-mail.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
-import { actorId, type Actor, type Archipelago } from '../../../src/pelago.ts';
+// A notification for the human: something they should know or act on that is not itself a change to the map, so it
+// needs no approval. Made by the write root (root.notify, which only this pack may call): on the map that asks, as the
+// one who sends it, past the rules, and told to the packs that hear notification.made. Another internal pack notifies
+// by this pack's name, act.report.notify; the kernel through the adapter at src/notify.ts.
 
-/** Send the human a notification. Not a fact about the world, so it needs no approval. */
-export async function notify(l: Archipelago, actor: Actor, input: { title: string; body?: string; level?: 'info' | 'warning' | 'urgent'; about?: string }) {
-  const about = input.about ? await l.entity(input.about) : undefined;
-  if (input.about && !about) throw new Error(`No item "${input.about}"`);
-  const { created } = await l.apply(actorId(actor), {
-    ops: [
-      // A notification from someone's agent is for that someone, whatever the workspace default.
-      { op: 'create', ref: 'n', type: 'notification', title: input.title, body: input.body, visibility: 'private', props: { level: input.level ?? 'info', from: actorId(actor) } },
-      ...(input.about ? [{ op: 'link' as const, type: 'about', from: 'n', to: input.about }] : []),
-    ],
-    reason: 'Notification',
-  });
-  // Sent by the system about something private (a quiet session, say): it goes to that thing's owner only.
-  if (!l.viewer && about) await l.operational(created.n, { reach: { private_to: about.private_to } });
-  // The packs that hear it are told, and may carry it further (src/notify-mail.ts): not waited for.
-  if (made) made(l, { action: 'notification.made', target: created.n, detail: { for: l.viewer || about?.private_to || (await ownerOf(await bypassingRls(l))) || null, title: input.title, body: input.body ?? '', level: input.level ?? 'info', about: input.about ?? null } });
-  return { notification: created.n };
+import type { KernelContext } from '#pelago/kernel';
+
+/** Who sends a notification, as the kernel hands it (src/pelago-types.ts, Actor): only what the log names it by. */
+export interface Sender {
+  kind: 'human' | 'agent';
+  name: string;
 }
 
-/** Who is told that a notification was made: the packs, set by src/packtools.ts, which this module cannot import. */
-type Made = (l: Archipelago, e: { action: string; target: string; detail: Record<string, unknown> }) => void;
-let made: Made | undefined;
-export const onNotificationMade = (fn: Made | undefined) => void (made = fn);
+/** What a notification says. */
+export interface Notice {
+  title: string;
+  body?: string;
+  level?: 'info' | 'warning' | 'urgent';
+  about?: string;
+}
+
+/** Send the human a notification, as `actor`. Not a fact about the world, so it needs no approval. */
+export async function notify(ctx: KernelContext, actor: Sender, input: Notice): Promise<{ notification: string }> {
+  const { title, body, level, about } = input;
+  return ctx.call('root.notify', { actor: { kind: actor.kind, name: actor.name }, title, ...(body !== undefined && { body }), ...(level !== undefined && { level }), ...(about !== undefined && { about }) });
+}
+
+/** act.report.notify: a notification another internal pack sends, as the sender it names. */
+export const notifyAct = (ctx: KernelContext, input: Notice & { actor: Sender }) => notify(ctx, input.actor, input);

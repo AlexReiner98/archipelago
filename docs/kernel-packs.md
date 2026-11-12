@@ -199,8 +199,12 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.scene` | loader | publish | a pack's own drawing's first frame, run in its sandboxed process (bug e_mjuwqk4a: never code kept on the map), and whether its stylesheet passes |
 | `root.drawing` | surface | publish | a drawing's module or service worker by its hash, as the reader may see the map, or whether the packs ship it |
 | `root.public_product` | surface | publish | a product's public page, data or result's picture as anyone reads them, with the headers every public answer carries |
-| `root.transient` | surface | looks, presence, mail | the transient store, kept and read (a key, a key with its bytes, keys and prefixes at once) as the whole workspace of the calling map |
+| `root.transient` | surface | looks, presence, mail, connect | the transient store, kept, read and taken (a key, a key with its bytes, a key read once, keys and prefixes at once) as the whole workspace of the calling map |
 | `root.look` | surface | looks | the UI's version, a look pass for the calling map's screen (walls), the room for another look this hour (rules) |
+| `root.notify` | write | notifications | a notification made on the calling map as its sender, past the rules, private, for the sender's person or the owner; told to the packs that hear notification.made |
+| `root.mail` | walls | alerts | a mail to the server's operator at PELAGO_ALERT_TO and no one else, with or without a map (a crash), through the mail gate |
+| `root.token` | identity | connect | the token an approved request is handed: an agent's, for the approving person, within the items approved, that may only report |
+| `root.connections` | surface | connect | the server packs a workspace may connect, whether each is ready and connected here, where to go to connect or ready one, and ending one, logged as the one who ends it |
 
 ## Write-path hooks
 
@@ -308,12 +312,12 @@ Started in this order; each needs only those above it in the table.
 | 1 | database | storage, row-level security, the shared lock | `open(ws)`, `scoped(viewer)`, `anyone()`, `asOwner(tx, sql)` (roots only), `definer(name)`, `tables(pack, spec)`, `migrate()`, `leading()` |
 | 2 | seal | keys, and what forget destroys of them | `seal(id, text)`, `openSaid(id, bytes)`, `destroyKey(id)`, `secret(key)`, `setSecret(key, v)`, `opseal` |
 | 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended`; `root.dump`, `root.merge` |
-| 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited`; `root.workspaces` |
-| 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate`, `drawingBox` (a drawing's first frame in a walled process), `lookPass`; slot `walls.pass_store` |
+| 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited`; `root.workspaces`, `root.token` |
+| 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate`, `drawingBox` (a drawing's first frame in a walled process), `lookPass`; slot `walls.pass_store`; `root.mail` |
 | 6 | loader | packs, versions, islands, the sandbox, the in-process tier | `Registry`, pack states, pins, island guards, `reach`, `host` (sandbox), `context(pack)` (the `KernelContext`), `call(service)`, `fillings(point)`; slot `loader.reads` |
 | 7 | rules | who decides what applies | `decide(who, ops, runs)`, `judge`, `mayDo`, `authorityOf`, actor checks, `standing` (still writable, room to store), private deps, layout changes; slot `rules.reply_ended` |
-| 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*` |
-| 9 | surface | the ten verbs, who may call them, the HTTP host | tools, MCP, CLI, the hook host, the server's routes and gates, the kernel reads (`get`, `search`, `schema`, `events`, `proposals`), the reads API (`packreads`, as `answerRead`); slots `surface.*`; `root.counters` |
+| 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*`; `root.notify` |
+| 9 | surface | the ten verbs, who may call them, the HTTP host | tools, MCP, CLI, the hook host, the server's routes and gates, the kernel reads (`get`, `search`, `schema`, `events`, `proposals`), the reads API (`packreads`, as `answerRead`); slots `surface.*`; `root.counters`, `root.connections` |
 
 The `Archipelago` class (`src/pelago.ts`) is taken apart on the way: change
 and apply go to write, `search`, `get`, `trail` and `events` to surface,
@@ -372,7 +376,7 @@ moves with a shim to the pack named.
 | waits | unwait |
 | mentions | mentions (its projector; step 25's table went to database, its remake after a restore to log's `projectAgain`) |
 | automation_triggers (required; automations stays plain, its handler in the sandbox) | automation-rules, due-on (what its edges met kept under `due_on:<automation>`, `kernel.memory`) |
-| clocks | due (on its context: the reads `clock`, `timed`, `due_of` in `packreads-clocks`, item.due through `root.due`, a watched query's edges through automation_triggers' `act.report.due_on`; its timer is still registered in `src/open-steps.ts`, for the owner's alert on a failed pass, until alerts answers by a service name); duties went: stream and snapshot keeping to log's `LEADING`, the backup timer to backup's server duty (`backupDuty`), the server packs' schedules beside it in `whileLeads` (`src/leader.ts`) |
+| clocks | due (on its context: the reads `clock`, `timed`, `due_of` in `packreads-clocks`, item.due through `root.due`, a watched query's edges through automation_triggers' `act.report.due_on`; its timer is the pack's `kernel.timers`, `due.ts#tick`, a failed pass told to the owner by alerts' `act.report.alert`, wave 6b); duties went: stream and snapshot keeping to log's `LEADING`, the backup timer to backup's server duty (`backupDuty`), the server packs' schedules beside it in `whileLeads` (`src/leader.ts`) |
 | sessions (exists) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-measures, session-name, session-parent, session-quiet, session-state, session-turns, sessiontime, touched, stands, spent, audit, working-rules, close-offer, file-said, frontier, frontier-prompt, places |
 | clocks | due, duties |
 | sessions (exists, optional) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-name, session-parent, session-quiet, session-turns (the view; its read is runs' answer.turns), touched, stands, audit, working-rules, close-offer, file-said |
@@ -382,11 +386,13 @@ moves with a shim to the pack named.
 | mcp_apps | mcp-view |
 | backup | backup's backupAll, upload and merge (through root services), and the server duty that asks every five minutes whether a backup is due (`backupDuty`, serverContext) |
 | usage | usage (through root.counters), pack-touches, pack-use (reads `type_counts`, `uses_lately`; root.uses), uses (root.uses) |
-| notifications | notify |
+| notifications | notify (as built, wave 6b: on its context, made by `root.notify`; others notify by `act.report.notify`) |
 | mail (`packs/mailer`) | mail, smtp, bounces, member-mail |
-| alerts | alert |
+| alerts | alert (as built, wave 6b: on its context, mailing through `root.mail`, a crash as a server duty; others alert by `act.report.alert`) |
 | looks | chrome, look-draw, icon, looks (`passFor` stays in walls) |
 | connect | install, connect (the install pages' and a token ask's words; their routes the surface's, sign-in identity's, wave 6b), token-ask, connection-tools, server-pack-tools, check-connections (as built, wave 6b: install, server-pack-tools and check-connections import nothing of the kernel, through `root.server_packs` and `root.observe`; connect, token-ask and connection-tools still do) |
+| launch | launcher (the token stays in identity) |
+| connect | install, connect, token-ask, connection-tools, server-pack-tools (as built, wave 6b: install, server-pack-tools, token-ask and connection-tools import nothing of the kernel, through `root.server_packs`, `root.transient`, `root.token` and `root.connections`; connect and check-connections still do) |
 | presence | presence, seeing |
 | monitoring | report (the health tool stays the surface's, `report-tool.ts`, applying what `act.report.reading` says) |
 | devtools | dev, pull |
@@ -590,9 +596,15 @@ The publish pack (wave 6b, e_pkytyzy7) is on its context, published and public-v
 its SQL is `packreads-publish` (items whole as `entity()` reads them, the types that can be public, the documents
 published beside one, drafts at address words, the documents an item holds, a published document as anyone reads
 it), what only a root may do is the seven `root.*` names above, the look is styles' `page.look` and a kept view's
-picture lenses' `answer.kept_picture`. One module stays on the map behind a pure shim: `share-tools`, whose tool
-inputs are zod shapes and whose asks (share_ask, publish_ask) are notifications made as the asking agent, which the
-notifications pack makes only on the map.
+picture lenses' `answer.kept_picture`. `share-tools` is on it too (wave 6b, e_zdmf9bc6): its asks (share_ask,
+publish_ask) notify as the asking agent by `act.report.notify`, and the `document` tool reads with a copy of the views
+pack's reader (`document-read.ts`), which answers it by no name.
+
+A pack's tool declares its input as a JSON shape (wave 6b): the sketch above (`"string"`, `"number"`, `"boolean"`,
+`"id"`, `"any"`, `[shape]`, `{ "key": shape, "key?": shape }`), a list of two or more words for an enum, and what each
+field is for in `says`, by its path (`"authority.of"`). The surface builds the zod schema where the tools are
+registered (`declaredTools`, `packs/surface/kernel/tool-input.ts`), handing each run the pack's context its adapter
+makes; `test/pack-tool-inputs.test.ts` pins every such tool's schemas against what they were in zod.
 
 ### Answers
 
@@ -628,8 +640,9 @@ At the old path, `src/<m>.ts`:
 As built (wave 6b, looks, presence, mail, monitoring): a function that took the whole database and a screen
 (presence, seeing, looks, bounces) is adapted to take the screen's map, and the database it is still handed is not
 read: the pack's context of that map reaches the transient store through `root.transient`, which reads it as the
-whole workspace, as its callers did. Notifications and alerts still import the kernel: a notification is applied past
-the rules as the asker's actor, and an alert mails, which no context does yet (the report of e_jxdxg89p).
+whole workspace, as its callers did. Notifications and alerts are on their contexts (wave 6b, e_zdmf9bc6): a
+notification is applied past the rules as its sender by the write root (`root.notify`), and an alert mails the
+operator through the walls (`root.mail`), a crash with no map as a server duty (`serverContext`).
 
 ### Tests
 

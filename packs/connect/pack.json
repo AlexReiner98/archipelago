@@ -5,7 +5,10 @@
   "description": "How a person and their agents reach the server: the install scripts, a token asked for and handed over, the connections an operator drops and the check of whether each connection answers. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
   "uses": [
     "service:root.server_packs",
-    "service:root.observe"
+    "service:root.observe",
+    "service:root.transient",
+    "service:root.token",
+    "service:root.connections"
   ],
   "kernel": {
     "trust": "service",

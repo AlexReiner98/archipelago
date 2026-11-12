@@ -18,15 +18,15 @@
     },
     {
       "id": "identity",
-      "hash": "a99e05070c62b8cc5a8e055b9a9956157b6e76c3e1d7a533bd7d8d50c5792e4b"
+      "hash": "c3f62b9ade96cdd96adf038a88ed255905635ea118beec3dcf421f28938815d2"
     },
     {
       "id": "walls",
-      "hash": "45c84b62e583c216bf0cb65bf0873027bc1f803ea68e0d117025621c4b847fd6"
+      "hash": "f67eff9b7be9a1ff814035f1f6d0da91e801571b2fa6154030cfe95a84d6d775"
     },
     {
       "id": "loader",
-      "hash": "ae58f37f42ae75bc496c11a39f1131b76ad308dbffaffe0045f760e5002bcb7d"
+      "hash": "2423d9cdfdf38b44dcf76115394e9d03945125880d6ef6b6b8557d2b2f502a15"
     },
     {
       "id": "rules",
@@ -34,11 +34,11 @@
     },
     {
       "id": "write",
-      "hash": "31c75527a58932684e3d1ffd5190764772ebe3ddda1fc8c862d6cd0e347cb461"
+      "hash": "ba91fc8296908cfa3cfdde8579a29a4d1092290ad7ab900c58c9f73ce2337651"
     },
     {
       "id": "surface",
-      "hash": "b5bbd2c16ef1f32550eb0cb9996f9b200a7e723d591eeb734055ab644a20b449"
+      "hash": "3eaca9274d9c9627c6bccace1d06558e1b5e690123e2679d3aabde80ee199701"
     }
   ],
   "calls": {
@@ -85,6 +85,7 @@
       "publish"
     ],
     "root.transient": [
+      "connect",
       "look_draw",
       "mailer",
       "presence"
@@ -93,6 +94,18 @@
       "look_draw"
     ],
     "root.observe": [
+      "connect"
+    ],
+    "root.notify": [
+      "notifications"
+    ],
+    "root.mail": [
+      "alerts"
+    ],
+    "root.token": [
+      "connect"
+    ],
+    "root.connections": [
       "connect"
     ]
   }
