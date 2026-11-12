@@ -1,5 +1,6 @@
 {
  "files": {
+  "packs/alerts/kernel/alert.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/automations/automations.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/automations/firing.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/automations/rows.test.ts": { "pglite": 0.1, "postgres": 0.4 },
@@ -28,6 +29,7 @@
   "packs/look_draw/kernel/looks.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/mailer/kernel/mailer.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/monitoring/kernel/report.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/notifications/kernel/notify.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/placement/kernel/island-start.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/presence/kernel/presence.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/publish/kernel/on-context.test.ts": { "pglite": 0, "postgres": 0 },
@@ -151,6 +153,7 @@
   "test/no-sticky.test.ts": { "pglite": 4.2, "postgres": 2.8 },
   "test/note-count.test.ts": { "pglite": 0, "postgres": 0 },
   "test/note-max.test.ts": { "pglite": 2, "postgres": 0.7 },
+  "test/notices-log.test.ts": { "pglite": 0, "postgres": 0 },
   "test/notify-mail.test.ts": { "pglite": 3.5, "postgres": 1.6 },
   "test/oauth.test.ts": { "pglite": 8.5, "postgres": 3.8 },
   "test/oplog-guard.test.ts": { "pglite": 4.4, "postgres": 2.6 },

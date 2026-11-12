@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';
-import { dueBetween, duePass } from './due.ts';
+import { dueBetween, duePass, tick } from './due.ts';
 import { dayStart, occurs } from './when.ts';
 
 const types = new Map([
@@ -62,4 +62,16 @@ test('a pass moves the clock, records each occurrence through root.due with its 
   assert.equal(recorded.length, 3, 'each told once, the watched query last');
   cursor = undefined;
   assert.deepEqual((await duePass(ctx, AT + 2 * MIN)).map((d) => d.item), ['e_auto0000'], 'the first pass ever only sets where the clock starts');
+});
+
+test("a pass that fails is told to the owner by the alerts pack's name, and the timer goes on", async () => {
+  const asked: [string, unknown][] = [];
+  const ctx = {
+    registry,
+    reads: async () => { throw new Error('the database is gone'); },
+    call: async (name: string, input: unknown) => void asked.push([name, input]),
+    said: () => undefined,
+  } as unknown as KernelContext;
+  await tick(ctx);
+  assert.deepEqual(asked, [['act.report.alert', { key: 'clock', title: 'The clock failed', body: 'A pass over what came due failed: the database is gone', from: 'pelago' }]]);
 });

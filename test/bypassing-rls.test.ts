@@ -19,8 +19,8 @@ const CALLERS: Record<string, number> = {
   'src/hook-tool.ts': 1,
   'src/members.ts': 4,
   'src/notify-mail.ts': 2,
-  'src/notify.ts': 1,
   'src/pack-launch.ts': 1,
+  'packs/write/kernel/root-notify.ts': 1, // root.notify: who a notification made by the system is for, the workspace's owner, read whole as src/notify.ts read it
   'packs/surface/kernel/root-looks.ts': 1, // root.look: a look pass is kept in the whole workspace's transient store, as passFor's callers kept it
   'packs/surface/kernel/root-transient.ts': 1, // root.transient: the store only the whole database reaches, for the packs roots.json lets keep there
   'src/session-name.ts': 2,

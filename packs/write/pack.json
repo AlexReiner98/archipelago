@@ -6,6 +6,24 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.notify": {
+        "in": {
+          "actor": {
+            "kind": "string",
+            "name": "string"
+          },
+          "title": "string",
+          "body?": "string",
+          "level?": "string",
+          "about?": "id"
+        },
+        "out": {
+          "notification": "id"
+        },
+        "run": "root-notify.ts#notifyOf"
+      }
+    }
   }
 }

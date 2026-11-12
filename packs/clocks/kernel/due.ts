@@ -7,7 +7,8 @@
 // starts from now. An automation that watches a query comes due when it starts to match instead, by the same fact: the
 // automation_triggers pack answers what its edges met (act.report.due_on). A hearer is told the event's seq, and in its
 // detail the item's version (its last position in the fact stream) and the packs it came due under (the read
-// `due_of`), so what it does can name what it answered. It runs every minute in each workspace while this server leads.
+// `due_of`), so what it does can name what it answered. It runs every minute in each workspace while this server leads
+// (the pack's timer, tick), and a pass that fails is told to the owner (the alerts pack, act.report.alert).
 
 import type { KernelContext } from '#pelago/kernel';
 import { DEFAULT_ZONE, startsOf, type Timed, type When } from './when.ts';
@@ -71,4 +72,14 @@ export async function duePass(ctx: KernelContext, now = Date.now()): Promise<Due
   const met = await ctx.call<{ now: number }, { met: Due; told: Told }[]>('act.report.due_on', { now });
   for (const m of met) await tell(m.told);
   return [...due, ...met.map((m) => m.met)];
+}
+
+/** The clocks pack's timer: one pass, and a pass that fails told to the workspace's owner (act.report.alert). */
+export async function tick(ctx: KernelContext): Promise<void> {
+  try {
+    await duePass(ctx);
+  } catch (err) {
+    const body = `A pass over what came due failed: ${(err as Error).message}`;
+    await ctx.call('act.report.alert', { key: 'clock', title: 'The clock failed', body, from: 'pelago' }).catch((e: Error) => ctx.said(`telling the owner the clock failed did not work: ${e.message}`));
+  }
 }

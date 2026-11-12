@@ -3,13 +3,12 @@
 // most for each thing (its key); the server's log has every one. A crash is mailed on the way down, before the
 // process exits and is started again.
 //
-// Settings, from the environment:
-//   PELAGO_ALERT_TO   who is mailed. Without it (or without PELAGO_MAIL_FROM, src/mail.ts), only the map is told.
+// On the alerts pack's context: the mail goes out through the walls (root.mail, to the operator's address alone, and
+// nothing without one), the notification through the notifications pack (act.report.notify). Where a map asks, the
+// context is of that map; a crash has none, and is handed a server duty's context (serverContext), which calls root
+// services alone. Another internal pack alerts by this pack's name, act.report.alert.
 
-import { env } from '../../../src/env.ts';
-import { normalEmail, sendMail } from '../../../src/mail.ts';
-import { notify } from '../../../src/notify.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { KernelContext } from '#pelago/kernel';
 
 const EVERY_MS = 3_600_000;
 const told = new Map<string, number>();
@@ -24,16 +23,10 @@ function sayNow(key: string, now = Date.now()): boolean {
 /** Forget what was said, for tests. */
 export const resetAlerts = () => told.clear();
 
-/** Where alerts are mailed, when the server has an address for them. */
-export const alertTo = () => normalEmail(env('ALERT_TO'));
-
 /** Mail the owner, if the server has an address for them. Never throws: a failure to tell is written to the log. */
-export async function mailOwner(subject: string, text: string): Promise<boolean> {
-  const to = alertTo();
-  if (!to) return false;
+export async function mailOwner(ctx: Pick<KernelContext, 'call'>, subject: string, text: string): Promise<boolean> {
   try {
-    await sendMail({ to, subject: `Archipelago: ${subject}`, text });
-    return true;
+    return (await ctx.call<{ subject: string; text: string }, { sent: boolean }>('root.mail', { subject: `Archipelago: ${subject}`, text })).sent;
   } catch (err) {
     console.error(`alert: mailing "${subject}" failed: ${(err as Error).message}`);
     return false;
@@ -51,19 +44,26 @@ export interface Alert {
   about?: string;
 }
 
-/** Tell the owner of `l` that something broke: on its map, and by mail when it is the server's own. */
-export async function alertOwner(l: Archipelago, alert: Alert): Promise<void> {
+/** Tell the owner of the context's map that something broke: on its map, and by mail when it is the server's own. */
+export async function alertOwner(ctx: KernelContext, alert: Alert): Promise<void> {
   console.error(`alert: ${alert.title}`);
-  if (!sayNow(`${l.workspace}/${alert.key}`)) return;
+  if (!sayNow(`${ctx.workspace}/${alert.key}`)) return;
   const body = `${alert.body}\n\nSaid once an hour at most; the server's log has each one.`;
+  const notice = { actor: { kind: 'agent', name: alert.from }, title: alert.title, body, level: alert.level ?? 'urgent', ...(alert.about !== undefined && { about: alert.about }) };
   await Promise.all([
-    l.workspace === 'default' ? mailOwner(alert.title, body) : undefined,
-    notify(l, { kind: 'agent', name: alert.from }, { title: alert.title, body, level: alert.level ?? 'urgent', about: alert.about }).catch((err) => console.error(`alert: telling the map failed: ${(err as Error).message}`)),
+    ctx.workspace === 'default' ? mailOwner(ctx, alert.title, body) : undefined,
+    ctx.call('act.report.notify', notice).catch((err) => console.error(`alert: telling the map failed: ${(err as Error).message}`)),
   ]);
 }
 
-/** On a crash, the owner is mailed what it was before the process exits (at most ten seconds later). */
-export function alertOnCrash(where: string): void {
+/** act.report.alert: an alert another internal pack raises, on the map its context is of. */
+export const alertAct = (ctx: KernelContext, alert: Alert) => alertOwner(ctx, alert);
+
+/**
+ * On a crash, the owner is mailed what it was before the process exits (at most ten seconds later). The context is
+ * asked for only then: a server duty's, which has no map and mails through the walls.
+ */
+export function alertOnCrash(ctx: () => Promise<Pick<KernelContext, 'call'>>, where: string): void {
   let crashing = false;
   const crash = (kind: string) => (err: unknown) => {
     console.error(`${kind}:`, err);
@@ -71,10 +71,13 @@ export function alertOnCrash(where: string): void {
     crashing = true;
     const said = err instanceof Error ? err.stack ?? err.message : String(err);
     const out = setTimeout(() => process.exit(1), 10_000);
-    void mailOwner(`the server on ${where} crashed`, `${kind}, at ${new Date().toISOString()}:\n\n${said.slice(0, 4000)}\n\nIt exits now and is started again by whatever runs it.`).finally(() => {
-      clearTimeout(out);
-      process.exit(1);
-    });
+    const text = `${kind}, at ${new Date().toISOString()}:\n\n${said.slice(0, 4000)}\n\nIt exits now and is started again by whatever runs it.`;
+    void ctx()
+      .then((c) => mailOwner(c, `the server on ${where} crashed`, text), (e: Error) => console.error(`alert: mailing the crash failed: ${e.message}`))
+      .finally(() => {
+        clearTimeout(out);
+        process.exit(1);
+      });
   };
   process.on('uncaughtException', crash('uncaught exception'));
   process.on('unhandledRejection', crash('unhandled rejection'));

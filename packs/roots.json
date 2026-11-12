@@ -22,11 +22,11 @@
     },
     {
       "id": "walls",
-      "hash": "45c84b62e583c216bf0cb65bf0873027bc1f803ea68e0d117025621c4b847fd6"
+      "hash": "f67eff9b7be9a1ff814035f1f6d0da91e801571b2fa6154030cfe95a84d6d775"
     },
     {
       "id": "loader",
-      "hash": "e9bd3e5e79e6957956717eef5b1df8f75dc6e00bf3dc9fb8a22620f37d98b7e7"
+      "hash": "3cf3ae3b8315d135571fdb4f996a71220a5f8440b880a6faa60da080972d4b17"
     },
     {
       "id": "rules",
@@ -34,11 +34,11 @@
     },
     {
       "id": "write",
-      "hash": "a36234663854a2365c66c8abc925980a7973d06f8670b9be802ecd92d025d3fa"
+      "hash": "c4bfc702846cc7f5676251ff7934f2fd1016cdb29ee7d27e88c5aee6c0afef98"
     },
     {
       "id": "surface",
-      "hash": "a167f5c0f70dfd6c24bfe8891d62a215aa22ab3774eac34b03e86f7d95d582a5"
+      "hash": "9ee969cdb0b31cb3e0a49719b066f9c897fac485b1ec5e429d23b0bd315cfdf0"
     }
   ],
   "calls": {
@@ -91,6 +91,12 @@
     ],
     "root.look": [
       "look_draw"
+    ],
+    "root.notify": [
+      "notifications"
+    ],
+    "root.mail": [
+      "alerts"
     ]
   }
 }
