@@ -10,7 +10,9 @@ import type { Actor, ChangeInput } from './pelago-types.ts';
 import type { Done } from '../../../src/activity.ts';
 import { openOps } from '../../../src/opseal.ts';
 import { isSealed } from '../../../src/seal.ts';
-import { decide } from '../../../src/rules.ts';
+import { decide, type RuleDef } from '../../../src/rules.ts';
+import { ownManifest } from '../../loader/kernel/root-calls.ts';
+import type { Registry } from '../../../src/packs.ts';
 import type { Light, OpFact, OpStream } from '../../../src/streams.ts';
 
 type Props = Record<string, unknown>;
@@ -42,6 +44,17 @@ export type BookkeepAsk =
 const STREAMS = /^(?:sessions|observations|automations)$/;
 const AUDIT = /^audit_cursor:e_\w+$/;
 
+/**
+ * The registry a pack's bookkeeping is judged by: the map's, with the pack's own rules as this server ships them where
+ * the map has not loaded it (an optional pack the kernel still runs on every map: sessions), so its rule lets it through
+ * wherever its code writes.
+ */
+function judgedBy(reg: Registry, pack: string): Registry {
+  if (reg.rules.some((r) => r.pack === pack)) return reg;
+  const own = ((ownManifest(pack) as { rules?: RuleDef[] } | undefined)?.rules ?? []).map((r) => ({ ...r, pack }));
+  return new Proxy(reg, { get: (t, k) => (k === 'rules' ? [...t.rules, ...own] : Reflect.get(t, k, t)) });
+}
+
 /** Answer one ask, on the map the caller's context is of. */
 export async function bookkeep(at: RootCall, ask: BookkeepAsk): Promise<unknown> {
   const map = at.map;
@@ -50,7 +63,7 @@ export async function bookkeep(at: RootCall, ask: BookkeepAsk): Promise<unknown>
     // Judged by the rules like any change, as the pack's bookkeeping: its own rule (sessions.bookkeeping) lets it
     // through, and the log names what it spared. Its actor and its authority (none claimed) are as they always were.
     const { actor, input } = ask.apply;
-    const verdict = await decide(map.db, map.registry, { human: actor.startsWith('human:'), bookkeeping: at.caller }, input.ops, map.policy);
+    const verdict = await decide(map.db, judgedBy(map.registry, at.caller), { human: actor.startsWith('human:'), bookkeeping: at.caller }, input.ops, map.policy);
     if (verdict.outcome !== 'apply') throw new Error(`root.bookkeep: ${at.caller}'s bookkeeping is ${verdict.outcome === 'hold' ? 'held' : 'refused'}: ${[...verdict.refused, ...verdict.held.map((r) => r.say)].join('; ')}`);
     const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];
     return map.apply(actor, input, { rule: { outcome: 'apply', spared } });

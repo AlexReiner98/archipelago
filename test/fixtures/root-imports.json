@@ -145,7 +145,6 @@
   "src/view-address.ts -> src/query-flat.ts",
   "src/within.ts -> src/places.ts",
   "src/workspace-tools.ts -> src/looks.ts",
-  "src/workspace-tools.ts -> src/replies.ts",
   "src/workspace-tools.ts -> src/reply-rules.ts",
   "src/workspace-tools.ts -> src/sessions.ts",
   "src/workspaces.ts -> src/island-start.ts",

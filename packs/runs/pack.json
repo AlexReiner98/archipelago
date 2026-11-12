@@ -56,6 +56,11 @@
         "out": { "run": { "id": "id", "title": "string", "status": "string", "open": "boolean" }, "turns": ["any"], "more": "number", "names": "any" },
         "run": "answers.ts#turns"
       },
+      "answer.story": {
+        "in": { "run": "string" },
+        "out": { "run": { "id": "id", "title": "string", "status": "string", "open": "boolean" }, "finding": "any", "beats": ["any"] },
+        "run": "answers.ts#story"
+      },
       "answer.place_for": {
         "in": { "remote?": "string", "cwd?": "string" },
         "out": { "place": "any" },
@@ -67,8 +72,8 @@
         "run": "answers.ts#livesIn"
       },
       "answer.narrowed": {
-        "in": { "text": "string" },
-        "out": { "settled": [{ "id": "id", "title": "string", "status": "string", "chosen?": "string", "why?": "string" }], "open": [{ "id": "id", "title": "string", "status": "string" }] },
+        "in": { "text": "string", "said?": "boolean" },
+        "out": { "text?": "any", "settled": [{ "id": "id", "title": "string", "status": "string", "chosen?": "string", "why?": "string" }], "open": [{ "id": "id", "title": "string", "status": "string" }] },
         "run": "answers.ts#narrowed"
       }
     }

@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "3745320f23283a0833363bcb9d7aba3888162ee5eb84f9ec727e492012464e43"
+      "hash": "3817a4b6e61c1c178ed1b597c3fdb91369138261d11f17c339f8f8f2f5273e04"
     },
     {
       "id": "rules",
@@ -34,11 +34,11 @@
     },
     {
       "id": "write",
-      "hash": "b6c587816abde68198df700ba99292eb522e412148bd5782836cccf83b9ef77d"
+      "hash": "4fd3d5868a3957b5b5abd37e63985083d84975b101a778781c11907e5cac0b3e"
     },
     {
       "id": "surface",
-      "hash": "4934aa2fe9074d7586e124ae90a716fc0c655e5fb4e4dd5989e0890f0270831d"
+      "hash": "b67aa5220d18e78ed71b836bc2fa9c6aa19d5b6176b95397906a3fb2031736fe"
     }
   ],
   "calls": {
@@ -56,7 +56,8 @@
     ],
     "root.uses": [
       "usage",
-      "query"
+      "query",
+      "sessions"
     ],
     "root.server_packs": [
       "connect"

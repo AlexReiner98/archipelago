@@ -35,6 +35,24 @@
         "out": "any",
         "run": "acts.ts#tookAct"
       },
+      "act.report.told": {
+        "in": {},
+        "out": "any",
+        "run": "acts.ts#toldAct"
+      },
+      "answer.seeing_line": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "run?": "string"
+        },
+        "out": {
+          "line": "any"
+        },
+        "run": "acts.ts#seeingLineAnswer"
+      },
       "answer.sight": {
         "in": {
           "whose": {

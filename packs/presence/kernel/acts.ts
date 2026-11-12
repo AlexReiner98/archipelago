@@ -4,7 +4,7 @@
 
 import type { KernelContext } from '#pelago/kernel';
 import { type Focus, looked, type Page, point, presence, runNamed, type Step, tellStamp, took, watching, type Whose } from './presence.ts';
-import { inSight, seen, type Seen } from './seeing.ts';
+import { inSight, seeingLine, seen, type Seen } from './seeing.ts';
 
 /** How long a show brought into sight waits for the owner's page to say so: tries of so many ms. */
 export const FOCUS_TRIES = 12;
@@ -23,6 +23,12 @@ export const tookAct = async (ctx: KernelContext, input: { whose: Whose; step: O
   if (input.told) await tellStamp(ctx);
   await took(ctx, input.whose, input.step, true);
 };
+
+/** act.report.told: a beat told with no step of its own (a reply rule's): the tell stamp moved, so a page polling for it hears it. */
+export const toldAct = async (ctx: KernelContext): Promise<void> => tellStamp(ctx);
+
+/** answer.seeing_line: what the owner is looking at now, as a line a session is told at a prompt, so "this" has a referent; none when they look at nothing lately. */
+export const seeingLineAnswer = async (ctx: KernelContext, input: { whose: Whose; run?: string }) => ({ line: (await seeingLine(ctx, input.whose, input.run)) ?? null });
 
 /**
  * answer.sight: whether a show of session `run` (or the one `actor` last named here) lands where the owner looks, and

@@ -6,6 +6,7 @@
 import type { Archipelago, Entity } from '../../../src/pelago.ts';
 import { scopeWithin } from '../../write/kernel/within.ts';
 import { packVersionsFor } from '../../loader/kernel/pack-versions.ts';
+import { itemLink } from '../../identity/kernel/members.ts';
 
 export type SessionsRead = {
   /** The open runs a chat's hook made (a session id) since a moment, newest first, at most 50. */
@@ -36,6 +37,14 @@ export type SessionsRead = {
   packs_at?: { island?: string };
   /** Everything a token within these items may write to. */
   token_scope?: string[];
+  /** Whose screen the map is read for: its workspace and the person it is read as, as the presence pack's names take it. */
+  whose?: true;
+  /** The island a session works on: its task's, once it has said one, else its repository's (the place it lives in). */
+  run_island?: string;
+  /** The open items that may be held: of a type with a capacity, saying it in one of these fields, or every one where a type says it as a number. */
+  holdable?: { types: string[]; fields: string[]; any: boolean };
+  /** How an item of this workspace is linked for a person: the site's address with {id} in it. */
+  item_link?: true;
 };
 
 const ids = (v: unknown, what: string): string[] => {
@@ -123,5 +132,20 @@ export async function sessionsRead(l: Archipelago, q: SessionsRead): Promise<unk
   }
   if (q.packs_at !== undefined) return packVersionsFor(l, typeof q.packs_at.island === 'string' ? { props: { island: q.packs_at.island } } : undefined);
   if (q.token_scope !== undefined) return [...(await scopeWithin(l, ids(q.token_scope, 'token_scope')))];
+  if (q.item_link !== undefined) return itemLink(l.workspace);
+  if (q.whose !== undefined) return { workspace: l.workspace, ...(l.viewer !== undefined && { viewer: l.viewer }) };
+  if (q.run_island !== undefined) {
+    const { rows } = await l.db.query<{ island: unknown; works: boolean }>(
+      `select e.props->>'island' as island, r.type = any($2::text[]) as works from relation r join entity e on e.id = r.to_id
+       where r.from_id = $1 and r.valid_to is null and e.archived_at is null and r.type = any($2::text[] || $3::text[]) and e.props ? 'island'
+       order by works desc, r.valid_from desc limit 1`,
+      [String(q.run_island), l.registry.relationFamily('works_on'), l.registry.relationFamily('lives_in')],
+    );
+    return typeof rows[0]?.island === 'string' ? rows[0].island : null;
+  }
+  if (q.holdable !== undefined) {
+    const { rows } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null and (props ?| $2::text[] or $3) -- index entity_type`, [ids(q.holdable.types, 'holdable.types'), ids(q.holdable.fields, 'holdable.fields'), q.holdable.any === true]);
+    return rows;
+  }
   return undefined;
 }

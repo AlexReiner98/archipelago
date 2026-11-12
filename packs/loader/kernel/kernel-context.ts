@@ -195,6 +195,9 @@ export function kernelContext(l: Archipelago, pack: string): KernelContext {
   return contextFor(l, manifest, hostFor(l));
 }
 
+/** An internal pack's context of a map whether or not the map has it on (an optional pack the kernel still names: sessions), made from the pack as this server ships it where the map has not loaded it. */
+export const ownContext = (l: Archipelago, pack: string): KernelContext => (l.registry.packs.some((p) => p.id === pack && isInternal(p)) ? kernelContext(l, pack) : contextFor(l, (ownManifest(pack) ?? (() => { throw new Error(`This server ships no ${pack} pack`); })()) as Manifest, hostFor(l)));
+
 /** Whether a reach's `items` let this address through: exactly what an open item of its type, as the map reads, keeps in its field. */
 async function keptAddress(l: Archipelago, kept: NonNullable<NonNullable<Manifest['reach']>['items']>, url: string): Promise<boolean> {
   for (const items of kept) {
