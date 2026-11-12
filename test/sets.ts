@@ -75,12 +75,8 @@ export const SLOW: Record<string, string> = {
   'packs/canvas/map-routing.test.ts': 'long',
   // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
   'test/sessions.test.ts': 'long',
-  'test/oauth.test.ts': 'long',
-  'test/server-auth.test.ts': 'long',
-  'test/query-flat.test.ts': 'long',
   'test/new-workspace.test.ts': 'long',
   'test/seeing.test.ts': 'long',
-  'test/handoff.test.ts': 'long',
   'test/setup.test.ts': 'long',
 };
 
