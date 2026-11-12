@@ -1,7 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DRAW_HOST_NAME } from './draw-host.ts';
 import { env } from './env.ts';
 import { readOnlyPacks, readWorkspacePacks } from './pack-allow.ts';
 import { DEFAULT_AGENT_POLICY, type Policy } from './pelago.ts';
@@ -84,6 +83,9 @@ export interface Config {
 
 /** The exit code that asks the dev supervisor (src/dev.ts) to start the server again. */
 export const RESTART_EXIT = 75;
+
+/** A name a drawing host may have (PELAGO_DRAW_HOST, src/draw-host.ts): a host name, and a port. */
+export const DRAW_HOST_NAME = /^[a-z0-9.-]+(:\d{1,5})?$/;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 

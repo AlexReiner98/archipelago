@@ -17,11 +17,11 @@ export interface DrawHostOptions {
 
 const LOOPBACK = ['127.0.0.1', 'localhost'];
 /** What the drawing host serves: the frame (its scripts written in), three.js, which a drawing imports from the frame's origin, and drawings by hash with their service workers (src/drawing-files.ts). */
+import { DRAW_HOST_NAME } from './config.ts';
+
 const SERVED = new Set(['/draw.html', '/three.js']);
 export const drawHostServes = (path: string) => SERVED.has(path) || path.startsWith('/drawing/');
 
-/** A name a drawing host may have: a host name, and a port. */
-export const DRAW_HOST_NAME = /^[a-z0-9.-]+(:\d{1,5})?$/;
 
 /** What the server answers a drawing host by, given its port and the origins its pages are reached at. */
 export function drawHosts(port: number, pageOrigins: string[], { host, loopback = false }: DrawHostOptions = {}) {

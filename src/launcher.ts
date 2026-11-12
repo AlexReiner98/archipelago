@@ -12,7 +12,7 @@ import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { createToken, revokeToken } from './auth.ts';
-import { needHuman } from './actor-checks.ts';
+import { launchedMay, needHuman } from './actor-checks.ts';
 import { actorId, type Actor, type Archipelago } from './pelago.ts';
 import { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './sessions.ts';
 import { briefFor, promptFor, type LaunchInput, type LaunchMode, type StartedBy } from './launch-brief.ts';
@@ -118,7 +118,7 @@ export async function launch(l: Archipelago, actor: Actor, input: LaunchInput, b
   mkdirSync(at.dir, { recursive: true });
   // With tokens on, the session gets its own agent token, good for a day and revoked the moment it ends; one someone
   // else started may only propose. The run says who. (With tokens off there is no identity to hold: everyone is the owner.)
-  const key = at.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined, ...(started && { may: 'propose' as const }) }) : undefined;
+  const key = at.auth ? await createToken(l.db, l.workspace, { kind: 'agent', name: `launched:${run}`, expires_days: 1, entity: l.viewer || undefined, ...launchedMay(started) }) : undefined;
   if (started) await l.apply(actorId(agent), { ops: [{ op: 'update', id: run, props: { started_by: started } }], reason: `Started by ${started.name}` });
   if (at.model) await l.apply(actorId(agent), { ops: [{ op: 'update', id: run, props: { model: at.model } }], reason: `Runs on ${at.model}` });
   const mcpFile = join(at.dir, `${run}.mcp.json`);

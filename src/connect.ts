@@ -9,6 +9,7 @@ import { BOUNCED_DAYS, failedFor, fromRelay, noteBounced } from './bounces.ts';
 import { normalEmail } from './mail.ts';
 import { workspacesOf } from './control-index.ts';
 import type { Q } from './db.ts';
+import './member-mail.ts'; // members' notices go out as mail where people sign in
 import { emailOfLink, LINK_MINUTES, memberOf, redeem, redeemTyped, requestSignIn, signedIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
 import { clearPassword, passwordProblem, passwordSet, passwordTriesSpent, passwordWorks, setPassword, TRIES_MINUTES } from './passwords.ts';
 import { installPage, installPs1, installScript, installSh, llmsTxt } from './install.ts';

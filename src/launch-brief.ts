@@ -1,21 +1,11 @@
 // What a launched session is told and who it is started for: on this machine (src/launcher.ts).
 
 import { askView } from './askview.ts';
-import { needHuman } from './actor-checks.ts';
+import { needHuman, startedFor, type StartedBy } from './actor-checks.ts';
 import type { Actor, Archipelago } from './pelago.ts';
 
-/**
- * Who started a run, when it was not the owner: another person, an automation, or a delivery from outside (a push).
- * Such a run only proposes, whatever agents may do here: what it changes waits for the owner.
- */
-export interface StartedBy {
-  kind: 'person' | 'automation' | 'webhook' | 'pack';
-  id?: string;
-  name: string;
-  /** A pack's action that started it (src/pack-action-launch.ts): the pack, and what else the pack says of the run. */
-  pack?: string;
-  [field: string]: unknown;
-}
+// Who a run is started for, and that one not the owner's only proposes, is an actor check (src/actor-checks.ts).
+export type { StartedBy };
 
 /** What the launched session may do without anyone there to approve it. */
 export type LaunchMode = 'plan' | 'acceptEdits';
@@ -43,9 +33,7 @@ export interface Brief {
 /** The task's brief, and who the session is started for when it is not the owner (another member, or what `by` names). */
 export async function briefFor(l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy): Promise<{ brief: Brief; started?: StartedBy }> {
   needHuman(actor, 'Only a human can launch a session.');
-  // Started by anyone but the owner (another member, or an automation), the session only proposes.
-  const owner = await l.setting<string>('me');
-  const started = by ?? (owner && actor.person && actor.person !== owner ? { kind: 'person' as const, id: actor.person, name: actor.name } : undefined);
+  const started = startedFor(actor, await l.setting<string>('me'), by);
   const brief = input.brief ?? ((await askView(l, actor, 'brief', { task: input.task })) as Brief);
   return { brief, started };
 }
