@@ -12,6 +12,7 @@ import { publicViewAt, publicViews } from '../../database/kernel/public-view-sto
 import { draftDocument, publicDocument } from '../../walls/kernel/public-document.ts';
 import { islandsOff } from '../../loader/kernel/islands.ts';
 import { LOCAL_PACK } from '../../loader/kernel/packs.ts';
+import { memoryPrefix, type Manifest } from '../../loader/kernel/manifest.ts';
 
 export type ServiceRead = {
   /** One open link by its id, or null: what an unlink takes away, read alone rather than every link of its kind. */
@@ -56,8 +57,8 @@ const loggedIn = (l: Archipelago, what: string) => {
   if (l.props !== 'props') throw new Error(`Anyone with no login reads no ${what}.`);
 };
 
-/** The settings key a pack's memory is kept under: its own, apart from the kernel's and every other pack's. */
-export const memoryKey = (pack: string, key: string) => `pack:${pack}:${key}`;
+/** The settings key a pack's memory is kept under: its own, apart from the kernel's and every other pack's; under the prefix its manifest declares (kernel.memory), if it does. */
+export const memoryKey = (pack: string, key: string, manifest?: Pick<Manifest, 'id' | 'kernel'>) => memoryPrefix(manifest ?? { id: pack }) + key;
 
 /** The answer to one of these reads, or undefined when the read is none of them. `pack` is the pack asking, when one is. */
 export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string): Promise<unknown> {
@@ -78,7 +79,7 @@ export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string)
   if (q.memory !== undefined) {
     const key = String(q.memory.key);
     if (!KEY.test(key)) throw new Error('memory.key is a short word of letters, digits, _, -, : and .');
-    const at = memoryKey(pack, key);
+    const at = memoryKey(pack, key, l.registry.packs.find((p) => p.id === pack));
     if (!('value' in q.memory)) return (await l.setting(at)) ?? null;
     if (q.memory.value === null || q.memory.value === undefined) await l.db.query(`delete from setting where key = $1`, [at]);
     else await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [at, JSON.stringify(q.memory.value)]);

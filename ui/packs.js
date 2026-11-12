@@ -122,8 +122,8 @@ export function packsCard({ info, then, goTo }) {
       title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}${p.description ? `\n${p.description}` : ''}${p.requires?.length ? `\nNeeds: ${p.requires.join(', ')}` : ''}`,
       off: !on,
       marks: marksOf(p),
-      // The switch is on the plate's face; the kernel's pack has none, since it is never off.
-      action: KERNEL.includes(p.id) ? h('span', { class: 'muted small', title: 'The kernel’s own: never off' }, 'always on') : toggle(p, on),
+      // The switch is on the plate's face; the kernel's pack and the server's required packs have none, since they are never off.
+      action: KERNEL.includes(p.id) || p.required ? h('span', { class: 'muted small', title: p.required ? 'The server’s own, required: never off' : 'The kernel’s own: never off' }, 'always on') : toggle(p, on),
       rows,
     });
   };

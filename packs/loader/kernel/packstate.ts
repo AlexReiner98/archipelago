@@ -20,6 +20,7 @@ import { ISLANDS } from './islands.ts';
 import { islandBlockers, moveOntoIslands } from '../../../src/island-start.ts';
 import { dependentsOf, KERNEL_PACKS } from './packorder.ts';
 import { manifestRead } from './pack-folders.ts';
+import { isRequired } from './manifest.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
 import { needHuman } from '../../../src/actor-checks.ts';
@@ -266,7 +267,7 @@ export function packStates(l: Archipelago) {
   };
   return l.registry.found.filter((p) => offered(p.id)).map((p) => {
     const waits = relying(p);
-    return { id: p.id, title: p.title, version: p.version, manifest: l.registry.hashes.get(p.id), description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...(bundleOf(p.id) && { bundle: said(bundleOf(p.id)!) }), ...(waits.length && { dependents: waits }), ...l.registry.states.get(p.id)! };
+    return { id: p.id, title: p.title, version: p.version, manifest: l.registry.hashes.get(p.id), description: p.description, requires: p.requires ?? [], touches: packTouches(p), ...(made(p.id) && { made: made(p.id) }), ...(bundleOf(p.id) && { bundle: said(bundleOf(p.id)!) }), ...(waits.length && { dependents: waits }), ...(isRequired(p) && l.registry.internal.has(p.id) && { required: true }), ...l.registry.states.get(p.id)! };
   });
 }
 
@@ -284,6 +285,9 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   if (!input.on && kernel) throw new Error(`The ${kernel} pack is the kernel's own: it is never taken out.`);
   // What the rules say of taking a pack out (core's root_off: a root pack never is), asked of each it names.
   if (!input.on) for (const pack of named) await l.may(actor, 'pack_off', { pack });
+  // A required internal pack is the server's own, always on (kernel.optional, docs/kernel-packs.md): an optional one is the map's to switch.
+  const required = named.find((id) => l.registry.found.some((p) => p.id === id && l.registry.internal.has(id) && isRequired(p)));
+  if (!input.on && required) throw new Error(`The ${required} pack is the server's own and required: it is never taken out.`);
   // Taking out a provider sends the packs that rely on it to waiting, their items kept; adding it back wakes them (decision e_f9ybsuce).
   const waitingBefore = new Set([...l.registry.states].filter(([, s]) => s.state === 'waiting').map(([id]) => id));
   await syncPacks(l); // the log says what is present before it says what changed

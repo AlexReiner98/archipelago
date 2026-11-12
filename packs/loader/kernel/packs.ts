@@ -11,7 +11,7 @@ import { checkFieldDecls, headOf, ownHead, type ColumnField } from '../../../src
 import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from '../../../src/rules.ts';
-import { isInternal, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from '../../../src/services.ts';
+import { isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from '../../../src/services.ts';
 import { OWN_PACKS, readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from '../../../src/phases.ts'; import { keepVersionTypes } from './version-types.ts';
 
@@ -128,7 +128,7 @@ export class Registry {
   /** Each pack's actions and views by the tool name they are offered as. */
   tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
   /** Every pack found, active, waiting or off, with why. */
-  states = new Map<string, PackState>(); /** The server's own internal packs (root and service, docs/kernel-packs.md): always on, never offered on the Packs screen. */ internal = new Set<string>();
+  states = new Map<string, PackState>(); /** The server's own internal packs (root and service, docs/kernel-packs.md), found here: each required (always on) or optional (a map may switch it off). */ internal = new Set<string>();
   found: PackFile[] = [];
   /** Each pack's manifest as it was read: the SHA-256 of its pack.json, which its fact on the log names. */
   hashes = new Map<string, string>();
@@ -162,7 +162,7 @@ export class Registry {
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK && !this.made.has(id)).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
     for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
-    if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why); const refused = new Map(kernelRefused(found.values(), (id) => !this.made.has(id) && this.swap?.of !== id && (!!this.given || this.where.get(id) === this.dir || this.where.get(id) === OWN_PACKS))); for (const p of found.values()) if (isInternal(p)) off.delete(p.id); for (const [id, why] of refused) off.set(id, why); this.internal = new Set([...found.values()].filter((p) => isInternal(p) && !refused.has(p.id)).map((p) => p.id)); // an internal pack is always on; kernel code from anywhere but the server's own folder never runs
+    if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why); const refused = new Map(kernelRefused(found.values(), (id) => !this.made.has(id) && this.swap?.of !== id && (!!this.given || this.where.get(id) === this.dir || this.where.get(id) === OWN_PACKS))); for (const p of found.values()) if (isRequired(p)) off.delete(p.id); for (const [id, why] of refused) off.set(id, why); this.internal = new Set([...found.values()].filter((p) => isInternal(p) && !refused.has(p.id)).map((p) => p.id)); // a required internal pack is always on, an optional one off where the map turned it off (kernel.optional); kernel code from anywhere but the server's own folder never runs
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
     // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses); a name it uses is read as the pack that provides it.
     const declaredBy = new Map([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((t) => [t.id, p.id] as const)));

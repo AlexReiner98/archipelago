@@ -39,7 +39,9 @@ test('a pack\'s memory is its own: read, written and cleared under its own key',
   assert.equal(await answerRead(l, { memory: { key: 'x:1', value: { pos: 3 } } }, 'automation_triggers'), true);
   assert.deepEqual(await answerRead(l, { memory: { key: 'x:1' } }, 'automation_triggers'), { pos: 3 });
   assert.equal(await answerRead(l, { memory: { key: 'x:1' } }, 'publish'), null, 'another pack does not read it');
-  assert.deepEqual(await l.setting('pack:automation_triggers:x:1'), { pos: 3 }, 'kept apart from the kernel\'s settings');
+  assert.deepEqual(await l.setting('due_on:x:1'), { pos: 3 }, 'kept under the prefix its manifest declares (kernel.memory), as the clock kept it');
+  await answerRead(l, { memory: { key: 'x:1', value: 1 } }, 'publish');
+  assert.equal(await l.setting('pack:publish:x:1'), 1, 'a pack that declares none: under its own key, apart from the kernel\'s settings');
   await answerRead(l, { memory: { key: 'x:1', value: null } }, 'automation_triggers');
   assert.equal(await answerRead(l, { memory: { key: 'x:1' } }, 'automation_triggers'), null);
   await assert.rejects(answerRead(l, { memory: { key: 'no spaces' } }, 'automation_triggers'), /memory.key/);

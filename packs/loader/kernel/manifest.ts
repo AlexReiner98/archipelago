@@ -76,8 +76,15 @@ export type ModuleRef = string;
 /** The manifest key `kernel` (docs/kernel-packs.md, "The manifest key"). */
 export interface KernelSpec {
   trust: Trust;
-  /** Never offered on the Packs screen, never taken out, versioned with the server: every root and service pack is. */
+  /** Shipped with the server, versioned with it, its code in-process: every root and service pack is. */
   internal: true;
+  /**
+   * Whether a map may switch it off on the Packs screen (decision e_cenjpmrf, the owner, 12 Nov 2026). Absent, it is
+   * required: always on, never taken out. An optional one is on where the map has it, and honours every reason a plain
+   * pack is off; it fills only the write path's points, which are read at each change, so switching it off takes it
+   * out at once. Never a root pack.
+   */
+  optional?: true;
   /** The folder of its code under the pack's own, `kernel/` unless said. */
   modules?: string;
   /** The service names it provides (`<family>.<name>`), each with its shapes (src/services.ts) and the function that answers it. */
@@ -92,14 +99,19 @@ export interface KernelSpec {
   tables?: Record<string, Record<string, string>>;
   /** What it runs on a clock, on the server that leads. */
   timers?: { run: ModuleRef; every_ms: number; leading?: boolean }[];
+  /**
+   * The settings prefix its memory (the read memory, src/packreads-service.ts) is kept under, in place of
+   * `pack:<id>:`: a prefix the code it took over already kept there, so nothing is migrated (decision e_a8dh8fg3).
+   */
+  memory?: string;
 }
-export const KERNEL_KEYS: readonly string[] = 'trust internal modules provides calls hooks fills tables timers'.split(' ');
+export const KERNEL_KEYS: readonly string[] = 'trust internal modules provides calls hooks fills tables timers optional memory'.split(' ');
 const MODULE_REF = /^[\w./-]+\.ts#[A-Za-z_$][\w$]*$/;
 
 /** Problems with a manifest's `kernel`, as sentences. Where a pack may carry it is the registry's (kernelRefused). */
 export function kernelProblems(k: unknown): string[] {
   if (k === undefined) return [];
-  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, calls?, hooks?, fills?, tables?, timers? }'];
+  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, calls?, hooks?, fills?, tables?, timers?, optional?, memory? }'];
   const s = k as Raw, problems: string[] = [];
   for (const key of Object.keys(s)) if (!(KERNEL_KEYS as readonly string[]).includes(key)) problems.push(`"kernel.${key}" is not a key of a manifest: in kernel, one of ${KERNEL_KEYS.join(', ')}`);
   if (s.trust !== 'root' && s.trust !== 'service') problems.push('kernel.trust is root or service');
@@ -111,13 +123,29 @@ export function kernelProblems(k: unknown): string[] {
   if (s.fills !== undefined && (!Array.isArray(s.fills) || s.fills.some((f) => typeof f !== 'string' || !f))) problems.push('kernel.fills is a list of the fields its rewrite may set');
   for (const [i, t] of arr<Raw>(s.timers).entries()) { ref(`kernel.timers[${i}]`, t.run); if (typeof t.every_ms !== 'number' || t.every_ms < 1000) problems.push(`kernel.timers[${i}].every_ms is a number of milliseconds, 1000 or more`); }
   if (s.trust === 'root' && (s.provides !== undefined || s.hooks !== undefined || s.fills !== undefined)) problems.push('a root pack opens hook points and slots; it fills none and provides no service name');
+  if (s.optional !== undefined && s.optional !== true) problems.push('kernel.optional is true, or absent for a required pack');
+  if (s.optional === true && s.trust === 'root') problems.push('a root pack is never optional: it is always on');
+  if (s.optional === true) {
+    // What is filled once at a workspace's open would outlive the switch: an optional pack declares none of it.
+    const held = ['provides', 'tables', 'timers'].filter((k) => s[k] !== undefined);
+    const points = Object.keys((s.hooks ?? {}) as Raw).filter((p) => !p.startsWith('write.'));
+    if (held.length || points.length) problems.push(`an optional pack fills only the write path's points (write.*), read at each change: not ${[...held.map((k) => `kernel.${k}`), ...points].join(', ')}`);
+  }
+  if (s.memory !== undefined && (typeof s.memory !== 'string' || !/^[a-z][a-z0-9_]*:$/.test(s.memory) || s.memory.startsWith('pack:'))) problems.push('kernel.memory is a settings prefix of lower-case letters, digits and _, ending in a colon, such as "due_on:", and never pack:');
+  if (s.memory !== undefined && s.trust !== 'service') problems.push("kernel.memory is a service pack's");
   return problems;
 }
 
 /** A pack's tier: root, service, or none (plain, in the sandbox). */
 export const tierOf = (m: Pick<Manifest, 'kernel'>): Trust | undefined => m.kernel?.trust;
-/** Whether a pack is the server's own internal one: always on, never on the Packs screen. */
+/** Whether a pack is the server's own internal one: shipped with the server, versioned with it, in-process. */
 export const isInternal = (m: Pick<Manifest, 'kernel'>): boolean => m.kernel?.internal === true;
+/** Whether an internal pack is optional: a map may switch it off on the Packs screen (kernel.optional). */
+export const isOptional = (m: Pick<Manifest, 'kernel'>): boolean => isInternal(m) && m.kernel?.optional === true;
+/** Whether an internal pack is required: always on, never taken out. */
+export const isRequired = (m: Pick<Manifest, 'kernel'>): boolean => isInternal(m) && !isOptional(m);
+/** The settings prefix a pack's memory is kept under: its declared one (kernel.memory), else its own `pack:<id>:`. */
+export const memoryPrefix = (m: Pick<Manifest, 'id' | 'kernel'>): string => m.kernel?.memory ?? `pack:${m.id}:`;
 
 /**
  * The packs that carry `kernel` but are not of the server's own folder (a pack kept as an item, a version, a folder

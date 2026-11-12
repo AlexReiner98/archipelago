@@ -4,6 +4,7 @@
 
 import type { KernelContext } from '#pelago/kernel';
 import { checkUpdated, checkWritten, type Types } from './automation-rules.ts';
+import { acting } from './due-on.ts';
 
 type Props = Record<string, unknown>;
 type Op = { op: string; id?: string; type?: string; props?: Props };
@@ -11,9 +12,10 @@ type Op = { op: string; id?: string; type?: string; props?: Props };
 /** The registry an island runs, as the write path hands it (src/write-hooks.ts, Judged): read only for its types. */
 interface Judged { islandRegistry(island: unknown): Promise<Types & { type(id: string): unknown }> }
 
-/** Each automation written in these ops whose trigger or conditions are wrong, as refusals naming the op. */
+/** Each automation written in these ops whose trigger or conditions are wrong, as refusals naming the op; none where the automations pack is off. */
 export async function validate(ctx: KernelContext, ops: Op[], _who: unknown, judged: Judged): Promise<{ refusals: string[] }> {
   const refusals: string[] = [];
+  if (!acting(ctx)) return { refusals }; // a map without the automations pack: nothing here checks what it would do
   for (const [i, op] of ops.entries()) {
     const where = `op ${i + 1} (${op.op})`;
     if (op.op === 'create') {
