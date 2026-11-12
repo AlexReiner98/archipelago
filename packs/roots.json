@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "848de4672759fee5edd361623bf8f9ca086085e77c10eccc9eb3ec1125fa62c4"
+      "hash": "d0e4f352b056f2229f052885330b6d9ee42bab52fdc2043658822f0e51985469"
     },
     {
       "id": "rules",
@@ -35,6 +35,10 @@
     {
       "id": "write",
       "hash": "c45282a60160d848f858c0f125b5cf88583cb0642a28caec41d617959c39f16d"
+    },
+    {
+      "id": "surface",
+      "hash": "e32580f34220615ab5b3d831ca35f3699d03e6648e40f8fac968db1c265f1c37"
     }
   ]
 }

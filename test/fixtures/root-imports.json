@@ -136,6 +136,8 @@
   "src/server.ts -> src/published-preview.ts",
   "src/standing.ts -> src/workspace-use.ts",
   "src/surface.ts -> src/askview.ts",
+  "src/surface-slots.ts -> src/kernel-context.ts",
+  "src/surface-slots.ts -> src/surface-fillings.ts",
   "src/token-tools.ts -> src/actor-checks.ts",
   "src/token-tools.ts -> src/outbox.ts",
   "src/tool-acts.ts -> src/audit.ts",

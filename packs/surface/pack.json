@@ -1,0 +1,11 @@
+{
+  "id": "surface",
+  "version": "0.1.0",
+  "title": "Tool surface",
+  "description": "The ten verbs and who may call them, the HTTP host and its routes and gates, MCP, the CLI and the hook host: how people and agents reach the map. The last root pack, started after write; it opens the slots surface.act, surface.read and surface.route.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

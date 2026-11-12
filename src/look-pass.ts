@@ -1,7 +1,7 @@
 // The look pass, the trusted half of a look (docs/kernel-packs.md, "Where each module goes": looks, `passFor` stays
 // in walls): a token for one drawing, minted for the asking agent's own person (never an admin), good for
 // LOOK_PASS_MS and for the reads a canvas makes (LOOK_READS) and nothing else. The server's gate reads it here
-// (readPass, passWorkspace); the looks pack draws with it (packs/looks/kernel/looks.ts).
+// (readPass, passWorkspace); the looks pack draws with it (packs/look_draw/kernel/looks.ts).
 
 import { sha256Hex, workspaceSecret } from './hashes.ts';
 import type { Q } from './db.ts';

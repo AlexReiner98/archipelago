@@ -1,5 +1,5 @@
 {
-  "id": "mail",
+  "id": "mailer",
   "version": "0.1.0",
   "title": "Mail",
   "description": "Sends the server's mail: sign-in links, invitations and notices, straight to the recipient's mail server or through a relay, and reads what bounced. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",

@@ -1,0 +1,93 @@
+// The page's address for what an agent asks to show or to look at: a kept view (a lens item, a saved canvas), a
+// lens and style of its own, an item's page or a screen. The page reads the same address (ui/query.js, readAddress),
+// so what an agent names is drawn as the owner would draw it. A lens the canvas could not draw is refused here.
+
+import { z } from 'zod';
+import { readFlat } from '../../../src/query-flat.ts';
+import type { Archipelago } from '../../../src/pelago.ts';
+
+/** What names a view, as show and query look take it. */
+export const VIEW_INPUT = {
+  entity: z.string().optional().describe('An item id: its page; a view kept on the map (type lens, a saved canvas) is drawn as the canvas it is, its query in the query bar.'),
+  query: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe('What the view draws: a query, as query flat takes it ({ filter: { find, only, not }, walk: { over (part_of< in: down a project, part_of> out: up, part_of either way), steps }, limit }), shown in the query bar as if written there. With entity, under that item\'s page. {} is the canvas as it opens.'),
+  lens: z.union([z.string(), z.record(z.string(), z.unknown())]).optional().describe('The old name of query, still taken; a kept view\'s id here is taken as entity.'),
+  style: z
+    .object({
+      lit: z.enum(['all', 'you', 'blocked']).optional().describe('What stays lit: everything, only what waits on the person looking, or only what is blocked.'),
+      layout: z.enum(['map', 'list', 'flow', 'strips', 'rows', 'cola', 'planar', 'grid', 'time', 'architecture', 'pages']).optional().describe('The layout: map, the one built in (the whole graph made plane at once, islands and ports with it, at right angles with the fewest bends, its distances relaxed). The others were retired on 9 Nov 2026 and draw as map.'),
+      shape: z.string().optional().describe('The old name of layout, still taken.'),
+      id: z.string().optional().describe('A style kept on the map (an item of type style), drawn with for this one look.'),
+    })
+    .optional()
+    .describe('How the view is drawn, for this one look. The style a view opens in is kept on the map: an item of type style, about the project or item it is for, or about nothing for the whole workspace; change it with change.'),
+};
+
+export interface ViewAsked {
+  entity?: string;
+  screen?: string;
+  query?: Record<string, unknown>;
+  lens?: string | Record<string, unknown>;
+  style?: { lit?: string; layout?: string; shape?: string; id?: string };
+}
+
+/** A web address a show frames in a pane: http or https, no name and password in it. */
+export const WEB_URL = z
+  .string()
+  .max(2000)
+  .refine((s) => URL.canParse(s) && /^https?:$/.test(new URL(s).protocol) && !new URL(s).username && !new URL(s).password, 'url is an http or https address, with no name or password in it');
+
+/** The page's address for a web page framed in a pane (ui/panes.js): `w?url=…`. */
+export const webAddress = (url: string) => `w?${new URLSearchParams({ url: new URL(url).href })}`;
+
+/** The page's address (after "#/") for what is asked. */
+export async function viewAddress(l: Archipelago, asked: ViewAsked): Promise<string> {
+  // A kept view's id given as lens is the view it names, as entity takes it.
+  if (typeof asked.lens === 'string') asked = { ...asked, entity: asked.entity ?? asked.lens, lens: undefined };
+  const input = { ...asked, lens: asked.query ?? (asked.lens as Record<string, unknown> | undefined), ...(asked.style && { style: { ...asked.style, shape: asked.style.layout ?? asked.style.shape } }) };
+  // A saved canvas is opened as what the canvas draws: the page reads its lens and style from the map.
+  const kept = input.entity && (await l.entity(input.entity));
+  if (input.entity && !kept) throw new Error(`No item "${input.entity}"`);
+  if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return `v?canvas=${input.entity}`;
+  if (input.lens || input.style) {
+    // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on a screen.
+    const wanted = (input.lens ?? {}) as { limit?: unknown };
+    const lens = Object.keys(wanted).length ? readFlat(l, wanted) : undefined;
+    for (const term of lens?.find ?? []) {
+      const [, id] = /^(?:id|in) (e_[a-z0-9]{8})$/.exec(term) ?? [];
+      if (id && !(await l.entity(id))) throw new Error(`No item "${id}"`);
+    }
+    // The address says the lens as the page reads it: each term of the filter, the walk, the limit, the window of time.
+    const query = new URLSearchParams();
+    if (lens) {
+      const walked = lens.walk.over === 'all' || lens.walk.over.length > 0;
+      for (const term of lens.find) query.append('find', term);
+      for (const term of lens.only) query.append('only', term);
+      if (lens.not.join() !== 'kind system') {
+        if (!lens.not.length) query.set('not', '');
+        for (const term of lens.not) query.append('not', term);
+      }
+      if (walked) query.set('over', lens.walk.over === 'all' ? 'all' : (lens.walk.over as string[]).join(','));
+      if (walked) query.set('steps', String(lens.walk.steps));
+      if (wanted.limit !== undefined) query.set('limit', String(lens.limit));
+      // A window of time as it was said (days from today stay so), as the page reads it back.
+      if (lens.time) query.set('time', `${lens.time.from},${lens.time.to}`);
+    }
+    if (input.style?.lit) query.set('lit', input.style.lit);
+    if (input.style?.shape) query.set('shape', input.style.shape);
+    if (input.style?.id) query.set('style', input.style.id);
+    // The canvas draws it, under the item's page when one is named.
+    return `${input.entity ? `e/${input.entity}` : 'v'}${query.size ? `?${query}` : ''}`;
+  }
+  if (!input.entity && !input.screen) throw new Error('A look or a show needs "entity", "screen" or "lens".');
+  return input.entity ? `e/${input.entity}` : input.screen!;
+}
+
+/** The address of a document's preview, for a look of it as it would publish (src/published-preview.ts). */
+export async function previewAddress(l: Archipelago, id: string | undefined): Promise<string> {
+  if (!id) throw new Error('A look with published needs "entity": the document.');
+  if (!(await l.entity(id))) throw new Error(`No item "${id}"`);
+  return `preview/${id}`;
+}
