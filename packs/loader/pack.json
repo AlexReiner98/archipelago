@@ -66,6 +66,16 @@
         },
         "out": "any",
         "run": "layout-services.ts#scene"
+      },
+      "root.pack_view": {
+        "in": {
+          "pack": "string",
+          "view": "string",
+          "params?": "any",
+          "actor": "any"
+        },
+        "out": "any",
+        "run": "pack-view.ts#packView"
       }
     }
   }

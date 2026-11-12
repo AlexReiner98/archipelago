@@ -28,12 +28,32 @@ test("a lens's steps are checked, name their items, and show a reader only what 
   assert.deepEqual(stepsShown(steps, new Set(['a'])), [{ add: ['a'], titles: {}, lit: [] }, { card: { title: 'End' }, remove: [] }]);
 });
 
-test('the flat lens by name is the view flat read as the asker; a check reads one item and says what is wrong', async () => {
-  const asked: unknown[] = [];
-  const ctx = { reads: async (q: { params: Record<string, unknown> }) => { asked.push(q); if (q.params.bad) throw new Error('no such term'); return { items: [] }; } } as unknown as KernelContext;
-  assert.deepEqual(await flat(ctx, { filter: { find: ['id e_x'] } }), { items: [] });
-  assert.deepEqual(await flatCheck(ctx, { filter: { find: ['id e_x'] }, limit: 50 }), {});
-  assert.deepEqual(asked, [{ view: 'flat', params: { filter: { find: ['id e_x'] } } }, { view: 'flat', params: { filter: { find: ['id e_x'] }, limit: 1 } }]);
-  assert.deepEqual(await flatCheck(ctx, { bad: true }), { problem: 'no such term' });
-  assert.match((await flatCheck(ctx, { limit: 9000 })).problem!, /from 1 to 2000/);
+/** A context whose map holds one type, one link type and the term near, its reads answered from what it is given. */
+function fake(answer: (q: Record<string, unknown>) => unknown = () => undefined) {
+  const asked: Record<string, unknown>[] = [];
+  const types = new Map([['task', { id: 'task', lineage: ['task'], fields: {}, statuses: {} }]]);
+  const relations = new Map([['part_of', { id: 'part_of', from: ['*'], to: ['*'] }]]);
+  const registry = { types, relations, canonical: (x: string) => x, type: (id: string) => types.get(id), isA: () => false, family: (t: string) => [t], relationFamily: (...r: string[]) => r };
+  const ctx = { registry, provided: () => ['near'], reads: async (q: Record<string, unknown>) => (asked.push(q), answer(q)) } as unknown as KernelContext;
+  return { ctx, asked };
+}
+
+test('a lens is checked by reading it, nothing asked of the map; the check says what is wrong', async () => {
+  const { ctx, asked } = fake();
+  assert.deepEqual(await flatCheck(ctx, { filter: { find: ['type task'], only: ['near x'] }, walk: { over: ['part_of<'] }, limit: 50 }), {});
+  assert.deepEqual(asked, [], 'a check reads nothing');
+  assert.match((await flatCheck(ctx, { filter: { find: ['type task'], only: ['far x'] } })).problem!, /"far x" is no term/);
+  assert.match((await flatCheck(ctx, { filter: { find: ['type task'] }, limit: 9000 })).problem!, /from 1 to 2000/);
+  assert.match((await flatCheck(ctx, { filter: { only: ['done'] } })).problem!, /for only to narrow/);
+});
+
+test('the flat lens by name reads its seeds through the reads API as the asker, and counts no use of a view', async () => {
+  const row = { id: 'e_a', type: 'task', title: 'A', body: '', visibility: 'shared', status: 'todo', is_open: true, owner: null, props: {}, created_at: new Date(0), updated_at: new Date(0) };
+  const { ctx, asked } = fake((q) => (q.me ? null : q.flat ? { items: [row], links: [], whole: [], found: { e_a: ['type'] }, terms: { e_a: ['type task'] }, step: {}, on_islands: false, islands: [] } : undefined));
+  const answer = (await flat(ctx, { filter: { find: ['type task'] } })) as { lens: { not: string[] }; items: { id: string; found: string[] }[] };
+  assert.deepEqual(answer.items.map((i) => [i.id, i.found]), [['e_a', ['type']]]);
+  assert.deepEqual(answer.lens.not, ['kind system'], 'the default Not');
+  assert.ok(asked.every((q) => q.view === undefined), 'no view is asked, so no use is counted');
+  const seeds = asked.find((q) => q.flat)!.flat as { find: { as: string }[]; said_not: boolean; limit: number };
+  assert.deepEqual([seeds.find.map((t) => t.as), seeds.said_not, seeds.limit], [['type task'], false, 500]);
 });

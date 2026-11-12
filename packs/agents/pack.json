@@ -29,6 +29,19 @@
         },
         "out": "string",
         "run": "launch-brief.ts#launchPrompt"
+      },
+      "answer.instructions": {
+        "in": {
+          "for?": "string",
+          "about?": "string",
+          "island?": "string"
+        },
+        "out": {
+          "said": [
+            "any"
+          ]
+        },
+        "run": "query-answers.ts#told"
       }
     },
     "hooks": {

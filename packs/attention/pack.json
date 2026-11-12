@@ -36,6 +36,15 @@
           ]
         },
         "run": "attention.ts#answer"
+      },
+      "answer.moved": {
+        "in": {},
+        "out": {
+          "ids": [
+            "id"
+          ]
+        },
+        "run": "query-answers.ts#moved"
       }
     }
   },

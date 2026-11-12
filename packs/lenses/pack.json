@@ -29,6 +29,33 @@
           "links": "any"
         },
         "run": "kept-picture.ts#keptPictureOf"
+      },
+      "answer.hubs_of": {
+        "in": {
+          "within?": "string"
+        },
+        "out": {
+          "at": "number",
+          "hubs": [
+            "any"
+          ]
+        },
+        "run": "query-answers.ts#hubsOf"
+      },
+      "answer.saved_views": {
+        "in": {
+          "limit?": "number"
+        },
+        "out": {
+          "pictures": [
+            "any"
+          ],
+          "more": "number",
+          "ended?": [
+            "id"
+          ]
+        },
+        "run": "query-answers.ts#saved"
       }
     }
   }

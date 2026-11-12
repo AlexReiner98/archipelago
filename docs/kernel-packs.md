@@ -74,6 +74,9 @@ trusted).
   prefix a service pack's memory (the read `memory`) is kept under, in place of
   its own `pack:<id>:`: a prefix the code it took over kept there already, so
   nothing is migrated. Lower-case, ending in a colon, never `pack:`.
+- **`families`** (wave 6b, the query step): the families whose every name a service pack may call (`ctx.call`)
+  and list (`ctx.provided`) beside the names it requires or uses: the query pack's `answer` (a view names its
+  answer) and `term` (a lens names its term).
 - **`modules`**: its code, TypeScript under the pack's folder
   (`packs/<id>/kernel/`), loaded with `import()` by the loader. Never a file
   a pack item or a version carries: `pack_code` stays the sandbox's alone.
@@ -190,7 +193,8 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
 | `root.server_packs` | loader | connect | the server packs the server's folders hold, each as the owner is shown it, and those left out with why (wave 6b: the `server_packs` tool, wired at `src/server-pack-tools.ts`) |
 | `root.observe` | write | connect | what a check of a connection saw: kept as an observation by who asked for the check, and the status with a line in the activity when it changed (wave 6b, e_gc8stacv: `check_connections`) |
-| `root.uses` | surface | usage | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`) |
+| `root.uses` | surface | usage, query | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`; the query pack counts a view asked) |
+| `root.pack_view` | loader | query | what a plain pack's view answers, run in the sandbox as the actor who asked, on the island's version of the pack its params name (wave 6b, the query step) |
 | `root.due` | loader | clocks | an item came due: item.due recorded on the map's activity stream as the kernel's and told to the sandboxed packs that hear it; its seq |
 | `root.publish` | database | publish | publishing's writes, each with its event: the published and public_view rows (publish, unpublish, share, unshare), and an item made public or shared again as the one publishing |
 | `root.may` | rules | publish | whether this kind of actor may publish or take down here (core's agent_publish, agent_unpublish) |
@@ -263,7 +267,7 @@ are slots of the write and log packs; the others:
 | `identity.invited` | identity | mail (`member-mail.ts#invited`, in `kernel.hooks`), filled when the server starts (`packs/loader/kernel/server-slots.ts`, loaded by the surface's server start) | `members.ts` importing `mail.ts` |
 | `open.<phase>` | identity (`src/lifecycle.ts`) | each root, by its `kernel/open.ts` (`OPEN`, and `LEADING` for what runs while the server leads), read in roots.json's order; an internal pack by `kernel.hooks`; what a service module still does there, `src/open-steps.ts` until its pack takes it | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
-| `surface.reads` | surface | agents (`instructions`), usage (`told`); the kernel until their packs hold their modules: views and askview (`view`), timeaxis (`placed`). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
+| `surface.reads` | surface | agents (`instructions`), usage (`told`), query (`view`, `placed`, wave 6b). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 
 This is also the fix for bug e_wpww27fm (trusted modules import services):
 each import it names becomes a slot, cut by the step that moves the
@@ -355,13 +359,13 @@ moves with a shim to the pack named.
 | loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts, due-event (root.due) |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
-| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking, launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server) |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), packreads-flat and packreads-query (wave 6b: the query pack's reads), region, blocking, launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server) |
 
 ### Service
 
 | Pack | Modules |
 |---|---|
-| query | query-flat, query-terms, query-steps, query-only, query-held, query-presets, askview, views, altitude, timeaxis, summary |
+| query | query-flat, query-terms, query-steps, query-only, query-presets, askview, views, altitude, timeaxis, summary (query-held to the reads API, packreads-flat) |
 | lenses | query-kept, query-saved, saved-views, view-life, view-twins, query-names |
 | views | view-graph, view-tree, inside, brief, moved, timelanes, documents, plan-note |
 | attention | attention, bounds, confirm |
@@ -575,14 +579,13 @@ surface's slot `surface.reads`, by the read's key, asked where the read was answ
 read with several keys answers as it did): an internal pack names it in its manifest
 (`"hooks": { "surface.reads": "reads.ts#instructions" }`, agents) and is handed its context of the
 map that asks, any map, opened or not (`hostAt`, `src/kernel-context.ts`); a module still in
-`src/` fills it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`, through
-`src/service-reads.ts`), until its pack holds it: `view` (with its pin) and `placed`; `events` left in wave 6, answered by
+`src/` filled it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`) until its pack held it, and none is left: `view` (with its pin) and `placed` are the query pack's since wave 6b; `events` left in wave 6, answered by
 the reads API from the log root's eventlog (`packreads-views`). As built (wave 6): `told` is the usage pack's (`reads.ts#told`), and what a run touched
 is the reads API's own, read from the transient store in `runsOf` (`src/packreads-log.ts`), since
 sessions is optional and an optional pack fills only `write.*`. The query step (wave 6, e_5euvh74f) moved query-flat, query-terms, query-only, query-held, query-presets,
 askview, views and timeaxis into `packs/query/kernel` behind pure shims, still on the map (`l`) and naming the kernel
 at `../../../src/`: what they call is sessions' (optional, so it provides no name), or another pack's that provides
-none, so `view` and `placed` stay kernel fillings until those packs answer by name. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
+none, so `view` and `placed` stayed kernel fillings. As built (wave 6b, e_xdcwzbcg): the query pack is on its context behind adapter shims. What it called is a name its pack provides (runs' frontier, worked_on, session_states, session_marks, run_spans, spent, session_measures, lives_in; attention's `answer.moved`; views' `answer.time_lanes`; lenses' `answer.hubs_of` and `answer.saved_views`; usage's `answer.usage`; styles' `answer.page_style`; agents' `answer.instructions`, whose `for` is session_start unless said), a root's (`root.uses`, `root.pack_view`), or a read: the flat lens's SQL is `packreads-flat` (`flat`, `flat_ends`, `flat_pos`: the seeds, the narrowing and the walk, held changes, Only's words), the operational views' `packreads-query` (`changed`, `open_runs`, `notifications`, `placed_rows`, `time_zone`). A read that names an island is the context's `island`. query-held went into `packreads-flat`. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
 reads API's own bounded scan, `packreads-scope`; runs' places (wave 6b) keeps its own copy of `livesIn` and `livesInFor` over the registry, and `scopeOf` through the read `within`. `test/packreads-slots.test.ts`
 pins each answer against its service's own functions.
 
@@ -607,7 +610,7 @@ notifications pack makes only on the map.
   the provider is handed a context of the map that asks, a person's view under
   their row-level security. `callService` runs the provider as the map the
   names were filled for at open: never use it for a read. The lens terms
-  (`term.*`, `src/query-terms.ts`) still call it.
+  (`term.*`) are the query pack's `ctx.call`, the family open to it (`kernel.families`).
 
 ### The shim
 
