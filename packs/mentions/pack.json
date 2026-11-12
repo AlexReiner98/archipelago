@@ -1,0 +1,13 @@
+{
+  "id": "mentions",
+  "version": "0.1.0",
+  "title": "Mentions",
+  "description": "What names an item in its note or fields: a table of its own, projected from the log as each item is written, so an item's page reads what mentions it by an index.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": { "log.project": "mentions.ts#project" },
+    "tables": { "mention": { "from_id": "id", "to_id": "id" } }
+  }
+}

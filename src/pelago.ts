@@ -5,14 +5,14 @@ import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, type Policy 
 import { mayWrite } from './within.ts'; import { roomToStore, stillWritable } from './standing.ts'; import { authorityOf } from './authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from './db.ts';
 import { once } from './merge.ts'; import { readEvents, type EventQuery } from './eventlog.ts'; import { doneFact, type Done } from './activity.ts';
-import type { Registry } from './packs.ts'; import { currentNames } from './type-items.ts'; import { noTwins } from './view-twins.ts';
+import type { Registry } from './packs.ts'; import { currentNames } from './type-items.ts'; import { follow, retyped, rewrite, type Who } from './write-hooks.ts';
 import { isSealed, seal, unseal } from './secrets.ts';
 import { KEPT_FIELDS } from './operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from './streams.ts';
 import { search, type SearchInput } from './search.ts'; import { layoutOf } from './layout-changes.ts';
 import { append, headOf, type Fact } from './log.ts'; import { projectDecision, projectFacts, stamp } from './replay.ts'; import { linkFacts } from './facts.ts';
 import { decideProposal } from './proposals.ts'; import { guardedFetch } from './outbound.ts'; import { needHuman } from './actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { used } from './uses.ts'; import { placeOnIslands } from './island-items.ts'; import { placeWithSubject } from './subject.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from './island-rules.ts';
+import { planChange } from './change-plan.ts'; import { used } from './uses.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from './island-rules.ts';
 
 export * from './pelago-types.ts';
 export type { Level, OpKind, Policy } from './rules.ts';
@@ -87,9 +87,12 @@ export class Archipelago {
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
-    currentNames(this.registry, input.ops); await placeWithSubject(this, this.registry, input.ops); await placeOnIslands(this, this.registry, input.ops, input.island); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
-    if (actor.kind !== 'human' && !input.pack) await noTwins(this, input.ops);
-    const { warnings } = await this.plan(input.ops);
+    // The write path's hook points (src/write-hooks.ts): rewrite, then who may write, then what follows the change, then
+    // validate as it is planned. The verdict covers every op, what followed included.
+    currentNames(this.registry, input.ops); await rewrite({ map: this, reg: this.registry, island: input.island }, input.ops); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
+    const followed = await follow({ map: this, reg: this.registry }, input.ops);
+    if (followed.length) input = { ...input, ops: [...input.ops, ...followed.flatMap((f) => f.ops)] };
+    const { warnings } = await this.plan(input.ops, { human: actor.kind === 'human', pack: input.pack });
     const me = actorId(actor);
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);
@@ -132,15 +135,15 @@ export class Archipelago {
       };
     }
     const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];
-    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared } })), ...letThrough(verdict.spared) };
+    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared }, ...(followed.length && { followed }) })), ...letThrough(verdict.spared) };
     return answered.length ? { ...applied, answered } : applied;
   }
 
   /** `ops`, when given, replaces the proposed ops: the reviewer's corrected version. One at a time: a second click while one applies is refused, not applied again. */
   decide(actor: Actor, input: Parameters<typeof decideProposal>[2]) { return once(input.proposal, () => decideProposal(this, actor, input)); }
 
-  /** Validate ops against the schema and the current map (src/change-plan.ts). Throws listing every problem. */
-  plan(ops: Op[]): Promise<{ warnings: string[] }> { return planChange(this, ops); }
+  /** Validate ops against the schema and the current map (src/change-plan.ts), and as who, where a change is judged. Throws listing every problem. */
+  plan(ops: Op[], who?: Who): Promise<{ warnings: string[] }> { return planChange(this, ops, who); }
 
   /** Apply a change without consulting policy (src/change-apply.ts): for human changes, approved proposals, and the system's own bookkeeping. */
   apply(actor: string, input: ChangeInput, opts?: Parameters<typeof applyChange>[3]) { return applyChange(this, actor, input, opts); }
@@ -161,7 +164,7 @@ export class Archipelago {
    * status the new type names otherwise takes its status there (statuses: the old status to the new one).
    */
   async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity', statuses: Record<string, string> = {}): Promise<number> {
-    return this.db.transaction(async (tx) => {
+    const moved = await this.db.transaction(async (tx) => {
       const { rows } = await tx.query<{ id: string; status?: string; from_id?: string; to_id?: string }>(
         what === 'entity' ? `select id, status from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1`,
         [from],
@@ -176,6 +179,8 @@ export class Archipelago {
       if (facts.length) await this.moved(tx, 'type.moved', reason, facts);
       return rows.length;
     });
+    await retyped(this, from, to, what); // what packs keep of it follows (write.retype, src/write-hooks.ts)
+    return moved;
   }
 
   /**

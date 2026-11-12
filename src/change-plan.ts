@@ -1,14 +1,15 @@
 // Planning a change: its ops checked against the schema and the map as it is now, before anything is written. The
 // write path (src/pelago.ts) asks it before a change is judged and again before it is applied.
 
-import { checkUpdated, checkWritten } from './automation-rules.ts'; import { undeclaredColumns } from './head.ts'; import { typedProblems } from './fields.ts';
+import { undeclaredColumns } from './head.ts'; import { typedProblems } from './fields.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
 import { currentNames, typesAfter } from './type-items.ts'; import { privateDependencies } from './private-deps.ts';
 import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from './island-items.ts'; import { subjectRefusals } from './subject.ts'; import { islandRegistry, pinRefusals } from './island-pin.ts';
 import type { Archipelago } from './pelago.ts';
+import { validate, type Who } from './write-hooks.ts';
 
-/** Validate ops against the schema and the current map. Throws listing every problem. */
-export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warnings: string[] }> {
+/** Validate ops against the schema and the current map, and by what fills write.validate (src/write-hooks.ts): who, where a change is judged. Throws listing every problem. */
+export async function planChange(map: Archipelago, ops: Op[], who?: Who): Promise<{ warnings: string[] }> {
   if (!ops.length) throw new Error('A change needs at least one op.'); currentNames(map.registry, ops);
   const errors: string[] = [], warnings: string[] = [];
   const refs = new Map<string, string>(), refIslands = new Map<string, unknown>(); // ref -> type, and the island it is made on
@@ -55,7 +56,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         const type = here.type(op.type);
         if (!type) break; if (type.retired) errors.push(`${where}: ${op.type} is retired here: no new item is made of it`);
         if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
-        errors.push(...[...checkWritten(here, op.type, op.props ?? {}), ...typedProblems(op.type, type.fields, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
+        errors.push(...[...typedProblems(op.type, type.fields, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
         if (op.ref) {
           if (refs.has(op.ref)) errors.push(`${where}: ref "${op.ref}" is used twice`);
           refs.set(op.ref, op.type); refIslands.set(op.ref, op.props?.island);
@@ -76,7 +77,7 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
         const target = await existing(op.id, where);
         if (!target) break;
         const here = await islandRegistry(map, op.props?.island ?? target.props.island, reg);
-        errors.push(...[...here.check(target.type, op.status, op.props ?? {}), ...checkUpdated(here, target.type, op.props ?? {}), ...typedProblems(target.type, here.type(target.type)?.fields ?? {}, op.props ?? {}, target.props), ...undeclaredColumns(here.type(target.type), op)].map((p) => `${where}: ${p}`));
+        errors.push(...[...here.check(target.type, op.status, op.props ?? {}), ...typedProblems(target.type, here.type(target.type)?.fields ?? {}, op.props ?? {}, target.props), ...undeclaredColumns(here.type(target.type), op)].map((p) => `${where}: ${p}`));
         if (op.visibility === 'public' && !reg.type(target.type)?.public) errors.push(`${where}: "${target.title}" is a ${target.type}, which cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
         if (op.title !== undefined && !op.title.trim()) errors.push(`${where}: title cannot be empty`);
         try {
@@ -127,6 +128,8 @@ export async function planChange(map: Archipelago, ops: Op[]): Promise<{ warning
     }
   }
   errors.push(...(await islandRefusals(map, reg, ops)), ...(await subjectRefusals(map, reg, ops)), ...(await pinRefusals(map, reg, ops)));
+  const checked = await validate({ map, reg, who }, ops); // a view's twins, an automation's trigger, and what packs check
+  errors.push(...checked.refusals); warnings.push(...checked.warnings);
   if (!errors.length) errors.push(...(await privateDependencies(map, ops)));
   if (errors.length) throw new Error(`Change rejected:\n- ${errors.join('\n- ')}`);
   return { warnings };

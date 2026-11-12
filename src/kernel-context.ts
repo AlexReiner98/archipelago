@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
 import { answerRead, type Read } from './packreads.ts';
 import { guardedFetch } from './outbound.ts';
-import { callService, fillServices } from './services.ts';
+import { callService, fillServices } from './services.ts'; import { fillWritePoints } from './write-hooks.ts';
 import type { Archipelago } from './pelago.ts';
 import type { ChangeInput } from './pelago-types.ts';
 import type { Registry } from './packs.ts';
@@ -125,6 +125,11 @@ export function openKernel(l: Archipelago): KernelHost {
   const host = new KernelHost((p) => l.registry.folderOf(p));
   hosts.set(l.registry, host);
   fillServices(l.registry, host.services(l));
+  // The write path's hook points (src/write-hooks.ts): what the internal packs fill, and a change made as one of them.
+  fillWritePoints(l.registry, {
+    fillings: (map, point) => host.fillings(map, point),
+    change: (map, pack, input) => contextFor(map, map.registry.packs.find((p) => p.id === pack)!, host).change(input),
+  });
   return host;
 }
 
