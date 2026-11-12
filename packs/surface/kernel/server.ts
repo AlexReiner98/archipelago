@@ -35,7 +35,7 @@ import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from '../..
 import { notify } from '../../../src/notify.ts'; import { alertOnCrash } from '../../../src/alert.ts';
 import { parseBackup, parseVault } from '../../../src/backup.ts'; import { backupAll } from '../../../src/backup-run.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../../src/members.ts'; import { requestWait } from '../../../src/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from '../../../src/workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from '../../../src/config.ts'; import { env } from '../../../src/env.ts'; import type { Booted } from '../../../src/boot.ts';
-import { SHORT, serveConnect } from '../../../src/connect.ts'; import { challenge, mcpAddress } from '../../../src/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
+import { SHORT, serveConnect } from './connect-routes.ts'; import { asked, installed, polled } from '../../../src/connect.ts'; import { challenge, mcpAddress } from '../../../src/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
 import { stopAllLaunched } from '../../../src/launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass, setLookOrigin } from '../../../src/looks.ts'; import { pageMay } from './may.ts';
@@ -47,12 +47,15 @@ import { serverDuties } from '../../../src/duties.ts'; import { keepCounts } fro
 import { clientAddress, trustedProxies } from '../../../src/address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';
 import { servePublic } from '../../../src/public-route.ts'; import { siteNav } from '../../../src/site.ts'; import { ICON, serveIcon } from '../../../src/icon.ts';
-import { previewOf } from '../../../src/published-preview.ts'; import { lengthsSheet, pageLook } from '../../../src/styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
+import { previewOf } from '../../../src/published-preview.ts'; import { lengthsSheet, pageLook, pageStyle } from '../../../src/styles.ts'; import { GUARD, json as send, PRIVATE, UNLISTED } from './reply.ts';
 import { configureSecrets } from '../../../src/secrets.ts'; import { serveFilled } from './surface-slots.ts';
 import { adapterBefore, answerAt, hookAt } from '../../../src/server-adapter.ts'; import { mountOf, serveMounted } from '../../../src/server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY, SIGNED_IN_READER_POLICY } from '../../../src/page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from '../../../src/draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
-import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../../src/workspaces.ts'; import { hasBounced } from '../../../src/bounces.ts'; import { setBounced } from '../../../src/mail.ts';
+import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../../src/workspaces.ts'; import { BOUNCED_DAYS, failedFor, fromRelay, hasBounced, noteBounced } from '../../../src/bounces.ts'; import { normalEmail, setBounced } from '../../../src/mail.ts';
+
+/** What the open routes answer with that is above the surface (./connect-routes.ts): the mail pack's, the styles pack's and the connect pack's. */
+const ABOVE = { email: normalEmail, pageStyle: (l: Archipelago) => pageStyle(l, {}, false), bounces: { fromRelay, failedFor, noteBounced, days: BOUNCED_DAYS }, connect: { installed, asked, polled } };
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
 const BODY_MAX = 32_000_000; /** What a route open to anyone takes: a form's worth, or a webhook's delivery. */ const OPEN_BODY_MAX = 64_000, HOOK_BODY_MAX = 1_000_000;
@@ -219,7 +222,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // What a project needs to work with this server, and a running system's request for its token: no token needed.
       // A server pack answers at the addresses it had before it was a pack, too (a GitHub App set up then still sends there).
       const packPath = (req.method === 'GET' && Object.hasOwn(SHORT, url.pathname) ? SHORT[url.pathname] : serverPacks.aliased(url.pathname)) ?? url.pathname;
-      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join|password|password\/set)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human'), from: addressOf(req) });
+      if (/^\/(connect|x|oauth|\.well-known)\//.test(packPath)) return await serveConnect(req, res, packPath, { hosts, named, tokens, fallback: DEFAULT_WORKSPACE, workspaces, tooOften: () => tooOften(req, res, /^\/x\/[^/]+\/hook\//.test(packPath) ? deliveries : /^\/connect\/(sign-in|code|join|password|password\/set)$/.test(packPath) ? signIn : open), body: () => readJson(req, OPEN_BODY_MAX), raw: () => readBody(req, HOOK_BODY_MAX), person: () => resolve(req, res, 'human'), from: addressOf(req), ...ABOVE });
 
       // A product's public page, which the reader pack passed on: open to anyone, on any name this server has (src/public-route.ts).
       const pub = req.method === 'GET' ? /^\/p\/([^/]+)\/([^/]+)(?:\/(data|picture|drawing|live)(?:\/([^/]+))?)?\/?$/.exec(url.pathname) : null;

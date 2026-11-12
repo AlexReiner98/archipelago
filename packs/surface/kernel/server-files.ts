@@ -79,7 +79,7 @@ export function setupPack(packs: ServerPack[] = ownPacks()): { pack: ServerPack;
   return undefined;
 }
 
-/** The version of the kernel's own setup, said by src/connect.ts: what a folder is checked against while no pack hands one out. */
+/** The version of the kernel's own setup, said at /connect/setup.mjs (./connect-routes.ts): what a folder is checked against while no pack hands one out. */
 let handedOut: string | undefined;
 export const handsOut = (version: string) => void (handedOut = version);
 

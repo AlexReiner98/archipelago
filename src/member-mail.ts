@@ -1,5 +1,5 @@
 // The mail side of members: members raises "invite issued" and "sign-in code" (src/members.ts), and this says how each
-// reads and sends it. Loaded with the sign-in routes (src/connect.ts), so the server that signs people in also mails them.
+// reads and sends it. Loaded with the server (src/first-start.ts), so the server that signs people in also mails them.
 import { mailConfigured, sendMail, type Mail } from './mail.ts';
 import { onMemberNotice, type MemberNotice } from './members.ts';
 

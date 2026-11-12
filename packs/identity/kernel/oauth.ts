@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 import { sameBytes, sha256Hex, workspaceSecret } from '../../../src/hashes.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ACCESS_MINUTES, grantToken, rotateGrant, workspaceOfGrant } from './auth.ts';
-import type { ConnectRoutes } from '../../../src/connect.ts';
+import type { OpenRoutes } from './sign-in.ts';
 import type { Q } from '../../../src/db.ts';
 import { clientOf, listedRedirect, registerClient, returnsTo, type Client } from './oauth-clients.ts';
 import { json as reply, PRIVATE } from '../../../src/reply.ts';
@@ -98,7 +98,7 @@ const json = (res: ServerResponse, status: number, body: unknown) => reply(res, 
 const oauthError = (res: ServerResponse, status: number, error: string, description: string) => json(res, status, { error, error_description: description });
 
 /** The page's request for a code: Allow from a signed-in person, or Deny. Answers where the browser goes next. */
-async function answerAsked(res: ServerResponse, origin: string, at: ConnectRoutes): Promise<unknown> {
+async function answerAsked(res: ServerResponse, origin: string, at: OpenRoutes): Promise<unknown> {
   const body = ((await at.body()) ?? {}) as { query?: unknown; allow?: unknown };
   const query = new URLSearchParams(String(body.query ?? ''));
   const asked = await askedBy(query, origin).catch((err) => {
@@ -129,7 +129,7 @@ interface Waiting {
 const samePkce = (verifier: string, challenge: string) => sameBytes(createHash('sha256').update(verifier).digest('base64url'), challenge);
 
 /** The token endpoint's form, or JSON from a client that sends that. */
-async function formOf(req: IncomingMessage, at: ConnectRoutes): Promise<URLSearchParams> {
+async function formOf(req: IncomingMessage, at: OpenRoutes): Promise<URLSearchParams> {
   const raw = (await at.raw()).toString();
   if (!String(req.headers['content-type'] ?? '').includes('json')) return new URLSearchParams(raw);
   try {
@@ -141,7 +141,7 @@ async function formOf(req: IncomingMessage, at: ConnectRoutes): Promise<URLSearc
 
 const issued = (made: { access: string; refresh: string }) => ({ access_token: made.access, token_type: 'Bearer', expires_in: ACCESS_MINUTES * 60, refresh_token: made.refresh, scope: SCOPE });
 
-async function trade(req: IncomingMessage, res: ServerResponse, origin: string, at: ConnectRoutes): Promise<unknown> {
+async function trade(req: IncomingMessage, res: ServerResponse, origin: string, at: OpenRoutes): Promise<unknown> {
   const form = await formOf(req, at);
   const grant = form.get('grant_type');
   const secret = form.get(grant === 'refresh_token' ? 'refresh_token' : 'code') ?? '';
@@ -162,7 +162,7 @@ async function trade(req: IncomingMessage, res: ServerResponse, origin: string, 
 }
 
 /** Everything under /oauth/ and /.well-known/, and only with tokens on: with none there is nothing to sign in to. */
-export async function serveOAuth(req: IncomingMessage, res: ServerResponse, path: string, at: ConnectRoutes): Promise<unknown> {
+export async function serveOAuth(req: IncomingMessage, res: ServerResponse, path: string, at: OpenRoutes): Promise<unknown> {
   const host = req.headers.host ?? '';
   if (!at.tokens) return json(res, 404, { error: 'This server signs nobody in.' });
   if (at.tooOften()) return;

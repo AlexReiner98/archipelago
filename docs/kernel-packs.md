@@ -189,6 +189,7 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.merge` | log | backup | the writes a merge makes, and what they did |
 | `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
 | `root.server_packs` | loader | connect | the server packs the server's folders hold, each as the owner is shown it, and those left out with why (wave 6b: the `server_packs` tool, wired at `src/server-pack-tools.ts`) |
+| `root.observe` | write | connect | what a check of a connection saw: kept as an observation by who asked for the check, and the status with a line in the activity when it changed (wave 6b, e_gc8stacv: `check_connections`) |
 | `root.uses` | surface | usage | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`) |
 
 ## Write-path hooks
@@ -312,7 +313,10 @@ to the connect pack. As built (wave 5): `search` is surface's `searchMap`
 seal's `readSecret` and `writeSecret`, the class's names kept as adapters;
 `checkConnections` is the connect pack's (`src/check-connections.ts`),
 filling `surface.act` as `check_connections`, and hands what it saw to the
-class's `observed`, which keeps it on the write path. As built (wave 6): `get`,
+class's `observed`, which keeps it on the write path. As built (wave 6b, e_gc8stacv): it runs
+on its context, calling each connection's own URL (its reach's `items`) and handing what it saw to
+the write root's `root.observe`, which calls `observed` as the one who asked; KERNEL_FILLINGS no
+longer names it. As built (wave 6): `get`,
 `trail`, `hidden` and `proposals` left the class for surface's
 `src/map-reads.ts` (`getItem`, `trail`, `hidden`, `proposals`); `events` is the
 activity log's `readEvents` (`src/eventlog.ts`), asked where an answer needs it
@@ -336,12 +340,12 @@ moves with a shim to the pack named.
 | database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), deploy, move, leader |
 | seal | seal, opseal, vault, secrets, backup-seal |
 | log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage), eventlog (wave 6: backup's dump and the surface's reads read events with a database or a transaction) |
-| identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
+| identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases), sign-in (wave 6b, e_wuqn82rf: passwords, codes and links traded for a token, out of connect, what it asks above itself handed in) |
 | walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail, drawing-box, drawing-runner, look-pass |
 | loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
-| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking, launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server) |
 
 ### Service
 
@@ -353,7 +357,7 @@ moves with a shim to the pack named.
 | attention | attention, bounds, confirm |
 | findings (exists) | findings |
 | styles | styles, style-move, layout-move, screens, colours |
-| agents | instructions, launch-brief, schema-brief |
+| agents | instructions, launch-brief (`answer.launch_brief`, `answer.launch_prompt`, for the surface's launcher), schema-brief |
 | placement | subject, island-start, `placeOnIslands`; `ensureSource` from change-apply |
 | waits | unwait |
 | mentions | mentions |
@@ -369,11 +373,11 @@ moves with a shim to the pack named.
 | mail | mail, smtp, bounces |
 | alerts | alert |
 | looks | chrome, look-draw, icon, looks (`passFor` stays in walls) |
-| launch | launcher (the token stays in identity) |
-| connect | install, connect, token-ask, connection-tools, server-pack-tools (as built, wave 6b: install and server-pack-tools import nothing of the kernel, the latter through `root.server_packs`; the rest still do) |
+| connect | install, connect (the install pages' and a token ask's words; their routes the surface's, sign-in identity's, wave 6b), token-ask, connection-tools, server-pack-tools, check-connections (as built, wave 6b: install, server-pack-tools and check-connections import nothing of the kernel, through `root.server_packs` and `root.observe`; connect, token-ask and connection-tools still do) |
 | presence | presence, seeing |
 | monitoring | report |
-| devtools | dev, pull |
+
+Dev and pull are scripts (`scripts/dev.ts`, `scripts/pull.ts`), no pack (wave 6b, e_wuqn82rf): the launch and devtools packs are gone.
 
 Frontier goes to sessions, the pack whose types (`run`, `works_on`) it names,
 which ends that part of bug e_j3a8ghe4.
