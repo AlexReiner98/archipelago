@@ -2,8 +2,9 @@
 // pack's module imports nothing of the kernel, zod included; the surface builds the zod schema from it where the tools
 // are registered (./tools.ts), so what an agent is told of a tool and what its input is checked by are as they were.
 //
-// A shape is "string", "number", "boolean", "id" (a string), "any", [shape] (a list of it), { "key": shape, "key?":
-// shape } (an object, `key?` optional), or a list of two or more strings: one of those words (an enum). What a field
+// A shape is "string", "number", "boolean", "id" (a string), "nonempty" (a string of one character or more), "any",
+// [shape] (a list of it), { "key": shape, "key?": shape } (an object, `key?` optional), a list of two or more of those
+// scalar shapes (a value of any one), or a list of two or more other strings: one of those words (an enum). What a field
 // is for is said beside the shape, in `says`, by its path ("authority", "authority.of").
 
 import { z } from 'zod';
@@ -11,7 +12,7 @@ import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import type { Tool } from './tools.ts';
 
 /** A JSON sketch of a tool's input value. */
-export type InputShape = 'string' | 'number' | 'boolean' | 'id' | 'any' | InputShape[] | string[] | { [key: string]: InputShape };
+export type InputShape = 'string' | 'number' | 'boolean' | 'id' | 'nonempty' | 'any' | InputShape[] | string[] | { [key: string]: InputShape };
 
 /**
  * A tool as a pack declares it: its input a shape (checked as it is built: a pack's module has no type of the
@@ -24,16 +25,22 @@ export interface DeclaredTool<C = unknown> extends Omit<Tool, 'input' | 'run'> {
   run(ctx: C, actor: Actor, input: any): Promise<unknown>;
 }
 
-const SCALARS = new Set(['string', 'number', 'boolean', 'id', 'any']);
+const SCALARS = new Set(['string', 'number', 'boolean', 'id', 'nonempty', 'any']);
 const isEnum = (s: unknown): s is string[] => Array.isArray(s) && s.length > 1 && s.every((w) => typeof w === 'string' && !SCALARS.has(w));
+/** A list of two or more scalar shapes: a value of any one of them. */
+const isUnion = (s: unknown): s is string[] => Array.isArray(s) && s.length > 1 && s.every((w) => typeof w === 'string' && SCALARS.has(w));
+
+/** The zod schema of one scalar shape. */
+const scalar = (shape: string): z.ZodType => (shape === 'number' ? z.number() : shape === 'boolean' ? z.boolean() : shape === 'any' ? z.any() : shape === 'nonempty' ? z.string().min(1) : z.string());
 
 /** The zod schema of one shape, at a path, its description from `says`. */
 function zodOf(shape: InputShape, says: Record<string, string>, path: string, optional: boolean): z.ZodType {
   let made: z.ZodType;
   if (typeof shape === 'string') {
     if (!SCALARS.has(shape)) throw new Error(`${path}: "${shape}" is no shape`);
-    made = shape === 'number' ? z.number() : shape === 'boolean' ? z.boolean() : shape === 'any' ? z.any() : z.string();
+    made = scalar(shape);
   } else if (isEnum(shape)) made = z.enum(shape as [string, ...string[]]);
+  else if (isUnion(shape)) made = z.union(shape.map(scalar) as [z.ZodType, z.ZodType, ...z.ZodType[]]);
   else if (Array.isArray(shape)) {
     if (shape.length !== 1) throw new Error(`${path}: a list's shape is one shape, as [shape]`);
     made = z.array(zodOf(shape[0] as InputShape, says, `${path}[]`, false));
