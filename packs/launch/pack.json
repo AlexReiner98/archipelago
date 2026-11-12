@@ -1,0 +1,11 @@
+{
+  "id": "launch",
+  "version": "0.1.0",
+  "title": "Launch",
+  "description": "Starts a headless agent session on a task from the map, at a human's word, with a token the kernel mints for it and revokes when it ends (src/auth.ts). A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

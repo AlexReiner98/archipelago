@@ -1,0 +1,11 @@
+{
+  "id": "alerts",
+  "version": "0.1.0",
+  "title": "Alerts",
+  "description": "The owner hears when something breaks: a notification on the map it broke in and, for the server's own map, a mail, once an hour at most for each thing. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
