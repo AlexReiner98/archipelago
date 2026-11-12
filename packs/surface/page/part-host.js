@@ -7,7 +7,9 @@
 // anything but the shipped parts, the way back (./way-back.js) stands at the page's foot, out of every part's reach.
 //
 // A part is handed nothing it did not declare: of an item, its id and type and the fields it reads of that type; its
-// query is asked as the person looking, so what they may not see it never gets.
+// query is asked as the person looking, so what they may not see it never gets. Beside them every part is handed, as
+// data (decision e_fx62gsjb), the schema's `words` of the island it draws for (root.parts) and the `style` values a
+// part may read: the style's numbers and page settings, never a colour or a length.
 
 import { api, h, state } from './base.js';
 import { partBridge } from './part-bridge.js';
@@ -22,14 +24,33 @@ const modules = new Map();
 /** The workers started, by version: the port, its bridge, and the parts mounted on it by mount id. */
 const versions = new Map();
 let mounts = 0;
+/** The schema's words by their hash, once read: asked again, the page says it has them. */
+const wordsBy = new Map();
+/** Each island's style (the map's, under ''), once read. */
+const styles = new Map();
 /** The way back drawn now, and the island it is for. */
 let back;
 
 /** The parts an island draws (or the map, with no island), or as they ship; each with its modules. */
 async function partsOn(island, shipped) {
-  const answer = await api('view', { name: 'parts', params: { ...(island && { island }), have: [...modules.keys()], ...(shipped && { shipped: true }) } });
+  const answer = await api('view', { name: 'parts', params: { ...(island && { island }), have: [...modules.keys(), ...wordsBy.keys()], ...(shipped && { shipped: true }) } });
   const parts = (answer?.parts ?? []).map((p) => (p.modules && modules.set(p.hash, p.modules), { ...p, modules: modules.get(p.hash) }));
-  return { parts, refined: answer?.refined };
+  if (answer?.words?.types) wordsBy.set(answer.words.hash, { types: answer.words.types, links: answer.words.links });
+  return { parts, refined: answer?.refined, words: wordsBy.get(answer?.words?.hash) ?? { types: {}, links: {} } };
+}
+
+/** The style a part on `island` is drawn by: the island's own, as its page is; the map's where there is none. */
+async function styleOn(island) {
+  const at = island ?? '';
+  if (!styles.has(at)) styles.set(at, island ? api('view', { name: 'style', params: { of: island } }).then((r) => r?.style ?? state.style, () => state.style) : Promise.resolve(state.style));
+  return styles.get(at);
+}
+
+const NAME = /^[a-z][a-z0-9_]*$/;
+/** What of a style a part is handed: its numbers, and its page settings that are words, numbers or yes and no. */
+function styleValues(style) {
+  const plain = (o, keep) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([k, v]) => NAME.test(k) && keep(v)));
+  return { numbers: plain(style?.numbers, Number.isFinite), page: plain(style?.page, (v) => ['string', 'number', 'boolean'].includes(typeof v)) };
 }
 
 /** A pack version's name for its worker: the pack and the hashes of its parts, so new code is a new worker. */
@@ -51,13 +72,13 @@ function cut(item, reads) {
 }
 
 /** What a part is handed: the item it stands on, and its query's items, as the person looking may read them. */
-async function inputOf(part, item) {
+async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
-  if (!part.query) return { item: here };
+  if (!part.query) return { item: here, ...given };
   const fill = (terms) => terms?.map((t) => t.replaceAll('{here}', item?.id ?? ''));
   const filter = { find: fill(part.query.find), ...(part.query.only && { only: fill(part.query.only) }), ...(part.query.not && { not: fill(part.query.not) }) };
   const answer = await api('view', { name: 'flat', params: { filter, limit: part.query.limit ?? 50 } });
-  return { item: here, items: (answer?.items ?? []).map((i) => cut(i, part.reads)).filter(Boolean), ...(answer?.cut && { more: true }) };
+  return { item: here, items: (answer?.items ?? []).map((i) => cut(i, part.reads)).filter(Boolean), ...(answer?.cut && { more: true }), ...given };
 }
 
 /** A version's worker, started once: its port heard here, each message going to the part mounted under its id. */
@@ -111,7 +132,7 @@ function sweep() {
 }
 
 /** Mount one part under `node` on its version's worker, with what it reads. */
-async function mount(node, part, parts, item) {
+async function mount(node, part, parts, item, words) {
   const version = versionOf(parts, part.pack);
   const one = await workerOf(version, parts, part.pack);
   const id = `m${++mounts}`;
@@ -119,11 +140,14 @@ async function mount(node, part, parts, item) {
   const body = h('div', { class: 'part-body', 'data-part-id': part.id, onclick: (ev) => { const el = ev.target.closest?.('[data-item]'); if (el && body.contains(el) && !el.closest('button, input, textarea')) location.hash = `#/e/${el.dataset.item}`; } });
   node.replaceChildren(body);
   const failed = (message) => node.isConnected && node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
-  const render = mountPart(body, { style: state.style, tell: (event) => one.bridge.send({ type: 'event', id, event }) });
-  const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await inputOf(part, item) });
+  const style = await styleOn(islandOf(item));
+  // What every part is handed beside its items: the island's words and the style's values (none of its looks).
+  const given = { words, style: styleValues(style) };
+  const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }) });
+  const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await inputOf(part, item, given) });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
   one.mounted.set(id, { part: { ...part, island: islandOf(item) }, node, render, failed, refresh });
-  one.bridge.send({ type: 'mount', id, part: part.id, input: await inputOf(part, item) });
+  one.bridge.send({ type: 'mount', id, part: part.id, input: await inputOf(part, item, given) });
 }
 
 /** The island an item is on: its own id when it is one (its type has the field an island pins a version by), else its island. */
@@ -148,11 +172,11 @@ export async function drawPart(node, { slot, item, redraw = () => {} }) {
   sweep();
   const island = islandOf(item);
   const shipped = Boolean(island && shippedOn(island));
-  const { parts, refined } = await partsOn(island, shipped);
+  const { parts, refined, words } = await partsOn(island, shipped);
   wayBackFor(island, shipped ? undefined : refined, async () => redraw());
   const part = parts.find((p) => p.slot === slot);
   if (!part) return false;
   if (!part.modules) throw new Error(`${part.title}: its code did not come`);
-  await mount(node, part, parts, item);
+  await mount(node, part, parts, item, words);
   return true;
 }

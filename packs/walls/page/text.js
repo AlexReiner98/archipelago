@@ -1,6 +1,6 @@
-// The one dialect a note is written in, read the same way wherever it is read (Rule 11): the item page (ui/body.js),
-// the published reader (ui/doc.js) and anyone's test of it. Text in, blocks and spans out, as data: each page draws
-// them with its own elements, and never as markup.
+// The one dialect a note is written in, read the same way wherever it is read (Rule 11): the item page and a part's
+// note mark (./body.js), the published reader (ui/doc.js) and anyone's test of it. Text in, blocks and spans out, as
+// data: each page draws them with its own elements, and never as markup.
 //
 // The dialect is markdown as agents and people write it on the map:
 //   # Title, ## Title, ### Title       a title; so is a line in capitals, or a short line of its own above a paragraph

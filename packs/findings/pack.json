@@ -35,7 +35,7 @@
       "title": "Findings",
       "slot": "piece.findings",
       "opens": ["piece.findings"],
-      "reads": { "finding": ["title", "value", "unit", "as_of", "published"], "island": ["title"] },
+      "reads": { "finding": ["title", "body", "value", "unit", "as_of", "published"], "island": ["title"] },
       "query": { "find": ["island {here}"], "only": ["type finding"], "limit": 60 },
       "sends": ["findings.stand_by"],
       "modules": { "index.js": "parts/findings/index.js", "rows.js": "parts/findings/rows.js" }

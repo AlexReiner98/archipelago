@@ -147,6 +147,13 @@ test('a part goes to the page by its hash: the owner’s version over it, an isl
     assert.equal(shelfs(shipped.parts)[0].hash, shelfs(partsFor(l.registry))[0].hash, 'as the pack ships it: no island version, no owner’s version');
     assert.ok(shelfs(shipped.parts)[0].modules, 'its modules come with it when the page has not got them');
     assert.equal((await parts({ caller: 'query', map: l }, {})).refined, undefined, 'with no island, nothing is said of one');
+
+    // With the parts go the schema's words, as data: whole the first time, by their hash once the page holds them.
+    const words = asked.words as { hash: string; types: Record<string, { title: string; open: string[]; closed: string[]; of?: string }>; links: Record<string, string> };
+    assert.equal(words.types.task.title, 'Task');
+    assert.ok(words.types.task.open.length && words.types.task.closed.length);
+    assert.equal(words.links.depends_on, 'depends on');
+    assert.deepEqual((await parts({ caller: 'query', map: l }, { island: trial, have: [words.hash] })).words, { hash: words.hash });
   } finally {
     hostFor(l.registry).stop();
     rmSync(dir, { recursive: true, force: true });

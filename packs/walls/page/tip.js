@@ -5,7 +5,7 @@
 // a key hides the tip and leaves them off. A drawing's own tip (layout-tip.js) quiets this one over its mark, and
 // over a mark a drawing is told the pointer entered, this one waits for the drawing's answer before it says anything.
 
-import { h } from './base.js';
+import { h } from './dom.js';
 import { toldOfEnter } from './marks.js';
 
 let box = null;

@@ -10,7 +10,7 @@ import { gist, sessionHue } from './words.js';
 // the mark was in sight for a moment (the style's `trace_seen_after`) while the page was visible. A hidden page or
 // pane, or a mark scrolled or panned out of sight, never counts. What waits and what has been seen are kept in this
 // browser for each workspace, so a reload keeps a trace not yet seen and does not bring back one that was. Over a
-// traced mark the page's one tip (ui/tip.js) says who changed it and why, in a line. Changes the person made here
+// traced mark the page's one tip (packs/walls/page/tip.js) says who changed it and why, in a line. Changes the person made here
 // are not traced: they saw them made.
 
 /** What waits to be seen, by item id: { key, line, hue, at }; `key` is the item and the position that changed it. */

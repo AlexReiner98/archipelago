@@ -1,9 +1,18 @@
 // A note as a page: its first paragraph and the titles of its sections, each one click away. What it says is read by
-// the one dialect every page reads (ui/text.js); this draws it for the item page.
+// the one dialect every page reads (./text.js); this draws it, for the item page and for a part's `note` mark
+// (./part-render.js), so a note reads the same wherever it is drawn. The host's: it reads no page state of its own; the
+// page hands it the style a note is read by and the titles it knows (noteContext), once, as it starts.
 
-import { h, state } from './base.js';
+import { h } from './dom.js';
 import { readSpans, readText } from './text.js';
-import { titles } from './words.js';
+
+/** What the page knows that a note is drawn by: its style now, and an item's title by its id. */
+const known = { style: () => ({}), title: () => undefined };
+/** Tell the note what the page knows: `style()` the style a note is read by when none is given, `title(id)` an item's title. */
+export function noteContext({ style, title } = {}) {
+  if (typeof style === 'function') known.style = style;
+  if (typeof title === 'function') known.title = title;
+}
 
 const NAME = /^[a-z][a-z0-9_]*$/;
 
@@ -18,12 +27,12 @@ export function drawSpans(text) {
       // A page of the site by its address is the site's to lead to: here its words, its address in the tooltip.
       if (s.t === 'page') return h('span', { title: s.path }, s.text);
       if (s.t === 'link') return h('a', { href: s.href, target: '_blank', rel: 'noopener noreferrer', title: s.href }, s.text ?? s.href.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, ''));
-      return h('a', { href: `#/e/${s.id}`, class: 'note-item', title: titles.get(s.id) ?? 'Open it' }, s.text ?? titles.get(s.id) ?? 'this item');
+      return h('a', { href: `#/e/${s.id}`, class: 'note-item', title: known.title(s.id) ?? 'Open it' }, s.text ?? known.title(s.id) ?? 'this item');
     });
   return draw(readSpans(text));
 }
 
-/** A table read by ui/text.js, each cell drawn by `cell`. */
+/** A table read by ./text.js, each cell drawn by `cell`. */
 export function drawTable(t, cell) {
   // The page's policy allows no inline style: a column's side is a class.
   const td = (tag, text, i) => h(tag, { class: `align-${t.aligns[i] ?? 'left'}` }, cell(text));
@@ -85,7 +94,7 @@ const sentence = (title) => (/[a-z]/.test(title) ? title : title.charAt(0) + tit
  * (note_*): the house style says, a kind's or an item's may say otherwise. Without a page's own, the workspace's.
  * `tick(line, done)`, where the note may be changed here, ticks a checklist item.
  */
-export function renderBody(text, { style = state.style, tick } = {}) {
+export function renderBody(text, { style = known.style(), tick } = {}) {
   const whole = style.page?.notes === 'whole';
   const open = style.page?.notes === 'open';
   const n = (name) => {

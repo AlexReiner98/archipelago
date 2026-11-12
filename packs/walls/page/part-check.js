@@ -3,7 +3,7 @@
 // marks, and the host alone makes them into the page (packs/walls/page/part-render.js), under the workspace's style.
 //
 // A mark is [kind, attributes, ...what is in it], as a drawing's is (packs/walls/page/marks.js); the attributes may be left out
-// (['text', 'Hello']). Seven kinds, nothing richer:
+// (['text', 'Hello']). Nine kinds, nothing richer:
 //   box     a group of marks, in a row or a column
 //   text    words
 //   list    marks one under another, a row each
@@ -11,6 +11,9 @@
 //   button  words the person presses; the press goes back to the part
 //   paint   a surface in its own units that pans and zooms in the host, holding paths and placed text
 //   path    a line or a shape on a paint surface
+//   note    words in the map's note dialect, drawn as the item page draws a note (packs/walls/page/body.js)
+//   menu    buttons behind a few words, for what is done rarely, placed in sight by the host
+// Any mark on the page may carry a `tip`: what it says of itself, shown by the page's one tooltip.
 // Every look is a name the style gives its value (packs/walls/page/part-marks.css): a tone, a gap or a size is a word or a step on
 // the style's scale, never a colour or a length. This module reads no page: it is run without a browser in tests.
 
@@ -36,7 +39,8 @@ const path = (v, why) => (typeof v !== 'string' ? why('not a path') : v.length >
 /** The tones a mark may take: each a colour the style names. */
 export const TONES = ['accent', 'muted', 'ok', 'warn', 'bad', 'closed'];
 const tone = oneOf(...TONES);
-const anyMark = { key, item };
+/** What any mark may say: its key, the item it stands for and, on the page, its tip. */
+const anyMark = { key, item, tip: words(partLimits.label) };
 
 /**
  * Each kind: the attributes it may have and how each is read, what it may hold (`marks`, `words`, `drawn`: paths and
@@ -47,10 +51,12 @@ export const MARKS = {
   box: { attrs: { ...anyMark, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag }, holds: 'marks' },
   text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end') }, holds: 'words' },
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
-  input: { attrs: { key, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag }, holds: 'nothing', keyed: true },
+  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag }, holds: 'nothing', keyed: true },
   button: { attrs: { ...anyMark, look: oneOf('main', 'quiet'), tone, label: words(partLimits.label) }, holds: 'words', keyed: true },
-  paint: { attrs: { key, width: side, height: side, start: point, pixels: flag }, holds: 'drawn' },
-  path: { attrs: { ...anyMark, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
+  paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag }, holds: 'drawn' },
+  path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
+  note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
+  menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet') }, holds: 'marks', only: ['button'], needs: ['label'] },
 };
 
 /** The nodes this module made: the renderer draws nothing else. */
@@ -95,6 +101,8 @@ function node(mark, seen, where, onPlane) {
   }
   const placed = at.x !== undefined || at.y !== undefined || at.anchor !== undefined;
   if (kind === 'text' && onPlane && (at.x === undefined || at.y === undefined)) why('text on a paint surface with no x and y');
+  if (onPlane && at.tip !== undefined) why(`a tip on ${a(kind)} on a paint surface: what lies there keeps none`);
+  if (kind === 'note' && at.tick && at.key === undefined) why('a note that ticks with no key: a tick goes back by its key');
   if (kind === 'text' && !onPlane && placed) why('x, y or anchor on text off a paint surface');
   for (const name of shape.needs ?? []) if (at[name] === undefined) why(`${a(kind)} with no ${name}`);
   if (kind === 'paint' && (at.width === undefined || at.height === undefined)) why('a paint surface with no width and height');
@@ -109,6 +117,7 @@ function node(mark, seen, where, onPlane) {
   } else {
     const inner = shape.holds === 'drawn';
     out.kids = rest.map((kid, i) => (typeof kid === 'string' || typeof kid === 'number' ? why(`words in ${a(kind)}: put them in a text`) : node(kid, seen, [...where, `${kind} ${i}`], inner || onPlane)));
+    for (const kid of shape.only ? out.kids : []) if (!shape.only.includes(kid.mark)) why(`${a(kid.mark)} in ${a(kind)}: it holds ${shape.only.join(' and ')}s only`);
   }
   checked.add(out);
   return out;

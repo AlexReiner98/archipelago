@@ -1,16 +1,23 @@
 // The host's renderer for parts: checked marks (packs/walls/page/part-check.js) made into the page, under the workspace's style.
 // A part answers whole each time it speaks; the renderer keeps what is already drawn where it can, matching a mark by
 // its key, else by its kind and place, so a field being typed in keeps its words and its caret. What the person does
-// goes back to the part as an event: { key, name, value }, `edit` and `submit` from an input, `press` from a button.
+// goes back to the part as an event: { key, name, value }, `edit` and `submit` from an input, `press` from a button
+// (one in a menu too), `tick` from a note's checklist ({ line, done }). A note is drawn as the item page draws one
+// (./body.js), under the style; a tip is the element's title, which the page's one tooltip shows (./tip.js).
 // Looks are classes and steps the style gives values to (packs/walls/page/part-marks.css); the renderer writes no colour or length.
 // Pan and zoom of a paint surface stay here (packs/walls/page/part-paint.js): the part is never asked where the reader looks.
 
 import { isChecked } from './part-check.js';
 import { paintSurface } from './part-paint.js';
+import { renderBody } from './body.js';
+// A menu opened is placed in sight (its listener is the page's).
+import './menu-place.js';
 
 /** What each element was drawn from, and the surface that runs a paint mark. */
 const drawnFrom = new WeakMap();
 const surfaces = new WeakMap();
+/** The tip each element was given last. */
+const drawnTip = new WeakMap();
 /** The values each field has sent the part, latest last, so its echo is known from a value of its own. */
 const sent = new WeakMap();
 const told = (el) => sent.get(el) ?? (sent.set(el, []), sent.get(el));
@@ -80,11 +87,19 @@ function build(node, ctx) {
     el.type = 'button';
     el.addEventListener('click', () => ctx.tell({ key: drawnFrom.get(el).key, name: 'press' }));
   } else if (node.mark === 'input') el = field(node, ctx);
+  else if (node.mark === 'note') el = make('div', 'pm-note');
+  else if (node.mark === 'menu') {
+    el = make('details', 'menu pm-menu');
+    el.append(make('summary', ''), make('div', 'menu-items'));
+    // A choice made shuts the menu, as every menu on the page does.
+    el.addEventListener('click', (ev) => ev.target.closest?.('.menu-items button') && (el.open = false));
+  }
   else if (node.mark === 'paint') {
     const surface = paintSurface(node, { style: ctx.style, drawn: drawOnPlane });
     surfaces.set(surface.el, surface);
     if (node.at.pixels) ctx.canvas(node.key, surface.pixels);
     drawnFrom.set(surface.el, node);
+    tipped(surface.el, node.at.tip);
     return surface.el;
   } else throw new Error(`No way to draw a ${node.mark} on the page`);
   drawnFrom.set(el, node);
@@ -107,7 +122,7 @@ function update(el, node, ctx, fresh = false) {
   const was = drawnFrom.get(el);
   drawnFrom.set(el, node);
   const { at } = node;
-  if (node.mark === 'paint') return (surfaces.get(el).update(node), el);
+  if (node.mark === 'paint') return (surfaces.get(el).update(node), tipped(el, at.tip), el);
   if (node.mark === 'input' && (at.lines ?? 1) > 1 !== (el.tagName === 'TEXTAREA')) {
     // A field that changes between one line and many is made again.
     const made = build(node, ctx);
@@ -117,7 +132,18 @@ function update(el, node, ctx, fresh = false) {
   looks(el, node);
   if (node.item !== undefined) el.dataset.item = node.item;
   else delete el.dataset.item;
-  if (node.words !== undefined && (fresh || was.words !== node.words)) el.textContent = node.words;
+  if (node.mark === 'note') {
+    // Drawn again only when its words, whether it ticks, or the style changed: a section the reader opened stays open.
+    if (fresh || was.words !== node.words || was.at.tick !== at.tick || el.drawnUnder !== ctx.style) {
+      const tick = at.tick ? (line, done) => ctx.tell({ key: drawnFrom.get(el).key, name: 'tick', value: { line, done } }) : undefined;
+      el.replaceChildren(renderBody(node.words, { ...(ctx.style && { style: ctx.style }), tick }));
+      el.drawnUnder = ctx.style;
+    }
+  } else if (node.words !== undefined && (fresh || was.words !== node.words)) el.textContent = node.words;
+  if (node.mark === 'menu') {
+    el.firstElementChild.textContent = at.label;
+    place(el.lastElementChild, node.kids, ctx);
+  }
   if (node.mark === 'button' || node.mark === 'input') at.label !== undefined ? el.setAttribute('aria-label', at.label) : el.removeAttribute('aria-label');
   if (node.mark === 'input') {
     el.placeholder = at.hint ?? '';
@@ -137,6 +163,14 @@ function update(el, node, ctx, fresh = false) {
   return el;
 }
 
+/** A tip is the element's own title; set only when it changes, as the page's tooltip takes a title off while it shows it. */
+function tipped(el, tip) {
+  if (tip === drawnTip.get(el)) return;
+  if (tip === undefined) el.removeAttribute('title');
+  else el.setAttribute('title', tip);
+  drawnTip.set(el, tip);
+}
+
 /** A mark's looks as classes and steps of the style's scales, set whole each time. */
 function looks(el, node) {
   const { at, mark: kind } = node;
@@ -148,7 +182,8 @@ function looks(el, node) {
   if (at.grow) cls.push('pm-grow');
   if (at.wrap) cls.push('pm-wrap');
   if (at.bold) cls.push('pm-bold');
-  el.className = cls.join(' ');
+  el.className = [...(kind === 'menu' ? ['menu'] : []), ...cls].join(' ');
+  tipped(el, at.tip);
   for (const [name, scale, value] of [['--pm-gap', 'space', at.gap], ['--pm-pad', 'space', at.pad], ['--pm-size', 'text', at.size]]) {
     if (value === undefined) el.style.removeProperty(name);
     else el.style.setProperty(name, value ? `var(--${scale}-${value})` : '0');

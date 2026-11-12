@@ -23,7 +23,7 @@
    every bar. Its padding is the gap to the mark. How it looks is the drawing's: the browser's own look for a popover
    is taken off. */
 .drawing-tip { position: fixed; inset: auto; margin: 0; padding: var(--space-4); border: 0; background: none; color: inherit; overflow: visible; pointer-events: none; }
-/* The page's one tooltip (ui/tip.js): what a control or a mark says of itself, in the top layer, after a moment's
+/* The page's one tooltip (packs/walls/page/tip.js): what a control or a mark says of itself, in the top layer, after a moment's
    wait; moving on to the next, at once. The browser never shows its own. */
 .tip { --tip-gap: var(--space-4); position: fixed; inset: auto; margin: 0; max-width: var(--tip-most); padding: var(--space-4) var(--space-6); background: var(--panel); color: var(--text); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.18); font-size: var(--text-2); line-height: 1.4; white-space: pre-line; overflow-wrap: anywhere; pointer-events: none; opacity: 1; transition: opacity 0.12s ease 0.45s; }
 .tip.at-once { transition: none; }

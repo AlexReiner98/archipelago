@@ -309,7 +309,7 @@ body.invoice table.text-table:first-of-type td {
 .align-center {
   text-align: center;
 }
-/* The one dialect's callouts, checklists and code (ui/text.js), in the reader's own colours. */
+/* The one dialect's callouts, checklists and code (packs/walls/page/text.js), in the reader's own colours. */
 aside.callout {
   margin: 0 0 var(--rhythm-4);
   padding: var(--rhythm-2) var(--rhythm-4);

@@ -29,7 +29,7 @@ const seen = (el, fn) => {
   const sight = new IntersectionObserver((all) => all.some((e) => e.isIntersecting) && (sight.disconnect(), fn()), { threshold: 0.5 });
   sight.observe(el);
 };
-/** The marks a drawing is told the pointer entered: it answers for them, so the page's tip waits for it (ui/tip.js). */
+/** The marks a drawing is told the pointer entered: it answers for them, so the page's tip waits for it (packs/walls/page/tip.js). */
 export const toldOfEnter = new WeakSet();
 /** The one address a drawing may link to: an item's page. */
 const ITEM = /^#\/e\/e_[a-z0-9]{8}$/;

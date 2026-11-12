@@ -2,6 +2,7 @@
 // What more than one module writes is kept on `state`; `route` is the router, set by app.js.
 
 import { applyTheme } from './theme.js';
+import { h } from './dom.js';
 
 export const state = { workspace: undefined, schema: undefined, may: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
 
@@ -34,21 +35,7 @@ export const main = document.getElementById('main');
 // A part may be inside another: a screen holds the page the kernel still draws itself as a part of its own.
 export const part = (name) => main.querySelector(`.part[data-part="${name}"]`) ?? main;
 
-export function h(tag, attrs, ...kids) {
-  const el = document.createElement(tag);
-  for (const [key, value] of Object.entries(attrs ?? {})) {
-    if (value == null || value === false) continue;
-    if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
-    else if (key === 'class') el.className = value;
-    else if (key in el) el[key] = value;
-    else el.setAttribute(key, value);
-  }
-  for (const kid of kids.flat(Infinity)) {
-    if (kid == null || kid === false) continue;
-    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
-  }
-  return el;
-}
+export { h };
 
 /** A lens's sets of words, each its own Find term: one or several (the find bar's Shift+Enter adds a set, e_e3k797d3). */
 export const wordsOf = (filter) => (filter?.find ?? []).filter((t) => t.startsWith('text ')).map((t) => t.slice(5));

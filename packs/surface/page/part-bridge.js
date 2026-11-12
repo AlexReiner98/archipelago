@@ -14,6 +14,8 @@ import { goingOut } from './part-going.js';
 
 /** How long, in milliseconds, a press lets its part send one action as the press's own. */
 const pressLasts = 2000;
+/** What the person does that a part may answer with one action as theirs: a press, and a tick in a note's checklist. */
+const GESTURES = ['press', 'tick'];
 
 /**
  * Bridge one pack version's port. `partOf(id)` is the part mounted under that id ({ id, title, sends, hash, island? }):
@@ -56,9 +58,9 @@ export function partBridge(port, { partOf } = {}) {
   }
 
   return {
-    /** Send the version's parts a message: a `press` event lets that part send one action as the press's own. */
+    /** Send the version's parts a message: a `press` (or a note's `tick`) lets that part send one action as its own. */
     send(message) {
-      if (message?.type === 'event' && message.event?.name === 'press') pressed.set(String(message.id), performance.now());
+      if (message?.type === 'event' && GESTURES.includes(message.event?.name)) pressed.set(String(message.id), performance.now());
       if (message?.type === 'unmount') (pressed.delete(String(message.id)), busy.delete(String(message.id)));
       port.postMessage(message);
     },

@@ -73,6 +73,28 @@ test('paths and placed text lie on a paint surface, and only there', () => {
   refused(['paint', { width: 10, height: 10, start: [1] }], /not \[x, y\]/);
 });
 
+test('a note holds words in the dialect, a menu holds buttons, and any mark on the page may carry a tip', () => {
+  const root = checkMarks([
+    'box', { tip: 'The whole of it' },
+    ['note', { key: 'n', tick: true, tip: 'How it was found' }, '## Why\n- [ ] check it'],
+    ['menu', { key: 'more', label: '⋯', look: 'quiet' }, ['button', { key: 'stand', tip: 'Mark it published' }, 'Stand by']],
+    ['input', { key: 'q', tip: 'Find' }],
+    ['paint', { width: 10, height: 10, tip: 'A map' }],
+  ]);
+  assert.equal(root.at.tip, 'The whole of it');
+  assert.equal(root.kids[0].words, '## Why\n- [ ] check it');
+  assert.equal(root.kids[0].at.tick, true);
+  assert.equal(root.kids[1].kids[0].mark, 'button');
+  refused(['menu', { label: 'More' }, ['text', 'loose']], /a text in a menu: it holds buttons only/);
+  refused(['menu', {}, ['button', { key: 'a' }, 'A']], /a menu with no label/);
+  refused(['note', {}, ['text', 'x']], /a note holding a mark/);
+  refused(['note', { tick: true }, '- [ ] a'], /a note that ticks with no key/);
+  refused(['paint', { width: 10, height: 10 }, ['path', { d: 'M0 0', tip: 'x' }]], /the attribute "tip" on a path/);
+  refused(['paint', { width: 10, height: 10 }, ['text', { x: 1, y: 1, tip: 'x' }, 'a']], /a tip on a text on a paint surface/);
+  refused(['text', { tip: 'x'.repeat(partLimits.label + 1) }, 'a'], /tip: more than 200 characters/);
+  refused(['note', {}, 'x'.repeat(partLimits.words + 1)], /more than 20000 characters/);
+});
+
 test('a part that says too much is refused whole', () => {
   const many = ['list', {}, ...Array.from({ length: partLimits.marks }, () => ['text', 'x'])];
   refused(many, /more than 5000 marks/);
