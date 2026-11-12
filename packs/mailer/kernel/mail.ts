@@ -43,7 +43,7 @@ export function setBounced(check: ((email: string) => Promise<boolean>) | undefi
 /** An address on its own, from "Name <address>" or a bare address. */
 export const addressOf = (from: string) => /<([^>]+)>/.exec(from)?.[1] ?? from.trim();
 
-export { normalEmail } from '../../../src/email-address.ts';
+export { normalEmail } from './email-address.ts';
 
 /** Whether this server sends mail, or only writes it to its log. */
 export const mailConfigured = () => Boolean(mailer || env('MAIL_FROM'));

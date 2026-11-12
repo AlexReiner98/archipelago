@@ -11,10 +11,11 @@
         {
           "id": "headless",
           "argv": ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "{mode}", "--session-id", "{session_id}", "--mcp-config", "{mcp_config}", "--allowedTools", "{tools}", "--model", "{model}"],
-          "read": "read"
+          "read": "read",
+          "default": true
         }
       ],
-      "adapter": { "surface": "claude_code", "in": "hook_in", "out": "hook_out" }
+      "adapter": { "surface": "claude_code", "in": "hook_in", "out": "hook_out", "before": { "actor": "claude-code", "agent": "claude" } }
     }
   }
 }

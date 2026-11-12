@@ -49,6 +49,18 @@ test("a limit is the handler's own time: its process starting and the kernel ans
   await assert.rejects(box.call(slow, { ...message, name: 'demo.spin', input: {} }, 200), /took longer than 200 ms and was stopped/);
 });
 
+test('a handler is walled off the network and the process: each way out is refused, and its reads still answer', async () => {
+  const box = new Sandbox(join(import.meta.dirname, 'packs', 'hostile'));
+  after(() => box.stop());
+  const read: Answerer = async (query) => ({ asked: query.get });
+  const message = { call: 'action', actor: { name: 'test', kind: 'human' } };
+  for (const name of ['net', 'http', 'bare_http', 'dns', 'child_process', 'module', 'data_url', 'fetch', 'websocket', 'binding', 'builtin']) {
+    await assert.rejects(box.call(read, { ...message, name, input: {} }, 5000), /may import only its own modules|is not a function|is not a constructor|Cannot read properties of undefined/, name);
+  }
+  const plain = (await box.call(read, { ...message, name: 'plain', input: { id: 'e_1' } }, 5000)).answer;
+  assert.deepEqual(plain, { hash: '11f6ad', seen: { asked: 'e_1' } }, 'an ordinary handler still answers, reading through the host');
+});
+
 test("a handler reads as the actor: another person's private item is not there for it", async () => {
   const l = await freshWith(new Registry(dir));
   const people = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 'ann', type: 'person', title: 'Ann', visibility: 'shared' }, { op: 'create', ref: 'bo', type: 'person', title: 'Bo', visibility: 'shared' }] })) as { created: Record<string, string> };

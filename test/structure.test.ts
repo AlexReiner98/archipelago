@@ -62,13 +62,11 @@ test("the kernel names no pack's type by its bare name", () => {
 
 // Every part of the kernel becomes a pack (the owner, e_ykymc952). Until each moves, what the kernel
 // still knows of it is listed with the step on the map that takes it away; an entry may only shrink.
-const SESSIONS = 'e_xzwgetrg Sessions behaviour into its pack', CLAUDE = 'e_c35gg6nh Claude Code hooks into its pack', VIEWS = 'e_8f8m2xtf Kernel views as packs';
+const SESSIONS = 'e_xzwgetrg Sessions behaviour into its pack', VIEWS = 'e_8f8m2xtf Kernel views as packs';
 
 // A surface is a pack that adapts a client's hooks or launches one (reach.server adapter or launchers), and the kernel
 // names none of it: not `claude_code`, `claude-code`, `claude-headless`, nor the client `claude`.
 const NAMES_SURFACES: Owed = {
-  'src/chat-run.ts': [1, CLAUDE], 'src/install.ts': [2, CLAUDE], 'src/server-adapter.ts': [1, CLAUDE],
-  'src/server-launch.ts': [1, CLAUDE], 'src/server.ts': [1, CLAUDE], 'src/token-tools.ts': [1, CLAUDE],
   'ui/agents-card.js': [2, VIEWS], 'ui/connect-agent.js': [4, VIEWS], 'ui/words.js': [1, VIEWS],
 };
 test('the kernel names no surface', () => {
@@ -83,7 +81,6 @@ test('the kernel names no surface', () => {
 
 // The sessions' actions, named here until the sessions pack declares them (e_xzwgetrg): the kernel switches on none.
 const NAMES_SESSION_ACTS: Owed = {
-  'src/session-hook.ts': [1, SESSIONS], 'src/tool-acts.ts': [1, SESSIONS],
   'src/views.ts': [1, SESSIONS], 'ui/item.js': [1, VIEWS],
 };
 test("the kernel names no session's action", () => {
@@ -494,6 +491,6 @@ test("a root pack's code imports only plumbing and the roots before it", () => {
   const owed = new Set(JSON.parse(read('test/fixtures/root-imports.json')) as string[]), added = rootImports().filter((e) => !owed.has(e));
   assert.deepEqual(added, [], 'Open a slot the higher pack fills, or hand the value in (docs/kernel-packs.md, "Slots").');
 });
-// 23. A service name is answered as the map that asks it (callAs, src/kernel-context.ts): callService runs its provider as the map the names were filled for, so it is called only where no map asks; kernel-context's is a name no internal pack provides.
-const CALLS_SERVICE: Record<string, number> = { 'src/kernel-context.ts': 1 }, servicePacks = walk('packs').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+// 23. A service name is answered as the map that asks it (callAs, src/kernel-context.ts): callService ran its provider as the map the names were filled for, and is gone (wave 6); none comes back.
+const CALLS_SERVICE: Record<string, number> = {}, servicePacks = walk('packs').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
 test('a service name is answered as the map that asks it', () => assert.deepEqual(ratchet(count([...kernelFiles, ...servicePacks], /(?<!function )\bcallService\s*[<(]/g), CALLS_SERVICE), [], 'Call it with callAs(l, name, input): its provider reads as the asker, under row-level security.'));

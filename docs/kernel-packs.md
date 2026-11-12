@@ -246,11 +246,12 @@ are slots of the write and log packs; the others:
 |---|---|---|---|
 | `log.appended` | log | usage | `bytes` called inside `log.append` |
 | `rules.reply_ended` | rules | sessions | `rules.ts` importing `reply-rules.ts` |
-| `loader.reads` | loader | surface | `packhost.ts` importing `packreads.ts` (the sandbox's reads) |
+| `walls.pass_store` | walls | surface (`transient`) | `look-pass.ts` importing `transient.ts` (a look pass kept in the transient store) |
+| `loader.reads` | loader | surface | `packhost.ts` and `kernel-context.ts` importing `packreads.ts` (the sandbox's reads, and a kernel pack's `ctx.reads`, which names the pack asking); the surface root's `open.ts` loads it before any workspace opens |
 | `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
-| `open.<phase>` | the stub | any | the fixed order in `Workspaces.load` |
+| `open.<phase>` | identity (`src/lifecycle.ts`) | each root, by its `kernel/open.ts` (`OPEN`, and `LEADING` for what runs while the server leads), read in roots.json's order; an internal pack by `kernel.hooks`; what a service module still does there, `src/open-steps.ts` until its pack takes it | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
-| `surface.reads` | surface | agents (`instructions`); the kernel until their packs hold their modules: uses (`told`), touched (`touched`), views and askview (`view`), timeaxis (`placed`). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
+| `surface.reads` | surface | agents (`instructions`), usage (`told`); the kernel until their packs hold their modules: views and askview (`view`), timeaxis (`placed`). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 
 This is also the fix for bug e_wpww27fm (trusted modules import services):
 each import it names becomes a slot, cut by the step that moves the
@@ -296,7 +297,7 @@ Started in this order; each needs only those above it in the table.
 | 2 | seal | keys, and what forget destroys of them | `seal(id, text)`, `openSaid(id, bytes)`, `destroyKey(id)`, `secret(key)`, `setSecret(key, v)`, `opseal` |
 | 3 | log | the record, its streams and projections, its copies | `append`, `head`, `read(cursor)`, `record(stream)`, `projectFacts`, `rebuild`, `snapshot`, `tail`, `dump`, `restore`; slots `log.project`, `log.appended`; `root.dump`, `root.merge` |
 | 4 | identity | who is asking: people, tokens, workspaces | `who(request)`, tokens, members' core, `workspaces` (list, create, delete, operator), `scope`, `policy`; slot `identity.invited`; `root.workspaces` |
-| 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate` |
+| 5 | walls | what may leave the server and what a page may run | `fetch(pack, url)` by reach, `pagePolicy`, `drawHost`, `cssCheck`, `svgFigure`, `scrub` (the public form), `publicDocument`, `unscopedRead` (the renamed `wholeMap`, its callers listed), `mailGate`, `drawingBox` (a drawing's first frame in a walled process), `lookPass`; slot `walls.pass_store` |
 | 6 | loader | packs, versions, islands, the sandbox, the in-process tier | `Registry`, pack states, pins, island guards, `reach`, `host` (sandbox), `context(pack)` (the `KernelContext`), `call(service)`, `fillings(point)`; slot `loader.reads` |
 | 7 | rules | who decides what applies | `decide(who, ops, runs)`, `judge`, `mayDo`, `authorityOf`, actor checks, `standing` (still writable, room to store), private deps, layout changes; slot `rules.reply_ended` |
 | 8 | write | the one write path and the shape of an item | `change`, `apply`, `plan`, proposals (decide, withdraw, undo), merge, forget, ops, head, fields, link ends, owner link, within; points `write.*` |
@@ -310,9 +311,13 @@ to the connect pack. As built (wave 5): `search` is surface's `searchMap`
 seal's `readSecret` and `writeSecret`, the class's names kept as adapters;
 `checkConnections` is the connect pack's (`src/check-connections.ts`),
 filling `surface.act` as `check_connections`, and hands what it saw to the
-class's `observed`, which keeps it on the write path. `get`, `trail`,
-`events` and `proposals` still go through the class (`src/map-reads.ts`)
-until the reads API calls them there. The rules root reads `rules.<on>`
+class's `observed`, which keeps it on the write path. As built (wave 6): `get`,
+`trail`, `hidden` and `proposals` left the class for surface's
+`src/map-reads.ts` (`getItem`, `trail`, `hidden`, `proposals`); `events` is the
+activity log's `readEvents` (`src/eventlog.ts`), asked where an answer needs it
+(`get`'s recent events and the `events` read, `src/tool-reads.ts`); the queue's
+read is the write root's `proposalsOf` (`src/proposals.ts`), which withdraw
+reads too. The class keeps its writes, `entity` and `mentionedIn`. The rules root reads `rules.<on>`
 fillings from the internal packs' `kernel.hooks`; sessions declares
 `rules.reply_ended`.
 
@@ -331,7 +336,7 @@ moves with a shim to the pack named.
 | seal | seal, opseal, vault, secrets, backup-seal |
 | log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage), eventlog (wave 6: backup's dump and the surface's reads read events with a database or a transaction) |
 | identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
-| walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail |
+| walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail, drawing-box, drawing-runner, look-pass |
 | loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
@@ -489,17 +494,15 @@ Set by the database step (e_8e5yhfdy); every root step moves its row the same wa
   imports do not count. Which pack a module is in is read from this document ("Where each
   module goes", "Plumbing"), or from where it now lives. The rule holds of every module of a root
   row, moved or not. What those modules imported above that when the wave began is owed, listed
-  in `test/fixtures/root-imports.json` (193 imports, as `src/<m>.ts -> src/<n>.ts`); an import
+  in `test/fixtures/root-imports.json` (193 imports when the wave began, as `src/<m>.ts -> src/<n>.ts`); an import
   not on it is refused. Cutting one needs no edit there; the gather step empties the list.
 - **Run** the tests that import the moved modules, the structure test, `npm run roots:check` and
   `npm run typecheck`, and start a throwaway server with `node src/server.ts` (see below) to see
   `/health` answer the new root's hash.
 
-> [!WARNING]
-> `node src/boot.ts` (`npm start`) does not start on `kernel-packs` as of 8463aba4: `src/lifecycle.ts`
-> imports `OPEN_PHASES` from `src/boot.ts`, the entry module still in its top-level await, so the
-> import of `server.ts` never settles. `node src/server.ts` starts. Found by the database step; its fix
-> is the lifecycle hooks' owner's.
+- **Boot.** `node src/boot.ts` (`npm start`) starts (wave 6): `OPEN_PHASES` is in
+  `src/open-phases.ts`, apart from the entry module, and the open phases no longer reach the stub.
+
 ## Moving a service in the wave (as built)
 
 How the kernel views step (e_8f8m2xtf) moved its modules into `packs/attention`
@@ -552,10 +555,13 @@ read with several keys answers as it did): an internal pack names it in its mani
 (`"hooks": { "surface.reads": "reads.ts#instructions" }`, agents) and is handed its context of the
 map that asks, any map, opened or not (`hostAt`, `src/kernel-context.ts`); a module still in
 `src/` fills it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`, through
-`src/service-reads.ts`), until its pack holds it: `told` (uses: the usage pack's code still
-imports the kernel, so it does not load from a copy of the packs), `touched` (sessions is
-optional, and an optional pack fills only `write.*`), `view` (with its pin) and `placed`; `events`
-left in wave 6, answered by the reads API from the log root's eventlog. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
+`src/service-reads.ts`), until its pack holds it: `view` (with its pin) and `placed`; `events` left in wave 6, answered by
+the reads API from the log root's eventlog (`packreads-views`). As built (wave 6): `told` is the usage pack's (`reads.ts#told`), and what a run touched
+is the reads API's own, read from the transient store in `runsOf` (`src/packreads-log.ts`), since
+sessions is optional and an optional pack fills only `write.*`. The query step (wave 6, e_5euvh74f) moved query-flat, query-terms, query-only, query-held, query-presets,
+askview, views and timeaxis into `packs/query/kernel` behind pure shims, still on the map (`l`) and naming the kernel
+at `../../../src/`: what they call is sessions' (optional, so it provides no name), or another pack's that provides
+none, so `view` and `placed` stay kernel fillings until those packs answer by name. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
 reads API's own bounded scan, `packreads-scope`, which places re-exports. `test/packreads-slots.test.ts`
 pins each answer against its service's own functions.
 

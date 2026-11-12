@@ -25,11 +25,12 @@ import { DEFAULT_ZONE, zoneOf } from '../../../src/timeaxis.ts';
  * The slot `loader.reads` (docs/kernel-packs.md, "Slots"): the reads API is surface's (packs/surface/kernel/packreads.ts),
  * which fills this when it loads, so a sandboxed pack's reads are answered without the loader importing above it.
  */
-let reads: ((l: Archipelago, read: Read) => Promise<unknown>) | undefined;
-export const fillReads = (answer: (l: Archipelago, read: Read) => Promise<unknown>): void => void (reads = answer);
-const answerRead = async (l: Archipelago, read: Read): Promise<unknown> => {
+let reads: ((l: Archipelago, read: Read, pack?: string) => Promise<unknown>) | undefined;
+export const fillReads = (answer: (l: Archipelago, read: Read, pack?: string) => Promise<unknown>): void => void (reads = answer);
+/** A read of the reads API as the map asks it; `pack` is the internal pack asking, when one is (its context's reads, src/kernel-context.ts). */
+export const readsAnswer = async (l: Archipelago, read: Read, pack?: string): Promise<unknown> => {
   if (!reads) throw new Error('No reads API is loaded: the loader slot loader.reads is filled by surface (src/packreads.ts).');
-  return reads(l, read);
+  return reads(l, read, pack);
 };
 
 const RUNNER = join(import.meta.dirname, 'pack-runner.ts');
@@ -171,7 +172,7 @@ export class Sandbox {
 
   /** Make one call; calls to one pack are taken one at a time. */
   call(l: Archipelago | Answerer, message: Record<string, unknown>, ms: number): Promise<Done> {
-    const answer: Answerer = typeof l === 'function' ? l : (query) => answerRead(l, query as Read);
+    const answer: Answerer = typeof l === 'function' ? l : (query) => readsAnswer(l, query as Read);
     const run = async (): Promise<Done> => {
       const { child, waiting, ready } = (this.proc ??= this.start());
       await ready;
@@ -241,7 +242,7 @@ export class PackHost {
     const file = l.registry.packs.find((p) => p.id === pack);
     const reads: Answerer = async (q) => {
       const beyond = file ? await answerBeyond(l, file, q) : NOT_BEYOND;
-      return beyond === NOT_BEYOND ? answerRead(l, q as Read) : beyond;
+      return beyond === NOT_BEYOND ? readsAnswer(l, q as Read) : beyond;
     };
     const ask: Answerer = answer ? async (q) => answer(q, reads) : reads;
     return box.call(ask, { call, name, input, actor: { name: actor.name, kind: actor.kind }, now: new Date().toISOString(), zone: await zoneOf(l).catch(() => DEFAULT_ZONE), present }, Math.min(ms, MAX_MS));

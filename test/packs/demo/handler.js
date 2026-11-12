@@ -61,6 +61,6 @@ export default {
   },
   // Says what of the environment it was given.
   async 'demo.env'() {
-    return { answer: Object.keys(process.env) };
+    return { answer: Object.keys(globalThis.process?.env ?? {}) };
   },
 };

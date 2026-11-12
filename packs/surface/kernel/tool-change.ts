@@ -12,7 +12,7 @@ import type { Tool } from './tools.ts';
 import { keep, kept as keptFor, take } from './transient.ts';
 import { undo } from '../../../src/undo.ts';
 import { resolveRun } from '../../../src/sessions.ts';
-import { covering } from '../../../src/withdraw.ts';
+import { covering } from '../../../src/withdraw.ts'; import { proposals } from './map-reads.ts';
 import { holdsOff } from '../../../src/rules.ts';
 import { type Noted, PLAN_SECTIONS, sections, structureAsText, tiedInChange, type TieTypes } from '../../../src/plan-note.ts';
 import { closeOffers } from '../../../src/close-offer.ts';
@@ -158,7 +158,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       }
       if (retry) await take((await bypassingRls(l)).db, `refused:${retry}`);
       // A held change that sets again all an older one of the same proposer asked says so, so that one can be withdrawn.
-      const covers = result.status === 'proposed' ? covering(await l.proposals()).get(result.proposal) : undefined;
+      const covers = result.status === 'proposed' ? covering(await proposals(l)).get(result.proposal) : undefined;
       if (covers && result.status === 'proposed') result = { ...result, covers, note: `${result.note} It covers ${covers.join(', ')}, held before it: withdraw those (revise, action withdraw).` };
       // A question an agent settled is not left for the human to come across: it is put to them by the next session
       // they talk to (attention, reason to_confirm, and the handoff), all of them in one list, not a notification for each.

@@ -5,6 +5,7 @@
 // is in no backup. Only the whole database reaches it; no member's role is granted it.
 
 import type { Q } from '../../../src/db.ts';
+import { fillPassStore } from '../../walls/kernel/look-pass.ts';
 
 /** The table, made by step 3 of the schema (src/migrate.ts). */
 export const TRANSIENT = `
@@ -54,3 +55,6 @@ export async function take<T>(db: Q, key: string): Promise<{ value: T; data?: Bu
   if (!row?.live) return undefined;
   return { value: row.value, ...(row.data && { data: Buffer.from(row.data) }) };
 }
+
+// The walls slot walls.pass_store: a look pass is kept here (packs/walls/kernel/look-pass.ts).
+fillPassStore({ keep, kept });

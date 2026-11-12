@@ -5,6 +5,8 @@ import { test } from 'node:test';
 import { altitudeOf } from './altitude.ts';
 import { readSteps, stepIds, stepsShown, stepsWrong } from './query-steps.ts';
 import { countBy, summed } from './summary.ts';
+import { flat, flatCheck } from './answers.ts';
+import type { KernelContext } from '#pelago/kernel';
 
 test('an altitude is one of the four levels, and any other stops the server', () => {
   assert.equal(altitudeOf('task', 'step'), 'step');
@@ -24,4 +26,14 @@ test("a lens's steps are checked, name their items, and show a reader only what 
   assert.match(stepsWrong([{ add: 'a' }])!, /add and remove are lists of ids/);
   assert.equal(stepsWrong(steps), undefined);
   assert.deepEqual(stepsShown(steps, new Set(['a'])), [{ add: ['a'], titles: {}, lit: [] }, { card: { title: 'End' }, remove: [] }]);
+});
+
+test('the flat lens by name is the view flat read as the asker; a check reads one item and says what is wrong', async () => {
+  const asked: unknown[] = [];
+  const ctx = { reads: async (q: { params: Record<string, unknown> }) => { asked.push(q); if (q.params.bad) throw new Error('no such term'); return { items: [] }; } } as unknown as KernelContext;
+  assert.deepEqual(await flat(ctx, { filter: { find: ['id e_x'] } }), { items: [] });
+  assert.deepEqual(await flatCheck(ctx, { filter: { find: ['id e_x'] }, limit: 50 }), {});
+  assert.deepEqual(asked, [{ view: 'flat', params: { filter: { find: ['id e_x'] } } }, { view: 'flat', params: { filter: { find: ['id e_x'] }, limit: 1 } }]);
+  assert.deepEqual(await flatCheck(ctx, { bad: true }), { problem: 'no such term' });
+  assert.match((await flatCheck(ctx, { limit: 9000 })).problem!, /from 1 to 2000/);
 });

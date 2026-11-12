@@ -2,10 +2,33 @@
   "id": "query",
   "version": "0.1.0",
   "title": "Query",
-  "description": "The query engine: how a lens is read and answered. So far the parts that read no map: a lens's steps, an item's altitude, and what changed summed up for an agent.",
+  "description": "The query engine: how a lens is read and answered (the flat query, its terms and words, held and placed in time), the standing views asked by name, a lens's steps, an item's altitude, and what changed summed up for an agent.",
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "answer.flat": {
+        "in": {},
+        "out": {
+          "items": [
+            {
+              "id": "id"
+            }
+          ],
+          "links": [
+            "any"
+          ]
+        },
+        "run": "answers.ts#flat"
+      },
+      "answer.flat_check": {
+        "in": {},
+        "out": {
+          "problem?": "string"
+        },
+        "run": "answers.ts#flatCheck"
+      }
+    }
   }
 }

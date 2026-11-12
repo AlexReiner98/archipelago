@@ -12,6 +12,9 @@ import { workingRules } from '../../../src/working-rules.ts';
 const ROOT = join(import.meta.dirname, '..', '..', '..');
 const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 
+/** The client the page's example names: the first the installer sets up (its CLIENTS), so the page names none of its own. */
+const EXAMPLE_CLIENT = /const CLIENTS = \[\s*'([a-z]+)'/.exec(read('scripts/pelago-install.mjs'))![1];
+
 /** The one line a person pastes, by the shell it is pasted in. */
 export const installLines = (origin: string) => ({
   windows: `irm ${origin}/connect/install.ps1 | iex`,
@@ -112,11 +115,11 @@ Connect to this server: find your section below and follow it. Do not ask whethe
 
 For Claude Code, Codex or Cursor, run the installer with your shell tool, naming your client (\`claude\`, \`codex\` or \`cursor\`). On Windows, in PowerShell:
 
-    ${run.windows('claude')}
+    ${run.windows(EXAMPLE_CLIENT)}
 
 On macOS or Linux:
 
-    ${run.unix('claude')}
+    ${run.unix(EXAMPLE_CLIENT)}
 
 Add \`--dry-run\` to see what it would do, changing nothing.
 

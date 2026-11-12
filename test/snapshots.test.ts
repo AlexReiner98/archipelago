@@ -13,6 +13,7 @@ import { asOf, rebuildProjections, snapshotNow } from '../src/rebuild.ts';
 import { newestValid, snapshots } from '../src/snapshot.ts';
 import { undo } from '../src/undo.ts';
 import { dumpVault } from '../src/vault.ts';
+import { getItem } from '../src/map-reads.ts';
 
 /** A map with a little of everything the projector reads: items, links, held changes and their fates, an undo, a merge. */
 async function busy(l: Archipelago) {
@@ -128,7 +129,7 @@ test('a past position reads as the map stood then: the nearest snapshot and the 
   const seen: { pos: number; title: string; status: string; links: number }[] = [];
   const mark = async () => {
     const t = (await l.entity(made.t))!;
-    seen.push({ pos: (await headOf(l.db)).pos, title: t.title, status: t.status, links: (await l.get(made.t)).outgoing.length });
+    seen.push({ pos: (await headOf(l.db)).pos, title: t.title, status: t.status, links: (await getItem(l, made.t)).outgoing.length });
   };
   await mark();
   await make(l, [{ op: 'link', type: 'part_of', from: made.t, to: made.p }]);
@@ -136,7 +137,7 @@ test('a past position reads as the map stood then: the nearest snapshot and the 
   await snapshotNow(l.db, l.registry, l.workspace);
   await make(l, [{ op: 'update', id: made.t, title: 'Second name', status: 'doing' }]);
   await mark();
-  await make(l, [{ op: 'unlink', relation: ((await l.get(made.t)) as any).outgoing[0].relation }, { op: 'update', id: made.t, status: 'done' }]);
+  await make(l, [{ op: 'unlink', relation: ((await getItem(l, made.t)) as any).outgoing[0].relation }, { op: 'update', id: made.t, status: 'done' }]);
   await mark();
   await l.change(agent, { reason: 'Rename it', ops: [{ op: 'update', id: made.t, title: 'Third name' }] });
   await make(l, [{ op: 'archive', id: made.p }]);

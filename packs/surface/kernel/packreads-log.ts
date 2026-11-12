@@ -8,8 +8,9 @@
 
 import type { Archipelago } from '../../../src/pelago.ts';
 import { openSaid } from '../../../src/seal.ts';
+import { bypassingRls } from '../../../src/outbox.ts';
 import { livesIn } from './packreads-scope.ts';
-import { filled } from './packreads-kernel.ts';
+import { keptAll } from './transient.ts';
 import { pageOf, paged, READ_LIMIT, shapes, type Page, type Paged } from './packreads-rows.ts';
 
 /** A fact is the asker's when what it is about is: an item, or a link, they may read now. */
@@ -113,9 +114,10 @@ export async function runsOf(l: Archipelago, q: { repo?: string; folder?: string
       );
   const out = paged(rows, page.size, (r) => typed(r as { id: string; type: string; props?: Record<string, unknown>; body?: string }));
   if (!q.touched || !out.rows.length) return out;
-  // The set the session's hook kept is read past row-level security (it is the server's); what is handed on is only
-  // what the asker may read now.
-  const sets = (await Promise.all(out.rows.map((r) => filled(l, 'touched', { touched: String(r.id) })))) as string[][];
+  // The set the session's hook kept (the transient store, under touched:<run>) is read past row-level security (it is
+  // the server's), every run's in one read; what is handed on is only what the asker may read now.
+  const kept = await keptAll<string[]>((await bypassingRls(l)).db, out.rows.map((r) => `touched:${r.id}`));
+  const sets = out.rows.map((r) => kept.get(`touched:${r.id}`) ?? []);
   const all = [...new Set(sets.flat())];
   const { rows: seen } = all.length ? await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and archived_at is null`, [all]) : { rows: [] };
   const may = new Set(seen.map((r) => r.id));

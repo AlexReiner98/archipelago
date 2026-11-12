@@ -19,8 +19,6 @@ export const KERNEL_FILLINGS: KernelFillings = {
   'surface.read': {},
   'surface.route': { backupFile },
   'surface.reads': {
-    told: async (l, q) => (await reads()).told(l, q), // to usage, once uses.ts reads no kernel module
-    touched: async (l, q) => (await reads()).touched(l, q), // sessions', an optional pack: a part of runs, not a read of its own
     view: async (l, q) => (await reads()).view(l, q), // to query, with views and askview
     placed: async (l, q) => (await reads()).placed(l, q), // to query, with timeaxis
   },

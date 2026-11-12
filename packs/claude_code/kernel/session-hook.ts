@@ -8,9 +8,11 @@ import { heldResources } from '../../../src/blocking.ts';
 import { toConfirm } from '../../../src/confirm.ts';
 import { STALE_DAYS } from '../../../src/attention.ts';
 import { instructionsFor } from '../../../src/instructions.ts';
-import type { Archipelago, Entity } from '../../../src/pelago.ts';
+import type { Actor, Archipelago, Entity } from '../../../src/pelago.ts';
 import { resolveRun, sessionEnd, sessionStart } from '../../../src/sessions.ts';
-import { HOOK_ACTOR } from '../../../src/chat-run.ts';
+import { BEGINS_AT } from '../../../src/tool-acts.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { itemLink } from '../../../src/members.ts';
 
 /** What may be held, as a read names it: the types with a capacity, the fields those say it in (a place that says nothing of it is no resource), and whether one says it as a number, so every item of it may be. */
@@ -33,6 +35,12 @@ export async function sessionIsland(l: Archipelago, run: string | undefined): Pr
   );
   return typeof rows[0]?.island === 'string' ? rows[0].island : undefined;
 }
+
+/**
+ * The actor a session's hooks act as, whatever surface it is in: the name this pack's adapter says hooks acted under
+ * before there were surfaces (reach.server.adapter.before.actor), as the log keeps it.
+ */
+export const HOOK_ACTOR: Actor = { kind: 'agent', name: (JSON.parse(readFileSync(join(import.meta.dirname, '..', 'pack.json'), 'utf8')) as { reach: { server: { adapter: { before: { actor: string } } } } }).reach.server.adapter.before.actor };
 
 /**
  * The surface a hook's session is recorded under: what its adapter said (this pack's handler.js, hook_in), else the
@@ -104,7 +112,7 @@ export async function hookSessionStart(l: Archipelago, input: { session_id?: str
   }
   // What every session is told is kept on the map as instructions (src/instructions.ts): the core pack's, under the owner's;
   // on an island that tries a version of its pack, the version's (its task's island, else its repository's).
-  lines.push('', ...(await instructionsFor(l, 'session_start', { about: repo?.id, island: await sessionIsland(l, started.run), fill: { run: started.run } })).map((one) => one.text));
+  lines.push('', ...(await instructionsFor(l, BEGINS_AT, { about: repo?.id, island: await sessionIsland(l, started.run), fill: { run: started.run } })).map((one) => one.text));
   return lines.join('\n');
 }
 

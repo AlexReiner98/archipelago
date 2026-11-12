@@ -12,7 +12,8 @@
     "internal": true,
     "modules": "kernel/",
     "hooks": {
-      "log.appended": "appended.ts#appended"
+      "log.appended": "appended.ts#appended",
+      "surface.reads": "reads.ts#told"
     }
   }
 }
