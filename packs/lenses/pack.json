@@ -29,6 +29,15 @@
           "links": "any"
         },
         "run": "kept-picture.ts#keptPictureOf"
+      },
+      "answer.picture_of": {
+        "in": {
+          "id": "id"
+        },
+        "out": {
+          "hash?": "string"
+        },
+        "run": "query-kept.ts#pictureOfAnswer"
       }
     }
   }

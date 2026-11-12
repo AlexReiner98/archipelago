@@ -27,9 +27,7 @@ const CALLERS: Record<string, number> = {
   'src/session-quiet.ts': 1,
   'src/sessions.ts': 1,
   'src/token-tools.ts': 1,
-  'src/tool-acts.ts': 2,
-  'src/tool-change.ts': 6,
-  'src/tool-human.ts': 4,
+  'src/tool-human.ts': 1, // import_backup: everything in the file goes in, whoever it is private to
   'src/tool-reads.ts': 4,
   'src/tools.ts': 1,
   'src/touched.ts': 3,

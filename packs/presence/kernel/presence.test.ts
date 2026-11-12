@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';
 import { listening, point, presence, tellStamp, took, watching, looked } from './presence.ts';
 import { inSight, seeing, seeingLine, seen, seenNow } from './seeing.ts';
+import { pointAct, screenAct, sightAnswer, tookAct } from './acts.ts';
 
 type Ask = { keep?: { key: string; value: unknown }; kept?: string; scan?: { keys: string[]; prefixes: string[]; except: string[] } };
 
@@ -53,4 +54,17 @@ test('what the owner looks at is read as the agent sees the map', async () => {
   assert.match((await seeingLine(ctx, w))!, /the view What blocks \(e_lens0001\), with task "Draw the ridges" \(e_task0001\) open/);
   assert.deepEqual(await inSight(ctx, w, 'e_run00001', 1), { looking: true, where: 'In the tab they are looking at.' });
   assert.equal((await inSight(ctx, w, 'e_run00001', 0)).looking, false, 'no page open');
+});
+
+test('what the tool surface asks by name: a show pointed, a told beat, a page polling, whether a show lands in sight', async () => {
+  const { ctx } = fake({ e_run00002: { id: 'e_run00002', title: 'Show it', type: 'run' } });
+  const whose = { workspace: 'w1', viewer: 'e_owner002' };
+  const focus = { at: 5, hash: 'e/e_y', actor: 'robot' };
+  assert.deepEqual(await pointAct(ctx, { whose, focus, step: { kind: 'show', actor: 'robot', hash: 'e/e_y', run: 'e_run00002' } }), focus);
+  await tookAct(ctx, { whose, told: true, step: { kind: 'story', actor: 'robot', did: 'found it', hash: 'e/e_run00002', run: 'e_run00002' } });
+  const given = await screenAct(ctx, { whose, page: { page: 'p2', on: true, where: 'e/e_y', lands: ['e_run00002'] } });
+  assert.equal(given.focus?.hash, 'e/e_y');
+  assert.deepEqual(given.steps.map((s) => s.kind), ['show', 'story']);
+  assert.ok(given.told > 0, 'a told beat moves the stamp');
+  assert.deepEqual(await sightAnswer(ctx, { whose, actor: 'robot', focus: true }), { pages: { open: 1, following: 1 }, sight: { looking: true, where: 'In the tab they are looking at.' } });
 });

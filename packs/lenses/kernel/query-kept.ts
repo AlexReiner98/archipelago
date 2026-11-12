@@ -123,3 +123,6 @@ export async function pictureOf(ctx: KernelContext, id: string): Promise<string 
   const [about] = (await ctx.reads({ links: { from: [id], types: ['about'], order: 'id', limit: 1 } })) as Link[];
   return about ? `graph?from=${about.to_id}` : 'graph?lens';
 }
+
+/** answer.picture_of: where on the page an item is seen at work (pictureOf), for the tool surface's change. */
+export const pictureOfAnswer = async (ctx: KernelContext, input: { id: string }) => ({ hash: await pictureOf(ctx, String(input?.id)) });

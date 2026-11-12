@@ -184,3 +184,6 @@ export function backupDuty(ctx: KernelContext, plan: BackupPlan): () => void {
   const t = setInterval(ask, ASK_MS).unref();
   return () => clearInterval(t);
 }
+
+/** act.capture.backup_merge: a backup merged into the map that asks (the whole map, as the tool surface's import_backup hands it). */
+export const mergeAct = (ctx: KernelContext, input: { dump: Dump; session_types?: string[]; apply?: boolean }) => merge(ctx, input.dump, { sessionTypes: input.session_types, apply: input.apply });

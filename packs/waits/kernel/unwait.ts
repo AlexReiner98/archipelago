@@ -64,3 +64,14 @@ export async function unwaitFollows(tx: Q, reg: Reg, op: Op, person: string | nu
   gone.push(...links.map((l) => ({ item: id, person, relation: l.id })));
   return links.map((l): Unlinked => ['-', l.id, 'link']);
 }
+
+/**
+ * answer.waiting_on: whose word an answer is (whoseWord), and the live waits_on links from these items to that person,
+ * read as the asker: what the tool surface's confirmed takes back once the owner has answered in chat.
+ */
+export async function waitingOn(ctx: KernelContext, input: { items: string[]; authority: { of: string } | null }): Promise<{ person: string | null; waits: { id: string; from_id: string }[] }> {
+  const person = await whoseWord(ctx, input.authority);
+  if (!person || !input.items?.length) return { person, waits: [] };
+  const links = (await ctx.reads({ links: { from: input.items, to: [person], types: ctx.registry.relationFamily('waits_on') } })) as { id: string; from_id: string }[];
+  return { person, waits: links.map((r) => ({ id: r.id, from_id: r.from_id })) };
+}

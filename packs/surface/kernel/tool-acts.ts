@@ -5,30 +5,29 @@
 
 import { z } from 'zod';
 import { importAudit } from '../../../src/audit.ts';
-import { instructionsFor } from '../../../src/instructions.ts';
-import { takeLook } from '../../../src/looks.ts';
-import { toConfirm } from '../../../src/confirm.ts';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { keepRunsWith, stopLaunched } from '../../../src/launcher.ts';
-import { notify } from '../../../src/notify.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
 import { itemLink } from '../../../src/members.ts';
 import { actorId } from '../../../src/pelago.ts';
-import { PICTURE_TYPES, putPicture } from '../../../src/pictures.ts';
-import { runNamed, tellStamp, took, watching } from '../../../src/presence.ts';
-import { inSight } from '../../../src/seeing.ts';
 import { recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from '../../../src/sessions.ts';
-import { point, sessionOpened, sessionTookUp } from './tool-change.ts';
+import { point, sessionOpened, sessionTookUp, whose } from './tool-change.ts';
 import { slotted } from './surface-slots.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { waitsOn, whoseWord } from '../../../src/unwait.ts';
 import { VIEW_INPUT, viewAddress, WEB_URL, webAddress } from './view-address.ts';
 import { withdraw } from '../../../src/withdraw.ts';
 
-/** How long a show brought into sight waits for the owner's page to say so: tries of so many ms. */
-const FOCUS_TRIES = 12;
-const FOCUS_MS = 500;
+// What an act asks of the packs above the surface it asks by their service names (docs/kernel-packs.md, "Service
+// names"), answered as the map that asks: the owner's screen (presence), a look (look_draw), a picture (publish), a
+// notification (notifications), what a session is told (agents) and where it stands (runs), what the owner is to
+// confirm (attention) and what no longer waits on them (waits).
+
+/** The kinds of picture picture_put keeps: the publish pack's (act.capture.picture), which checks them again. */
+const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;
+
+/** Who acts, as a pack's service is told it: only what the log names it by. */
+const sender = (actor: { kind: string; name: string }) => ({ kind: actor.kind, name: actor.name });
 
 // A launched session's run is kept with the same writes as the session acts here (src/launcher.ts, the surface's).
 keepRunsWith({ sessionStart, sessionUpdate, sessionEnd, tell, recordUsage });
@@ -79,19 +78,13 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // Where it pointed, and whether a page of theirs is there to follow it; with a look, the picture of what is there.
       if (input.url && input.look) throw new Error('look draws the map: a url is framed on their page, never drawn by the server.');
       const hash = input.url ? webAddress(input.url) : await viewAddress(l, input);
-      const { db } = await bypassingRls(l);
       const focus = input.focus ?? true;
       const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run, focus, input.watch);
-      const pages = await watching(db, l);
-      // Whether the owner sees it: the tab in sight is the one this session's shows go to. Brought there, it is once
-      // their page has looked again (every two seconds), so it is asked until then.
-      const run = input.run ?? runNamed(l, actor.name);
-      let sight = await inSight(l, db, run, pages.open);
-      for (let tries = 0; focus && pages.open && !sight.looking && tries < FOCUS_TRIES; tries++) {
-        await new Promise((done) => setTimeout(done, FOCUS_MS));
-        sight = await inSight(l, db, run, pages.open);
-      }
-      return { ...at, pages, sight, ...(input.look && (await takeLook(db, l.db, l, actor.name, hash, input))) };
+      // Whether the owner sees it: the tab in sight is the one this session's shows go to; brought there, it is asked
+      // until their page has looked again (the presence pack's answer.sight).
+      const { pages, sight } = await callAs<{ pages: unknown; sight: unknown }>(l, 'answer.sight', { whose: whose(l), actor: actor.name, run: input.run, focus });
+      const size = { width: input.width, height: input.height, scheme: input.scheme, fresh: input.fresh };
+      return { ...at, pages, sight, ...(input.look && (await callAs<Record<string, unknown>>(l, 'answer.look', { whose: whose(l), actor: actor.name, hash, size }))) };
     },
   },
   claim: {
@@ -144,9 +137,9 @@ export const ACT_TOOLS: Record<string, Tool> = {
       if (started.resumed) return { ...started, link: itemLink(l.workspace) };
       // A session on a task is told what its task's island says: the version of its pack the island runs (src/island-pin.ts).
       const island = input.task ? (await l.entity(input.task))?.props.island : undefined;
-      const told = await instructionsFor(l, BEGINS_AT, { about: started.repo?.id, ...(typeof island === 'string' && { island }), fill: { run: started.run } });
-      // And where it stands: what the sessions before it here worked on that needs attention now (src/frontier.ts).
-      const here = await (await import('../../../src/frontier.ts')).frontier(l, { run: started.run, cwd: input.cwd, remote: input.remote });
+      const told = await callAs<{ text: string }[]>(l, 'answer.instructions', { where: BEGINS_AT, about: started.repo?.id, ...(typeof island === 'string' && { island }), fill: { run: started.run } });
+      // And where it stands: what the sessions before it here worked on that needs attention now (the runs pack's answer.frontier).
+      const here = await callAs(l, 'answer.frontier', { run: started.run, cwd: input.cwd, remote: input.remote });
       return { ...started, link: itemLink(l.workspace), frontier: here, ...(told.length && { instructions: told.map((one) => one.text) }) };
     },
   },
@@ -185,9 +178,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, input) => {
       const answer = await tell(l, actor, input);
-      const { db } = await bypassingRls(l);
-      await tellStamp(db, l);
-      await took(db, l, { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}`, run: answer.run }, true);
+      await callAs(l, 'act.report.took', { whose: whose(l), told: true, step: { kind: 'story', actor: actor.name, did: input.said, hash: `e/${answer.run}`, run: answer.run } });
       return answer;
     },
   },
@@ -215,7 +206,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       data: z.string().min(1).describe('The file, as base64.'),
       content_type: z.enum(PICTURE_TYPES).describe('An SVG is kept only when it is drawing alone: shapes, fills, strokes and text, with no script, style, link or fetch.'),
     },
-    run: async (l, actor, input) => putPicture(l, actor, input),
+    run: async (l, actor, input) => callAs(l, 'act.capture.picture', { ...input, actor: sender(actor) }),
   },
   session_end: {
     within: { still_true: 'vouch for it' },
@@ -247,7 +238,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       level: z.enum(['info', 'warning', 'urgent']).optional(),
       about: z.string().optional().describe('Id of the item it concerns.'),
     },
-    run: async (l, actor, input) => notify(l, actor, input),
+    run: async (l, actor, input) => callAs(l, 'act.report.notify', { ...input, actor: sender(actor) }),
   },
   check_connections: {
     description: 'Ping every connection (external tool) and record whether it is reachable. Work that needs an unreachable connection shows as blocked.',
@@ -276,7 +267,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       basis: z.string().min(1).describe('What the owner said and where, in their words: "Owner in chat, 12 Oct: all fine but the pricing one".'),
     },
     run: async (l, actor, input) => {
-      const asked = await toConfirm(l, { limit: 500 });
+      const asked = await callAs<{ questions: { id: string; seq: number }[] }>(l, 'answer.to_confirm', { limit: 500 });
       const answered = asked.questions.filter((q) => q.seq <= input.upto).map((q) => q.id);
       const authority = actor.kind === 'human' ? { of: 'human' as const, who: actorId(actor) } : { of: 'human' as const, basis: input.basis, stated_by: actorId(actor) };
       // The owner's word on what agents settled: something done, on whose authority, kept in the activity stream.
@@ -288,10 +279,10 @@ export const ACT_TOOLS: Record<string, Tool> = {
         [answered],
       );
       if (rows.length) await l.apply('agent:pelago', { ops: rows.map((n) => ({ op: 'update' as const, id: n.id, status: 'read' })), reason: 'Put to the owner and answered in chat' });
-      // Answered on the owner's word, they no longer wait on the owner (src/unwait.ts).
-      const person = await whoseWord(l, authority), waits = person ? await waitsOn(l.db, l.registry, answered, person) : [];
+      // Answered on the owner's word, they no longer wait on the owner (the waits pack's answer.waiting_on).
+      const { person, waits } = await callAs<{ person: string | null; waits: { id: string; from_id: string }[] }>(l, 'answer.waiting_on', { items: answered, authority });
       if (waits.length) await l.apply(actorId(actor), { ops: waits.map((w) => ({ op: 'unlink' as const, relation: w.id })), reason: 'Answered on their word: no longer waits on them' }, { authority });
-      return { confirmed_upto: input.upto, questions: answered.length, left: (await toConfirm(l)).count, ...(waits.length && { unwaited: waits.map((w) => ({ item: w.from_id, person, relation: w.id })) }) };
+      return { confirmed_upto: input.upto, questions: answered.length, left: (await callAs<{ count: number }>(l, 'answer.to_confirm', {})).count, ...(waits.length && { unwaited: waits.map((w) => ({ item: w.from_id, person, relation: w.id })) }) };
     },
   },
   restart: {
