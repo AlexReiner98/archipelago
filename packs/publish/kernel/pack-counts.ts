@@ -2,8 +2,10 @@
 // src/server-acts.ts): only how many, never of whom. A count is held in memory and written down each minute as one
 // entry of the pack's stream on that workspace, adding to the day, and read back as what was added after a position.
 
-import type { Archipelago } from '../../../src/pelago.ts';
-import { opEntries, type CountStream, type OpFact } from '../../../src/streams.ts';
+import type { KernelContext } from '#pelago/kernel';
+
+/** A fact of an operational stream (src/streams.ts), as a count is written: a key's day and how many were added. */
+type OpFact = ['+', string, string, unknown] | ['-', string, string];
 
 /** A key a count may be kept under: a short word of letters, digits, _ and -. */
 export const COUNT_KEY = /^[A-Za-z0-9_-]{1,40}$/;
@@ -31,13 +33,14 @@ export function addCount(workspace: string, stream: string, key: string, day = d
 /** The counts held in memory for a workspace's stream, as rows, without taking them. */
 export const heldCounts = (workspace: string, stream: string) => [...(pending.get(place(workspace, stream)) ?? [])].map(([key, n]) => rowOf(key, n));
 
-type Opened = { pelago: Pick<Archipelago, 'record' | 'db'> };
+/** A workspace's map as the server opens it: what writes an entry of a stream (Archipelago.record). */
+type Opened = { pelago: { record(stream: never, actor: string, facts: OpFact[]): Promise<unknown> } };
 
 /** Write down what has been counted since the last time: one entry of each stream that counted, adding to the day. */
 export async function flushCounts(open: (workspace: string) => Promise<Opened>) {
   for (const [at, counts] of [...pending]) {
     pending.delete(at);
-    const [workspace, stream] = at.split(' ') as [string, CountStream];
+    const [workspace, stream] = at.split(' ') as [string, never];
     const facts = [...counts].map(([key, n]): OpFact => { const r = rowOf(key, n); return ['+', ID + r.key, r.day, r.n]; });
     try {
       const { pelago } = await open(workspace);
@@ -61,8 +64,9 @@ export function keepCounts(open: (workspace: string) => Promise<Opened>, everyMs
  * The counts written down after a position of a stream, summed per key per day: each n is what was added to that day
  * since `after`. At most COUNT_ROWS rows, whole entries only; `pos` is the last entry read, to ask from next.
  */
-export async function countsSince(pelago: Pick<Archipelago, 'db'>, stream: string, after = 0): Promise<{ counts: { key: string; day: string; n: number }[]; pos: number }> {
-  const entries = await opEntries(pelago.db, stream as CountStream, { from: after + 1, limit: COUNT_ROWS });
+export async function countsSince(ctx: KernelContext, stream: string, after = 0): Promise<{ counts: { key: string; day: string; n: number }[]; pos: number }> {
+  // At most COUNT_ROWS entries, as the read answers (src/packreads-service.ts, counts).
+  const entries = (await ctx.reads({ counts: { stream, after } })) as { pos: number; facts: OpFact[] }[];
   const sum = new Map<string, number>();
   let pos = after;
   for (const e of entries) {

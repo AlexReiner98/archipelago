@@ -55,11 +55,12 @@ const allSubjectLinks = (reg: Reg) => [...new Set([...reg.types.values()].flatMa
 /** Why ops break the rule, as sentences: a new item made with no subject, one put on another island than its subject's, or the last tie to a live item's subject taken away. */
 export async function subjectRefusals(ctx: KernelContext, reg: Reg, ops: Op[]): Promise<string[]> {
   const errors: string[] = [];
-  // The open ties of every subject type, read once when an op unlinks: a link is read by its kind, never the whole map's.
-  let ties: Link[] | undefined;
+  // The link an unlink takes away, read alone (open only), and only when it is a tie to a subject.
+  const kinds = new Set(allSubjectLinks(reg));
   const tieById = async (id: string) => {
-    if (!ties) { const kinds = allSubjectLinks(reg); ties = kinds.length ? ((await ctx.reads({ links: { types: kinds } })) as Link[]) : []; }
-    return ties.find((r) => r.id === id);
+    if (!kinds.size) return undefined;
+    const link = (await ctx.reads({ link: id })) as Link | null;
+    return link && kinds.has(link.type) ? link : undefined;
   };
   for (const [i, op] of ops.entries()) {
     const where = `op ${i + 1} (${op.op})`;

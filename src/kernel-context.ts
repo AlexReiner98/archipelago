@@ -179,7 +179,7 @@ export function contextFor(l: Archipelago, pack: Manifest, host: KernelHost): Ke
   return {
     pack: { id, version: pack.version, hash: l.registry.hashes.get(id) ?? '' },
     workspace: l.workspace,
-    reads: (read) => answerRead(l, read),
+    reads: (read) => answerRead(l, read, id),
     registry: l.registry,
     call: <I, O>(name: string, input: I) => host.call<O>(l, pack, name, input),
     change: ({ basis, ...input }) => {

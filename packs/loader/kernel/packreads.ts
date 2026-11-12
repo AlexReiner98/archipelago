@@ -16,8 +16,9 @@ import { NAME, pageOf, paged, READ_LIMIT, shapes, type Page } from './packreads-
 import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './packreads-log.ts';
 import { pinned, type Pin } from './packreads-pin.ts';
 import { kernelRead, type KernelRead } from './packreads-kernel.ts';
+import { serviceRead, type ServiceRead } from './packreads-service.ts';
 
-export type Read = KernelRead & {
+export type Read = KernelRead & ServiceRead & {
   get?: string;
   /** Items of a type (flavours included): with a status or one of several, fields equal to where's, and a field between two values. */
   items?: { type: string; status?: string | string[]; where?: Record<string, unknown>; between?: { field: string; from?: string; to?: string } };
@@ -81,10 +82,13 @@ export type Read = KernelRead & {
   packs?: boolean;
 };
 
-export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
-  // The reads a kernel view needs as a service pack (src/packreads-kernel.ts).
+/** The answer to a read, as the map asks it; `pack` is the internal pack asking, when one is (its own memory is read by it alone). */
+export async function answerRead(l: Archipelago, q: Read, pack?: string): Promise<unknown> {
+  // The reads a kernel view needs as a service pack (src/packreads-kernel.ts), and those the moved services need (src/packreads-service.ts).
   const kernel = await kernelRead(l, q);
   if (kernel !== undefined) return kernel;
+  const service = await serviceRead(l, q, pack);
+  if (service !== undefined) return service;
   if (q.fields && (!Array.isArray(q.fields) || q.fields.some((f) => !NAME.test(f)))) throw new Error('fields is a list of field names');
   // An item's columns as the asker may read them: anyone with no login reads no note, no owner, no link's id, and of the
   // props only the few public ones, and may not filter by props at all.
@@ -231,5 +235,5 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, owner.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, shared, picture, counts, corrections.');
 }
