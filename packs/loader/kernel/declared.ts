@@ -405,6 +405,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     if (typeof d.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);
     for (const [name, file] of Object.entries(d.modules ?? {})) if (!/^[a-z][a-z0-9_-]*.js$/.test(name) || typeof file !== 'string' || file.includes('..')) problems.push(`${at}: "${name}" is not a module's name (a-z, ending .js) with a file in the pack`);
   }
+  for (const it of pack.reach?.items ?? []) if (pack.kernel?.internal !== true || !/^[a-z][a-z0-9_]*$/.test(it?.family ?? '') || !/^[a-z][a-z0-9_]*$/.test(it?.field ?? '')) problems.push('reach.items names a type and its field, for an internal pack only');
   for (const host of parts(pack).hosts) if (!URL.canParse(host.base) || !/^https?:$/.test(new URL(host.base).protocol)) problems.push(`host "${host.id}": base is an http or https address`);
   for (const hook of parts(pack).webhooks) {
     if (!handler || !hook.secret) problems.push(`webhook "${hook.id}" needs the handler and the name of its secret`);

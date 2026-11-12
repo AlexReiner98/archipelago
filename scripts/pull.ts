@@ -18,11 +18,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { homedir, hostname } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { parseBackup, parseVault, readable, restore, type Dump } from '../../../src/backup.ts';
-import { rewrap, type VaultDump } from '../../../src/vault.ts';
-import { loadConfig } from '../../../src/config.ts';
-import { openDb } from '../../../src/db.ts';
-import { configureSecrets } from '../../../src/secrets.ts';
+import { parseBackup, parseVault, readable, restore, type Dump } from '../src/backup.ts';
+import { rewrap, type VaultDump } from '../src/vault.ts';
+import { loadConfig } from '../src/config.ts';
+import { openDb } from '../src/db.ts';
+import { configureSecrets } from '../src/secrets.ts';
 
 /** Where a pulled copy waits until the data folder can be swapped for it. */
 export const pulledDir = (dataDir: string) => `${dataDir}.pulled`;
@@ -200,6 +200,4 @@ export async function putInPlace(dataDir: string, port: number): Promise<string>
   throw new Error(`The local server did not come back within 30 seconds: see runs/dev-server.log. The copy is in ${existsSync(target) ? target : dataDir}.`);
 }
 
-// Run as `node src/pull.ts` too (`npm run pull`), through the shim the wave leaves there.
-const ranAs = process.argv[1] ? resolve(process.argv[1]) : '';
-if (import.meta.main || ranAs === resolve(import.meta.dirname, '../../../src/pull.ts')) await pull();
+if (import.meta.main) await pull(); // npm run pull

@@ -187,6 +187,15 @@ export function kernelContext(l: Archipelago, pack: string): KernelContext {
   return contextFor(l, manifest, hostFor(l));
 }
 
+/** Whether a reach's `items` let this address through: exactly what an open item of its type, as the map reads, keeps in its field. */
+async function keptAddress(l: Archipelago, kept: NonNullable<NonNullable<Manifest['reach']>['items']>, url: string): Promise<boolean> {
+  for (const items of kept) {
+    const { rows } = await l.db.query(`select 1 from entity where type = any($1::text[]) and archived_at is null and is_open and props ->> $2 = $3 limit 1`, [l.registry.family(items.family), items.field, url]);
+    if (rows.length) return true;
+  }
+  return false;
+}
+
 /**
  * The context one internal pack's call is handed. Every reach is checked against its manifest when it is used, so a
  * pack that asks for what it did not declare is refused by name, never quietly given less.
@@ -218,8 +227,11 @@ export function contextFor(l: Archipelago, pack: Manifest, host: KernelHost): Ke
     fetch: (url, init) => {
       const to = new URL(url);
       const host = (pack.reach?.hosts ?? []).find((h) => { const base = new URL(h.base); return base.origin === to.origin && to.pathname.startsWith(base.pathname); });
-      if (!host) refuse(`calls ${to.origin}, a host its reach does not name`);
-      return guardedFetch(to, init);
+      const kept = pack.reach?.items ?? [];
+      if (host) return guardedFetch(to, init);
+      const refused = () => refuse(`calls ${to.origin}, a host its reach does not name`);
+      if (!kept.length) refused();
+      return keptAddress(l, kept, url).then((ok) => (ok ? guardedFetch(to, init) : refused()));
     },
     now: () => new Date(),
     said: (message) => console.error(`${id}: ${message}`),

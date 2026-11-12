@@ -8,7 +8,7 @@ import { importAudit } from '../../../src/audit.ts';
 import { instructionsFor } from '../../../src/instructions.ts';
 import { takeLook } from '../../../src/looks.ts';
 import { toConfirm } from '../../../src/confirm.ts';
-import { stopLaunched } from '../../../src/launcher.ts';
+import { keepRunsWith, stopLaunched } from '../../../src/launcher.ts';
 import { notify } from '../../../src/notify.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import { itemLink } from '../../../src/members.ts';
@@ -16,7 +16,7 @@ import { actorId } from '../../../src/pelago.ts';
 import { PICTURE_TYPES, putPicture } from '../../../src/pictures.ts';
 import { runNamed, tellStamp, took, watching } from '../../../src/presence.ts';
 import { inSight } from '../../../src/seeing.ts';
-import { recordRun, sessionEnd, sessionStart, sessionUpdate, tell } from '../../../src/sessions.ts';
+import { recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from '../../../src/sessions.ts';
 import { point, sessionOpened, sessionTookUp } from './tool-change.ts';
 import { slotted } from './surface-slots.ts';
 import { backupNow, restartNow } from './tool-config.ts';
@@ -29,6 +29,9 @@ import { withdraw } from '../../../src/withdraw.ts';
 /** How long a show brought into sight waits for the owner's page to say so: tries of so many ms. */
 const FOCUS_TRIES = 12;
 const FOCUS_MS = 500;
+
+// A launched session's run is kept with the same writes as the session acts here (src/launcher.ts, the surface's).
+keepRunsWith({ sessionStart, sessionUpdate, sessionEnd, tell, recordUsage });
 
 export const ACT_TOOLS: Record<string, Tool> = {
   backup: {

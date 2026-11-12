@@ -164,7 +164,7 @@ function invoiceHead(d) {
 
 /** Whether a page ends with a way to start a map of one's own: read with no login, and the style gives it words. */
 const startsOwn = (d) => !own && !preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
-/** That way: where this server says a person with no account begins (src/connect.ts), else its front page. */
+/** That way: where this server says a person with no account begins (/connect/start, packs/surface/kernel/connect-routes.ts), else its front page. */
 function startLink(words) {
   const link = h('a', { class: 'start-own', href: '/' }, words);
   fetch('/connect/start').then((res) => (res.ok ? res.json() : null)).then((r) => r?.url && link.setAttribute('href', r.url), () => null);

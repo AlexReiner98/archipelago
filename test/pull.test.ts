@@ -16,7 +16,7 @@ import { takeBackup } from '../src/backup-tools.ts';
 import { openDb } from '../src/db.ts';
 import { configureOutbox } from '../src/outbox.ts';
 import { Archipelago } from '../src/pelago.ts';
-import { connection, held, putInPlace, sameFolder, takeIn, takePulled } from '../src/pull.ts';
+import { connection, held, putInPlace, sameFolder, takeIn, takePulled } from '../scripts/pull.ts';
 import { configureSecrets } from '../src/secrets.ts';
 import { hashOf } from '../src/snapshot.ts';
 import { callTool } from '../src/tools.ts';

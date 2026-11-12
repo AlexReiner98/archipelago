@@ -7,6 +7,30 @@
     "trust": "service",
     "internal": true,
     "modules": "kernel/",
+    "provides": {
+      "answer.launch_brief": {
+        "in": {
+          "actor": "any",
+          "input": "any",
+          "by?": "any"
+        },
+        "out": {
+          "brief": "any",
+          "started?": "any"
+        },
+        "run": "launch-brief.ts#launchBrief"
+      },
+      "answer.launch_prompt": {
+        "in": {
+          "brief": "any",
+          "mode": "string",
+          "run": "id",
+          "instructions?": "string"
+        },
+        "out": "string",
+        "run": "launch-brief.ts#launchPrompt"
+      }
+    },
     "hooks": {
       "surface.reads": "reads.ts#instructions"
     }

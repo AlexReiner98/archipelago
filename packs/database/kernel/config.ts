@@ -82,7 +82,7 @@ export interface Config {
   dev: boolean;
 }
 
-/** The exit code that asks the dev supervisor (src/dev.ts) to start the server again. */
+/** The exit code that asks the dev supervisor (scripts/dev.ts) to start the server again. */
 export const RESTART_EXIT = 75;
 
 /** A name a drawing host may have (PELAGO_DRAW_HOST, src/draw-host.ts): a host name, and a port. */

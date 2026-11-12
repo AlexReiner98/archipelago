@@ -6,15 +6,15 @@
 // a file under src/ or packs/ changes, so a session that broke the server can
 // repair it without anyone at the terminal. Everything the server prints is
 // also kept in runs/dev-server.log, where an agent can read why it fell over. A copy of the live map that
-// `npm run pull` left waiting goes in place of the data folder before the server starts (src/pull.ts).
+// `npm run pull` left waiting goes in place of the data folder before the server starts (scripts/pull.ts).
 
 import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
-import { loadConfig, RESTART_EXIT } from '../../../src/config.ts';
+import { loadConfig, RESTART_EXIT } from '../src/config.ts';
 import { takePulled } from './pull.ts';
 
-const ROOT = join(import.meta.dirname, '..', '..', '..');
+const ROOT = join(import.meta.dirname, '..');
 const LOG = join(ROOT, 'runs', 'dev-server.log');
 mkdirSync(join(ROOT, 'runs'), { recursive: true });
 

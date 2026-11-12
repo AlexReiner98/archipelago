@@ -1,66 +1,19 @@
-// What a machine with no Archipelago checkout needs to work with this server: the setup a surface's server pack hands
-// out at /connect/setup.mjs (its setup mount; the claude_code pack's for Claude Code), filled with this server's
-// address. Nothing in it is secret: the token stays in the machine's environment. A running system asks here for a
-// token of its own, which a person approves (src/token-ask.ts).
+// What a machine with no Archipelago checkout is handed to work with this server: the install pages and scripts (GET
+// /connect/install and its short addresses), the one command that sets a project up, and a running system's request
+// for a token of its own, which a person approves (./token-ask.ts), and its poll. Nothing in it is secret: the token
+// stays in the machine's environment.
+//
+// The routes are the surface's (packs/surface/kernel/connect-routes.ts: which names the server answers to, how often
+// an address may ask, who is signed in); this answers each with its words. Sign-in is identity's (the owner, 12 Nov
+// 2026, e_wuqn82rf).
 
-import type { IncomingMessage, ServerResponse } from 'node:http';
-import { bearer } from '../../../src/auth.ts';
-import { BOUNCED_DAYS, failedFor, fromRelay, noteBounced } from '../../../src/bounces.ts';
-import { normalEmail } from '../../../src/mail.ts';
-import { workspacesOf } from '../../../src/control-index.ts';
 import type { Q } from '../../../src/db.ts';
-import '../../../src/member-mail.ts'; // members' notices go out as mail where people sign in
-import { emailOfLink, LINK_MINUTES, memberOf, redeem, redeemTyped, requestSignIn, signedIn, triesSpent, typedWorks, workspaceOfCode } from '../../../src/members.ts';
-import { clearPassword, passwordProblem, passwordSet, passwordTriesSpent, passwordWorks, setPassword, TRIES_MINUTES } from '../../../src/passwords.ts';
-import { installPage, installPs1, installScript, installSh, llmsTxt } from './install.ts';
-import { serveOAuth } from '../../../src/oauth.ts';
-import { json, PRIVATE } from '../../../src/reply.ts';
-import type { Actor } from '../../../src/pelago.ts';
-import { serverPacksOf } from '../../../src/server-host.ts';
-import { documentsInForce, signinGate } from '../../../src/server-gates.ts';
-import { serveFile, setupPack } from '../../../src/server-files.ts';
-import { serveServerPack } from '../../../src/server-routes.ts';
-import { pageStyle } from '../../../src/styles.ts';
 import { workingRules } from '../../../src/working-rules.ts';
+import { installPage, installPs1, installScript, installSh, llmsTxt } from './install.ts';
 import { askForToken, pollForToken } from './token-ask.ts';
-import type { Workspace, Workspaces } from '../../../src/workspaces.ts';
 
 /** The one command, with no secret in it, that sets a project up or brings its files up to date. */
 export const setupCommand = (origin: string) => `node -e "fetch('${origin}/connect/setup.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))"`;
-
-/** What the /connect routes are handed by the server: its names, whether it signs in with tokens, and its counts. */
-export interface ConnectRoutes {
-  hosts: string[];
-  named: string[];
-  tokens: boolean;
-  /** The workspace a request that names none is for. */
-  fallback: string;
-  workspaces: Pick<Workspaces, 'has' | 'get' | 'hold' | 'list' | 'create' | 'control'>;
-  /** True, and the request answered, when its address has asked too often. */
-  tooOften: () => boolean;
-  body: () => Promise<unknown>;
-  /** The body as it came, for what is signed over its bytes. Read it or body, not both. */
-  raw: () => Promise<Buffer>;
-  /** Where the request comes from, for what is counted by address (a pack's stream). */
-  from?: string;
-  /** Who is signed in, as any request with a token says; refused if nobody is. */
-  person: () => Promise<{ ws: Workspace; actor: () => Actor; look?: true }>;
-}
-
-/** One sign-in mail a minute to an address, whoever asks: the form cannot be used to flood someone's inbox. */
-const lately = new Map<string, number>();
-function askedLately(email: string): boolean {
-  const now = Date.now();
-  for (const [e, at] of lately) if (now - at > 60_000) lately.delete(e);
-  if (lately.has(email)) return true;
-  lately.set(email, now);
-  return false;
-}
-
-/** Where a person with no account begins on this server, if anywhere: a server pack's start page. */
-const startOf = (at: ConnectRoutes) => serverPacksOf(at.workspaces).start();
-
-const reply = (res: ServerResponse, status: number, body: unknown) => json(res, status, body, PRIVATE);
 
 /** What /connect/install hands out, by path: its type and its text for this server's address. */
 const INSTALL: Record<string, [string, (origin: string) => string]> = {
@@ -72,183 +25,33 @@ const INSTALL: Record<string, [string, (origin: string) => string]> = {
   '/connect/llms.txt': ['text/plain', llmsTxt],
 };
 
-/** The short addresses an agent finds or guesses at the root, each answered as the /connect/ path it stands for. */
-export const SHORT: Record<string, string> = {
-  '/install': '/connect/install',
-  '/install.md': '/connect/install.md',
-  '/install.ps1': '/connect/install.ps1',
-  '/install.sh': '/connect/install.sh',
-  '/llms.txt': '/connect/llms.txt',
-};
+/** What an install path hands out for this server's address: its type and its text, or undefined for no such path. */
+export function installed(path: string, origin: string): { type: string; text: string } | undefined {
+  const at = Object.hasOwn(INSTALL, path) ? INSTALL[path] : undefined;
+  return at && { type: at[0], text: at[1](origin) };
+}
 
-/**
- * Everything under /connect/ and /x/, none of it behind a token: the setup script, a system's request for a token (POST
- * /connect/request) and its poll (POST /connect/poll/<workspace>/<id>, the poll's secret as Authorization: Bearer).
- * Each is counted as the other open routes are, and given only under a name this server answers to.
- */
-export async function serveConnect(req: IncomingMessage, res: ServerResponse, path: string, at: ConnectRoutes) {
-  const host = req.headers.host ?? '';
-  if (!at.hosts.includes(host)) return reply(res, 404, { error: 'Not found' });
-  // What a server pack offers anyone: its pages, entries and webhooks (src/server-routes.ts).
-  if (path.startsWith('/x/')) return serveServerPack(req, res, path, at);
-  // A client signing in through the browser (src/oauth.ts).
-  if (/^\/(oauth|\.well-known)\//.test(path)) return serveOAuth(req, res, path, at);
-  const origin = `${at.named.includes(host) ? 'https' : 'http'}://${host}`;
-  if (req.method === 'GET' && path === '/connect/setup.mjs') {
-    if (at.tooOften()) return;
-    // The pack that takes the setup mount hands out its own file; with none, this server hands out no setup.
-    const setup = setupPack();
-    if (setup) return serveFile(res, setup.pack.file, setup.id, { origin, tokens: at.tokens, folder: setup.pack.folder });
-    return reply(res, 404, { error: 'No server pack here hands out a setup.' });
-  }
-  // Installing Archipelago, by a person or their agent (src/install.ts): the page, and what its one line fetches.
-  const install = INSTALL[path];
-  if (req.method === 'GET' && install) {
-    if (at.tooOften()) return;
-    res.writeHead(200, { 'content-type': `${install[0]}; charset=utf-8`, 'cache-control': 'no-store' });
-    return res.end(install[1](origin));
-  }
-  // The page's colours and lengths before anyone is signed in, so the sign-in page is drawn like every other.
-  if (req.method === 'GET' && path === '/connect/theme') {
-    if (at.tooOften()) return;
-    const { style } = await pageStyle((await at.workspaces.get(at.fallback)).pelago, {}, false);
-    return reply(res, 200, { theme: style.theme ?? null, lengths: style.lengths ?? null });
-  }
-  // The documents a person agrees to before they are signed in, for a page that asks for them first (a signup).
-  if (req.method === 'GET' && path === '/connect/agreements') {
-    if (at.tooOften()) return;
-    return reply(res, 200, { agreements: await documentsInForce(serverPacksOf(at.workspaces)) });
-  }
-  // Where a person with no account begins, for the sign-in page to offer: a pack's start page.
-  if (req.method === 'GET' && path === '/connect/start') {
-    if (at.tooOften()) return;
-    return reply(res, 200, { url: startOf(at) ?? null });
-  }
-  // Signing in by email: a link asked for at an address, and a link opened, its code traded once for a token.
-  // A person signed in keeps a password for their address, or takes it away; an agent or a look pass never does.
-  if (req.method === 'POST' && path === '/connect/password/set') {
-    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
-    if (at.tooOften()) return;
-    const { ws, actor, look } = await at.person();
-    const who = actor();
-    if (look || who.kind !== 'human' || !who.person) return reply(res, 403, { error: 'Only the person signed in keeps a password, not an agent.' });
-    const { rows } = await ws.pelago.db.query<{ email: string }>(`select email from member where person_id = $1 and removed_at is null limit 1`, [who.person]);
-    const email = rows[0]?.email;
-    if (!email) return reply(res, 403, { error: 'A password is kept for a member’s address, and this sign-in has none.' });
-    const control = await at.workspaces.control();
-    const body = ((await at.body()) ?? {}) as { password?: unknown };
-    if (body.password === undefined) return reply(res, 200, { email, set: (await passwordSet(control, email)) ?? null });
-    if (body.password === null) return (await clearPassword(control, email), reply(res, 200, { email, set: null }));
-    const problem = passwordProblem(body.password);
-    if (problem) return reply(res, 400, { error: problem });
-    await setPassword(control, email, body.password as string);
-    return reply(res, 200, { email, set: await passwordSet(control, email) });
-  }
-  // A failure notice the relay hands over (src/bounces.ts): the addresses that failed for good are sent nothing for a while.
-  if (req.method === 'POST' && path === '/connect/bounce') {
-    if (!fromRelay(req.headers.authorization)) return reply(res, 403, { error: 'Only the relay hands over bounces.' });
-    const failed = failedFor((await at.raw()).toString('utf8'));
-    await noteBounced((await at.workspaces.get(at.fallback)).pelago, failed);
-    if (failed.length) console.log(`bounced for good, not mailed for ${BOUNCED_DAYS} days: ${failed.length} address${failed.length === 1 ? '' : 'es'}`);
-    return reply(res, 200, { kept: failed.length });
-  }
-  if (req.method === 'POST' && (path === '/connect/sign-in' || path === '/connect/join' || path === '/connect/code' || path === '/connect/password')) {
-    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
-    if (at.tooOften()) return;
-    const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown; agree?: unknown; ref?: unknown };
-    const all = async () => (await at.workspaces.list()).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
-    // Only the workspaces this address is a member of are opened: an unknown address opens none (src/control-index.ts).
-    const theirs = async (email: string) => {
-      const ids = new Set(await workspacesOf(await at.workspaces.control(), email, all));
-      return (await at.workspaces.list()).filter((w) => ids.has(w.id)).map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
-    };
-    // Before a code is traded, the documents this person has not agreed to at their current version, as the signin
-    // gates say (src/server-gates.ts): recorded there if the request agrees to them, else answered so the page can
-    // ask. The code is not spent while anything is owed.
-    const owes = async (email: string) => (await signinGate(serverPacksOf(at.workspaces), { email, agree: body.agree, via: 'sign-in' })).owes;
-    if (path === '/connect/sign-in') {
-      const email = normalEmail(body.email);
-      if (!email) return reply(res, 400, { error: 'That is not an email address.' });
-      // Answered at once and the same either way: whether the address is a member anywhere is not told. An address in
-      // no workspace is sent nothing; the page offers where to begin to everyone who asks.
-      if (!askedLately(email)) void requestSignIn(await theirs(email), email).catch((err) => console.error(`sign-in mail to ${email} failed:`, (err as Error).message));
-      return reply(res, 200, { sent_to: email });
-    }
-    // An address and its password. Its workspace is the one named, or the only one; for several, the answer lists them.
-    if (path === '/connect/password') {
-      const email = normalEmail(body.email);
-      if (!email) return reply(res, 400, { error: 'That is not an email address.' });
-      const control = await at.workspaces.control();
-      const wait = `Too many wrong passwords for this address. Wait ${TRIES_MINUTES} minutes, or ask for an email instead.`;
-      if (await passwordTriesSpent(control, email)) return reply(res, 429, { error: wait });
-      const refused = () => reply(res, 401, { error: 'That email and password do not match.' });
-      if (!(await passwordWorks(control, email, (body as { password?: unknown }).password))) return (await passwordTriesSpent(control, email)) ? reply(res, 429, { error: wait }) : refused();
-      const mine: { id: string; name: string; db: () => Promise<Q> }[] = [];
-      for (const w of await theirs(email)) if (await memberOf(await w.db(), email)) mine.push(w);
-      if (!mine.length) return reply(res, 403, { error: 'This address is a member of no workspace here.' });
-      const named = (body as { workspace?: unknown }).workspace;
-      const ws = mine.length === 1 ? mine[0] : mine.find((w) => w.id === named);
-      if (!ws) return reply(res, 200, { workspaces: mine.map(({ id, name }) => ({ id, name })) });
-      const owed = await owes(email);
-      if (owed.length) return reply(res, 200, { agree: owed });
-      const db = await ws.db();
-      return reply(res, 200, { token: await signedIn(db, ws.id, (await memberOf(db, email))!) });
-    }
-    // A code from the mail, typed with the address it was sent to.
-    if (path === '/connect/code') {
-      const email = normalEmail(body.email);
-      if (!email) return reply(res, 400, { error: 'That is not an email address.' });
-      // Asked only once the code is known to work, so the answer says nothing of an address the asker cannot sign in as.
-      // The tries are counted before the code is looked at, so past them nothing says whether a code would work.
-      const control = (await at.workspaces.get(at.fallback)).pelago.db;
-      if (await triesSpent(control, email)) return reply(res, 429, { error: `Too many wrong codes for this address. Wait ${LINK_MINUTES} minutes, then ask for a new email.` });
-      const mine = await theirs(email);
-      if (await typedWorks(mine, email, String(body.code ?? ''))) {
-        const owed = await owes(email);
-        if (owed.length) return reply(res, 200, { agree: owed });
-      }
-      const traded = await redeemTyped(mine, control, email, String(body.code ?? ''));
-      if (traded === 'tries') return reply(res, 429, { error: `Too many wrong codes for this address. Wait ${LINK_MINUTES} minutes, then ask for a new email.` });
-      return traded === 'gone' ? reply(res, 410, { error: 'That code was not accepted: it may be mistyped, used or run out.' }) : reply(res, 200, traded);
-    }
-    const code = String(body.code ?? '');
-    const workspace = workspaceOfCode(code);
-    const gone = () => reply(res, 410, { error: 'This sign-in link has been used or has run out. Ask for a new one.' });
-    if (!workspace || !(await at.workspaces.has(workspace))) return gone();
-    res.once('close', at.workspaces.hold(workspace));
-    const db = (await at.workspaces.get(workspace)).pelago.db;
-    const email = await emailOfLink(db, code);
-    if (!email) return gone();
-    const owed = await owes(email);
-    if (owed.length) return reply(res, 200, { agree: owed });
-    const token = await redeem(db, workspace, code);
-    return token ? reply(res, 200, { token }) : gone();
-  }
-  const poll = /^\/connect\/poll\/([a-z0-9-]+)\/(a_[0-9a-f]{12})$/.exec(path);
-  if (req.method !== 'POST' || !(path === '/connect/request' || poll)) return reply(res, 404, { error: 'Not found' });
-  // A system asks from a shell, never from a web page; and with no tokens there is nothing to hand it.
-  if (req.headers.origin) return reply(res, 403, { error: 'A system asks for its token itself, not from a web page.' });
-  if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in with tokens: there is no token to ask for.' });
-  if (at.tooOften()) return;
-  const body = poll ? undefined : ((await at.body()) ?? {}) as { workspace?: unknown };
-  const workspace = poll ? poll[1] : typeof body?.workspace === 'string' ? body.workspace : at.fallback;
-  if (!(await at.workspaces.has(workspace))) return reply(res, 404, { error: `No workspace "${workspace}".` });
-  res.once('close', at.workspaces.hold(workspace));
-  const db = (await at.workspaces.get(workspace)).pelago.db;
-  if (poll) {
-    const answer = await pollForToken(db, workspace, poll[2], bearer(req.headers.authorization) ?? '');
-    return reply(res, answer.state === 'gone' ? 410 : 200, answer);
-  }
+/** A system's request for its token (POST /connect/request), answered with what it shows and polls with. */
+export async function asked(db: Q, body: unknown, origin: string, workspace: string): Promise<{ status: number; body: unknown }> {
   try {
-    const asked = await askForToken(db, body);
-    return reply(res, 200, {
-      code: asked.code,
-      poll: { url: `${origin}/connect/poll/${workspace}/${asked.id}`, secret: asked.secret },
-      approve_at: `${origin}/`,
-      expires_at: asked.expires_at,
-      note: `Show the code. A person approves it on Home, or on the page of an item watched at an address you named. Poll every few seconds with POST and Authorization: Bearer <secret> until it says approved (with the token, given once), refused or gone.`,
-    });
+    const ask = await askForToken(db, body);
+    return {
+      status: 200,
+      body: {
+        code: ask.code,
+        poll: { url: `${origin}/connect/poll/${workspace}/${ask.id}`, secret: ask.secret },
+        approve_at: `${origin}/`,
+        expires_at: ask.expires_at,
+        note: `Show the code. A person approves it on Home, or on the page of an item watched at an address you named. Poll every few seconds with POST and Authorization: Bearer <secret> until it says approved (with the token, given once), refused or gone.`,
+      },
+    };
   } catch (err) {
-    return reply(res, 400, { error: (err as Error).message });
+    return { status: 400, body: { error: (err as Error).message } };
   }
+}
+
+/** A system's poll for its token (POST /connect/poll/<workspace>/<id>, its secret as the bearer). */
+export async function polled(db: Q, workspace: string, id: string, secret: string): Promise<{ status: number; body: unknown }> {
+  const answer = await pollForToken(db, workspace, id, secret);
+  return { status: answer.state === 'gone' ? 410 : 200, body: answer };
 }

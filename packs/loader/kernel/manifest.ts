@@ -33,6 +33,8 @@ export type HandlerDef =
 /** What a pack may reach beyond its own map. */
 export interface ReachDef {
   hosts?: (HostDef & Partial<ServerHost>)[];
+  /** The addresses the map's own items keep that it may call, an internal pack only: exactly what an open item of this type (its flavours included) holds in this field (connect's check of each connection). */
+  items?: { family: string; field: string }[];
   secrets?: { name: string; env?: string }[];
   webhooks?: (WebhookDef & { format?: 'prefixed' | 'hex'; limit_ms?: number })[];
   /** Server packs' hosts it reads through, as its workspace's connection to that pack. */
@@ -160,7 +162,7 @@ export const kernelRefused = (packs: Iterable<Manifest>, own: (id: string) => bo
 
 /** The keys of a manifest, and of its reach. */
 export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'styles', 'reach', 'shared', 'moved_from', 'kernel'] as const;
-export const REACH_KEYS = ['hosts', 'secrets', 'webhooks', 'via', 'server', 'launch'] as const;
+export const REACH_KEYS = ['hosts', 'items', 'secrets', 'webhooks', 'via', 'server', 'launch'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'gates', 'mounts', 'streams', 'files', 'launchers', 'adapter', 'counts'] as const;
 
 /** Every key pack files used before the manifest, and where it went (docs/packs.md has the table). */
