@@ -39,6 +39,11 @@ export const UI_FILES: Record<string, string> = {
   '/draw-marks.js': 'draw-marks.js',
   // What runs in a drawing's worker: written in front of draw-marks.js, and into a drawing's service worker (drawInside).
   '/draw-inside.js': 'draw-inside.js',
+  // What runs in a pack version's worker around its parts, and the frame's half that starts one: both written into draw-marks.js.
+  '/part-inside.js': 'part-inside.js',
+  '/draw-parts.js': 'draw-parts.js',
+  // How the page asks the frame for a pack version's port (ui/draw-parts.js).
+  '/part-workers.js': 'part-workers.js',
   // The projector's pure part, which the page runs on the facts it reads (ui/replica.js): served from the log pack's own file.
   '/project.js': 'project.js',
   // What a stylesheet from the map may say, which the page checks a sheet by and the server checks page_css by on write.
@@ -84,7 +89,8 @@ async function current() {
     else text.set(f, body);
   }
   // The frame's script is two files: what runs in a worker (draw-inside.js, handed to the worker as its text) and the frame's own.
-  text.set('draw-marks.js', `${text.get('draw-inside.js')}\n${text.get('draw-marks.js')}`);
+  // Parts run in the same frame and workers: what runs around them (part-inside.js) and the frame's half (draw-parts.js).
+  text.set('draw-marks.js', ['draw-inside.js', 'part-inside.js', 'draw-marks.js', 'draw-parts.js'].map((f) => text.get(f)).join('\n'));
   held = { key, version, text };
   return held;
 }

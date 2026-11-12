@@ -13,7 +13,8 @@
   const say = (message) => parent.postMessage(message, '*');
 
   // A page with no origin may not start a worker every way a page can, and browsers differ in which: each is tried until one answers.
-  const source = `(${inside})(${JSON.stringify(home)})`;
+  // The same worker serves a pack version's parts (ui/part-inside.js, written in front of this beside draw-inside.js).
+  const source = `(${inside})(${JSON.stringify(home)});(${partInside})()`;
   // A classic worker first: it starts at once where a module worker from a blob is refused, and imports the drawing all the same.
   const WAYS = [
     () => new Worker(URL.createObjectURL(new Blob([source], { type: 'text/javascript' }))),
@@ -51,6 +52,8 @@
     return one;
   };
   spareOne();
+  // A pack version's parts take the warm worker too (ui/draw-parts.js, after this in the frame's script).
+  self.takeWorker = take;
 
   // A drawing a pack ships is drawn, where this frame has an origin of its own (the drawing host's, never the page's),
   // by a service worker the host serves for it (/drawing/<hash>/sw.js, around ui/draw-inside.js): the browser keeps
