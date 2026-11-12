@@ -5,7 +5,8 @@
 import { z } from 'zod';
 import { endedOf, LIMITS, NEAR, useOf, type LimitName, type Limits } from '../../../src/standing.ts';
 import { limitOf, renameWorkspace } from '../../../src/members.ts';
-import { looksBy, looksThisHour } from '../../../src/looks.ts';
+/** The looks drawn for a map's workspace in the last hour, all and by who asked: the look_draw pack's count (answer.looks_counted). */
+const looksCounted = async (l: Archipelago) => (await import('../../loader/kernel/kernel-context.ts')).callAs<{ hour: number; by: [string, number][] }>(l, 'answer.looks_counted', {});
 import { sessionsAwake } from '../../../src/sessions.ts';
 import { awakeSessions, requestsBy, requestsThisMinute, SESSION_AWAKE_MS, storageOf, storageParts } from './workspace-use.ts';
 import { bytesByType, largestItems } from '../../../src/bytes.ts';
@@ -83,7 +84,7 @@ async function replyRules(l: Archipelago, lifted: Record<string, boolean>, set: 
 async function limitUse(l: Archipelago, limits: Limits) {
   const { db } = await bypassingRls(l);
   const { rows } = await db.query<{ n: number }>(`select count(*)::int as n from member where removed_at is null`);
-  return useOf(limits, { members: rows[0].n, storage: await storageOf(l.workspace), requests: requestsThisMinute(l.workspace), sessions: await sessionsAwake(l), looks: looksThisHour(l.workspace) });
+  return useOf(limits, { members: rows[0].n, storage: await storageOf(l.workspace), requests: requestsThisMinute(l.workspace), sessions: await sessionsAwake(l), looks: (await looksCounted(l)).hour });
 }
 
 /**
@@ -100,7 +101,8 @@ export async function countersOf(call: RootCall, input: { admin?: boolean; runs:
   used.storage = await storageOf(l.workspace);
   used.sessions = await awakeSessions(whole.db, input.runs);
   used.requests = requestsThisMinute(l.workspace);
-  used.looks = looksThisHour(l.workspace);
+  const counted = await looksCounted(l);
+  used.looks = counted.hour;
   const members = input.admin ? (await whole.db.query<{ person_id: string | null }>(`select person_id from member where removed_at is null`)).rows : undefined;
   if (members) used.members = members.length;
   const since = new Date(Date.now() - SESSION_AWAKE_MS).toISOString();
@@ -111,7 +113,7 @@ export async function countersOf(call: RootCall, input: { admin?: boolean; runs:
   return {
     limits: limits ?? null, near: NEAR, order: [...LIMITS], used, allowed: limits ? useOf(limits, used) : [],
     storage_parts: await storageParts(whole.db), bytes_by_type: await bytesByType(whole.db), largest: await largestItems(whole.db, input.largest),
-    requests_by: [...requestsBy(l.workspace)], looks_by: [...looksBy(l.workspace)], awake: awake.map((r) => r.id),
+    requests_by: [...requestsBy(l.workspace)], looks_by: counted.by, awake: awake.map((r) => r.id),
     ...(members && { members: members.flatMap((m) => (m.person_id ? [m.person_id] : [])) }),
   };
 }

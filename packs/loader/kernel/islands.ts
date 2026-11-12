@@ -10,7 +10,7 @@
 // island pack and a map pack. The kernel's own pack is not judged here. Off is the default: with the setting off,
 // nothing here is asked.
 
-import { capabilityOf } from '../../../src/link-ends.ts';
+import { capabilityOf } from './link-ends.ts';
 import { MANIFEST_KEYS, parts, type Manifest } from './manifest.ts';
 import { KERNEL_PACKS, needOf } from './packorder.ts';
 

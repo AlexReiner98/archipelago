@@ -14,21 +14,21 @@ import { z } from 'zod';
 import { newId } from '../../../src/db.ts';
 import { env } from '../../../src/env.ts';
 import { append, type Fact } from '../../../src/log.ts';
-import { decideAct, listActs, setPackSecret } from '../../../src/outside.ts';
+import { decideAct, listActs, setPackSecret } from './outside.ts';
 import { canSeal } from '../../../src/secrets.ts';
 import { ISLANDS } from './islands.ts';
-import { islandBlockers, moveOntoIslands } from '../../../src/island-start.ts';
 import { dependentsOf, KERNEL_PACKS } from './packorder.ts';
 import { manifestRead } from './pack-folders.ts';
 import { isRequired } from './manifest.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
-import { needHuman } from '../../../src/actor-checks.ts';
-import { actorId, type Actor, type Archipelago } from '../../../src/pelago.ts';
+import { actorId, needHuman } from '../../identity/kernel/actor-checks.ts';
+import type { Actor, Archipelago, Op } from '../../../src/pelago.ts';
 import type { Tool } from '../../../src/tools.ts';
 import { syncTypes } from './typetable.ts';
-import { packTouches } from '../../../src/pack-touches.ts';
-import { withUse } from '../../../src/pack-use.ts';
+import { packTouches } from './pack-touches.ts';
+/** The in-process tier, loaded when asked: the placement pack plans islands, the usage pack counts use (their answers). */
+const kernel = () => import('./kernel-context.ts');
 import { folderCode, keptHashes } from './pack-code.ts';
 import { keepsKernel, movedPacks } from './pack-moved.ts';
 import { bundlesOffered, expandBundles, packsNamed, readBundles, type Bundle } from './bundles.ts';
@@ -81,7 +81,7 @@ export async function setIslands(l: Archipelago, actor: Actor | 'system', on: bo
   if (!on && actor !== 'system' && (await islandsOn(l))) throw new Error('Islands cannot be turned off: a map on islands stays on them.');
   const turning = on && !(await islandsOn(l));
   if (turning) {
-    const blocked = await islandBlockers(l);
+    const { why: blocked } = await (await kernel()).callAs<{ why?: string }>(l, 'answer.island_blockers', {});
     if (blocked) throw new Error(blocked);
   }
   const put = async (value: boolean) => {
@@ -96,7 +96,8 @@ export async function setIslands(l: Archipelago, actor: Actor | 'system', on: bo
   if (!on || actor === 'system') return;
   // Set again while on, it moves what came in on no island since (an import, say).
   try {
-    await moveOntoIslands(l, actor);
+    const { reason, ops } = await (await kernel()).callAs<{ reason: string; ops: Op[] }>(l, 'answer.island_moves', {});
+    if (ops.length) await l.change(actor, { reason, ops });
   } catch (err) {
     if (!turning) throw err;
     await put(false);
@@ -333,7 +334,7 @@ export const PACK_STATE_TOOLS: Record<string, Tool> = {
   packs: {
     description: 'The packs here and the state of each: active, waiting (with what it needs) or off. One kept as an item names it (made). To author a pack, make an item of type pack (query schema with type pack says its fields): the owner then adds it here.',
     input: {},
-    run: async (l) => withUse(l, packStates(l)),
+    run: async (l) => (await (await kernel()).callAs<{ states: unknown[] }>(l, 'answer.pack_use', { states: packStates(l) })).states,
   },
   pack_set: {
     description: 'Turn a pack off or on in this workspace. Its items stay; while it is off they are dormant and its tools are gone. The packs relying on it (dependents in packs) wait meanwhile, and wake when it is on again. A bundle (packs that go together) is turned by its id or any of its packs’ ids, all its packs at once.',

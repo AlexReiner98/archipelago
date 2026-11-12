@@ -164,3 +164,6 @@ export async function sendMail(mail: Mail): Promise<void> {
   }
   throw new Error(`The mail to ${mail.to} was not sent: ${last?.message ?? 'no server to send it to'}`);
 }
+
+/** The filling of the walls' slot walls.mail (in this pack's manifest): what the mail gate lets through is sent here. */
+export const sender = () => sendMail;

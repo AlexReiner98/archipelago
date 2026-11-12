@@ -1,17 +1,11 @@
 // The query pack run without a database: its modules read no map, so input in, answer out. Against a real map:
-// test/altitude.test.ts and test/layouts-sent.test.ts, through the shims in src/.
+// test/layouts-sent.test.ts, through the shims in src/ (an altitude is the loader's: test/altitude.test.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { altitudeOf } from './altitude.ts';
 import { readSteps, stepIds, stepsShown, stepsWrong } from './query-steps.ts';
 import { countBy, summed } from './summary.ts';
 import { flat, flatCheck } from './answers.ts';
 import type { KernelContext } from '#pelago/kernel';
-
-test('an altitude is one of the four levels, and any other stops the server', () => {
-  assert.equal(altitudeOf('task', 'step'), 'step');
-  assert.throws(() => altitudeOf('task', 'leaf'), /must be one of workspace, project, stream, step/);
-});
 
 test('what changed is summed: few enough given whole, else counted with the newest', () => {
   assert.deepEqual(summed([1, 2], String), { newest: [1, 2] });

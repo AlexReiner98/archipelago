@@ -6,8 +6,8 @@
 // liftedHere, handed the whole database by its hook).
 
 import type { RootCall } from '../../loader/kernel/root-calls.ts';
-import { bypassingRls } from '../../walls/kernel/outbox.ts';
-import { roomForSession } from '../../rules/kernel/standing.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
+import { roomForSession } from '../../identity/kernel/standing.ts';
 import { awakeSessions } from './workspace-use.ts';
 import { setupBehind } from './server-files.ts';
 import { describeChanges, humanChanges, latestSeq } from './tool-reads.ts';

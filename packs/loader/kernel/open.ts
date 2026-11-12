@@ -2,17 +2,20 @@
 // roots). In the packs phase, the types a workspace defines for itself (those kept in a folder before taken in once) and
 // the registry, before the write root makes the map on it. In the types phase, which packs are present, as which
 // manifests, and which the owner turned off (what they made is dormant), the types kept on the map, the type table, and
-// the internal packs' code opened (src/kernel-context.ts), so a pack's manifest fills the phases after it.
+// the internal packs' code opened (src/kernel-context.ts), so a pack's manifest fills the phases after it. An open
+// workspace follows what other servers changed in it (FOLLOW), and its packs' processes stop as it closes (CLOSE).
 
 import { join } from 'node:path';
 import { addLocalType, importLocalPack, localTypes } from '../../identity/kernel/control.ts';
-import type { RootOpen } from '../../identity/kernel/lifecycle.ts';
+import type { RootClose, RootFollow, RootOpen } from '../../identity/kernel/lifecycle.ts';
 import { openKernel } from './kernel-context.ts';
 import { packsFor } from './pack-allow.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
-import { followMade, islandsOn, packsOff, syncPacks } from './packstate.ts';
+import { followMade, followPacks, islandsOn, packsOff, syncPacks } from './packstate.ts';
+import { hostFor } from './packtools.ts';
 import { takeTypeItems } from './type-items.ts';
 import { syncTypes } from './typetable.ts';
+
 
 export const OPEN: RootOpen = {
   packs: [
@@ -39,3 +42,13 @@ export const OPEN: RootOpen = {
     },
   ],
 };
+
+export const FOLLOW: RootFollow = [
+  async (ws) => {
+    if (ws.pelago.registry.followLocal(await localTypes<TypeDef>(ws.pelago.db))) await syncTypes(ws.pelago);
+    if (await takeTypeItems(ws.pelago)) await syncTypes(ws.pelago);
+    await followPacks(ws.pelago);
+  },
+];
+
+export const CLOSE: RootClose = [(ws) => hostFor(ws.pelago.registry).stop()];

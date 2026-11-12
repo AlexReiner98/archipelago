@@ -58,8 +58,22 @@ async function unplaced(ctx: Reads): Promise<{ id: string; type: string }[]> {
  * made by `change`: as the one who turned islands on.
  */
 export async function moveOntoIslands(ctx: Reads, change: MakeChange): Promise<{ islands: number; moved: number }> {
+  const { reason, ops, islands, moved } = await islandMoves(ctx);
+  if (ops.length) await change({ reason, ops });
+  return { islands, moved };
+}
+
+/** answer.island_blockers: why this map cannot be held to the island rules as it is (islandBlockers), for the loader. */
+export const blockers = async (ctx: Reads) => { const why = await islandBlockers(ctx); return why ? { why } : {}; };
+
+/**
+ * answer.island_moves: the change that moves every item on no island onto islands (moveOntoIslands), planned: the
+ * loader makes it as the one who turned islands on. No ops when nothing is on no island.
+ */
+export async function islandMoves(ctx: Reads): Promise<{ reason: string; ops: IslandOp[]; islands: number; moved: number }> {
+  const reason = 'Islands turned on: what was on the map moves onto islands';
   const items = await unplaced(ctx);
-  if (!items.length) return { islands: 0, moved: 0 };
+  if (!items.length) return { reason, ops: [], islands: 0, moved: 0 };
   const shared = new Set(ctx.registry.packs.filter((p) => KERNEL_PACKS.includes(p.id)).flatMap((m) => m.shared ?? []));
   const packOf = (type: string) => (shared.has(type) ? undefined : ctx.registry.type(type)?.pack);
   const packs = [...new Set(items.map((i) => packOf(i.type)).filter((p): p is string => Boolean(p)))];
@@ -68,8 +82,7 @@ export async function moveOntoIslands(ctx: Reads, change: MakeChange): Promise<{
   const titleOf = (pack: string) => (packs.length === 1 ? name : `${name}: ${ctx.registry.packs.find((p) => p.id === pack)?.title ?? pack}`);
   const ops: IslandOp[] = packs.map((pack, i) => ({ op: 'create', ref: `island${i}`, type: ISLAND, title: titleOf(pack), status: 'current', visibility: 'shared', props: { pack } }));
   for (const item of items) ops.push({ op: 'update', id: item.id, props: { island: `{island${Math.max(0, packs.indexOf(packOf(item.type) ?? packs[0]))}}` } });
-  await change({ reason: 'Islands turned on: what was on the map moves onto islands', ops });
-  return { islands: packs.length, moved: items.length };
+  return { reason, ops, islands: packs.length, moved: items.length };
 }
 
 /** A new workspace's first island, named after it and speaking core: made by the server as the workspace is, through `change`. */

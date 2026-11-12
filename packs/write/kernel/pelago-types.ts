@@ -158,7 +158,8 @@ export interface Proposal {
   held_by: Ruled | null;
 }
 
-export const actorId = (actor: Actor) => `${actor.kind}:${actor.name}`;
+// How an actor is named in the log: the identity root's (packs/identity/kernel/actor-checks.ts), who is asking.
+export { actorId } from '../../identity/kernel/actor-checks.ts';
 
 /** Active holds on resources, including ones whose holder the caller may not see. */
 export const ACTIVE_HOLDS = `pelago_active_holds(current_user = 'pelago_member', current_setting('pelago.viewer', true))`;

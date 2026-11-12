@@ -24,6 +24,27 @@
         },
         "out": "any",
         "run": "looks.ts#lookAnswer"
+      },
+      "answer.look_at": {
+        "in": {
+          "whose": {
+            "workspace": "string",
+            "viewer?": "string"
+          },
+          "look": "string"
+        },
+        "out": "any",
+        "run": "looks.ts#lookAtAnswer"
+      },
+      "answer.looks_counted": {
+        "in": {},
+        "out": {
+          "hour": "number",
+          "by": [
+            "any"
+          ]
+        },
+        "run": "looks.ts#looksCounted"
       }
     },
     "hooks": {

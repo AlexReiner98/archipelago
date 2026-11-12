@@ -1,1 +1,1 @@
-export * from '../packs/walls/kernel/outside.ts';
+export * from '../packs/loader/kernel/outside.ts';

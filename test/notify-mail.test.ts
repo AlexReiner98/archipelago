@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
 import { setMailer, type Mail } from '../src/mail.ts';
+import '../packs/loader/kernel/server-slots.ts'; // the mailer fills the walls' slot walls.mail, as when the server starts
 import { notify } from '../src/notify.ts';
 import { mailHeard, ownerOf } from '../src/notify-mail.ts';
 import { configureOutbox } from '../src/outbox.ts';

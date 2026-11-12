@@ -12,9 +12,9 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { isInternal, readManifest } from '../../loader/kernel/manifest.ts';
-import { OWN_PACKS } from '../../loader/kernel/pack-folders.ts';
-import type { RuleDef } from './rules.ts';
+import { isInternal, readManifest } from './manifest.ts';
+import { OWN_PACKS } from './pack-folders.ts';
+import type { RuleDef } from '../../rules/kernel/rules.ts';
 
 /** What a pack says of the rules on its event: the problems with one, as checkRules reports them. */
 export interface RuleEvent {

@@ -13,8 +13,8 @@ import { ACCESS_MINUTES, grantToken, rotateGrant, workspaceOfGrant } from './aut
 import type { OpenRoutes } from './sign-in.ts';
 import type { Q } from '../../../src/db.ts';
 import { clientOf, listedRedirect, registerClient, returnsTo, type Client } from './oauth-clients.ts';
-import { json as reply, PRIVATE } from '../../../src/reply.ts';
-import { keep, take } from '../../../src/transient.ts';
+import { json as reply, PRIVATE } from './reply.ts';
+import { keep, take } from '../../database/kernel/transient.ts';
 
 /** How long a code waits to be traded. */
 const CODE_MINUTES = 5;

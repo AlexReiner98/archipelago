@@ -14,6 +14,17 @@
         },
         "out": "any",
         "run": "due-on.ts#dueOn"
+      },
+      "answer.automation_problems": {
+        "in": {
+          "props": "any"
+        },
+        "out": {
+          "problems": [
+            "string"
+          ]
+        },
+        "run": "automation-rules.ts#problemsOf"
       }
     },
     "hooks": {

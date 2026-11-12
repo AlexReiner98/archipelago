@@ -1,8 +1,14 @@
 // A view kept on the map names types and link types in its flat lens (its filter's terms,
 // its walk). When a pack takes a type or a link type over (moved_from), the views that named the old one name the new
-// one (src/pelago.ts, retype): this says what changes in one view's fields, nothing when nothing does.
+// one (src/pelago.ts, retype, asking answer.renamed_query): this says what changes in one view's fields, nothing when
+// nothing does.
+
+import type { KernelContext } from '#pelago/kernel';
 
 type Props = Record<string, unknown>;
+
+/** answer.renamed_query: a kept view's fields that name `from`, renamed to `to`, for the write root's retype. */
+export const renamed = (_ctx: KernelContext, input: { props: Props; from: string; to: string; what: 'entity' | 'relation' }) => ({ props: renamedQuery(input.props ?? {}, input.from, input.to, input.what) });
 
 /** The fields of a kept view that name `from`, renamed to `to`; empty when it names nothing. */
 export function renamedQuery(props: Props, from: string, to: string, what: 'entity' | 'relation'): Props {

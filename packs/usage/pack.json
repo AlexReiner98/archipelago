@@ -16,6 +16,28 @@
       "surface.reads": "reads.ts#told"
     },
     "provides": {
+      "answer.pack_use": {
+        "in": {
+          "states": [
+            "any"
+          ]
+        },
+        "out": {
+          "states": [
+            "any"
+          ]
+        },
+        "run": "pack-use.ts#packUse"
+      },
+      "act.report.used": {
+        "in": {
+          "kind": "string",
+          "id": "string",
+          "n?": "number"
+        },
+        "out": "any",
+        "run": "uses.ts#usedAct"
+      },
       "answer.usage": {
         "in": {
           "admin?": "boolean"

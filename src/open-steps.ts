@@ -8,9 +8,9 @@ import { firstIsland } from './island-start.ts';
 import { onOpen, whileLeading } from './lifecycle.ts';
 import { setIslands } from './packstate.ts';
 
-// islands: a fresh default map on islands, as create puts every other new map (e_44rbfwxp).
+// islands: every new map on islands with one to start on (e_44rbfwxp): one create made, and a fresh default map.
 onOpen('islands', 'placement', async (o) => {
-  if (!(o.begins && o.isDefault && o.config.defaultOnIslands)) return;
+  if (!(o.made || (o.begins && o.isDefault && o.config.defaultOnIslands))) return;
   await setIslands(o.pelago!, 'system', true);
   await firstIsland(o.pelago!, o.name);
 });

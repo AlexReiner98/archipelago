@@ -5,12 +5,24 @@
 // pack can mail no one but that person, about nothing but that notification, once; whether it does (the person turned
 // mail on, it is not their quiet hours) is the pack's to decide.
 
-import { normalEmail, sendMail } from '../../../src/mail.ts';
-import { itemLink } from '../../../src/members.ts';
-import { bypassingRls } from './outbox.ts';
+import { normalEmail } from '../../identity/kernel/email-address.ts';
+import { itemLink } from '../../identity/kernel/members.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
 import { env } from '../../../src/env.ts';
 import type { RootCall } from '../../loader/kernel/root-calls.ts';
+
+/** A mail the gate lets through: to whom, about what, and what it says. */
+export interface GateMail { to: string; subject: string; text: string }
+
+/**
+ * The slot walls.mail (docs/kernel-packs.md, "Slots"): who sends what the gate lets through. The mailer pack fills it
+ * (`kernel.hooks["walls.mail"]`), when the server starts (packs/loader/kernel/server-slots.ts), so the walls send
+ * without importing above themselves. Unfilled, nothing is sent, and the log says so.
+ */
+let send = async (mail: GateMail): Promise<void> => void console.log(`mail not sent (no mail side loaded): "${mail.subject}"`);
+export const onSendMail = (filled: (mail: GateMail) => Promise<void>): void => void (send = filled);
+const sendMail = (mail: GateMail) => send(mail);
 
 /** The event the kernel tells packs when a notification is made. */
 export const NOTIFICATION_MADE = 'notification.made';

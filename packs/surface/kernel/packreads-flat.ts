@@ -8,7 +8,7 @@
 // itself is refused, never the whole map.
 
 import type { Archipelago } from '../../../src/pelago.ts';
-import { kernelTypes, SYSTEM, WRAPS } from '../../write/kernel/head.ts';
+import { kernelTypes, SYSTEM, WRAPS } from '../../loader/kernel/head.ts';
 import { ISLAND, onIslands } from '../../loader/kernel/island-items.ts';
 import { headPos } from '../../log/kernel/tail.ts';
 import { blockGraph } from './blocking.ts';

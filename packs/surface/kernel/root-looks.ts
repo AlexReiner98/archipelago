@@ -4,9 +4,9 @@
 // workspace's transient store), and how many looks the workspace may have in an hour (rules, standing.ts).
 
 import type { RootCall } from '../../loader/kernel/root-calls.ts';
-import { bypassingRls } from '../../walls/kernel/outbox.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
 import { passFor } from '../../walls/kernel/look-pass.ts';
-import { looksAllowed, overLimit } from '../../rules/kernel/standing.ts';
+import { looksAllowed, overLimit } from '../../identity/kernel/standing.ts';
 import { uiVersion } from './ui-files.ts';
 
 /** One of: the UI's version, a pass for `actor` on the calling map's screen, or the room for one more look after `had` this hour. */

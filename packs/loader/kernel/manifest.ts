@@ -137,7 +137,7 @@ export function kernelProblems(k: unknown): string[] {
   if (s.optional === true && s.trust === 'root') problems.push('a root pack is never optional: it is always on');
   if (s.optional === true) {
     // What is filled once at a workspace's open would outlive the switch: an optional pack declares none of it. A check
-    // of a rule on its event (rules.<on>, packs/rules/kernel/rule-events.ts) holds nothing of a map: it is filled once
+    // of a rule on its event (rules.<on>, packs/loader/kernel/rule-events.ts) holds nothing of a map: it is filled once
     // for the process, its rules checked whether a map runs the pack or not.
     const held = ['provides', 'tables', 'timers'].filter((k) => s[k] !== undefined);
     const points = Object.keys((s.hooks ?? {}) as Raw).filter((p) => !p.startsWith('write.') && !p.startsWith('rules.'));

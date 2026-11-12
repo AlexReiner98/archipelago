@@ -13,7 +13,7 @@ import { draftDocument, publicDocument } from './public-documents.ts';
 import { islandsOff } from '../../loader/kernel/islands.ts';
 import { LOCAL_PACK } from '../../loader/kernel/packs.ts';
 import { memoryPrefix, type Manifest } from '../../loader/kernel/manifest.ts';
-import { workspaceName } from '../../rules/kernel/standing.ts';
+import { workspaceName } from '../../identity/kernel/standing.ts';
 
 export type ServiceRead = {
   /** One open link by its id, or null: what an unlink takes away, read alone rather than every link of its kind. */

@@ -3,14 +3,13 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts'; import { capabilityOf, holds, unknownEnd, within } from '../../../src/link-ends.ts';
+import { capacityOf, checkCapabilities, type Capabilities } from './capabilities.ts'; import { capabilityOf, holds, unknownEnd, within } from './link-ends.ts';
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
-import { altitudeOf, type Altitude } from '../../../src/altitude.ts';
-import { checkValue } from '../../../src/fields.ts';
-import { checkFieldDecls, headOf, ownHead, type ColumnField } from '../../../src/head.ts';
+import { altitudeOf, type Altitude } from './altitude.ts';
+import { checkValue } from './fields.ts'; import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
 import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
-import { checkRules, type RuleDef } from '../../../src/rules.ts';
+import type { RuleDef } from '../../../src/rules.ts'; import { checkRules } from './rule-check.ts';
 import { isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from '../../../src/services.ts';
 import { OWN_PACKS, readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from '../../../src/phases.ts'; import { keepVersionTypes } from './version-types.ts';
@@ -105,7 +104,7 @@ export interface ResolvedType {
 export type ResolvedRelation = Omit<RelationDef, 'root'> & { pack: string; root: string; dormant?: boolean };
 
 /** The pack that approved type proposals are written to. */ export const LOCAL_PACK = 'local'; /** The plain wire: no link type is a flavour of it. */ export const BASE_LINK = 'link';
-export { SYSTEM } from '../../../src/head.ts';
+export { SYSTEM } from './head.ts';
 
 export class Registry {
   /** The first folder packs are read from: the server's own (`packsDir`). */

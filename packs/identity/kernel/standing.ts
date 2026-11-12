@@ -8,9 +8,30 @@
 // is read-only until its day to be deleted, when the server's leader deletes it (src/workspaces.ts).
 // The write path (src/pelago.ts) asks stillWritable and roomToStore, a session starting (src/sessions.ts)
 // roomForSession, a look (src/looks.ts) looksAllowed, a signed-in request (src/server.ts) requestWait, and adding a
-// member src/members.ts.
+// member src/members.ts. The identity root's (wave 7): a workspace's standing is its tenancy, as its members are.
 
-import { bytes, storageOf, takeRequest, tokenEach } from '../../../src/workspace-use.ts';
+/** A number of bytes as a person reads it. */
+export const bytes = (n: number) => (n >= 1e9 ? `${+(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${+(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} kB` : `${n} bytes`);
+
+/**
+ * The slot identity.use (docs/kernel-packs.md, "Slots"): what a workspace uses, as the surface measures it
+ * (src/workspace-use.ts): the bytes it stores, and its signed-in requests a minute. The surface fills it when it loads,
+ * so a limit is held against its use without identity importing above itself.
+ */
+export interface Use {
+  storageOf(workspace: string): Promise<number>;
+  takeRequest(workspace: string, token: string, most: number | undefined, who?: string): { wait: number; workspace?: boolean };
+  tokenEach(): number;
+}
+let use: Use | undefined;
+export const fillUse = (filled: Use): void => void (use = filled);
+const measured = (): Use => {
+  if (!use) throw new Error('Nothing measures what a workspace uses here: the surface fills identity.use (src/workspace-use.ts).');
+  return use;
+};
+const storageOf = (workspace: string) => measured().storageOf(workspace);
+const takeRequest: Use['takeRequest'] = (...args) => measured().takeRequest(...args);
+const tokenEach = () => measured().tokenEach();
 
 export interface Limits {
   members?: number;

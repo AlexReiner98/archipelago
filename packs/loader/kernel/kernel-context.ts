@@ -11,6 +11,7 @@
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
+import { codeFolder } from './code-folder.ts';
 import { readsAnswer } from './packhost.ts';
 import type { Read } from '../../../src/packreads.ts';
 import { guardedFetch } from '../../../src/outbound.ts';
@@ -51,9 +52,10 @@ export interface KernelContext {
   /**
    * A migration of what the pack keeps, run as a workspace opens: the facts it planned, appended in one transaction as
    * the system's move (Archipelago.moved), as the kernel's own migrations are: what moved, and nothing else, with no rule
-   * asked. Never a change someone makes: that is `change`.
+   * asked. Never a change someone makes: that is `change`. With `done`, what the move did beyond its facts (what it
+   * could not carry over) is kept beside them as something done, in the same transaction.
    */
-  move(action: string, reason: string, facts: Fact[]): Promise<void>;
+  move(action: string, reason: string, facts: Fact[], done?: Record<string, unknown>): Promise<void>;
   /** Facts on an operational stream, only one its pack's rules keep. */
   record(stream: string, facts: OpFact[]): Promise<void>;
   /** A secret its reach names, only. */
@@ -89,7 +91,7 @@ export class KernelHost {
   /** A function of a pack's modules, by its `<file>.ts#<export>`: never a file outside its modules folder. */
   async fn(pack: Manifest, ref: ModuleRef): Promise<Fn> {
     const [file, name] = ref.split('#');
-    const dir = resolve(this.folderOf(pack.id), pack.kernel?.modules ?? 'kernel/');
+    const dir = resolve(codeFolder({ folderOf: this.folderOf }, pack), pack.kernel?.modules ?? 'kernel/');
     const path = resolve(dir, file);
     const inside = relative(dir, path);
     if (!inside || inside.startsWith('..') || isAbsolute(inside)) throw new Error(`The ${pack.id} pack names ${ref}, outside its modules`);
@@ -233,7 +235,10 @@ export function contextFor(l: Archipelago, pack: Manifest, host: KernelHost): Ke
       // made as an agent named for the pack, kept to its reach by core's pack_reach, its authority said in the basis.
       return l.change({ kind: 'agent', name: systemActor(id) }, { ...input, pack: id, authority: { of: 'agent', basis: `${authority.of}: ${authority.basis}` } });
     },
-    move: (action, reason, facts) => l.db.transaction((tx) => l.moved(tx, action, reason, facts)),
+    move: (action, reason, facts, done) => l.db.transaction(async (tx) => {
+      await l.moved(tx, action, reason, facts);
+      if (done) await l.log(tx, { actor: 'system', action, reason, detail: done });
+    }),
     record: async (stream, facts) => {
       if (!l.registry.rules.some((r) => r.pack === id && r.stream === stream)) refuse(`records on "${stream}", a stream none of its rules keeps`);
       await l.record(stream as OpStream, systemActor(id), facts);

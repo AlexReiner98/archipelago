@@ -3,7 +3,7 @@
 // report writes nothing but the readings its report tool sends; one that may propose has every change wait. What it
 // sees is not narrowed here: that stays the database's, its person's view.
 
-import { scopeOf } from '../../../src/places.ts';
+import { scopeOf } from './scope-of.ts';
 import { LINK_ITEM, TYPE_ITEM } from '../../../src/type-overlay.ts';
 import type { Actor, Archipelago, Op } from './pelago.ts';
 

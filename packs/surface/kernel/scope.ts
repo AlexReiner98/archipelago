@@ -4,10 +4,10 @@
 // change writes is checked on the write path (within.ts); the other tools are
 // checked here, before they run. What such a token may call is a list: a tool
 // that writes is on it with its check, the tools that only read are named,
-// and anything else is refused.
+// and anything else is refused. The surface's (wave 7): it checks a tool call before the tool runs.
 
 import { packTool } from '../../../src/packtools.ts';
-import { livesIn, placeFor } from '../../../src/places.ts';
+import { livesIn } from './packreads-scope.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { resolveRun } from '../../../src/sessions.ts';
 import { refuser, scopeWithin } from '../../../src/within.ts';
@@ -25,7 +25,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
     if (typeof id === 'string' && !scope.has(id)) refuse(`${await named(id)} is not part of it, so this token cannot ${doing}.`);
   };
   const isRepo = async (given: unknown) => {
-    const id = typeof given === 'string' && /^e_[a-z0-9]{8}$/.test(given) ? given : (await placeFor(l, { remote: String(given ?? '') }))?.id;
+    const id = typeof given === 'string' && /^e_[a-z0-9]{8}$/.test(given) ? given : (await (await import('../../../src/kernel-context.ts')).callAs<{ place: { id: string } | null }>(l, 'answer.place_for', { remote: String(given ?? '') })).place?.id;
     if (!id || !scope.has(id)) refuse('It cannot speak for another repository.');
   };
 

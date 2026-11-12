@@ -1,1 +1,1 @@
-export * from '../packs/write/kernel/link-ends.ts';
+export * from '../packs/loader/kernel/link-ends.ts';

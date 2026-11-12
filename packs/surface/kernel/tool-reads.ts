@@ -8,7 +8,9 @@ import { showingIn } from './public-views.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
 import { callAs } from '../../../src/kernel-context.ts';
-import { lookAt, takeLook } from '../../../src/looks.ts';
+// A look is the look_draw pack's, asked by name on the screen of the map that asks (answer.look, answer.look_at).
+const whose = (l: Archipelago) => ({ workspace: l.workspace, ...(l.viewer !== undefined && { viewer: l.viewer }) });
+const looks = async <O>(l: Archipelago, name: string, input: object) => (await import('../../loader/kernel/kernel-context.ts')).callAs<O>(l, name, { whose: whose(l), ...input });
 import { islandVersion } from '../../../src/island-pin.ts';
 import { LARGE, sizeOf } from '../../../src/head.ts';
 import { props } from './tool-ops.ts'; import { searchMap } from './search.ts'; import { getItem, proposals } from './map-reads.ts';
@@ -369,7 +371,7 @@ export const READ_TOOLS: Record<string, Tool> = {
     // A look again is the looks pack's (its store is the transient store's: the database handed is not read), a kept
     // picture the publish pack's (answer.picture).
     run: async (l, _actor, input) => {
-      if (input.look) return lookAt(l.db, l, input.look);
+      if (input.look) return looks(l, 'answer.look_at', { look: input.look });
       if (!input.result) throw new Error('picture needs the id of a result, or a look.');
       return callAs(l, 'answer.picture', { result: input.result });
     },
@@ -388,7 +390,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
     },
     // Drawn by the looks pack, at the address the surface reads off what is asked (the databases handed are not read).
-    run: async (l, actor, input) => takeLook(l.db, l.db, l, actor.name, input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), input),
+    run: async (l, actor, input) => looks(l, 'answer.look', { actor: actor.name, hash: input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), size: input }),
   },
   seeing: {
     description:

@@ -92,3 +92,6 @@ export async function subjectRefusals(ctx: KernelContext, reg: Reg, ops: Op[]): 
   }
   return errors;
 }
+
+/** answer.subject_refusals: what refuses a change's ops for want of their subject (subjectRefusals), judged by the registry the write root hands. */
+export const refusals = async (ctx: KernelContext, input: { ops: Op[]; registry: Reg }) => ({ refusals: await subjectRefusals(ctx, input.registry, input.ops) });

@@ -5,14 +5,13 @@
 // entry to be told the answer (then), which answers ops in turn.
 
 import { newSecret } from '../../../src/auth.ts';
-import { parts } from '../../../src/manifest.ts';
+import { parts } from './manifest.ts';
 import { newId } from '../../../src/db.ts';
-import type { ActionDef, HostDef } from '../../../src/declared.ts';
-import { notify } from '../../../src/notify.ts';
-import type { Done, PackHost } from '../../../src/packhost.ts';
-import type { PackFile } from '../../../src/packs.ts';
-import { needHuman } from '../../../src/actor-checks.ts';
-import { actorId, type Actor, type Archipelago } from '../../../src/pelago.ts';
+import type { ActionDef, HostDef } from './declared.ts';
+import type { Done, PackHost } from './packhost.ts';
+import type { PackFile } from './packs.ts';
+import { actorId, needHuman } from '../../identity/kernel/actor-checks.ts';
+import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { seal, unseal } from '../../../src/secrets.ts';
 
 export interface OutsideRequest {
@@ -122,7 +121,8 @@ export async function handleRequests(host: PackHost, l: Archipelago, actor: Acto
       [id, l.workspace, pack.id, action!.id, r.act, JSON.stringify(r), JSON.stringify({ kind: actor.kind, name: actor.name }), l.viewer || null, changeset ?? null],
     );
     if (held) {
-      await notify(l, { kind: 'agent', name: `pack:${pack.id}` }, { title: `${pack.title} asks to ${declared.does}`, body: `Held for you because it ${declared.money ? 'moves money' : 'cannot be taken back'}: act ${id}. Allow it with act_decide.`, level: 'warning' });
+      // Told to the owner by the notifications pack (act.report.notify), as the pack that asked.
+      await (await import('./kernel-context.ts')).callAs(l, 'act.report.notify', { actor: { kind: 'agent', name: `pack:${pack.id}` }, title: `${pack.title} asks to ${declared.does}`, body: `Held for you because it ${declared.money ? 'moves money' : 'cannot be taken back'}: act ${id}. Allow it with act_decide.`, level: 'warning' });
       out.push({ host: r.host, act: r.act, status: 'held', id });
     } else out.push(...(await makeAct(host, l, actor, pack, id, r, depth)));
   }

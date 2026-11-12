@@ -105,9 +105,12 @@ export async function ownerRows<T>(tx: Q, sql: string, params: unknown[]): Promi
   }
 }
 
+/** A link's facts found by the item at its far end, as log_fact_link_from finds them by the near one (step 46). */
+export const LINK_TO = `create index if not exists log_fact_link_to on log_fact ((value->>2)) where field = 'link';`;
+
 /** Every link that ever had the item at either end, as the log says. */
 async function linksOf(tx: Q, item: string): Promise<string[]> {
-  const { rows } = await tx.query<{ id: string }>(`select distinct id from log_fact where field = 'link' and op = '+' and (value->>1 = $1 or value->>2 = $1)`, [item]);
+  const { rows } = await tx.query<{ id: string }>(`select distinct id from log_fact where field = 'link' and op = '+' and (value->>1 = $1 or value->>2 = $1) -- index log_fact_link_from, log_fact_link_to`, [item]);
   return rows.map((r) => r.id);
 }
 

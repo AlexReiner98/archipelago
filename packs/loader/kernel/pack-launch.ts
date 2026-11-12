@@ -1,15 +1,14 @@
 // A session started as a pack's answer. A pack that hears the kernel's clock tell it an item came due (item.due,
 // src/due.ts) may answer with one launch, and the kernel starts it (src/launcher.ts) only when what came due is an
-// enabled automation that says to launch just that: its own task, mode and instructions, checked as on write
-// (src/automation-rules.ts). An automation is made, changed or brought back by an agent only with a human's approval
-// (core's rule agent_automations, which nothing lifts), so the launch is on that human's authority, as the automation:
+// enabled automation that says to launch just that: its own task, mode and instructions, checked as on write (the
+// automation_triggers pack's answer.automation_problems). An automation is made, changed or brought back by an agent
+// only with a human's approval (core's rule agent_automations, which nothing lifts), so the launch is on that human's authority, as the automation:
 // the session it starts only proposes, and its run names the automation. Nothing else may launch this way: another
 // call, another event, an event another pack recorded, an item of another type, a paused automation, or a launch that
 // differs from what the automation says are each refused whole. Not while the session it last started is still open.
 
-import { checkAutomation } from '../../../src/automation-rules.ts';
 import type { LaunchInput, LaunchMode, StartedBy } from '../../../src/launch-brief.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 
 /** How a session is started: src/launcher.ts hands it in when it loads, since what it reads reaches back to the pack host. */
@@ -47,7 +46,7 @@ export async function launchHeard(l: Archipelago, pack: string, input: unknown, 
   if (!auto || auto.archived_at || !whole.registry.isA(auto.type, 'automation')) throw new Error(`The ${pack} pack asks to launch for ${id}, which is not an automation.`);
   if (auto.status !== 'enabled') throw new Error(`The ${pack} pack asks to launch for "${auto.title}", which is not enabled.`);
   const p = auto.props;
-  const problems = checkAutomation(p);
+  const { problems } = await (await import('./kernel-context.ts')).callAs<{ problems: string[] }>(whole, 'answer.automation_problems', { props: p });
   if (problems.length) throw new Error(`"${auto.title}" cannot launch: ${problems.join('; ')}`);
   if (p.action !== 'launch') throw new Error(`"${auto.title}" does not launch a session.`);
   const said = (p.input ?? {}) as Record<string, unknown>;

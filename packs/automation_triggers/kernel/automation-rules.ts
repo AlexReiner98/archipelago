@@ -105,3 +105,6 @@ export function checkAutomation(props: Record<string, unknown>): string[] {
   }
   return problems;
 }
+
+/** answer.automation_problems: what is wrong with an automation's definition, as the loader asks before a pack launches one (src/pack-launch.ts). */
+export const problemsOf = (_ctx: unknown, input: { props?: Record<string, unknown> }) => ({ problems: checkAutomation(input?.props ?? {}) });

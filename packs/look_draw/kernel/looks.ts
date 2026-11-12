@@ -127,3 +127,9 @@ export async function lookAt(ctx: KernelContext, w: Whose, look: string) {
 
 /** answer.look: a look taken for the tool surface (a show with look: true), on the screen it names (`whose`). */
 export const lookAnswer = (ctx: KernelContext, input: { whose: Whose; actor: string; hash: string; size?: Parameters<typeof takeLook>[4] }) => takeLook(ctx, input.whose, input.actor, input.hash, input.size);
+
+/** answer.look_at: a look taken on the screen it names (`whose`) in the last LOOK_MS, again. */
+export const lookAtAnswer = (ctx: KernelContext, input: { whose: Whose; look: string }) => lookAt(ctx, input.whose, input.look);
+
+/** answer.looks_counted: the looks drawn for the asking map's workspace in the last hour, all and by who asked, by this process. */
+export const looksCounted = (ctx: KernelContext) => ({ hour: looksThisHour(ctx.workspace), by: [...looksBy(ctx.workspace)] });

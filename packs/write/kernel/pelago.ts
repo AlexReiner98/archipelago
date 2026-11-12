@@ -1,7 +1,7 @@
 // The map and its single write path. Every change to items and links goes through change(): it is validated, judged
 // by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
-import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type Policy } from '../../../src/rules.ts'; import { renamedQuery } from '../../../src/query-names.ts';
+import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type Policy } from '../../../src/rules.ts';
 import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomToStore, stillWritable } from '../../../src/standing.ts'; import { authorityOf } from '../../../src/authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from '../../../src/db.ts';
 import { once } from './merge.ts'; import { doneFact, type Done } from '../../../src/activity.ts';
@@ -12,13 +12,15 @@ import { layoutOf } from '../../../src/layout-changes.ts';
 import { append, headOf, type Fact } from '../../../src/log.ts'; import { projectDecision, projectFacts, stamp } from '../../../src/replay.ts'; import { linkFacts } from '../../../src/facts.ts';
 import { decideProposal } from './proposals.ts'; import { needHuman } from '../../../src/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { used } from '../../../src/uses.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../../src/island-rules.ts';
+import { planChange } from './change-plan.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../../src/island-rules.ts';
 
 export * from './pelago-types.ts';
 export type { Level, OpKind, Policy } from '../../../src/rules.ts';
 export { DEFAULT_AGENT_POLICY } from '../../../src/rules.ts';
 
 type Props = Record<string, unknown>;
+/** The loader's in-process tier, loaded when first asked: it reaches the reads API, which reaches back here. */
+const kernel = () => import('../../loader/kernel/kernel-context.ts');
 
 export { BLOCKING_RELATIONS } from '../../../src/private-deps.ts';
 
@@ -69,6 +71,19 @@ export class Archipelago {
     return registry === this.registry ? this : new Archipelago(this.db, registry, this.policy, this.workspace, this.viewer, this.props);
   }
 
+  /** This map on another handle of its database: the type table's whole map (packs/loader/kernel/typetable.ts). */
+  on(db: Db): Archipelago {
+    return new Archipelago(db, this.registry, this.policy, this.workspace);
+  }
+
+  /** Each owner said as a link: a one-time migration, run by the type table as a workspace opens. */
+  linkOwners = () => linkOwners(this, () => newId('r'));
+
+  /** One use of a rule counted for the Packs screen, by the usage pack (act.report.used): a moment later, never awaited. */
+  private used(kind: 'held' | 'refused', id: string): void {
+    void kernel().then((k) => k.callAs(this, 'act.report.used', { kind, id })).catch((err: Error) => console.error(`counting a use on ${this.workspace} failed: ${err.message}`));
+  }
+
   /** Whether new things are private to their author unless they say otherwise. */
   async defaultVisibility(q: Q = this.db): Promise<'private' | 'shared'> {
     const { rows } = await q.query<{ value: string }>(`select value from setting where key = 'default_visibility'`);
@@ -105,8 +120,8 @@ export class Archipelago {
     // Each op is judged by the rules of the version of its pack its island runs, if one does (src/island-rules.ts).
     const verdict = await decide(this.db, this.registry, who, input.ops, this.policy, await opRuns(this, input.ops));
     // Each rule that refused or held it is counted once a change, for the Packs screen (src/uses.ts).
-    for (const r of new Set(verdict.refusers.map((x) => `${x.pack}.${x.rule}`))) used(this.workspace, 'refused', r);
-    if (verdict.outcome === 'hold') for (const r of new Set(verdict.held.map((x) => `${x.pack}.${x.rule}`))) used(this.workspace, 'held', r);
+    for (const r of new Set(verdict.refusers.map((x) => `${x.pack}.${x.rule}`))) this.used('refused', r);
+    if (verdict.outcome === 'hold') for (const r of new Set(verdict.held.map((x) => `${x.pack}.${x.rule}`))) this.used('held', r);
     if (verdict.outcome === 'refuse') throw new Error(`Change rejected:\n${verdict.refused.map((r) => `- ${r}`).join('\n')}`);
     // A question an agent settled, where the owner lets it, is put to them by the next session they talk to.
     const answered: { id: string; title: string; status: string; outcome?: string; authority: Authority }[] = [];
@@ -168,15 +183,17 @@ export class Archipelago {
    * status the new type names otherwise takes its status there (statuses: the old status to the new one).
    */
   async retype(from: string, to: string, what: 'entity' | 'relation' = 'entity', statuses: Record<string, string> = {}): Promise<number> {
+    const { callAs } = await kernel();
     const moved = await this.db.transaction(async (tx) => {
       const { rows } = await tx.query<{ id: string; status?: string; from_id?: string; to_id?: string }>(
         what === 'entity' ? `select id, status from entity where type = $1 -- index entity_type` : `select id, from_id, to_id from relation where type = $1`,
         [from],
       );
-      // What names it in its settings: a screen in on, a view kept on the map in its lens (src/query-names.ts).
+      // What names it in its settings: a screen in on, a view kept on the map in its lens (the lenses pack's answer.renamed_query).
       const { rows: held } = await tx.query<{ id: string; type: string; props: Props }>(`select id, type, props from entity where type = any($1::text[]) -- index entity_type`, [[...this.registry.family('screen'), ...this.registry.family('lens')]]);
       const on = (p: Props) => (what === 'entity' && Array.isArray(p.on) && p.on.includes(from) ? { on: p.on.map((t) => (t === from ? to : t)) } : {});
-      const named = held.map((r) => ({ id: r.id, props: this.registry.isA(r.type, 'lens') ? renamedQuery(r.props, from, to, what) : on(r.props) })).filter((r) => Object.keys(r.props).length);
+      const renamed = async (props: Props) => (await callAs<{ props: Props }>(this, 'answer.renamed_query', { props, from, to, what })).props;
+      const named = (await Promise.all(held.map(async (r) => ({ id: r.id, props: this.registry.isA(r.type, 'lens') ? await renamed(r.props) : on(r.props) })))).filter((r) => Object.keys(r.props).length);
       const reason = `Every ${from} is a ${to} now: its pack took the ${what === 'entity' ? 'type' : 'relation'} over.`;
       const facts = rows.flatMap((r): Fact[] => (what === 'entity' ? [['+', r.id, 'type', to], ...(r.status && statuses[r.status] ? [['+', r.id, 'status', statuses[r.status]] as Fact] : [])] : [['+', r.id, 'link', [to, r.from_id, r.to_id]]]));
       for (const r of named) for (const [k, v] of Object.entries(r.props)) facts.push(['+', r.id, k, v]);

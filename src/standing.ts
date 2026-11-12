@@ -1,1 +1,1 @@
-export * from '../packs/rules/kernel/standing.ts';
+export * from '../packs/identity/kernel/standing.ts';

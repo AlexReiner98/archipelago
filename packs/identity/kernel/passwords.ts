@@ -10,7 +10,7 @@
 import { randomBytes, scrypt } from 'node:crypto';
 import type { Q } from '../../../src/db.ts';
 import { sameBytes } from '../../../src/hashes.ts';
-import { keep, kept } from '../../../src/transient.ts';
+import { keep, kept } from '../../database/kernel/transient.ts';
 
 export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 200;

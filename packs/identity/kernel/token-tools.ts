@@ -3,10 +3,10 @@
 // propose (every change waits for a person) or change (as any agent, under the workspace's setting).
 
 import { z } from 'zod';
-import { needAdmin } from '../../../src/actor-checks.ts';
+import { needAdmin } from './actor-checks.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { humanTokenAllowed } from './members.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
+import { bypassingRls } from './outbox.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { createPersonToken, extendPersonToken, personTokensOf, revokePersonToken } from './person-tokens.ts';
 import type { Tool } from '../../../src/tools.ts';

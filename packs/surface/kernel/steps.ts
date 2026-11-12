@@ -2,7 +2,7 @@
 // search.
 
 import type { StepPart } from '../../database/kernel/migrate.ts';
-import { TRANSIENT } from './transient.ts';
+import { TRANSIENT } from '../../database/kernel/transient.ts';
 import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
 
 export const STEPS: StepPart[] = [

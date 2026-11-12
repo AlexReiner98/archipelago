@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import type { RootCall } from '../../../src/root-calls.ts';
 import { svgRefused } from '../../walls/kernel/svg-figure.ts';
 import { mayDo } from './rules.ts';
-import { roomToStore } from './standing.ts';
+import { roomToStore } from '../../identity/kernel/standing.ts';
 
 /** The acts root.may answers: publishing's, and no more. */
 const ACTS = ['publish', 'unpublish'];
