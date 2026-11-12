@@ -12,7 +12,7 @@ import { bytesByType, largestItems } from '../../../src/bytes.ts';
 import type { RootCall } from '../../../src/root-calls.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import { actorId, type Archipelago } from '../../../src/pelago.ts';
-import { askedLately } from '../../../src/replies.ts';
+import { askedLately } from './asked-lately.ts';
 import { atSetting, AT_MAX, countsTo, isAt, onReply } from '../../../src/reply-rules.ts';
 import { HOLDS_OFF, holdsOff, liftsOn } from '../../../src/rules.ts';
 import type { Tool } from './tools.ts';

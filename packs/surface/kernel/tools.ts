@@ -21,7 +21,7 @@ import { viewsSaid } from '../../../src/askview.ts';
 import { actionsOf, listedChange, movedTo, route, surfaceNames, surfaceTools, type Action } from './surface.ts';
 import { packAct } from './surface-slots.ts';
 import { ACT_TOOLS } from './tool-acts.ts';
-import { HOOK_TOOLS } from '../../../src/hook-tool.ts';
+import { HOOK_TOOLS, context as hooking } from '../../../src/hook-tool.ts';
 import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
@@ -85,7 +85,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 const PACK_TOOLS: Record<string, Tool> = Object.assign({}, ...(await serverFillings<Record<string, DeclaredTool<KernelContext>>>('surface.tools')).map(({ pack, filled }) => declaredTools(filled, (l) => kernelContext(l, pack))));
 
 export const TOOLS: Record<string, Tool> = {
-  ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HOOK_TOOLS, ...HUMAN_TOOLS,
+  ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...declaredTools(HOOK_TOOLS, hooking), ...HUMAN_TOOLS,
   ...PACK_STATE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
   ...TOKEN_TOOLS, ...MEMBER_TOOLS, ...WORKSPACE_TOOLS, ...PACK_TOOLS,
 };

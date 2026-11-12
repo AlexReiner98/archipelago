@@ -4,13 +4,14 @@
 
 import type { KernelContext } from '#pelago/kernel';
 import { FRONTIER_REASONS, frontier as frontierOf, frontierText, said, workedOn as worked, type FrontierInput } from './frontier.ts';
-import { narrowed as narrowedOf } from './frontier-prompt.ts';
+import { narrowed as narrowedOf, narrowedText } from './frontier-prompt.ts';
 import { livesIn as livesInOf, livesInFor, placeFor as placeOf } from './places.ts';
 import { byAttention, markOf, sessionStates } from './session-state.ts';
 import { sessionMeasures, type MeasuresInput } from './session-measures.ts';
 import { runSpans, type Run } from './sessiontime.ts';
 export { spent } from './spent.ts';
 export { turns } from './run-turns.ts';
+export { story } from './run-story.ts';
 
 const ids = (v: unknown, what: string): string[] => {
   if (!Array.isArray(v) || v.some((id) => typeof id !== 'string')) throw new Error(`${what} is a list of ids`);
@@ -58,5 +59,8 @@ export const placeFor = async (ctx: KernelContext, input: { remote?: string; cwd
 /** The links a thing lives in a place by; with type, the one that ties a thing to a place of that type. */
 export const livesIn = (ctx: KernelContext, input: { type?: string }) => ({ kinds: livesInOf(ctx), ...(typeof input?.type === 'string' && { link: livesInFor(ctx, input.type) }) });
 
-/** What the map has settled and left open on some text a session was asked. */
-export const narrowed = (ctx: KernelContext, input: { text: string }) => narrowedOf(ctx, String(input?.text ?? ''));
+/** What the map has settled and left open on some text a session was asked; with said, also as the text a hook hands the session (none when it holds nothing). */
+export async function narrowed(ctx: KernelContext, input: { text: string; said?: boolean }) {
+  const n = await narrowedOf(ctx, String(input?.text ?? ''));
+  return input?.said ? { ...n, text: narrowedText(n) ?? null } : n;
+}

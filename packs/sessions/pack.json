@@ -3,8 +3,11 @@
   "version": "0.1.0",
   "title": "Sessions",
   "description": "What a session is shown and told: its turns and what it worked on, on its page; the Sessions view and how a session's state is marked; and what every session is told at its start. Split out of core with its ids kept: the run type stays in core, which the kernel reads.",
-  "uses": ["service:root.bookkeep", "service:root.sessions", "service:root.transient", "service:answer.place_for", "service:answer.view_style"],
+  "uses": ["service:root.bookkeep", "service:root.sessions", "service:root.transient", "service:root.uses", "service:root.hook", "service:answer.place_for", "service:answer.view_style", "service:answer.turns", "service:act.report.took", "service:act.report.told", "service:act.report.notify", "service:act.report.alert", "service:answer.frontier", "service:answer.instructions", "service:answer.to_confirm", "service:answer.narrowed", "service:answer.seeing_line"],
   "kernel": { "trust": "service", "internal": true, "optional": true, "modules": "kernel/", "hooks": { "rules.reply_ended": "reply-rules.ts#checkReplyRule" } },
+  "rules": [
+    { "id": "bookkeeping", "when": { "bookkeeping": true }, "then": "spare", "say": "A session's own record of itself (it began, was named, waits, ended) is bookkeeping: it applies as it is made, as the agent it is for." }
+  ],
   "views": [
     { "form": "screen", "id": "core.run_turns", "title": "Turns", "on": ["run"], "pieces": [{ "piece": "turns" }] },
     { "form": "screen", "id": "core.run_worked", "title": "Worked on", "on": ["run"], "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["worked {here}"] }, "limit": 50 }, "style": { "shape": "map" } }] }

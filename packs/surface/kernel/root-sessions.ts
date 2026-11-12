@@ -9,9 +9,18 @@ import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import { bypassingRls } from '../../walls/kernel/outbox.ts';
 import { roomForSession } from '../../rules/kernel/standing.ts';
 import { awakeSessions } from './workspace-use.ts';
+import { setupBehind } from './server-files.ts';
+import { describeChanges, humanChanges, latestSeq } from './tool-reads.ts';
+import { offeredActions } from './tools.ts';
 
-/** awake: the sessions at work now; room: refused, saying the limit, when one more would be over it; settings: the reply rules' settings of these names. */
-export type SessionsAsk = { awake: true } | { room: true } | { settings: string[] };
+/**
+ * awake: the sessions at work now; room: refused, saying the limit, when one more would be over it; settings: the reply
+ * rules' settings of these names. What a session's hooks are told of the server and of what people did (wave 6b,
+ * e_rr96yyj3), as its map reads them: behind, whether a project's setup is behind what this server hands out (by the
+ * version its hook says); offered, the actions the tools offer here; heard, the newest event's seq; changes, what
+ * people did after a seq, with the newest few of them described as a hook says them.
+ */
+export type SessionsAsk = { awake: true } | { room: true } | { settings: string[] } | { behind: string | null } | { offered: true } | { heard: true } | { changes: { after: number; newest: number } };
 
 /** A reply rule's setting: reply_<name>, or with _at the number it counts to (packs/sessions/kernel/reply-rules.ts). */
 const REPLY_SETTING = /^reply_[a-z0-9_]+$/;
@@ -29,6 +38,14 @@ export async function sessionRoom(call: RootCall, ask: SessionsAsk): Promise<unk
     if (!keys.length) return [];
     const { rows } = await (await whole()).query<{ key: string; value: unknown }>(`select key, value from setting where key = any($1::text[])`, [keys]);
     return rows;
+  }
+  if (ask && 'behind' in ask) return setupBehind(typeof ask.behind === 'string' ? ask.behind : undefined);
+  if (ask && 'offered' in ask) return offeredActions(map.registry);
+  if (ask && 'heard' in ask) return latestSeq(map);
+  if (ask && 'changes' in ask) {
+    const changes = await humanChanges(map, Number(ask.changes.after));
+    const newest = changes.slice(Math.max(0, changes.length - (Math.floor(Number(ask.changes.newest)) || 0)));
+    return { changes: changes.map(({ seq, action }) => ({ seq, action })), described: describeChanges(newest) };
   }
   throw new Error('root.sessions counts the sessions awake, says whether there is room for one more, or reads the reply rules\' settings');
 }

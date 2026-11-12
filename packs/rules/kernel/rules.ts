@@ -77,8 +77,11 @@ export interface RuleDef {
     root?: string[];
     /** For a rule on a reply's end: what the reply did (true), did not (false) or did at least so often (a number), as its hook read it. */
     reply?: Record<string, boolean | number>;
+    /** The change is the rule's own pack's bookkeeping (root.bookkeep): its record of itself, made as the actor it is for. */
+    bookkeeping?: boolean;
   };
-  then?: 'hold' | 'refuse' | 'ask' | { require: string[] };
+  /** spare: what it matches is let through, every other rule it would be under spared by this one (its pack's bookkeeping only). */
+  then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] };
   /** Fields whose values together may belong to one item of the type only. */
   unique?: string[];
   /** For unique: the type it holds within, flavours included. */
@@ -152,6 +155,8 @@ export interface Who {
   pack?: string;
   /** The drawing that asked for it: its style, and the types it declares it writes. A rule holds it though a person sends it. */
   drawing?: { style: string; writes: string[] };
+  /** The pack whose bookkeeping the change is, as root.bookkeep sends it: only that pack's rule spares it. */
+  bookkeeping?: string;
 }
 
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
@@ -187,7 +192,8 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
       continue;
     }
     const then = rule.then;
-    if (then !== 'hold' && then !== 'refuse' && !(typeof then === 'object' && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse or { require: [fields] }`);
+    if (then !== 'hold' && then !== 'refuse' && then !== 'spare' && !(typeof then === 'object' && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse, spare or { require: [fields] }`);
+    if (then === 'spare' && (rule.when?.bookkeeping !== true || rule.lifted)) problems.push(`${at}: a rule spares only its own pack's bookkeeping (when.bookkeeping), and nothing lifts it`);
     if (rule.when && 'kind' in rule.when) problems.push(`${at}: when names a type or a capability, not a kind`);
     for (const t of list(rule.when?.type) ?? []) if (!known(t)) problems.push(`${at}: no type "${t}"`);
     if (rule.when?.compare !== undefined && !COMPARE.test(rule.when.compare)) problems.push(`${at}: compare reads like "total > 500"`);
@@ -209,7 +215,7 @@ function capable(reg: Registry, type: string, wanted: string | Record<string, Re
 }
 
 /** Whether a rule's when holds for one op written by this actor to these targets (none for a create). */
-function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Target[], held: boolean): boolean {
+function applies(rule: RuleDef & { pack?: string }, reg: Registry, who: Who, w: Written, targets: Target[], held: boolean): boolean {
   const when = rule.when ?? {};
   if (when.actor && (when.actor === 'human') !== who.human) return false;
   if (who.reading && !(rule.readings ?? rule.then !== 'hold')) return false;
@@ -221,6 +227,7 @@ function applies(rule: RuleDef, reg: Registry, who: Who, w: Written, targets: Ta
   if (when.held !== undefined && held !== when.held) return false;
   if (when.pack !== undefined && Boolean(who.pack) !== when.pack) return false;
   if (when.drawing !== undefined && Boolean(who.drawing) !== when.drawing) return false;
+  if (when.bookkeeping !== undefined && (Boolean(who.bookkeeping) && who.bookkeeping === rule.pack) !== when.bookkeeping) return false;
   if (when.reach === 'outside' && !(who.pack ? outsideReach(reg, who.pack, w, targets) : who.drawing && outsideLayout(reg, who.drawing.writes, w, targets))) return false;
   if (when.dormant !== undefined) {
     const asleep = [w.op === 'create' || w.op === 'link' ? w.type : undefined, ...targets.map((t) => t.type)].some((t) => t && (reg.types.get(t)?.dormant || reg.relations.get(t)?.dormant));
@@ -315,8 +322,12 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`) });
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
+  // A pack's bookkeeping its own rule lets through is spared every other rule, each named as spared by it, it first.
+  const lets = order.find((r) => r.then === 'spare' && applies(r, reg, who, w, targets, false)), letBy = lets && `${lets.pack}.${lets.id ?? ''}`;
+  if (lets) spared.push({ ...ruled(lets), lifted_by: letBy });
   for (const rule of order) {
-    if (rule.unique || rule.stream || rule.on !== undefined || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
+    if (rule.unique || rule.stream || rule.on !== undefined || rule.then === 'spare' || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
+    if (letBy) { spared.push({ ...ruled(rule), lifted_by: letBy }); continue; }
     const by = rule.lifted && lifted(rule, w.op);
     if (by) {
       spared.push({ ...ruled(rule), lifted_by: by });
@@ -334,7 +345,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
       if (missing.length) refusers.push(ruled(rule)), refused.push(said(rule, `"${title}": needs ${missing.join(', ')}`));
     }
   }
-  return { held, spared, refused, refusers };
+  return { held, spared, refused, refusers, letBy };
 }
 
 /** What a unique rule refuses: another item of the type with the same values. `self` is the item being changed. */
@@ -458,7 +469,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
       // A rule of a version names it: the held change says which version of the pack held it.
       const mark = (r: Ruled) => (run && r.pack === run.version.of && !KERNEL_PACKS.includes(r.pack) ? { ...r, version: run.version.item } : r);
       const one = judge(these, registry, who, op, targets, lifted);
-      return { held: one.held.map(mark), spared: one.spared.map(mark), refusers: one.refusers.map(mark), refused: [...one.refused, ...(await clashes(q, registry, op, targets[0]))] };
+      return { held: one.held.map(mark), spared: one.spared.map(mark), refusers: one.refusers.map(mark), refused: [...one.refused, ...(one.letBy ? [] : await clashes(q, registry, op, targets[0]))] };
     }));
     const held = once(each.flatMap((e) => e.held), keyOf);
     const passed = off ? held.filter((r) => !askedFor(r)) : [];

@@ -35,7 +35,7 @@
           "for?": "string",
           "about?": "string",
           "island?": "string",
-          "where": "string",
+          "where?": "string",
           "fill?": "any"
         },
         "out": {

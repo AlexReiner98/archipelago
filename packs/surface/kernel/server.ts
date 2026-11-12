@@ -41,7 +41,7 @@ import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass } from '../../../src/look-pass.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { configureOutbox } from '../../../src/outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from '../../../src/control-index.ts'; import { isPersonToken, personAt } from '../../../src/person-tokens.ts';
-import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './root-connections.ts'; import { configureHookTool } from '../../../src/hook-tool.ts'; import { setReach } from '../../../src/pack-reach.ts';
+import { serverPacksOf } from './server-host.ts'; import { configureConnections } from './root-connections.ts'; import { configureHookTool } from './root-hook.ts'; import { setReach } from '../../../src/pack-reach.ts';
 import { pgLeader, soleLeader, whileLeads, type Leader } from '../../../src/leader.ts'; import { drained } from './drain.ts';
 import { clientAddress, trustedProxies } from '../../../src/address.ts';
 import { DELIVERY_LIMIT, limiter, PUBLIC_LIMIT, REFUSED_LIMIT, SIGN_IN_LIMIT, type Limit } from './limit.ts';

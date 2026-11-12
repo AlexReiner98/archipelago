@@ -26,19 +26,19 @@
     },
     {
       "id": "loader",
-      "hash": "3c0170072673de9cd55c8bdf0411861a2e2f27f1af77e6a0f0c2d0d2ed3a6a1a"
+      "hash": "72bf6e7ab2a5768cd67e4157aa2d064382e4cd723d9874aa6496fbea3bcf277c"
     },
     {
       "id": "rules",
-      "hash": "73c87536e106600b3134d96cff666047ae734aa7f2ae730a2653ec606e6a099e"
+      "hash": "2280c15e5d8dcc2c8ce933f3cc11b51e5e223200f351cd1ca0378a87d95e9a31"
     },
     {
       "id": "write",
-      "hash": "7c09c975660faf7ad98cc484800a8aa1c51e314b5e93bd995b48debce2dffa17"
+      "hash": "92b820bde6320aa9c16979f6c702ff90a4f8cc3ad4a337f03484ba8aa452caa1"
     },
     {
       "id": "surface",
-      "hash": "95757681443a0e2cf0164d2ca7ff0c6c109e2d990718a8ad7c188d6f145c3b64"
+      "hash": "6d0aca14172a0ed52450ba1bd8ce663b62fb4a56aefe6140361b67a3ce5bdc06"
     }
   ],
   "calls": {
@@ -56,7 +56,8 @@
     ],
     "root.uses": [
       "usage",
-      "query"
+      "query",
+      "sessions"
     ],
     "root.server_packs": [
       "connect"
@@ -117,6 +118,9 @@
       "sessions"
     ],
     "root.sessions": [
+      "sessions"
+    ],
+    "root.hook": [
       "sessions"
     ]
   }

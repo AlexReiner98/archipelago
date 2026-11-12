@@ -83,6 +83,11 @@
         "out": "any",
         "run": "root-connections.ts#connectionsOf"
       },
+      "root.hook": {
+        "in": "any",
+        "out": "any",
+        "run": "root-hook.ts#hookAnswer"
+      },
       "root.sessions": {
         "in": "any",
         "out": "any",

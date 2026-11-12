@@ -129,9 +129,16 @@ other; nothing in code skips the rules.
 - A system change never settles a question, never forgets, and never touches
   a root pack's items (`settle_said`, `forget`, `root`).
 - Core's `agent_changes` does not hold it. A pack that wants its own
-  bookkeeping held, or spared another hold, declares the rule (sessions'
-  writes, which today skip the proposal step in code, become the rule
-  `sessions.bookkeeping`).
+  bookkeeping held, or spared another hold, declares the rule. As built
+  (wave 6b, e_rr96yyj3): sessions' writes are the rule
+  `sessions.bookkeeping`, `then: "spare"` with `when: { bookkeeping: true }`
+  (`src/rules.ts`): `root.bookkeep` sends a session's record of itself
+  through `decide` as the sessions pack's bookkeeping, that rule lets it
+  through, and the log's `rule` names it first among what it spared. The
+  actor (the session's agent) and authority (none claimed) are as before
+  (`test/bookkeeping-log.test.ts`). A spare rule matches only its own
+  pack's bookkeeping, nothing lifts it, and it spares refusals as well as
+  holds, as the old path skipped both.
 
 ## Service names
 
@@ -193,7 +200,7 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
 | `root.server_packs` | loader | connect | the server packs the server's folders hold, each as the owner is shown it, and those left out with why (wave 6b: the `server_packs` tool, wired at `src/server-pack-tools.ts`) |
 | `root.observe` | write | connect | what a check of a connection saw: kept as an observation by who asked for the check, and the status with a line in the activity when it changed (wave 6b, e_gc8stacv: `check_connections`) |
-| `root.uses` | surface | usage, query | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`; the query pack counts a view asked) |
+| `root.uses` | surface | usage, query, sessions | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`; the query pack counts a view asked); sessions counts a reply rule's asking (wave 6b, e_rr96yyj3) |
 | `root.pack_view` | loader | query | what a plain pack's view answers, run in the sandbox as the actor who asked, on the island's version of the pack its params name (wave 6b, the query step) |
 | `root.due` | loader | clocks | an item came due: item.due recorded on the map's activity stream as the kernel's and told to the sandboxed packs that hear it; its seq |
 | `root.publish` | database | publish | publishing's writes, each with its event: the published and public_view rows (publish, unpublish, share, unshare), and an item made public or shared again as the one publishing |
@@ -204,8 +211,9 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.drawing` | surface | publish | a drawing's module or service worker by its hash, as the reader may see the map, or whether the packs ship it |
 | `root.public_product` | surface | publish | a product's public page, data or result's picture as anyone reads them, with the headers every public answer carries |
 | `root.transient` | surface | looks, presence, mail, connect | the transient store, kept, read and taken (a key, a key with its bytes, a key read once, keys and prefixes at once) as the whole workspace of the calling map |
-| `root.bookkeep` | write | sessions | a session's own record of itself as it always reached the log (wave 6b, e_5vtbam7d): a change applied as the session's actor past the rules, the operational write, a claim and a give-back, what it vouches for as its own change through the rules, its events on the sessions stream deduplicated under their lock, an audit import with its cursor |
-| `root.sessions` | surface | sessions | what the sessions pack needs of the whole workspace (wave 6b): the sessions at work, whether there is room for one more, the owner's settings of the reply rules |
+| `root.bookkeep` | write | sessions | a session's own record of itself as it always reached the log (wave 6b, e_5vtbam7d): a change applied as the session's actor, judged as its bookkeeping and let through by `sessions.bookkeeping` (e_rr96yyj3), the operational write, a claim and a give-back, what it vouches for as its own change through the rules, its events on the sessions stream deduplicated under their lock, an audit import with its cursor |
+| `root.sessions` | surface | sessions | what the sessions pack needs of the whole workspace (wave 6b): the sessions at work, whether there is room for one more, the owner's settings of the reply rules; and what a hook is told of the server and of people (e_rr96yyj3): whether a setup is behind, the actions offered, the newest event, what people did after one with the newest described |
+| `root.hook` | surface | sessions | a session's hook called over MCP (report, action hook: claude_code's tool, run on the sessions pack's context since claude_code is a server pack) answered as `/hooks/<surface>/<event>` answers it, with the server's packs, the code it runs, its setup version and working rules (wave 6b, e_rr96yyj3; `configureHookTool` is surface's `root-hook.ts`) |
 | `root.transient` | surface | looks, presence, mail, sessions | the transient store, kept and read (a key, a key with its bytes, keys and prefixes at once) as the whole workspace of the calling map |
 | `root.look` | surface | looks | the UI's version, a look pass for the calling map's screen (walls), the room for another look this hour (rules) |
 | `root.notify` | write | notifications | a notification made on the calling map as its sender, past the rules, private, for the sender's person or the owner; told to the packs that hear notification.made |
@@ -397,9 +405,9 @@ moves with a shim to the pack named.
 | clocks | due (on its context: the reads `clock`, `timed`, `due_of` in `packreads-clocks`, item.due through `root.due`, a watched query's edges through automation_triggers' `act.report.due_on`; its timer is the pack's `kernel.timers`, `due.ts#tick`, a failed pass told to the owner by alerts' `act.report.alert`, wave 6b); duties went: stream and snapshot keeping to log's `LEADING`, the backup timer to backup's server duty (`backupDuty`), the server packs' schedules beside it in `whileLeads` (`src/leader.ts`) |
 | sessions (exists) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-measures, session-name, session-parent, session-quiet, session-state, session-turns, sessiontime, touched, stands, spent, audit, working-rules, close-offer, file-said, frontier, frontier-prompt, places |
 | clocks | due, duties |
-| sessions (exists, optional) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-name, session-parent, session-quiet, session-turns (the view; its read is runs' answer.turns), touched, stands, audit, working-rules, close-offer, file-said; as built (wave 6b, e_5vtbam7d): chat-run, session-parent, run-record, stands, touched, reconcile, file-said, audit, session-events, close-offer, session-name, bookkeeping and session-life (sessions' logic) import nothing of the kernel, their SQL in `packreads-sessions`, their writes through `root.bookkeep`, `root.sessions` and `root.transient`; sessions (the map-facing calls: presence's took and VIEWS.story), hook-answers, replies, session-quiet, session-turns and working-rules still do, each for a pack that names no service yet or for no map at all |
+| sessions (exists, optional) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-name, session-parent, session-quiet, session-turns, session-hook, touched, stands, audit, close-offer, file-said; as built (wave 6b, e_5vtbam7d, e_rr96yyj3): every module imports nothing of the kernel, its SQL in `packreads-sessions`, its writes through `root.bookkeep` (judged by `decide`, let through by `sessions.bookkeeping`), the whole workspace through `root.sessions`, `root.transient`, `root.uses` and `root.hook`; a step shown by presence's `act.report.took`/`act.report.told`, the owner's view line `answer.seeing_line`, the frontier, instructions, to_confirm and narrowed by name. Adapters at `src/` hand it `ownContext` (`kernel-context.ts`: its context whether or not the map has it on). The views `story` and `turns` are the query pack's, answered by runs' `answer.story` and `answer.turns`. The quiet look is the pack's, its timer the kernel's (`src/session-quiet.ts`, an optional pack has no timers). working-rules went to loader (no map; which packs the server turns on), with the presets' part of agents' `said` copied |
 | runs (required; decision e_w4bmpnx3) | frontier, frontier-prompt, session-state, session-measures, sessiontime, spent, places, run-turns (the read of session-turns); as built (wave 6b): on ctx, its SQL in `packreads-runs`, each read named `answer.*` in its manifest (frontier, worked_on, session_states, session_marks, run_spans, spent, session_measures, turns, place_for, lives_in, narrowed) |
-| claude_code (exists) | hook-tool, session-hook |
+| claude_code (exists) | hook-tool, session-hook; as built (wave 6b, e_rr96yyj3): a server pack, so no `kernel` key (a pack with kernel code has no handlers or server reach): its hook tool is declared with a JSON input shape and run on the sessions pack's context through `root.hook`; session-hook keeps `HOOK_ACTOR`, the session start text moved to sessions |
 | publish | published, published-data, published-frames, published-live, published-pictures, published-preview, public-bake, public-route, public-view, site, share-tools, drawing-files, pictures, pack-counts |
 | mcp_apps | mcp-view |
 | backup | backup's backupAll, upload and merge (through root services), and the server duty that asks every five minutes whether a backup is due (`backupDuty`, serverContext) |
