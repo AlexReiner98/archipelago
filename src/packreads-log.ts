@@ -162,7 +162,7 @@ export async function settledUnconfirmed(l: Archipelago, limit: number) {
      where f.stream = 'facts' and f.seq > $1 and f.field = 'status' and f.op = '+' and le.head->'actor'->>'id' not like 'human:%' and coalesce(le.head->'authority'->>'who', '') not like 'human:%'
        and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and f.value = to_jsonb(e.status)
      order by e.id, f.seq desc`,
-    [since, l.registry.having('settles')],
+    [since, [...l.registry.types.values()].filter((t) => t.capabilities.settles !== undefined).map((t) => t.id)], // the types that settle (registry.having)
   );
   // What an agent settled on its own judgment is what the owner has not seen; what it settled on their word they
   // chose themselves, in chat. The first are listed first, and counted apart.

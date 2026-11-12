@@ -4,16 +4,17 @@
 // workspace's owner. Each is bounded by the ids it is given, a limit, or an index it names, and answered as the asker
 // under row-level security, as every read of packreads.ts is. What reads the whole map is not here.
 
-import type { Archipelago } from './pelago.ts';
+import { ACTIVE_HOLDS, type Archipelago } from './pelago.ts';
 import { blockGraph, heldResources } from './blocking.ts';
 import { openSaid } from './seal.ts';
 import { scopeOf } from './places.ts';
 import { scanAround, scanKinds, type Around } from './region.ts';
 import { instructionsFor } from './instructions.ts';
 import { shapes } from './packreads-rows.ts';
+import { notKernel } from './head.ts';
 
 export type KernelRead = {
-  /** Items by id, every column the asker may read (archived ones too), in the order the database gives them. */
+  /** Items by id, every column the asker may read and their confidence (archived ones too), in the order the database gives them. */
   ids?: string[];
   /** The open links from, to or among some items (or of some kinds, by the index on open links of a kind), exact kinds;
    *  order: kept (as the map keeps them), id, or newest (the newest made first; with limit, at most that many). */
@@ -41,12 +42,19 @@ export type KernelRead = {
   owned?: { by: string; also?: string[] };
   /** Of some open items, those whose bound (the bound capability of their type) is crossed: a date due within days, or a quantity under its limit. */
   bounds?: { ids: string[]; days: number };
+  /** For each of some items, what it is part of at any depth that is kept (not archived, not the system's), each with
+   *  how many kept things it is part of itself (depth: none is outermost), by the ancestor's title. */
+  ancestors?: string[];
+  /** Which of some items hold something kept (not archived, not the system's) at any depth. */
+  holding?: string[];
 };
 
 const list = (v: unknown, what: string): string[] => {
   if (!Array.isArray(v) || v.some((id) => typeof id !== 'string')) throw new Error(`${what} is a list of ids`);
   return v as string[];
 };
+/** What a lens keeps of the closure: not archived, not the system's. */
+const kept = (l: Archipelago, e: string) => `${e}.archived_at is null and ${notKernel(l.registry, `${e}.type`)}`;
 const loggedIn = (l: Archipelago, what: string) => {
   if (l.props !== 'props') throw new Error(`Anyone with no login reads no ${what}.`);
 };
@@ -55,7 +63,7 @@ const loggedIn = (l: Archipelago, what: string) => {
 export async function kernelRead(l: Archipelago, q: KernelRead): Promise<unknown> {
   if (q.ids !== undefined) {
     const { cols, typed } = shapes(l);
-    const { rows } = await l.db.query<{ type: string }>(`select ${cols('entity')} from entity where id = any($1::text[])`, [list(q.ids, 'ids')]);
+    const { rows } = await l.db.query<{ type: string }>(`select ${cols('entity')}, entity.confidence from entity where id = any($1::text[])`, [list(q.ids, 'ids')]);
     return rows.map(typed);
   }
   if (q.links !== undefined) {
@@ -101,8 +109,9 @@ export async function kernelRead(l: Archipelago, q: KernelRead): Promise<unknown
   if (q.within !== undefined) return [...(await scopeOf(l, String(q.within.id), Boolean(q.within.open), q.within.among && list(q.within.among, 'within.among')))];
   if (q.blocks !== undefined) return [...(await blockGraph(l, list(q.blocks, 'blocks'))).direct.values()].flat();
   if (q.holds !== undefined) {
-    const held = await heldResources(l);
-    return q.holds === true ? held : held.filter((h) => (q.holds as string[]).includes(h.resource));
+    if (q.holds === true) return heldResources(l);
+    const { rows } = await l.db.query(`select h.to_id as resource, h.holder_title as held_by_title from ${ACTIVE_HOLDS} h where h.to_id = any($1::text[])`, [list(q.holds, 'holds')]);
+    return rows;
   }
   if (q.region !== undefined) {
     loggedIn(l, 'region');
@@ -123,6 +132,21 @@ export async function kernelRead(l: Archipelago, q: KernelRead): Promise<unknown
     return rows.map(typed);
   }
   if (q.bounds !== undefined) return crossed(l, Number(q.bounds.days), list(q.bounds.ids, 'bounds.ids'));
+  if (q.ancestors !== undefined) {
+    const { rows } = await l.db.query<{ id: string; at: string; depth: number }>(
+      `select c.descendant as id, c.ancestor as at,
+         (select count(*) from part_closure p join entity a on a.id = p.ancestor where p.descendant = c.ancestor and ${kept(l, 'a')})::int as depth
+       from part_closure c join entity e on e.id = c.ancestor
+       where c.descendant = any($1::text[]) and ${kept(l, 'e')}
+       order by e.title, c.ancestor`,
+      [list(q.ancestors, 'ancestors')],
+    );
+    return rows;
+  }
+  if (q.holding !== undefined) {
+    const { rows } = await l.db.query<{ id: string }>(`select distinct c.ancestor as id from part_closure c join entity e on e.id = c.descendant where c.ancestor = any($1::text[]) and ${kept(l, 'e')}`, [list(q.holding, 'holding')]);
+    return rows.map((r) => r.id);
+  }
   return undefined;
 }
 
