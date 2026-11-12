@@ -170,6 +170,24 @@ A drawing can say what a mark is in a tip beside it: `{ tip: { key, mark } }` sh
 
 A drawing's stylesheet (`css`) is read only inside its own picture: nested under `:where([data-drawing="…"])`, so its selectors weigh what they would alone, with the picture's paint contained. What could reach outside it (`&`, `:has`, `:root`, a leading combinator, `@import`, `url(`, a quote, a backslash, a brace that closes the wrapper) is refused.
 
+## Marks for parts
+
+A part (a pack's piece of the app, run walled in a worker: decision e_xeqhcums) answers with marks of its own, smaller than a drawing's: seven, and nothing richer (`ui/part-check.js`). Each is `[mark, attributes, ...what is in it]`, the attributes left out when there are none.
+
+| Mark | Holds | Says |
+|---|---|---|
+| `box` | marks | `flow` row or column, `gap` and `pad` (steps 0 to 14 of the style's spaces), `align`, `grow`, `wrap`, `look` plain, band or sunk |
+| `text` | words | `look` body, title, muted, mark or code, `size` (a step 1 to 9 of the style's text), `bold`; on a paint surface `x`, `y`, `anchor` |
+| `list` | marks | a row each, `look` rows draws a line between them |
+| `input` | nothing | `key` (needed), `value`, `hint`, `label`, `lines` (more than one is a box of lines) |
+| `button` | words | `key` (needed), `look` main or quiet, `label` |
+| `paint` | paths and placed text | `width` and `height` in its own units, `start`, `pixels` |
+| `path` | nothing | `d` (commands and numbers only), `look` line, fill or dash, `weight` (a step 1 to 4 of the style's borders) |
+
+Any mark may say its `key` and the `item` it stands for, and a box, text, button or path a `tone` (accent, muted, ok, warn, bad, closed). What is not listed is refused whole with where it was, as are a key used twice, a path off a paint surface, and more than the caps in `partLimits`. A tone, a step or a look is a class or a `var()` the style gives its value (`ui/part-marks.css`): a part names no colour and no length.
+
+The host draws only what the check made (`ui/part-render.js`), and each answer whole: it keeps what is drawn by key, else by mark and place, so a field being typed in keeps its words and caret. In the field the person is in, a value the part answers with that the field already sent (an echo, perhaps behind their typing) is let be; one of the part's own (the field cleared) is set. What the person does goes back as `{ key, name, value }`: `edit` and `submit` (Enter) from an input, `press` from a button. A paint surface pans and zooms on the page (`ui/part-paint.js`, on `ui/pan-zoom.js`), never asking the part; with `pixels` a canvas of its size lies under its paths, moved with them, and is handed once to whoever hosts the part (`canvas(key, el)`), to give the part to paint on.
+
 ## A picture that plays
 
 A view may keep `steps`: how the picture came to be, ending on the map as it is (`packs/query/kernel/query-steps.ts`). Each changes the one before it, from nothing: `add` and `remove` (ids), `titles` and `flag` (by id), `fields` (by id, then by name), `link` and `unlink` (each `[from, to]`), `chapter` (`name`, `when`, `count`) and `lines` (`by`, `text`). A status a step gives is sent with its phase, by the type of what it is given to, so a drawing reads where a thing stood then as it reads where it stands now. The last step is the map as it is: what the steps leave in, with its own titles, fields and status now, and gone if it is retired (work that is finished stays), so the still picture is always the last frame and true of what it shows. What a step names is sent with the picture even when finished: a part that is gone is told of. A published picture keeps its steps, naming only what it shows.
