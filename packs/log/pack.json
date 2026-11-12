@@ -1,0 +1,11 @@
+{
+  "id": "log",
+  "version": "0.1.0",
+  "title": "Log",
+  "description": "The record: the log every change is appended to and never rewritten, its streams, partitions and retention, the projector and the projections it makes (closure, activity), snapshots and rebuild, the tail a page follows, and a backup's dump and restore. Started after database.",
+  "kernel": {
+    "trust": "root",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

@@ -7,6 +7,10 @@
     {
       "id": "database",
       "hash": "9e99e898b87d65539835d0d9f91198869d1d7c4a83efc2a9e401310d9470944b"
+    },
+    {
+      "id": "log",
+      "hash": "24ed80e45369d0f4b846edc3db6795279d0017d1cbbcfd9f88bf9e86f6fd352c"
     }
   ]
 }
