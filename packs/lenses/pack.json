@@ -65,6 +65,18 @@
           "hash?": "string"
         },
         "run": "query-kept.ts#pictureOfAnswer"
+      },
+      "answer.shown_in": {
+        "in": {
+          "id": "id",
+          "trail": [
+            "any"
+          ]
+        },
+        "out": [
+          "any"
+        ],
+        "run": "shown-in.ts#shownInOf"
       }
     }
   }

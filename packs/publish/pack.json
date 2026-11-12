@@ -24,6 +24,13 @@
           "content_type": "string"
         },
         "run": "pictures.ts#pictureAct"
+      },
+      "answer.picture": {
+        "in": {
+          "result": "id"
+        },
+        "out": "any",
+        "run": "pictures.ts#getPicture"
       }
     },
     "hooks": {
@@ -32,7 +39,8 @@
       "surface.preview": "published-preview.ts#previewOf",
       "surface.site_nav": "site.ts#siteNav",
       "surface.bake": "public-bake.ts#bake",
-      "surface.counts_since": "pack-counts.ts#countsSince"
+      "surface.counts_since": "pack-counts.ts#countsSince",
+      "surface.tools": "surface-tools.ts#tools"
     }
   },
   "uses": [

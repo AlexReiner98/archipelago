@@ -26,7 +26,7 @@ export async function publicPage(l: Archipelago, product: string, build?: string
   type Proven = {
     build?: string | null;
     builds?: string[];
-    counts?: Record<'questions' | 'answered' | 'tests' | 'passed' | 'failed' | 'not_run', number>;
+    counts?: Record<string, number>; // questions, answered, tests, passed, failed, not_run
     proofs?: { id: string; title: string; total: number; passed: number; failed: number; not_run: number; answered: boolean; tests: { id: string; title: string; status: string; compares: string | null; tolerance: string | null; environment: string | null; result: Found | null; before: Found | null }[] }[];
   };
   const proven = ((await askView(pub, anyone, 'proof', { build, within: [...under] }).catch(() => ({}))) ?? {}) as Proven;

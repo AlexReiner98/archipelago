@@ -42,10 +42,22 @@ test('the kernel names no pack', () => {
 const NAMES_PACK_TYPES: Record<string, number> = {
   'src/altitude.ts': 1, 'src/capabilities.ts': 2, 'src/declared.ts': 3,
   'src/look-pass.ts': 1,
-  'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2,
-  'src/public-document.ts': 1, 'src/public.ts': 2, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
-  'src/session-hook.ts': 1, 'src/surface.ts': 2, 'src/tool-reads.ts': 1, 'src/ui-files.ts': 1,
-  'ui/doc.js': 1, 'ui/item-doc.js': 1,
+  'src/manifest.ts': 1,
+  'src/outside.ts': 1,
+  'src/packhost.ts': 4,
+  'src/packreads.ts': 1,
+  'src/packs.ts': 3,
+  'src/packtools.ts': 3,
+  'src/pelago.ts': 2,
+  'src/public-document.ts': 1,
+  'src/public.ts': 1,
+  'src/rules.ts': 1,
+  'src/schema.ts': 1,
+  'src/scope.ts': 2,
+  'src/session-hook.ts': 1,
+  'src/ui-files.ts': 1,
+  'ui/doc.js': 1,
+  'ui/item-doc.js': 1,
 };
 
 // Core's words until 11 Nov 2026 (people and calendar packs, e_wrdg6udh); `event` is also the kernel's for a log event.

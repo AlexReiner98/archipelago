@@ -6,6 +6,9 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "hooks": {
+      "surface.mcp": "surface-mcp.ts#mcpApps"
+    }
   }
 }

@@ -18,7 +18,8 @@
       "surface.act": "check-connections.ts#check_connections",
       "surface.connect": "served.ts#served",
       "surface.token_asked": "connect.ts#asked",
-      "surface.token_polled": "connect.ts#polled"
+      "surface.token_polled": "connect.ts#polled",
+      "surface.tools": "surface-tools.ts#tools"
     }
   },
   "reach": {
