@@ -3,7 +3,7 @@
 // its key, else by its kind and place, so a field being typed in keeps its words and its caret. What the person does
 // goes back to the part as an event: { key, name, value }, `edit` and `submit` from an input, `press` from a button.
 // Looks are classes and steps the style gives values to (packs/walls/page/part-marks.css); the renderer writes no colour or length.
-// Pan and zoom of a paint surface stay here (ui/part-paint.js): the part is never asked where the reader looks.
+// Pan and zoom of a paint surface stay here (packs/walls/page/part-paint.js): the part is never asked where the reader looks.
 
 import { isChecked } from './part-check.js';
 import { paintSurface } from './part-paint.js';

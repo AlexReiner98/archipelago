@@ -1,7 +1,7 @@
 /* The frame every drawing's picture is drawn in. A frame the picture moves in, like a map: the wheel zooms, a drag moves it. */
 .lf-stage { position: relative; height: clamp(var(--ln-stage-least), var(--ln-stage), var(--ln-stage-most)); overflow: hidden; background: var(--ln-sea); cursor: grab; touch-action: none; user-select: none; }
 .lf-stage.moving { cursor: grabbing; }
-/* Text too small on screen to read is not drawn (ui/pan-zoom.js); a drawing says what more than a name is, under [data-text=names]. */
+/* Text too small on screen to read is not drawn (packs/walls/page/pan-zoom.js); a drawing says what more than a name is, under [data-text=names]. */
 .lf-stage[data-text="none"] > svg text { display: none; }
 .lf-stage > svg { display: block; width: 100%; height: 100%; }
 /* What the marks mean: a card in the frame's corner, one mark to a line, whatever the zoom, and never wider than the style says. */

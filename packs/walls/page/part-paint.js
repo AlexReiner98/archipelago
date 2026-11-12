@@ -1,5 +1,5 @@
 // A part's paint surface: a plane in its own units (width by height) holding paths and placed text, seen through a
-// frame that pans and zooms it on the page (ui/pan-zoom.js), never by asking the part. With `pixels`, a canvas of the
+// frame that pans and zooms it on the page (packs/walls/page/pan-zoom.js), never by asking the part. With `pixels`, a canvas of the
 // plane's size lies under the paths, for whoever hosts the part to hand it over to paint on (an OffscreenCanvas in the
 // part's worker); it moves with the plane, so what is painted there stays under what is drawn over it.
 
@@ -8,7 +8,7 @@ import { panZoom } from './pan-zoom.js';
 const SVG = 'http://www.w3.org/2000/svg';
 
 /**
- * Make a paint surface for `node`. `drawn(mark)` makes one mark on the plane (ui/part-render.js). Answers with its
+ * Make a paint surface for `node`. `drawn(mark)` makes one mark on the plane (packs/walls/page/part-render.js). Answers with its
  * element, the pixel canvas when it has one, `update(node)` with a new answer, and `stop()`.
  */
 export function paintSurface(node, { style, drawn }) {

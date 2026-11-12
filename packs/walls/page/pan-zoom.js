@@ -3,10 +3,10 @@
 // pointer did not move. Nothing holds it in: it goes as far as the reader takes it. Zoom is only scale, never structure; what is too
 // small on screen to read is not drawn (the text's tier, `data-text` on the frame: none, names, all), and what is out
 // of sight is not drawn at all. Whoever drew it is told what is in view (`told`), once a frame at most. It opens with
-// all of it in sight when that can be read, else at a size that reads, brought to where it starts.
+// all of it in sight when that can be read, else at a size that reads, brought to where it starts. The host's: it knows
+// nothing of the app, so what stands beside the frame (the sheet) is said by whoever makes one (`beside`).
 
-import { numberOf } from './query-base.js';
-import { sheetAside } from './sheet-follow.js';
+import { numberOf } from './style-number.js';
 import { pinchOf } from './pinch.js';
 
 /** What a frame of `n` units' text is shown as, on screen at `px` a unit: none, its names, or all of it. */
@@ -18,11 +18,13 @@ const planeOf = (style) => Object.fromEntries(['zoom_least', 'zoom_most', 'open_
 /**
  * Make `svg` (`width` by `height` in its own units) move inside `frame`. `start` is a point to open on when all of
  * it cannot be read at once; `aside` is room kept on the left for what floats over the frame (a legend); `style` gives
- * the plane's numbers; `told(view)` hears what is in view, in the picture's units, as it changes.
+ * the plane's numbers; `told(view)` hears what is in view, in the picture's units, as it changes; `beside()` says the
+ * share of the page's width something stands beside the frame (the app's sheet), so its coming or going leaves the
+ * picture where it is.
  * Answers with what a control may do: zoom by a factor, fit it all, open again, bring a point into sight, or say and
  * restore where it stands.
  */
-export function panZoom(frame, svg, { width, height, start = [width / 2, 0], aside = 0, style, told }) {
+export function panZoom(frame, svg, { width, height, start = [width / 2, 0], aside = 0, style, told, beside: besideOf = () => 0 }) {
   const plane = planeOf(style);
   const view = { s: 1, x: 0, y: 0 };
   let fitted = 1;
@@ -192,7 +194,7 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   // A frame that changes size keeps what was in the middle of it in the middle (a pane whose edge is dragged does not
   // carry the picture with that edge), but the sheet coming or going leaves it where the reader put it: only the room
   // beside it changes. One first given a size opens.
-  let opened = Boolean(frame.clientWidth), was = size(), beside = sheetAside();
+  let opened = Boolean(frame.clientWidth), was = size(), beside = besideOf();
   if (opened) open();
   /** Taken off the page, the frame's observers end with it. */
   const stop = () => (resized.disconnect(), reshaped.disconnect());
@@ -201,11 +203,11 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     if (!frame.clientWidth) return;
     const now = size();
     if (!opened) return void ((opened = true), (was = now), open());
-    const stays = sheetAside() !== beside;
+    const stays = besideOf() !== beside;
     if (!stays) view.x += (was[0] - now[0]) / 2 / view.s;
     view.y += (was[1] - now[1]) / 2 / view.s;
     was = now;
-    beside = sheetAside();
+    beside = besideOf();
     apply();
   });
   resized.observe(frame);

@@ -151,7 +151,7 @@ export function canvasIn(host, pane) {
     /** The ids of what it draws now. */
     ids: () => (at?.view?.answer?.items ?? []).map((i) => i.id),
     refresh: (tail = false) => (tail && at?.view?.store ? undefined : at?.view?.refresh?.()),
-    /** The frame the drawing moves in now, and what moves it (ui/pan-zoom.js). */
+    /** The frame the drawing moves in now, and what moves it (packs/walls/page/pan-zoom.js). */
     moves: () => at?.view?.querySelector('.lens-view')?.moves,
     /**
      * All of it in sight, beside the sheet and between the bars, unless the reader has moved it since its lens was
@@ -176,7 +176,7 @@ export function canvasIn(host, pane) {
   const keepIt = () => at && c.moves() && (at.kept = moved() ?? at.kept);
   for (const name of ['pointerup', 'wheel']) host.addEventListener(name, () => setTimeout(keepIt, 0), { passive: true });
   // Its frame changing size (a story's milestone coming in beside it) fits it again, as a page opened or shut does:
-  // never once the reader has moved it. At the next frame, once the plane has kept its middle (ui/pan-zoom.js).
+  // never once the reader has moved it. At the next frame, once the plane has kept its middle (packs/walls/page/pan-zoom.js).
   const sized = new ResizeObserver(() => requestAnimationFrame(() => c.fit()));
   // A drawing mounted anew (a new view, the map changed under it): back where the reader left it, else fitted.
   new MutationObserver((list) => {

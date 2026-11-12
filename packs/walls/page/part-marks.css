@@ -1,4 +1,4 @@
-/* How a part's marks look (ui/part-render.js): every value is the style's, read from its variables. A mark names a
+/* How a part's marks look (packs/walls/page/part-render.js): every value is the style's, read from its variables. A mark names a
    look, a tone or a step of a scale; the step is set on the element as --pm-gap, --pm-pad, --pm-size or --pm-weight,
    each a var() of the style's scale, and read here. */
 
@@ -36,7 +36,7 @@ textarea.pm-input { font: inherit; color: var(--text); background: var(--panel);
 .pm-tone-bad { color: var(--bad); }
 .pm-tone-closed { color: var(--closed); }
 
-/* A paint surface: the plane fills a frame of its own shape, and moves inside it (ui/part-paint.js). */
+/* A paint surface: the plane fills a frame of its own shape, and moves inside it (packs/walls/page/part-paint.js). */
 .pm-paint { position: relative; overflow: hidden; width: 100%; aspect-ratio: var(--pm-aspect, auto); touch-action: none; user-select: none; contain: paint; }
 .pm-plane, .pm-pixels { position: absolute; left: 0; top: 0; }
 .pm-plane { width: 100%; height: 100%; }

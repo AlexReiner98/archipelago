@@ -24,7 +24,7 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/identity/page/workspace.js': 7,
   'packs/identity/page/workspaces-card.js': 2,
   'packs/walls/page/layout-asks.js': 4,
-  'packs/walls/page/layout.js': 11,
+  'packs/walls/page/layout.js': 10,
   'packs/walls/page/marks.js': 3,
   'packs/walls/page/surface.js': 1,
   'packs/loader/page/packs.js': 5,

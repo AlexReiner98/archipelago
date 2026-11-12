@@ -1,6 +1,6 @@
 // What a part answers with, checked by its shape before anything is drawn. A part is a pack's code, run walled in a
 // worker (decision e_xeqhcums), so nothing it sends is trusted: it says what is on its screen in a small vocabulary of
-// marks, and the host alone makes them into the page (ui/part-render.js), under the workspace's style.
+// marks, and the host alone makes them into the page (packs/walls/page/part-render.js), under the workspace's style.
 //
 // A mark is [kind, attributes, ...what is in it], as a drawing's is (packs/walls/page/marks.js); the attributes may be left out
 // (['text', 'Hello']). Seven kinds, nothing richer:

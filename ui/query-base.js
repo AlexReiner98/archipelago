@@ -52,12 +52,8 @@ export const sizeOf = (style, name) => {
   if (typeof v !== 'number') throw new Error(`The style names no size "${name}": the house style (core.house, packs/canvas/pack.json) names every one a drawing uses`);
   return v;
 };
-/** A number a drawing's code is drawn by: the style's, named by the house style. */
-export const numberOf = (style, name) => {
-  const v = style.numbers?.[name];
-  if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (core.house, packs/canvas/pack.json) names every one a drawing uses`);
-  return v;
-};
+/** A number a drawing's code is drawn by: the style's, named by the house style (the host's, packs/walls/page/style-number.js). */
+export { numberOf } from './style-number.js';
 
 /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it: the same numbers at every depth. */
 export function queryTree(answer) {

@@ -12,7 +12,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-/** The house style's numbers, which the frame a picture moves in is moved by (ui/pan-zoom.js). */
+/** The house style's numbers, which the frame a picture moves in is moved by (packs/walls/page/pan-zoom.js). */
 const numbers = JSON.stringify(house('flow').numbers);
 /** A drawing's index.js that answers with this scene, after what `before` runs. */
 const hostile = (scene: string, before = '') => `export async function picture(input, tools) { ${before}; return { scene: ${scene} }; }`;
