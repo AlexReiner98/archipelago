@@ -80,7 +80,10 @@ test('instructions answer as the agents pack says them, and told counts each', a
   assert.ok(((await answerRead(l, { instructions: { where: 'session_start' } })) as unknown[]).length > 0, 'the presets said at the start of a session');
   const before = heldCounts(l.workspace, 'uses').find((c) => c.key === 'told:e_counted')?.n ?? 0;
   assert.equal(await answerRead(l, { told: ['e_counted', 'e_counted'] }), true);
-  assert.equal(heldCounts(l.workspace, 'uses').find((c) => c.key === 'told:e_counted')?.n, before + 2);
+  // A use is counted a moment after it is told (src/uses.ts counts through root.uses, never awaited).
+  const count = () => heldCounts(l.workspace, 'uses').find((c) => c.key === 'told:e_counted')?.n;
+  for (let i = 0; i < 100 && count() !== before + 2; i++) await new Promise((r) => setTimeout(r, 5));
+  assert.equal(count(), before + 2);
   await assert.rejects(answerRead(l, { told: 'e_counted' as never }), /told is a list of ids/);
 });
 
