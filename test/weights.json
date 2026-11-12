@@ -25,6 +25,7 @@
   "packs/query/kernel/query.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/sessions/kernel/bookkeeping.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/styles/kernel/styles.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/usage/kernel/usage.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/views/kernel/views.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/waits/kernel/unwait.test.ts": { "pglite": 0, "postgres": 0 },
   "test/activity.test.ts": { "pglite": 4.2, "postgres": 1.7 },

@@ -92,7 +92,7 @@ test("the kernel names no session's action", () => {
 });
 
 // The kernel runs a pack's code only as the pack's, through the registry: it imports none from packs/.
-const IMPORTS_PACKS: Owed = { 'src/session-measures.ts': [1, SESSIONS], 'src/session-state.ts': [2, SESSIONS], 'src/session-turns.ts': [1, SESSIONS] };
+const IMPORTS_PACKS: Owed = {};
 test("the kernel imports no pack's code", () => {
   const named = count(kernelFiles.filter((f) => !ADAPTERS.has(f)), /(?:\bfrom\s+|\bimport\s*\(\s*)['"`][^'"`]*\bpacks\//g);
   assert.deepEqual(ratchet(named, counts(IMPORTS_PACKS)), [], "Move the code that needs it into the pack, or hand the pack's answer in.");
@@ -355,7 +355,7 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
 // (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
 const WHOLE_READS: Record<string, number> = {
-  'src/backup.ts': 1,
+  'src/backup-run.ts': 1,
   'src/forget.ts': 2,
   'src/log.ts': 2,
   'src/mentions.ts': 1,
