@@ -992,6 +992,12 @@
       "say": "Publishing is the owner’s here: they allow agents in Settings, under Agents. Ask them with publish_ask."
     },
     {
+      "id": "agent_unpublish",
+      "when": { "actor": "agent", "op": "unpublish" },
+      "then": "refuse",
+      "say": "Taking a document down is the owner’s: ask them to unpublish it."
+    },
+    {
       "id": "agent_backups",
       "when": { "actor": "agent", "op": "backup_download" },
       "then": "refuse",

@@ -133,8 +133,9 @@ export async function publish(l: Archipelago, actor: Actor, id: string, said?: S
   return { published: id, sections: given.sections.length, lenses: Object.keys(given.lenses).length, ...(given.path && { path: given.path }) };
 }
 
-/** Take a document down: it is shared again, and its address answers nothing. */
+/** Take a document down: it is shared again, and its address answers nothing. Only a human may (core's agent_unpublish). */
 export async function unpublish(l: Archipelago, actor: Actor, id: string) {
+  await mayDo(l.db, l.registry, actor.kind === 'human', 'unpublish');
   const doc = await l.entity(id);
   if (!doc) throw new Error(`No item "${id}".`);
   await l.db.transaction(async (tx) => {
