@@ -10,10 +10,9 @@ import { transientOf } from './root-transient.ts';
 import { op, source, TITLE_MAX } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { undo } from '../../../src/undo.ts';
-import { resolveRun } from '../../../src/sessions.ts';
+import { closeOffers, resolveRun } from './session-calls.ts';
 import { covering } from '../../../src/withdraw.ts'; import { proposals } from './map-reads.ts';
 import { holdsOff } from '../../../src/rules.ts';
-import { closeOffers } from '../../../src/sessions.ts';
 import { logged } from '../../../src/logged.ts';
 
 /** Where an agent last pointed the human's screen (the presence pack's Focus). */

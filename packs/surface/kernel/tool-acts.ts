@@ -4,14 +4,14 @@
 // recorded, a backup taken.
 
 import { z } from 'zod';
-import { importAudit } from '../../../src/sessions.ts';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { keepRunsWith, stopLaunched } from '../../../src/launcher.ts';
 import { itemLink } from '../../../src/members.ts';
 import { actorId } from '../../../src/pelago.ts';
-import { recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from '../../../src/sessions.ts';
+import { importAudit, recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './session-calls.ts';
 import { point, sessionOpened, sessionTookUp, whose } from './tool-change.ts';
 import { slotted } from './surface-slots.ts';
+import { rechecked } from './recheck.ts';
 import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
@@ -252,7 +252,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
       repo: z.string().describe('The repository: its id, its GitHub name "owner/name", or its title.'),
       summary: z.string().optional().describe('What was checked and what was found.'),
     },
-    run: slotted('surface.act', 'rechecked'), // what it does is a filling (src/recheck.ts)
+    run: async (l, actor, input) => rechecked(l, actor, input), // the surface's own (./recheck.ts)
   },
   import_audit: {
     description: 'Copy new entries from a connection\'s tool-call log into the activity log, so actions taken in that tool are visible here.',

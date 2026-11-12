@@ -3,7 +3,7 @@
 
 import { z } from 'zod';
 import { lastSeq, readEvents } from '../../../src/eventlog.ts';
-import { askView, viewList, viewsSaid } from '../../../src/askview.ts';
+import { askView, viewList, viewsSaid } from './view-words.ts';
 import { showingIn } from './public-views.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
@@ -18,7 +18,6 @@ import type { Tool } from './tools.ts';
 import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
 import { withCovers } from '../../../src/withdraw.ts';
 import { itemLink } from '../../../src/members.ts';
-import '../../../src/session-turns.ts'; // adds the turns view
 
 /** One thing the human did to the map, small enough to put in front of a model. */
 export interface HumanChange {

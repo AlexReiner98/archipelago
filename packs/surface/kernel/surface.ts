@@ -6,7 +6,7 @@
 // name still answers for one release, as POST /agent/<name>, with the call that replaces it (movedTo).
 
 import { z } from 'zod';
-import { viewList, viewNames } from '../../../src/askview.ts';
+import { viewList, viewNames } from './view-words.ts';
 import { KERNEL_VERBS } from '../../../src/declared.ts';
 import type { ActionDef } from '../../../src/declared.ts';
 import type { Registry } from '../../../src/packs.ts';

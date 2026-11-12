@@ -139,15 +139,20 @@ export function kernelProblems(k: unknown): string[] {
     // What is filled once at a workspace's open would outlive the switch: an optional pack declares none of it. A check
     // of a rule on its event (rules.<on>, packs/loader/kernel/rule-events.ts) holds nothing of a map: it is filled once
     // for the process, its rules checked whether a map runs the pack or not.
+    // Nor do the server's slots read once for the process from its own folder (loader.calls, surface.tools,
+    // surface.replies): an optional pack's acts and hooks answer on any map, as the kernel's did.
     const held = ['provides', 'tables', 'timers'].filter((k) => s[k] !== undefined);
-    const points = Object.keys((s.hooks ?? {}) as Raw).filter((p) => !p.startsWith('write.') && !p.startsWith('rules.'));
-    if (held.length || points.length) problems.push(`an optional pack fills only the write path's points (write.*), read at each change, and the rules' checks of its events (rules.*): not ${[...held.map((k) => `kernel.${k}`), ...points].join(', ')}`);
+    const points = Object.keys((s.hooks ?? {}) as Raw).filter((p) => !p.startsWith('write.') && !p.startsWith('rules.') && !PROCESS_POINTS.includes(p));
+    if (held.length || points.length) problems.push(`an optional pack fills only the write path's points (write.*), read at each change, the rules' checks of its events (rules.*) and the server's slots read once for the process (${PROCESS_POINTS.join(', ')}): not ${[...held.map((k) => `kernel.${k}`), ...points].join(', ')}`);
   }
   if (s.memory !== undefined && (typeof s.memory !== 'string' || !/^[a-z][a-z0-9_]*:$/.test(s.memory) || s.memory.startsWith('pack:'))) problems.push('kernel.memory is a settings prefix of lower-case letters, digits and _, ending in a colon, such as "due_on:", and never pack:');
   if (s.memory !== undefined && s.trust !== 'service') problems.push("kernel.memory is a service pack's");
   if (s.families !== undefined && (s.trust !== 'service' || !Array.isArray(s.families) || s.families.some((f) => !(FAMILIES as readonly unknown[]).includes(f)))) problems.push(`kernel.families is a service pack's list of families whose every name it may call, each one of ${FAMILIES.join(', ')}`);
   return problems;
 }
+
+/** The slots a root reads once for the process, from the server's own folder, whatever a map has on: an optional pack may fill them. */
+export const PROCESS_POINTS: readonly string[] = ['loader.calls', 'surface.tools', 'surface.replies'];
 
 /** A pack's tier: root, service, or none (plain, in the sandbox). */
 export const tierOf = (m: Pick<Manifest, 'kernel'>): Trust | undefined => m.kernel?.trust;

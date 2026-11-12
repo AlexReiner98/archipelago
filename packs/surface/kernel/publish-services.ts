@@ -6,7 +6,7 @@ import type { RootCall } from '../../../src/root-calls.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import { drawingsBy, layoutsOf } from '../../loader/kernel/layouts.ts';
 import { GUARD, POLICY } from '../../walls/kernel/public-document.ts';
-import { publicPage, publicPicture } from '../../walls/kernel/public.ts';
+import { publicPage, publicPicture } from './public.ts';
 import { drawInside, uiPage } from './ui-files.ts';
 
 const HASH = /^[0-9a-f]{64}$/;

@@ -50,6 +50,18 @@
           ]
         },
         "run": "subject.ts#refusals"
+      },
+      "answer.first_island": {
+        "in": {
+          "name": "string"
+        },
+        "out": {
+          "reason": "string",
+          "ops": [
+            "any"
+          ]
+        },
+        "run": "island-start.ts#firstIslandChange"
       }
     }
   }

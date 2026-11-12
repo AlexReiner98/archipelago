@@ -3,7 +3,8 @@
 // so what an agent names is drawn as the owner would draw it. A lens the canvas could not draw is refused here.
 
 import { z } from 'zod';
-import { readFlat } from '../../../src/query-flat.ts';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
+import type { FlatLens } from '../../query/kernel/query-flat.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
 
 /** What names a view, as show and query look take it. */
@@ -54,7 +55,7 @@ export async function viewAddress(l: Archipelago, asked: ViewAsked): Promise<str
   if (input.lens || input.style) {
     // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on a screen.
     const wanted = (input.lens ?? {}) as { limit?: unknown };
-    const lens = Object.keys(wanted).length ? await readFlat(l, wanted) : undefined;
+    const lens = Object.keys(wanted).length ? await callAs<FlatLens>(l, 'answer.flat_lens', wanted) : undefined;
     for (const term of lens?.find ?? []) {
       const [, id] = /^(?:id|in) (e_[a-z0-9]{8})$/.exec(term) ?? [];
       if (id && !(await l.entity(id))) throw new Error(`No item "${id}"`);

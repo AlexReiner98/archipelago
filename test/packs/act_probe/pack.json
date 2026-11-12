@@ -2,11 +2,11 @@
   "id": "act_probe",
   "version": "0.1.0",
   "title": "Act probe",
-  "description": "A service pack for testing the surface's slots: it fills surface.act with probe_act, and with rechecked, which the kernel fills too.",
+  "description": "A service pack for testing the surface's slots: it fills surface.act with probe_act, and surface.read with probe_read.",
   "kernel": {
     "trust": "service",
     "internal": true,
     "modules": "kernel/",
-    "hooks": { "surface.act": ["acts.ts#probe_act", "acts.ts#rechecked"], "surface.read": "acts.ts#probe_read" }
+    "hooks": { "surface.act": "acts.ts#probe_act", "surface.read": "acts.ts#probe_read" }
   }
 }

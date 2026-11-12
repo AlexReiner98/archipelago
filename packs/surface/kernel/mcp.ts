@@ -14,7 +14,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { viewNames } from '../../../src/askview.ts';
+import { viewNames } from './view-words.ts';
 import { onToolsChanged } from '../../../src/packstate.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { serverFillings } from './server-fillings.ts';

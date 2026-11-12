@@ -1,7 +1,7 @@
 // Sessions gone quiet: every so often the leader looks for open sessions that have stopped reporting, tells the human
 // once about each that still holds something, and ends one that has said nothing for the house style's
 // quiet_end_after. The look is this pack's, on its context; the timer that runs it while the server leads is the
-// kernel's still (src/session-quiet.ts, started by src/open-steps.ts), since an optional pack has no timers and the
+// kernel's still (src/session-quiet.ts, started by src/workspaces.ts), since an optional pack has no timers and the
 // end it makes is this pack's own (sessionEnd), which no required pack can ask of an optional one by name.
 
 import type { KernelContext } from '#pelago/kernel';

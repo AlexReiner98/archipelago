@@ -1,6 +1,6 @@
 // GET /backup-file/<workspace>/<key>: a backup someone asked to download, by the one-time key its tool handed them
-// (src/backup-tools.ts). Its filling of the slot surface.route (src/surface-slots.ts), held by the kernel until the
-// backup pack takes it.
+// (src/backup-tools.ts): one of the surface's own routes answered before the server's (src/surface-slots.ts), since the
+// one-time keys are the surface's backup tools'.
 
 import { serveBackupFile } from './backup-tools.ts';
 import type { RouteFilling } from './surface-slots.ts';

@@ -1,7 +1,9 @@
 // The surface's slots (docs/kernel-packs.md, "Slots"): the surface keeps each action's words, its verb and who may
-// call it; what it does is a filling, by the kernel's own module until a pack takes it, or by an internal pack's hook.
-// Proved on rechecked (src/recheck.ts) and the backup file route (src/backup-route.ts).
+// call it; what it does is a filling, an internal pack's hook. The surface's own act (rechecked, src/recheck.ts) and
+// route (the backup file, src/backup-route.ts) fill nothing: they are its own code.
 import assert from 'node:assert/strict';
+import { cpSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { test } from 'node:test';
 import { openKernel } from '../src/kernel-context.ts';
@@ -11,11 +13,11 @@ import { annotationsOf } from '../src/surface.ts';
 import { callTool, surfaceFor } from '../src/tools.ts';
 import { agent, freshWith, human, PACKS, packsWith } from './map.ts';
 
-test('rechecked is offered under report as before, its behaviour the kernel module that fills it', async () => {
+test("rechecked is offered under report as before, the surface's own act", async () => {
   const l = await freshWith(new Registry(PACKS, ['core']));
-  assert.ok(await filledTool(l, 'surface.act', 'rechecked'), 'the kernel fills it until its pack takes it');
+  assert.equal(await filledTool(l, 'surface.act', 'rechecked'), undefined, "the surface's own code: no slot's filling");
   assert.equal(await filledTool(l, 'surface.act', 'probe_act'), undefined, 'a name nothing fills');
-  await assert.rejects(callTool(l, agent, 'report', { action: 'rechecked', params: { repo: 'anything' } }), /No pack here keeps scheduled re-checks/, 'the verb routes onto the filling');
+  await assert.rejects(callTool(l, agent, 'report', { action: 'rechecked', params: { repo: 'anything' } }), /No pack here keeps scheduled re-checks/, 'the verb routes onto it');
   await assert.rejects(slotted('surface.act', 'probe_act')(l, agent, {}), /Nothing here fills probe_act \(surface.act\)/);
 });
 
@@ -32,10 +34,14 @@ test("an internal pack fills an act and a read, called with its context and who 
 });
 
 test('a name two fill is refused, naming both: one name, one owner', async () => {
-  const l = await freshWith(new Registry(packsWith('act_probe')));
+  const dir = packsWith('act_probe');
+  // A twin of the probe, filling the same act.
+  cpSync(join(dir, 'act_probe'), join(dir, 'act_twin'), { recursive: true });
+  const file = join(dir, 'act_twin', 'pack.json');
+  writeFileSync(file, readFileSync(file, 'utf8').replace('"act_probe"', '"act_twin"'));
+  const l = await freshWith(new Registry(dir));
   openKernel(l);
-  await assert.rejects(filledTool(l, 'surface.act', 'rechecked'), /rechecked is filled by the kernel and the act_probe pack: one name, one owner/);
-  await assert.rejects(callTool(l, agent, 'rechecked', { repo: 'x' }), /one name, one owner/);
+  await assert.rejects(filledTool(l, 'surface.act', 'probe_act'), /probe_act is filled by the act_probe pack and the act_twin pack: one name, one owner/);
 });
 
 test('a route filling answers before the server, counting its requests against the limit it names', async () => {

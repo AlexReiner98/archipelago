@@ -7,14 +7,14 @@ import { endedOf, LIMITS, NEAR, useOf, type LimitName, type Limits } from '../..
 import { limitOf, renameWorkspace } from '../../../src/members.ts';
 /** The looks drawn for a map's workspace in the last hour, all and by who asked: the look_draw pack's count (answer.looks_counted). */
 const looksCounted = async (l: Archipelago) => (await import('../../loader/kernel/kernel-context.ts')).callAs<{ hour: number; by: [string, number][] }>(l, 'answer.looks_counted', {});
-import { sessionsAwake } from '../../../src/sessions.ts';
+import { sessionsAwake } from './session-calls.ts';
 import { awakeSessions, requestsBy, requestsThisMinute, SESSION_AWAKE_MS, storageOf, storageParts } from './workspace-use.ts';
 import { bytesByType, largestItems } from '../../../src/bytes.ts';
 import type { RootCall } from '../../../src/root-calls.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import { actorId, type Archipelago } from '../../../src/pelago.ts';
 import { askedLately } from './asked-lately.ts';
-import { atSetting, AT_MAX, countsTo, isAt, onReply } from '../../../src/reply-rules.ts';
+import { atSetting, AT_MAX, countsTo, isAt, onReply } from './reply-words.ts';
 import { HOLDS_OFF, holdsOff, liftsOn } from '../../../src/rules.ts';
 import type { Tool } from './tools.ts';
 import { notKernel } from '../../../src/head.ts';

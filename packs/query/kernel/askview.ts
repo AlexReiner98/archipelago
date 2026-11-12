@@ -101,3 +101,6 @@ export async function askView(map: KernelContext, actor: Actor, name: string, pa
   // A pack's own code answers it, in the sandbox, as the one who asked.
   return map.call('root.pack_view', { pack: found.pack, view: found.def.id, params, actor });
 }
+
+/** surface.views: what the surface says of the views, read once for the server (packs/surface/kernel/view-words.ts). */
+export const words = () => ({ names: viewNames, list: viewList, said: viewsSaid });

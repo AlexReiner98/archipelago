@@ -8,11 +8,6 @@ export function probe_act(ctx: KernelContext, input: { said: string }, who: Call
   return { said: input.said, who: who.name, by: ctx.pack.id };
 }
 
-/** surface.act rechecked: filled here too, so the surface refuses it (one name, one owner). */
-export function rechecked() {
-  return { rechecked: [] };
-}
-
 /** surface.read probe_read: a read through the pack's context. */
 export async function probe_read(ctx: KernelContext, input: { id: string }) {
   return ctx.reads({ get: input.id });

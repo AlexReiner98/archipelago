@@ -85,7 +85,13 @@ export async function islandMoves(ctx: Reads): Promise<{ reason: string; ops: Is
   return { reason, ops, islands: packs.length, moved: items.length };
 }
 
-/** A new workspace's first island, named after it and speaking core: made by the server as the workspace is, through `change`. */
+/** `answer.first_island`: the change that makes a new workspace's first island, named after it and speaking core. */
+export const firstIslandChange = (_ctx: unknown, input: { name: string }): { reason: string; ops: IslandOp[] } => ({
+  ops: [{ op: 'create', type: ISLAND, title: input.name, status: 'current', visibility: 'shared', props: { pack: 'core' } }],
+  reason: 'A new workspace starts on islands',
+});
+
+/** A new workspace's first island: made by the server as the workspace is, through `change`. */
 export async function firstIsland(change: MakeChange, name: string): Promise<void> {
-  await change({ ops: [{ op: 'create', type: ISLAND, title: name, status: 'current', visibility: 'shared', props: { pack: 'core' } }], reason: 'A new workspace starts on islands' });
+  await change(firstIslandChange(undefined, { name }));
 }

@@ -36,7 +36,7 @@ test("what Workspaces.load did in a fixed order is the roots' and the kernel's f
     { phase: 'types', pack: 'loader' },
     { phase: 'types', pack: 'loader' },
     { phase: 'begin', pack: 'rules' },
-    { phase: 'islands', pack: 'placement' },
+    { phase: 'islands', pack: 'loader' },
   ]);
   for (const f of filled) assert.ok((OPEN_PHASES as readonly string[]).includes(f.phase));
   assert.deepEqual((await kernelDuties()).sort(), ['log', 'sessions', 'surface'], 'the clock is the clocks pack’s own timer (kernel.timers), and the log is kept by its root');

@@ -47,6 +47,20 @@
           "problem?": "string"
         },
         "run": "answers.ts#flatCheck"
+      },
+      "answer.flat_lens": {
+        "in": {},
+        "out": "any",
+        "run": "answers.ts#flatLens"
+      },
+      "answer.ask_view": {
+        "in": {
+          "actor": "any",
+          "name": "string",
+          "params?": "any"
+        },
+        "out": "any",
+        "run": "answers.ts#askedView"
       }
     },
     "families": [
@@ -54,6 +68,7 @@
       "term"
     ],
     "hooks": {
+      "surface.views": "askview.ts#words",
       "surface.reads": [
         "reads.ts#view",
         "reads.ts#placed"
