@@ -4,16 +4,16 @@
 // the kernel answers is a lens preset or named as operational; the page calls no more tools than it did; the canvas draws no
 // depth; a drawing's modules are all in its list, a length in one is named, and a wired one keeps its layers and wires apart;
 // a root pack needs only the roots before it. Each rule keeps a list of what already broke it when the rule was made (16 Oct
-// 2026). An entry may only shrink, and goes once the rule is met: when you bring a number down, lower it here. A module moved
-// into a pack is read at its shim's path (test/structure-kit.ts), so no list here changes when one moves.
+// 2026). An entry may only shrink, and goes once the rule is met: when you bring a number down, lower it here. Every module
+// is read at its own place (test/structure-kit.ts); a list keyed by a path names it there (scripts/gather.ts re-keys them).
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
-import { basename, join, relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
 import { spacing } from './spacing.ts';
-import { ADAPTERS, codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, srcCode, VENDORED, walk } from './structure-kit.ts';
+import { codeFiles, count, counts, KEPT, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, VENDORED, walk } from './structure-kit.ts';
 import { rootImports } from './structure-roots.ts';
 import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
@@ -88,10 +88,11 @@ test("the kernel names no session's action", () => {
   assert.deepEqual(ratchet(named, counts(NAMES_SESSION_ACTS)), [], 'An action is its pack\'s: let the pack declare what it checks.');
 });
 
-// The kernel runs a pack's code only as the pack's, through the registry: it imports none from packs/.
+// The kernel runs a pack's code only as the pack's, through the registry: it imports none from packs/ but the root packs'
+// (its own code). A type-only import is erased and does not count. The shims src/ keeps for wave 7 (KEPT) are its debt.
 const IMPORTS_PACKS: Owed = {};
 test("the kernel imports no pack's code", () => {
-  const named = count(kernelFiles.filter((f) => !ADAPTERS.has(f)), /(?:\bfrom\s+|\bimport\s*\(\s*)['"`][^'"`]*\bpacks\//g);
+  const named = Object.fromEntries(kernelFiles.filter((f) => !KEPT.has(f)).map((f) => [f, serviceImports(f)]).filter(([, n]) => (n as number) > 0));
   assert.deepEqual(ratchet(named, counts(IMPORTS_PACKS)), [], "Move the code that needs it into the pack, or hand the pack's answer in.");
 });
 
@@ -166,10 +167,10 @@ test("a pack's code comes with its tests", () => {
 const CYCLES: Record<string, number> = {};
 
 test('kernel modules import one way', () => {
-  const files = srcCode;
-  const edges = new Map(files.map((f) => [basename(f), [] as string[]]));
+  // Each module by its path: since the gather a module imports another pack's at `../../<p>/kernel/<m>.ts`.
+  const files = srcCode, known = new Set(files), edges = new Map(files.map((f) => [f, [] as string[]]));
   for (const f of files) {
-    for (const [, spec] of read(f).matchAll(/(?:^|;)[ \t]*import\s+(?!type\b)[^;]*?from\s+'\.\/([^']+\.ts)'/gm)) edges.get(basename(f))!.push(spec);
+    for (const [, spec] of read(f).matchAll(/(?:^|;)[ \t]*import\s+(?!type\b)[^;]*?from\s+'(\.{1,2}\/[^']+\.ts)'/gm)) if (known.has(target(f, spec))) edges.get(f)!.push(target(f, spec));
   }
   // Tarjan's strongly connected components: an edge inside one with more than one module is a cycle.
   const index = new Map<string, number>(), low = new Map<string, number>(), stack: string[] = [], on = new Set<string>();
@@ -304,7 +305,7 @@ const isProse = (s: string) => (/[a-z] [a-z]/i.test(s) || /^[A-Z][a-z]/.test(s))
 test('the UI and the tools use one name for each idea', () => {
   const files = [
     ...walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f)),
-    ...walk('src').filter((f) => /^src\/(?:tools|views|declared|[a-z-]+-tools)\.ts$/.test(f)),
+    ...[...walk('src'), ...walk('packs')].filter((f) => /^(?:src|packs\/[\w-]+\/kernel)\/(?:tools|views|declared|[a-z-]+-tools)\.ts$/.test(f)),
   ];
   const counted = Object.fromEntries(
     files

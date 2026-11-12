@@ -1,7 +1,7 @@
 // What the structure test reads the code with: the files, by part, and the ratchet each rule keeps.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, basename } from 'node:path';
+import { join, posix } from 'node:path';
 
 export const ROOT = join(import.meta.dirname, '..');
 const CODE = /\.(ts|js|mjs|css|html)$/;
@@ -19,46 +19,39 @@ export const rawWalk = (dir: string): string[] =>
 /** A file's text as it is on disk. */
 export const raw = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 
-// Kernel packs in the wave (docs/kernel-packs.md, "Moving in the wave (as built)"). A module moved into a pack leaves
-// a shim at its old path, a file whose only code is `export * from '../packs/<p>/kernel/<m>.ts';`, found here by that
-// shape alone. Until the gather step every rule reads the moved code at its old path (the shim's), with its imports
-// written as if it were still there, so no list keyed by a path changes when a module moves.
-const SHIM = /^export \* from '\.\.\/(packs\/[\w-]+\/kernel\/[\w./-]+\.ts)';$/;
-const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').trim();
-/** Each shim's old path, with the moved file it stands for. */
-export const SHIMS = new Map(rawWalk('src').flatMap((f) => { const to = f.endsWith('.ts') ? SHIM.exec(code(raw(f)))?.[1] : undefined; return to ? [[f, to] as const] : []; }));
-/**
- * A service pack's adapter shim (docs/kernel-packs.md, "Moving a service in the wave (as built)"): at the old path, it
- * re-exports its moved module and adapts what took the map, building the pack's context when called. Its only value
- * imports are of `../packs/<p>/kernel/<its own name>.ts`, every other static import is `import type`, and its one
- * dynamic import is `./kernel-context.ts`. The kernel may import that pack there, and nowhere else.
- */
-const adapts = (f: string, text: string) => {
-  const own = basename(f), targets = [...text.matchAll(/(?:^|;)[ \t]*(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+'([^']+)'/gm)].map((m) => m[1]);
-  const dynamic = [...text.matchAll(/\bimport\s*\(\s*'([^']+)'/g)].map((m) => m[1]);
-  const ofOwn = (t: string) => /^\.\.\/packs\/[\w-]+\/kernel\/[^/]+$/.test(t) && basename(t) === own;
-  return targets.length > 0 && targets.every(ofOwn) && dynamic.every((t) => t === './kernel-context.ts');
-};
-export const ADAPTERS = new Set(rawWalk('src').filter((f) => f.endsWith('.ts') && !SHIMS.has(f) && adapts(f, code(raw(f)))));
-/** Each moved file, with the old path it is read at. */
-export const MOVED = new Map([...SHIMS].map(([from, to]) => [to, from]));
-/** A moved module's imports as they read from its old path: of src/ and of any pack's kernel/, each `./<m>`. */
-const reroot = (text: string) => text.replace(/(['"`])\.\.\/\.\.\/\.\.\/src\//g, '$1./').replace(/(['"`])\.\.\/\.\.\/[\w-]+\/kernel\//g, '$1./');
+// Kernel packs after the gather (docs/kernel-packs.md, "Moving in the wave (as built)", and wave 3, "Gather"): every
+// module is read at its own place. The kernel is src/ (the stub and plumbing) and the root packs' kernel/; a service
+// pack's code is a pack's, under rule 4. The lists keyed by a path name the module where it lives
+// (scripts/gather.ts re-keys them). What the kernel still imports of a service pack goes through a shim left in src/
+// until wave 7 cuts it: those shims are listed in test/fixtures/gather-kept.json, with who imports each, and the
+// list only shrinks.
 
-/** Every file under a folder, a moved module at its old path only. */
-export const walk = (dir: string): string[] => rawWalk(dir).filter((f) => !MOVED.has(f));
-/** A file's text; at a shim, the moved module's, read as from there. */
-export const read = (path: string) => (SHIMS.has(path) ? reroot(raw(SHIMS.get(path)!)) : raw(path));
+/** Every file under a folder. */
+export const walk = rawWalk;
+/** A file's text. */
+export const read = raw;
+/** The shims src/ keeps for wave 7: a kernel caller still imports a service pack's module through each. */
+export const KEPT = new Set(existsSync(join(ROOT, 'test/fixtures/gather-kept.json')) ? Object.keys(JSON.parse(raw('test/fixtures/gather-kept.json')) as Record<string, string[]>) : []);
+/** The pack a path is in, if it is under packs/. */
+export const packOfPath = (path: string) => /^packs\/([\w-]+)\//.exec(path)?.[1];
+/** A relative import's target, as a path from the repository's root. */
+export const target = (from: string, spec: string) => posix.normalize(posix.join(posix.dirname(from), spec));
 export const lines = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
 export const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory());
 const manifest = (p: string) => (existsSync(join(ROOT, 'packs', p, 'pack.json')) ? JSON.parse(raw(`packs/${p}/pack.json`)) : {}) as { kernel?: { trust?: string } };
 /** The packs whose manifest says they are root: their code is the kernel's, under every rule the kernel keeps. */
 export const rootPacks = packIds.filter((p) => manifest(p).kernel?.trust === 'root');
-/** A root pack's code that was never in src/ (its index.ts, a module written there): moved modules are read at their shims. */
+/** A root pack's code: every module under its kernel/ but its tests. */
 export const rootCode = rootPacks.flatMap((p) => walk(`packs/${p}/kernel`)).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
 /** The kernel's TypeScript: src/, and the root packs' code. */
 export const srcCode = [...walk('src').filter((f) => f.endsWith('.ts')), ...rootCode];
 export const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
+const VALUE_IMPORT = /(?:^|;)[ \t]*(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+['"`]([^'"`]+)['"`]|\bimport\s*\(\s*['"`]([^'"`]+)['"`]/gm;
+/** How many value imports of a file name a pack that is not a root (a service pack's code, or a plain pack's). */
+export const serviceImports = (f: string) => [...read(f).matchAll(VALUE_IMPORT)].filter((m) => {
+  const spec = m[1] ?? m[2], pack = spec.startsWith('.') ? packOfPath(target(f, spec)) : undefined;
+  return pack !== undefined && !rootPacks.includes(pack);
+}).length;
 export const kernelFiles = [...walk('src'), ...walk('ui'), ...rootCode].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
 /** The packs gone to hosted (9 Nov 2026), with their type and link names. */
 export const LEFT = JSON.parse(read('test/fixtures/left-packs.json')) as Record<string, string[]>;
