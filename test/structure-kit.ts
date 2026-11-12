@@ -8,18 +8,45 @@ const CODE = /\.(ts|js|mjs|css|html)$/;
 /** Vendored as a file at the owner's asking (CLAUDE.md), not written here. */
 export const VENDORED = ['ui/three.module.min.js'];
 
-export const walk = (dir: string): string[] =>
+/** Every file under a folder, as it is on disk. */
+export const rawWalk = (dir: string): string[] =>
   !existsSync(join(ROOT, dir))
     ? []
     : readdirSync(join(ROOT, dir)).flatMap((name) => {
         const path = `${dir}/${name}`;
-        return statSync(join(ROOT, path)).isDirectory() ? walk(path) : [path];
+        return statSync(join(ROOT, path)).isDirectory() ? rawWalk(path) : [path];
       });
-export const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
+/** A file's text as it is on disk. */
+export const raw = (path: string) => readFileSync(join(ROOT, path), 'utf8');
+
+// Kernel packs in the wave (docs/kernel-packs.md, "Moving in the wave (as built)"). A module moved into a pack leaves
+// a shim at its old path, a file whose only code is `export * from '../packs/<p>/kernel/<m>.ts';`, found here by that
+// shape alone. Until the gather step every rule reads the moved code at its old path (the shim's), with its imports
+// written as if it were still there, so no list keyed by a path changes when a module moves.
+const SHIM = /^export \* from '\.\.\/(packs\/[\w-]+\/kernel\/[\w./-]+\.ts)';$/;
+const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').trim();
+/** Each shim's old path, with the moved file it stands for. */
+export const SHIMS = new Map(rawWalk('src').flatMap((f) => { const to = f.endsWith('.ts') ? SHIM.exec(code(raw(f)))?.[1] : undefined; return to ? [[f, to] as const] : []; }));
+/** Each moved file, with the old path it is read at. */
+export const MOVED = new Map([...SHIMS].map(([from, to]) => [to, from]));
+/** A moved module's imports as they read from its old path: of src/ and of any pack's kernel/, each `./<m>`. */
+const reroot = (text: string) => text.replace(/(['"`])\.\.\/\.\.\/\.\.\/src\//g, '$1./').replace(/(['"`])\.\.\/\.\.\/[\w-]+\/kernel\//g, '$1./');
+
+/** Every file under a folder, a moved module at its old path only. */
+export const walk = (dir: string): string[] => rawWalk(dir).filter((f) => !MOVED.has(f));
+/** A file's text; at a shim, the moved module's, read as from there. */
+export const read = (path: string) => (SHIMS.has(path) ? reroot(raw(SHIMS.get(path)!)) : raw(path));
 export const lines = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
-export const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
-export const kernelFiles = [...walk('src'), ...walk('ui')].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
 export const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory());
+const manifest = (p: string) => (existsSync(join(ROOT, 'packs', p, 'pack.json')) ? JSON.parse(raw(`packs/${p}/pack.json`)) : {}) as { kernel?: { trust?: string } };
+/** The packs whose manifest says they are root: their code is the kernel's, under every rule the kernel keeps. */
+export const rootPacks = packIds.filter((p) => manifest(p).kernel?.trust === 'root');
+/** A root pack's code that was never in src/ (its index.ts, a module written there): moved modules are read at their shims. */
+export const rootCode = rootPacks.flatMap((p) => walk(`packs/${p}/kernel`)).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+/** The kernel's TypeScript: src/, and the root packs' code. */
+export const srcCode = [...walk('src').filter((f) => f.endsWith('.ts')), ...rootCode];
+export const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
+export const kernelFiles = [...walk('src'), ...walk('ui'), ...rootCode].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
 /** The packs gone to hosted (9 Nov 2026), with their type and link names. */
 export const LEFT = JSON.parse(read('test/fixtures/left-packs.json')) as Record<string, string[]>;
 /** The kernel's own packs: the kinds, the root relations and the system tier. */

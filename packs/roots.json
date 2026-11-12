@@ -3,6 +3,10 @@
     {
       "id": "core",
       "hash": "56ede734e3c6623e77efafdfc1459b1dc0f8d47169592fe152a0560ecfdcceb8"
+    },
+    {
+      "id": "database",
+      "hash": "9e99e898b87d65539835d0d9f91198869d1d7c4a83efc2a9e401310d9470944b"
     }
   ]
 }

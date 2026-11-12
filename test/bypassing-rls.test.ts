@@ -5,19 +5,12 @@
 // shrink, as the lists in test/structure.test.ts do: when a call goes, lower its number in the same commit.
 
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
 import { test } from 'node:test';
+import { read, walk } from './structure-kit.ts'; // a module moved into a pack is counted at its shim's path
 
-const ROOT = join(import.meta.dirname, '..');
-const walk = (dir: string): string[] =>
-  readdirSync(join(ROOT, dir)).flatMap((name) => {
-    const path = `${dir}/${name}`;
-    return statSync(join(ROOT, path)).isDirectory() ? walk(path) : [path];
-  });
 const files = ['src', 'ui', 'packs'].flatMap(walk).filter((f) => /\.(ts|js|mjs)$/.test(f));
 const count = (pattern: RegExp) =>
-  Object.fromEntries(files.map((f) => [f, readFileSync(join(ROOT, f), 'utf8').match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
+  Object.fromEntries(files.map((f) => [f, read(f).match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
 
 /** Calls of bypassingRls, each file's count. */
 const CALLERS: Record<string, number> = {

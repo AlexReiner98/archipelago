@@ -1,13 +1,11 @@
-// The shape of the code, checked. Files stay small; the kernel names no pack; writes to items and
-// relations go through one path; a pack reaches the kernel only through what it is handed; a pack's
-// code is tested without a database; kernel modules import one way; the UI loads as modules; and
-// there are four dependencies; every picture is a drawing a pack ships; every view the kernel answers is a
-// lens preset or named as operational; the page calls no more tools than it did; the canvas draws no depth; and a
-// drawing's modules are all in its list, a length in one is named, and a wired one keeps its layers and its wires apart.
-//
-// Each rule keeps a list of what already broke it when the rule was made (16 Oct 2026). An entry
-// may only shrink, and goes once the rule is met: when you bring a number down, lower it here.
-
+// The shape of the code, checked. Files stay small; the kernel names no pack; writes to items and relations go through one
+// path; a pack reaches the kernel only through what it is handed; a pack's code is tested without a database; kernel modules
+// import one way; the UI loads as modules; there are four dependencies; every picture is a drawing a pack ships; every view
+// the kernel answers is a lens preset or named as operational; the page calls no more tools than it did; the canvas draws no
+// depth; a drawing's modules are all in its list, a length in one is named, and a wired one keeps its layers and wires apart;
+// a root pack needs only the roots before it. Each rule keeps a list of what already broke it when the rule was made (16 Oct
+// 2026). An entry may only shrink, and goes once the rule is met: when you bring a number down, lower it here. A module moved
+// into a pack is read at its shim's path (test/structure-kit.ts), so no list here changes when one moves.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -15,7 +13,8 @@ import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
 import { spacing } from './spacing.ts';
-import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, VENDORED, walk } from './structure-kit.ts';
+import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, srcCode, VENDORED, walk } from './structure-kit.ts';
+import { rootImports } from './structure-roots.ts';
 import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
 const MAX_LINES = 500;
@@ -115,13 +114,13 @@ const WRITES_ELSEWHERE: Record<string, number> = {};
 const WRITE_PATH = ['src/pelago.ts', 'src/change-apply.ts', 'src/replay.ts'];
 
 test('items and relations are written in one place', () => {
-  const others = walk('src').filter((f) => f.endsWith('.ts') && !WRITE_PATH.includes(f));
+  const others = srcCode.filter((f) => !WRITE_PATH.includes(f));
   const writes = count(others, /\b(?:insert\s+into|update|delete\s+from)\s+(?:entity|relation)\b/gi);
   assert.deepEqual(ratchet(writes, WRITES_ELSEWHERE), [], 'Send the change through Archipelago.change.');
 });
 
 test('every store is named, with its rule', () => {
-  const made = (re: RegExp) => new Set(codeFiles.filter((f) => f.startsWith('src/')).flatMap((f) => [...read(f).matchAll(re)].map((m) => m[1])));
+  const made = (re: RegExp) => new Set(srcCode.flatMap((f) => [...read(f).matchAll(re)].map((m) => m[1])));
   const tables = [...made(/create table if not exists (\w+)/gi)].filter((t) => !made(/drop table if exists (\w+)/gi).has(t)); // one a later step drops is no store
   const named = [...MAP_TABLES, ...Object.keys(STORES)];
   assert.deepEqual(tables.filter((t) => !named.includes(t)), [], 'Name the store in src/operational.ts, with the one rule it keeps.');
@@ -133,7 +132,7 @@ test('every store is named, with its rule', () => {
 // nowhere else: a change is held only with the rule that held it, a setting is read only as the lift of a rule, and
 // the server's policy only as the rules it lifts or adds.
 test('every approval is decided by a rule', () => {
-  const src = walk('src').filter((f) => f.endsWith('.ts'));
+  const src = srcCode;
   const held = count(src, /append\(tx, this\.workspace, 'pending'/g);
   assert.deepEqual(held, { 'src/pelago.ts': 1 }, 'A change waits only where Archipelago.change holds it on the verdict of decide.');
   assert.deepEqual(count(src, /insert\s+into\s+proposal\s*\(/gi), { 'src/replay.ts': 1 }, 'The queue is projected from the pending stream, nowhere else.');
@@ -147,7 +146,7 @@ test('every approval is decided by a rule', () => {
 // 4. A pack's code imports only its own files and Node's built-ins, never the kernel's; its tests also #pelago/test, and a kernel pack's modules `import type` #pelago/kernel.
 test("a pack's code imports nothing of the kernel", () => {
   const reaching: string[] = [];
-  for (const file of walk('packs').filter((f) => /\.(ts|js|mjs)$/.test(f))) { const text = read(file);
+  for (const file of walk('packs').filter((f) => /\.(ts|js|mjs)$/.test(f) && !rootCode.includes(f))) { const text = read(file); // a root's: rule 22
     for (const { 1: spec, index } of text.matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)) {
       const own = spec.startsWith('./') || (spec.startsWith('../') && !relative(join(ROOT, 'packs', file.split('/')[1]), join(ROOT, file, '..', spec)).startsWith('..'));
       if (!own && !(spec === '#pelago/test' && /\.test\.ts$/.test(file)) && !(spec === '#pelago/kernel' && /^import\s+type\b/.test(text.slice(text.lastIndexOf('import', index), index))) && !spec.startsWith('node:')) reaching.push(`${file} imports ${spec}`);
@@ -159,7 +158,7 @@ test("a pack's code imports nothing of the kernel", () => {
 // 5. A pack that carries code carries the tests of it, run without a database: input and what was
 // read go in, ops and requests come out.
 test("a pack's code comes with its tests", () => {
-  const untested = packIds.filter((p) => {
+  const untested = packIds.filter((p) => !rootPacks.includes(p)).filter((p) => { // a root's tests stay in test/ in the wave
     const files = walk(`packs/${p}`);
     return files.some((f) => /\.(ts|js|mjs)$/.test(f) && !/\.test\./.test(f)) && !files.some((f) => /\.test\.(ts|js|mjs)$/.test(f));
   });
@@ -170,7 +169,7 @@ test("a pack's code comes with its tests", () => {
 const CYCLES: Record<string, number> = {};
 
 test('kernel modules import one way', () => {
-  const files = walk('src').filter((f) => f.endsWith('.ts'));
+  const files = srcCode;
   const edges = new Map(files.map((f) => [basename(f), [] as string[]]));
   for (const f of files) {
     for (const [, spec] of read(f).matchAll(/^import\s+(?!type\b)[^;]*?from\s+'\.\/([^']+\.ts)'/gm)) edges.get(basename(f))!.push(spec);
@@ -372,9 +371,9 @@ const GROWS = /\b(?:from|join)\s+(?:entity|relation|event|log_entry|log_fact|log
 const BOUND = /=\s*any\s*\(|unnest\s*\(|\b(?:id|from_id|to_id|target_id|ancestor|descendant|owner|changeset|undoes)\s*=\s*(?:\$|[a-z_]+\b(?!\s*\())|\bid\s+in\s*\(\s*select|\blimit\s+(?:\$|\d|\$\{)|\b(?:seq|pos|ts|at)\s*(?:>=?|=)\s*\$|--\s*index\s+[a-z_]+/i;
 
 test('no read of the whole map', () => {
-  const indexes = new Set(walk('src').flatMap((f) => [...read(f).matchAll(/create (?:unique )?index if not exists (\w+)/g)].map((m) => m[1])));
+  const indexes = new Set(srcCode.flatMap((f) => [...read(f).matchAll(/create (?:unique )?index if not exists (\w+)/g)].map((m) => m[1])));
   const queries = (text: string) => [...text.matchAll(/`(?:[^`\\]|\\.)*`/gs)].map((m) => m[0]).filter((q) => /\bselect\b/i.test(q) && GROWS.test(q));
-  const files = walk('src').filter((f) => f.endsWith('.ts') && f !== 'src/read-indexes.ts');
+  const files = srcCode.filter((f) => f !== 'src/read-indexes.ts');
   const named = files.flatMap((f) => queries(read(f)).flatMap((q) => [...q.matchAll(/--\s*index\s+([a-z_, ]+)/g)].flatMap((m) => m[1].split(',').map((n) => n.trim()).filter(Boolean)))).filter((name) => !indexes.has(name));
   assert.deepEqual(named, [], 'A read names an index the schema makes.');
   const counted = Object.fromEntries(files.map((f) => [f, queries(read(f)).filter((q) => !BOUND.test(q)).length]).filter(([, n]) => (n as number) > 0));
@@ -410,7 +409,7 @@ test('the page calls no more tools through /api than it did', () => {
 test('the canvas draws no depth, and nothing keeps places', () => {
   assert.doesNotMatch(read('ui/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
   assert.doesNotMatch(read('src/query-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
-  const keepers = walk('src').filter((f) => f.endsWith('.ts') && /(?:readOps|record)\([^)]*'places'/.test(read(f)));
+  const keepers = srcCode.filter((f) => /(?:readOps|record)\([^)]*'places'/.test(read(f)));
   assert.deepEqual(keepers, [], 'Nothing keeps where a person put a thing: a view is drawn from its query alone; grouping that matters is a link.');
 });
 
@@ -456,11 +455,8 @@ test('a length in a drawing is named on the style', () => {
 // says its layer in its first comment ("Layer: metrics."); LAYERS_OWED (test/wired.ts) is what those that do not yet say so
 // will say, read as if they did, so the rules hold of them today, and a name goes from it as its module says it.
 // LAYERS_MIXED are modules that are more than one layer. Each list here may only shrink, LAYERS_OWED too.
-const LAYERS_MIXED: Record<string, number> = {};
-const LAYER_IMPORTS: Record<string, number> = {};
-const WRITERS: Record<string, number> = {};
-const wired = drawings.filter((d) => d.id in WIRED);
-const wiredFiles = [...new Set(wired.flatMap((d) => Object.keys(d.modules).map((name) => pathOf(d, name))))];
+const LAYERS_MIXED: Record<string, number> = {}, LAYER_IMPORTS: Record<string, number> = {}, WRITERS: Record<string, number> = {};
+const wired = drawings.filter((d) => d.id in WIRED), wiredFiles = [...new Set(wired.flatMap((d) => Object.keys(d.modules).map((name) => pathOf(d, name))))];
 
 test('each module of a wired drawing names its layer', () => {
   assert.deepEqual(wiredFiles.filter((f) => !saysLayer(f) && !owedLayer(f)).map(short), [], 'Say its layer in its first comment: "Layer: graph.", topology, shape, metrics or marks (docs/layouts.md).');
@@ -483,7 +479,6 @@ test("only Metrics sets a place or a wire's points", () => {
   assert.deepEqual(ratchet(counted, WRITERS), [], 'Coordinates are output: Metrics sets them, from what this layer says.');
 });
 
-
 // 21. Sealed: each wired drawing runs on small sketches (test/wired.ts), and no two wires of it lie on one line, none stands
 // under the spacing, no box stands on a box, none runs through a box. The spacing is the flow's (test/spacing.ts).
 // Counted for the map as it stood when it became the one layout, 9 Nov 2026; each count may only go down.
@@ -497,4 +492,9 @@ test('a wired drawing keeps its wires apart', async () => {
     for (const [what, n] of Object.entries(found)) counted[`${d.id} ${what}`] = n;
   }
   assert.deepEqual(ratchet(counted, NOT_SEALED), [], `Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md). Now: ${JSON.stringify(counted)}`);
+});
+// 22. A root imports plumbing, its own pack and the roots before it; what it imported above them is owed (structure-roots.ts).
+test("a root pack's code imports only plumbing and the roots before it", () => {
+  const owed = new Set(JSON.parse(read('test/fixtures/root-imports.json')) as string[]), added = rootImports().filter((e) => !owed.has(e));
+  assert.deepEqual(added, [], 'Open a slot the higher pack fills, or hand the value in (docs/kernel-packs.md, "Slots").');
 });

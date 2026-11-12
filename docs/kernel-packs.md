@@ -377,3 +377,49 @@ service step takes it.
   checked in CI with `packs/roots.json`.
 - **Shims during the wave**, removed by the gather step, so nineteen sessions
   can move code without rewriting each other's imports.
+
+## Moving in the wave (as built)
+
+### Root packs
+
+Set by the database step (e_8e5yhfdy); every root step moves its row the same way, and none edits
+`test/structure.test.ts`.
+
+- **Move.** `git mv src/<m>.ts packs/<pack>/kernel/<m>.ts`, and write the shim, whose only code
+  is `export * from '../packs/<pack>/kernel/<m>.ts';` (comments allowed). The structure test finds
+  shims by that shape (`SHIMS`, `test/structure-kit.ts`): there is no list to keep.
+- **Imports in a moved module.** A module of the same pack stays `./<m>.ts`; anything still in
+  `src/`, plumbing or a shim, is `../../../src/<m>.ts`; another pack's moved code may be named at
+  its new place (`../../<p>/kernel/<m>.ts`) or through its shim. Fix what reads paths from its
+  own place (`import.meta.url`, `import.meta.dirname`): one more `../../`. A module run as a
+  script keeps answering at its old path (see `deploy.ts`: `node src/deploy.ts` is how the hosted
+  deploy runs it).
+- **The pack.** `pack.json` with `kernel: { trust: "root", internal: true, modules: "kernel/" }`,
+  and `kernel/index.ts` exporting `start(ctx)`, which the stub calls at boot. While the wave lasts
+  it loads nothing the server did not load before: it answers its parts as lazy `import()`s.
+  Add the pack to `packs/roots.json` in its place in "The root packs", then `npm run roots` and
+  `npm run roots:check`. Any later change under the pack's folder needs `npm run roots` again.
+- **Every rule still applies, at the old path.** The structure test reads a shim as the moved
+  module (its imports rewritten as if it were still in `src/`) and leaves the moved file out of
+  its walk, so the 500 lines, the kernel naming no pack, one write path, named stores, no whole
+  read, one-way imports and the rest count it under `src/<m>.ts` as before, and no ratchet list
+  changes when a module moves. A root pack's code that was never in `src/` (its `index.ts`, a new
+  module) is kernel code too (`rootCode`, `srcCode`). `test/bypassing-rls.test.ts` reads the same
+  way. A root pack's tests stay in `test/`, through the shims, so it is spared "a pack's code
+  comes with its tests" and "a pack's code imports nothing of the kernel".
+- **What a root may import** (rule 22, `test/structure-roots.ts`): plumbing, its own pack, and the
+  roots before it in "The root packs", at their new place or through their shims. Type-only
+  imports do not count. Which pack a module is in is read from this document ("Where each
+  module goes", "Plumbing"), or from where it now lives. The rule holds of every module of a root
+  row, moved or not. What those modules imported above that when the wave began is owed, listed
+  in `test/fixtures/root-imports.json` (193 imports, as `src/<m>.ts -> src/<n>.ts`); an import
+  not on it is refused. Cutting one needs no edit there; the gather step empties the list.
+- **Run** the tests that import the moved modules, the structure test, `npm run roots:check` and
+  `npm run typecheck`, and start a throwaway server with `node src/server.ts` (see below) to see
+  `/health` answer the new root's hash.
+
+> [!WARNING]
+> `node src/boot.ts` (`npm start`) does not start on `kernel-packs` as of 8463aba4: `src/lifecycle.ts`
+> imports `OPEN_PHASES` from `src/boot.ts`, the entry module still in its top-level await, so the
+> import of `server.ts` never settles. `node src/server.ts` starts. Found by the database step; its fix
+> is the lifecycle hooks' owner's.
