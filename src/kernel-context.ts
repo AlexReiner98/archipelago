@@ -26,7 +26,7 @@ export interface SystemAuthority { of: 'system'; basis: string }
 export type SystemChange = Omit<ChangeInput, 'authority' | 'pack' | 'hold' | 'drawing' | 'run'> & { basis?: string };
 
 /** What the registry tells a pack: read only. */
-export type RegistryRead = Readonly<Pick<Registry, 'types' | 'relations' | 'rules' | 'packs' | 'type' | 'isA'>>;
+export type RegistryRead = Readonly<Pick<Registry, 'types' | 'relations' | 'rules' | 'packs' | 'trees' | 'type' | 'isA' | 'family' | 'relationFamily' | 'ancestry' | 'having' | 'capacity'>>;
 
 /** The one thing a kernel pack's function is handed (docs/kernel-packs.md). */
 export interface KernelContext {
@@ -105,7 +105,18 @@ export class KernelHost {
   async call<O>(l: Archipelago, from: Manifest, name: string, input: unknown): Promise<O> {
     const want = `service:${name}`;
     if (![...(from.requires ?? []), ...(from.uses ?? [])].includes(want)) throw new Error(`The ${from.id} pack calls ${want}, which it neither requires nor uses`);
-    return callService<O>(l.registry, name, input); // filled at open (openKernel): one active provider per name, checked by orderPacks
+    return this.answer<O>(l, name, input);
+  }
+
+  /**
+   * A service name answered as the map that asks it: its provider handed a context of that map, so it reads as the
+   * asker under row-level security (a person's view, `l.as(viewer)`), never as the map the names were filled for.
+   * Only an internal pack's name is answered here; any other is what fillServices was handed.
+   */
+  async answer<O>(l: Archipelago, name: string, input: unknown): Promise<O> {
+    const pack = this.packs(l).find((p) => p.kernel?.provides?.[name]);
+    if (!pack) return callService<O>(l.registry, name, input);
+    return (await (await this.fn(pack, pack.kernel!.provides![name].run))(contextFor(l, pack, this), input)) as O;
   }
 
   /** The clocks the internal packs declare, each ready to fire with its pack's context: started by whoever leads. */
@@ -135,6 +146,28 @@ export function openKernel(l: Archipelago): KernelHost {
 
 /** The kernel host opened for a workspace's registry, if it was. */
 export const hostOf = (l: Pick<Archipelago, 'registry'>): KernelHost | undefined => hosts.get(l.registry);
+
+/** Hosts for a registry no workspace opened (a test's map, a registry read at a past version): code only, nothing filled. */
+const loose = new WeakMap<object, KernelHost>();
+const hostFor = (l: Archipelago): KernelHost => {
+  const host = hostOf(l) ?? loose.get(l.registry) ?? new KernelHost((p) => l.registry.folderOf(p));
+  if (!hostOf(l)) loose.set(l.registry, host);
+  return host;
+};
+
+/** A service name, answered as the map that asks it (KernelHost.answer): what a kernel caller uses, a lens preset's answer among them. */
+export const callAs = <O = unknown>(l: Archipelago, name: string, input: unknown): Promise<O> => hostFor(l).answer<O>(l, name, input);
+
+/**
+ * The context of one internal pack for a map, as its own calls get it: what the shim at a moved module's old path
+ * (docs/kernel-packs.md, "Moving a service in the wave") hands the pack's function, so a caller passing the map keeps
+ * working until the gather step rewrites it.
+ */
+export function kernelContext(l: Archipelago, pack: string): KernelContext {
+  const manifest = l.registry.packs.find((p) => p.id === pack && isInternal(p));
+  if (!manifest) throw new Error(`No internal pack "${pack}" is loaded here`);
+  return contextFor(l, manifest, hostFor(l));
+}
 
 /**
  * The context one internal pack's call is handed. Every reach is checked against its manifest when it is used, so a
