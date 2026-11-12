@@ -113,14 +113,14 @@ test('a pack with a handler is refused on an island map and taken without it', (
 
 test('core declares the shared set, so a pack on task and decision is taken beside one that is not', () => {
   const on = { types: [{ id: 'ontask_step', title: 'Step', extends: 'task' } as never, { id: 'ontask_call', title: 'Call', extends: 'decision' } as never] };
-  const looks = { styles: [{ id: 'looks.colours', title: 'Colours', props: {} }], types: [{ id: 'looks_memo', title: 'Memo', extends: 'record' } as never] }; // both kinds
-  const reg = new Registry(packsWith(island('ontask', on), island('looks', looks)));
+  const looks = { styles: [{ id: 'tinted.colours', title: 'Colours', props: {} }], types: [{ id: 'tinted_memo', title: 'Memo', extends: 'record' } as never] }; // both kinds
+  const reg = new Registry(packsWith(island('ontask', on), island('tinted', looks)));
   for (const id of ['task', 'decision', 'question']) assert.equal(reg.type(id)!.pack, 'core', `${id} is core’s`);
   reg.turnOff([], true);
-  assert.equal(reg.states.get('looks')?.state, 'off', 'a pack that carries looks is not taken');
+  assert.equal(reg.states.get('tinted')?.state, 'off', 'a pack that carries looks is not taken');
   assert.equal(reg.states.get('ontask')?.state, 'active');
   assert.ok(reg.types.has('task') && reg.types.has('decision') && reg.types.has('ontask_step'), 'task and decision stay with it off');
-  assert.ok(!reg.types.has('looks_memo'), 'its own types go with it');
+  assert.ok(!reg.types.has('tinted_memo'), 'its own types go with it');
   const without = { ...core(), types: core().types!.filter((t) => (t as { id?: string }).id !== 'decision') };
   assert.throws(() => readManifest(JSON.stringify(without), 'core'), /shared names decision: the shared set is of the types this pack declares/);
 });

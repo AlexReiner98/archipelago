@@ -4,8 +4,9 @@ import { test } from 'node:test';
 import { openDb } from '../src/db.ts';
 import * as one from '../src/presence.ts';
 
-// The module loaded a second time is a second server: its own process, the same database.
-const other: typeof one = await import(`${new URL('../src/presence.ts', import.meta.url).href}?other`);
+// The module loaded a second time is a second server: its own process, the same database. Loaded where it now lives
+// (packs/presence), since its shim at src/presence.ts loaded again would hand back the same module.
+const other: typeof one = await import(`${new URL('../packs/presence/kernel/presence.ts', import.meta.url).href}?other`);
 
 test('a show on one server moves a page polling another; read steps follow within a flush', async () => {
   const db = await openDb();

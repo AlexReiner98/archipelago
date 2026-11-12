@@ -1,0 +1,11 @@
+{
+  "id": "notifications",
+  "version": "0.1.0",
+  "title": "Notifications",
+  "description": "Sends the human a notification on the map, needing no approval; whom it may mail is the walls' recipient gate (src/notify-mail.ts). A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

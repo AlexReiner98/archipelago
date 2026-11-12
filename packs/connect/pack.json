@@ -1,0 +1,11 @@
+{
+  "id": "connect",
+  "version": "0.1.0",
+  "title": "Connect",
+  "description": "How a person and their agents reach the server: the install scripts, sign-in pages, a token asked for and handed over, and the connections an operator drops. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

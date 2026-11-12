@@ -1,0 +1,11 @@
+{
+  "id": "monitoring",
+  "version": "0.1.0",
+  "title": "Monitoring",
+  "description": "What a running system reports to the map: a monitor says a part went down or came back, a deploy says a part is live at a commit. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}
