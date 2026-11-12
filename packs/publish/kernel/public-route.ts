@@ -1,36 +1,42 @@
 // What anyone may open at /p/<workspace>/<id> that the reader pack (packs/reader) does not answer: a product's
 // public page (ui/public.html), its data and its results' pictures. A published document is the reader's; a product's
 // page stays here while it reads software's proof and changelog views, which no act gives a pack (src/public.ts).
-// Everything is read as the public role sees the map, so there is nothing here to guard: what is not public is not
-// there to be found.
+// Everything is read as the public role sees the map (root.public_product, the surface's), so there is nothing here to
+// guard: what is not public is not there to be found.
 
-import type { ServerResponse } from 'node:http';
-import { GUARD, POLICY } from '../../../src/public-document.ts';
-import { publicPage, publicPicture } from '../../../src/public.ts';
-import { pageLook } from '../../../src/styles.ts';
-import { uiPage } from '../../../src/ui-files.ts';
-import type { Workspaces } from '../../../src/workspaces.ts';
+import type { KernelContext } from '#pelago/kernel';
 
-/** Answer a GET under /p/ for a product: its page, its data, or one of its results' pictures. */
-export async function servePublic(res: ServerResponse, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }, at: { workspaces: Workspaces }) {
-  const { workspace, id, what, extra } = match;
-  const none = () => res.writeHead(404, { ...GUARD, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
-  const pelago = (await at.workspaces.has(workspace)) ? (await at.workspaces.get(workspace)).pelago : null;
+/** What a GET is answered on: a response as node's http server hands it, only what is written here. */
+export interface Reply {
+  writeHead(status: number, headers: Record<string, string>): Reply;
+  end(body?: string | Buffer): unknown;
+}
+type Product = { guard: Record<string, string>; policy?: string; found?: boolean; html?: string; page?: Record<string, unknown> | null; picture?: { content_type: string; data: string } | null };
+
+/**
+ * Answer a GET under /p/ for a product: its page, its data, or one of its results' pictures. `ctx` is the publish
+ * pack's context of the workspace's map, or of none (its workspace field empty) where the server holds no such workspace.
+ */
+export async function servePublic(ctx: Pick<KernelContext, 'call' | 'workspace'>, res: Reply, match: { workspace: string; id: string; what?: string; extra?: string; build?: string }) {
+  const { id, what, extra, build } = match;
+  const held = ctx.workspace !== '';
+  const product = await ctx.call<unknown, Product>('root.public_product', { id, ...(what && { what }), ...(extra && { extra }), ...(build && { build }) });
+  const { guard } = product;
+  const none = () => res.writeHead(404, { ...guard, 'content-type': 'application/json' }).end(JSON.stringify({ error: 'Not found' }));
   if (!what) {
     // A product's page reads its data once open. What is not public, or not there, has no page at all.
-    const found = pelago && (await pelago.forAnyone().db.query(`select 1 from entity where id = $1`, [id])).rows.length > 0;
-    res.writeHead(found ? 200 : 404, { ...GUARD, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': POLICY });
-    return res.end(await uiPage('public.html'));
+    res.writeHead(product.found ? 200 : 404, { ...guard, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'content-security-policy': String(product.policy) });
+    return res.end(String(product.html));
   }
-  if (!pelago) return none();
+  if (!held) return none();
   if (what === 'data') {
-    const page = await publicPage(pelago, id, match.build);
-    if (!page) return none();
-    return res.writeHead(200, { ...GUARD, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...page, ...(await pageLook(pelago)) }));
+    if (!product.page) return none();
+    const look = await ctx.call<Record<string, unknown> | undefined, Record<string, unknown>>('page.look', undefined);
+    return res.writeHead(200, { ...guard, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...product.page, ...look }));
   }
   if (what !== 'picture') return none();
   // Anything public in its own right shows its own picture.
-  const picture = extra ? await publicPicture(pelago, extra) : null;
+  const picture = product.picture;
   if (!picture) return none();
-  return res.writeHead(200, { ...GUARD, 'content-type': picture.content_type, 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }).end(picture.bytes);
+  return res.writeHead(200, { ...guard, 'content-type': picture.content_type, 'cache-control': 'public, max-age=300', 'content-security-policy': "default-src 'none'" }).end(Buffer.from(picture.data, 'base64'));
 }

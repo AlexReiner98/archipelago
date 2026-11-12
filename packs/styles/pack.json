@@ -17,6 +17,11 @@
           "style": "any"
         },
         "run": "view-style.ts#viewStyle"
+      },
+      "page.look": {
+        "in": "any",
+        "out": "any",
+        "run": "styles.ts#pageLook"
       }
     }
   }

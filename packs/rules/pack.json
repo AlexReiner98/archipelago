@@ -6,6 +6,28 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.may": {
+        "in": {
+          "act": "string",
+          "human": "boolean"
+        },
+        "out": "boolean",
+        "run": "publish-services.ts#may"
+      },
+      "root.picture": {
+        "in": {
+          "id": "id",
+          "actor": "string",
+          "content_type": "string",
+          "data": "string"
+        },
+        "out": {
+          "size": "number"
+        },
+        "run": "publish-services.ts#picture"
+      }
+    }
   }
 }

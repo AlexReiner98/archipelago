@@ -50,6 +50,22 @@
           "seq": "any"
         },
         "run": "due-event.ts#dueOf"
+      },
+      "root.layout": {
+        "in": {
+          "id": "string"
+        },
+        "out": "any",
+        "run": "layout-services.ts#layout"
+      },
+      "root.scene": {
+        "in": {
+          "id": "string",
+          "hash?": "string",
+          "input": "any"
+        },
+        "out": "any",
+        "run": "layout-services.ts#scene"
       }
     }
   }

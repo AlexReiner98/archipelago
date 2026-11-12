@@ -6,6 +6,17 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.publish": {
+        "in": {
+          "act": "string",
+          "id": "id",
+          "actor?": "string"
+        },
+        "out": "any",
+        "run": "publish-rows.ts#publishRows"
+      }
+    }
   }
 }

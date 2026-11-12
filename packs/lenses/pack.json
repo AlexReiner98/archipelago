@@ -14,6 +14,22 @@
     "modules": "kernel/",
     "hooks": {
       "write.validate": "view-twins.ts#validate"
+    },
+    "provides": {
+      "answer.kept_picture": {
+        "in": {
+          "id": "id"
+        },
+        "out": {
+          "items": [
+            {
+              "id": "id"
+            }
+          ],
+          "links": "any"
+        },
+        "run": "kept-picture.ts#keptPictureOf"
+      }
     }
   }
 }

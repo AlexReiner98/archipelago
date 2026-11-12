@@ -1,9 +1,8 @@
 // A view's drawing as a published page keeps it: its answer frozen, with nothing private in it and nothing that names
-// a person or a session (src/published.ts).
+// a person or a session (./published.ts). The picture is the lenses pack's (answer.kept_picture).
 
-import type { Archipelago } from '../../../src/pelago.ts';
-import { isKept, keptPicture } from '../../../src/query-saved.ts';
-import { stepsShown } from '../../../src/query-steps.ts';
+import type { KernelContext } from '#pelago/kernel';
+import { isKept, itemsOf, stepsShown, type Step } from './map.ts';
 import { framesFor } from './published-frames.ts';
 
 const IDS = /[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g;
@@ -15,7 +14,13 @@ export function gist(body: string, most = 160): string {
   return sentence.length <= most ? sentence : `${sentence.slice(0, most - 1).replace(/\s+\S*$/, '')}…`;
 }
 
-type Answer = Awaited<ReturnType<typeof keptPicture>>;
+type Item = { id: string; type: string; owner?: unknown; body?: unknown } & Record<string, unknown>;
+type Link = { type: string; from: string; to: string } & Record<string, unknown>;
+/** A kept view's picture, as the lenses pack answers it (packs/lenses/kernel/query-saved.ts, keptPicture). */
+export type Answer = { items: Item[]; links: Link[]; lens: Record<string, unknown>; steps?: Step[]; style?: Record<string, unknown> } & Record<string, unknown>;
+
+/** The picture of a view kept on the map, as the one asking may see it; it throws when the item is none. */
+export const keptPicture = (ctx: Pick<KernelContext, 'call'>, id: string) => ctx.call<{ id: string }, Answer>('answer.kept_picture', { id });
 
 /**
  * A view's picture as a reader may have it: its items and the links among them, each item with its first line and
@@ -25,7 +30,7 @@ export function freezeQuery(answer: Answer, bodies: Map<string, string>, partOf:
   const { code: _code, ...style } = (answer.style ?? {}) as Record<string, unknown>;
   // What each is inside, for the drawings that nest: what it is part of, where that is drawn too, said by inside and not by a link as well.
   const ids = new Set(answer.items.map((i) => i.id));
-  const inside = new Map<string, (typeof answer.links)[number]>();
+  const inside = new Map<string, Link>();
   for (const k of answer.links) if (partOf.includes(k.type) && ids.has(k.to) && k.from !== k.to && !inside.has(k.from)) inside.set(k.from, k);
   const nothing = { items: 0, needs_you: 0, blocked: 0, work: 0, sessions: 0 };
   return {
@@ -43,24 +48,22 @@ export function freezeQuery(answer: Answer, bodies: Map<string, string>, partOf:
  * type they hold. `shared` keeps to what the whole workspace may see, as anything public must; without it, to what
  * the one asking may see, for a draft read before it is published.
  */
-export async function picturesOf(l: Archipelago, sections: { id: string; type: string }[], shared: boolean) {
+export async function picturesOf(ctx: KernelContext, sections: { id: string; type: string }[], shared: boolean) {
   const lenses: Record<string, ReturnType<typeof freezeQuery>> = {};
   const types: Record<string, string> = {};
-  for (const section of sections.filter((s) => isKept(l, s.type))) {
-    const answer = await keptPicture(l, section.id).catch(() => null);
+  for (const section of sections.filter((s) => isKept(ctx, s.type))) {
+    const answer = await keptPicture(ctx, section.id).catch(() => null);
     if (!answer) continue;
-    const { rows } = await l.db.query<{ id: string; body: string }>(
-      `select id, body from entity where id = any($1::text[])${shared ? ` and visibility <> 'private' and private_to is null` : ''}`,
-      [answer.items.map((i) => i.id)],
-    );
+    const read = await itemsOf(ctx, answer.items.map((i) => i.id));
+    const rows = shared ? read.filter((r) => r.visibility !== 'private' && r.private_to == null) : read;
     const shown = new Map(rows.map((r) => [r.id, r.body]));
     const kept = { ...answer, items: answer.items.filter((i) => shown.has(i.id)), links: answer.links.filter((k) => shown.has(k.from) && shown.has(k.to)) };
     // What a reader with no login is not shown is counted, so the page can say the view is not empty, only private.
     const hidden = answer.items.length - kept.items.length;
-    lenses[section.id] = { ...freezeQuery(kept, shown, l.registry.relationFamily('part_of')), ...(shared && hidden && { hidden }) };
-    for (const i of kept.items) types[i.type] = l.registry.type(i.type)?.title ?? i.type;
+    lenses[section.id] = { ...freezeQuery(kept, shown, ctx.registry.relationFamily('part_of')), ...(shared && hidden && { hidden }) };
+    for (const i of kept.items) types[i.type] = ctx.registry.type(i.type)?.title ?? i.type;
   }
   // Each picture's first frame, so a reader's page has it on screen with the text.
-  await framesFor(l, lenses);
+  await framesFor(ctx, lenses);
   return { lenses, types };
 }

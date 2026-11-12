@@ -191,6 +191,13 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.server_packs` | loader | connect | the server packs the server's folders hold, each as the owner is shown it, and those left out with why (wave 6b: the `server_packs` tool, wired at `src/server-pack-tools.ts`) |
 | `root.uses` | surface | usage | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`) |
 | `root.due` | loader | clocks | an item came due: item.due recorded on the map's activity stream as the kernel's and told to the sandboxed packs that hear it; its seq |
+| `root.publish` | database | publish | publishing's writes, each with its event: the published and public_view rows (publish, unpublish, share, unshare), and an item made public or shared again as the one publishing |
+| `root.may` | rules | publish | whether this kind of actor may publish or take down here (core's agent_publish, agent_unpublish) |
+| `root.picture` | rules | publish | a picture kept for an item: the walls' SVG check, room to store, the row and its observation, as the one who sent it |
+| `root.layout` | loader | publish | a pack's drawing as the server ships it (its hash, whether it has code) and the commit the server runs |
+| `root.scene` | loader | publish | a pack's own drawing's first frame, run in its sandboxed process (bug e_mjuwqk4a: never code kept on the map), and whether its stylesheet passes |
+| `root.drawing` | surface | publish | a drawing's module or service worker by its hash, as the reader may see the map, or whether the packs ship it |
+| `root.public_product` | surface | publish | a product's public page, data or result's picture as anyone reads them, with the headers every public answer carries |
 
 ## Write-path hooks
 
@@ -566,6 +573,14 @@ at `../../../src/`: what they call is sessions' (optional, so it provides no nam
 none, so `view` and `placed` stay kernel fillings until those packs answer by name. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
 reads API's own bounded scan, `packreads-scope`, which places re-exports. `test/packreads-slots.test.ts`
 pins each answer against its service's own functions.
+
+The publish pack (wave 6b, e_pkytyzy7) is on its context, published and public-view with it, behind adapter shims:
+its SQL is `packreads-publish` (items whole as `entity()` reads them, the types that can be public, the documents
+published beside one, drafts at address words, the documents an item holds, a published document as anyone reads
+it), what only a root may do is the seven `root.*` names above, the look is styles' `page.look` and a kept view's
+picture lenses' `answer.kept_picture`. One module stays on the map behind a pure shim: `share-tools`, whose tool
+inputs are zod shapes and whose asks (share_ask, publish_ask) are notifications made as the asking agent, which the
+notifications pack makes only on the map.
 
 ### Answers
 

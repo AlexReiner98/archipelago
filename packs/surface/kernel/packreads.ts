@@ -14,9 +14,10 @@ import type { Pin } from './packreads-pin.ts';
 import { filled, kernelRead, type KernelRead } from './packreads-kernel.ts';
 import { serviceRead, type ServiceRead } from './packreads-service.ts'; import { clocksRead, type ClocksRead } from './packreads-clocks.ts';
 import { viewsRead, type ViewsRead } from './packreads-views.ts';
+import { publishRead, type PublishRead } from './packreads-publish.ts';
 import { fillReads } from '../../loader/kernel/packhost.ts'; import { trail } from './map-reads.ts';
 
-export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & {
+export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & PublishRead & {
   get?: string;
   /** Items of a type (flavours included): with a status or one of several, fields equal to where's, and a field between two values. */
   items?: { type: string; status?: string | string[]; where?: Record<string, unknown>; between?: { field: string; from?: string; to?: string } };
@@ -88,6 +89,8 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   if (kernel !== undefined) return kernel;
   const service = await serviceRead(l, q, pack);
   if (service !== undefined) return service;
+  const published = await publishRead(l, q, pack);
+  if (published !== undefined) return published;
   const views = await viewsRead(l, q);
   if (views !== undefined) return views;
   const clocks = await clocksRead(l, q, pack);
@@ -221,5 +224,5 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, view_lives, in_projects, mentioned, marked, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, shared, picture, counts, corrections.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, view_lives, in_projects, mentioned, marked, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, entities, publishable, published_others, draft_paths, held_documents, published_doc, shared, picture, counts, corrections.');
 }

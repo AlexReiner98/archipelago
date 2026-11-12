@@ -29,7 +29,7 @@ export type ServiceRead = {
   /** The public view at an address word, as anyone reads it, or null. */
   public_view_at?: string;
   /** A document as the public read gives it (the privacy scrub), or, draft, as it will once published, read as the asker. */
-  public_document?: { id: string; draft?: boolean };
+  public_document?: { id: string; draft?: boolean; elsewhere?: Record<string, string> };
   /** What was published of an item: what was given, by whom and when, or null. */
   published_row?: string;
   /** The views shared in public, newest first (at most 500), or the one of an item: by whom, when and at which path. */
@@ -110,7 +110,9 @@ export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string)
   if (q.public_view_at !== undefined) return publicViewAt(l, String(q.public_view_at));
   if (q.public_document !== undefined) {
     const id = String(q.public_document.id);
-    return q.public_document.draft ? draftDocument(l, id) : publicDocument(l, id);
+    // The other documents published here it may name, by id and title: a reader then opens them at their own pages.
+    const elsewhere = new Map(Object.entries(q.public_document.elsewhere ?? {}).map(([k, v]) => [k, String(v)]));
+    return q.public_document.draft ? draftDocument(l, id, elsewhere) : publicDocument(l, id, elsewhere);
   }
   if (q.published_row !== undefined) {
     loggedIn(l, 'publishing');

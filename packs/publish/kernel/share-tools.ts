@@ -1,14 +1,41 @@
-// Ways to read from outside the map: a public view anyone may open (src/public-view.ts), made, listed and taken down by
+// Ways to read from outside the map: a public view anyone may open (./public-view.ts), made, listed and taken down by
 // a person, and publishing a document. Links with a secret went with public views (the owner, 11 Nov 2026).
+//
+// The one module of the publish pack still on the map (wave 6b, e_pkytyzy7): a tool's input is a zod shape the
+// surface's table reads, and an agent's ask (share_ask, publish_ask) is a notification made as that agent, which the
+// notifications pack makes on the map, not on a context. It reaches the rest of the pack through the shims at src/.
 
 import { z } from 'zod';
 import { readDocument } from '../../../src/documents.ts';
+import { notify } from '../../../src/notify.ts';
+import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { share, unshare } from '../../../src/public-view.ts';
-import { shareAsk, sharedViews, sharePlan } from './public-view-freeze.ts';
+import { sharedViews, sharePlan } from '../../../src/public-view-freeze.ts';
 import { publish, publishAll, unpublish } from '../../../src/published.ts';
-import { publishAsk, publishedState, publishPlan } from './published-freeze.ts';
-import { picturesOf } from './published-pictures.ts';
+import { publishedState, publishPlan } from '../../../src/published-freeze.ts';
+import { picturesOf } from '../../../src/published-pictures.ts';
 import type { Tool } from '../../../src/tools.ts';
+
+const ID = /^e_[a-z0-9]{8}$/;
+
+/** An agent asks the person to make a view or an item public: a notification about it, which they share from its page. */
+export async function shareAsk(l: Archipelago, actor: Actor, id: string, reason?: string) {
+  const item = ID.test(id) ? await l.entity(id) : null;
+  if (!item) throw new Error(`"${id}" is not an item of this workspace you can read.`);
+  if (item.archived_at) throw new Error(`"${item.title}" is archived.`);
+  await notify(l, actor, { title: `Make "${item.title}" public`.slice(0, 200), body: reason ?? '', about: id });
+  return { asked: true, note: 'The person is notified; making it public is theirs.' };
+}
+
+/** An agent asks for an item's documents to be published: a notification about it for the person, who publishes with one click. */
+export async function publishAsk(l: Archipelago, actor: Actor, within: string, reason?: string) {
+  const plan = await publishPlan(l, within);
+  if (!plan.to_publish) return { asked: false, note: `Everything in "${plan.within.title}" is published as it stands.` };
+  const n = plan.to_publish;
+  const title = `${n} document${n === 1 ? '' : 's'} in "${plan.within.title}" to publish`.slice(0, 200);
+  await notify(l, actor, { title, body: [reason, plan.documents.filter((d) => d.changed).map((d) => `- ${d.title}`).join('\n')].filter(Boolean).join('\n\n'), about: within });
+  return { asked: true, to_publish: n, note: 'The person is notified; publishing is theirs, with one click on the item’s page.' };
+}
 
 const authority = z
   .object({
