@@ -149,7 +149,7 @@ export async function serveDrawingFile(res: ServerResponse, path: string, at: Dr
   const reader = await at.reader();
   // A pack's own drawing is served from what the packs ship, and a service worker installing it asks for every module at
   // once: only a read of the map (a drawing kept there, or a guess) is counted against the open limit.
-  if (!shippedDrawing(reader, asked.hash) && at.tooOften()) return;
+  if (!(await shippedDrawing(reader, asked.hash)) && at.tooOften()) return;
   const worker = asked.name === 'sw.js';
   const text = worker ? await drawingWorker(reader, asked.hash) : await drawingFile(reader, asked.hash, asked.name);
   if (text === null) return res.writeHead(404, { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' }).end();

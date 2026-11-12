@@ -46,6 +46,27 @@
         },
         "out": "any",
         "run": "server-acts.ts#usesOf"
+      },
+      "root.drawing": {
+        "in": {
+          "hash": "string",
+          "file?": "string",
+          "worker?": "boolean"
+        },
+        "out": "any",
+        "run": "publish-services.ts#drawing"
+      },
+      "root.public_product": {
+        "in": {
+          "id": "string",
+          "what?": "string",
+          "extra?": "string",
+          "build?": "string"
+        },
+        "out": {
+          "guard": "any"
+        },
+        "run": "publish-services.ts#publicProduct"
       }
     }
   }

@@ -6,6 +6,24 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.layout": {
+        "in": {
+          "id": "string"
+        },
+        "out": "any",
+        "run": "layout-services.ts#layout"
+      },
+      "root.scene": {
+        "in": {
+          "id": "string",
+          "hash?": "string",
+          "input": "any"
+        },
+        "out": "any",
+        "run": "layout-services.ts#scene"
+      }
+    }
   }
 }

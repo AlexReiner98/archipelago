@@ -24,6 +24,7 @@
   "packs/core/turns.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/email/email.test.ts": { "pglite": 0.1, "postgres": 0.1 },
   "packs/placement/kernel/island-start.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/publish/kernel/on-context.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/reader/bake.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/reader/rails.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/reader/reader.test.ts": { "pglite": 0, "postgres": 0 },

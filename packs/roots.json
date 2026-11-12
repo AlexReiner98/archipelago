@@ -6,7 +6,7 @@
     },
     {
       "id": "database",
-      "hash": "a5f22f3c14b26c9fdbec8726ed742054257653b63429155398989599af46a8bf"
+      "hash": "98d39e4dbea7794366e3fcab9385e7f33ec64cd6a2ef67bb41e62010adcdbe13"
     },
     {
       "id": "seal",
@@ -26,11 +26,11 @@
     },
     {
       "id": "loader",
-      "hash": "9e69a41cf34deb22f1ee1cdd3d1ac2ff3fa81024a66cf0d20f02b8e260816b58"
+      "hash": "1bd5e162942973dd7db19c739916da5440400a1e38796fbc581da664e0c79769"
     },
     {
       "id": "rules",
-      "hash": "c8171f53521a461c6fa42d0db4ca399a83d0ededeeac5439e7eb8596d094873f"
+      "hash": "73c87536e106600b3134d96cff666047ae734aa7f2ae730a2653ec606e6a099e"
     },
     {
       "id": "write",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "4f62bf63a01450673a768c35901e4ac24a1ff5d21b86f6393642c135c0c645c8"
+      "hash": "e6307b9f8f69c893323968ce7c382c195dbc8e8a4b195858f11c27ffa7ed1fb6"
     }
   ],
   "calls": {
@@ -56,6 +56,27 @@
     ],
     "root.uses": [
       "usage"
+    ],
+    "root.publish": [
+      "publish"
+    ],
+    "root.may": [
+      "publish"
+    ],
+    "root.picture": [
+      "publish"
+    ],
+    "root.layout": [
+      "publish"
+    ],
+    "root.scene": [
+      "publish"
+    ],
+    "root.drawing": [
+      "publish"
+    ],
+    "root.public_product": [
+      "publish"
     ]
   }
 }
