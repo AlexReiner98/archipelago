@@ -54,7 +54,11 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
     }
     const then = rule.then;
     if (then !== 'hold' && then !== 'refuse' && then !== 'spare' && !(typeof then === 'object' && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse, spare or { require: [fields] }`);
-    if (then === 'spare' && (rule.when?.bookkeeping !== true || rule.lifted)) problems.push(`${at}: a rule spares only its own pack's bookkeeping (when.bookkeeping), and nothing lifts it`);
+    // A rule spares its own pack's bookkeeping from every rule, or an op from rules of its own pack it names (spares).
+    const ids = new Set(rules.map((r) => r.id).filter(Boolean));
+    if (rule.spares !== undefined && (then !== 'spare' || !Array.isArray(rule.spares) || !rule.spares.length || rule.spares.some((id) => typeof id !== 'string' || id === rule.id || !ids.has(id)))) problems.push(`${at}: spares names rules of its own pack, by id, for a rule whose then is spare`);
+    else if (then === 'spare' && rule.spares === undefined && rule.when?.bookkeeping !== true) problems.push(`${at}: a rule spares its own pack's bookkeeping (when.bookkeeping), or the rules of its pack it names (spares)`);
+    if (then === 'spare' && rule.lifted) problems.push(`${at}: nothing lifts a rule that spares`);
     if (rule.when && 'kind' in rule.when) problems.push(`${at}: when names a type or a capability, not a kind`);
     for (const t of list(rule.when?.type) ?? []) if (!known(t)) problems.push(`${at}: no type "${t}"`);
     if (rule.when?.compare !== undefined && !COMPARE.test(rule.when.compare)) problems.push(`${at}: compare reads like "total > 500"`);

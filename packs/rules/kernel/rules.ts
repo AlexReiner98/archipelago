@@ -14,6 +14,7 @@ import { fieldInReach, inReach } from '../../loader/kernel/reach.ts';
 import { COMPARE, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
 export { checkRules } from '../../loader/kernel/rule-check.ts';
 import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
+import { opFacts } from '../../loader/kernel/part-trial.ts';
 
 type OneOrMany = string | string[];
 
@@ -81,9 +82,15 @@ export interface RuleDef {
     reply?: Record<string, boolean | number>;
     /** The change is the rule's own pack's bookkeeping (root.bookkeep): its record of itself, made as the actor it is for. */
     bookkeeping?: boolean;
+    /** The op writes a version's part code alone, the version pinned on one island at most: a trial (packs/loader/kernel/part-trial.ts). */
+    part_trial?: boolean;
+    /** The op pins an island to a version carrying code that another island already pins. */
+    spreads?: boolean;
   };
-  /** spare: what it matches is let through, every other rule it would be under spared by this one (its pack's bookkeeping only). */
+  /** spare: what it matches is let through, every other rule it would be under spared by this one (its pack's bookkeeping only), or with spares, those alone. */
   then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] };
+  /** For spare: the rules it lets the op through, by id, each of its own pack. Left out, every rule (bookkeeping). */
+  spares?: string[];
   /** Fields whose values together may belong to one item of the type only. */
   unique?: string[];
   /** For unique: the type it holds within, flavours included. */
@@ -183,9 +190,17 @@ function capable(reg: Registry, type: string, wanted: string | Record<string, Re
   return Object.entries(wanted).every(([name, fields]) => has[name] !== undefined && Object.entries(fields).every(([k, v]) => has[name]![k] === v));
 }
 
+/** What is read of an op before the rules judge it, beside the op itself (packs/loader/kernel/part-trial.ts). */
+export interface OpFacts {
+  part_trial?: boolean;
+  spreads?: boolean;
+}
+
 /** Whether a rule's when holds for one op written by this actor to these targets (none for a create). */
-function applies(rule: RuleDef & { pack?: string }, reg: Registry, who: Who, w: Written, targets: Target[], held: boolean): boolean {
+function applies(rule: RuleDef & { pack?: string }, reg: Registry, who: Who, w: Written, targets: Target[], held: boolean, facts: OpFacts = {}): boolean {
   const when = rule.when ?? {};
+  if (when.part_trial !== undefined && Boolean(facts.part_trial) !== when.part_trial) return false;
+  if (when.spreads !== undefined && Boolean(facts.spreads) !== when.spreads) return false;
   if (when.actor && (when.actor === 'human') !== who.human) return false;
   if (who.reading && !(rule.readings ?? rule.then !== 'hold')) return false;
   if (when.op && !list(when.op)!.includes(w.op)) return false;
@@ -269,7 +284,7 @@ export function outsideLayout(reg: Registry, writes: string[], w: Written, targe
 export type Lifted = (rule: RuleDef, op: string) => string | false;
 
 /** What the rules make of one op: the rules that hold it, the ones a lift spared it, and what refuses it. */
-export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, targets: Target[], lifted: Lifted = () => false) {
+export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, targets: Target[], lifted: Lifted = () => false, facts: OpFacts = {}) {
   const held: Ruled[] = [];
   const spared: Ruled[] = [];
   const refused: string[] = [];
@@ -281,11 +296,16 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
   // A pack's bookkeeping its own rule lets through is spared every other rule, each named as spared by it, it first.
-  const lets = order.find((r) => r.then === 'spare' && applies(r, reg, who, w, targets, false)), letBy = lets && `${lets.pack}.${lets.id ?? ''}`;
+  const sparing = order.filter((r) => r.then === 'spare' && applies(r, reg, who, w, targets, false, facts));
+  const lets = sparing.find((r) => !r.spares), letBy = lets && `${lets.pack}.${lets.id ?? ''}`;
   if (lets) spared.push({ ...ruled(lets), lifted_by: letBy });
+  // A rule that names what it spares lets the op through those of its own pack's rules alone.
+  const named = new Map(sparing.filter((r) => r.spares).flatMap((r) => r.spares!.map((id) => [`${r.pack}.${id}`, `${r.pack}.${r.id ?? ''}`] as const)));
   for (const rule of order) {
-    if (rule.unique || rule.stream || rule.on !== undefined || rule.then === 'spare' || !applies(rule, reg, who, w, targets, held.length > 0)) continue;
+    if (rule.unique || rule.stream || rule.on !== undefined || rule.then === 'spare' || !applies(rule, reg, who, w, targets, held.length > 0, facts)) continue;
     if (letBy) { spared.push({ ...ruled(rule), lifted_by: letBy }); continue; }
+    const spare = named.get(`${rule.pack}.${rule.id ?? ''}`);
+    if (spare) { spared.push({ ...ruled(rule), lifted_by: spare }); continue; }
     const by = rule.lifted && lifted(rule, w.op);
     if (by) {
       spared.push({ ...ruled(rule), lifted_by: by });
@@ -416,6 +436,8 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   const ops = given as (Written & { id?: string; keep?: string; drop?: string })[];
   const on = (op: (typeof ops)[number]) => (op.op === 'merge' ? [op.keep!, op.drop!] : op.id ? [op.id] : []);
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
+  // What is read of each op beside it: a part's trial version, a version spread to another island (packs/loader/kernel/part-trial.ts).
+  const facts = await opFacts(q, reg, ops, found);
   // With holds off, what a rule holds applies as made; a wait the change or its token asked for (asked, may) still holds.
   const off = who.human && !who.drawing ? false : await holdsOff(q);
   const askedFor = (r: Ruled) => { const when = every.get(keyOf(r))?.when; return when?.asked !== undefined || when?.may !== undefined; };
@@ -426,7 +448,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
       const { rules: these, registry } = under(run);
       // A rule of a version names it: the held change says which version of the pack held it.
       const mark = (r: Ruled) => (run && r.pack === run.version.of && !KERNEL_PACKS.includes(r.pack) ? { ...r, version: run.version.item } : r);
-      const one = judge(these, registry, who, op, targets, lifted);
+      const one = judge(these, registry, who, op, targets, lifted, facts[i]);
       return { held: one.held.map(mark), spared: one.spared.map(mark), refusers: one.refusers.map(mark), refused: [...one.refused, ...(one.letBy ? [] : await clashes(q, registry, op, targets[0]))] };
     }));
     const held = once(each.flatMap((e) => e.held), keyOf);
