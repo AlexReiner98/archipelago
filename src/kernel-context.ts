@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
 import { answerRead, type Read } from './packreads.ts';
 import { guardedFetch } from './outbound.ts';
+import { callService, fillServices } from './services.ts';
 import type { Archipelago } from './pelago.ts';
 import type { ChangeInput } from './pelago-types.ts';
 import type { Registry } from './packs.ts';
@@ -104,10 +105,7 @@ export class KernelHost {
   async call<O>(l: Archipelago, from: Manifest, name: string, input: unknown): Promise<O> {
     const want = `service:${name}`;
     if (![...(from.requires ?? []), ...(from.uses ?? [])].includes(want)) throw new Error(`The ${from.id} pack calls ${want}, which it neither requires nor uses`);
-    const providers = this.packs(l).filter((p) => p.kernel?.provides?.[name]);
-    if (providers.length !== 1) throw new Error(providers.length ? `${want} is provided by ${providers.map((p) => p.id).join(' and ')}: one pack owns a name` : `No active pack provides ${want}`);
-    const provider = providers[0];
-    return (await (await this.fn(provider, provider.kernel!.provides![name].run))(contextFor(l, provider, this), input)) as O;
+    return callService<O>(l.registry, name, input); // filled at open (openKernel): one active provider per name, checked by orderPacks
   }
 
   /** The clocks the internal packs declare, each ready to fire with its pack's context: started by whoever leads. */
@@ -118,6 +116,20 @@ export class KernelHost {
     })));
   }
 }
+
+/** The kernel host of each opened workspace's registry. */
+const hosts = new WeakMap<object, KernelHost>();
+
+/** At a workspace's open: a host for its internal packs, and their service names filled (src/services.ts). Internal packs are never turned off, so what they provide holds until the server restarts. */
+export function openKernel(l: Archipelago): KernelHost {
+  const host = new KernelHost((p) => l.registry.folderOf(p));
+  hosts.set(l.registry, host);
+  fillServices(l.registry, host.services(l));
+  return host;
+}
+
+/** The kernel host opened for a workspace's registry, if it was. */
+export const hostOf = (l: Pick<Archipelago, 'registry'>): KernelHost | undefined => hosts.get(l.registry);
 
 /**
  * The context one internal pack's call is handed. Every reach is checked against its manifest when it is used, so a

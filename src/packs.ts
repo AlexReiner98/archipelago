@@ -11,7 +11,7 @@ import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
 import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
-import { isInternal, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts';
+import { isInternal, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo } from './services.ts';
 import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts'; import { keepVersionTypes } from './version-types.ts';
 
@@ -258,8 +258,8 @@ export class Registry {
     };
     for (const rel of relations.values()) rel.root = rootOf(declared.get(rel.id)!, []);
 
-    for (const type of types.values()) {
-      const problems = [...checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed]), ...checkFieldDecls(type, raw.get(type.id), extra.get(type.id)), ...checkPhases(raw.get(type.id)?.statuses ?? { open: [], closed: [] })];
+    const openedOf = (pack: string) => { const p = ordered.find((x) => x.id === pack); return p ? openedTo(p, 'capability') : []; }; for (const type of types.values()) {
+      const problems = [...checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed], openedOf(type.pack)), ...checkFieldDecls(type, raw.get(type.id), extra.get(type.id)), ...checkPhases(raw.get(type.id)?.statuses ?? { open: [], closed: [] })];
       if (problems.length) throw new Error(`Type "${type.id}" in pack "${type.pack}": ${problems.join('; ')}`);
     }
 

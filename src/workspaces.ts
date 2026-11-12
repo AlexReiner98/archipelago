@@ -33,7 +33,7 @@ async function beginShared(q: Q): Promise<['+', string, string, unknown][]> {
 import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } from './packstate.ts';
 import { firstIsland } from './island-start.ts';
 import { hostFor } from './packtools.ts';
-import { syncTypes } from './typetable.ts';
+import { syncTypes } from './typetable.ts'; import { openKernel } from './kernel-context.ts';
 import { packsFor } from './pack-allow.ts';
 import { onPacksChanged, onTypesChanged, typeItems } from './type-items.ts';
 
@@ -284,7 +284,7 @@ export class Workspaces {
       await takeTypeItems(pelago);
       // The packs kept as items are read with the type items: the log and the packs on take them in now.
       if (pelago.registry.made.size) await followMade(pelago);
-      await syncTypes(pelago);
+      await syncTypes(pelago); openKernel(pelago); // the internal packs' service names, filled (src/kernel-context.ts)
       if (begins) await pelago.record('settings', 'system', [...(await beginApplying(db)), ...(await beginShared(db))]);
       const ws = { id, name: isDefault ? 'Default' : (this.known.get(id) ?? id), pelago, quiet: new QuietSessions(pelago) };
       // A fresh default map on islands, as create puts every other new map (e_44rbfwxp).
