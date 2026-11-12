@@ -14,7 +14,7 @@
     },
     {
       "id": "log",
-      "hash": "35734b469ef7067a6e40e0ea7b1315ce27254975ba941bb8b58ab936d48b833e"
+      "hash": "33d57922c0ecff8d486c9c4a63a52b0edc817661dcd7b1c14a8a56afc7a7a107"
     },
     {
       "id": "identity",
@@ -22,11 +22,11 @@
     },
     {
       "id": "walls",
-      "hash": "33f6e70d1e9b26e29da254faa8463023cafe84c0c05b0e8a198b40fe190da004"
+      "hash": "630e2eb49911a2f17fb9a77bf9dd24a943da71165c4e052d052361b890890465"
     },
     {
       "id": "loader",
-      "hash": "daa1ffa51bf281a4ec2c130f4cc5a4ee9440b38889411ae97757ebf99005dedd"
+      "hash": "12a7d6a5fa2706dfefccde71bac32e9b1423846b3a8b6f60675c437e7b68b154"
     },
     {
       "id": "rules",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "6221751a18ba08bd15b671efdcab0e059b934a2976d8433444340b9feb807140"
+      "hash": "3fe630900e65578a56c886e24995b5da5620a5bcf014cd7bd05ebe9cfd79fd5d"
     }
   ],
   "calls": {
