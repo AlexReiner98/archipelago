@@ -72,4 +72,17 @@ test("through a pack's context: an unlisted pack is refused, and a kernel caller
   await assert.rejects(kernelContext(l.as('e_nobody00'), 'backup').call('root.merge', { dump: {} }), /writes the whole map/);
 });
 
+test('root.uses: usage adds to its map’s uses and reads what is held; any other pack is refused', async () => {
+  const l = await fresh();
+  const usage = kernelContext(l, 'usage');
+  const held = async () => ((await usage.call('root.uses', { held: true })) as { key: string; n: number }[]).find((r) => r.key === 'view:root_uses_test')?.n ?? 0;
+  const was = await held();
+  await usage.call('root.uses', { add: [{ key: 'view:root_uses_test', n: 2 }] });
+  assert.equal(await held(), was + 2);
+  await assert.rejects(usage.call('root.uses', { workspace: 'another', add: [{ key: 'x' }] }), /counts only the map that calls it/);
+  // backup is no caller of root.uses: refused by the list, though it names the service here.
+  await assert.rejects(callRoot('backup', 'root.uses', { held: true }, { map: l }), /The backup pack may not call root\.uses: packs\/roots\.json lets only usage call it/);
+  await assert.rejects(kernelContext(l, 'backup').call('root.uses', { held: true }), /neither requires nor uses|may not call root\.uses/);
+});
+
 test("the backup pack keeps a vault's backup as long as the seal says", () => assert.equal(VAULT_DAYS, VAULT_BACKUP_DAYS));

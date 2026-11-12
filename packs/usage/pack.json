@@ -4,7 +4,8 @@
   "title": "Usage",
   "description": "What a workspace uses and what that use is made of: the bytes each item adds to the log, its storage, sessions at work, requests a minute and looks an hour against the limits a server sets (the server's counters, read through root.counters), and how much each thing a pack declares is used, for the Packs screen.",
   "uses": [
-    "service:root.counters"
+    "service:root.counters",
+    "service:root.uses"
   ],
   "kernel": {
     "trust": "service",

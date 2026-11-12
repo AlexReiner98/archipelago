@@ -188,6 +188,7 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.dump` | log | backup | a workspace's backup and its vault's, the workspace held open while read |
 | `root.merge` | log | backup | the writes a merge makes, and what they did |
 | `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
+| `root.uses` | surface | usage | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`) |
 
 ## Write-path hooks
 
@@ -347,7 +348,7 @@ moves with a shim to the pack named.
 | publish | published, published-data, published-frames, published-live, published-pictures, published-preview, public-bake, public-route, public-view, site, share-tools, drawing-files, pictures, pack-counts |
 | mcp_apps | mcp-view |
 | backup | backup's backupAll, upload and merge (through root services) |
-| usage | usage (through root.counters), pack-touches, pack-use, uses |
+| usage | usage (through root.counters), pack-touches, pack-use (reads `type_counts`, `uses_lately`; root.uses), uses (root.uses) |
 | notifications | notify |
 | mail | mail, smtp, bounces |
 | alerts | alert |

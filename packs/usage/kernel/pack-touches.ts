@@ -1,9 +1,21 @@
 // What a pack touches, read from its manifest alone: every declaration it makes, grouped as a person reads them, each
 // one by name, with what it is in a few words and its whole definition as the manifest says it. Nothing is filtered
 // out: the kernel's actions and the retention rules are listed with the rest. Where its use on the map can be counted,
-// the declaration names how (`counts`), and src/pack-use.ts fills in how much.
+// the declaration names how (`counts`), and pack-use.ts fills in how much.
 
-import type { PackFile } from '../../../src/packs.ts';
+/** A pack's manifest, as much of it as is read here: the keys a person reads it by. */
+export interface PackFile {
+  id: string;
+  types?: unknown;
+  links?: unknown;
+  views?: unknown;
+  styles?: unknown;
+  layouts?: unknown;
+  rules?: unknown;
+  actions?: unknown;
+  handlers?: unknown;
+  reach?: unknown;
+}
 
 /** How a declaration's use is counted: items of a type, links of a link type, a rule's holds, refusals and asks, a view's reads, an instruction's sayings. */
 export type Counted = { by: 'items' | 'links'; type: string } | { by: 'ruling' | 'view' | 'told'; id: string };
@@ -19,7 +31,7 @@ export interface Touched {
   /** The declaration as the manifest has it. */
   def: unknown;
   counts?: Counted;
-  /** Filled by src/pack-use.ts: how much it was used, and in words what that is made of. */
+  /** Filled by pack-use.ts: how much it was used, and in words what that is made of. */
   used?: number;
   said?: string;
 }

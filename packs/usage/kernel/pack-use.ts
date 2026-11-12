@@ -1,41 +1,41 @@
 // How much each thing a pack declares is used on this map, for the Packs screen: the items of each type and the links
 // of each link type standing now (with how many were made in the last 30 days), and from the uses stream
-// (src/uses.ts) the last 30 days of each view's reads, each instruction's sayings, and each rule's holds, refusals and
-// asks. Every read is bounded: by the types named, by an index, or by the days and a limit of entries.
+// (uses.ts) the last 30 days of each view's reads, each instruction's sayings, and each rule's holds, refusals and
+// asks. Every read is the context's, bounded: by the types named, or by the days and a limit of entries (the reads
+// type_counts and uses_lately, packs/surface/kernel/packreads-service.ts); what is held in memory is root.uses.
 
-import { heldCounts } from '../../../src/pack-counts.ts';
+import type { KernelContext } from '#pelago/kernel';
 import type { Counted, Touched } from './pack-touches.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import { opEntries, type OpStream } from '../../../src/streams.ts';
-import { USES, useKey, type UseKind } from './uses.ts';
+import { useKey, type UseKind } from './uses.ts';
 
 /** How far back a use is counted. */
 export const USE_DAYS = 30;
-/** The most entries of the uses stream read: a minute's counts are one entry, so this is weeks of steady use. */
-const USE_ENTRIES = 50_000;
 
 const DAY_MS = 86_400_000;
 const dayOf = (t: number) => new Date(t).toISOString().slice(0, 10);
+type OpFact = ['+', string, string, unknown] | ['-', string, string];
 
-/** Each use key's count over the last USE_DAYS days: what the stream holds, and what is counted but not yet written. */
-async function usesLately(l: Archipelago): Promise<Map<string, number>> {
+/** Each use key's count over the last USE_DAYS days: what the stream holds, and what is counted but not yet written (root.uses). */
+async function usesLately(ctx: KernelContext): Promise<Map<string, number>> {
   const from = dayOf(Date.now() - (USE_DAYS - 1) * DAY_MS), to = dayOf(Date.now());
   const out = new Map<string, number>();
   const add = (key: string, day: string, n: number) => day >= from && out.set(key, (out.get(key) ?? 0) + n);
-  for (const e of await opEntries(l.db, USES as OpStream, { days: [from, to], limit: USE_ENTRIES }))
-    for (const f of e.facts) if (f[0] === '+' && f[1].startsWith('key:')) add(f[1].slice('key:'.length), f[2], Number(f[3]) || 0);
-  for (const r of heldCounts(l.workspace, USES)) add(r.key, r.day, r.n);
+  const [written, held] = await Promise.all([
+    ctx.reads({ uses_lately: { days: [from, to] } }) as Promise<{ facts: OpFact[] }[]>,
+    ctx.call<unknown, { key: string; day: string; n: number }[]>('root.uses', { held: true }),
+  ]);
+  for (const e of written) for (const f of e.facts) if (f[0] === '+' && f[1].startsWith('key:')) add(f[1].slice('key:'.length), f[2], Number(f[3]) || 0);
+  for (const r of held) add(r.key, r.day, r.n);
   return out;
 }
 
+type Standing = { type: string; n: number; lately: number };
+
 /** The items of each type, and of the links of each link type, standing now and made in the last USE_DAYS days. */
-async function standing(l: Archipelago, types: string[], links: string[]) {
+async function standing(ctx: KernelContext, types: string[], links: string[]) {
   const since = new Date(Date.now() - USE_DAYS * DAY_MS).toISOString();
-  const [items, ties] = await Promise.all([
-    types.length ? l.db.query<{ type: string; n: number; lately: number }>(`select type, count(*)::int as n, count(*) filter (where created_at >= $2)::int as lately from entity where type = any($1::text[]) and archived_at is null group by type -- index entity_type_created`, [types, since]) : { rows: [] },
-    links.length ? l.db.query<{ type: string; n: number; lately: number }>(`select type, count(*)::int as n, count(*) filter (where valid_from >= $2)::int as lately from relation where type = any($1::text[]) and valid_to is null group by type -- index relation_open_type`, [links, since]) : { rows: [] },
-  ]);
-  return { items: new Map(items.rows.map((r) => [r.type, r])), links: new Map(ties.rows.map((r) => [r.type, r])) };
+  const counted = (types.length || links.length ? await ctx.reads({ type_counts: { types, links, since } }) : { items: [], links: [] }) as { items: Standing[]; links: Standing[] };
+  return { items: new Map(counted.items.map((r) => [r.type, r])), links: new Map(counted.links.map((r) => [r.type, r])) };
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -43,10 +43,10 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 type State = { touches: { key: string; n: number; items: Touched[] }[] };
 
 /** The pack states given, each counted thing with how much it was used here (`used`, and `said` in words), and each group with how many are unused. */
-export async function withUse<S extends State>(l: Archipelago, states: S[]): Promise<(Omit<S, 'touches'> & { use_days: number; touches: (S['touches'][number] & { unused: number })[] })[]> {
+export async function withUse<S extends State>(ctx: KernelContext, states: S[]): Promise<(Omit<S, 'touches'> & { use_days: number; touches: (S['touches'][number] & { unused: number })[] })[]> {
   const counted = states.flatMap((s) => s.touches.flatMap((g) => g.items.flatMap((t) => (t.counts ? [t.counts] : []))));
   const of = (by: Counted['by']) => [...new Set(counted.flatMap((c) => (c.by === by && 'type' in c ? [c.type] : [])))];
-  const [{ items, links }, uses] = await Promise.all([standing(l, of('items'), of('links')), usesLately(l)]);
+  const [{ items, links }, uses] = await Promise.all([standing(ctx, of('items'), of('links')), usesLately(ctx)]);
   const use = (kind: UseKind, id: string) => uses.get(useKey(kind, id.replace(/\s/g, '_'))) ?? 0;
   const measure = (c: Counted): { used: number; said: string } => {
     if (c.by === 'items' || c.by === 'links') {

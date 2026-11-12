@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "fec9a912aabe0feb667ed60afb2c4c313e1ac87d549e23a0b713f3c90e223335"
+      "hash": "0e84fa2abe05abdfea960323ee4ce745ac21261ed2e4cea5556c2148981f03ac"
     }
   ],
   "calls": {
@@ -52,6 +52,9 @@
       "backup"
     ],
     "root.counters": [
+      "usage"
+    ],
+    "root.uses": [
       "usage"
     ]
   }
