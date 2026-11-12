@@ -8,7 +8,7 @@ import type { Entry, Fact } from './log.ts';
 import type { Q } from './db.ts';
 import { itemStep, isLink, linkStep, MOVED, runs, type TypesRead } from './project.ts';
 import { joined, regather } from './closure.ts';
-import { mentioned } from './mentions.ts';
+import { declaredTables, projectPacks } from './log-project.ts';
 
 // The pure part, one file the page runs too (src/project.ts): kept importable from here, where it always was.
 export { isLink, typesOf, MOVED, type TypesRead } from './project.ts';
@@ -23,7 +23,7 @@ export const FORGET_ROWS = [`update entity set owner = null where owner = $1`, `
    up(d, a) as (select r.from_id, r.to_id from relation r join below b on b.id = r.from_id where r.valid_to is null and r.type = 'part_of'
      union select up.d, r.to_id from up join relation r on r.from_id = up.a where r.valid_to is null and r.type = 'part_of')
    delete from part_closure c using below b where c.descendant = b.id and not exists (select 1 from up where up.d = c.descendant and up.a = c.ancestor)`,
-  `delete from part_closure where ancestor = $1 or descendant = $1`, `delete from mention where from_id = $1 or to_id = $1`];
+  `delete from part_closure where ancestor = $1 or descendant = $1`]; // the packs' tables: src/log-project.ts
 
 /** One run of facts on an item, folded (src/project.ts) and written into entity. */
 async function item(tx: Q, reg: TypesRead, at: string, moved: boolean, id: string, run: Fact[]) {
@@ -41,7 +41,6 @@ async function item(tx: Q, reg: TypesRead, at: string, moved: boolean, id: strin
        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $14, $15)`,
       [id, row.type, row.kind, row.title, row.body, row.status, row.visibility, row.private_to, row.owner, row.confidence, row.source_id, row.is_open, JSON.stringify(row.props), at, row.archived_at],
     );
-    await mentioned(tx, id);
     return;
   }
   const params: unknown[] = [id, at, step.is_open, JSON.stringify(step.props), step.unset, moved];
@@ -51,7 +50,6 @@ async function item(tx: Q, reg: TypesRead, at: string, moved: boolean, id: strin
     `update entity set ${[...cols, ''].join(', ')}is_open = $3, props = (props || $4::jsonb) - $5::text[], updated_at = case when $6 then updated_at else $2 end where id = $1`,
     params,
   );
-  if (step.mentions) await mentioned(tx, id);
 }
 
 /** One run of facts on a link, folded (src/project.ts) and written into relation, with what is inside what after it. */
@@ -89,6 +87,8 @@ export async function projectFacts(tx: Q, reg: TypesRead, at: string, facts: Fac
     if (isLink(id)) await link(tx, reg, at, id, run);
     else await item(tx, reg, at, moved, id, run);
   }
+  // Then the packs' own tables, from the same facts (log.project, src/log-project.ts): what names what, first.
+  await projectPacks(tx, reg, at, facts);
 }
 
 const digest = (v: unknown) => typeof v === 'object' && v !== null && '$h' in v;
@@ -131,7 +131,7 @@ export const inOrder = (a: Entry, b: Entry) =>
  * order it was appended. Run on a copy of the log (the test does); src/rebuild.ts does it in the background.
  */
 export async function rebuild(tx: Q, reg: TypesRead, all: Entry[]): Promise<void> {
-  for (const table of PROJECTED) await tx.query(`delete from ${table}`);
+  for (const table of new Set([...PROJECTED, ...declaredTables(reg)])) await tx.query(`delete from ${table}`);
   for (const e of [...all].sort(inOrder)) await projectEntry(tx, reg, e);
 }
 

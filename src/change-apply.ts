@@ -4,11 +4,11 @@
 import { newId, type Q } from './db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
 import { roomToStore, stillWritable } from './standing.ts';
-import { placeOnIslands } from './island-items.ts'; import { placeWithSubject } from './subject.ts';
-import { typesAfter, typesApplied } from './type-items.ts';
+import { after, followedStill, rewrite, type Followed } from './write-hooks.ts';
+import { typesAfter } from './type-items.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { append, type Decision, type Fact } from './log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from './replay.ts'; import { changedFacts, itemFacts, linkFacts } from './facts.ts';
-import { supersede } from './proposals.ts'; import { unwaitFollows, whoseWord, type Unwaited } from './unwait.ts'; import { asOwner, forgetIn, ownerRows } from './forget.ts';
+import { unwaitFollows, whoseWord, type Unwaited } from './unwait.ts'; import { asOwner, forgetIn, ownerRows } from './forget.ts';
 import type { Authority, ChangeInput, SourceSpec } from './pelago-types.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Verdict } from './rules.ts';
@@ -24,12 +24,14 @@ const privateTo = (map: Archipelago, visibility: string, to?: string | null): st
  * facts are appended to the fact stream as one change set in the same transaction. dry: the facts it would append and
  * the ids it would make, with nothing written; ids: those ids, to make the same ones again.
  */
-export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string>; privateTo?: string | null } = {}) {
+export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string>; privateTo?: string | null; followed?: Followed } = {}) {
   const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(map.workspace); if (!opts.dry) await roomToStore(map.workspace);
   if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
   // Validate again: the map may have changed since this was proposed. A new item naming no island is placed again (src/island-items.ts).
-  await placeWithSubject(map, map.registry, ops); await placeOnIslands(map, map.registry, ops);
+  await rewrite({ map, reg: map.registry }, ops);
   const { warnings } = await map.plan(ops);
+  // A change judged with what followed it (write.follow): what follows it now must be the same, or the map moved.
+  if (opts.followed?.length) await followedStill({ map, reg: map.registry }, ops, opts.followed);
   const changeset = newId('c');
   const created: Record<string, string> = {};
   const reg = await typesAfter(map, ops);
@@ -152,26 +154,14 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
     if (opts.dry) throw DRY;
     const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
     const by = { id: actor, ...(opts.token && { token: opts.token }) };
-    const done = await append(tx, map.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [], ...(input.run && { run: input.run }), ...(input.pack && { pack: { id: input.pack, manifest: map.registry.hashes.get(input.pack) ?? null, action: input.action ?? null } }) }, facts);
+    const done = await append(tx, map.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [], ...(input.run && { run: input.run }), ...(input.pack && { pack: { id: input.pack, manifest: map.registry.hashes.get(input.pack) ?? null, action: input.action ?? null } }), ...(opts.followed?.length && { follows: opts.followed.map((f) => ({ pack: f.pack, ops: f.ops.length })) }) }, facts);
     if (done.at !== when) throw new Error(`The log's time moved under its lock (${when}, then ${done.at})`);
     await projectDecision(tx, done);
   }).catch((err) => { if (err !== DRY) throw err; });
   if (opts.dry) return { status: 'dry' as const, changeset, created, warnings, facts, ids };
 
-  await afterLog(warnings, () => typesApplied(map, ops, reg), () => supersede(map, changeset));
+  await after({ map, reg }, { changeset, actor, reason: input.reason, ops }, warnings); // write.after: the types it made, what it supersedes, and what packs do
   return { status: 'applied' as const, changeset, created, warnings, ...(unwaited.length && { unwaited }) };
-}
-
-/**
- * What follows a change once its log entry is written: the change has applied, whatever becomes of these, so a failure
- * among them is said as a warning, never as an error that would make the change look undone and be sent again.
- */
-async function afterLog(warnings: string[], ...steps: (() => Promise<unknown>)[]) {
-  for (const step of steps)
-    await step().catch((err) => {
-      console.error(err);
-      warnings.push(`Applied, but what follows it failed: ${(err as Error).message}`);
-    });
 }
 
 /** A prop's value with {ref} replaced by the id it makes, in every string inside it (a lens's filter, a style named in it). */
