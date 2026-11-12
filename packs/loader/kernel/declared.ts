@@ -6,7 +6,7 @@ import { REASONS } from '../../../src/attention.ts';
 import { CAPABILITIES } from './capabilities.ts';
 import { LIFTS } from '../../../src/rules.ts';
 import { capabilityOf, DELIVERABLE, unknownEnd } from '../../../src/link-ends.ts';
-import { parts } from './manifest.ts';
+import { isInternal, parts } from './manifest.ts';
 import { ownsId } from './packorder.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
 import { checkServices, KERNEL_SETTINGS, KERNEL_TERMS, openedTo, type Family } from '../../../src/services.ts';
@@ -320,7 +320,7 @@ export const toolName = (id: string) => id.replaceAll('.', '_');
 
 const isObjectSchema = (s: unknown) => Boolean(s) && typeof s === 'object' && (s as { type?: unknown }).type === 'object';
 
-/** Problems with what a pack declares, given the types loaded and whether it has a handler. Empty means it loads. */
+/** Problems with what a pack declares, given the types loaded and whether it has a handler. Empty means it loads. An internal pack's action needs none: its code runs in-process (act.<verb>.<action>). */
 export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, verbs: string[], handler: boolean, always: readonly string[] = []): string[] {
   const problems: string[] = [];
   const own = (id: string) => ownsId(pack, id); // or a name kept by a pack it took declarations from
@@ -341,7 +341,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
         const view = def as ViewDef;
         if (typeof view.lens !== 'object' || view.lens === null || Array.isArray(view.lens)) problems.push(`${at}: lens is the fields of a lens`);
         if (view.answer !== undefined && !(answers as string[]).includes(view.answer)) problems.push(`${at}: answer is one of ${[...LENS_ANSWERS, ...always].join(', ')}, or one its pack provides or requires as service:answer.<name>`);
-      } else if (!handler) problems.push(`${at} needs the pack's handler.js: a verb with nothing to compute is a generic op`);
+      } else if (!handler && !(isInternal(pack) && 'verb' in def)) problems.push(`${at} needs the pack's handler.js: a verb with nothing to compute is a generic op`);
       if (!(preset && def.input === undefined) && !isObjectSchema(def.input)) problems.push(`${at}: input is the JSON Schema of an object`);
       if (def.limit_ms !== undefined && !(def.limit_ms > 0 && def.limit_ms <= 30_000)) problems.push(`${at}: limit_ms is at most 30000`);
       if (what === 'action') {

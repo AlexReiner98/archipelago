@@ -79,6 +79,13 @@ test('a pack names an answer, a piece or a page it provides or requires, and not
   assert.deepEqual(checkDeclared(opened, new Map(), [], false), []);
 });
 
+test("an internal pack's action needs no handler.js: its code runs in-process", () => {
+  const actions = [{ id: 'a.go', title: 'Go', verb: 'capture', description: 'Go.', input: { type: 'object', properties: {} } }];
+  const handled = (p: Record<string, unknown>) => checkDeclared(pack('a', p), new Map(), ['capture'], false).filter((m) => /handler\.js/.test(m));
+  assert.equal(handled({ actions }).length, 1, 'a plain pack still needs one');
+  assert.deepEqual(handled({ actions, kernel: { trust: 'service', internal: true } }), []);
+});
+
 test('a capability a pack opens may be carried; one nobody opened is refused', () => {
   assert.match(checkCapabilities({ tide: {} } as never, {}, new Set())[0], /"tide" is not a capability/);
   assert.deepEqual(checkCapabilities({ tide: {} } as never, {}, new Set(), [], ['tide']), []);
