@@ -85,7 +85,7 @@ const actionsKey = (session: string | undefined) => `actions:${session ?? ''}`;
 const sayAt = async (l: Archipelago, where: string, fill: Record<string, string>, session?: string) =>
   (await instructionsFor(l, where, { fill, island: await sessionIsland(l, session && (await resolveRun(l, session, true))?.id) })).map((one) => one.text).join(' ');
 
-// A client keeps the tools as they were when it connected; what to do about it is core's instruction for server_restarted.
+// A client keeps the tools as they were when it connected; what to do about it is practice's instruction for server_restarted.
 const restarted = async (l: Archipelago, { started, commit }: HookCall['running'], added: string[] | undefined, session?: string) =>
   `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). ${
     added?.length ? `Actions new since you were given the tools: ${added.join('; ')}. ` : added ? 'No action is new since you were given the tools. ' : ''
