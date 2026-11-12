@@ -33,6 +33,10 @@ const rootsOf = (files: Source[]) => {
 
 export const modules: Extractor = {
   id: 'modules',
+  kinds: ['module'],
+  perFile: true,
+  whole: (path) => path === 'packs/roots.json',
+  keyOfFile: (path) => (CODE.test(path) && !isTest(path) && layerOf(path, new Set()) !== undefined ? `module:${path}` : undefined),
   owns: (path) => (CODE.test(path) && !isTest(path) && layerOf(path, new Set()) !== undefined) || path === 'packs/roots.json',
   extract(files) {
     const roots = rootsOf(files);
@@ -55,6 +59,10 @@ export const slowOf = (text: string) => new Set([...(/SLOW[^=]*=\s*\{([\s\S]*?)\
 
 export const tests: Extractor = {
   id: 'tests',
+  kinds: ['test'],
+  perFile: true,
+  whole: (path) => path === 'test/sets.ts',
+  keyOfFile: (path) => (/\.test\.(ts|js|mjs)$/.test(path) ? `test:${path}` : undefined),
   owns: (path) => /\.test\.(ts|js|mjs)$/.test(path) || path === 'test/sets.ts',
   extract(files) {
     const sets = files.find((f) => f.path === 'test/sets.ts' && f.repo === 'open_core');

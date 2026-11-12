@@ -136,6 +136,7 @@ export function modelOf(packs: PackFile[], bundles: { b: Json }[], calls: Record
 
 export const manifests: Extractor = {
   id: 'manifests',
+  kinds: ['pack', 'bundle', 'name', 'type', 'link', 'part', 'store'],
   owns: (path) => MANIFEST.test(path) || path === 'packs/roots.json',
   extract(files) {
     const roots = files.find((f) => f.path === 'packs/roots.json' && f.repo === 'open_core');

@@ -28,6 +28,7 @@ export function checksOf(text: string): { check: string; breaks: number; heading
 
 export const checks: Extractor = {
   id: 'checks',
+  kinds: ['check'],
   owns: (path) => path === FILE,
   extract(files) {
     const f = files.find((x) => x.path === FILE && x.repo === 'open_core');

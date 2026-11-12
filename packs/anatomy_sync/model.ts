@@ -14,8 +14,13 @@ export interface WantLink { type: string; from: string; to: string; props?: Reco
 /** What the extractors want of the island. */
 export interface Model { items: Want[]; links: WantLink[] }
 
-/** One kind of source: which files it reads and what it makes of them. */
-export interface Extractor { id: string; owns: (path: string) => boolean; extract: (files: Source[]) => Model }
+/**
+ * One kind of source: which files it reads, what it makes of them, and the kinds of key it makes (`kinds`, the part of
+ * a key before its first colon). `perFile` says a file's items and links come from that file alone (a module's), so a
+ * change redoes only the files it touched; `whole` names the files it owns that are read for every file all the same
+ * (roots.json for the modules' layer), a change to which redoes them all; `keyOfFile` is the key a file's item has.
+ */
+export interface Extractor { id: string; kinds: string[]; owns: (path: string) => boolean; extract: (files: Source[]) => Model; perFile?: boolean; whole?: (path: string) => boolean; keyOfFile?: (path: string) => string | undefined }
 
 /** The link types the sync makes: it may take back one of these it no longer wants, and no other. */
 export const MADE_LINKS = ['part_of', 'anatomy.requires', 'anatomy.uses', 'anatomy.provides', 'anatomy.calls', 'anatomy.grants', 'anatomy.extends', 'anatomy.joins', 'anatomy.hears', 'anatomy.records', 'anatomy.moved_from', 'anatomy.kept_in', 'anatomy.imports', 'anatomy.tests'];
@@ -44,14 +49,22 @@ export function keyOf(type: string, props: Record<string, any>, pack?: string): 
   }
 }
 
-/** Every extractor's wants as one: each key once (the first extractor to want it), and no link to a key nobody wants. */
-export function merge(models: Model[]): Model {
+/** The kind of a key: what comes before its first colon (`module` of `module:ui/find.js`). */
+export const kindOfKey = (key: string) => key.split(':')[0];
+
+/**
+ * Every extractor's wants as one: each key once (the first extractor to want it), and no link to a key nobody wants.
+ * `known` are keys the island holds already, which a link may end on though no extractor run this time wants them
+ * (a module redone alone still ties to its pack).
+ */
+export function merge(models: Model[], known: ReadonlySet<string> = new Set()): Model {
   const items = new Map<string, Want>();
   for (const m of models) for (const i of m.items) if (!items.has(i.key)) items.set(i.key, i);
   const seen = new Set<string>(), links: WantLink[] = [];
+  const there = (k: string) => items.has(k) || known.has(k);
   for (const m of models) for (const l of m.links) {
     const k = `${l.type}|${l.from}|${l.to}`;
-    if (seen.has(k) || l.from === l.to || !items.has(l.from) || !items.has(l.to)) continue;
+    if (seen.has(k) || l.from === l.to || !there(l.from) || !there(l.to)) continue;
     seen.add(k); links.push(l);
   }
   return { items: [...items.values()], links };
