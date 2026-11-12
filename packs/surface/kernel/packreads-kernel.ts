@@ -7,16 +7,21 @@
 import { ACTIVE_HOLDS, type Archipelago } from '../../../src/pelago.ts';
 import { blockGraph, heldResources } from './blocking.ts';
 import { openSaid } from '../../../src/seal.ts';
-import { scopeOf } from '../../../src/places.ts';
+import { scopeOf } from './packreads-scope.ts';
 import { scanAround, scanKinds, type Around } from './region.ts';
-import { instructionsFor } from '../../../src/instructions.ts';
 import { shapes } from './packreads-rows.ts';
 import { notKernel } from '../../../src/head.ts';
 import { islandRegistry } from '../../loader/kernel/island-pin.ts';
 import { presetsOf } from '../../loader/kernel/declared.ts';
 import { asOf } from '../../../src/rebuild.ts';
 import { layoutFor } from '../../loader/kernel/layouts.ts';
-import { used } from '../../../src/uses.ts';
+
+/**
+ * What a service answers of the reads API, by the read's key (the slot surface.reads, ./surface-slots.ts): asked where
+ * the read was answered before. The slot is loaded when first asked, since it reaches the packs, which read through
+ * this.
+ */
+export const filled = async (l: Archipelago, key: string, q: unknown, pack?: string) => (await import('./surface-slots.ts')).answerFilled(l, key, q, pack);
 
 export type KernelRead = {
   /** Items by id, every column the asker may read and their confidence (archived ones too), in the order the database gives them. */
@@ -88,7 +93,7 @@ const loggedIn = (l: Archipelago, what: string) => {
 };
 
 /** The answer to one of these reads, or undefined when the read is none of them. */
-export async function kernelRead(l: Archipelago, q: KernelRead): Promise<unknown> {
+export async function kernelRead(l: Archipelago, q: KernelRead, pack?: string): Promise<unknown> {
   if (q.ids !== undefined) {
     const { cols, typed } = shapes(l);
     const { rows } = await l.db.query<{ type: string }>(`select ${cols('entity')}, entity.confidence from entity where id = any($1::text[])`, [list(q.ids, 'ids')]);
@@ -149,9 +154,9 @@ export async function kernelRead(l: Archipelago, q: KernelRead): Promise<unknown
     loggedIn(l, 'region');
     return scanKinds(l, q.kinds);
   }
-  const looks = await lookRead(l, q);
+  const looks = await lookRead(l, q, pack);
   if (looks !== undefined) return looks;
-  if (q.instructions !== undefined) return instructionsFor(l, String(q.instructions.where), q.instructions.about === undefined ? {} : { about: String(q.instructions.about) });
+  if (q.instructions !== undefined) return filled(l, 'instructions', q, pack);
   if (q.owner) return (await l.setting<string>('me')) || null;
   if (q.owned !== undefined) {
     const { cols, typed } = shapes(l);
@@ -205,7 +210,7 @@ const aboutOf = async (l: Archipelago, ids: string[]) =>
   (await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'about' and valid_to is null and from_id = any($1::text[])`, [ids])).rows;
 
 /** The reads of the looks and words the map keeps (the styles and agents packs), or undefined when the read is none of them. */
-async function lookRead(l: Archipelago, q: KernelRead): Promise<unknown> {
+async function lookRead(l: Archipelago, q: KernelRead, pack?: string): Promise<unknown> {
   if (q.told_from !== undefined) {
     const island = q.told_from.island;
     const presets = presetsOf((await islandRegistry(l, island)).packs, 'instruction');
@@ -216,10 +221,7 @@ async function lookRead(l: Archipelago, q: KernelRead): Promise<unknown> {
     const links = await aboutOf(l, rows.map((r) => r.id));
     return { presets, kept: rows.map((r) => ({ ...r, about: links.filter((link) => link.from_id === r.id).map((link) => link.to_id) })) };
   }
-  if (q.told !== undefined) {
-    for (const id of list(q.told, 'told')) used(l.workspace, 'told', id);
-    return true;
-  }
+  if (q.told !== undefined) return filled(l, 'told', q, pack);
   if (q.versions !== undefined) {
     const { rows } = await l.db.query(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null and props ->> 'preset' is not null order by updated_at, id`, [l.registry.family(q.versions === 'layout' ? 'layout' : 'style')]);
     return rows;

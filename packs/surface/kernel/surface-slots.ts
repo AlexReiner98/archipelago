@@ -8,19 +8,23 @@
 //   input and who asked. Until its step moves it into a pack, a kernel module fills one from KERNEL_FILLINGS
 //   (src/surface-fillings.ts), called as the surface's own tools are.
 // - `surface.route`: an HTTP route the server answers, matched by method and path before the server's own.
+// - `surface.reads`: a read of the reads API (`answerRead`, ./packreads.ts) a service answers, by its key
+//   (`"surface.reads": "reads.ts#instructions"`), called with its KernelContext of the map that asks (so it reads as
+//   the asker, under row-level security) and the whole read. The reads API names no service: a filling is asked
+//   where its read was answered before, so a read with several keys is answered as it was.
 //
 // One owner: a name filled twice (by two packs, or by a pack and the kernel) is refused when it is called, naming
 // both, as two packs declaring one type are. Swapping who fills one is taking one out and putting the other in.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { hostOf } from '../../../src/kernel-context.ts';
+import { hostAt, hostOf } from '../../../src/kernel-context.ts';
 import { KERNEL_FILLINGS } from '../../../src/surface-fillings.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { actorId } from '../../../src/pelago-types.ts';
 import type { Workspaces } from '../../../src/workspaces.ts';
 
 /** The slots the tool surface opens. */
-export const SURFACE_SLOTS = ['surface.act', 'surface.read', 'surface.route'] as const;
+export const SURFACE_SLOTS = ['surface.act', 'surface.read', 'surface.route', 'surface.reads'] as const;
 export type ToolSlot = 'surface.act' | 'surface.read';
 
 /** What a tool's filling runs, as the surface's own tools do. */
@@ -43,8 +47,11 @@ export interface RouteFilling {
   serve(req: IncomingMessage, res: ServerResponse, match: RegExpExecArray, host: RouteHost): Promise<unknown>;
 }
 
-/** The kernel modules that fill each tool slot, by name: those a pack does not yet hold. */
-export type KernelFillings = { [S in ToolSlot]: Record<string, ToolRun> } & { 'surface.route': Record<string, RouteFilling> };
+/** What a kernel module's filling of surface.reads runs: the map that asks, the whole read, and the internal pack asking, when one is. */
+export type ReadRun = (l: Archipelago, read: any, pack?: string) => Promise<unknown>;
+
+/** The kernel modules that fill each slot, by name: those a pack does not yet hold. */
+export type KernelFillings = { [S in ToolSlot]: Record<string, ToolRun> } & { 'surface.route': Record<string, RouteFilling>; 'surface.reads': Record<string, ReadRun> };
 
 type Found = { by: string; run: ToolRun };
 
@@ -95,6 +102,23 @@ export async function packAct(l: Archipelago, tool: string): Promise<ToolRun | u
     if (def.admin && !(actor.kind === 'human' && actor.admin)) throw new Error(`"${def.id}" is for a workspace's admins only: what it starts is paid for by the workspace.`);
     return filled.run(input, { kind: actor.kind, name: actorId(actor) } satisfies Caller);
   };
+}
+
+/**
+ * The answer to a read of the reads API by what fills its key in surface.reads: the kernel's own, or an internal
+ * pack's, on any map (one no workspace opened too: a test's, or a person's view of one). Refused when two fill it,
+ * and when nothing does.
+ */
+export async function answerFilled(l: Archipelago, key: string, read: unknown, pack?: string): Promise<unknown> {
+  const found: { by: string; run: () => Promise<unknown> }[] = [];
+  const own = KERNEL_FILLINGS['surface.reads'][key];
+  if (own) found.push({ by: 'the kernel', run: () => own(l, read, pack) });
+  for (const f of await hostAt(l).fillings(l, 'surface.reads')) {
+    if (f.ref.slice(f.ref.indexOf('#') + 1) === key) found.push({ by: `the ${f.pack} pack`, run: () => f.run(read) });
+  }
+  if (found.length > 1) throw new Error(`${key} is filled by ${found.map((f) => f.by).join(' and ')}: one name, one owner (surface.reads)`);
+  if (!found.length) throw new Error(`Nothing here answers the read ${key} (surface.reads): the pack that does it is not running.`);
+  return found[0].run();
 }
 
 /** The routes the kernel's modules fill, in order. */

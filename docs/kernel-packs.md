@@ -249,6 +249,7 @@ are slots of the write and log packs; the others:
 | `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
 | `open.<phase>` | the stub | any | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
+| `surface.reads` | surface | agents (`instructions`); the kernel until their packs hold their modules: uses (`told`), touched (`touched`), eventlog (`events`), views and askview (`view`), timeaxis (`placed`) | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 
 This is also the fix for bug e_wpww27fm (trusted modules import services):
 each import it names becomes a slot, cut by the step that moves the
@@ -324,7 +325,7 @@ moves with a shim to the pack named.
 | loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
-| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads, packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, region, blocking |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking |
 
 ### Service
 
@@ -533,8 +534,20 @@ live in `packs/surface/kernel/`, with `region` and `blocking`, the bounded scans
 keep their shims in `src/`. The loader's sandbox asks it through the slot `loader.reads`
 (`fillReads`, `src/packhost.ts`), filled when `packreads` loads. `askview` and `views` stay in
 query: in surface they would owe their imports of attention, usage, sessions, styles and agents
-for the few they cut. What the reads import of service packs (places, touched, instructions,
-uses, eventlog, views, timeaxis, query-flat) stays owed in `test/fixtures/root-imports.json`.
+for the few they cut.
+
+The reads API names no service (wave 5, e_8m5j9p37). A read a service answers is a filling of
+surface's slot `surface.reads`, by the read's key, asked where the read was answered before (so a
+read with several keys answers as it did): an internal pack names it in its manifest
+(`"hooks": { "surface.reads": "reads.ts#instructions" }`, agents) and is handed its context of the
+map that asks, any map, opened or not (`hostAt`, `src/kernel-context.ts`); a module still in
+`src/` fills it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`, through
+`src/service-reads.ts`), until its pack holds it: `told` (uses: the usage pack's code still
+imports the kernel, so it does not load from a copy of the packs), `touched` (sessions is
+optional, and an optional pack fills only `write.*`), `events`, `view` (with its pin) and
+`placed`. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
+reads API's own bounded scan, `packreads-scope`, which places re-exports. `test/packreads-slots.test.ts`
+pins each answer against its service's own functions.
 
 ### Answers
 

@@ -3,7 +3,9 @@
 // keys name. Which packs ship such places the kernel does not know: with none, a session is tied to no place.
 
 import type { Entity, Archipelago } from '../../../src/pelago.ts';
-import { notKernel } from '../../../src/head.ts';
+
+// What is a place's or an item's is read by the reads API, so it is surface's (packs/surface/kernel/packreads-scope.ts).
+export { livesIn, livesInFor, SCOPE, scopeOf } from '../../surface/kernel/packreads-scope.ts';
 
 const norm = (path: string) => path.replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
 
@@ -48,48 +50,10 @@ export async function placeFor(l: Archipelago, keys: { remote?: string; cwd?: st
     .sort((a, b) => b.folder!.length - a.folder!.length)[0]?.e;
 }
 
-/** The link that ties a thing to this place: of the relations that are a kind of lives_in, the nearest one its type is made for. */
-export function livesInFor(l: Archipelago, placeType: string): string {
-  const lineage = l.registry.type(placeType)?.lineage ?? [placeType];
-  const fits = l.registry
-    .relationFamily('lives_in')
-    .map((id) => l.registry.relations.get(id)!)
-    .map((r) => ({ id: r.id, at: Math.min(...r.to.map((t) => (t === '*' ? lineage.length : lineage.indexOf(t))).filter((i) => i >= 0)) }))
-    .filter((r) => Number.isFinite(r.at));
-  return fits.sort((a, b) => a.at - b.at)[0]?.id ?? 'lives_in';
-}
-
 /** What a place is known by, as its own fields give it (address, folder): undefined for anything not known by either. */
 export function whereOf(l: Archipelago, e: Entity): { address?: string; folder?: string } | undefined {
   const where = l.registry.type(e.type)?.capabilities.where;
   if (!where?.address && !where?.folder) return undefined;
   const field = (name: string | undefined) => (name && typeof e.props[name] === 'string' ? (e.props[name] as string) : undefined);
   return { address: field(where.address), folder: field(where.folder) };
-}
-
-/** The relations a thing lives in a place by, read whichever flavour tied it. */
-export const livesIn = (l: Archipelago) => l.registry.relationFamily('lives_in');
-
-/**
- * Everything that is a place's or an item's, as a query over $1 and the lives_in relations in $2: the item itself,
- * what lives in it, and all that is part of that or about it. An issue is often filed as about a project, not as
- * part of it, and is that project's work all the same.
- */
-export const SCOPE = `with recursive scope(id) as (
-       select $1::text
-       union
-       select from_id from relation where type = any($2::text[]) and to_id = $1 and valid_to is null
-       union
-       select r.from_id from relation r join scope s on r.to_id = s.id where r.type in ('part_of', 'about') and r.valid_to is null
-     )`;
-
-/** The ids of everything that is a place's or an item's (SCOPE); open: only what is open and not the system's, and the item; among: only which of these. */
-export async function scopeOf(l: Archipelago, id: string, open = false, among?: string[]): Promise<Set<string>> {
-  const { rows } = await l.db.query<{ id: string }>(
-    open
-      ? `${SCOPE} select s.id from scope s join entity e on e.id = s.id where s.id = $1 or (e.is_open and e.archived_at is null and ${notKernel(l.registry, 'e.type')})`
-      : `${SCOPE} select id from scope${among ? ' where id = any($3::text[])' : ''}`,
-    [id, livesIn(l), ...(among ? [among] : [])],
-  );
-  return new Set(rows.map((r) => r.id));
 }

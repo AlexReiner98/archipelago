@@ -8,8 +8,8 @@
 
 import type { Archipelago } from '../../../src/pelago.ts';
 import { openSaid } from '../../../src/seal.ts';
-import { livesIn } from '../../../src/places.ts';
-import { touchedBy } from '../../../src/touched.ts';
+import { livesIn } from './packreads-scope.ts';
+import { filled } from './packreads-kernel.ts';
 import { pageOf, paged, READ_LIMIT, shapes, type Page, type Paged } from './packreads-rows.ts';
 
 /** A fact is the asker's when what it is about is: an item, or a link, they may read now. */
@@ -115,7 +115,7 @@ export async function runsOf(l: Archipelago, q: { repo?: string; folder?: string
   if (!q.touched || !out.rows.length) return out;
   // The set the session's hook kept is read past row-level security (it is the server's); what is handed on is only
   // what the asker may read now.
-  const sets = await Promise.all(out.rows.map((r) => touchedBy(l, String(r.id))));
+  const sets = (await Promise.all(out.rows.map((r) => filled(l, 'touched', { touched: String(r.id) })))) as string[][];
   const all = [...new Set(sets.flat())];
   const { rows: seen } = all.length ? await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and archived_at is null`, [all]) : { rows: [] };
   const may = new Set(seen.map((r) => r.id));
