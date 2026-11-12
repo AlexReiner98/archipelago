@@ -45,3 +45,11 @@ export async function noTwins(ctx: KernelContext, ops: Op[]): Promise<void> {
   const twins = await twinsOf(ctx, ops);
   if (twins.length) throw new Error(`Change rejected:\n${twins.map((t) => `- ${t}`).join('\n')}`);
 }
+
+/** Who a change is from, as the write path tells a validator: a person, or an agent or a pack's action. */
+interface Who { human: boolean; pack?: string }
+
+/** The filling of write.validate: each view an agent makes that is one kept already, refused; not a person's, nor a pack action's. */
+export async function validate(ctx: KernelContext, ops: Op[], who?: Who): Promise<{ refusals: string[] }> {
+  return { refusals: who && !who.human && !who.pack ? await twinsOf(ctx, ops) : [] };
+}

@@ -3,7 +3,7 @@
 // the island rules that check where it went stay with the loader (islandRefusals).
 
 import type { KernelContext } from '#pelago/kernel';
-import { type Item, itemOf, type Op, type Reg, type Type } from './ops.ts';
+import { type Item, itemOf, type Judged, type Op, type Reg, type Type } from './ops.ts';
 
 /** Core's type of an island. */
 const ISLAND = 'island';
@@ -88,4 +88,11 @@ export async function placeOnIslands(ctx: KernelContext, reg: Reg, ops: Op[], gi
     const there = islands.filter((r) => fits(type, r.pack));
     if (there.length === 1) place(i, there[0].id);
   }
+}
+
+/** The filling of write.rewrite: each new item that names no island placed on one, in a copy of the ops; run after the subject's. */
+export async function rewrite(ctx: KernelContext, ops: Op[], judged: Judged): Promise<Op[]> {
+  const out = ops.slice();
+  await placeOnIslands(ctx, judged.registry, out, judged.island);
+  return out;
 }

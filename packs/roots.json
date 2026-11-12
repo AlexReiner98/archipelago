@@ -14,7 +14,7 @@
     },
     {
       "id": "log",
-      "hash": "d569d2fabc251b41b8e029196b64a1a028044c8d83c53f712542facceccf10d7"
+      "hash": "9650f3050e79ca4c4e8c7a9fe304ecfffd88ad81462791b101c3344a951e0b22"
     },
     {
       "id": "identity",
@@ -26,7 +26,7 @@
     },
     {
       "id": "loader",
-      "hash": "7a947f97b73000fb3e20ec0ad2818f918d6872f6f5fbb3c5157afb593e9d4fa3"
+      "hash": "530428f5886d35222102cdd94544fc820090bc1e6d5661a5188c6d3fd89f202a"
     },
     {
       "id": "rules",
@@ -34,7 +34,7 @@
     },
     {
       "id": "write",
-      "hash": "c45282a60160d848f858c0f125b5cf88583cb0642a28caec41d617959c39f16d"
+      "hash": "9d6ed75dca0b27f8bd89b43a7984d857711a684c7fc79bff5dfdef635f8f3529"
     },
     {
       "id": "surface",

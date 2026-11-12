@@ -13,9 +13,10 @@ import { pathToFileURL } from 'node:url';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
 import { answerRead, type Read } from './packreads.ts';
 import { guardedFetch } from './outbound.ts';
-import { callService, fillServices } from './services.ts'; import { fillWritePoints } from './write-hooks.ts';
+import { callService, fillServices } from './services.ts'; import { fillWritePoints, type WriteSlot } from './write-hooks.ts';
 import type { Archipelago } from './pelago.ts';
 import type { ChangeInput } from './pelago-types.ts';
+import type { Fact } from './log.ts';
 import type { Registry } from './packs.ts';
 import type { OpFact, OpStream } from './streams.ts';
 
@@ -39,6 +40,12 @@ export interface KernelContext {
   call<I, O>(name: string, input: I): Promise<O>;
   /** A change, as `system:<pack>` on its own authority, through the rules. */
   change(input: SystemChange): Promise<Awaited<ReturnType<Archipelago['change']>>>;
+  /**
+   * A migration of what the pack keeps, run as a workspace opens: the facts it planned, appended in one transaction as
+   * the system's move (Archipelago.moved), as the kernel's own migrations are: what moved, and nothing else, with no rule
+   * asked. Never a change someone makes: that is `change`.
+   */
+  move(action: string, reason: string, facts: Fact[]): Promise<void>;
   /** Facts on an operational stream, only one its pack's rules keep. */
   record(stream: string, facts: OpFact[]): Promise<void>;
   /** A secret its reach names, only. */
@@ -155,6 +162,12 @@ const hostFor = (l: Archipelago): KernelHost => {
   return host;
 };
 
+/** The write path's slot for a map no workspace opened (src/write-hooks.ts): its internal packs' fillings, from a loose host. */
+export const looseWriteSlot: WriteSlot = {
+  fillings: (map, point) => hostFor(map).fillings(map, point),
+  change: (map, pack, input) => kernelContext(map, pack).change(input),
+};
+
 /** A service name, answered as the map that asks it (KernelHost.answer): what a kernel caller uses, a lens preset's answer among them. */
 export const callAs = <O = unknown>(l: Archipelago, name: string, input: unknown): Promise<O> => hostFor(l).answer<O>(l, name, input);
 
@@ -188,6 +201,7 @@ export function contextFor(l: Archipelago, pack: Manifest, host: KernelHost): Ke
       // made as an agent named for the pack, kept to its reach by core's pack_reach, its authority said in the basis.
       return l.change({ kind: 'agent', name: systemActor(id) }, { ...input, pack: id, authority: { of: 'agent', basis: `${authority.of}: ${authority.basis}` } });
     },
+    move: (action, reason, facts) => l.db.transaction((tx) => l.moved(tx, action, reason, facts)),
     record: async (stream, facts) => {
       if (!l.registry.rules.some((r) => r.pack === id && r.stream === stream)) refuse(`records on "${stream}", a stream none of its rules keeps`);
       await l.record(stream as OpStream, systemActor(id), facts);

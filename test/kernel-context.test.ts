@@ -27,6 +27,8 @@ test('the manifest key kernel says a tier, and is refused when it says anything 
   assert.throws(manifest({ trust: 'service', internal: true, hooks: { 'write.follow': '../../src/db.ts#open' } }), /names a function of the pack's modules/);
   assert.throws(manifest({ trust: 'root', internal: true, hooks: { 'write.follow': 'a.ts#f' } }), /a root pack opens hook points/);
   assert.throws(manifest({ trust: 'service', internal: true, timers: [{ run: 'a.ts#t', every_ms: 5 }] }), /every_ms/);
+  assert.equal(tierOf(manifest({ trust: 'service', internal: true, hooks: { 'write.rewrite': 'a.ts#r' }, fills: ['island'] })()), 'service', 'the fields its rewrite may set');
+  assert.throws(manifest({ trust: 'service', internal: true, fills: 'island' }), /kernel.fills is a list/);
   assert.throws(manifest({ trust: 'service', internal: true }, { handlers: [{ event: 'item.due' }] }), /no handlers for the sandbox/);
 });
 
@@ -54,7 +56,7 @@ test('a hook point is filled by the pack, called with its context: ops in, ops o
   const fills = await host.fillings(l, 'write.follow');
   assert.deepEqual(fills.map((f) => [f.pack, f.ref]), [['kernel_probe', 'probe.ts#follow']]);
   assert.deepEqual(await fills[0].run([{ op: 'create', ref: 'a', type: 'task', title: 'Fix the gate' }, { op: 'update', id: 'e_x' }]), [{ op: 'create', ref: 'seen0', type: 'task', title: 'Seen: Fix the gate' }]);
-  assert.deepEqual(await host.fillings(l, 'write.validate'), [], 'a point no pack fills has nothing');
+  assert.deepEqual(await host.fillings(l, 'write.retype'), [], 'a point no pack fills has nothing');
 });
 
 test("a service pack's change goes through change as the pack, and it reads what it made", async () => {

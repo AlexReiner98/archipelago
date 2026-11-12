@@ -15,6 +15,7 @@
 // What follows an op at the level of facts (the owner's link, src/owner-link.ts) stays in the write path.
 
 import { BUILT_IN } from './write-fillings.ts';
+import { islandRegistry } from './island-pin.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Op } from './pelago-types.ts';
 import type { Registry } from './packs.ts';
@@ -28,6 +29,13 @@ export interface Who { human: boolean; pack?: string }
 
 /** What the write path hands its own fillings: the map, the types the change is judged by, and what the change says. */
 export interface WriteEnv { map: Archipelago; reg: Registry; island?: string; who?: Who }
+
+/**
+ * What a rewrite or a validator of a pack is handed beside the ops: the registry the change is judged by (an island's
+ * version, where that differs from the map's), the island the change was given, and the registry an island runs.
+ */
+export interface Judged { registry: Registry; island?: string; islandRegistry(island: unknown): Promise<Registry> }
+const judgedOf = (env: WriteEnv): Judged => ({ registry: env.reg, island: env.island, islandRegistry: (island) => islandRegistry(env.map, island, env.reg) });
 
 /** What a validator answers. */
 export interface Checked { refusals: string[]; warnings?: string[] }
@@ -57,6 +65,13 @@ const slots = new WeakMap<object, WriteSlot>();
 /** At a workspace's open: the internal packs' fillings of the write path's points, for its registry. */
 export const fillWritePoints = (registry: object, slot: WriteSlot): void => void slots.set(registry, slot);
 
+/**
+ * The slot of a map's registry: the one its open filled, else, for a map no loader opened (a test's, a registry read
+ * at a past version), its internal packs' fillings from a loose host, as their code runs for it anywhere else. The
+ * import is dynamic: the loader's context imports this module.
+ */
+const slotOf = async (map: Archipelago): Promise<WriteSlot> => slots.get(map.registry) ?? (await import('./kernel-context.ts')).looseWriteSlot;
+
 /** The packs' fields a rewrite may set, by the manifest's `kernel.fills` (none, until a pack says). */
 const fillsOf = (map: Archipelago, pack: string): string[] => {
   const k = map.registry.packs.find((p) => p.id === pack)?.kernel as { fills?: unknown } | undefined;
@@ -66,7 +81,7 @@ const fillsOf = (map: Archipelago, pack: string): string[] => {
 /** Every filling of a point, the write path's own first, then the packs', in order. */
 async function fillings(env: WriteEnv, point: Point): Promise<Filling[]> {
   const own = (BUILT_IN[point] ?? []).map((b): Filling => ({ pack: b.pack, fills: b.fills ?? [], run: (...args) => (b.run as (e: WriteEnv, ...a: unknown[]) => Promise<unknown>)(env, ...args) }));
-  const packs = (await slots.get(env.map.registry)?.fillings(env.map, point) ?? []).map((f): Filling => ({ pack: f.pack, fills: fillsOf(env.map, f.pack), run: f.run }));
+  const packs = (await (await slotOf(env.map)).fillings(env.map, point)).map((f): Filling => ({ pack: f.pack, fills: fillsOf(env.map, f.pack), run: f.run }));
   return [...own, ...packs];
 }
 
@@ -105,7 +120,7 @@ export function rewriteProblem(before: Op[], after: unknown, fills: string[]): s
 /** write.rewrite: each filling's answer checked against its bounds and put in the ops' place, in the list given. */
 export async function rewrite(env: WriteEnv, ops: Op[]): Promise<void> {
   for (const f of await fillings(env, 'write.rewrite')) {
-    const out = await f.run(structuredClone(ops));
+    const out = await f.run(structuredClone(ops), judgedOf(env));
     const problem = rewriteProblem(ops, out, f.fills);
     if (problem) throw rejected([`the ${f.pack} pack's rewrite ${problem}`]);
     // An op it left as it was stays the same object: the apply loop knows each op by it (change-apply.ts, `at`).
@@ -117,7 +132,7 @@ export async function rewrite(env: WriteEnv, ops: Op[]): Promise<void> {
 export async function validate(env: WriteEnv, ops: Op[]): Promise<{ refusals: string[]; warnings: string[] }> {
   const refusals: string[] = [], warnings: string[] = [];
   for (const f of await fillings(env, 'write.validate')) {
-    const out = (await f.run(structuredClone(ops), env.who)) as Checked | undefined;
+    const out = (await f.run(structuredClone(ops), env.who, judgedOf(env))) as Checked | undefined;
     refusals.push(...(out?.refusals ?? []));
     warnings.push(...(out?.warnings ?? []));
   }
@@ -159,10 +174,10 @@ export async function after(env: WriteEnv, entry: AfterEntry, warnings: string[]
 
 /** write.retype: what each pack does once a type or link type is renamed, made as that pack through change. */
 export async function retyped(map: Archipelago, from: string, to: string, what: 'entity' | 'relation'): Promise<void> {
-  const slot = slots.get(map.registry);
-  for (const f of (await slot?.fillings(map, 'write.retype')) ?? []) {
+  const slot = await slotOf(map);
+  for (const f of await slot.fillings(map, 'write.retype')) {
     const ops = (await f.run(from, to, what)) as Op[] | undefined;
     if (!Array.isArray(ops) || !ops.length) continue;
-    await slot!.change(map, f.pack, { reason: `Every ${from} is a ${to} now: what the ${f.pack} pack keeps of it follows.`, basis: 'its retype', ops });
+    await slot.change(map, f.pack, { reason: `Every ${from} is a ${to} now: what the ${f.pack} pack keeps of it follows.`, basis: 'its retype', ops });
   }
 }

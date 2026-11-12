@@ -8,7 +8,7 @@
 // asker under row-level security, and is handed the registry the change is judged by (an island's, where it differs).
 
 import type { KernelContext } from '#pelago/kernel';
-import { type Item, type Link, type Op, type Reg, itemOf } from './ops.ts';
+import { type Item, type Judged, type Link, type Op, type Reg, itemOf } from './ops.ts';
 
 type Create = Extract<Op, { op: 'create' }>;
 type LinkOp = Extract<Op, { op: 'link' }>;
@@ -47,6 +47,13 @@ export async function placeWithSubject(ctx: KernelContext, reg: Reg, ops: Op[]):
     const visibility = op.visibility === undefined && there.visibility ? { visibility: there.visibility as Create['visibility'] } : undefined;
     if (island || visibility) ops[i] = { ...op, ...visibility, ...(island && { props: { ...op.props, ...island } }) };
   }
+}
+
+/** The filling of write.rewrite: each new item that lives with its subject put where its subject is, in a copy of the ops. */
+export async function rewrite(ctx: KernelContext, ops: Op[], judged: Judged): Promise<Op[]> {
+  const out = ops.slice();
+  await placeWithSubject(ctx, judged.registry, out);
+  return out;
 }
 
 /** Every link type that ties some type to its subject: what a live tie taken away may be. */

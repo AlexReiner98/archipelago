@@ -7,8 +7,8 @@ import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';
 import { pageStyle, styleFor } from './styles.ts';
 import { withScreens } from './screens.ts';
-import { planStyles } from './style-move.ts';
-import { planLayouts } from './layout-move.ts';
+import { moveStyles, planStyles } from './style-move.ts';
+import { LAYOUTS_MOVED, moveLayouts, planLayouts } from './layout-move.ts';
 import { cssProblem } from './page-css.ts';
 
 const preset = { id: 'core.plain', title: 'Plain', props: { shape: 'flow', lengths: { gap: 8 } } };
@@ -69,6 +69,16 @@ test('the moves are planned as facts, and nothing to move plans none', async () 
   assert.deepEqual(moved.facts, [['+', 'v1', 'style', { gap: 2 }], ['+', 's1', 'status', 'retired']]);
   const layouts = await planLayouts(context({ layout_moves: [{ id: 's2', props: { code: 'x', gap: 1 } }] }));
   assert.deepEqual(layouts, { facts: [['+', 's2', 'type', 'layout'], ['+', 's2', 'settings', { gap: 1 }], ['-', 's2', 'gap']], layouts: ['s2'] });
+});
+
+test("the moves are appended as the system's move, once each, and nothing to move appends nothing", async () => {
+  const moves: unknown[][] = [];
+  const at = (answers: Record<string, unknown>) => ({ ...context(answers), move: async (...m: unknown[]) => void moves.push(m) }) as KernelContext;
+  assert.deepEqual(await moveStyles(at({ style_moves: null })), { views: 0, retired: 0 });
+  assert.deepEqual(await moveLayouts(at({ layout_moves: [] })), []);
+  assert.equal(moves.length, 0);
+  assert.deepEqual(await moveLayouts(at({ layout_moves: [{ id: 's2', props: { code: 'x' } }] })), ['s2']);
+  assert.deepEqual(moves.map(([action, reason]) => [action, reason]), [['layout.moved', LAYOUTS_MOVED]]);
 });
 
 test("a page's stylesheet is checked as the walls check it", () => {

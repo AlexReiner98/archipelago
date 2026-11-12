@@ -55,8 +55,7 @@ export const STYLES_MOVED = 'A view holds its own layout and settings: each styl
 
 /**
  * The migration, planned: the facts that put each style's fields in its views and retire it, and how many views took
- * settings and how many styles left. What it reads is the styles pack's read (style_moves); the kernel appends the
- * facts as the system's move (src/style-move.ts), which a service pack may not.
+ * settings and how many styles left. What it reads is the styles pack's read (style_moves).
  */
 export async function planStyles(ctx: KernelContext): Promise<{ facts: Fact[]; views: number; retired: number }> {
   const lens = ctx.registry.family('lens');
@@ -77,4 +76,11 @@ export async function planStyles(ctx: KernelContext): Promise<{ facts: Fact[]; v
   }
   for (const id of retired) facts.push(['+', id, 'status', 'retired']);
   return { facts, views: held.size, retired: retired.length };
+}
+
+/** The migration: the planned facts appended as the system's move (ctx.move); how many views took settings and how many styles left. */
+export async function moveStyles(ctx: KernelContext): Promise<{ views: number; retired: number }> {
+  const { facts, views, retired } = await planStyles(ctx);
+  if (facts.length) await ctx.move('lens.moved', STYLES_MOVED, facts);
+  return { views, retired };
 }

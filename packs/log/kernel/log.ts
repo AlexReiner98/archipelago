@@ -6,11 +6,20 @@
 
 import { GENESIS, entryHash } from '../../../src/jcs.ts';
 import type { Q } from '../../../src/db.ts';
-import { countBytes } from '../../../src/bytes.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
 import { openEntries, openValue, sealEntry } from '../../../src/seal.ts';
 
 export type Stream = 'facts' | 'pending';
+
+/**
+ * The slot log.appended (docs/kernel-packs.md, "Slots"): what is handed each append's facts as they were stored, in its
+ * transaction (the usage pack counts the bytes each item adds). The loader fills it from the internal packs that
+ * declare it, before a map is written; each filling once, by its pack and function. A filling that fails fails the append.
+ */
+export type Appended = (entry: { facts: unknown[] }, tx: Q) => Promise<void>;
+const appended = new Map<string, Appended>();
+/** Fill the slot log.appended with a pack's function, named <pack>:<file>#<export>: in place of what had that name. */
+export const fillAppended = (name: string, run: Appended): void => void appended.set(name, run);
 
 /** One value of one field of one item, link or type asserted (`+`) or retracted (`-`); a fifth element says about the fact. */
 export type Fact = ['+', string, string, unknown] | ['+', string, string, unknown, Record<string, unknown>] | ['-', string, string];
@@ -127,8 +136,8 @@ export async function append(tx: Q, ws: string, stream: Stream, head: { id: stri
        from jsonb_array_elements($4::jsonb) with ordinality f(x, n)`,
       [stream, pos, at, JSON.stringify(facts)],
     );
-    // What each item adds to the log, counted as it is stored (src/bytes.ts).
-    await countBytes(tx, facts);
+    // What fills log.appended is handed the facts as they are stored (the usage pack: what each item adds).
+    for (const run of appended.values()) await run({ facts }, tx);
   }
   // Handed back in clear, as the caller said it: what it projects into today's tables.
   return { ...entry, ...head, keys: sealed.head.keys, facts: plain } as unknown as Entry;

@@ -282,6 +282,8 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   if (input.on && !named.every(offeredHere(l))) throw new Error(`The ${input.pack} pack is not offered to this workspace on this server.`);
   const kernel = named.find((id) => KERNEL_PACKS.includes(id));
   if (!input.on && kernel) throw new Error(`The ${kernel} pack is the kernel's own: it is never taken out.`);
+  // What the rules say of taking a pack out (core's root_off: a root pack never is), asked of each it names.
+  if (!input.on) for (const pack of named) await l.may(actor, 'pack_off', { pack });
   // Taking out a provider sends the packs that rely on it to waiting, their items kept; adding it back wakes them (decision e_f9ybsuce).
   const waitingBefore = new Set([...l.registry.states].filter(([, s]) => s.state === 'waiting').map(([id]) => id));
   await syncPacks(l); // the log says what is present before it says what changed

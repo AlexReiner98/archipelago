@@ -1,8 +1,8 @@
 // The map and its single write path. Every change to items and links goes through change(): it is validated, judged
 // by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
-import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, type Policy } from '../../../src/rules.ts'; import { renamedQuery } from '../../../src/query-names.ts';
-import { mayWrite } from './within.ts'; import { roomToStore, stillWritable } from '../../../src/standing.ts'; import { authorityOf } from '../../../src/authority.ts';
+import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type Policy } from '../../../src/rules.ts'; import { renamedQuery } from '../../../src/query-names.ts';
+import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomToStore, stillWritable } from '../../../src/standing.ts'; import { authorityOf } from '../../../src/authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from '../../../src/db.ts';
 import { once } from './merge.ts'; import type { EventQuery } from '../../../src/eventlog.ts'; import { doneFact, type Done } from '../../../src/activity.ts';
 import type { Registry } from '../../../src/packs.ts'; import { currentNames } from '../../../src/type-items.ts'; import { follow, retyped, rewrite, type Who } from '../../../src/write-hooks.ts';
@@ -48,7 +48,11 @@ export class Archipelago {
     this.workspace = workspace;
     this.viewer = viewer;
     this.props = props;
+    fillLogSlots(registry); // the log's slot log.appended, filled before this map appends anything
   }
+
+  /** Whether this actor may do an act that is not a change (pack_off, publish): refused with the rule's reason when a rule refuses it. */
+  may(actor: Actor, act: string, props?: Record<string, unknown>): Promise<void> { return mayDo(this.db, this.registry, actor.kind === 'human', act, props); }
 
   /** This map as anyone sees it with no login: only what is public. Ask it of the whole map, not of one person's view. */
   forAnyone(): Archipelago {

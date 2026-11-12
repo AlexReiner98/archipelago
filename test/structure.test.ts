@@ -472,19 +472,16 @@ test('a layer of a wired drawing reads only those before it', () => {
   }
   assert.deepEqual(ratchet(against, LAYER_IMPORTS), [], 'Hand the later layer what it needs, or move what both read to the earlier one.');
 });
-
 test("only Metrics sets a place or a wire's points", () => {
   const others = wiredFiles.filter((f) => !ranks(f).includes(LAYERS.indexOf('metrics')));
   const counted = Object.fromEntries(others.map((f) => [short(f), scanned(read(f)).code.match(WRITES)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
   assert.deepEqual(ratchet(counted, WRITERS), [], 'Coordinates are output: Metrics sets them, from what this layer says.');
 });
-
 // 21. Sealed: each wired drawing runs on small sketches (test/wired.ts), and no two wires of it lie on one line, none stands
 // under the spacing, no box stands on a box, none runs through a box. The spacing is the flow's (test/spacing.ts).
 // Counted for the map as it stood when it became the one layout, 9 Nov 2026; each count may only go down.
 // The map's trunks (one wire for the links of one type and one way off a box) are what share: wires of one box.
 const NOT_SEALED: Record<string, number> = { 'core.map knot: shared': 1, 'core.map fan: shared': 24, 'core.map crossed: shared': 3, 'core.map comb: shared': 31 };
-
 test('a wired drawing keeps its wires apart', async () => {
   const counted: Record<string, number> = {};
   for (const d of wired) {
@@ -498,3 +495,6 @@ test("a root pack's code imports only plumbing and the roots before it", () => {
   const owed = new Set(JSON.parse(read('test/fixtures/root-imports.json')) as string[]), added = rootImports().filter((e) => !owed.has(e));
   assert.deepEqual(added, [], 'Open a slot the higher pack fills, or hand the value in (docs/kernel-packs.md, "Slots").');
 });
+// 23. A service name is answered as the map that asks it (callAs, src/kernel-context.ts): callService runs its provider as the map the names were filled for, so it is called only where no map asks; kernel-context's is a name no internal pack provides.
+const CALLS_SERVICE: Record<string, number> = { 'src/kernel-context.ts': 1 }, servicePacks = walk('packs').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
+test('a service name is answered as the map that asks it', () => assert.deepEqual(ratchet(count([...kernelFiles, ...servicePacks], /(?<!function )\bcallService\s*[<(]/g), CALLS_SERVICE), [], 'Call it with callAs(l, name, input): its provider reads as the asker, under row-level security.'));
