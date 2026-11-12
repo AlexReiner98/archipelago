@@ -1,5 +1,4 @@
 [
-  "packs/rules/kernel/rule-fillings.ts -> src/reply-rules.ts",
   "src/backup.ts -> src/control-index.ts",
   "src/backup.ts -> src/control.ts",
   "src/backup.ts -> src/eventlog.ts",
