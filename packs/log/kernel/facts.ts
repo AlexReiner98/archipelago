@@ -4,7 +4,7 @@
 
 import type { Fact } from './log.ts';
 import { KEPT_FIELDS } from './operational.ts';
-import { ITEM_COLUMNS } from '../../../src/project.ts';
+import { ITEM_COLUMNS } from './project.ts';
 
 type Row = Record<string, any>;
 
