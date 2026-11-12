@@ -11,8 +11,8 @@ import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
 import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import { checkRules, type RuleDef } from './rules.ts';
-import { isInternal, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo } from './services.ts';
-import { readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
+import { isInternal, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
+import { OWN_PACKS, readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from './phases.ts'; import { keepVersionTypes } from './version-types.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -162,7 +162,7 @@ export class Registry {
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK && !this.made.has(id)).map((id) => [id, 'not enabled on this server']));
     for (const id of this.turnedOff) off.set(id, 'turned off here');
     for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
-    if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why); const refused = new Map(kernelRefused(found.values(), (id) => !this.made.has(id) && this.swap?.of !== id && (!!this.given || this.where.get(id) === this.dir))); for (const p of found.values()) if (isInternal(p)) off.delete(p.id); for (const [id, why] of refused) off.set(id, why); this.internal = new Set([...found.values()].filter((p) => isInternal(p) && !refused.has(p.id)).map((p) => p.id)); // an internal pack is always on; kernel code from anywhere but the server's own folder never runs
+    if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why); const refused = new Map(kernelRefused(found.values(), (id) => !this.made.has(id) && this.swap?.of !== id && (!!this.given || this.where.get(id) === this.dir || this.where.get(id) === OWN_PACKS))); for (const p of found.values()) if (isInternal(p)) off.delete(p.id); for (const [id, why] of refused) off.set(id, why); this.internal = new Set([...found.values()].filter((p) => isInternal(p) && !refused.has(p.id)).map((p) => p.id)); // an internal pack is always on; kernel code from anywhere but the server's own folder never runs
     const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
     // What a pack names of a pack it uses is registered only while that one is active (src/manifest.ts, uses); a name it uses is read as the pack that provides it.
     const declaredBy = new Map([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((t) => [t.id, p.id] as const)));
@@ -277,7 +277,7 @@ export class Registry {
     const verbs = ordered.flatMap((pack) => parts(pack).verbs);
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
-      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), !!this.given || (pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js'))));
+      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), !!this.given || (pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js'))), providedOf(ordered.filter(isInternal), 'answer')); // an internal pack's answers, always on: any view names them
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
       for (const def of parts(pack).actions) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.

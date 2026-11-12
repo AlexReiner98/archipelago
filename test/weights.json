@@ -1,5 +1,6 @@
 {
  "files": {
+  "packs/attention/kernel/attention.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/canvas/flow-lines.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/canvas/flow-topology.test.ts": { "pglite": 6.1, "postgres": 3.4 },
   "packs/canvas/map-found.test.ts": { "pglite": 0.1, "postgres": 0.1 },
@@ -14,6 +15,8 @@
   "packs/canvas/map-undrawn.test.ts": { "pglite": 0.3, "postgres": 0.3 },
   "packs/core/session-states.test.ts": { "pglite": 0, "postgres": 0 },
   "packs/core/turns.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/mentions/kernel/mentions.test.ts": { "pglite": 0, "postgres": 0 },
+  "packs/views/kernel/views.test.ts": { "pglite": 0, "postgres": 0 },
   "test/activity.test.ts": { "pglite": 4.2, "postgres": 1.7 },
   "test/addresses.test.ts": { "pglite": 6.7, "postgres": 3.4 },
   "test/agent-publish.test.ts": { "pglite": 3.9, "postgres": 1.8 },

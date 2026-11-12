@@ -255,7 +255,7 @@ moves with a shim to the pack named.
 | log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore; the rest to backup), backup-log |
 | identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
 | walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail |
-| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packreads, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
+| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packreads, packreads-kernel, packreads-log, packreads-pin, packreads-rows, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
 | surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools, search, transient, view-address, listing |
@@ -423,3 +423,89 @@ Set by the database step (e_8e5yhfdy); every root step moves its row the same wa
 > imports `OPEN_PHASES` from `src/boot.ts`, the entry module still in its top-level await, so the
 > import of `server.ts` never settles. `node src/server.ts` starts. Found by the database step; its fix
 > is the lifecycle hooks' owner's.
+## Moving a service in the wave (as built)
+
+How the kernel views step (e_8f8m2xtf) moved its modules into `packs/attention`
+and `packs/views`; every service step does the same, and none needs to edit
+`test/structure.test.ts` for it.
+
+### The pack
+
+- `packs/<id>/pack.json` with `"kernel": { "trust": "service", "internal":
+  true, "modules": "kernel/", "provides": { ... } }`; each module is moved with
+  `git mv src/<m>.ts packs/<id>/kernel/<m>.ts`.
+- A module imports only its own pack's files (`./x.ts`), `node:` built-ins, and
+  `import type { KernelContext } from '#pelago/kernel'`. Never another pack,
+  not even a sister service: a small pure helper is copied (`blocks.ts`, the
+  block graph, is in both attention and views), anything else is a service name
+  (`ctx.call`).
+- Every value import of the kernel becomes the context: `ctx.reads` for the
+  map, `ctx.registry` for types, links and capabilities, `ctx.call` for
+  another pack. Each function takes `ctx` where it took `l`.
+- An internal pack is the server's code: every registry reads it from the
+  server's own folder (`OWN_PACKS`, `src/pack-folders.ts`), so a test's map
+  or a copy of some packs has it as the server does.
+
+### Reads
+
+SQL stays in the kernel as a bounded read (`src/packreads-kernel.ts`, beside
+`src/packreads.ts`), answered as the asker under row-level security. General
+ones first: `ids` (items by id, every column, archived too), `links` (open
+links from, to or among some items, or of some kinds; `order` kept, id or
+newest; `limit`), `history` (an item's facts, opened, or its last position),
+`tops`, `within` (a scope's ids), `blocks` (the block graph's edges),
+`holds`, `owned`, `owner`, `ancestors`, `holding`. Reads a lens makes whole
+(`region`, `kinds`) and what agents are told (`instructions`). Where the
+database's own reckoning is the behaviour (a date against `current_date`, a
+`numeric`), the module's SQL moves into the read as it was (`bounds`, and
+`confirm`, now `settledUnconfirmed` in `src/packreads-log.ts`).
+
+### Answers
+
+- A lens answer the kernel answered itself (`READINGS`, `src/query-presets.ts`)
+  becomes `answer.<name>` the pack provides, and leaves `LENS_ANSWERS`
+  (`src/declared.ts`) in the same step. A view that names it moves to the pack
+  keeping its `core.x` id (core is re-pinned: `npm run roots`); a pack that
+  names it from elsewhere says `"uses": ["service:answer.<name>"]` (canvas).
+- An internal pack's answers are always there, so any pack's view may name
+  them (`checkDeclared`'s `always`, filled from the registry's internal packs).
+- An answer is called with `callAs(l, name, input)` (`src/kernel-context.ts`):
+  the provider is handed a context of the map that asks, a person's view under
+  their row-level security. `callService` runs the provider as the map the
+  names were filled for at open: never use it for a read. The lens terms
+  (`term.*`, `src/query-terms.ts`) still call it.
+
+### The shim
+
+At the old path, `src/<m>.ts`:
+
+- A module whose functions take no map: `export * from
+  '../packs/<id>/kernel/<m>.ts';` and nothing else.
+- One whose functions took the map: `export *` from the module, `import * as
+  moved` from it, `import type { Archipelago }`, and an adapter of the same
+  name for each such function, which builds the pack's context when it is
+  called:
+  `const ctx = async (l) => (await import('./kernel-context.ts')).kernelContext(l, '<id>');`
+  `export const f = async (l, ...rest) => moved.f(await ctx(l), ...rest);`
+  The import is dynamic: `kernel-context.ts` reaches `packreads.ts`, which
+  imports the query modules, which import shims, and a static import would be a
+  cycle.
+
+### Tests
+
+- The tests in `test/` stay, unchanged, and reach the module through its shim.
+- The pack carries its own beside its modules (`packs/<id>/kernel/*.test.ts`),
+  run without a database: a fake context whose `reads` answers each read by
+  its key from a few rows in memory. `test/sets.ts` runs these in the full set;
+  a new file goes in `test/weights.json` at 0 until CI measures it.
+
+### What the structure test is to check
+
+- A file in `src/` is a shim when its only value import of a pack is
+  `../packs/<id>/kernel/<its own name>.ts` (`export *`, `import * as`), its
+  other imports are type-only, and its one dynamic import is
+  `./kernel-context.ts`: it is listed (`SHIMS`), and not counted by "the
+  kernel imports no pack's code".
+- A shim's counts in the other ratchets go with its module: the step that
+  moves one lowers or removes the module's entries (for this step,
+  `NAMES_PACK_TYPES` loses `src/attention.ts` and `src/confirm.ts`).

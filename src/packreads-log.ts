@@ -10,7 +10,6 @@ import type { Archipelago } from './pelago.ts';
 import { openSaid } from './seal.ts';
 import { livesIn } from './places.ts';
 import { touchedBy } from './touched.ts';
-import { toConfirm } from './confirm.ts';
 import { pageOf, paged, READ_LIMIT, shapes, type Page, type Paged } from './packreads-rows.ts';
 
 /** A fact is the asker's when what it is about is: an item, or a link, they may read now. */
@@ -137,11 +136,58 @@ export async function heldChanges(l: Archipelago, q: { page?: Page }) {
   return paged(rows, page.size, (r) => ({ ...r, ts: new Date(r.ts).toISOString() }));
 }
 
-/** What agents settled that the owner has not confirmed (src/confirm.ts): the questions, and the mark to confirm up to. */
+/** What agents settled that the owner has not confirmed: the questions, and the mark to confirm up to. */
 export async function confirmQuestions(l: Archipelago, q: { limit?: number }) {
   noLogin(l);
   const limit = q.limit === undefined ? 40 : Number(q.limit);
   if (!Number.isInteger(limit) || limit < 1 || limit > READ_LIMIT) throw new Error(`confirm.limit is a whole number from 1 to ${READ_LIMIT}`);
-  const { how: _how, ...answer } = await toConfirm(l, { limit });
-  return answer;
+  return settledUnconfirmed(l, limit);
+}
+
+/**
+ * Questions agents have settled since the owner last looked, or last answered for them: each decision or hypothesis
+ * an agent closed, with what was chosen and on what it rests (what the attention pack puts to the owner: its confirm.ts).
+ */
+export async function settledUnconfirmed(l: Archipelago, limit: number) {
+  // Each mark is in the settings stream; one made before that stream was numbered is an activity entry carried in.
+  const { rows: marks } = await l.db.query<{ upto: number | null }>(
+    `select max(case when o.stream = 'settings' then (o.facts->0->>3)::int else (o.facts->0->3->'detail'->>'upto')::int end) as upto from log_op o
+     where o.seq is not null and o.facts->0->>2 in ('changes.seen', 'questions.confirmed') and o.stream in ('settings', 'activity') -- index log_op_action`,
+  );
+  const since = marks[0]?.upto ?? 0;
+  const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; outcome: string | null; seq: number; ts: Date; actor: string; changeset: string; authority: { of?: string; basis?: unknown } | null }>(
+    // Read from the log: each status an agent set, on its own say or a human's word it reported, that the item still has.
+    `select distinct on (e.id) e.id, e.type, e.title, e.status, e.props->>'outcome' as outcome, f.seq::int as seq, le.at as ts, le.head->'actor'->>'id' as actor, le.head->'authority' as authority, le.id as changeset
+     from log_fact f join log_entry le on le.stream = f.stream and le.at = f.at and le.pos = f.pos join entity e on e.id = f.id
+     where f.stream = 'facts' and f.seq > $1 and f.field = 'status' and f.op = '+' and le.head->'actor'->>'id' not like 'human:%' and coalesce(le.head->'authority'->>'who', '') not like 'human:%'
+       and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and f.value = to_jsonb(e.status)
+     order by e.id, f.seq desc`,
+    [since, [...l.registry.types.values()].filter((t) => t.capabilities.settles !== undefined).map((t) => t.id)], // the types that settle (registry.having)
+  );
+  // What an agent settled on its own judgment is what the owner has not seen; what it settled on their word they
+  // chose themselves, in chat. The first are listed first, and counted apart.
+  const own = (q: { authority: { of?: string } | null }) => q.authority?.of !== 'human';
+  const newest = rows.sort((a, b) => Number(own(b)) - Number(own(a)) || b.seq - a.seq);
+  // The basis is the change set's words, sealed in the log with its key (src/seal.ts): opened only for those listed,
+  // since each takes its key from the vault (a map with hundreds settled spent most of the read on the rest).
+  const listed = newest.slice(0, limit);
+  const bases = await openSaid(l.db, listed.map((r, i) => ({ id: r.changeset, field: 'basis', value: r.authority?.basis, i })));
+  for (const b of bases) if (b.value !== undefined) listed[b.i].authority = { ...listed[b.i].authority, basis: b.value };
+  const short = (s: string | undefined) => (s && s.length > 240 ? `${s.slice(0, 240)}…` : s);
+  return {
+    count: newest.length,
+    on_agents_judgment: newest.filter(own).length,
+    on_owners_word: newest.filter((q) => !own(q)).length,
+    upto: newest.reduce((max, q) => Math.max(max, q.seq), since),
+    questions: listed.map((q) => ({
+      id: q.id,
+      title: q.title,
+      answer: q.outcome ?? q.status,
+      settled: q.ts,
+      seq: q.seq,
+      by: q.actor,
+      on: own(q) ? 'the agent’s own judgment' : 'the owner’s word, as the agent reports it',
+      basis: short(q.authority?.basis as string | undefined),
+    })),
+  };
 }

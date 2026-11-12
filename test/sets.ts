@@ -90,8 +90,8 @@ export const LONG = 15;
 const walk = (dir: string): string[] =>
   !existsSync(join(ROOT, dir)) ? [] : readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? (e.name === 'node_modules' ? [] : walk(`${dir}/${e.name}`)) : [`${dir}/${e.name}`]));
 
-/** Every test file npm test:full runs, as paths from the repository's root. */
-export const allTests = () => [...walk('test').filter((f) => /^test\/[^/]+\.test\.ts$/.test(f)), ...walk('packs').filter((f) => /^packs\/[^/]+\/[^/]+\.test\.ts$/.test(f))].sort();
+/** Every test file npm test:full runs, as paths from the repository's root: an internal pack's beside its modules too (packs/<id>/kernel/). */
+export const allTests = () => [...walk('test').filter((f) => /^test\/[^/]+\.test\.ts$/.test(f)), ...walk('packs').filter((f) => /^packs\/[^/]+\/(?:kernel\/)?[^/]+\.test\.ts$/.test(f))].sort();
 
 export const fastTests = () => allTests().filter((f) => !(f in SLOW));
 

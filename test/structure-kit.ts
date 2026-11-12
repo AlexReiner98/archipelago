@@ -1,7 +1,7 @@
 // What the structure test reads the code with: the files, by part, and the ratchet each rule keeps.
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 
 export const ROOT = join(import.meta.dirname, '..');
 const CODE = /\.(ts|js|mjs|css|html)$/;
@@ -27,6 +27,19 @@ const SHIM = /^export \* from '\.\.\/(packs\/[\w-]+\/kernel\/[\w./-]+\.ts)';$/;
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').trim();
 /** Each shim's old path, with the moved file it stands for. */
 export const SHIMS = new Map(rawWalk('src').flatMap((f) => { const to = f.endsWith('.ts') ? SHIM.exec(code(raw(f)))?.[1] : undefined; return to ? [[f, to] as const] : []; }));
+/**
+ * A service pack's adapter shim (docs/kernel-packs.md, "Moving a service in the wave (as built)"): at the old path, it
+ * re-exports its moved module and adapts what took the map, building the pack's context when called. Its only value
+ * imports are of `../packs/<p>/kernel/<its own name>.ts`, every other static import is `import type`, and its one
+ * dynamic import is `./kernel-context.ts`. The kernel may import that pack there, and nowhere else.
+ */
+const adapts = (f: string, text: string) => {
+  const own = basename(f), targets = [...text.matchAll(/^(?:import|export)\s+(?!type\b)[^;]*?\bfrom\s+'([^']+)'/gm)].map((m) => m[1]);
+  const dynamic = [...text.matchAll(/\bimport\s*\(\s*'([^']+)'/g)].map((m) => m[1]);
+  const ofOwn = (t: string) => /^\.\.\/packs\/[\w-]+\/kernel\/[^/]+$/.test(t) && basename(t) === own;
+  return targets.length > 0 && targets.every(ofOwn) && dynamic.every((t) => t === './kernel-context.ts');
+};
+export const ADAPTERS = new Set(rawWalk('src').filter((f) => f.endsWith('.ts') && !SHIMS.has(f) && adapts(f, code(raw(f)))));
 /** Each moved file, with the old path it is read at. */
 export const MOVED = new Map([...SHIMS].map(([from, to]) => [to, from]));
 /** A moved module's imports as they read from its old path: of src/ and of any pack's kernel/, each `./<m>`. */

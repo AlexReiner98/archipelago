@@ -190,7 +190,7 @@ test('a new workspace starts with the kernel and what keeps its ids, and a pack 
   try {
     const l = await mapOf(packsWith(CLOCK, 'reacher'));
     // The kernel, and the packs that keep what core shipped under core's ids (the house style and drawings, a session's marks, Held for you, what a Claude Code session is told when its folder is behind).
-    const kernel = ['pack:canvas', 'pack:claude_code', 'pack:core', 'pack:practice', 'pack:sessions'];
+    const kernel = ['pack:attention', 'pack:canvas', 'pack:claude_code', 'pack:core', 'pack:practice', 'pack:sessions', 'pack:views']; // attention and views: the core.attention and core.brief views
     assert.deepEqual((await syncPacks(l)).map((f) => f[1]).sort(), kernel, 'only the kernel and what keeps its ids are asserted');
     assert.deepEqual((await packsOff(l)).sort(), l.registry.found.map((p) => p.id).filter((p) => !kernel.includes(`pack:${p}`)).sort(), 'every other pack is off');
     assert.deepEqual(await syncPacks(l), [], 'and opening it again adds none');

@@ -1,32 +1,13 @@
-// Bounds: a field against a limit, declared by a type as its bound capability. A date due by a day, a quantity
-// under its reorder level. What crosses one is at risk, whatever the field is called.
+// Moved to packs/attention/kernel/bounds.ts (docs/kernel-packs.md, "Moving a service in the wave"): this shim keeps its
+// importers working until the gather step rewrites them. What took the map is handed the pack's context of it,
+// made when it is called (kernelContext), so this module imports nothing the reads import.
 
 import type { Archipelago } from './pelago.ts';
+import * as moved from '../packs/attention/kernel/bounds.ts';
 
-interface Crossed {
-  id: string;
-  type: string;
-  title: string;
-  status: string;
-  owner: string | null;
-}
+export * from '../packs/attention/kernel/bounds.ts';
 
-/** Open items among some whose bound is crossed or near: a date due within some days, or a quantity under its limit. */
-export async function pastBounds(l: Archipelago, days: number, among: string[]) {
-  const bounds = l.registry.having('bound').map((type) => ({ type, ...l.registry.type(type)!.capabilities.bound! }));
-  const { rows: due } = await l.db.query<Crossed & { due: string; overdue: boolean }>(
-    `select e.id, e.type, e.title, e.status, e.owner, e.props->>b.field as due, (e.props->>b.field)::date < current_date as overdue
-     from entity e join jsonb_to_recordset($2::jsonb) as b(type text, field text) on b.type = e.type
-     where e.id = any($3::text[]) and e.is_open and e.archived_at is null and e.props ? b.field and (e.props->>b.field)::date <= current_date + $1::int
-     order by due`,
-    [days, JSON.stringify(bounds.filter((b) => b.limit)), among],
-  );
-  const { rows: under } = await l.db.query<Crossed & { value: number; limit: number }>(
-    `select e.id, e.type, e.title, e.status, e.owner, (e.props->>b.field)::numeric as value, (e.props->>b.below)::numeric as limit
-     from entity e join jsonb_to_recordset($1::jsonb) as b(type text, field text, below text) on b.type = e.type
-     where e.id = any($2::text[]) and e.is_open and e.archived_at is null and (e.props->>b.field)::numeric < (e.props->>b.below)::numeric`,
-    [JSON.stringify(bounds.filter((b) => b.below)), among],
-  );
-  return { due, under };
-}
+/** The attention pack's context of a map. */
+const ctx = async (l: Archipelago) => (await import('./kernel-context.ts')).kernelContext(l, 'attention');
 
+export const pastBounds = async (l: Archipelago, days: number, among: string[]) => moved.pastBounds(await ctx(l), days, among);

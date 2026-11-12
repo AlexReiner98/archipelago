@@ -13,7 +13,7 @@ import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
 import { spacing } from './spacing.ts';
-import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, srcCode, VENDORED, walk } from './structure-kit.ts';
+import { ADAPTERS, codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, srcCode, VENDORED, walk } from './structure-kit.ts';
 import { rootImports } from './structure-roots.ts';
 import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
@@ -40,7 +40,7 @@ test('the kernel names no pack', () => {
 // bare name too. What was counted on that day is words that are also some pack's type name (a capability, a view, a
 // verb's action): no new one may be added. SQL strings count too (`type = 'run'`); run, works_on, notification, about are core's.
 const NAMES_PACK_TYPES: Record<string, number> = {
-  'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
+  'src/altitude.ts': 1, 'src/capabilities.ts': 2, 'src/declared.ts': 3,
   'src/eventlog.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
   'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/pg.ts': 1,
   'src/public-document.ts': 1, 'src/public.ts': 2, 'src/replay.ts': 1, 'src/rules.ts': 1, 'src/saved-views.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
@@ -94,7 +94,7 @@ test("the kernel names no session's action", () => {
 // The kernel runs a pack's code only as the pack's, through the registry: it imports none from packs/.
 const IMPORTS_PACKS: Owed = { 'src/session-measures.ts': [1, SESSIONS], 'src/session-state.ts': [2, SESSIONS], 'src/session-turns.ts': [1, SESSIONS] };
 test("the kernel imports no pack's code", () => {
-  const named = count(kernelFiles, /(?:\bfrom\s+|\bimport\s*\(\s*)['"`][^'"`]*\bpacks\//g);
+  const named = count(kernelFiles.filter((f) => !ADAPTERS.has(f)), /(?:\bfrom\s+|\bimport\s*\(\s*)['"`][^'"`]*\bpacks\//g);
   assert.deepEqual(ratchet(named, counts(IMPORTS_PACKS)), [], "Move the code that needs it into the pack, or hand the pack's answer in.");
 });
 

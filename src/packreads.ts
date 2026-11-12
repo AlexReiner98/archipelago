@@ -15,8 +15,9 @@ import { LENS_LIMIT } from './query-flat.ts';
 import { NAME, pageOf, paged, READ_LIMIT, shapes, type Page } from './packreads-rows.ts';
 import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './packreads-log.ts';
 import { pinned, type Pin } from './packreads-pin.ts';
+import { kernelRead, type KernelRead } from './packreads-kernel.ts';
 
-export type Read = {
+export type Read = KernelRead & {
   get?: string;
   /** Items of a type (flavours included): with a status or one of several, fields equal to where's, and a field between two values. */
   items?: { type: string; status?: string | string[]; where?: Record<string, unknown>; between?: { field: string; from?: string; to?: string } };
@@ -81,6 +82,9 @@ export type Read = {
 };
 
 export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
+  // The reads a kernel view needs as a service pack (src/packreads-kernel.ts).
+  const kernel = await kernelRead(l, q);
+  if (kernel !== undefined) return kernel;
   if (q.fields && (!Array.isArray(q.fields) || q.fields.some((f) => !NAME.test(f)))) throw new Error('fields is a list of field names');
   // An item's columns as the asker may read them: anyone with no login reads no note, no owner, no link's id, and of the
   // props only the few public ones, and may not filter by props at all.
@@ -227,5 +231,5 @@ export async function answerRead(l: Archipelago, q: Read): Promise<unknown> {
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, owner.');
 }
