@@ -59,6 +59,8 @@ export interface Drew {
   island?: string;
   packs: PackVersion[];
   parts: PartVersion[];
+  /** Asked at a past position whose packs this server cannot read: why today's drew in their place. */
+  stand_in?: string;
 }
 
 const COMMIT = /^[0-9a-f]{40}$/;

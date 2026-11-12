@@ -39,8 +39,12 @@ export interface PartsAnswer {
   refined?: Refined;
   /** What the page draws with, as recorded (packs/loader/kernel/pack-versions.ts): the look keeps it beside its picture. */
   drew?: Drew;
-  /** Asked at a past position: the packs' code as it stood then, the owner's versions of parts as they are now. */
-  at?: { pos: number; owners_parts: 'now' };
+  /**
+   * Asked at a past position: the packs' code as it stood then, the owner's versions of parts as they are now. Where the
+   * log's packs of then cannot be read by this server (a manifest of a shape it no longer takes), today's stand in, and
+   * `stand_in` says why.
+   */
+  at?: { pos: number; owners_parts: 'now'; stand_in?: string };
 }
 
 /** The last set each person's page recorded on each island, by this process: the same set is not recorded again. */
@@ -74,16 +78,21 @@ export async function parts(call: RootCall, input: { island?: string; have?: str
   const island = typeof input?.island === 'string' ? input.island : undefined;
   const head = await headPos(l.db);
   const at = Number.isInteger(input?.at) && input.at! >= 0 && input.at! < head ? input.at! : undefined;
-  const drawn = async (answer: PartsAnswer): Promise<PartsAnswer> => {
-    const drew = await drewWith(l, { island, host: input?.host, server: startedFrom() ?? null, at: at ?? head, parts: answer.parts });
-    if (at === undefined) await record(l, drew);
-    return { ...answer, drew };
-  };
-  if (input?.shipped) return drawn({ parts: shippedParts(l, have), shipped: true });
+  if (input?.shipped) return drawn(l, { parts: shippedParts(l, have), shipped: true });
   // At a past position (a look redrawn as it was): the packs' code as the log kept it then (registryAt).
-  const past = at === undefined ? undefined : await registryAt(l.db, l.registry, at);
-  const reg = await islandRegistry(l, island, past?.registry ?? l.registry);
+  let past: Awaited<ReturnType<typeof registryAt>>, stand_in: string | undefined;
+  if (at !== undefined) past = await registryAt(l.db, l.registry, at).catch((err) => void (stand_in = String(err?.message ?? err).slice(0, 300)));
+  const then = past ? l.readIn(past.registry) : l;
+  const reg = await islandRegistry(then, island, then.registry);
   const kept = await keptParts(l, reg);
   const refined = island && !past ? await refinedOn(l, island, kept) : undefined;
-  return drawn({ parts: partsFor(reg, kept, have), ...(refined && { refined }), ...(past && { at: { pos: at!, owners_parts: 'now' as const } }) });
+  const answer = { parts: partsFor(reg, kept, have), ...(refined && { refined }), ...(at !== undefined && { at: { pos: at, owners_parts: 'now' as const, ...(stand_in && { stand_in }) } }) };
+  return drawn(then, answer, past ? at : undefined);
+
+  /** The answer with what it draws with: the packs of the registry it was read in, at the position whose code it is. Recorded only for today's. */
+  async function drawn(map: Archipelago, answer: PartsAnswer, pos?: number): Promise<PartsAnswer> {
+    const drew = await drewWith(map, { island, host: input?.host, server: startedFrom() ?? null, at: pos ?? head, parts: answer.parts });
+    if (at === undefined) await record(l!, drew);
+    return { ...answer, drew: { ...drew, ...(answer.at?.stand_in && { stand_in: answer.at.stand_in }) } };
+  }
 }
