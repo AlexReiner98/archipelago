@@ -3,10 +3,13 @@
 // verbs are declared by the core pack the same way. Checked when the pack loads.
 
 import { REASONS } from './attention.ts';
+import { CAPABILITIES } from './capabilities.ts';
+import { LIFTS } from './rules.ts';
 import { capabilityOf, DELIVERABLE, unknownEnd } from './link-ends.ts';
 import { parts } from './manifest.ts';
 import { ownsId } from './packorder.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
+import { checkServices, KERNEL_SETTINGS, KERNEL_TERMS, openedTo, type Family } from './services.ts';
 
 export interface VerbDef {
   id: string;
@@ -95,13 +98,13 @@ export interface ViewDef {
   limit_ms?: number;
   /** A view the kernel answers, never the pack's code: by the read its answer names (src/query-presets.ts), with these fields (the brief's links, over). */
   lens?: Record<string, unknown>;
-  /** With lens: which read answers it (one of LENS_ANSWERS); the flat lens when left out. */
+  /** With lens: which read answers it (one of LENS_ANSWERS, or an answer its pack provides or requires as service:answer.<name>); the flat lens when left out. */
   answer?: string;
   /** With lens: for a param, the lens fields each of its values stands for. */
   choices?: Record<string, Record<string, Record<string, unknown>>>;
 }
 
-/** The reads a view the kernel answers may name, each kept to the form its view had (src/query-presets.ts). */
+/** The reads a view the kernel answers itself may name, each kept to the form its view had (src/query-presets.ts). Others are the family answer.<name>. */
 export const LENS_ANSWERS = ['flat', 'graph', 'tree', 'hubs', 'attention', 'brief', 'frontier'] as const;
 
 /**
@@ -147,7 +150,8 @@ export interface ReasonDef {
 
 /** One piece of a screen, drawn by the kernel: what it draws and from what. */
 export interface PieceDef {
-  piece: keyof typeof PIECES;
+  /** One of PIECES, or a piece its pack provides or requires as service:piece.<name>. */
+  piece: keyof typeof PIECES | (string & {});
   /** For rows from a view: the pack's view. */
   view?: string;
   /** For rows from a view: the input the item's id goes in. */
@@ -254,7 +258,7 @@ export interface ScreenDef {
  */
 export const PIECES = { figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [], turns: [], findings: [] } as const;
 
-/** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. */
+/** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. Others are the family page.<name>. */
 export const PAGES = ['time'];
 
 /** Every screen the packs declare, in the order the packs load. */
@@ -297,6 +301,20 @@ export const KERNEL_VERBS: Record<string, string> = {
   undo: 'revise',
 };
 
+/**
+ * What the kernel still answers itself of each service family (src/services.ts): a pack may not provide one of these
+ * (one name, one owner). The step that moves one into a pack takes it off this list in the same change.
+ */
+export const KERNEL_OWNS: Record<Family, readonly string[]> = {
+  answer: LENS_ANSWERS,
+  term: KERNEL_TERMS,
+  capability: CAPABILITIES,
+  setting: [...KERNEL_SETTINGS, ...LIFTS],
+  piece: Object.keys(PIECES),
+  page: PAGES,
+  act: Object.entries(KERNEL_VERBS).map(([action, verb]) => `${verb}.${action}`),
+};
+
 /** What an action or view is called as a tool: time.log is time_log. */
 export const toolName = (id: string) => id.replaceAll('.', '_');
 
@@ -307,6 +325,10 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   const problems: string[] = [];
   const own = (id: string) => ownsId(pack, id); // or a name kept by a pack it took declarations from
   const seen = new Set<string>();
+  problems.push(...checkServices(pack, KERNEL_OWNS));
+  const answers = [...LENS_ANSWERS, ...openedTo(pack, 'answer')];
+  const pieces: Record<string, readonly string[]> = { ...PIECES, ...Object.fromEntries(openedTo(pack, 'piece').map((p) => [p, []])) };
+  const pages = [...PAGES, ...openedTo(pack, 'page')];
   for (const [what, list] of [['action', parts(pack).actions], ['view', parts(pack).views]] as const) {
     for (const def of list) {
       const at = `${what} "${def.id}"`;
@@ -317,7 +339,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       if (preset) {
         const view = def as ViewDef;
         if (typeof view.lens !== 'object' || view.lens === null || Array.isArray(view.lens)) problems.push(`${at}: lens is the fields of a lens`);
-        if (view.answer !== undefined && !(LENS_ANSWERS as readonly string[]).includes(view.answer)) problems.push(`${at}: answer is one of ${LENS_ANSWERS.join(', ')}`);
+        if (view.answer !== undefined && !(answers as string[]).includes(view.answer)) problems.push(`${at}: answer is one of ${LENS_ANSWERS.join(', ')}, or one its pack provides or requires as service:answer.<name>`);
       } else if (!handler) problems.push(`${at} needs the pack's handler.js: a verb with nothing to compute is a generic op`);
       if (!(preset && def.input === undefined) && !isObjectSchema(def.input)) problems.push(`${at}: input is the JSON Schema of an object`);
       if (def.limit_ms !== undefined && !(def.limit_ms > 0 && def.limit_ms <= 30_000)) problems.push(`${at}: limit_ms is at most 30000`);
@@ -346,14 +368,14 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
     if (screen.at !== undefined && screen.at !== 'home') problems.push(`${at}: at is "home", the one kernel page a screen is drawn on`);
     if (screen.start !== undefined && (screen.start !== true || screen.at !== 'home')) problems.push(`${at}: start is true, on a screen at "home": the map's start page`);
     for (const piece of screen.pieces ?? []) {
-      const needs: readonly string[] | undefined = PIECES[piece.piece];
-      if (!needs) problems.push(`${at}: "${piece.piece}" is not a piece: one of ${Object.keys(PIECES).join(', ')}`);
+      const needs: readonly string[] | undefined = Object.hasOwn(pieces, piece.piece) ? pieces[piece.piece] : undefined;
+      if (!needs) problems.push(`${at}: "${piece.piece}" is not a piece: one of ${Object.keys(PIECES).join(', ')}, or one its pack provides or requires as service:piece.<name>`);
       for (const key of needs ?? []) if (!piece[key as keyof PieceDef]) problems.push(`${at}: a ${piece.piece} piece names its ${key}`);
       if (piece.view && !parts(pack).views.some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
       if (piece.action && !parts(pack).actions.some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
       if (piece.piece === 'button' && !piece.action === !piece.draw) problems.push(`${at}: a button does one thing: its pack's action, or draw`);
       if (piece.draw && !Object.keys(piece.draw).every((k) => ['style', 'shape'].includes(k))) problems.push(`${at}: a button's draw says "style" or "shape"`);
-      if (piece.page && !PAGES.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}`);
+      if (piece.page && !pages.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}, or one its pack provides or requires as service:page.<name>`);
       for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
       if (piece.lens && typeof piece.lens === 'object' && (typeof piece.lens.filter !== 'object' || !piece.lens.filter)) problems.push(`${at}: a view piece's lens is a flat lens: { filter, walk, limit }`);
       if (piece.by && !(screen.on ?? []).every((t) => types.get(t)?.fields[piece.by!])) problems.push(`${at}: a count's by is a field of every type it is on`);

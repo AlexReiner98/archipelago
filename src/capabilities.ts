@@ -1,6 +1,9 @@
 // Capabilities: what the kernel computes from a type, declared by the type with the field each reads. The kernel
-// knows the ones listed in CAPABILITIES and packs cannot add another. A flavour inherits its parent's; a sibling does not. Each is checked against
-// the type's own fields when its pack loads, so a capability naming a field the type lacks stops the pack.
+// knows the ones listed in CAPABILITIES; a pack adds another by providing its behaviour as the service
+// `capability.<name>` (src/services.ts), and a type may then carry it where its pack provides or requires that name.
+// A flavour inherits its parent's; a sibling does not. Each the kernel knows is checked against the type's own fields
+// when its pack loads, so a capability naming a field the type lacks stops the pack; one a pack provides is checked by
+// its provider. The check of the list stays here; what each one does moves to its provider.
 
 import type { FieldDef } from './packs.ts';
 
@@ -114,8 +117,11 @@ export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'w
 
 const DATES = ['date', 'datetime'];
 
-/** Problems with a type's capabilities, given its resolved fields, statuses and the relations known. Empty means they hold. */
-export function checkCapabilities(caps: Capabilities, fields: Record<string, FieldDef>, relations: Set<string>, statuses: string[] = []): string[] {
+/**
+ * Problems with a type's capabilities, given its resolved fields, statuses and the relations known, and the
+ * capabilities its pack has opened (provided or required as `capability.<name>`). Empty means they hold.
+ */
+export function checkCapabilities(caps: Capabilities, fields: Record<string, FieldDef>, relations: Set<string>, statuses: string[] = [], opened: readonly string[] = []): string[] {
   const problems: string[] = [];
   const has = (what: string, field: string | undefined, types: string[]) => {
     if (field === undefined) return;
@@ -123,7 +129,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     if (!def) problems.push(`${what} reads "${field}", which it has no field of`);
     else if (!types.includes(def.type)) problems.push(`${what} reads "${field}", a ${def.type}, not a ${types.join(' or ')}`);
   };
-  for (const name of Object.keys(caps)) if (!(CAPABILITIES as readonly string[]).includes(name)) problems.push(`"${name}" is not a capability: one of ${CAPABILITIES.join(', ')}`);
+  for (const name of Object.keys(caps)) if (!(CAPABILITIES as readonly string[]).includes(name) && !opened.includes(name)) problems.push(`"${name}" is not a capability: one of ${CAPABILITIES.join(', ')}, or one its pack provides or requires as service:capability.<name>`);
   const { bound, when, where, capacity, settles, watch, promised } = caps;
   if (bound) {
     if (!bound.field) problems.push('bound needs a field');

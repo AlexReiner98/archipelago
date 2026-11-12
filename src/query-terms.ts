@@ -8,6 +8,9 @@
 //   <link>< <item> (what the item links to) · owner me|<person> · and Only's words (src/query-only.ts)
 //
 // An end is an id or a name. A word's set can only be checked of items in hand, so a word is no term of Find.
+//
+// Any other word is a term a pack provides as the service term.<word> (src/services.ts): asked with the rest of the
+// term as its end and who is asking, it answers the ids of its set ({ ids }), as the viewer may see them.
 
 import type { Archipelago } from './pelago.ts';
 import { readWord, type Narrowing, type Word } from './query-only.ts';
@@ -17,6 +20,7 @@ import { heldIds } from './query-held.ts';
 import { movedIds } from './moved.ts';
 import { kernelTypes, SYSTEM } from './head.ts';
 import { ISLAND, onIslands } from './island-items.ts';
+import { callService, hasService } from './services.ts';
 
 export type Term =
   | { sort: 'text'; said: string }
@@ -31,11 +35,19 @@ export type Term =
   | { sort: 'frontier' }
   | { sort: 'worked'; end: string }
   | { sort: 'link'; link: string; end: string; back: boolean; owner?: boolean }
-  | { sort: 'word'; word: Word; said: string };
+  | { sort: 'word'; word: Word; said: string }
+  | { sort: 'service'; word: string; end?: string };
 
 const KIND = /^kind\s+(.+)$/i;
 const SAID = /^(text|type|id|in|related|island|owner|worked)\s+(.+)$/i;
 const LINK = /^(\S+?)(<?)\s+(.+)$/;
+const SERVED = /^([a-z][a-z0-9_]*)(?:\s+(.+))?$/i;
+
+/** A term a pack provides, if the words are one: its word, and the rest as its end. */
+function servedTerm(l: Archipelago, s: string): Term | undefined {
+  const [, word, end] = SERVED.exec(s) ?? [];
+  return word && hasService(l.registry, `term.${word.toLowerCase()}`) ? { sort: 'service', word: word.toLowerCase(), ...(end !== undefined && { end }) } : undefined;
+}
 
 /** One term as written; a term that reads as nothing is refused, in the words of the part it stands in. */
 export function readTerm(l: Archipelago, raw: unknown, part: string): Term {
@@ -64,6 +76,8 @@ export function readTerm(l: Archipelago, raw: unknown, part: string): Term {
   const [, link, back, end] = LINK.exec(s) ?? [];
   if (link && l.registry.relations.has(l.registry.canonical(link))) return { sort: 'link', link, end, back: back === '<' };
   if (l.registry.types.has(l.registry.canonical(s))) return { sort: 'type', type: s };
+  const served = servedTerm(l, s);
+  if (served) return served;
   throw new Error(`filter.${part}: "${s}" is no term: held, moved, frontier, worked <session>, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, island <island>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent)`);
 }
 
@@ -81,6 +95,7 @@ export function sayTerm(t: Term): string {
   if (t.sort === 'frontier') return 'frontier';
   if (t.sort === 'worked') return `worked ${t.end}`;
   if (t.sort === 'word') return t.said;
+  if (t.sort === 'service') return t.end === undefined ? t.word : `${t.word} ${t.end}`;
   return t.owner ? `owner ${t.end}` : `${t.link}${t.back ? '<' : ''} ${t.end}`;
 }
 
@@ -97,6 +112,13 @@ export async function frontierOf(l: Archipelago): Promise<Map<string, { why: str
   const f = await frontier(l, { limit: FRONTIER_MOST });
   const rank = (r: { why: string }) => FRONTIER_REASONS.indexOf(r.why as (typeof FRONTIER_REASONS)[number]);
   return new Map(f.items.map((i) => [i.id, [...i.reasons].sort((a, b) => rank(a) - rank(b)).map((r) => ({ why: r.why, said: said(r) }))]));
+}
+
+/** The ids a provided term's set holds, as its provider answers them: ids alone, anything else refused. */
+async function servedIds(l: Archipelago, t: Extract<Term, { sort: 'service' }>, me: string | null): Promise<string[]> {
+  const out = await callService<{ ids?: unknown }>(l.registry, `term.${t.word}`, { ...(t.end !== undefined && { end: t.end }), me });
+  if (!Array.isArray(out?.ids) || out.ids.some((id) => typeof id !== 'string')) throw new Error(`filter: the term "${sayTerm(t)}" answered no ids: its provider answers { ids }`);
+  return out.ids as string[];
 }
 
 /** What the sessions named changed, touched or were set to work on. */
@@ -129,6 +151,7 @@ export async function setOf(l: Archipelago, t: Exclude<Term, { sort: 'word' }>, 
   if (t.sort === 'held') return { cond: 'e.id = any($?::text[])', param: await heldIds(l) };
   if (t.sort === 'moved') return { cond: 'e.id = any($?::text[])', param: await movedIds(l) };
   if (t.sort === 'frontier') return { cond: 'e.id = any($?::text[])', param: [...(await frontierOf(l)).keys()] };
+  if (t.sort === 'service') return { cond: 'e.id = any($?::text[])', param: await servedIds(l, t, me) };
   const at = await endsOf(l, t, me);
   if (t.sort === 'worked') return { cond: 'e.id = any($?::text[])', param: await workedBy(l, at) };
   if (t.sort === 'island') return { cond: onIslands('$?'), param: at };

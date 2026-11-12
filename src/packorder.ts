@@ -12,9 +12,14 @@
 // (`status:done@task`) or a phase some status stands in (`phase:finished@task`). It is checked by shape, as a record
 // type's width is: the type as its provider declares it (its lineage, and fields other packs add to it) may have more,
 // never less. A version in its provider's place is checked the same way (src/island-pin.ts).
+//
+// A service (`service:answer.attention`, docs/kernel-packs.md) is a function an in-process pack provides under its
+// manifest's `kernel` key (src/services.ts). One pack owns a name, and a caller's declared shape is met by its provider
+// or the caller waits, saying which field.
 
 import { phasesOf } from './phases.ts';
 import type { PackFile, TypeDef } from './packs.ts';
+import { kernelOf, meets, providedBy } from './services.ts';
 
 export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 
@@ -42,17 +47,17 @@ export const ownsId = (pack: { id: string; moved_from?: string[] }, id: string):
 export const KERNEL_EVENTS = ['item.due', 'notification.made'];
 
 /** A name a pack requires or uses, read: what it asks for, and of what. A bare id is a pack: the old form. */
-export type Need = { by: 'has' | 'type' | 'event' | 'field' | 'status' | 'phase' | 'pack'; name: string; of?: string };
+export type Need = { by: 'has' | 'type' | 'event' | 'service' | 'field' | 'status' | 'phase' | 'pack'; name: string; of?: string };
 /** The forms that name what is read of a type: <what>@<type>. */
 const SHAPED = ['field', 'status', 'phase'] as const;
-const FORMS = ['has', 'type', 'event', ...SHAPED] as const;
+const FORMS = ['has', 'type', 'event', 'service', ...SHAPED] as const;
 const shaped = (by: string) => (SHAPED as readonly string[]).includes(by);
 /** Whether a manifest's entry of requires or uses is a name in one of these forms; what they are, for its refusal. */
 export const isName = (n: unknown): n is string => {
   const m = typeof n === 'string' ? /^(?:([a-z]+):)?([\w.-]+(@[\w.-]+)?)$/.exec(n) : null;
   return !!m && (m[1] === undefined ? !m[3] : (FORMS as readonly string[]).includes(m[1]) && shaped(m[1]) === !!m[3]);
 };
-const SAYS: Record<string, string> = { has: 'capability', type: 'id', event: 'kind' };
+const SAYS: Record<string, string> = { has: 'capability', type: 'id', event: 'kind', service: 'family>.<name' };
 export const NAME_FORMS = `a name is ${FORMS.map((f) => `${f}:<${SAYS[f] ?? `${f}>@<type`}>`).join(', ')}, or a pack's id (the old form)`;
 export function needOf(name: string): Need {
   const at = name.indexOf(':');
@@ -103,7 +108,8 @@ function shapeMissing(need: Need, all: PackFile[]): string {
 
 /**
  * The packs among `packs` that provide a name, by id: those declaring a type with that capability, the one declaring
- * that type or link type, the one whose handlers record that event (core for the kernel's), the one whose type has
+ * that type or link type, the one whose handlers record that event (core for the kernel's), the one whose `kernel`
+ * provides that service, the one whose type has
  * the field, status or phase asked of it (by shape: more is fine, less is none), or the pack itself.
  */
 export function providersOf(name: string, packs: Iterable<PackFile>): string[] {
@@ -114,6 +120,7 @@ export function providersOf(name: string, packs: Iterable<PackFile>): string[] {
   switch (need.by) {
     case 'has': return of((p) => own(p).some((t) => t.capabilities?.[need.name] !== undefined));
     case 'type': return of((p) => own(p).some((t) => t.id === need.name) || (p.links ?? []).some((r) => r.id === need.name));
+    case 'service': return of((p) => providedBy(p).includes(need.name));
     case 'event': return KERNEL_EVENTS.includes(need.name) ? of((p) => KERNEL_PACKS.includes(p.id)) : of((p) => (p.handlers ?? []).some((h) => !('schedule' in h) && (h.records ?? []).includes(need.name)));
     case 'pack': return of((p) => p.id === need.name);
     default: return shapedProviders(need, all);
@@ -146,7 +153,7 @@ export function orderPacks(found: Map<string, PackFile>, off: Map<string, string
   const states = new Map<string, PackState>();
   const ordered: PackFile[] = [];
   const owners = new Map<string, string>();
-  const namesOf = (p: PackFile) => [...(p.types ?? []).flatMap((t) => ('of' in t ? [] : [t.id])), ...(p.links ?? []).map((r) => r.id)];
+  const namesOf = (p: PackFile) => [...(p.types ?? []).flatMap((t) => ('of' in t ? [] : [t.id])), ...(p.links ?? []).map((r) => r.id), ...providedBy(p).map((n) => `service:${n}`)];
   const visit = (pack: PackFile, trail: string[]): PackState => {
     const known = states.get(pack.id);
     if (known) return known;
@@ -157,14 +164,21 @@ export function orderPacks(found: Map<string, PackFile>, off: Map<string, string
         const providers = providersOf(name, found.values());
         if (providers.includes(pack.id)) continue; // it provides what it requires itself
         const states = providers.map((id) => ({ id, ...visit(found.get(id)!, [...trail, pack.id]) }));
-        if (states.some((s) => s.state === 'active')) continue;
         const need = needOf(name);
+        const live = states.find((s) => s.state === 'active');
+        if (live && need.by === 'service') {
+          // Checked by shape: what the caller declared it calls the name with, against what its provider declares.
+          const said = kernelOf(pack).calls?.[need.name];
+          const why = said && meets(kernelOf(found.get(live.id)!).provides?.[need.name] ?? {}, said);
+          if (why) return set(pack, { state: 'waiting', why: `needs ${name} as it calls it, and ${live.id}'s ${why}` });
+        }
+        if (live) continue;
         const why = need.by === 'pack' ? `needs ${name}, which is ${states[0]?.state ?? 'not on this server'}`
           : !providers.length ? `needs ${name}: ${need.of ? shapeMissing(need, [...found.values()]) : 'no pack here provides it'}`
           : `needs ${name}, which ${states.map((s) => `${s.id} is ${s.state}`).join(', ')}`;
         return set(pack, { state: 'waiting', why });
       }
-      // One owner per name: a pack declaring a type or link type another active pack owns waits until that one goes.
+      // One owner per name: a pack declaring a type or link type, or providing a service, another active pack owns waits until that one goes.
       const taken = namesOf(pack).filter((n) => owners.has(n));
       if (taken.length) return set(pack, { state: 'waiting', why: `${taken.map((n) => `${n} is ${owners.get(n)}'s`).join(', ')}: one pack owns a name` });
     }
