@@ -2,7 +2,7 @@
 // own packs run theirs in src/hooks.ts). Only the leader does them (src/leader.ts): they start when this process takes
 // the lead and stop when it loses it.
 
-import { backupAll, newestBackup } from './backup.ts';
+import { backupAll, newestBackup } from './backup-run.ts';
 import type { Config } from './config.ts';
 import type { Leader } from './leader.ts';
 import { every } from './lifecycle.ts';

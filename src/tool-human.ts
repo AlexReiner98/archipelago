@@ -4,7 +4,7 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { merge, parseBackup, parseVault, readable } from './backup.ts';
+import { parseBackup, parseVault, readable } from './backup.ts'; import { merge } from './backup-run.ts';
 import { launch } from './launcher.ts';
 import { bypassingRls } from './outbox.ts';
 import type { TypeDef } from './packs.ts';

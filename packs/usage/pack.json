@@ -1,0 +1,12 @@
+{
+  "id": "usage",
+  "version": "0.1.0",
+  "title": "Usage",
+  "description": "What a workspace uses and what that use is made of: the bytes each item adds to the log, its storage, sessions at work and requests a minute against the limits a server sets, and how much each thing a pack declares is used, for the Packs screen.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": { "log.appended": "bytes.ts#appended" }
+  }
+}
