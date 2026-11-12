@@ -50,7 +50,7 @@ export const PREVIEW_MOST = 200;
 const MAX_STEPS = 6;
 /** How much of an item's note travels with it: enough to show on hover. */
 const NOTE_START = 280;
-/** Asked for whole (`notes: "whole"`, for a drawing that reads them, such as the pages), the notes of this many items, seeds first. */
+/** Asked for whole (`notes: "whole"`, for a drawing that reads them, such as the pages), the notes of this many items, seeds first; with `fields: true`, of every item sent. */
 export const NOTES_WHOLE_MOST = 100;
 
 /** A link the walk follows and which way (decision e_gue6cg6q): `>` along it from the item it starts at, `<` back to it, else either. */
@@ -147,7 +147,11 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
   const lens = readFlat(at, input);
   // How much of each note is sent is not the lens: the same items, their notes whole for a drawing that reads them.
   if (input.notes !== undefined && input.notes !== 'whole') throw new Error('notes must be "whole", or left out for the start of each note');
-  const whole = input.notes === 'whole';
+  // Asked with its fields (`fields: true`, for a script that keeps the map in step with what it reads): every item sent
+  // with every field its type declares and its note whole, whatever the limit; else the fields its type shows.
+  if (input.fields !== undefined && input.fields !== true) throw new Error('fields must be true, or left out for the fields each type shows');
+  const allFields = input.fields === true;
+  const whole = input.notes === 'whole' || allFields;
   // Asked by a page that keeps the answer current: where the log stood before anything was read, so the facts after it
   // that the page plays reach what this answer holds, and nothing said while it was read is missed (ui/live.js).
   if (input.follow !== undefined && input.follow !== true) throw new Error('follow must be true, or left out');
@@ -178,7 +182,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
     find: terms.slice(0, f), only: terms.slice(f, f + o), not: terms.slice(f + o, f + o + n),
     said_not: (input.filter as { not?: unknown } | undefined)?.not !== undefined,
     walk: lens.walk, limit: lens.limit, me,
-    ...(since && { since }), ...(whole && { whole }),
+    ...(since && { since }), ...(whole && { whole: allFields ? ('all' as const) : true }),
     ...(preview && { preview: { part: preview.part, terms: offered.map((x, i) => ({ raw: x.raw, term: terms[f + o + n + i] })), ids: Array.isArray(preview.ids) ? preview.ids : [] } }),
   };
   if (preview) return (await ctx.reads({ flat } as never)) as never;
@@ -211,7 +215,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
     ...(me && { viewer: me }),
     items: items.map((e) => {
       const type = ctx.registry.type(e.type), defs = type?.fields ?? {};
-      const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
+      const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => (allFields ? Object.hasOwn(defs, key) : defs[key]?.shown) && value != null));
       return {
         id: e.id, type: e.type,
         // What its type is a flavour of, nearest first (task: work), as a link says it: a drawing reads shapes and colours by it.
