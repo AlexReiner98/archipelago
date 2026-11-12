@@ -5,7 +5,7 @@
 // Unwait and sources stay inline for now: both act at the level of facts inside the apply loop, and as a
 // write.follow their ops would be judged by the rules, which is the owner's to see first (task e_mhqvdzj6).
 
-import { placeOnIslands } from './island-items.ts'; import { placeWithSubject } from './subject.ts';
+import { placeOnIslands } from './island-place.ts'; import { placeWithSubject } from './subject.ts';
 import { noTwins } from './view-twins.ts';
 import { checkUpdated, checkWritten } from './automation-rules.ts'; import { islandRegistry } from './island-pin.ts';
 import { typesApplied } from './type-items.ts'; import { supersede } from './proposals.ts';
