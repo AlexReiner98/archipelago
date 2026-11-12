@@ -165,6 +165,9 @@ const hostFor = (l: Archipelago): KernelHost => {
   return host;
 };
 
+/** The kernel host of a map: its workspace's, or for a map no workspace opened, a loose one (code only, nothing filled at open). */
+export const hostAt = (l: Archipelago): KernelHost => hostFor(l);
+
 /** The write path's slot for a map no workspace opened (src/write-hooks.ts): its internal packs' fillings, from a loose host. */
 export const looseWriteSlot: WriteSlot = {
   fillings: (map, point) => hostFor(map).fillings(map, point),

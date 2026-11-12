@@ -7,6 +7,7 @@ import type { KernelContext } from '#pelago/kernel';
 import { instructionsFor } from './instructions.ts';
 import { briefFor } from './launch-brief.ts';
 import { schemaBrief } from './schema-brief.ts';
+import { instructions } from './reads.ts';
 
 function context(answers: Record<string, unknown>, asked: Record<string, unknown>[] = []): KernelContext {
   const reads = async (q: Record<string, unknown>) => {
@@ -44,4 +45,10 @@ test('the schema in brief: statuses and the fields a writer sets', () => {
   const types = new Map([['task', { id: 'task', starter: 'task', statuses: { open: ['open'], closed: ['done'] }, columns: {}, fields: { due: { type: 'date' }, made: { type: 'string', system: true } } }]]);
   const brief = schemaBrief({ types, relations: new Map(), packs: [{ id: 'core' }] } as never);
   assert.deepEqual(brief.types, [{ id: 'task', statuses: 'open / done', fields: 'due: date' }]);
+});
+
+test('the read instructions answers what is said where, about an item', async () => {
+  const ctx = context({ told_from: { presets: [{ id: 'core.start', title: 'Start', body: 'Go.', props: { for: ['session_start'] } }], kept: [] }, told: true });
+  assert.deepEqual((await instructions(ctx, { instructions: { where: 'session_start', about: 'e_x' } })).map((s) => s.id), ['core.start']);
+  assert.deepEqual(await instructions(ctx, { instructions: { where: 'nowhere' } }), []);
 });

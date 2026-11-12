@@ -3,19 +3,15 @@
 // handler asks what kind of thing it is rather than naming a type alone. A read that asks for some fields is given
 // those of each item's props, and no note: a session's story or a long note need not cross the pipe for nothing.
 
-import { livesIn, livesInFor, SCOPE } from '../../../src/places.ts';
+import { livesIn, livesInFor, SCOPE } from './packreads-scope.ts';
 import type { Archipelago, Entity } from '../../../src/pelago.ts';
 import { blockGraph } from './blocking.ts';
 import { packVersions } from '../../loader/kernel/pack-versions.ts';
-import { readEvents } from '../../../src/eventlog.ts';
-import { askPackView, VIEWS } from '../../../src/views.ts';
 import { scanAround } from './region.ts';
-import { placeAll, readAxis, zoneOf } from '../../../src/timeaxis.ts';
-import { LENS_LIMIT } from '../../../src/query-flat.ts';
 import { NAME, pageOf, paged, READ_LIMIT, shapes, type Page } from './packreads-rows.ts';
 import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './packreads-log.ts';
-import { pinned, type Pin } from './packreads-pin.ts';
-import { kernelRead, type KernelRead } from './packreads-kernel.ts';
+import type { Pin } from './packreads-pin.ts';
+import { filled, kernelRead, type KernelRead } from './packreads-kernel.ts';
 import { serviceRead, type ServiceRead } from './packreads-service.ts';
 import { fillReads } from '../../loader/kernel/packhost.ts';
 
@@ -89,7 +85,7 @@ fillReads((l, read) => answerRead(l, read));
 /** The answer to a read, as the map asks it; `pack` is the internal pack asking, when one is (its own memory is read by it alone). */
 export async function answerRead(l: Archipelago, q: Read, pack?: string): Promise<unknown> {
   // The reads a kernel view needs as a service pack (src/packreads-kernel.ts), and those the moved services need (src/packreads-service.ts).
-  const kernel = await kernelRead(l, q);
+  const kernel = await kernelRead(l, q, pack);
   if (kernel !== undefined) return kernel;
   const service = await serviceRead(l, q, pack);
   if (service !== undefined) return service;
@@ -173,20 +169,8 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
       links: read.relations.map((r) => ({ ...(open && { id: r.id }), type: r.type, from: r.from_id, to: r.to_id, is: lineage(r.type) })),
     };
   }
-  if (q.placed !== undefined) {
-    const axis = readAxis(q.placed);
-    const { rows } = await l.db.query<Entity>(
-      `select ${cols('e')} from entity e where e.type = any($1::text[]) and e.archived_at is null and (e.is_open or e.updated_at >= $2::timestamptz) order by e.updated_at desc limit ${LENS_LIMIT} -- index entity_type`,
-      [family(q.placed.types) ?? [], axis.from],
-    );
-    const spans = await placeAll(l, rows, axis, await zoneOf(l));
-    return rows.filter((e) => spans.get(e.id)?.length).map((e) => ({ ...typed(e), open: e.is_open, time: spans.get(e.id) }));
-  }
-  if (q.events) {
-    const { action, target, since, limit } = q.events;
-    const rows = await readEvents(l.db, { action, target, since, limit: Math.min(limit ?? 50, READ_LIMIT) });
-    return rows.filter((r) => !since || new Date(r.ts) > new Date(since)).map(({ seq, ts, actor, action, target_id, reason, detail }) => ({ seq, ts, actor, action, target_id, reason, detail }));
-  }
+  if (q.placed !== undefined) return filled(l, 'placed', q, pack);
+  if (q.events) return filled(l, 'events', q, pack);
   if (q.pictures) {
     const { rows } = await l.db.query<{ entity_id: string }>(`select entity_id from picture where entity_id = any($1::text[])`, [q.pictures]);
     return rows.map((r) => r.entity_id);
@@ -219,12 +203,8 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   if (q.held) return heldChanges(l, { page: q.page });
   if (q.confirm !== undefined) return confirmQuestions(l, q.confirm ?? {});
   if (q.packs) return packVersions(l.registry);
-  if (q.view !== undefined) {
-    // A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work).
-    const view = VIEWS[q.view];
-    if (q.pin !== undefined) pinned(l, q.view, q.pin);
-    return view ? view.run(l, q.params ?? {}) : askPackView(l, q.view, q.params ?? {});
-  }
+  // A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work), pinned or not.
+  if (q.view !== undefined) return filled(l, 'view', q, pack);
   if (q.type_info !== undefined) {
     const t = l.registry.type(q.type_info);
     // lives_in: the link that puts an item in a place of this type.
