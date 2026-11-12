@@ -7,8 +7,9 @@ import { test } from 'node:test';
 import { openKernel } from '../src/kernel-context.ts';
 import { Registry } from '../src/packs.ts';
 import { filledTool, serveFilled, slotted, type RouteHost } from '../src/surface-slots.ts';
-import { callTool } from '../src/tools.ts';
-import { agent, freshWith, PACKS, packsWith } from './map.ts';
+import { annotationsOf } from '../src/surface.ts';
+import { callTool, surfaceFor } from '../src/tools.ts';
+import { agent, freshWith, human, PACKS, packsWith } from './map.ts';
 
 test('rechecked is offered under report as before, its behaviour the kernel module that fills it', async () => {
   const l = await freshWith(new Registry(PACKS, ['core']));
@@ -52,4 +53,20 @@ test('a route filling answers before the server, counting its requests against t
   status = 0;
   assert.equal(await serveFilled(get('/backup-file/ws/key'), res, '/backup-file/ws/key', refusing), true);
   assert.equal(status, 0, 'asked too often: the limit answered it');
+});
+
+test('a pack declares an action under a verb of its own, its code in-process', async () => {
+  const l = await freshWith(new Registry(packsWith('verb_probe')));
+  openKernel(l);
+  const names = surfaceFor(l.registry).map(([name]) => name);
+  assert.deepEqual(names.slice(-2), ['probe', 'draw'], 'its verb is a tool of the surface, before draw');
+  assert.equal(annotationsOf(l.registry, 'probe').title, 'Probe');
+  assert.match(String((surfaceFor(l.registry).find(([n]) => n === 'probe')![1]).description), /verb_probe\.ping/, 'the verb lists its action');
+  assert.deepEqual(await callTool(l, agent, 'probe', { action: 'ping', params: { said: 'hi' } }), { said: 'hi', who: `agent:${agent.name}`, by: 'verb_probe' }, 'run in-process, not in the sandbox');
+  assert.deepEqual(await callTool(l, agent, 'verb_probe_ping', { said: 'yo' }), { said: 'yo', who: `agent:${agent.name}`, by: 'verb_probe' }, 'by its tool name too');
+  await assert.rejects(callTool(l, agent, 'report', { action: 'ping', params: { said: 'hi' } }), /"verb_probe.ping" is a probe: call probe/);
+  await assert.rejects(callTool(l, agent, 'probe', { action: 'hush', params: {} }), /for humans only/);
+  assert.deepEqual(await callTool(l, human, 'probe', { action: 'hush', params: {} }), { hushed: true });
+  const core = await freshWith(new Registry(PACKS, ['core']));
+  assert.ok(!surfaceFor(core.registry).some(([name]) => name === 'probe'), 'a map without the pack offers the ten');
 });
