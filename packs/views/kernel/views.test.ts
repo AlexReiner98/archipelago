@@ -7,6 +7,7 @@ import type { KernelContext } from '#pelago/kernel';
 import { graph } from './answers.ts';
 import { holders } from './inside.ts';
 import { sections, structureAsText } from './plan-note.ts';
+import { forReader, readDocument, sectionIds } from './documents.ts';
 
 const at = new Date('2026-11-01T00:00:00Z');
 const item = (id: string, props: Record<string, unknown> = {}) => ({ id, type: 'task', title: id.toUpperCase(), status: 'open', owner: null, is_open: true, created_at: at, updated_at: at, archived_at: null, props });
@@ -52,4 +53,29 @@ test('a note of several sections with fewer items tied is said back', () => {
   assert.equal(sections(body), 4);
   assert.match(structureAsText([{ at: 1, op: 'create', body, ties: 1 }])!, /4 sections, 1 items tied/);
   assert.equal(structureAsText([{ at: 1, op: 'create', body, ties: 4 }]), undefined);
+});
+
+test('a document is read whole: its text, each item it brings in where its line names it, and what is kept elsewhere', async () => {
+  const doc = { id: 'e_doc00000', type: 'task', title: 'Doc', status: 'open', body: 'Intro\ne_aaaaaaaa\nMiddle\n  e_bbbbbbbb \ne_gone0000', props: { for: 'e_me', tokens_estimated: 3 }, updated_at: at, archived_at: null };
+  const kept = new Map([[doc.id, doc], ['e_aaaaaaaa', { ...item('e_aaaaaaaa'), body: 'A' }], ['e_bbbbbbbb', { ...item('e_bbbbbbbb'), body: 'B' }]]);
+  const asked: unknown[] = [];
+  const ctx = { ...context(), reads: async (q: Record<string, unknown>) => {
+    asked.push(Object.keys(q)[0]);
+    if (q.ids) return (q.ids as string[]).flatMap((id) => (kept.has(id) ? [kept.get(id)] : []));
+    if (q.pictures) return ['e_bbbbbbbb'];
+    if (q.links) return [{ from_id: 'e_aaaaaaaa', to_id: doc.id }];
+    throw new Error('not read here');
+  } } as unknown as KernelContext;
+  assert.deepEqual(sectionIds(doc.body), ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_gone0000']);
+  const read = await readDocument(ctx, doc.id);
+  assert.deepEqual(read.parts.map((p) => ('text' in p ? p.text : 'section' in p ? [p.section.id, p.section.picture] : p.missing)), ['Intro', ['e_aaaaaaaa', false], 'Middle', ['e_bbbbbbbb', true], 'e_gone0000']);
+  assert.equal(read.for, 'e_me');
+  assert.deepEqual(read.not_inside, ['e_bbbbbbbb']);
+  await assert.rejects(readDocument(ctx, 'e_nothere0'), /not on this map/);
+});
+
+test('a reader from outside is told of no item a document does not bring in', () => {
+  const given = { id: 'e_doc00000', type: 'task', title: 'Doc', status: 'open', body: 'See e_aaaaaaaa and (e_secret00).\ne_aaaaaaaa', props: {}, updated_at: '2026-11-01', items: [{ id: 'e_aaaaaaaa', type: 'task', title: 'A', status: 'open', body: 'Not e_secret00', updated_at: '2026-11-01' }] };
+  const out = forReader(context(), given, 'e_share000');
+  assert.deepEqual(out.parts, [{ text: 'See e_aaaaaaaa and.' }, { section: { ...given.items[0], body: 'Not', via: 'e_share000' } }]);
 });

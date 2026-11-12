@@ -250,7 +250,7 @@ are slots of the write and log packs; the others:
 | `identity.invited` | identity | mail | `members.ts` importing `mail.ts` |
 | `open.<phase>` | the stub | any | the fixed order in `Workspaces.load` |
 | `surface.read`, `surface.act`, `surface.route` | surface | any | the closed tables in `tool-reads.ts`, `tool-acts.ts`, `server.ts` |
-| `surface.reads` | surface | agents (`instructions`); the kernel until their packs hold their modules: uses (`told`), touched (`touched`), eventlog (`events`), views and askview (`view`), timeaxis (`placed`) | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
+| `surface.reads` | surface | agents (`instructions`); the kernel until their packs hold their modules: uses (`told`), touched (`touched`), views and askview (`view`), timeaxis (`placed`). `events` is the reads API's own since wave 6 (`packreads-views`), eventlog being the log root's | `packreads*.ts` importing instructions, uses, touched, eventlog, views, timeaxis, query-flat |
 
 This is also the fix for bug e_wpww27fm (trusted modules import services):
 each import it names becomes a slot, cut by the step that moves the
@@ -329,7 +329,7 @@ moves with a shim to the pack named.
 |---|---|
 | database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), deploy, move, leader |
 | seal | seal, opseal, vault, secrets, backup-seal |
-| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage) |
+| log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage), eventlog (wave 6: backup's dump and the surface's reads read events with a database or a transaction) |
 | identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
 | walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail |
 | loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
@@ -343,7 +343,7 @@ moves with a shim to the pack named.
 |---|---|
 | query | query-flat, query-terms, query-steps, query-only, query-held, query-presets, askview, views, altitude, timeaxis, summary |
 | lenses | query-kept, query-saved, saved-views, view-life, view-twins, query-names |
-| views | view-graph, view-tree, inside, brief, eventlog, moved, timelanes, documents, plan-note |
+| views | view-graph, view-tree, inside, brief, moved, timelanes, documents, plan-note |
 | attention | attention, bounds, confirm |
 | findings (exists) | findings |
 | styles | styles, style-move, layout-move, screens, colours |
@@ -554,8 +554,8 @@ map that asks, any map, opened or not (`hostAt`, `src/kernel-context.ts`); a mod
 `src/` fills it from `KERNEL_FILLINGS` (`src/surface-fillings.ts`, through
 `src/service-reads.ts`), until its pack holds it: `told` (uses: the usage pack's code still
 imports the kernel, so it does not load from a copy of the packs), `touched` (sessions is
-optional, and an optional pack fills only `write.*`), `events`, `view` (with its pin) and
-`placed`. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
+optional, and an optional pack fills only `write.*`), `view` (with its pin) and `placed`; `events`
+left in wave 6, answered by the reads API from the log root's eventlog. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
 reads API's own bounded scan, `packreads-scope`, which places re-exports. `test/packreads-slots.test.ts`
 pins each answer against its service's own functions.
 
