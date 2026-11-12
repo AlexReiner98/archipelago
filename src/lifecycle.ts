@@ -12,7 +12,7 @@
 //     each called with its pack's KernelContext (src/kernel-context.ts). The registry is made in the `packs` phase, so
 //     a pack's manifest can fill only the phases after it: types (once its host is open), begin, islands and ready.
 
-import { OPEN_PHASES } from './boot.ts';
+import { OPEN_PHASES } from './open-phases.ts';
 import type { Dump } from './backup.ts';
 import type { Database } from './db.ts';
 import { hostOf } from './kernel-context.ts';

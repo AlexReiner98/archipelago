@@ -30,7 +30,7 @@ export const HOME = join(import.meta.dirname, '..');
 /** Where the root list is, under the repository. */
 export const ROOTS_FILE = 'packs/roots.json';
 /** The phases a workspace opens in, each a slot `open.<phase>` the packs fill (the order Workspaces.load had). */
-export const OPEN_PHASES = ['restore', 'packs', 'types', 'begin', 'islands', 'ready'] as const;
+export { OPEN_PHASES } from './open-phases.ts'; import { OPEN_PHASES } from './open-phases.ts';
 /** The control value the starts are kept under, and how many are kept. */
 export const STARTS_KEY = 'boot.starts';
 const STARTS_KEPT = 50;
