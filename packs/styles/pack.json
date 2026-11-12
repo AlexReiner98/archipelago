@@ -22,6 +22,20 @@
         "in": "any",
         "out": "any",
         "run": "styles.ts#pageLook"
+      },
+      "answer.schema_styled": {
+        "in": {
+          "described": "any"
+        },
+        "out": {
+          "screens": [
+            "any"
+          ],
+          "styles": [
+            "any"
+          ]
+        },
+        "run": "schema-styled.ts#schemaStyled"
       }
     }
   }

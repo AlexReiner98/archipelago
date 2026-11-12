@@ -15,7 +15,8 @@
     "internal": true,
     "modules": "kernel/",
     "hooks": {
-      "surface.act": "check-connections.ts#check_connections"
+      "surface.act": "check-connections.ts#check_connections",
+      "surface.tools": "surface-tools.ts#tools"
     }
   },
   "reach": {

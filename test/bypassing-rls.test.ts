@@ -30,8 +30,7 @@ const CALLERS: Record<string, number> = {
   'src/tool-acts.ts': 2,
   'src/tool-change.ts': 6,
   'src/tool-human.ts': 4,
-  'src/tool-reads.ts': 4,
-  'src/tools.ts': 1,
+  'src/tool-reads.ts': 1,
   'src/touched.ts': 3,
   'src/typetable.ts': 2,
   'src/workspace-tools.ts': 4, // root.counters, the usage view's whole count (was src/usage.ts's)

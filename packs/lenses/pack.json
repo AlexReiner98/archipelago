@@ -29,6 +29,18 @@
           "links": "any"
         },
         "run": "kept-picture.ts#keptPictureOf"
+      },
+      "answer.shown_in": {
+        "in": {
+          "id": "id",
+          "trail": [
+            "any"
+          ]
+        },
+        "out": [
+          "any"
+        ],
+        "run": "shown-in.ts#shownInOf"
       }
     }
   }

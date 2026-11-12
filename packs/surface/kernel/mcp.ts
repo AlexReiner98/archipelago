@@ -15,11 +15,24 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
 import { viewNames } from '../../../src/askview.ts';
-import { registerView, toolView, VIEW_CAPABILITY } from '../../../src/mcp-view.ts';
 import { onToolsChanged } from '../../../src/packstate.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import { serverFillings } from './server-fillings.ts';
 import { annotationsOf } from './surface.ts';
 import { callTool, surfaceFor, type Tool } from './tools.ts';
+
+/** What a pack adds to the MCP server (surface.mcp, ./server-fillings.ts): the capability it speaks, what a tool's listing carries, a resource it offers. */
+interface McpFilling {
+  capability: Record<string, object>;
+  toolView(tool: string): Record<string, unknown>;
+  register(mcp: McpServer): void;
+}
+const mcpFillings = await serverFillings<McpFilling>('surface.mcp');
+if (mcpFillings.length > 1) throw new Error(`surface.mcp is filled by ${mcpFillings.map((f) => f.pack).join(' and ')}: it takes one filling`);
+const apps = mcpFillings[0];
+const VIEW_CAPABILITY = apps?.filled.capability ?? {};
+const toolView = (tool: string) => apps?.filled.toolView(tool) ?? {};
+const registerView = (mcp: McpServer) => apps?.filled.register(mcp);
 
 const actorField = {
   actor: z.string().optional().describe('Who you are, for the log.'),

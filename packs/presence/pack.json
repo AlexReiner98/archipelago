@@ -9,6 +9,29 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "act.report.step": {
+        "in": {
+          "step": "any",
+          "viewer?": "string"
+        },
+        "out": "any",
+        "run": "surface-reads.ts#step"
+      },
+      "act.query.listening": {
+        "in": "number",
+        "out": "any",
+        "run": "presence.ts#listening"
+      },
+      "answer.seeing": {
+        "in": {
+          "run?": "string",
+          "viewer?": "string"
+        },
+        "out": "any",
+        "run": "surface-reads.ts#seeingNow"
+      }
+    }
   }
 }

@@ -6,7 +6,19 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "answer.picture": {
+        "in": {
+          "result": "id"
+        },
+        "out": "any",
+        "run": "pictures.ts#getPicture"
+      }
+    },
+    "hooks": {
+      "surface.tools": "surface-tools.ts#tools"
+    }
   },
   "uses": [
     "service:root.publish",

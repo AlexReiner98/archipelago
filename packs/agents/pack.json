@@ -29,6 +29,27 @@
         },
         "out": "string",
         "run": "launch-brief.ts#launchPrompt"
+      },
+      "answer.schema_brief": {
+        "in": {},
+        "out": {
+          "packs": [
+            "string"
+          ],
+          "types": [
+            "any"
+          ],
+          "relations": "any"
+        },
+        "run": "schema-answers.ts#brief"
+      },
+      "answer.schema_of": {
+        "in": {
+          "described": "any",
+          "type": "string"
+        },
+        "out": "any",
+        "run": "schema-answers.ts#one"
       }
     },
     "hooks": {
