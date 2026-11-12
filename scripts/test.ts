@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { blankImageFile } from '../src/db.ts';
+import { blankImageFile } from '../packs/database/kernel/db.ts';
 import { lock, unlock } from '../test/lock.ts';
 import { keys, passed, remember } from '../test/passes.ts';
 import { affected, allTests, fastTests, heaviestFirst, ROOT, shard, UNPRIVILEGED } from '../test/sets.ts';

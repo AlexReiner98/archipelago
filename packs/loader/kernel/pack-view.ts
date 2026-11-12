@@ -3,8 +3,8 @@
 // pack declares it; the sandbox runs it as the one who asked, on the island's version of the pack when the view's
 // params name an island. Values in, values out.
 
-import type { RootCall } from '../../../src/root-calls.ts';
-import type { Actor } from '../../../src/pelago.ts';
+import type { RootCall } from './root-calls.ts';
+import type { Actor } from '../../write/kernel/pelago.ts';
 import { islandRegistry } from './island-pin.ts';
 import { parts } from './manifest.ts';
 import { hostIn } from './packtools.ts';

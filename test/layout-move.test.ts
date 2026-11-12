@@ -3,7 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { layoutsMoved } from '../src/layout-move.ts';
+import { layoutsMoved } from '../packs/styles/kernel/layout-move.ts';
 
 const drawings = new Set(['core.grid']);
 

@@ -7,7 +7,7 @@
 // is for is said beside the shape, in `says`, by its path ("authority", "authority.of").
 
 import { z } from 'zod';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import type { Tool } from './tools.ts';
 
 /** A JSON sketch of a tool's input value. */

@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { promptTitle } from '../src/session-name.ts';
+import { promptTitle } from '../packs/sessions/kernel/session-name.ts';
 import { serve } from './serve.ts';
 
 const runInstaller = (base: string, home: string, flags: string[]) =>

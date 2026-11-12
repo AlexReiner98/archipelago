@@ -4,15 +4,15 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Archipelago } from '../src/pelago.ts';
-import { openDb, type Q } from '../src/db.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { openDb, type Q } from '../packs/database/kernel/db.ts';
 import { entryHash, GENESIS } from '../src/jcs.ts';
-import { entries, factAt, stored, verify, type Entry } from '../src/log.ts';
-import { makePartitions } from '../src/partitions.ts';
-import { rebuild } from '../src/replay.ts';
-import { dumpVault, restoreVault } from '../src/vault.ts';
-import { record } from '../src/streams.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { entries, factAt, stored, verify, type Entry } from '../packs/log/kernel/log.ts';
+import { makePartitions } from '../packs/log/kernel/partitions.ts';
+import { rebuild } from '../packs/log/kernel/replay.ts';
+import { dumpVault, restoreVault } from '../packs/seal/kernel/vault.ts';
+import { record } from '../packs/log/kernel/streams.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { fresh, make, replayed } from './map.ts';
 
 const monthsAgo = (n: number, day = 3) => {

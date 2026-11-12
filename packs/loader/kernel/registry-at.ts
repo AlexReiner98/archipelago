@@ -10,7 +10,7 @@
 // pack taken out is. Before any pack fact, there is no past registry: today's stands. The islands setting and the
 // workspace's own types are as the logs said them by P (src/registry-then.ts).
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { dirname } from 'node:path';
 import { readManifest } from './manifest.ts';
 import { codeFromLog, folderCode } from './pack-code.ts';

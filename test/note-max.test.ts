@@ -5,8 +5,8 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, make, PACKS } from './map.ts';
 
 const SAY = 'Rewrite it whole with body: keep what is still so.';

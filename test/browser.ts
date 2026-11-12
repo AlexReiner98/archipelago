@@ -6,7 +6,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromeBinary } from '../src/chrome.ts';
+import { chromeBinary } from '../packs/look_draw/kernel/chrome.ts';
 import { until, wait } from './wait.ts';
 
 export { until, wait };

@@ -2,9 +2,9 @@
 // 2026). The row's owner column stays as the link's index, for row-level reads and for attention: the write path
 // keeps the two the same, and an item has one owner, so a new owned_by link takes the place of the one before it.
 
-import { linkFacts } from '../../../src/facts.ts';
-import type { Q } from '../../../src/db.ts';
-import type { Fact } from '../../../src/log.ts';
+import { linkFacts } from '../../log/kernel/facts.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { Fact } from '../../log/kernel/log.ts';
 import type { Archipelago, Op } from './pelago.ts';
 
 export const OWNED_BY = 'owned_by';

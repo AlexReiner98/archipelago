@@ -9,9 +9,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { uiFile } from '../src/ui-files.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { uiFile } from '../packs/surface/kernel/ui-files.ts';
 import { agent, fresh, human, make } from './map.ts';
 
 /** The page's pure modules as the server serves them, loaded from a folder of their own as the browser would. */

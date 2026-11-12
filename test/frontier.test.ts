@@ -8,12 +8,14 @@ import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { folderKey, frontier, frontierText } from '../src/frontier.ts';
-import { type Actor } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { sessionEnd, sessionStart } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
+import { folderKey, frontierText } from '../packs/runs/kernel/frontier.ts';
+import * as frontierPack from '../packs/runs/kernel/frontier.ts';
+import { type Actor } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { freshWith, human } from './map.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const agent: Actor = { kind: 'agent', name: 'test' };
 
@@ -30,7 +32,7 @@ test('a second session is placed where the first worked: the owner’s correctio
   await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"') on conflict (key) do update set value = excluded.value`);
 
   // The first session plans the work and ends; it writes no summary for anyone.
-  const first = await sessionStart(l, agent, { session_id: 'one', cwd: 'C:/work/todo' });
+  const first = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'one', cwd: 'C:/work/todo' }));
   const made = ((await l.change(agent, {
     run: first.run,
     reason: 'Plan login',
@@ -45,15 +47,15 @@ test('a second session is placed where the first worked: the owner’s correctio
       { op: 'link', type: 'depends_on', from: 'form', to: 'table' },
     ],
   })) as { created: Record<string, string> }).created;
-  await sessionEnd(l, agent, { run: first.run, outcome: 'finished' });
+  await sessionsPack.sessionEnd(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ run: first.run, outcome: 'finished' }));
 
   // The owner corrects a step and adds one of their own to the plan.
   await l.change(human, { reason: 'Rename', ops: [{ op: 'update', id: made.table, title: 'User table, with email unique' }] });
   const added = ((await l.change(human, { reason: 'Add', ops: [{ op: 'create', ref: 'reset', type: 'task', title: 'Password reset' }, { op: 'link', type: 'part_of', from: 'reset', to: made.hub }] })) as { created: Record<string, string> }).created.reset;
 
   // A second session, in a worktree of the same checkout.
-  const second = await sessionStart(l, agent, { session_id: 'two', cwd: 'C:\\work\\todo\\.claude\\worktrees\\next' });
-  const f = await frontier(l, { run: second.run });
+  const second = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'two', cwd: 'C:\\work\\todo\\.claude\\worktrees\\next' }));
+  const f = await frontierPack.frontier(kernelContext(l, 'runs'), ({ run: second.run }));
   assert.equal(f.before.sessions, 1, 'the first session is found by its folder');
   const why = new Map(f.items.map((i) => [i.id, i.reasons.map((r) => r.why)]));
   assert.ok(why.get(made.table)?.includes('corrected'), 'the owner’s edit is on the frontier');
@@ -68,18 +70,18 @@ test('a second session is placed where the first worked: the owner’s correctio
 
   // Once an agent has touched what the owner corrected, it is no longer a correction.
   await l.change(agent, { run: second.run, reason: 'Seen', ops: [{ op: 'update', id: made.table, status: 'doing' }] });
-  const after = await frontier(l, { run: second.run });
+  const after = await frontierPack.frontier(kernelContext(l, 'runs'), ({ run: second.run }));
   assert.ok(!after.items.find((i) => i.id === made.table)?.reasons.some((r) => r.why === 'corrected'));
 
   // A session somewhere else is handed nothing of this.
-  const elsewhere = await sessionStart(l, agent, { session_id: 'three', cwd: 'C:/work/other' });
-  const none = await frontier(l, { run: elsewhere.run });
+  const elsewhere = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'three', cwd: 'C:/work/other' }));
+  const none = await frontierPack.frontier(kernelContext(l, 'runs'), ({ run: elsewhere.run }));
   assert.equal(none.before.sessions, 0);
   assert.match(frontierText(none)[0], /No session has worked here before/);
 
   // A chat with no folder (ChatGPT, Grok Bot) is the person's, wherever they worked: it is handed the open work too.
-  const chat = await sessionStart(l, agent, { session_id: 'four', title: 'A chat', surface: 'chatgpt' });
-  const theirs = await frontier(l, { run: chat.run });
+  const chat = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'four', title: 'A chat', surface: 'chatgpt' }));
+  const theirs = await frontierPack.frontier(kernelContext(l, 'runs'), ({ run: chat.run }));
   assert.ok(theirs.before.sessions >= 1 && theirs.items.some((i) => i.id === made.hash), 'the undecided question reaches a chat');
 
   // And the same answer is a view anyone may ask, the agent's start and the person's alike.
@@ -104,7 +106,7 @@ test('capture session_start answers with where the session stands', async () => 
 
 test('the first thing the owner asks narrows the start to what is settled on it, once', async () => {
   const { answerHook } = await import('./claude-hook.ts');
-  const { askedBy } = await import('../src/frontier-prompt.ts');
+  const { askedBy } = await import('../packs/runs/kernel/frontier-prompt.ts');
   const packs = mkdtempSync(join(tmpdir(), 'pelago-frontier-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
   const l = await freshWith(new Registry(packs));
@@ -136,7 +138,7 @@ test('Home reads the frontier of the whole workspace, each item with why; a sess
   const l = await freshWith(new Registry(packs));
   await callTool(l, human, 'init', { name: 'Alex' });
   await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"') on conflict (key) do update set value = excluded.value`);
-  const run = (await sessionStart(l, agent, { session_id: 'plan', cwd: '/srv/todo' })).run;
+  const run = (await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'plan', cwd: '/srv/todo' }))).run;
   const made = ((await l.change(agent, {
     run,
     reason: 'Plan',
@@ -148,10 +150,10 @@ test('Home reads the frontier of the whole workspace, each item with why; a sess
       { op: 'link', type: 'part_of', from: 'hash', to: 'hub' },
     ],
   })) as { created: Record<string, string> }).created;
-  await sessionEnd(l, agent, { run, outcome: 'finished' });
+  await sessionsPack.sessionEnd(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ run, outcome: 'finished' }));
 
   // Asked from no place (a person's Home), the frontier is every recent session's.
-  const f = await frontier(l, {});
+  const f = await frontierPack.frontier(kernelContext(l, 'runs'), ({}));
   assert.equal(f.before.sessions, 1);
   assert.ok(f.items.some((i) => i.id === made.hash));
 

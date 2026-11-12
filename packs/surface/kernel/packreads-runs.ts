@@ -3,10 +3,10 @@
 // the log or the stream, a limit, or an index it names, and answered as the asker under row-level security, as every
 // read of packreads.ts is. The SQL is the modules' own, moved as it was (packs/runs/kernel).
 
-import type { Archipelago, Entity } from '../../../src/pelago.ts';
-import { openOps } from '../../../src/opseal.ts';
-import { isSealed } from '../../../src/seal.ts';
-import type { Light, OpFact } from '../../../src/streams.ts';
+import type { Archipelago, Entity } from '../../write/kernel/pelago.ts';
+import { openOps } from '../../seal/kernel/opseal.ts';
+import { isSealed } from '../../seal/kernel/seal.ts';
+import type { Light, OpFact } from '../../log/kernel/streams.ts';
 import { searchMap, type SearchInput } from './search.ts';
 import { touchedSets } from './packreads-log.ts';
 

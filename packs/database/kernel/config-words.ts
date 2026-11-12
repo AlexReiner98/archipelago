@@ -3,7 +3,7 @@
 // Pure, and the database root's, so the config is read without asking above it; the loader (pack-allow.ts) and
 // identity (policy.ts) answer these as theirs.
 
-import type { Level, OpKind, Policy } from '../../../src/rules.ts';
+import type { Level, OpKind, Policy } from '../../rules/kernel/rules.ts';
 
 const list = (text: string) => text.split(',').map((p) => p.trim()).filter(Boolean);
 

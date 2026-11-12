@@ -4,16 +4,16 @@
 // (count.add, count.read: how many, never of whom), each read logged on that site's map. What it may do on a workspace whose admin connected it is in src/server-connect.ts. Every act is logged on the default workspace's map with the pack that asked,
 // so what a server pack did is in the owner's history like anything else.
 
-import { setControlValue, controlValue } from '../../../src/control.ts';
+import { setControlValue, controlValue } from '../../identity/kernel/control.ts';
 import { mailing, onMap, published } from './above.ts';
 import '../../loader/kernel/server-slots.ts'; // a workspace is made only where members' notices go out as mail
-import { admitMember, linkFor, memberOf, ownerEmail } from '../../../src/members.ts';
+import { admitMember, linkFor, memberOf, ownerEmail } from '../../identity/kernel/members.ts';
 import { madeKey } from './server-gates.ts';
-import type { ServerAct, ServerPackFile } from '../../../src/server-packs.ts';
+import type { ServerAct, ServerPackFile } from '../../loader/kernel/server-packs.ts';
 import { env } from '../../../src/env.ts';
-import type { RootCall } from '../../../src/root-calls.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import { freeId } from '../../../src/workspace-id.ts';
-import type { Workspaces } from '../../../src/workspaces.ts';
+import type { Workspaces } from '../../identity/kernel/workspaces.ts';
 
 export type ActPlaces = Pick<Workspaces, 'has' | 'get' | 'create' | 'hold'>;
 

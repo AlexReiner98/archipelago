@@ -2,7 +2,7 @@
 // the kernel): the two answer alike, sheet by sheet.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { cssProblem } from '../src/css-check.ts';
+import { cssProblem } from '../packs/walls/kernel/css-check.ts';
 import { cssProblem as packs } from '../packs/styles/kernel/page-css.ts';
 
 const SHEETS = [

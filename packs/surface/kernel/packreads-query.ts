@@ -4,7 +4,7 @@
 // is bounded by the ids it is given, a limit, or an index it names, and answered as the asker under row-level security,
 // as every read of packreads.ts is. The SQL is the modules' own, moved as it was.
 
-import type { Archipelago, Entity } from '../../../src/pelago.ts';
+import type { Archipelago, Entity } from '../../write/kernel/pelago.ts';
 import { factEvents, readEvents } from '../../log/kernel/eventlog.ts';
 import { doneCounts } from '../../log/kernel/activity.ts';
 import { flatRead, type FlatRead } from './packreads-flat.ts';

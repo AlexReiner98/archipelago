@@ -1,10 +1,10 @@
 // Search through its indexes answers as reading every row did: the same items, in the same order, for whoever asks.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Q } from '../src/db.ts';
-import type { Archipelago } from '../src/pelago.ts';
+import type { Q } from '../packs/database/kernel/db.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { fresh, make } from './map.ts';
-import { searchMap } from '../src/search.ts';
+import { searchMap } from '../packs/surface/kernel/search.ts';
 
 /** Search as it was before the index (to 23 Oct 2026): every row's words read on each call. */
 async function before(db: Q, input: { q: string; type?: string[]; limit?: number }) {

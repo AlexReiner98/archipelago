@@ -19,7 +19,7 @@
 
 import { phasesOf } from '../../../src/phases.ts';
 import type { PackFile, TypeDef } from './packs.ts';
-import { kernelOf, meets, providedBy } from '../../../src/services.ts';
+import { kernelOf, meets, providedBy } from './services.ts';
 
 export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
 

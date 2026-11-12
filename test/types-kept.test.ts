@@ -7,14 +7,14 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { freshWith, human, make, packsWith } from './map.ts';
-import { newId } from '../src/db.ts';
-import { append, headOf } from '../src/log.ts';
-import { Registry } from '../src/packs.ts';
-import { setIslands, syncPacks } from '../src/packstate.ts';
-import { Archipelago, type Op } from '../src/pelago.ts';
-import { asOf } from '../src/rebuild.ts';
-import { registryAt } from '../src/registry-at.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { newId } from '../packs/database/kernel/db.ts';
+import { append, headOf } from '../packs/log/kernel/log.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago, type Op } from '../packs/write/kernel/pelago.ts';
+import { asOf } from '../packs/log/kernel/rebuild.ts';
+import { registryAt } from '../packs/loader/kernel/registry-at.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 
 const tick = () => new Promise((r) => setTimeout(r, 5)); // the logs' times are to the millisecond
 

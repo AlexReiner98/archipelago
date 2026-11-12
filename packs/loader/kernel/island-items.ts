@@ -8,8 +8,8 @@
 
 import { sharedOf } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import type { Op } from '../../../src/pelago-types.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import type { Op } from '../../write/kernel/pelago-types.ts';
 import type { FieldDef, Registry, ResolvedType } from './packs.ts';
 
 /** Core's type of an island, and the field of an item that names the one it lives on. */

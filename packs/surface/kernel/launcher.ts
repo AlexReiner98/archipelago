@@ -15,16 +15,16 @@ import { randomUUID } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { createToken, revokeToken } from '../../../src/auth.ts';
-import { launchedMay, needHuman } from '../../../src/actor-checks.ts';
-import { actorId, type Actor, type Archipelago } from '../../../src/pelago.ts';
-import type { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from '../../../src/sessions.ts';
-import type { Brief, LaunchInput, LaunchMode, StartedBy } from '../../../src/launch-brief.ts';
-import { callAs } from '../../../src/kernel-context.ts';
-import { setPackLaunch } from '../../../src/pack-launch.ts';
-import { setActionLaunch } from '../../../src/pack-action-launch.ts';
+import { createToken, revokeToken } from '../../identity/kernel/auth.ts';
+import { launchedMay, needHuman } from '../../identity/kernel/actor-checks.ts';
+import { actorId, type Actor, type Archipelago } from '../../write/kernel/pelago.ts';
+import type { recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './session-calls.ts';
+import type { Brief, LaunchInput, LaunchMode, StartedBy } from '../../agents/kernel/launch-brief.ts';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
+import { setPackLaunch } from '../../loader/kernel/pack-launch.ts';
+import { setActionLaunch } from '../../loader/kernel/pack-action-launch.ts';
 
-export type { LaunchMode, StartedBy } from '../../../src/launch-brief.ts';
+export type { LaunchMode, StartedBy } from '../../agents/kernel/launch-brief.ts';
 
 // The pelago tools a launched session may call unprompted, as an MCP client names them: a launcher's {tools}.
 // `change` is safe here because agent changes are held as proposals.

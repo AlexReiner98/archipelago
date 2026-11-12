@@ -8,7 +8,7 @@
 import { normalEmail } from '../../identity/kernel/email-address.ts';
 import { itemLink } from '../../identity/kernel/members.ts';
 import { bypassingRls } from '../../identity/kernel/outbox.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { env } from '../../../src/env.ts';
 import type { RootCall } from '../../loader/kernel/root-calls.ts';
 

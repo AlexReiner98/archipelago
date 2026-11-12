@@ -8,11 +8,11 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gunzipSync, gzipSync } from 'node:zlib';
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { sha256Hex as sha256 } from '../../../src/hashes.ts';
 import { jcs } from '../../../src/jcs.ts';
-import { openTables, sealTables } from '../../../src/backup-seal.ts';
-import type { VaultDump } from '../../../src/vault.ts';
+import { openTables, sealTables } from '../../seal/kernel/backup-seal.ts';
+import type { VaultDump } from '../../seal/kernel/vault.ts';
 import type { Rows } from './replay.ts';
 
 /** Step 23: where snapshots are kept, and the schema a rebuild projects into beside the live tables. Neither is a member's. */

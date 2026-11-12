@@ -6,18 +6,19 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { dump, restore } from '../src/backup.ts';
-import { dumpVault } from '../src/vault.ts';
-import { openDb } from '../src/db.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
-import { movesAgain, syncTypes } from '../src/typetable.ts';
-import { askView } from '../src/askview.ts';
+import { dump, restore } from '../packs/log/kernel/backup.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { Archipelago, type Actor } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { movesAgain, syncTypes } from '../packs/loader/kernel/typetable.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
 import { human, PACKS } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A view asked by its name, as the view tool asks it. */
-const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
+const ask = (l: Archipelago, name: string, params: Record<string, unknown> = {}) => askviewPack.askView(kernelContext(l, 'query'), ({ kind: 'human', name: 'test' }) as Parameters<typeof askviewPack.askView>[1], name, params);
 
 const agent: Actor = { kind: 'agent', name: 'test' };
 

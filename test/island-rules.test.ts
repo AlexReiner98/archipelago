@@ -4,9 +4,9 @@
 // Core's own rules are never a version's. Beside the table of every change (test/approvals.ts), which has no islands.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
-import type { Archipelago, ChangeInput } from '../src/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import type { Archipelago, ChangeInput } from '../packs/write/kernel/pelago.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
 
 const thing = { id: 'plain.thing', title: 'Thing', description: 'A thing.', extends: 'work' };

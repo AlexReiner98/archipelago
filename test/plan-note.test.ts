@@ -3,8 +3,8 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sections, structureAsText } from '../src/plan-note.ts';
-import { WRITE_TOOLS } from '../src/tool-change.ts';
+import { sections, structureAsText } from '../packs/surface/kernel/plan-note.ts';
+import { WRITE_TOOLS } from '../packs/surface/kernel/tool-change.ts';
 import { fresh, make } from './map.ts';
 
 const plan = 'Why.\n\n## One\nx\n## Two\ny\n## Three\nz\n## Four\nw';

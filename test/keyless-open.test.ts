@@ -5,8 +5,8 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { configureSecrets } from '../src/secrets.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { configureSecrets } from '../packs/seal/kernel/secrets.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 import { packsWith } from './map.ts';
 
 const packFacts = async (l: { db: { query: <T>(sql: string) => Promise<{ rows: T[] }> } }) =>

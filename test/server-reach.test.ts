@@ -7,10 +7,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { checkServerPack, loadServerPacks } from '../src/server-packs.ts';
-import { hookAt } from '../src/server-adapter.ts';
-import { mountOf } from '../src/server-mounts.ts';
-import { setupBehind } from '../src/server-files.ts';
+import { checkServerPack, loadServerPacks } from '../packs/loader/kernel/server-packs.ts';
+import { hookAt } from '../packs/loader/kernel/server-adapter.ts';
+import { mountOf } from '../packs/surface/kernel/server-mounts.ts';
+import { setupBehind } from '../packs/surface/kernel/server-files.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'pelago-reach-'));
 after(() => rmSync(dir, { recursive: true, force: true }));

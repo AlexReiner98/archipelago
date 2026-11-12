@@ -4,8 +4,8 @@
 // place of the traps and reporting a task's brief gives.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { setIslands } from '../src/packstate.ts';
-import { callTool } from '../src/tools.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { fresh, human, make } from './map.ts';
 
 type Row = { id: string; title: string; value?: string; confidence: number; as_of?: string; readers: number };

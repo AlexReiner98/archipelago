@@ -6,10 +6,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
-import { lengthsSheet } from '../src/styles.ts';
-import { VIEWS } from '../src/views.ts';
-import { Registry } from '../src/packs.ts';
+import { lengthsSheet } from '../packs/styles/kernel/styles.ts';
+import { VIEWS } from '../packs/query/kernel/views.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { fresh, freshWith, make, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 test('a page is drawn by its style: the house style, a kind\'s preset over it, the owner\'s version over that', async () => {
   const l = await freshWith(new Registry(packsWith('reader')));
@@ -17,7 +18,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
     { op: 'create', ref: 'p', type: 'aim', title: 'P' },
     { op: 'create', ref: 'd', type: 'writing', title: 'D' },
   ]);
-  const of = async (id?: string) => (await VIEWS.style.run(l, id ? { of: id } : {})) as { style: any; used: { id: string; preset?: string }[] };
+  const of = async (id?: string) => (await VIEWS.style.run(kernelContext(l, 'query'), id ? { of: id } : {})) as { style: any; used: { id: string; preset?: string }[] };
   const workspace = await of();
   assert.deepEqual([workspace.style.page.picture, workspace.style.page.notes, typeof workspace.style.numbers.note_opening_most], [true, 'open', 'number']);
   // The page's colours are the house style's theme, light and dark alike, every name in both.
@@ -53,7 +54,7 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
 
 test('the layout chosen in the view band reaches the style read, with its drawing; one no pack draws is drawn as the map', async () => {
   const l = await fresh();
-  const read = async (input: Record<string, unknown>) => ((await VIEWS.style.run(l, { ...input, have: [] })) as { style: any }).style;
+  const read = async (input: Record<string, unknown>) => ((await VIEWS.style.run(kernelContext(l, 'query'), { ...input, have: [] })) as { style: any }).style;
   assert.equal((await read({ shape: 'map' })).drawing.id, 'core.map');
   const retired = await read({ shape: 'grid' });
   assert.deepEqual([retired.shape, retired.drawing.id], ['map', 'core.map'], 'a layout retired on 9 Nov 2026 draws as the map');
@@ -67,7 +68,7 @@ test('what is made for a reader, of any pack, opens as reading: canvas’s prese
     { op: 'create', ref: 'r', type: 'local.report', title: 'The report' },
     { op: 'create', ref: 't', type: 'task', title: 'A task' },
   ]);
-  const of = async (id: string) => (await VIEWS.style.run(l, { of: id })) as { style: any; used: { id: string; preset?: string }[] };
+  const of = async (id: string) => (await VIEWS.style.run(kernelContext(l, 'query'), { of: id })) as { style: any; used: { id: string; preset?: string }[] };
   const report = await of(made.r);
   assert.deepEqual([report.style.page.picture, report.style.page.notes, report.style.notes.measure], [false, 'whole', 'reader_measure']);
   assert.ok(report.used.some((u) => u.preset === 'core.reading'), 'by canvas’s reading preset');

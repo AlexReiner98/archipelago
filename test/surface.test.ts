@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { canAsk } from '../src/askview.ts';
-import { QUERY_READS, route, SURFACE } from '../src/surface.ts';
-import { callTool, replacementOf, surfaceFor, TOOLS } from '../src/tools.ts';
-import { Registry } from '../src/packs.ts';
+import { canAsk } from '../packs/query/kernel/askview.ts';
+import { QUERY_READS, route, SURFACE } from '../packs/surface/kernel/surface.ts';
+import { callTool, replacementOf, surfaceFor, TOOLS } from '../packs/surface/kernel/tools.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { agent, fresh, freshWith, packsWith } from './map.ts';
 import { closers, serve } from './serve.ts';
 
@@ -139,14 +139,14 @@ test('an agent does a session’s work through the surface: start, change, tell,
 test('an agent’s instructions name only the surface: every other action by its verb', async () => {
   const { readFileSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const { KERNEL_VERBS } = await import('../src/declared.ts');
+  const { KERNEL_VERBS } = await import('../packs/loader/kernel/declared.ts');
   const root = join(import.meta.dirname, '..');
-  const files = ['CLAUDE.md', 'examples/working-rules.md', '.claude/skills/pelago-bump/SKILL.md', 'examples/github/pelago.yml', 'src/hook-answers.ts', 'src/launcher.ts'];
+  const files = ['CLAUDE.md', 'examples/working-rules.md', '.claude/skills/pelago-bump/SKILL.md', 'examples/github/pelago.yml', 'packs/sessions/kernel/hook-answers.ts', 'packs/surface/kernel/launcher.ts'];
   const actions = Object.keys(KERNEL_VERBS).filter((name) => !SURFACE.includes(name));
   // An action is named as code (`tell`) or by a name no sentence has (session_update): then the word before it is action.
   const named = new RegExp(`\`(${actions.join('|')})\`|\\b(${actions.filter((a) => a.includes('_')).join('|')})\\b`, 'g');
   const wrong: string[] = [];
-  const { workingRules } = await import('../src/working-rules.ts');
+  const { workingRules } = await import('../packs/loader/kernel/working-rules.ts');
   const texts = new Map([...files.map((file) => [file, readFileSync(join(root, file), 'utf8')] as const), ['the rules as handed out', workingRules()]]);
   for (const [file, text] of texts) {
     for (const [, tool] of text.matchAll(/mcp__pelago__([a-z_]+)/g)) if (!SURFACE.includes(tool)) wrong.push(`${file}: mcp__pelago__${tool}`);

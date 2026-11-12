@@ -4,11 +4,11 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after } from 'node:test';
-import type { Limit } from '../src/limit.ts';
-import { normalEmail, setMailer, type Mail } from '../src/mail.ts';
-import { linkFor } from '../src/members.ts';
-import { createHttpServer } from '../src/server.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import type { Limit } from '../packs/surface/kernel/limit.ts';
+import { normalEmail, setMailer, type Mail } from '../packs/mailer/kernel/mail.ts';
+import { linkFor } from '../packs/identity/kernel/members.ts';
+import { createHttpServer } from '../packs/surface/kernel/server.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
 // The mail the servers would send is kept here instead.
 export const mailbox: Mail[] = [];

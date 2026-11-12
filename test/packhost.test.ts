@@ -5,9 +5,9 @@ import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { PackHost, resolved, Sandbox, type Answerer } from '../src/packhost.ts';
-import { Registry } from '../src/packs.ts';
-import { readEvents } from '../src/eventlog.ts';
+import { PackHost, resolved, Sandbox, type Answerer } from '../packs/loader/kernel/packhost.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
 import { freshWith, human } from './map.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'pelago-host-'));

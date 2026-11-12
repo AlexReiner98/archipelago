@@ -10,7 +10,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 
 /** The tables, made by step 4 of the schema (src/migrate.ts). */
 export const CONTROL = `

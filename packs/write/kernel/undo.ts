@@ -3,10 +3,10 @@
 // field that has been changed again since is left alone and reported, not overwritten.
 
 import type { Actor, Archipelago, Op, UpdateOp } from './pelago.ts';
-import { entry, factAt, type Fact } from '../../../src/log.ts';
+import { entry, factAt, type Fact } from '../../log/kernel/log.ts';
 import { OWNED_BY } from './owner-link.ts';
-import { ITEM_COLUMNS } from '../../../src/project.ts';
-import { newestValid } from '../../../src/snapshot.ts';
+import { ITEM_COLUMNS } from '../../log/kernel/project.ts';
+import { newestValid } from '../../log/kernel/snapshot.ts';
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 /** The head fields an update op sets by name; any other field of an item is a declared one, in props. */

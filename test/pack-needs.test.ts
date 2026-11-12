@@ -4,10 +4,10 @@
 // not run a version that drops what an active pack needs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { readManifest } from '../src/manifest.ts';
-import { orderPacks, providersOf } from '../src/packorder.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
+import { readManifest } from '../packs/loader/kernel/manifest.ts';
+import { orderPacks, providersOf } from '../packs/loader/kernel/packorder.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
 import { freshWith, human, make, packsWith, PACKS } from './map.ts';
 
 const THING = { id: 'plain.thing', title: 'Thing', description: 'A thing.', extends: 'work' };

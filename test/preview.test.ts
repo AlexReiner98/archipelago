@@ -4,12 +4,13 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { setIslands } from '../src/packstate.ts';
-import { createToken } from '../src/auth.ts';
-import { wouldPublish } from '../src/published.ts';
-import { Registry } from '../src/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import * as publishedPack from '../packs/publish/kernel/published.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { freshWith, make, PACKS } from './map.ts';
 import { serve } from './serve.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A pack with a document the kernel can publish: core keeps none of its own (test/fixtures/packs/pages). */
 const PAGES = [join(import.meta.dirname, 'fixtures', 'packs')];
@@ -104,5 +105,5 @@ test('a private document has no preview: it says so, by name', async () => {
   const l = await freshWith(new Registry([PACKS, ...PAGES]));
   const { p } = await make(l, [{ op: 'create', ref: 'p', type: 'page', title: 'Notes to self', visibility: 'private', body: 'Mine.' }]);
   await l.db.query(`update entity set private_to = 'e_owner' where id = $1`, [p]);
-  await assert.rejects(wouldPublish(l, p), /"Notes to self" is private: share it/);
+  await assert.rejects(publishedPack.wouldPublish(kernelContext(l, 'publish'), p), /"Notes to self" is private: share it/);
 });

@@ -4,10 +4,11 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { packStates, syncPacks } from '../src/packstate.ts';
-import { sessionStart } from '../src/sessions.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { packStates, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
 import { agent, freshWith, PACKS } from './map.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const TALLY = { id: 'tally', version: '0.1.0', title: 'Tally', description: 'Counts kept by hand.', requires: ['core'], types: [] as unknown[] };
 
@@ -20,7 +21,7 @@ test('a run records its packs, and a changed manifest gives the next run a diffe
   await syncPacks(l);
 
   const runPacks = async (session_id: string) => {
-    const { run } = await sessionStart(l, agent, { cwd: dir, session_id });
+    const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ cwd: dir, session_id }));
     return (await l.entity(run))!.props.packs as { id: string; version: string; manifest: string }[];
   };
   const first = await runPacks('one');

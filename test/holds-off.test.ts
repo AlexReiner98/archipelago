@@ -2,10 +2,10 @@
 // made, whatever rule would hold it, forget included. A wait the change or its token asked for still holds.
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { hostFor } from '../src/packtools.ts';
-import type { Actor, Archipelago } from '../src/pelago.ts';
-import { decide } from '../src/rules.ts';
-import { callTool } from '../src/tools.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import type { Actor, Archipelago } from '../packs/write/kernel/pelago.ts';
+import { decide } from '../packs/rules/kernel/rules.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { fresh, make } from './map.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };

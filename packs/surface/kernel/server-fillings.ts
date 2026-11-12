@@ -9,9 +9,9 @@
 import { readdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { isInternal, type Manifest } from '../../../src/manifest.ts';
-import { OWN_PACKS } from '../../../src/pack-folders.ts';
-import { ownManifest } from '../../../src/root-calls.ts';
+import { isInternal, type Manifest } from '../../loader/kernel/manifest.ts';
+import { OWN_PACKS } from '../../loader/kernel/pack-folders.ts';
+import { ownManifest } from '../../loader/kernel/root-calls.ts';
 
 /** A server slot's filling: its pack, and what its function answered. */
 export interface ServerFilling<T> { pack: string; filled: T }

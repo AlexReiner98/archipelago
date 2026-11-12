@@ -6,17 +6,18 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } f
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { presetsOf } from '../src/declared.ts';
-import { instructionsFor } from '../src/instructions.ts';
-import { manifestRead } from '../src/pack-folders.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Registry } from '../src/packs.ts';
-import { packsOff, syncPacks } from '../src/packstate.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { checkServerPack, loadServerPacks, OWN_PACKS } from '../src/server-packs.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { presetsOf } from '../packs/loader/kernel/declared.ts';
+import * as instructionsPack from '../packs/agents/kernel/instructions.ts';
+import { manifestRead } from '../packs/loader/kernel/pack-folders.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { packsOff, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { checkServerPack, loadServerPacks, OWN_PACKS } from '../packs/loader/kernel/server-packs.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { PACKS, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A pack written for the test, as a hosted folder would hold one. */
 const GRANTS = { id: 'grants', version: '1', title: 'Grants', description: 'A pack kept in a folder of its own.', requires: ['core'], types: [{ id: 'grant', title: 'Grant', description: 'A grant applied for.', extends: 'record' }] };
@@ -144,7 +145,7 @@ test('a map that had setup_behind from practice is given claude_code’s half, o
     assert.deepEqual((await syncPacks(now)).filter((f) => /pack:claude_code$/.test(f[1])).map((f) => f[0]), ['+']);
     assert.ok(!(await packsOff(now)).includes('claude_code'));
     assert.deepEqual((await syncPacks(now)).filter((f) => /pack:claude_code$/.test(f[1])), [], 'once');
-    const said = await instructionsFor(now, 'setup_behind', { fill: { command: 'npx setup' } });
+    const said = await instructionsPack.instructionsFor(kernelContext(now, 'agents'), 'setup_behind', ({ fill: { command: 'npx setup' } }));
     assert.deepEqual(said.map((s) => s.preset), ['core.setup_behind']);
     assert.match(said[0].text, /npx setup/);
   } finally {

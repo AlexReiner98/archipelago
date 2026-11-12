@@ -5,7 +5,7 @@
 // Unwait and sources left the apply loop for their packs (waits, placement) as fillings of write.follow.rides: what
 // they add rides the change's verdict, judged by no rule on its own (the owner, 12 Nov 2026, e_umv4gdqr).
 
-import { typesApplied } from '../../../src/type-items.ts'; import { supersede } from './proposals.ts';
+import { typesApplied } from '../../loader/kernel/type-items.ts'; import { supersede } from './proposals.ts';
 import type { AfterEntry, BuiltIn, Point, WriteEnv } from './write-hooks.ts';
 
 export const BUILT_IN: { [P in Point]?: BuiltIn[] } = {

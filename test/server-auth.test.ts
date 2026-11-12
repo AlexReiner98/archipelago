@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { createToken, workspaceOf } from '../src/auth.ts';
-import { loadConfig } from '../src/config.ts';
-import { DEFAULT_AGENT_POLICY } from '../src/pelago.ts';
-import { configureRestart } from '../src/tools.ts';
+import { createToken, workspaceOf } from '../packs/identity/kernel/auth.ts';
+import { loadConfig } from '../packs/database/kernel/config.ts';
+import { DEFAULT_AGENT_POLICY } from '../packs/write/kernel/pelago.ts';
+import { configureRestart } from '../packs/surface/kernel/tools.ts';
 import { serve } from './serve.ts';
 
 test('with auth off, one workspace and the surface decides who is calling', async () => {

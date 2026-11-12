@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { uiFile } from '../src/ui-files.ts';
+import { uiFile } from '../packs/surface/kernel/ui-files.ts';
 
 // The page's module as the server serves it, loaded as a browser would.
 const dir = mkdtempSync(join(tmpdir(), 'pelago-doc-ref-'));

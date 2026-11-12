@@ -10,12 +10,12 @@
 // the words begun are kept for a quarter of an hour, under a name the pack's own store cannot reach.
 
 import { randomBytes } from 'node:crypto';
-import { claimControlValue, controlValue, storeGet, storePut, storeTake } from '../../../src/control.ts';
-import type { Q } from '../../../src/db.ts';
+import { claimControlValue, controlValue, storeGet, storePut, storeTake } from '../../identity/kernel/control.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { askHook, hookFor, runHook } from './hooks.ts';
-import type { Archipelago, Op } from '../../../src/pelago.ts';
-import type { ServerPackFile } from '../../../src/server-packs.ts';
-import type { Workspaces } from '../../../src/workspaces.ts';
+import type { Archipelago, Op } from '../../write/kernel/pelago.ts';
+import type { ServerPackFile } from '../../loader/kernel/server-packs.ts';
+import type { Workspaces } from '../../identity/kernel/workspaces.ts';
 
 export type ConnectPlaces = Pick<Workspaces, 'has' | 'get' | 'hold'>;
 

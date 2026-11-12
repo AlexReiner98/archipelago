@@ -2,8 +2,8 @@
 // with the op that closes it, and the line a commit closes its task by names them too. Nothing is closed unasked.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
 
 // A link that offers to close what it runs to, and a type for it to run to: a pack's, as any such link is.

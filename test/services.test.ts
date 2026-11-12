@@ -2,16 +2,17 @@
 // each closed list opened as a family a pack provides: answers, terms, capabilities, settings, pieces and pages.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkCapabilities } from '../src/capabilities.ts';
-import { checkDeclared, KERNEL_OWNS } from '../src/declared.ts';
-import { isName, needOf, orderPacks, providersOf } from '../src/packorder.ts';
-import type { PackFile } from '../src/packs.ts';
-import { answerPreset } from '../src/query-presets.ts';
-import { checkServices, fillServices, fits, meets, shapeProblem, valueProblem, type ServiceFn } from '../src/services.ts';
-import { callTool } from '../src/tools.ts';
-import { flatRead } from '../src/query-flat.ts';
-import type { Actor } from '../src/pelago.ts';
+import { checkCapabilities } from '../packs/loader/kernel/capabilities.ts';
+import { checkDeclared, KERNEL_OWNS } from '../packs/loader/kernel/declared.ts';
+import { isName, needOf, orderPacks, providersOf } from '../packs/loader/kernel/packorder.ts';
+import type { PackFile } from '../packs/loader/kernel/packs.ts';
+import * as queryPresetsPack from '../packs/query/kernel/query-presets.ts';
+import { checkServices, fillServices, fits, meets, shapeProblem, valueProblem, type ServiceFn } from '../packs/loader/kernel/services.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
+import type { Actor } from '../packs/write/kernel/pelago.ts';
 import { fresh, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const pack = (id: string, more: Record<string, unknown> = {}) => ({ id, version: '1', ...more }) as unknown as PackFile;
@@ -100,15 +101,15 @@ test('an answer and a term a pack provides are asked of it, and a term answers i
     ['term.near', async (input: unknown) => (asked.push(input), { ids: [made.a] })],
     ['term.broken', async () => ({ ids: 'no' })],
   ]));
-  assert.deepEqual(await answerPreset(l, { id: 'v.inbox', description: '', shape: 'rows', lens: { over: ['x'] }, answer: 'inbox' }, { limit: 3 }), { rows: [] });
+  assert.deepEqual(await queryPresetsPack.answerPreset(kernelContext(l, 'query'), ({ id: 'v.inbox', lens: { over: ['x'] }, answer: 'inbox' }), ({ limit: 3 })), { rows: [] });
   assert.deepEqual(asked[0], { limit: 3, lens: { over: ['x'] } });
-  const found = (await flatRead(l, { filter: { find: ['type task'], only: ['near Kept'] } })) as { items: { title: string }[] };
+  const found = (await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['type task'], only: ['near Kept'] } }))) as { items: { title: string }[] };
   assert.deepEqual(found.items.map((i) => i.title), ['Kept']);
   assert.deepEqual(asked[1], { end: 'Kept', me: null });
-  await assert.rejects(flatRead(l, { filter: { find: ['type task'], only: ['broken'] } }), /answered no ids/);
-  await assert.rejects(flatRead(l, { filter: { find: ['type task'], only: ['nowhere'] } }), /is no term/);
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['type task'], only: ['broken'] } })), /answered no ids/);
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['type task'], only: ['nowhere'] } })), /is no term/);
   fillServices(l.registry, new Map());
-  await assert.rejects(answerPreset(l, { id: 'v.inbox', description: '', shape: 'rows', lens: {}, answer: 'inbox' }, {}), /No pack here provides service:answer\.inbox/);
+  await assert.rejects(queryPresetsPack.answerPreset(kernelContext(l, 'query'), ({ id: 'v.inbox', lens: {}, answer: 'inbox' }), ({})), /No pack here provides service:answer\.inbox/);
 });
 
 test('a setting a pack provides is set by its key, checked by its shape, and read by a member only when it says so', async () => {

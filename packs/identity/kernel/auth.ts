@@ -4,11 +4,11 @@
 // it may report, propose or change. Tokens live in their workspace's own
 // database, stored only as a hash.
 
-import { newId, type Db, type Q } from '../../../src/db.ts';
+import { newId, type Db, type Q } from '../../database/kernel/db.ts';
 import { sameBytes, sha256Hex, workspaceSecret } from '../../../src/hashes.ts';
 import { indexToken, unindexed } from './control-index.ts';
-import { record } from '../../../src/streams.ts';
-import type { Actor, May } from '../../../src/pelago.ts';
+import { record } from '../../log/kernel/streams.ts';
+import type { Actor, May } from '../../write/kernel/pelago.ts';
 
 export interface Identity {
   /** Carries the token's person, admin flag and id along with kind and name. */

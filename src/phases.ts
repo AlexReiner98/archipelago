@@ -4,7 +4,7 @@
 // started, a later one under way, the first closed finished, a later one ended; a lone open status is standing (it
 // is, and is not on its way anywhere), and what stands does not finish but ends. Trouble is only ever said.
 
-import type { Statuses } from './packs.ts';
+import type { Statuses } from '../packs/loader/kernel/packs.ts';
 
 export const PHASES = ['not_started', 'under_way', 'finished', 'ended', 'trouble', 'standing'] as const;
 export type Phase = (typeof PHASES)[number];

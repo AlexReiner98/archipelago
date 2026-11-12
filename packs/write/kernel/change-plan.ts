@@ -3,10 +3,10 @@
 
 import { undeclaredColumns } from '../../loader/kernel/head.ts'; import { typedProblems } from '../../loader/kernel/fields.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
-import { currentNames, typesAfter } from '../../../src/type-items.ts'; import { privateDependencies } from '../../../src/private-deps.ts';
-import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from '../../../src/island-items.ts'; import { islandRegistry, pinRefusals } from '../../../src/island-pin.ts';
+import { currentNames, typesAfter } from '../../loader/kernel/type-items.ts'; import { privateDependencies } from '../../rules/kernel/private-deps.ts';
+import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from '../../loader/kernel/island-items.ts'; import { islandRegistry, pinRefusals } from '../../loader/kernel/island-pin.ts';
 import type { Archipelago } from './pelago.ts';
-import { validate, type Who } from '../../../src/write-hooks.ts';
+import { validate, type Who } from './write-hooks.ts';
 
 /** Validate ops against the schema and the current map, and by what fills write.validate (src/write-hooks.ts): who, where a change is judged. Throws listing every problem. */
 export async function planChange(map: Archipelago, ops: Op[], who?: Who): Promise<{ warnings: string[] }> {

@@ -8,7 +8,7 @@ import { capabilityOf, DELIVERABLE, unknownEnd } from './link-ends.ts';
 import { isInternal, parts } from './manifest.ts';
 import { ownsId } from './packorder.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
-import { checkServices, KERNEL_SETTINGS, KERNEL_TERMS, openedTo, type Family } from '../../../src/services.ts';
+import { checkServices, KERNEL_SETTINGS, KERNEL_TERMS, openedTo, type Family } from './services.ts';
 
 /**
  * The reasons the attention pack gives (its REASONS, packs/attention/kernel/attention.ts): a pack's own reason joins one

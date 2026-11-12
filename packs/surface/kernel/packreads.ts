@@ -4,7 +4,7 @@
 // those of each item's props, and no note: a session's story or a long note need not cross the pipe for nothing.
 
 import { livesIn, livesInFor, SCOPE } from './packreads-scope.ts';
-import type { Archipelago, Entity } from '../../../src/pelago.ts';
+import type { Archipelago, Entity } from '../../write/kernel/pelago.ts';
 import { blockGraph } from './blocking.ts';
 import { packVersions } from '../../loader/kernel/pack-versions.ts';
 import { scanAround } from './region.ts';

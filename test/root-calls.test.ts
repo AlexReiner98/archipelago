@@ -7,10 +7,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { checkRoots, HOME, pinRoots } from '../src/boot.ts';
-import { kernelContext } from '../src/kernel-context.ts';
-import { kernelProblems } from '../src/manifest.ts';
-import { callRoot, readRootTable } from '../src/root-calls.ts';
-import { VAULT_BACKUP_DAYS } from '../src/vault.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
+import { kernelProblems } from '../packs/loader/kernel/manifest.ts';
+import { callRoot, readRootTable } from '../packs/loader/kernel/root-calls.ts';
+import { VAULT_BACKUP_DAYS } from '../packs/seal/kernel/vault.ts';
 import { VAULT_DAYS } from '../packs/backup/kernel/backup-run.ts';
 import { fresh } from './map.ts';
 
@@ -81,7 +81,7 @@ test('root.uses: usage adds to its map’s uses and reads what is held; any othe
   assert.equal(await held(), was + 2);
   await assert.rejects(usage.call('root.uses', { workspace: 'another', add: [{ key: 'x' }] }), /counts only the map that calls it/);
   // backup is no caller of root.uses: refused by the list, though it names the service here.
-  await assert.rejects(callRoot('backup', 'root.uses', { held: true }, { map: l }), /The backup pack may not call root\.uses: packs\/roots\.json lets only usage, query call it/);
+  await assert.rejects(callRoot('backup', 'root.uses', { held: true }, { map: l }), /The backup pack may not call root\.uses: packs\/roots\.json lets only usage, query, sessions call it/);
   await assert.rejects(kernelContext(l, 'backup').call('root.uses', { held: true }), /neither requires nor uses|may not call root\.uses/);
 });
 

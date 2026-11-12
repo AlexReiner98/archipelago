@@ -5,17 +5,19 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { dump, readable, readBackup, restore } from '../src/backup.ts';
-import { backupAll, merge, newestBackup } from '../src/backup-run.ts';
-import { openDb } from '../src/db.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { sessionEnd, sessionStart } from '../src/sessions.ts';
-import { Workspaces } from '../src/workspaces.ts';
-import { dumpVault } from '../src/vault.ts';
+import { dump, readable, readBackup, restore } from '../packs/log/kernel/backup.ts';
+import { backupAll, newestBackup } from '../packs/backup/kernel/backup-run.ts';
+import * as backupRunPack from '../packs/backup/kernel/backup-run.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
 import { human, agent, fresh, make } from './map.ts';
-import { searchMap } from '../src/search.ts';
-import { getItem, proposals } from '../src/map-reads.ts';
-import { readEvents } from '../src/eventlog.ts';
+import { searchMap } from '../packs/surface/kernel/search.ts';
+import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { kernelContext, ownContext, serverContext } from '../packs/loader/kernel/kernel-context.ts';
 
 test('a backup merges into a map that has moved on: nothing is lost, the later edit wins, and twice is the same as once', async () => {
   const a = await fresh();
@@ -43,15 +45,15 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   ]);
   const [pending] = await proposals(a);
   await a.decide(human, { proposal: pending.id, approve: false, note: 'no' });
-  const session = await sessionStart(a, agent, { title: 'Still running in a', surface: 'test' });
+  const session = await sessionsPack.sessionStart(ownContext(a, 'sessions'), agent as sessionsPack.Actor, ({ title: 'Still running in a', surface: 'test' }));
   const from = await snapshot(a);
   const count = async (l: Archipelago, table: string) => (await l.db.query<{ n: number }>(`select count(*)::int as n from ${table}`)).rows[0].n;
   const before = [await count(b, 'entity'), await count(b, 'log_op')];
 
   const options = { sessionTypes: b.registry.family('run') };
-  const preview = await merge(b, from, options);
+  const preview = await backupRunPack.merge(kernelContext(b, 'backup'), from, options);
   assert.deepEqual([preview.applied, await count(b, 'entity'), await count(b, 'log_op')], [false, ...before], 'looking changes nothing');
-  const done = await merge(b, from, { ...options, apply: true });
+  const done = await backupRunPack.merge(kernelContext(b, 'backup'), from, { ...options, apply: true });
   assert.deepEqual({ ...done, applied: false, events: { ...done.events, first_seq: 0, last_seq: 0 } }, { ...preview, events: { ...preview.events, first_seq: 0, last_seq: 0 } }, 'and it does what it said it would');
   assert.deepEqual([done.entities.added, done.entities.updated, done.entities.kept_newer_here], [1, 2, 1], 'the new task; the renamed and the archived one; and the aim b renamed stays');
   assert.deepEqual([done.relations, done.proposals, done.left_out.open_sessions], [{ added: 1, ended: 1 }, { added: 0, decided: 1 }, 1]);
@@ -66,16 +68,16 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   assert.equal((await proposals(b)).length, 0);
   assert.ok(((await readEvents(b.db, { target: made.t, limit: 8 })) as any[]).some((e: any) => e.action === 'entity.update'), 'with the history of what changed');
 
-  const again = await merge(b, from, { ...options, apply: true });
+  const again = await backupRunPack.merge(kernelContext(b, 'backup'), from, { ...options, apply: true });
   assert.deepEqual([again.entities.added, again.entities.updated, again.relations, again.events.added, again.proposals], [0, 0, { added: 0, ended: 0 }, 0, { added: 0, decided: 0 }], 'a second time adds nothing');
 
   // And back the other way: a hears of what b did, and keeps its own.
-  const back = await merge(a, await snapshot(b), { ...options, apply: true });
+  const back = await backupRunPack.merge(kernelContext(a, 'backup'), await snapshot(b), { ...options, apply: true });
   assert.deepEqual([back.entities.added, back.entities.updated, back.entities.kept_newer_here], [1, 1, 0]);
   assert.deepEqual([await title(a, made.p), await title(a, made.t)], ['Proj, renamed in b', 'Task, renamed in a']);
   assert.ok(await a.entity(session.run), 'its own session is untouched');
   // An older file never undoes a newer map.
-  const stale = await merge(b, from, { ...options, apply: true });
+  const stale = await backupRunPack.merge(kernelContext(b, 'backup'), from, { ...options, apply: true });
   assert.equal(stale.entities.updated, 0);
 });
 
@@ -88,7 +90,7 @@ test('backups are written per workspace, read back, and only the newest are kept
   const dir = join(root, 'backups');
   assert.equal(newestBackup(dir), undefined);
   for (let i = 0; i < 3; i++) {
-    const done = await backupAll(workspaces, dir, 2);
+    const done = await backupAll(serverContext('backup', workspaces), dir, 2);
     assert.deepEqual(done.map((d) => [d.workspace, d.error]), [['default', undefined], ['acme', undefined]]);
     await new Promise((r) => setTimeout(r, 5));
   }
@@ -114,12 +116,12 @@ test('backups are written per workspace, read back, and only the newest are kept
   });
   await new Promise<void>((r) => store.listen(0, '127.0.0.1', r));
   const target = { url: `http://127.0.0.1:${(store.address() as AddressInfo).port}/object/bucket/`, key: 'k' };
-  const sent = await backupAll(workspaces, dir, 2, target);
+  const sent = await backupAll(serverContext('backup', workspaces), dir, 2, target);
   assert.deepEqual(sent.map((d) => d.copied), [true, true]);
   assert.match(received[1].url!, /^\/object\/bucket\/acme\/.+\.json\.gz$/);
   assert.deepEqual([received[1].auth, received[1].bytes > 100], ['Bearer k', true]);
   refuse = true;
-  const failed = await backupAll(workspaces, dir, 2, target);
+  const failed = await backupAll(serverContext('backup', workspaces), dir, 2, target);
   assert.deepEqual([failed[0].copied, failed[0].error, /403/.test(failed[0].copy_error!)], [false, undefined, true], 'the backup stands; the failed copy is reported');
   store.close();
   await workspaces.closeAll();
@@ -157,13 +159,13 @@ test('a workspace nobody is using is closed, and opens again with its data', asy
 
   const again = await workspaces.get('acme');
   assert.deepEqual((await searchMap(again.pelago, { type: 'task' })).map((e) => e.title), ['Theirs'], 'the data is there when it opens again');
-  const session = await sessionStart(again.pelago, agent, { title: 'Working' });
+  const session = await sessionsPack.sessionStart(ownContext(again.pelago, 'sessions'), agent as sessionsPack.Actor, ({ title: 'Working' }));
   assert.deepEqual(await workspaces.closeIdle(0), [], 'a workspace with an open session stays open, so the session can be seen to go quiet');
-  await sessionEnd(again.pelago, agent, { run: session.run, outcome: 'finished', summary: 'done' });
+  await sessionsPack.sessionEnd(ownContext(again.pelago, 'sessions'), agent as sessionsPack.Actor, ({ run: session.run, outcome: 'finished', summary: 'done' }));
 
   const dir = join(root, 'backups');
   assert.deepEqual(await workspaces.closeIdle(0), ['acme']);
-  await backupAll(workspaces, dir, 2);
+  await backupAll(serverContext('backup', workspaces), dir, 2);
   assert.equal(workspaces.isOpen('acme'), false, 'a backup closes what it had to open');
   await workspaces.closeAll();
 });

@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pageMay } from '../src/may.ts';
+import { pageMay } from '../packs/surface/kernel/may.ts';
 
 test('a person may read and write, and an admin also manage the workspace', () => {
   assert.deepEqual(pageMay({ kind: 'human', name: 'ann' }, false), ['read', 'write']);

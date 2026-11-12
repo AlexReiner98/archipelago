@@ -7,8 +7,8 @@
 // swapped back (issue e_3m3nt2e3). Only when neither finds anything is an item with any one of the words taken,
 // the most words first: "stale map unpushed commits" should still find the issue that "stale" finds (issue e_vb4ykndy).
 
-import type { Q } from '../../../src/db.ts';
-import type { Archipelago, Entity } from '../../../src/pelago.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { Archipelago, Entity } from '../../write/kernel/pelago.ts';
 
 // The words of a title and its note, kept in an index on the very expression search matches with, so the index finds
 // exactly what reading every row found; and the trigrams of every title, for a match anywhere in it and for the

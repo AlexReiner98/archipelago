@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Registry, type PackFile } from '../src/packs.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { freshWith, human, make, packsWith } from './map.ts';
 
 /** A copy of the shipped packs, core changed by `core` and one more pack beside them when given. */

@@ -5,10 +5,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make, replayed } from './map.ts';
-import { callTool, humanChanges, latestSeq } from '../src/tools.ts';
-import { readEvents } from '../src/eventlog.ts';
-import { undo } from '../src/undo.ts';
-import { getItem, proposals } from '../src/map-reads.ts';
+import { callTool, humanChanges, latestSeq } from '../packs/surface/kernel/tools.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
+import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
 
 test('every projection made again from the log is the live one', async () => {
   const l = await fresh();

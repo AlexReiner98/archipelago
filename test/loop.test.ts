@@ -181,8 +181,8 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
 });
 
 test('a member who only reads, signed in, is shown the way to a map of their own too', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
-  const { createToken } = await import('../src/auth.ts');
-  const { linkFor } = await import('../src/members.ts');
+  const { createToken } = await import('../packs/identity/kernel/auth.ts');
+  const { linkFor } = await import('../packs/identity/kernel/members.ts');
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const alex = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;

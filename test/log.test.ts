@@ -6,10 +6,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, all, fresh, human, make, replayed } from './map.ts';
 import { canonical, entryHash, jcs } from '../src/jcs.ts';
-import { entry, stored, verify } from '../src/log.ts';
-import { undo } from '../src/undo.ts';
-import { getItem, proposals } from '../src/map-reads.ts';
-import { readEvents } from '../src/eventlog.ts';
+import { entry, stored, verify } from '../packs/log/kernel/log.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
+import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
 
 test('the canonical form is RFC 8785, and a sealed value is hashed by its digest', () => {
   assert.equal(jcs({ b: [1, 'x', null, true], a: { d: 1e21, c: 0.1 }, é: ' "' }), '{"a":{"c":0.1,"d":1e+21},"b":[1,"x",null,true],"é":" \\""}');

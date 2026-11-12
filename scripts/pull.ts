@@ -18,11 +18,11 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, w
 import { homedir, hostname } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { parseBackup, parseVault, readable, restore, type Dump } from '../src/backup.ts';
-import { rewrap, type VaultDump } from '../src/vault.ts';
-import { loadConfig } from '../src/config.ts';
-import { openDb } from '../src/db.ts';
-import { configureSecrets } from '../src/secrets.ts';
+import { parseBackup, parseVault, readable, restore, type Dump } from '../packs/log/kernel/backup.ts';
+import { rewrap, type VaultDump } from '../packs/seal/kernel/vault.ts';
+import { loadConfig } from '../packs/database/kernel/config.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { configureSecrets } from '../packs/seal/kernel/secrets.ts';
 
 /** Where a pulled copy waits until the data folder can be swapped for it. */
 export const pulledDir = (dataDir: string) => `${dataDir}.pulled`;

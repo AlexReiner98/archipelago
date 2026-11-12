@@ -6,7 +6,7 @@
 // so a map made after the move, whose log never kept a manifest of A that held them, is not given B this way: it starts
 // with what the server starts it with. A types and link types move by takenOver, by their ids or their moved_from.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { KERNEL_PACKS, movedFrom } from './packorder.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 

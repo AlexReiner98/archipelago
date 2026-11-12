@@ -9,7 +9,7 @@ import { parts } from './manifest.ts';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import { mailHeard, type NotificationMail } from '../../../src/notify-mail.ts';
+import { mailHeard, type NotificationMail } from '../../walls/kernel/notify-mail.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
 import { launchHeard, type LaunchAsked } from './pack-launch.ts';
 import { launchesAsked, launchesRefused, type LaunchesAsked } from './pack-action-launch.ts';
@@ -17,7 +17,7 @@ import { answerBeyond, holdWorkspace, NOT_BEYOND } from './pack-reach.ts';
 import type { PackFile } from './packs.ts';
 import type { Read } from '../../surface/kernel/packreads.ts';
 import { actorId } from '../../identity/kernel/actor-checks.ts';
-import type { Actor, Archipelago, Op, SourceSpec } from '../../../src/pelago.ts';
+import type { Actor, Archipelago, Op, SourceSpec } from '../../write/kernel/pelago.ts';
 // Anyone with no login cannot read the workspace's settings: a public page is counted in the default zone.
 /** The time zone a pack's call is told days are counted in: the workspace's, or Toronto's (as the query pack's timeaxis counts them). */
 const DEFAULT_ZONE = 'America/Toronto';

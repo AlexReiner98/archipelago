@@ -5,7 +5,7 @@
   "type": "module",
   "imports": {
     "#pelago/test": "./test/pack-harness.ts",
-    "#pelago/kernel": "./src/kernel-context.ts"
+    "#pelago/kernel": "./packs/loader/kernel/kernel-context.ts"
   },
   "description": "A living map of all your work: a structured model of work, decisions and what waits on what, for you, your team and your agents.",
   "license": "MIT",

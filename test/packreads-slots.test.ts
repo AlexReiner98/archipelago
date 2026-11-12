@@ -3,18 +3,22 @@
 // The answers may not change when a read becomes a filling of the slot surface opens.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import '../src/views.ts';
-import { answerRead } from '../src/packreads.ts';
-import { readEvents } from '../src/eventlog.ts';
-import { instructionsFor } from '../src/instructions.ts';
-import { livesInFor, scopeOf } from '../src/places.ts';
-import { LENS_LIMIT } from '../src/query-flat.ts';
-import { placeAll, readAxis, zoneOf } from '../src/timeaxis.ts';
-import { touchedBy, addTouched } from '../src/touched.ts';
-import { heldCounts } from '../src/pack-counts.ts';
-import { askPackView, VIEWS } from '../src/views.ts';
-import { sessionStart } from '../src/sessions.ts';
+import '../packs/query/kernel/views.ts';
+import { answerRead } from '../packs/surface/kernel/packreads.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import * as instructionsPack from '../packs/agents/kernel/instructions.ts';
+import { livesInFor } from '../packs/runs/kernel/places.ts';
+import * as placesPack from '../packs/runs/kernel/places.ts';
+import { LENS_LIMIT } from '../packs/query/kernel/query-flat.ts';
+import { readAxis } from '../packs/query/kernel/timeaxis.ts';
+import * as timeaxisPack from '../packs/query/kernel/timeaxis.ts';
+import * as touchedPack from '../packs/sessions/kernel/touched.ts';
+import { heldCounts } from '../packs/publish/kernel/pack-counts.ts';
+import { VIEWS } from '../packs/query/kernel/views.ts';
+import * as viewsPack from '../packs/query/kernel/views.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const sorted = (xs: string[]) => [...xs].sort();
 
@@ -36,10 +40,10 @@ test('within and type_info answer as the places they read', async () => {
   for (const asker of [l, l.as(bo), l.as('e_someone')]) {
     for (const open of [false, true]) {
       const answer = (await answerRead(asker, { within: { id: made.repo, open } })) as string[];
-      assert.deepEqual(sorted(answer), sorted([...(await scopeOf(asker, made.repo, open))]));
+      assert.deepEqual(sorted(answer), sorted([...(await placesPack.scopeOf(kernelContext(asker, 'runs'), made.repo, open, undefined))]));
     }
     const among = [made.part, made.done, 'e_notthere'];
-    assert.deepEqual(sorted((await answerRead(asker, { within: { id: made.hub, among } })) as string[]), sorted([...(await scopeOf(asker, made.hub, false, among))]));
+    assert.deepEqual(sorted((await answerRead(asker, { within: { id: made.hub, among } })) as string[]), sorted([...(await placesPack.scopeOf(kernelContext(asker, 'runs'), made.hub, false, among))]));
   }
   assert.ok(((await answerRead(l, { within: { id: made.repo } })) as string[]).includes(made.issue), 'what is about a part is in it');
   await assert.rejects(answerRead(l, { within: { id: made.repo, among: 'x' as never } }), /within\.among is a list of ids/);
@@ -59,9 +63,9 @@ test('within and type_info answer as the places they read', async () => {
 test('a run read with what it touched answers as the touched store', async () => {
   const l = await fresh();
   const { task } = await make(l, [{ op: 'create', ref: 'task', type: 'task', title: 'Probe' }]);
-  const a = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'p1' });
-  await addTouched(l, a.run, [task, 'e_notthere']);
-  assert.deepEqual(await touchedBy(l, a.run), [task, 'e_notthere']);
+  const a = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ cwd: 'C:\\code\\Apex', session_id: 'p1' }));
+  await touchedPack.addTouched(kernelContext(l, 'sessions'), a.run, ([task, 'e_notthere']));
+  assert.deepEqual(await touchedPack.touchedBy(kernelContext(l, 'sessions'), a.run), [task, 'e_notthere']);
   const runs = (await answerRead(l, { runs: { folder: 'C:\\code\\Apex', touched: true } })) as { rows: { id: string; touched: string[] }[] };
   assert.deepEqual(runs.rows.map((r) => [r.id, r.touched]), [[a.run, [task]]]);
 });
@@ -75,7 +79,7 @@ test('instructions answer as the agents pack says them, and told counts each', a
   ]);
   for (const [where, about] of [['file:src/packreads.ts', undefined], ['session_start', task], ['session_start', undefined], ['nowhere', undefined]] as const) {
     const answer = await answerRead(l, { instructions: { where, ...(about && { about }) } });
-    assert.deepEqual(answer, await instructionsFor(l, where, about === undefined ? {} : { about }));
+    assert.deepEqual(answer, await instructionsPack.instructionsFor(kernelContext(l, 'agents'), where, (about === undefined ? {} : { about })));
   }
   assert.ok(((await answerRead(l, { instructions: { where: 'session_start' } })) as unknown[]).length > 0, 'the presets said at the start of a session');
   const before = heldCounts(l.workspace, 'uses').find((c) => c.key === 'told:e_counted')?.n ?? 0;
@@ -112,14 +116,14 @@ test('events, views and what is placed in time answer as the query modules do', 
       `select * from entity e where e.type = any($1::text[]) and e.archived_at is null and (e.is_open or e.updated_at >= $2::timestamptz) order by e.updated_at desc limit ${LENS_LIMIT}`,
       [placedQ.types.flatMap((t) => l.registry.family(t)), axis.from],
     );
-    const spans = await placeAll(asker, rows as never, axis, await zoneOf(asker));
+    const spans = await timeaxisPack.placeAll(kernelContext(asker, 'query'), rows as never, axis, await timeaxisPack.zoneOf(kernelContext(asker, 'query')));
     const answer = (await answerRead(asker, { placed: placedQ })) as { id: string; open: boolean; time: unknown }[];
     assert.deepEqual(answer.map((e) => [e.id, e.open, e.time]), rows.filter((e) => spans.get(e.id)?.length).map((e) => [e.id, e.is_open, spans.get(e.id)]));
     // view: a kernel view, as it runs; a pack's view, as the pack asker answers it.
     const kernel = Object.keys(VIEWS).includes('changed_since') ? 'changed_since' : Object.keys(VIEWS)[0];
     const params = { since };
-    assert.deepEqual(await answerRead(asker, { view: kernel, params }), await VIEWS[kernel].run(asker, params));
-    assert.deepEqual(await answerRead(asker, { view: 'attention', params: { person: bo } }), await askPackView(asker, 'attention', { person: bo }));
+    assert.deepEqual(await answerRead(asker, { view: kernel, params }), await VIEWS[kernel].run(kernelContext(asker, 'query'), params));
+    assert.deepEqual(await answerRead(asker, { view: 'attention', params: { person: bo } }), await viewsPack.askPackView(kernelContext(asker, 'query'), 'attention', ({ person: bo })));
   }
   await assert.rejects(answerRead(l, { placed: { types: ['task'], from: '2026-10-18', to: '2026-10-12' } }), /comes after/);
   await assert.rejects(answerRead(l, { view: 'no_such_view' }), /No view "no_such_view"|no_such_view/);

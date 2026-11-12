@@ -4,8 +4,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make } from './map.ts';
-import { callTool, describeChanges, humanChanges, latestSeq } from '../src/tools.ts';
-import { getItem } from '../src/map-reads.ts';
+import { callTool, describeChanges, humanChanges, latestSeq } from '../packs/surface/kernel/tools.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
 
 test('an approved private create is the proposer\'s to see, not the approver\'s alone', async () => {
   const l = await fresh();

@@ -6,11 +6,11 @@
 // compacted streams lose what they sealed with those keys the same way, through the compaction role (src/opseal.ts).
 // Today's rows of the item leave in the write path (src/pelago.ts), through asOwner.
 
-import type { Q } from '../../../src/db.ts';
-import { digested } from '../../../src/seal.ts';
-import { entries } from '../../../src/log.ts';
-import { destroy } from '../../../src/vault.ts';
-import { forgetOps, opLinksOf } from '../../../src/opseal.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import { digested } from '../../seal/kernel/seal.ts';
+import { entries } from '../../log/kernel/log.ts';
+import { destroy } from '../../seal/kernel/vault.ts';
+import { forgetOps, opLinksOf } from '../../seal/kernel/opseal.ts';
 
 /** Forget an item, for good. `reasons`: change sets (c_…) and held changes (p_…) whose reason and basis go with it. */
 export interface ForgetOp {

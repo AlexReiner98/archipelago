@@ -10,15 +10,15 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { KEPT_FIELDS } from '../src/operational.ts';
-import { setIslands } from '../src/packstate.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { factsAfter, headPos } from '../src/tail.ts';
-import { callTool } from '../src/tools.ts';
-import { uiFile } from '../src/ui-files.ts';
-import { undo } from '../src/undo.ts';
+import { KEPT_FIELDS } from '../packs/log/kernel/operational.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { factsAfter, headPos } from '../packs/log/kernel/tail.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { uiFile } from '../packs/surface/kernel/ui-files.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
 import { agent, all, fresh, human, make } from './map.ts';
-import { getItem } from '../src/map-reads.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
 
 /** The page's modules as the server serves them, loaded from a folder of their own as the browser would load them. */
 async function pageModules() {

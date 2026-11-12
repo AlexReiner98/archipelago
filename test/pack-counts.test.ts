@@ -6,13 +6,15 @@ import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { doneEvents } from '../src/activity.ts';
-import { addCount, countsSince, dayOf, flushCounts, heldCounts, keepCounts } from '../src/pack-counts.ts';
-import { runAct } from '../src/server-acts.ts';
-import type { ServerPackFile } from '../src/server-packs.ts';
-import { opEntries, type OpStream } from '../src/streams.ts';
+import { doneEvents } from '../packs/log/kernel/activity.ts';
+import { addCount, dayOf, flushCounts, heldCounts, keepCounts } from '../packs/publish/kernel/pack-counts.ts';
+import * as packCountsPack from '../packs/publish/kernel/pack-counts.ts';
+import { runAct } from '../packs/surface/kernel/server-acts.ts';
+import type { ServerPackFile } from '../packs/loader/kernel/server-packs.ts';
+import { opEntries, type OpStream } from '../packs/log/kernel/streams.ts';
 import { fresh } from './map.ts';
 import { serve } from './serve.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const PAGES = [join(import.meta.dirname, 'fixtures', 'packs')];
 const BROWSER = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
@@ -51,21 +53,21 @@ test('counts are written down each minute in their stream, adding to the day, an
   addCount('flushed', VISITS, 'x', '2026-11-04');
   addCount('flushed', VISITS, 'x', '2026-11-05');
   await flushCounts(open);
-  const all = await countsSince(l, VISITS);
+  const all = await packCountsPack.countsSince(kernelContext(l, 'publish'), VISITS, 0);
   assert.deepEqual(all.counts, [{ key: 'x', day: '2026-11-04', n: 3 }, { key: 'y', day: '2026-11-04', n: 1 }, { key: 'x', day: '2026-11-05', n: 1 }], 'two flushes in a day sum');
-  const later = await countsSince(l, VISITS, first[0].pos);
+  const later = await packCountsPack.countsSince(kernelContext(l, 'publish'), VISITS, (first[0].pos));
   assert.deepEqual(later.counts, [{ key: 'x', day: '2026-11-04', n: 1 }, { key: 'x', day: '2026-11-05', n: 1 }], 'after a position, only what was added since');
-  assert.deepEqual(await countsSince(l, VISITS, all.pos), { counts: [], pos: all.pos });
+  assert.deepEqual(await packCountsPack.countsSince(kernelContext(l, 'publish'), VISITS, all.pos), { counts: [], pos: all.pos });
 
   // What was written down before the move, as tag:, reads the same.
   await l.record(VISITS, 'system', [['+', 'tag:old', '2026-11-03', 4]]);
-  assert.deepEqual((await countsSince(l, VISITS, all.pos)).counts, [{ key: 'old', day: '2026-11-03', n: 4 }]);
+  assert.deepEqual((await packCountsPack.countsSince(kernelContext(l, 'publish'), VISITS, all.pos)).counts, [{ key: 'old', day: '2026-11-03', n: 4 }]);
 
   // What has not been written down when the server stops is written down on the way.
-  const pos = (await countsSince(l, VISITS)).pos;
+  const pos = (await packCountsPack.countsSince(kernelContext(l, 'publish'), VISITS, 0)).pos;
   addCount('flushed', VISITS, 'z', '2026-11-05');
   await keepCounts(open, 3_600_000)();
-  assert.deepEqual((await countsSince(l, VISITS, pos)).counts, [{ key: 'z', day: '2026-11-05', n: 1 }]);
+  assert.deepEqual((await packCountsPack.countsSince(kernelContext(l, 'publish'), VISITS, pos)).counts, [{ key: 'z', day: '2026-11-05', n: 1 }]);
 });
 
 test('a failed write keeps the counts for the next minute', async () => {

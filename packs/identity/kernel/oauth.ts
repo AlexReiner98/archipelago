@@ -11,7 +11,7 @@ import { sameBytes, sha256Hex, workspaceSecret } from '../../../src/hashes.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { ACCESS_MINUTES, grantToken, rotateGrant, workspaceOfGrant } from './auth.ts';
 import type { OpenRoutes } from './sign-in.ts';
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { clientOf, listedRedirect, registerClient, returnsTo, type Client } from './oauth-clients.ts';
 import { json as reply, PRIVATE } from './reply.ts';
 import { keep, take } from '../../database/kernel/transient.ts';

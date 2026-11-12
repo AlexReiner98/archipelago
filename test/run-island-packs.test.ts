@@ -2,13 +2,14 @@
 // version's manifest; elsewhere, the map's. What comes due on such an island is recorded under the same.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { doneEvents } from '../src/activity.ts';
-import { duePass } from '../src/due.ts';
-import type { PackVersion } from '../src/pack-versions.ts';
-import { Registry } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
-import { sessionStart } from '../src/sessions.ts';
+import { doneEvents } from '../packs/log/kernel/activity.ts';
+import * as duePack from '../packs/clocks/kernel/due.ts';
+import type { PackVersion } from '../packs/loader/kernel/pack-versions.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** An island pack with a type of work and a type that happens at a time. */
 const plain = {
@@ -39,7 +40,7 @@ test('a run on a pinned island records the version; one elsewhere, the map’s',
   ]);
 
   const runPacks = async (session_id: string, task?: string) => {
-    const { run } = await sessionStart(l, agent, { cwd: '/tmp/islands', session_id, ...(task && { task }) });
+    const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ cwd: '/tmp/islands', session_id, ...(task && { task }) }));
     return (await l.entity(run))!.props.packs as PackVersion[];
   };
   const trial = await runPacks('trial', tasks.here), rest = await runPacks('rest', tasks.there), none = await runPacks('none');
@@ -60,8 +61,8 @@ test('a run on a pinned island records the version; one elsewhere, the map’s',
     { op: 'create', ref: 'here', type: 'plain.happening', title: 'Due on the trial', props: { island: made.trial, at: new Date(at).toISOString() } },
     { op: 'create', ref: 'there', type: 'plain.happening', title: 'Due on the rest', props: { island: made.rest, at: new Date(at).toISOString() } },
   ]);
-  await duePass(l, at - 60_000);
-  await duePass(l, at + 60_000);
+  await duePack.duePass(kernelContext(l, 'clocks'), (at - 60_000));
+  await duePack.duePass(kernelContext(l, 'clocks'), (at + 60_000));
   const packsDue = async (target: string) => ((await doneEvents(l.db, { action: 'item.due', target }, 10))[0] as unknown as { detail: { packs: PackVersion[] } }).detail.packs;
   assert.deepEqual(await packsDue(due.here), trial, 'an item due on the trial island, under the version');
   assert.deepEqual(await packsDue(due.there), rest, 'one elsewhere, under the map’s');

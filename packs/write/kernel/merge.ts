@@ -2,7 +2,7 @@
 // run again appends the absorbed note to the kept one again (23 Oct 2026: one approval clicked three times wrote it
 // three times), so it is refused on the write path, and a held merge the map has since overtaken is refused when approved.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 
 interface Side {
   id: string;

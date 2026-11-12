@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { islandProblems, sharedOf } from '../src/islands.ts';
-import { readManifest, type Manifest } from '../src/manifest.ts';
-import { callTool } from '../src/tools.ts';
+import { islandProblems, sharedOf } from '../packs/loader/kernel/islands.ts';
+import { readManifest, type Manifest } from '../packs/loader/kernel/manifest.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, fresh, human, make, PACKS } from './map.ts';
 
 const refused = async (l: Awaited<ReturnType<typeof fresh>>, ops: object[], says: RegExp) =>
@@ -74,7 +74,7 @@ test('a finding is in the shared set: a pack on an island map may build on it', 
 });
 
 test('a field typed by another is json, typed by an enum of its own type', async () => {
-  const { checkFieldDecls } = await import('../src/head.ts');
+  const { checkFieldDecls } = await import('../packs/loader/kernel/head.ts');
   const type = { system: false } as never;
   assert.deepEqual(checkFieldDecls(type, { id: 'x', title: 'X', description: '', extends: 'record', fields: { v: { type: 'json', typed_by: 't' }, t: { type: 'enum', values: ['text'] } } }), []);
   assert.match(checkFieldDecls(type, { id: 'x', title: 'X', description: '', extends: 'record', fields: { v: { type: 'string', typed_by: 't' }, t: { type: 'enum', values: ['text'] } } }).join(), /typed by "t"/);

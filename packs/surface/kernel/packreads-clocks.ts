@@ -3,7 +3,7 @@
 // due under (its version and the packs of its island). Each is bounded by the types or the id it is given, and answered
 // as the map that asks, under row-level security, as every read of packreads.ts is.
 
-import type { Archipelago, Entity } from '../../../src/pelago.ts';
+import type { Archipelago, Entity } from '../../write/kernel/pelago.ts';
 import { packVersionsFor, type PackVersion } from '../../loader/kernel/pack-versions.ts';
 
 export type ClocksRead = {

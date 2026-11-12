@@ -4,8 +4,8 @@
 // held change and applied when it is approved.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, all, fresh, human, make } from './map.ts';
 
 /** An entry as the test pins it: every id named by the order it first appears, the times and hashes left out. */

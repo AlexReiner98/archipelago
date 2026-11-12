@@ -8,7 +8,7 @@
 // wrong codes are (src/members.ts), and past PASSWORD_TRIES the address waits.
 
 import { randomBytes, scrypt } from 'node:crypto';
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { sameBytes } from '../../../src/hashes.ts';
 import { keep, kept } from '../../database/kernel/transient.ts';
 

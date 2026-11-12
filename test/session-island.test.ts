@@ -3,11 +3,12 @@
 // runs (src/island-pin.ts); a session anywhere else is told the map's. Once it says a task, the task's island leads.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
-import { hookSessionStart, sessionIsland } from '../src/session-hook.ts';
-import { resolveRun, sessionStart } from '../src/sessions.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import * as sessionHookPack from '../packs/sessions/kernel/session-hook.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const OLD = 'Keep things true.', NEW = 'Keep things true, and say why.';
 
@@ -41,15 +42,15 @@ test('a session started in a repository on a pinned island is told the version; 
   const says = (text: string) => ({ NEW: text.includes(NEW), OLD: text.includes(OLD) });
 
   // By its remote, and by its folder alone.
-  assert.deepEqual(says(await hookSessionStart(l, { session_id: 's-trial', cwd: '/elsewhere', remote: 'https://github.com/o/trial' })), { NEW: true, OLD: false }, 'a repository on the trial island hears the version');
-  assert.deepEqual(says(await hookSessionStart(l, { session_id: 's-trial-dir', cwd: '/code/trial/src' })), { NEW: true, OLD: false }, 'found by its folder too');
-  assert.deepEqual(says(await hookSessionStart(l, { session_id: 's-rest', cwd: '/code/rest' })), { NEW: false, OLD: true }, 'a repository on an island with no pin hears the map’s');
-  assert.deepEqual(says(await hookSessionStart(l, { session_id: 's-none', cwd: '/code/unknown' })), { NEW: false, OLD: true }, 'a folder with no repository hears the map’s');
-  assert.equal(await sessionIsland(l, (await resolveRun(l, 's-rest'))?.id), rest);
+  assert.deepEqual(says(await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 's-trial', cwd: '/elsewhere', remote: 'https://github.com/o/trial' }))), { NEW: true, OLD: false }, 'a repository on the trial island hears the version');
+  assert.deepEqual(says(await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 's-trial-dir', cwd: '/code/trial/src' }))), { NEW: true, OLD: false }, 'found by its folder too');
+  assert.deepEqual(says(await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 's-rest', cwd: '/code/rest' }))), { NEW: false, OLD: true }, 'a repository on an island with no pin hears the map’s');
+  assert.deepEqual(says(await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 's-none', cwd: '/code/unknown' }))), { NEW: false, OLD: true }, 'a folder with no repository hears the map’s');
+  assert.equal(await sessionHookPack.sessionIsland(ownContext(l, 'sessions'), ((await sessionsPack.resolveRun(ownContext(l, 'sessions'), 's-rest', false))?.id)), rest);
 
   // A session in the rest's repository that takes on work on the trial island runs under the task's island, and a resume says so.
-  await sessionStart(l, agent, { cwd: '/code/rest', task: onTrial });
-  assert.equal(await sessionIsland(l, (await resolveRun(l, 's-rest'))?.id), trial, 'its task leads its repository');
-  assert.deepEqual(says(await hookSessionStart(l, { session_id: 's-rest', cwd: '/code/rest', source: 'resume' })), { NEW: true, OLD: false }, 'resumed on the task, it hears the version');
+  await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ cwd: '/code/rest', task: onTrial }));
+  assert.equal(await sessionHookPack.sessionIsland(ownContext(l, 'sessions'), ((await sessionsPack.resolveRun(ownContext(l, 'sessions'), 's-rest', false))?.id)), trial, 'its task leads its repository');
+  assert.deepEqual(says(await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 's-rest', cwd: '/code/rest', source: 'resume' }))), { NEW: true, OLD: false }, 'resumed on the task, it hears the version');
   void here, there;
 });

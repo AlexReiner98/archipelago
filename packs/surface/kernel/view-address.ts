@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
 import type { FlatLens } from '../../query/kernel/query-flat.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** What names a view, as show and query look take it. */
 export const VIEW_INPUT = {

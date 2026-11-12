@@ -3,14 +3,14 @@
 // server and is migrated by it as it starts.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { loadConfig } from '../../database/kernel/config.ts';
 import { listWorkspaces } from './control.ts';
 import { openDb } from '../../database/kernel/db.ts';
 import { latest, versionOf } from '../../database/kernel/migrate.ts';
 import { databaseFor } from '../../database/kernel/pg.ts';
 
-async function deploy() {
+export async function deploy() {
   const { dataDir, databaseUrl } = loadConfig();
   if (!databaseUrl) {
     console.error('PELAGO_DATABASE_URL is not set. A database in a folder is migrated by the server that opens it, as it starts.');
@@ -33,6 +33,5 @@ async function deploy() {
   }
 }
 
-// Run as `node src/deploy.ts` too (the hosted deploy script does), through the shim the wave leaves there.
-const ranAs = process.argv[1] ? resolve(process.argv[1]) : '';
-if (import.meta.main || ranAs === resolve(import.meta.dirname, '../../../src/deploy.ts')) await deploy();
+// Run as `node src/deploy.ts` too (the hosted deploy script does): that entry calls deploy.
+if (import.meta.main) await deploy();

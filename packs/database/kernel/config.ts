@@ -3,7 +3,7 @@ import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { env } from '../../../src/env.ts';
 import { readOnlyPacks, readWorkspacePacks, serverPolicy } from './config-words.ts';
-import type { Policy } from '../../../src/pelago.ts';
+import type { Policy } from '../../write/kernel/pelago.ts';
 
 export interface Config {
   port: number;

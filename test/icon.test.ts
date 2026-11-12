@@ -1,7 +1,7 @@
 // The map's icon as the server answers it (packs/surface/kernel/icon.ts): its PNG, or not found.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ICON, serveIcon } from '../src/icon.ts';
+import { ICON, serveIcon } from '../packs/surface/kernel/icon.ts';
 
 test('the icon is answered as its PNG, or not found', () => {
   assert.ok(ICON.test('/favicon.ico') && ICON.test('/favicon.png') && !ICON.test('/favicon.gif'));

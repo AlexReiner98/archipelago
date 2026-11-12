@@ -3,14 +3,14 @@
 // was when nothing it sets has moved since, planned again when something has, and refused as overtaken when a field it
 // sets outright has since been set to something else. Rejecting it, or finding it moot, appends an entry with no facts.
 
-import { needHuman } from '../../../src/actor-checks.ts';
+import { needHuman } from '../../identity/kernel/actor-checks.ts';
 import type { Actor, Archipelago, Op, Proposal } from './pelago.ts';
-import { append, entry, factAt, type Decision } from '../../../src/log.ts';
-import { ITEM_COLUMNS } from '../../../src/facts.ts';
-import { projectDecision, stamp } from '../../../src/replay.ts';
+import { append, entry, factAt, type Decision } from '../../log/kernel/log.ts';
+import { ITEM_COLUMNS } from '../../log/kernel/facts.ts';
+import { projectDecision, stamp } from '../../log/kernel/replay.ts';
 import { dropExcepted } from './ops.ts';
 import { overtaken } from './merge.ts';
-import { newId, type Q } from '../../../src/db.ts';
+import { newId, type Q } from '../../database/kernel/db.ts';
 
 const UNSAID = new Map(ITEM_COLUMNS.map(([, field, unsaid]) => [field, unsaid]));
 const said = (field: string, v: unknown) => JSON.stringify(v ?? UNSAID.get(field) ?? null);

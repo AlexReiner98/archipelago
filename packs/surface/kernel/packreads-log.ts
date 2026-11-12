@@ -6,8 +6,8 @@
 // asker's to read when its item, or its link, is theirs to read now. So every read here joins the projection, which
 // the database filters as the asker. Each is bounded by an id, a set of them, a run's time, or a page.
 
-import type { Archipelago } from '../../../src/pelago.ts';
-import { openSaid } from '../../../src/seal.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import { openSaid } from '../../seal/kernel/seal.ts';
 import { livesIn } from './packreads-scope.ts';
 import { transientOf } from './root-transient.ts';
 import { pageOf, paged, READ_LIMIT, shapes, type Page, type Paged } from './packreads-rows.ts';

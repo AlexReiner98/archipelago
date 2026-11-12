@@ -6,7 +6,7 @@
 
 import { parts } from '../../loader/kernel/manifest.ts';
 import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 export type Pin = { pack: string; version?: string; manifest?: string };
 

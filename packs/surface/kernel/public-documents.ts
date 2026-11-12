@@ -9,7 +9,7 @@
 
 import { onMap } from './above.ts';
 import { readable } from '../../walls/kernel/public-document.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 

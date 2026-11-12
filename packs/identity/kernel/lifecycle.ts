@@ -1,28 +1,27 @@
 // A workspace's lifecycle (docs/kernel-packs.md, "Slots" and "The boot stub", step 5): it opens phase by phase, each
 // phase a slot `open.<phase>` that packs fill, and while this server leads it runs the duties packs declare: timers,
-// and anything else started on the lead and stopped when it is lost. Workspaces.load (src/workspaces.ts) runs no step
+// and anything else started on the lead and stopped when it is lost. Workspaces.load (./workspaces.ts) runs no step
 // of its own any more; it opens the database, hands it here and builds the workspace from what the phases made.
 //
 // Three kinds of filling, run in this order in each phase:
 //   - a root pack's, declared by the root itself: its `kernel/open.ts` exports OPEN (the steps it fills, by phase) and
 //     LEADING (what it runs while this server leads), read in the order packs/roots.json starts the roots. The
 //     identity root asks no root above it by name: it reads what each declares, as the stub reads their start.
-//   - the kernel's own, registered with onOpen and whileLeading/timer from the module that holds the code, under the
-//     pack it moves to: what the kernel still does while this server leads (the quiet sessions timer, src/workspaces.ts),
-//     until its step moves it, with its filling, into the pack.
+//   - the kernel's own, registered with onOpen and whileLeading/timer from the module that holds the code, under its
+//     pack. None is left in the server's own code; a test may register one.
 //   - an internal pack's, declared in its manifest: `kernel.hooks["open.<phase>"]` and `kernel.timers`, in pack order,
 //     each called with its pack's KernelContext. The loader fills the slot (fillOpen) when it opens a map's packs
 //     (openKernel, src/kernel-context.ts): the registry is made in the `packs` phase, so a pack's manifest can fill
 //     only the phases after it: types (once its host is open), begin, islands and ready.
 
 import { OPEN_PHASES } from './open-phases.ts';
-import type { Dump } from '../../../src/backup.ts';
-import type { Database } from '../../../src/db.ts';
+import type { Dump } from '../../log/kernel/backup.ts';
+import type { Database } from '../../database/kernel/db.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Registry } from '../../../src/packs.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Workspace, WorkspacesConfig } from './workspaces.ts';
 
 export type Phase = (typeof OPEN_PHASES)[number];

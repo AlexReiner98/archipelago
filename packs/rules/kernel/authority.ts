@@ -1,7 +1,7 @@
 // On whose authority something is done, as the log keeps it: a human acting is theirs; an agent says whether it is a
 // human's word (and where it was said) or its own judgment, and the record keeps that the agent reported it.
 
-import type { Authority } from '../../../src/pelago.ts';
+import type { Authority } from '../../write/kernel/pelago.ts';
 
 export function authorityOf(human: boolean, me: string, claimed?: Pick<Authority, 'of' | 'basis'>): Authority {
   if (human) return { of: 'human', who: me };

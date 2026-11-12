@@ -5,12 +5,12 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Archipelago } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { expandBundles, packsNamed, readBundle, readBundles } from '../src/bundles.ts';
-import { bundlesHere, packStates, packsOff, setPack, syncPacks } from '../src/packstate.ts';
-import { syncTypes } from '../src/typetable.ts';
-import { openDb } from '../src/db.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { expandBundles, packsNamed, readBundle, readBundles } from '../packs/loader/kernel/bundles.ts';
+import { bundlesHere, packStates, packsOff, setPack, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
 import { human, packsWith, PACKS } from './map.ts';
 
 async function mapOf(dir: string, only?: string[]) {

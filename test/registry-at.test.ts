@@ -8,12 +8,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { freshWith, make, PACKS, packsWith } from './map.ts';
-import { newId } from '../src/db.ts';
-import { append, headOf } from '../src/log.ts';
-import { Registry } from '../src/packs.ts';
-import { syncPacks } from '../src/packstate.ts';
-import { asOf } from '../src/rebuild.ts';
-import { registryAt } from '../src/registry-at.ts';
+import { newId } from '../packs/database/kernel/db.ts';
+import { append, headOf } from '../packs/log/kernel/log.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { asOf } from '../packs/log/kernel/rebuild.ts';
+import { registryAt } from '../packs/loader/kernel/registry-at.ts';
 
 test('a read before a pack changed reads its types as they were, and after it as they are', async () => {
   const dir = packsWith();

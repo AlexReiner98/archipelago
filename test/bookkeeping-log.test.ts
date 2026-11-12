@@ -4,10 +4,12 @@
 // sessions.bookkeeping lets it through, and the log names it.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { sessionEnd, sessionStart, sessionUpdate } from '../src/sessions.ts';
-import { HOOK_ACTOR, hookSessionEnd, hookSessionStart } from '../src/session-hook.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { HOOK_ACTOR } from '../packs/claude_code/kernel/session-hook.ts';
+import * as sessionHookPack from '../packs/sessions/kernel/session-hook.ts';
 import { agent, fresh, make } from './map.ts';
-import { checkRules, judge } from '../src/rules.ts';
+import { checkRules, judge } from '../packs/rules/kernel/rules.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 type Head = { actor: { id: string }; authority: unknown; rule: { outcome: string; spared?: { rule: string; pack: string }[] } };
 
@@ -26,11 +28,11 @@ test("a session's bookkeeping keeps its actor and authority on the log and is ne
   const from = await head(l);
 
   // A hook registers a run, names it, and ends it; an agent's own session takes a task, waits and ends.
-  await hookSessionStart(l, { session_id: 'hooked', cwd: '/tmp/x', title: 'Hooked chat' });
-  await hookSessionEnd(l, { session_id: 'hooked', reason: 'exit' });
-  const mine = await sessionStart(l, agent, { session_id: 'mine', task: made.t });
-  await sessionUpdate(l, agent, { run: mine.run, status: 'waiting', note: 'Waiting on the owner' });
-  await sessionEnd(l, agent, { run: mine.run, outcome: 'finished', summary: 'Done' });
+  await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'hooked', cwd: '/tmp/x', title: 'Hooked chat' }));
+  await sessionHookPack.hookSessionEnd(ownContext(l, 'sessions'), ({ session_id: 'hooked', reason: 'exit' }));
+  const mine = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'mine', task: made.t }));
+  await sessionsPack.sessionUpdate(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ run: mine.run, status: 'waiting', note: 'Waiting on the owner' }));
+  await sessionsPack.sessionEnd(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ run: mine.run, outcome: 'finished', summary: 'Done' }));
 
   const { entries, waiting } = await since(l, from);
   assert.equal(waiting, 0, 'nothing a session writes of itself waits');

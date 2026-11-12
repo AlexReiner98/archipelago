@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { checkRules, judge, type Target, type Who, type Written } from '../src/rules.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { checkRules, judge, type Target, type Who, type Written } from '../packs/rules/kernel/rules.ts';
 
 const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
 const agent: Who = { human: false };

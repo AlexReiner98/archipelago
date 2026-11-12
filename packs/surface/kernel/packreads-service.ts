@@ -4,7 +4,7 @@
 // corrected what after an agent (sessions' frontier). Each is bounded by the ids, key or limit it is given, and
 // answered as the asker under row-level security, as every read of packreads.ts is.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { headPos } from '../../log/kernel/tail.ts';
 import { opEntries, type OpStream } from '../../log/kernel/streams.ts';
 import { isCountStream } from '../../log/kernel/retention.ts';

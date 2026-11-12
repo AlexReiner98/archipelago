@@ -2,10 +2,10 @@
 // to the kept item three times. A merge of what is already gone is refused, on the write path and when approved.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Archipelago } from '../src/pelago.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { agent, fresh, human, make } from './map.ts';
-import { proposals } from '../src/map-reads.ts';
-import { readEvents } from '../src/eventlog.ts';
+import { proposals } from '../packs/surface/kernel/map-reads.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
 
 const pair = (l: Archipelago) =>
   make(l, [

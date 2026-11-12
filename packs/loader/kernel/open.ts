@@ -4,11 +4,12 @@
 // manifests, and which the owner turned off (what they made is dormant), the types kept on the map, the type table, and
 // the internal packs' code opened (src/kernel-context.ts), so a pack's manifest fills the phases after it. In the islands
 // phase, a new map is put on islands with one to start on (e_44rbfwxp), the island as placement makes it
-// (answer.first_island). An open workspace follows what other servers changed in it (FOLLOW), and its packs' processes stop as it closes (CLOSE).
+// (answer.first_island). While this server leads, the beat of the slot loader.leading (LEADING). An open workspace follows what other servers changed in it (FOLLOW), and its packs' processes stop as it closes (CLOSE).
 
 import { join } from 'node:path';
 import { addLocalType, importLocalPack, localTypes } from '../../identity/kernel/control.ts';
-import type { RootClose, RootFollow, RootOpen } from '../../identity/kernel/lifecycle.ts';
+import type { RootClose, RootFollow, RootLeading, RootOpen } from '../../identity/kernel/lifecycle.ts';
+import { leadingBeat } from './leading.ts';
 import { callAs, openKernel } from './kernel-context.ts';
 import { packsFor } from './pack-allow.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
@@ -16,7 +17,7 @@ import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } f
 import { hostFor } from './packtools.ts';
 import { takeTypeItems } from './type-items.ts';
 import { syncTypes } from './typetable.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 
 export const OPEN: RootOpen = {
@@ -62,3 +63,6 @@ export const FOLLOW: RootFollow = [
 ];
 
 export const CLOSE: RootClose = [(ws) => hostFor(ws.pelago.registry).stop()];
+
+/** While this server leads: the beat of the slot loader.leading in each workspace (./leading.ts), each pack's filling run where the map has it on. */
+export const LEADING: RootLeading = [(ws) => leadingBeat(ws)];

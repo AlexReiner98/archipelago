@@ -4,7 +4,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { callTool, offeredActions } from '../src/tools.ts';
+import { callTool, offeredActions } from '../packs/surface/kernel/tools.ts';
 import { agent, fresh } from './map.ts';
 
 test('a pack action for a person is not in the agents’ list, and an agent calling it is refused', async () => {

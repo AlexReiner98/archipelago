@@ -7,11 +7,11 @@
 
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { hasHumanToken } from '../../../src/auth.ts';
+import { hasHumanToken } from '../../identity/kernel/auth.ts';
 import { env } from '../../../src/env.ts';
 import '../../loader/kernel/server-slots.ts'; // the owner's sign-in code goes out as mail (identity.invited, filled by the mailer pack)
-import { adminEmails, admitMember, ownerEmail, requestSignIn } from '../../../src/members.ts';
-import type { Workspace, Workspaces } from '../../../src/workspaces.ts';
+import { adminEmails, admitMember, ownerEmail, requestSignIn } from '../../identity/kernel/members.ts';
+import type { Workspace, Workspaces } from '../../identity/kernel/workspaces.ts';
 
 /** Where the operator secret of a first start is written when nobody is at a terminal. */
 export const FIRST_START_FILE = 'first-start-secrets.txt';

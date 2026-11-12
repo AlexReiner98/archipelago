@@ -5,13 +5,13 @@ import { cpSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { callTool, toolsFor } from '../src/tools.ts';
-import { ATTENTION_REASONS } from '../src/declared.ts';
-import { REASONS } from '../src/attention.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Archipelago, type Actor } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { callTool, toolsFor } from '../packs/surface/kernel/tools.ts';
+import { ATTENTION_REASONS } from '../packs/loader/kernel/declared.ts';
+import { REASONS } from '../packs/attention/kernel/attention.ts';
 import { human } from './map.ts';
 
 

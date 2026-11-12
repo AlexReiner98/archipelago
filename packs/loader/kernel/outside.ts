@@ -4,15 +4,15 @@
 // for a person, and is made once they say so. Every act is logged and never undone. A request may name a handler
 // entry to be told the answer (then), which answers ops in turn.
 
-import { newSecret } from '../../../src/auth.ts';
+import { newSecret } from '../../identity/kernel/auth.ts';
 import { parts } from './manifest.ts';
-import { newId } from '../../../src/db.ts';
+import { newId } from '../../database/kernel/db.ts';
 import type { ActionDef, HostDef } from './declared.ts';
 import type { Done, PackHost } from './packhost.ts';
 import type { PackFile } from './packs.ts';
 import { actorId, needHuman } from '../../identity/kernel/actor-checks.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import { seal, unseal } from '../../../src/secrets.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
+import { seal, unseal } from '../../seal/kernel/secrets.ts';
 
 export interface OutsideRequest {
   host: string;

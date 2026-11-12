@@ -7,7 +7,7 @@
 //   answer needs it (the tool events, and get's recent events, src/tool-reads.ts), not here, which would owe a service.
 // - proposals is the write root's (proposalsOf, src/proposals.ts): the write path reads its own queue (withdraw).
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { proposalsOf } from '../../write/kernel/proposals.ts';
 
 /** Whether an item is there though the reader may not see it (pelago_item_hidden, src/schema.ts). */

@@ -1,8 +1,8 @@
 // A new workspace's id, made from the name it is given: by a server pack that sells one (src/server-acts.ts) and by
 // the sign-up page (src/signup.ts), from one list of ids nobody may take.
 
-import { validWorkspaceId } from './auth.ts';
-import type { Workspaces } from './workspaces.ts';
+import { validWorkspaceId } from '../packs/identity/kernel/auth.ts';
+import type { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
 /** Ids no new workspace takes: the server's own names, and the paths it serves under (/x/ is a server pack's). */
 export const RESERVED = ['default', 'www', 'app', 'api', 'admin', 'mail', 'staging', 'archipelago', 'x'];

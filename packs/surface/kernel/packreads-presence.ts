@@ -2,7 +2,7 @@
 // that, all the way up, so the owner's page can tell a session working inside a plan it watches. Bounded by the one
 // run it names, through the part_of closure; answered as the asker.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 export type PresenceRead = {
   /** What a session works on now and what holds each of those, at any depth, by the closure: ids only. */

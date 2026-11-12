@@ -1,18 +1,19 @@
 // An agent publishes a document only where the workspace's owner allows it, each publish logged with its authority;
 // the allowance is a human admin's to give, and taking a document down stays a human's.
 import assert from 'node:assert/strict';
-import { doneEvents } from '../src/activity.ts';
+import { doneEvents } from '../packs/log/kernel/activity.ts';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { migrate } from '../src/migrate.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
-import { unpublish } from '../src/published.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { migrate } from '../packs/database/kernel/migrate.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Archipelago, type Actor } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import * as publishedPack from '../packs/publish/kernel/published.ts';
 import { packsWith } from './map.ts';
 import { OLD_EVENT } from './old-event.ts';
-import { WORKSPACE_SHARE } from '../src/schema.ts';
+import { WORKSPACE_SHARE } from '../packs/database/kernel/schema.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const member: Actor = { kind: 'human', name: 'member' };
@@ -55,10 +56,10 @@ test('with the owner’s allowance an agent publishes, and the log keeps on whos
   // Taking it down stays a human's.
   await assert.rejects(callTool(l, agent, 'unpublish', { id: doc }), /for humans only/);
   // And not only at the tool: a direct call, as a pack would make, is refused by core's rule agent_unpublish.
-  await assert.rejects(unpublish(l, agent, doc), /Taking a document down is the owner’s/);
+  await assert.rejects(publishedPack.unpublish(kernelContext(l, 'publish'), agent, doc), /Taking a document down is the owner’s/);
   assert.equal((await l.entity(doc))!.visibility, 'public', 'still published');
   assert.equal((await l.db.query(`select 1 from published`)).rows.length, 1);
-  assert.equal((await unpublish(l, owner, doc)).unpublished, doc, 'the owner takes it down');
+  assert.equal((await publishedPack.unpublish(kernelContext(l, 'publish'), owner, doc)).unpublished, doc, 'the owner takes it down');
   assert.equal((await l.db.query(`select 1 from published`)).rows.length, 0);
   await callTool(l, agent, 'publish', { id: doc, authority: { of: 'human', basis } });
   // A token that may only propose is refused even so: publishing is never held, so it asks instead.

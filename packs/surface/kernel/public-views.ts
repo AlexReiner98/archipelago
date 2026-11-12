@@ -4,7 +4,7 @@
 // by (the loader's layouts), and an item's public address is the one this server answers at (/p/<workspace>/<id>).
 
 import { layoutFor } from '../../loader/kernel/layouts.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 /** An address word: lowercase letters and digits, words joined by single dashes. */

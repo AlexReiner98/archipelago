@@ -15,11 +15,14 @@ export function configureSaid(packs: Pick<ServerPacks, 'packs'> | undefined): vo
   serverPacks = packs;
 }
 
+/** The reads an agent reaches through query, the one that reads an item whole marked: all a reader's page asks of the schema (reads: true). */
+export const readsSaid = (tools: Record<string, Tool>) => queryReads(tools).map((name) => ({ name, ...(tools[name].whole && { whole: true }) }));
+
 /** The schema's answer with what the tools declare; an answer of one type, or the brief an agent is given, as it was. */
 export function toolsSaid(said: unknown, tools: Record<string, Tool>): unknown {
   if (!said || typeof said !== 'object' || !('pack_tools' in said)) return said;
   const named = (flag: 'begins' | 'ends') => Object.keys(tools).find((name) => tools[name][flag]);
-  const reads = queryReads(tools).map((name) => ({ name, ...(tools[name].whole && { whole: true }) }));
+  const reads = readsSaid(tools);
   const before = serverPacks && adapterBefore(serverPacks)?.before;
   return { ...said, acts: { begins: named('begins'), ends: named('ends') }, reads, ...(before && { before }) };
 }

@@ -17,4 +17,4 @@ export const devMode = () => restartServer !== undefined;
 export const restartNow = () => restartServer!();
 
 /** A tool only a workspace's admin may call says so before it does anything. */
-export { needAdmin } from '../../../src/actor-checks.ts';
+export { needAdmin } from '../../identity/kernel/actor-checks.ts';

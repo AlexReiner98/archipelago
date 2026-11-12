@@ -3,7 +3,7 @@
 // view's migration moves). Each is bounded by the ids it is given, a limit, or an index it names, and answered as the
 // asker under row-level security, as every read of packreads.ts is. The SQL is the modules' own, moved as it was.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { readEvents } from '../../log/kernel/eventlog.ts';
 import { READ_LIMIT } from './packreads-rows.ts';
 

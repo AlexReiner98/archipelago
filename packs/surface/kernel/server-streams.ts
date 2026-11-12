@@ -11,7 +11,7 @@ import { published } from './above.ts';
 import { publicView } from './public-views.ts';
 import { json, PRIVATE } from './reply.ts';
 import type { ActPlaces } from './server-acts.ts';
-import type { ServerPackFile } from '../../../src/server-packs.ts';
+import type { ServerPackFile } from '../../loader/kernel/server-packs.ts';
 
 export interface StreamCall {
   workspace: string;

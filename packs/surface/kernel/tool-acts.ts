@@ -5,9 +5,9 @@
 
 import { z } from 'zod';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
-import { keepRunsWith, stopLaunched } from '../../../src/launcher.ts';
-import { itemLink } from '../../../src/members.ts';
-import { actorId } from '../../../src/pelago.ts';
+import { keepRunsWith, stopLaunched } from './launcher.ts';
+import { itemLink } from '../../identity/kernel/members.ts';
+import { actorId } from '../../write/kernel/pelago.ts';
 import { importAudit, recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './session-calls.ts';
 import { point, sessionOpened, sessionTookUp, whose } from './tool-change.ts';
 import { slotted } from './surface-slots.ts';
@@ -16,7 +16,7 @@ import { backupNow, restartNow } from './tool-config.ts';
 import { BRANCH } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { VIEW_INPUT, viewAddress, WEB_URL, webAddress } from './view-address.ts';
-import { withdraw } from '../../../src/withdraw.ts';
+import { withdraw } from '../../write/kernel/withdraw.ts';
 
 // What an act asks of the packs above the surface it asks by their service names (docs/kernel-packs.md, "Service
 // names"), answered as the map that asks: the owner's screen (presence), a look (look_draw), a picture (publish), a

@@ -2,7 +2,7 @@
 // from this, never from a mode of its own. It says what the server lets the session do and enforces nothing itself:
 // a look reads (src/looks.ts), and a token's `may` holds its writes where they are made (src/pelago.ts).
 
-import type { Actor } from '../../../src/pelago-types.ts';
+import type { Actor } from '../../write/kernel/pelago-types.ts';
 
 /** read: the map as the session sees it; write: a change to it (applied or held); admin: the workspace's members, tokens, settings. */
 export type PageMay = 'read' | 'write' | 'admin';

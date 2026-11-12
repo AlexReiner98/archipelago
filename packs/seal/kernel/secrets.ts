@@ -21,8 +21,8 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { env } from '../../../src/env.ts';
-import type { Q } from '../../../src/db.ts';
-import type { OpFact } from '../../../src/streams.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { OpFact } from '../../log/kernel/streams.ts';
 
 const MARK = 'sealed:v1:';
 let dir: string | null = null;

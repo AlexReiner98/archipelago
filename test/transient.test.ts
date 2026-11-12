@@ -1,9 +1,9 @@
 // What one request leaves for the next is kept in the workspace's database, so another server can answer the next.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { begin, connectAct } from '../src/server-connect.ts';
-import { keep, kept, take } from '../src/transient.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { begin, connectAct } from '../packs/surface/kernel/server-connect.ts';
+import { keep, kept, take } from '../packs/database/kernel/transient.ts';
 
 test('a value is kept until it runs out, and taken once', async () => {
   const db = await openDb();

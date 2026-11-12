@@ -37,10 +37,10 @@ if (URL_) {
   await admin.end();
 }
 
-const { openDb } = await import('../src/db.ts');
+const { openDb } = await import('../packs/database/kernel/db.ts');
 const { entryHash, GENESIS } = await import('../src/jcs.ts');
-const log = await import('../src/log.ts');
-const { readEvents } = await import('../src/eventlog.ts');
+const log = await import('../packs/log/kernel/log.ts');
+const { readEvents } = await import('../packs/log/kernel/eventlog.ts');
 
 const say = (line: string) => console.log(line);
 const results: Record<string, unknown> = { db: URL_ ? 'postgres' : 'pglite', entries: ENTRIES, seed: SEED, runs: RUNS, at: new Date().toISOString() };

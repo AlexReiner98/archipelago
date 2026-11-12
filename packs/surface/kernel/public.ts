@@ -5,7 +5,7 @@
 // is there: names, states and what the tests found, and nothing else. The surface's since wave 7 (out of walls): its
 // proof and changelog are views, asked by name of the query pack (answer.ask_view), which is above the walls.
 
-import type { Entity, Archipelago } from '../../../src/pelago.ts';
+import type { Entity, Archipelago } from '../../write/kernel/pelago.ts';
 import { askView } from './view-words.ts';
 
 /**

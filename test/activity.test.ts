@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CARRIED, doneEvents, lastSeq } from '../src/activity.ts';
-import { dump, restore } from '../src/backup.ts';
-import { openDb, type Database } from '../src/db.ts';
-import { readEvents } from '../src/eventlog.ts';
+import { CARRIED, doneEvents, lastSeq } from '../packs/log/kernel/activity.ts';
+import { dump, restore } from '../packs/log/kernel/backup.ts';
+import { openDb, type Database } from '../packs/database/kernel/db.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
 import { OLD_EVENT } from './old-event.ts';
-import { latest, migrate, versionOf } from '../src/migrate.ts';
-import { dumpVault } from '../src/vault.ts';
-import { Archipelago } from '../src/pelago.ts';
+import { latest, migrate, versionOf } from '../packs/database/kernel/migrate.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { fresh, make } from './map.ts';
 
 

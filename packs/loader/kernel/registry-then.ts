@@ -1,7 +1,7 @@
 // What a past registry (src/registry-at.ts) reads besides the pack facts: whether the map was on islands then, and the
 // types the workspace had defined for itself (define_type) by then. Both are read from the logs, as of a fact position.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { ISLANDS } from './islands.ts';
 import type { TypeDef } from './packs.ts';
 

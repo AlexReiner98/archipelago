@@ -9,13 +9,13 @@ import { after, test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
-import { Archipelago } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { followPacks, setPack } from '../src/packstate.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { followPacks, setPack } from '../packs/loader/kernel/packstate.ts';
 import { freshWith, human, PACKS } from './map.ts';
-import { orderPacks } from '../src/packorder.ts';
-import { createHttpServer } from '../src/server.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { orderPacks } from '../packs/loader/kernel/packorder.ts';
+import { createHttpServer } from '../packs/surface/kernel/server.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
 /** A pack written for the test: one type and one action, so turning it off takes both away. */
 const TALLY = {

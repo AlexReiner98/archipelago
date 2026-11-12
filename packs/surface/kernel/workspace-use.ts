@@ -2,8 +2,8 @@
 // a minute. Measured alike on every server, whatever limits it: the usage view shows them, and where a server pack
 // sets a workspace limits (src/standing.ts), they are what each limit is held against.
 
-import type { Q } from '../../../src/db.ts';
-import { limiter, TOKEN_LIMIT, type Limit } from '../../../src/limit.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import { limiter, TOKEN_LIMIT, type Limit } from './limit.ts';
 import { bytes, fillUse } from '../../identity/kernel/standing.ts';
 
 /** A session not heard from for this long is not at work: it holds no place among those at once. */

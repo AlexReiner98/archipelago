@@ -12,9 +12,9 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { delimiter, dirname, extname, isAbsolute, join, resolve } from 'node:path';
 import { env } from '../../../src/env.ts';
-import { configureLauncher, stopLaunchedOf, type Launcher, type LauncherConfig, type Read } from '../../../src/launcher.ts';
+import { configureLauncher, stopLaunchedOf, type Launcher, type LauncherConfig, type Read } from './launcher.ts';
 import type { ServerPacks } from './server-host.ts';
-import { LAUNCH_FILLS } from '../../../src/server-reach.ts';
+import { LAUNCH_FILLS } from '../../loader/kernel/server-reach.ts';
 
 /** How long reading one line may take. */
 const READ_MS = 5_000;

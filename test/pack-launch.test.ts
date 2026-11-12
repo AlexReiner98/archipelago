@@ -6,10 +6,10 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { configureLauncher, type Launcher } from '../src/launcher.ts';
-import { launchHeard } from '../src/pack-launch.ts';
-import { PackHost } from '../src/packhost.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
+import { configureLauncher, type Launcher } from '../packs/surface/kernel/launcher.ts';
+import { launchHeard } from '../packs/loader/kernel/pack-launch.ts';
+import { PackHost } from '../packs/loader/kernel/packhost.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { freshWith, make, packsWith } from './map.ts';
 
 const YARD: PackFile = {

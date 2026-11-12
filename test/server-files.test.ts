@@ -9,9 +9,9 @@ import type { ServerResponse } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { filesVersion, handsOut, serveFile, setupBehind, setupPack, setupVersion } from '../src/server-files.ts';
-import { loadServerPacks } from '../src/server-packs.ts';
-import { workingRules } from '../src/working-rules.ts';
+import { filesVersion, handsOut, serveFile, setupBehind, setupPack, setupVersion } from '../packs/surface/kernel/server-files.ts';
+import { loadServerPacks } from '../packs/loader/kernel/server-packs.ts';
+import { workingRules } from '../packs/loader/kernel/working-rules.ts';
 
 const FIXTURES = join(import.meta.dirname, 'server-packs', 'setup');
 const dir = mkdtempSync(join(tmpdir(), 'pelago-files-'));

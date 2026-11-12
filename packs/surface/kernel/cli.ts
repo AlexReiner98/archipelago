@@ -3,10 +3,10 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { hashSecret, newSecret, OPERATOR_RESET_FILE } from '../../../src/auth.ts';
-import { loadConfig } from '../../../src/config.ts';
+import { hashSecret, newSecret, OPERATOR_RESET_FILE } from '../../identity/kernel/auth.ts';
+import { loadConfig } from '../../database/kernel/config.ts';
 import { env } from '../../../src/env.ts';
-import { packsFor } from '../../../src/pack-allow.ts';
+import { packsFor } from '../../loader/kernel/pack-allow.ts';
 
 const USAGE = `pelago <command>
 
@@ -174,7 +174,7 @@ async function main(): Promise<void> {
       const dir = join(dataDir, '..', 'workspaces');
       const proof = newSecret('reset');
       if (databaseUrl) {
-        const [{ openDb }, { OPERATOR_RESET, setControlValue }] = await Promise.all([import('../../../src/db.ts'), import('../../../src/control.ts')]);
+        const [{ openDb }, { OPERATOR_RESET, setControlValue }] = await Promise.all([import('../../database/kernel/db.ts'), import('../../identity/kernel/control.ts')]);
         const db = await openDb(databaseUrl);
         await setControlValue(db, OPERATOR_RESET, hashSecret(proof)).finally(() => db.close());
       } else {
@@ -199,7 +199,7 @@ The old one no longer works.`);
       const [from, to] = args;
       if (!from || !to) throw new Error('Usage: pelago move <data folder | postgres://…> <new data folder | postgres://…>');
       const [{ isServer, openDb }, { dropDatabase, makeDatabase }, { move }, { Registry }, { localTypes }, { configureSecrets }] = await Promise.all([
-        import('../../../src/db.ts'), import('../../../src/pg.ts'), import('../../../src/move.ts'), import('../../../src/packs.ts'), import('../../../src/control.ts'), import('../../../src/secrets.ts'),
+        import('../../database/kernel/db.ts'), import('../../database/kernel/pg.ts'), import('../../log/kernel/move.ts'), import('../../loader/kernel/packs.ts'), import('../../identity/kernel/control.ts'), import('../../seal/kernel/secrets.ts'),
       ]);
       const { packDirs, packs, workspacePacks, dataDir } = loadConfig();
       // A move carries a map whole: every pack any workspace here may have.

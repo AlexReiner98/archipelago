@@ -8,9 +8,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
-import { createToken } from '../src/auth.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
 import { DIRECTORY, FOLDER, pluginFiles } from '../scripts/plugin.ts';
-import { LISTING } from '../src/listing.ts';
+import { LISTING } from '../packs/surface/kernel/listing.ts';
 import { serve } from './serve.ts';
 
 const ROOT = join(import.meta.dirname, '..');

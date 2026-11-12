@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { z } from 'zod';
 import { inputOf } from '../packs/surface/kernel/tool-input.ts';
-import { TOOLS } from '../src/tools.ts';
+import { TOOLS } from '../packs/surface/kernel/tools.ts';
 
 const PINNED = JSON.parse(readFileSync(new URL('./fixtures/pack-tool-schemas.json', import.meta.url), 'utf8')) as Record<string, unknown>;
 

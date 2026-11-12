@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { cssProblem } from '../src/css-check.ts';
+import { cssProblem } from '../packs/walls/kernel/css-check.ts';
 import { packsWith } from './map.ts';
 import { serve } from './serve.ts';
 

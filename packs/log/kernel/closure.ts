@@ -6,7 +6,7 @@
 // whose row-level security keeps what the reader may not see out. The migration fills it from part_of itself, which no
 // pack extends today; a rebuild (regatherAll) reads the whole family as the registry has it.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 
 /** Every pair a set of items' ancestors make, walked up the open part_of links of a family. */
 const UP = (from: string, fam: string) => `with recursive up(d, a) as (

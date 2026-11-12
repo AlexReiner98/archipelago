@@ -1,28 +1,28 @@
 // The map and its single write path. Every change to items and links goes through change(): it is validated, judged
 // by the rules (src/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
-import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type Policy } from '../../../src/rules.ts';
-import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomToStore, stillWritable } from '../../../src/standing.ts'; import { authorityOf } from '../../../src/authority.ts';
-import { anyone, newId, scoped, type Db, type Q } from '../../../src/db.ts';
-import { once } from './merge.ts'; import { doneFact, type Done } from '../../../src/activity.ts';
-import type { Registry } from '../../../src/packs.ts'; import { currentNames } from '../../../src/type-items.ts'; import { follow, retyped, rewrite, type Who } from '../../../src/write-hooks.ts';
-import { readSecret, writeSecret } from '../../../src/secrets.ts';
-import { KEPT_FIELDS } from '../../../src/operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from '../../../src/streams.ts';
-import { layoutOf } from '../../../src/layout-changes.ts';
-import { append, headOf, type Fact } from '../../../src/log.ts'; import { projectDecision, projectFacts, stamp } from '../../../src/replay.ts'; import { linkFacts } from '../../../src/facts.ts';
-import { decideProposal } from './proposals.ts'; import { needHuman } from '../../../src/actor-checks.ts';
+import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type Policy } from '../../rules/kernel/rules.ts';
+import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomToStore, stillWritable } from '../../identity/kernel/standing.ts'; import { authorityOf } from '../../rules/kernel/authority.ts';
+import { anyone, newId, scoped, type Db, type Q } from '../../database/kernel/db.ts';
+import { once } from './merge.ts'; import { doneFact, type Done } from '../../log/kernel/activity.ts';
+import type { Registry } from '../../loader/kernel/packs.ts'; import { currentNames } from '../../loader/kernel/type-items.ts'; import { follow, retyped, rewrite, type Who } from './write-hooks.ts';
+import { readSecret, writeSecret } from '../../seal/kernel/secrets.ts';
+import { KEPT_FIELDS } from '../../log/kernel/operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from '../../log/kernel/streams.ts';
+import { layoutOf } from '../../rules/kernel/layout-changes.ts';
+import { append, headOf, type Fact } from '../../log/kernel/log.ts'; import { projectDecision, projectFacts, stamp } from '../../log/kernel/replay.ts'; import { linkFacts } from '../../log/kernel/facts.ts';
+import { decideProposal } from './proposals.ts'; import { needHuman } from '../../identity/kernel/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../../src/island-rules.ts';
+import { planChange } from './change-plan.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
 
 export * from './pelago-types.ts';
-export type { Level, OpKind, Policy } from '../../../src/rules.ts';
-export { DEFAULT_AGENT_POLICY } from '../../../src/rules.ts';
+export type { Level, OpKind, Policy } from '../../rules/kernel/rules.ts';
+export { DEFAULT_AGENT_POLICY } from '../../rules/kernel/rules.ts';
 
 type Props = Record<string, unknown>;
 /** The loader's in-process tier, loaded when first asked: it reaches the reads API, which reaches back here. */
 const kernel = () => import('../../loader/kernel/kernel-context.ts');
 
-export { BLOCKING_RELATIONS } from '../../../src/private-deps.ts';
+export { BLOCKING_RELATIONS } from '../../rules/kernel/private-deps.ts';
 
 export class Archipelago {
   readonly db: Db;

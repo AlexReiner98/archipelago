@@ -4,9 +4,9 @@
 // it was then. What is not a fact (a push heard, a pack turned on, a setting changed) is an entry of log_op, read by
 // ./activity.ts. Both are numbered from one sequence, so a cursor (`after`, `before`) runs over both.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { isLink, MOVED } from './replay.ts';
-import { openSaid } from '../../../src/seal.ts';
+import { openSaid } from '../../seal/kernel/seal.ts';
 import { doneEvents } from './activity.ts';
 import { FACT_ACTIONS } from './activity-steps.ts';
 

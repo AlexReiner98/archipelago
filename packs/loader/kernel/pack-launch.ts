@@ -7,9 +7,9 @@
 // call, another event, an event another pack recorded, an item of another type, a paused automation, or a launch that
 // differs from what the automation says are each refused whole. Not while the session it last started is still open.
 
-import type { LaunchInput, LaunchMode, StartedBy } from '../../../src/launch-brief.ts';
+import type { LaunchInput, LaunchMode, StartedBy } from '../../agents/kernel/launch-brief.ts';
 import { bypassingRls } from '../../identity/kernel/outbox.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 
 /** How a session is started: src/launcher.ts hands it in when it loads, since what it reads reaches back to the pack host. */
 type Launch = (l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy) => Promise<{ run: string; mode: LaunchMode }>;

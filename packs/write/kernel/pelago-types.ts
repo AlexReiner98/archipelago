@@ -1,8 +1,8 @@
 // The shapes the map is written and read in: who acts, the ops of a change, an item, a held change. The write path
 // (src/pelago.ts) takes and answers them; every other module names them from there.
 
-import type { Ruled } from '../../../src/rules.ts';
-import type { Registry, TypeDef } from '../../../src/packs.ts';
+import type { Ruled } from '../../rules/kernel/rules.ts';
+import type { Registry, TypeDef } from '../../loader/kernel/packs.ts';
 import type { ForgetOp } from './forget.ts';
 
 export interface Actor {

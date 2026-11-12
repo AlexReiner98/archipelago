@@ -7,7 +7,7 @@
 // removed, and a workspace's whole lists are added again after a restore; one left behind only costs a look. A
 // database that has never had an index is indexed once, from every workspace, when it is first asked.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 
 let control: (() => Promise<Q>) | undefined;
 /** The server's own database, said once when the server starts. Without it, nothing is noted. */

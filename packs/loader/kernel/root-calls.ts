@@ -12,8 +12,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Archipelago } from '../../../src/pelago.ts';
-import type { Workspaces } from '../../../src/workspaces.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import type { Workspaces } from '../../identity/kernel/workspaces.ts';
 
 /** The repository whose packs/ and roots.json are read, unless told otherwise. */
 export const ROOT_HOME = join(import.meta.dirname, '..', '..', '..');

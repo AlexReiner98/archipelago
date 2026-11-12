@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
 import { test } from 'node:test';
-import { createToken } from '../src/auth.ts';
-import { limiter } from '../src/limit.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import { limiter } from '../packs/surface/kernel/limit.ts';
 import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';

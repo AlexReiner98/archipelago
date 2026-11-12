@@ -6,10 +6,10 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { createToken } from '../src/auth.ts';
-import { foldBytes, recountBytes } from '../src/bytes.ts';
-import { runAct } from '../src/server-acts.ts';
-import { loadServerPacks } from '../src/server-packs.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import { foldBytes, recountBytes } from '../packs/log/kernel/bytes.ts';
+import { runAct } from '../packs/surface/kernel/server-acts.ts';
+import { loadServerPacks } from '../packs/loader/kernel/server-packs.ts';
 import { serve } from './serve.ts';
 
 const FIXTURES = join(import.meta.dirname, 'server-packs');

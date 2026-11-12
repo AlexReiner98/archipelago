@@ -4,16 +4,16 @@
 // workspace's owner. Each is bounded by the ids it is given, a limit, or an index it names, and answered as the asker
 // under row-level security, as every read of packreads.ts is. What reads the whole map is not here.
 
-import { ACTIVE_HOLDS, type Archipelago } from '../../../src/pelago.ts';
+import { ACTIVE_HOLDS, type Archipelago } from '../../write/kernel/pelago.ts';
 import { blockGraph, heldResources } from './blocking.ts';
-import { openSaid } from '../../../src/seal.ts';
+import { openSaid } from '../../seal/kernel/seal.ts';
 import { scopeOf } from './packreads-scope.ts';
 import { scanAround, scanKinds, type Around } from './region.ts';
 import { shapes } from './packreads-rows.ts';
-import { notKernel } from '../../../src/head.ts';
+import { notKernel } from '../../loader/kernel/head.ts';
 import { islandRegistry } from '../../loader/kernel/island-pin.ts';
 import { presetsOf } from '../../loader/kernel/declared.ts';
-import { asOf } from '../../../src/rebuild.ts';
+import { asOf } from '../../log/kernel/rebuild.ts';
 import { layoutFor } from '../../loader/kernel/layouts.ts';
 
 /**

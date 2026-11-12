@@ -8,10 +8,10 @@
 //
 // A server with no gate asks nothing: nobody owes anything, and nothing is limited.
 
-import { controlValue } from '../../../src/control.ts';
-import type { Q } from '../../../src/db.ts';
+import { controlValue } from '../../identity/kernel/control.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import type { ServerPacks } from './server-host.ts';
-import { standingFrom, type Standing } from '../../../src/standing.ts';
+import { standingFrom, type Standing } from '../../identity/kernel/standing.ts';
 
 /** One document to agree to: where it is read and the version in force. */
 export interface Agreement {

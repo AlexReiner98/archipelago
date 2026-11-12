@@ -4,7 +4,7 @@
 // capabilities. A definition that changed (a pack upgraded, or added back after a while) is logged with what changed.
 // A type that took another over (moved_from) takes its items once the old one is defined by no pack; a relation, its links.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { ResolvedRelation, ResolvedType } from './packs.ts';
 import { hostAt } from './kernel-context.ts';
 import { versionAdded } from './version-types.ts';

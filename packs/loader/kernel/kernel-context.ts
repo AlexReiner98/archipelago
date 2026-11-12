@@ -13,17 +13,17 @@ import { pathToFileURL } from 'node:url';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
 import { codeFolder } from './code-folder.ts';
 import { readsAnswer } from './packhost.ts';
-import type { Read } from '../../../src/packreads.ts';
-import { guardedFetch } from '../../../src/outbound.ts';
+import type { Read } from '../../surface/kernel/packreads.ts';
+import { guardedFetch } from '../../walls/kernel/outbound.ts';
 import { fillServices, serviceName, serviceOf, servicesOf, type Family } from './services.ts';
 import { islandRegistry } from './island-pin.ts';
 import { callRoot, declares, isRootName, ownManifest, type RootCall } from './root-calls.ts';
 import { fillOpen } from '../../identity/kernel/lifecycle.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import type { ChangeInput } from '../../../src/pelago-types.ts';
-import type { Fact } from '../../../src/log.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import type { ChangeInput } from '../../write/kernel/pelago-types.ts';
+import type { Fact } from '../../log/kernel/log.ts';
 import type { Registry } from './packs.ts';
-import type { OpFact, OpStream } from '../../../src/streams.ts';
+import type { OpFact, OpStream } from '../../log/kernel/streams.ts';
 
 /** On whose authority a service pack's change is made: its own, kept apart from a human's and an agent's. */
 export interface SystemAuthority { of: 'system'; basis: string }

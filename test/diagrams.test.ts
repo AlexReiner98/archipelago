@@ -15,9 +15,9 @@ const cells = (xml: string, attr: 'vertex' | 'edge') => (xml.match(new RegExp(`$
 
 test('imports are read: relative, dynamic and from a page; type-only imports and other folders are not', () => {
   const modules = readModules([
-    { path: 'src/server.ts', text: "// One process.\nimport { a } from './pelago.ts';\nimport type { T } from './db.ts';\nconst m = await import('./db.ts');\nimport { z } from 'zod';\n" },
-    { path: 'src/pelago.ts', text: "// The write path. More here.\nimport {\n  b,\n} from './db.ts';\n" },
-    { path: 'src/db.ts', text: '' },
+    { path: 'packs/surface/kernel/server.ts', text: "// One process.\nimport { a } from './pelago.ts';\nimport type { T } from './db.ts';\nconst m = await import('./db.ts');\nimport { z } from 'zod';\n" },
+    { path: 'packs/write/kernel/pelago.ts', text: "// The write path. More here.\nimport {\n  b,\n} from './db.ts';\n" },
+    { path: 'packs/database/kernel/db.ts', text: '' },
     { path: 'ui/index.html', text: '<script type="module" src="/app.js"></script>' },
     { path: 'ui/app.js', text: "import { h } from './base.js';\n" },
     { path: 'ui/base.js', text: '' },
@@ -27,11 +27,11 @@ test('imports are read: relative, dynamic and from a page; type-only imports and
   ]);
   const by = Object.fromEntries(modules.map((m) => [m.path, m]));
   assert.equal(by['test/x.test.ts'], undefined);
-  assert.deepEqual(by['src/server.ts'].imports, [{ to: 'src/pelago.ts', dynamic: false }, { to: 'src/db.ts', dynamic: true }]);
-  assert.deepEqual(by['src/pelago.ts'].imports, [{ to: 'src/db.ts', dynamic: false }]);
-  assert.equal(by['src/pelago.ts'].about, 'The write path.');
-  assert.equal(by['src/pelago.ts'].area, 'Write path and model');
-  assert.equal(by['src/server.ts'].area, 'Server and surfaces', 'a file no rule names falls in the last area');
+  assert.deepEqual(by['packs/surface/kernel/server.ts'].imports, [{ to: 'packs/write/kernel/pelago.ts', dynamic: false }, { to: 'packs/database/kernel/db.ts', dynamic: true }]);
+  assert.deepEqual(by['packs/write/kernel/pelago.ts'].imports, [{ to: 'packs/database/kernel/db.ts', dynamic: false }]);
+  assert.equal(by['packs/write/kernel/pelago.ts'].about, 'The write path.');
+  assert.equal(by['packs/write/kernel/pelago.ts'].area, 'Write path and model');
+  assert.equal(by['packs/surface/kernel/server.ts'].area, 'Server and surfaces', 'a file no rule names falls in the last area');
   assert.deepEqual(by['ui/index.html'].imports, [{ to: 'ui/app.js', dynamic: false }]);
   assert.deepEqual(by['packs/demo/handler.js'].imports, [{ to: 'packs/demo/days.js', dynamic: false }]);
   assert.equal(by['packs/demo/handler.js'].area, 'demo pack');

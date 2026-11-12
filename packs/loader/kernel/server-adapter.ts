@@ -7,8 +7,8 @@
 
 import type { HookAsk, HookBody, Neutral } from '../../sessions/kernel/hook-answers.ts';
 import { ownCall } from './own-calls.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import type { ServerPacks } from '../../../src/server-host.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import type { ServerPacks } from '../../surface/kernel/server-host.ts';
 
 /** A hook as the server hands it: the map as the token's person sees it, and what the session is answered from. */
 export interface HookCall extends HookAsk {

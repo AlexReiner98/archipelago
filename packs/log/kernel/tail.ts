@@ -6,10 +6,10 @@
 // projects the facts itself, with the projector the server runs (src/project.ts), so a change reaches it without a
 // lens read.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import type { Entry, Fact } from './log.ts';
 import { MOVED } from './project.ts';
-import { openEntries, openSaid } from '../../../src/seal.ts';
+import { openEntries, openSaid } from '../../seal/kernel/seal.ts';
 
 /** Entries read in one call at most: a page further behind asks again from where the answer stops (`more`). */
 const ENTRIES = 500;

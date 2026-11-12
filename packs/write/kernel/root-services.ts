@@ -1,7 +1,7 @@
 // The write root's root services (docs/kernel-packs.md, "Root services"): what only the write path may do, asked by
 // the internal packs packs/roots.json names for each (src/root-calls.ts).
 
-import type { RootCall } from '../../../src/root-calls.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
 
 /** What a check of a connection saw, as the connect pack hands it: the connection, what it saw, and who asked for the check. */
 export interface Observation { id: string; status: 'available' | 'unavailable'; by: string }

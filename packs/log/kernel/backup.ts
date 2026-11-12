@@ -18,25 +18,25 @@
 // Since format 3 a backup is the log and a snapshot (src/backup-log.ts): the log's rows whole, the newest snapshot of
 // the projections, and only what the log does not say. Items, links and the review queue are made again from them.
 
-import { isSealed, seal, SECRET_SETTINGS } from '../../../src/secrets.ts';
+import { isSealed, seal, SECRET_SETTINGS } from '../../seal/kernel/secrets.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
-import { resolve } from 'node:path';
-import { isServer, openDb, type Db, type Q } from '../../../src/db.ts';
+
+import { isServer, openDb, type Db, type Q } from '../../database/kernel/db.ts';
 import { rootFills } from '../../database/kernel/root-fills.ts';
-import type { Registry } from '../../../src/packs.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
 import { regatherAll } from './closure.ts';
-import { recountBytes } from '../../../src/bytes.ts';
+import { recountBytes } from './bytes.ts';
 import { projectAgainAtOpen } from './log-project.ts';
-import { databaseFor } from '../../../src/pg.ts';
-import { analyzeAll } from '../../../src/stats.ts';
-import { FACT_ACTIONS, factEvents } from '../../../src/eventlog.ts';
+import { databaseFor } from '../../database/kernel/pg.ts';
+import { analyzeAll } from '../../database/kernel/stats.ts';
+import { FACT_ACTIONS, factEvents } from './eventlog.ts';
 import { CARRIED, carryRows, doneEvents, type EventRow } from './activity.ts';
-import { openTables, sealTables, sealedDump } from '../../../src/backup-seal.ts';
+import { openTables, sealTables, sealedDump } from '../../seal/kernel/backup-seal.ts';
 import { projectBackup } from './backup-log.ts';
 import { liveSnapshot } from './snapshot.ts';
-import { dumpVault, restoreVault, type VaultDump } from '../../../src/vault.ts';
-import type { RootCall } from '../../../src/root-calls.ts';
+import { dumpVault, restoreVault, type VaultDump } from '../../seal/kernel/vault.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import { makePartitions } from './partitions.ts';
 
 /** The slot log.restored: what a root above the log keeps of a backup in the restore's transaction, once its rows are in (its kernel/fills.ts, RESTORED). */
@@ -167,7 +167,7 @@ export async function restore(db: Db, given: Dump, as?: string): Promise<Record<
   return counts;
 }
 
-export { notImported } from '../../../src/eventlog.ts';
+export { notImported } from './eventlog.ts';
 
 /** The types a workspace defined for itself, as a local pack file, if it has any. */
 export const localPackOf = (registry: Registry) => registry.localPack();
@@ -252,10 +252,9 @@ export async function dumpOf(call: RootCall, input: { workspace: string; name: s
   }
 }
 
-// Run as `node src/backup.ts restore ...` too, through the shim the wave leaves there.
-const ranAs = process.argv[1] ? resolve(process.argv[1]) : '';
-if (import.meta.main || ranAs === resolve(import.meta.dirname, '../../../src/backup.ts')) {
-  const [command, file, target, vault] = process.argv.slice(2);
+/** `node src/backup.ts restore <backup file> <target> [vault backup file]`: the command line's restore (src/backup.ts runs it). */
+export async function restoreCommand(argv: string[]): Promise<void> {
+  const [command, file, target, vault] = argv;
   if (command !== 'restore' || !file || !target) {
     console.error('Usage: node src/backup.ts restore <backup file> <new data folder | postgres://...> [vault backup file]');
     process.exit(1);
@@ -269,3 +268,5 @@ if (import.meta.main || ranAs === resolve(import.meta.dirname, '../../../src/bac
   console.log(Object.entries(done.counts).map(([table, n]) => `${table}: ${n}`).join(', '));
   if (backup.workspace.id !== 'default' && !isServer(target)) console.log(`A server finds it once it is listed: create the workspace from this backup through the operator instead (POST /operator/workspaces).`);
 }
+
+if (import.meta.main) await restoreCommand(process.argv.slice(2));

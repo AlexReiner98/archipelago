@@ -1,7 +1,7 @@
 // Other workspaces on this server, reached through the server: each workspace is its own database. Nothing passes
 // between two workspaces any more: notifications and shares by workspace were dropped (the owner, 10 Nov 2026).
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** Hands back another workspace's map, or undefined if there is no such workspace. */
 type Lookup = (workspace: string) => Promise<Archipelago | undefined>;

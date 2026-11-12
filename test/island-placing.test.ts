@@ -6,9 +6,9 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { PackHost } from '../src/packhost.ts';
-import { Registry } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
+import { PackHost } from '../packs/loader/kernel/packhost.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
 import { freshWith, human, make } from './map.ts';
 
 /** An island pack: a run and its results. */

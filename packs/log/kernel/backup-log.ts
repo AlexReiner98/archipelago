@@ -8,14 +8,14 @@
 // alone does not make (items from before the log, rows a merge wrote). Refused for other code, a copy made where the
 // projector has moved on read only what the log says, and on 25 Oct 2026 that was 137 of 2619 items.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import type { Entry, Fact } from './log.ts';
 import { inOrder, typesOf, loadRows, projectEntry, projectedRows, PROJECTED, type Rows } from './replay.ts';
 import { projectsApart } from './closure.ts';
-import { openAll } from '../../../src/seal.ts';
-import { openTables } from '../../../src/backup-seal.ts';
+import { openAll } from '../../seal/kernel/seal.ts';
+import { openTables } from '../../seal/kernel/backup-seal.ts';
 import { check, fromBackup, sealedRows } from './snapshot.ts';
-import type { VaultDump } from '../../../src/vault.ts';
+import type { VaultDump } from '../../seal/kernel/vault.ts';
 
 type Row = Record<string, unknown>;
 

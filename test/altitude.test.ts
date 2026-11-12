@@ -2,7 +2,7 @@
 // (docs/ui-strategy.md). A kind gives it; a type may set its own; a flavour inherits it.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry, type PackFile } from '../src/packs.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { packsWith } from './map.ts';
 
 const levels: PackFile = {

@@ -4,15 +4,16 @@
 
 import assert from 'node:assert/strict';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { publish, unpublish } from '../src/published.ts';
-import type { ActPlaces } from '../src/server-acts.ts';
-import type { ServerPackFile } from '../src/server-packs.ts';
-import { publishedAct } from '../src/server-published.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Archipelago, type Actor } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import * as publishedPack from '../packs/publish/kernel/published.ts';
+import type { ActPlaces } from '../packs/surface/kernel/server-acts.ts';
+import type { ServerPackFile } from '../packs/loader/kernel/server-packs.ts';
+import { publishedAct } from '../packs/surface/kernel/server-published.ts';
 import { packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const ACTS = ['public.read', 'public.at', 'public.picture', 'public.drawing', 'public.list'] as const;
@@ -42,7 +43,7 @@ async function site() {
   ).created;
   // A figure on the section and one on the unpublished draft, kept as the figure store keeps them.
   for (const id of [made.s, made.u]) await l.db.query(`insert into picture (entity_id, content_type, bytes, size) values ($1, 'image/png', $2, 3)`, [id, Buffer.from([1, 2, 3])]);
-  await publish(l, owner, made.d);
+  await publishedPack.publish(kernelContext(l, 'publish'), owner, made.d);
   const act = (name: (typeof ACTS)[number], input: Record<string, unknown>) => publishedAct(at, pack(), name, { workspace: 'default', ...input });
   return { l, at, made, act };
 }
@@ -86,7 +87,7 @@ test('what is not public, or taken down, is not reachable', async () => {
   // A public view stands as it was frozen, whatever the map says since, until it is taken down (or archived).
   await l.change(owner, { reason: 'test', ops: [{ op: 'update', id: made.d, visibility: 'private' }] });
   assert.ok(await act('public.read', { id: made.d }));
-  await unpublish(l, owner, made.d);
+  await publishedPack.unpublish(kernelContext(l, 'publish'), owner, made.d);
   assert.equal(await act('public.read', { id: made.d }), null);
   assert.equal(await act('public.at', { path: 'how-it-works' }), null);
   assert.equal(await act('public.picture', { id: made.d, section: made.s }), null);

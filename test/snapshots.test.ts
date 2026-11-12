@@ -5,15 +5,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { agent, fresh, human, make, replayed } from './map.ts';
-import { dump, restore } from '../src/backup.ts';
-import { openDb } from '../src/db.ts';
-import { headOf, verify } from '../src/log.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { asOf, rebuildProjections, snapshotNow } from '../src/rebuild.ts';
-import { newestValid, snapshots } from '../src/snapshot.ts';
-import { undo } from '../src/undo.ts';
-import { dumpVault } from '../src/vault.ts';
-import { getItem } from '../src/map-reads.ts';
+import { dump, restore } from '../packs/log/kernel/backup.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { headOf, verify } from '../packs/log/kernel/log.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { asOf, rebuildProjections, snapshotNow } from '../packs/log/kernel/rebuild.ts';
+import { newestValid, snapshots } from '../packs/log/kernel/snapshot.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
 
 /** A map with a little of everything the projector reads: items, links, held changes and their fates, an undo, a merge. */
 async function busy(l: Archipelago) {

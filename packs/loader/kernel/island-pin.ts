@@ -15,8 +15,8 @@ import { actorsOf, packKind, sharedOf } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import type { PackVersion } from './pack-items.ts';
 import type { Registry } from './packs.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import type { Op } from '../../../src/pelago-types.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import type { Op } from '../../write/kernel/pelago-types.ts';
 
 /** The field of an island that names the version of its pack it runs. */
 export const PACK_VERSION = 'pack_version';

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { heldResources } from '../src/blocking.ts';
-import { callTool } from '../src/tools.ts';
+import { heldResources } from '../packs/surface/kernel/blocking.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, fresh, attend, human, make } from './map.ts';
 
 /** Attention is read for a person: the workspace's owner, whose is what nobody owns. */

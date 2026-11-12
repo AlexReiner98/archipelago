@@ -10,13 +10,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { agent, all, fresh, human, make, replayed } from './map.ts';
-import { openDb, type Database } from '../src/db.ts';
-import { verify } from '../src/log.ts';
-import { move } from '../src/move.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { undo } from '../src/undo.ts';
-import { getItem } from '../src/map-reads.ts';
+import { openDb, type Database } from '../packs/database/kernel/db.ts';
+import { verify } from '../packs/log/kernel/log.ts';
+import { move } from '../packs/log/kernel/move.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { undo } from '../packs/write/kernel/undo.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
 
 const server = process.env.PELAGO_TEST_DATABASE_URL;
 

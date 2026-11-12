@@ -2,8 +2,8 @@
 // server reads which addresses failed for good from them (src/bounces.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createToken } from '../src/auth.ts';
-import { failedFor } from '../src/bounces.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import { failedFor } from '../packs/mailer/kernel/bounces.ts';
 import { mailbox, serve } from './serve.ts';
 
 // A delivery status notification as Postfix writes one (RFC 3464): two recipients failed, one only delayed.

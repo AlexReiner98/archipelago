@@ -3,16 +3,16 @@
 
 import { z } from 'zod';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
-import { bodyAfter } from '../../../src/ops.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import { bodyAfter } from '../../write/kernel/ops.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { type Noted, PLAN_SECTIONS, sections, structureAsText, tiedInChange, type TieTypes } from './plan-note.ts';
 import { transientOf } from './root-transient.ts';
 import { op, source, TITLE_MAX } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { undo } from '../../../src/undo.ts';
+import { undo } from '../../write/kernel/undo.ts';
 import { closeOffers, resolveRun } from './session-calls.ts';
-import { covering } from '../../../src/withdraw.ts'; import { proposals } from './map-reads.ts';
-import { holdsOff } from '../../../src/rules.ts';
+import { covering } from '../../write/kernel/withdraw.ts'; import { proposals } from './map-reads.ts';
+import { holdsOff } from '../../rules/kernel/rules.ts';
 import { logged } from '../../../src/logged.ts';
 
 /** Where an agent last pointed the human's screen (the presence pack's Focus). */

@@ -1,7 +1,7 @@
 // What blocks what, derived from relations every time so it cannot go stale: work that depends on something open,
 // waits on someone, or needs a resource that is unavailable or held by others as often as it can be held.
 
-import { ACTIVE_HOLDS, type Archipelago } from '../../../src/pelago.ts';
+import { ACTIVE_HOLDS, type Archipelago } from '../../write/kernel/pelago.ts';
 
 interface Edge {
   x: string;

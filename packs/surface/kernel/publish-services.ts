@@ -2,7 +2,7 @@
 // packs/roots.json names: a drawing's code as files (root.drawing), and what a product's public page is made of
 // (root.public_product). Values in, values out.
 
-import type { RootCall } from '../../../src/root-calls.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import { drawingsBy, layoutsOf } from '../../loader/kernel/layouts.ts';
 import { GUARD, POLICY } from '../../walls/kernel/public-document.ts';

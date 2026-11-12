@@ -3,11 +3,12 @@
 // automation's version and the notification the kernel made for it, under the pack's rule that keeps them forever.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { doneEvents } from '../src/activity.ts';
-import { duePass } from '../src/due.ts';
-import { packVersions, type PackVersion } from '../src/pack-versions.ts';
-import { dayStart } from '../src/timeaxis.ts';
+import { doneEvents } from '../packs/log/kernel/activity.ts';
+import * as duePack from '../packs/clocks/kernel/due.ts';
+import { packVersions, type PackVersion } from '../packs/loader/kernel/pack-versions.ts';
+import { dayStart } from '../packs/query/kernel/timeaxis.ts';
 import { fresh, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const at = (day: string, h: number, m = 0) => dayStart(day, 'America/Toronto') + (h * 60 + m) * 60_000;
 type Fired = { seq: number; action: string; target_id: string; reason: string; detail: { at: string; due_seq: number; version: number; ok: boolean; result: string; made: string[]; packs: PackVersion[]; pack: string } };
@@ -19,8 +20,8 @@ test('a firing is kept: what it answered, as which version, and the notification
     { op: 'create', ref: 'w', type: 'automation', title: 'Weekly posting', status: 'enabled', props: { trigger: 'weekly', days: [1], at: '09:00', action: 'notify', message: 'Post today' } },
     { op: 'link', type: 'about', from: 'w', to: 'loop' },
   ]);
-  await duePass(l, at('2030-01-07', 8));
-  await duePass(l, at('2030-01-07', 9));
+  await duePack.duePass(kernelContext(l, 'clocks'), (at('2030-01-07', 8)));
+  await duePack.duePass(kernelContext(l, 'clocks'), (at('2030-01-07', 9)));
 
   let fired: Fired[] = [];
   for (let i = 0; i < 100 && !fired.length; i++) {

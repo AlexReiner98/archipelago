@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { OPEN_PHASES } from '../src/boot.ts';
-import { kernelDuties, kernelFillings } from '../src/lifecycle.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { kernelDuties, kernelFillings } from '../packs/identity/kernel/lifecycle.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 import { PACKS, packsWith } from './map.ts';
 
 const seen: string[] = ((globalThis as { kernelOpenSeen?: string[] }).kernelOpenSeen ??= []);
@@ -25,7 +25,7 @@ async function until(what: string, ok: () => Promise<boolean> | boolean): Promis
 }
 
 test("what Workspaces.load did in a fixed order is the roots' and the kernel's fillings of the open phases, each under its pack", async () => {
-  await import('../src/workspaces.ts');
+  await import('../packs/identity/kernel/workspaces.ts');
   const filled = await kernelFillings();
   assert.deepEqual(filled, [
     { phase: 'restore', pack: 'log' },
@@ -39,7 +39,7 @@ test("what Workspaces.load did in a fixed order is the roots' and the kernel's f
     { phase: 'islands', pack: 'loader' },
   ]);
   for (const f of filled) assert.ok((OPEN_PHASES as readonly string[]).includes(f.phase));
-  assert.deepEqual((await kernelDuties()).sort(), ['log', 'sessions', 'surface'], 'the clock is the clocks pack’s own timer (kernel.timers), and the log is kept by its root');
+  assert.deepEqual((await kernelDuties()).sort(), ['loader', 'log', 'surface'], 'the clock is the clocks pack’s own timer (kernel.timers), the log is kept by its root, and the loader beats loader.leading (the quiet look is sessions’ filling)');
 });
 
 test('the clock runs only while this server leads, and stops when it loses the lead', async (t) => {

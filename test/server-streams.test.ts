@@ -6,11 +6,12 @@ import { createServer, request, type IncomingMessage } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { publish } from '../src/published.ts';
-import { closeStreams, serveStream } from '../src/server-streams.ts';
-import type { ServerPackFile } from '../src/server-packs.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import * as publishedPack from '../packs/publish/kernel/published.ts';
+import { closeStreams, serveStream } from '../packs/surface/kernel/server-streams.ts';
+import type { ServerPackFile } from '../packs/loader/kernel/server-packs.ts';
 import { freshWith, human, make, PACKS } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const pack = { id: 'reader', reach: { server: { streams: [{ id: 'live', on: 'published' }] } } } as unknown as ServerPackFile;
 
@@ -21,7 +22,7 @@ async function served(t: TestContext) {
     { op: 'create', ref: 'd', type: 'page', title: 'Landing', visibility: 'shared', body: 'What it is, in a line.' },
     { op: 'create', ref: 'draft', type: 'page', title: 'Not yet', visibility: 'shared', body: 'Not published.' },
   ]);
-  await publish(l, human, made.d);
+  await publishedPack.publish(kernelContext(l, 'publish'), human, made.d);
   const workspaces = { has: async (id: string) => id === l.workspace, get: async () => ({ pelago: l }) } as any;
   const server = createServer((req, res) => {
     const [, , , stream = '', workspace = '', id = ''] = (req.url ?? '').split('/');
@@ -48,7 +49,7 @@ test("a pack's page is told when the document it listens to is published again",
   assert.equal(res.headers['content-type'], 'text/event-stream');
   await until(res, /: listening/);
   const told = until(res, /event: published\ndata: \d+/);
-  await publish(l, human, made.d);
+  await publishedPack.publish(kernelContext(l, 'publish'), human, made.d);
   assert.match(await told, /event: published/);
   res.destroy();
 });

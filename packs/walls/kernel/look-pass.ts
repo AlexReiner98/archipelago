@@ -4,8 +4,8 @@
 // (readPass, passWorkspace); the looks pack draws with it (packs/look_draw/kernel/looks.ts).
 
 import { sha256Hex, workspaceSecret } from '../../../src/hashes.ts';
-import type { Q } from '../../../src/db.ts';
-import type { Whose } from '../../../src/presence.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { Whose } from '../../presence/kernel/presence.ts';
 // A pass is kept in the transient store, the database root's (wave 7: the slot walls.pass_store went with it).
 import { keep, kept } from '../../database/kernel/transient.ts';
 

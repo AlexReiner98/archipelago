@@ -8,12 +8,12 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { islandsOff } from '../src/islands.ts';
-import { configureLauncher } from '../src/launcher.ts';
-import { PackHost } from '../src/packhost.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { ServerPacks } from '../src/server-host.ts';
-import { configureLaunch } from '../src/server-launch.ts';
+import { islandsOff } from '../packs/loader/kernel/islands.ts';
+import { configureLauncher } from '../packs/surface/kernel/launcher.ts';
+import { PackHost } from '../packs/loader/kernel/packhost.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { ServerPacks } from '../packs/surface/kernel/server-host.ts';
+import { configureLaunch } from '../packs/surface/kernel/server-launch.ts';
 import { agent, freshWith, human, make, PACKS, packsWith } from './map.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'pelago-refine-replay-'));

@@ -3,11 +3,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { flatRead } from '../src/query-flat.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { viewAddress } from '../src/view-address.ts';
+import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { viewAddress } from '../packs/surface/kernel/view-address.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const titles = (answer: { items: { title: string }[] }) => answer.items.map((i) => i.title).sort();
 
@@ -31,15 +32,15 @@ async function project() {
 
 test('Find in an item: all that is part of it at any depth, of any type, not the item itself', async () => {
   const { l, made } = await project();
-  const answer = await flatRead(l, { filter: { find: [`in ${made.p}`] } });
+  const answer = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`] } }));
   assert.deepEqual(titles(answer), ['Done already', 'Find in', 'The bar', 'Which words?']);
   assert.ok(answer.items.every((i) => 'found' in i && i.found?.includes('in')), 'each says it was found in the item');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`in ${made.p}`], not: ['done'] } })), ['Find in', 'The bar', 'Which words?'], 'Not applies');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`in ${made.p}`], only: ['task'] } })), ['Done already', 'Find in'], 'Only narrows it');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`in ${made.f}`] }, walk: { over: ['depends_on'], steps: 1 } })), ['Elsewhere', 'Find in', 'Which words?'], 'and the walk goes on from it');
-  const capped = await flatRead(l, { filter: { find: [`in ${made.p}`] }, limit: 2 });
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], not: ['done'] } }))), ['Find in', 'The bar', 'Which words?'], 'Not applies');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], only: ['task'] } }))), ['Done already', 'Find in'], 'Only narrows it');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.f}`] }, walk: { over: ['depends_on'], steps: 1 } }))), ['Elsewhere', 'Find in', 'Which words?'], 'and the walk goes on from it');
+  const capped = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`] }, limit: 2 }));
   assert.deepEqual([capped.items.length, capped.cut], [2, true], 'bounded by the limit');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: ['in e_nothing0'] } })), [], 'in nothing, nothing');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['in e_nothing0'] } }))), [], 'in nothing, nothing');
   assert.equal(await viewAddress(l, { lens: { filter: { find: [`in ${made.p}`] } } }), `v?find=in+${made.p}`, 'the address carries it');
   await assert.rejects(viewAddress(l, { lens: { filter: { find: ['in e_nothing0'] } } }), /No item/);
   assert.equal(await viewAddress(l, { lens: made.p }), await viewAddress(l, { entity: made.p }), 'an id as lens is shown as entity');
@@ -47,7 +48,7 @@ test('Find in an item: all that is part of it at any depth, of any type, not the
 
 test('the walk follows each link out, in or either way, as it is named', async () => {
   const { l, made } = await project();
-  const walk = async (from: string, over: string[] | 'all', steps = 1) => titles(await flatRead(l, { filter: { find: [`id ${from}`] }, walk: { over, steps } }));
+  const walk = async (from: string, over: string[] | 'all', steps = 1) => titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`id ${from}`] }, walk: { over, steps } })));
   assert.deepEqual(await walk(made.a, ['depends_on>']), ['Elsewhere', 'Find in'], 'out: what it depends on');
   assert.deepEqual(await walk(made.o, ['depends_on>']), ['Elsewhere'], 'nothing it depends on');
   assert.deepEqual(await walk(made.o, ['depends_on<']), ['Elsewhere', 'Find in'], 'in: what depends on it');
@@ -55,7 +56,7 @@ test('the walk follows each link out, in or either way, as it is named', async (
   assert.deepEqual(await walk(made.f, ['part_of<'], 6), ['Find in', 'The bar', 'Which words?'], 'what is in it, downward');
   assert.deepEqual(await walk(made.f, ['part_of']), ['Find in', 'Rework', 'The bar', 'Which words?'], 'either way, as a lens kept before ways were said');
   assert.deepEqual(await walk(made.a, ['part_of>', 'depends_on>'], 2), ['Elsewhere', 'Find in', 'Rework', 'The bar'], 'each link its own way');
-  await assert.rejects(flatRead(l, { filter: { find: [`id ${made.a}`] }, walk: { over: ['nope>'] } }), /unknown link type "nope"/);
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`id ${made.a}`] }, walk: { over: ['nope>'] } })), /unknown link type "nope"/);
   assert.equal(await viewAddress(l, { lens: { filter: { find: [`id ${made.a}`] }, walk: { over: ['depends_on>', 'part_of<'], steps: 2 } } }), `v?find=id+${made.a}&over=depends_on%3E%2Cpart_of%3C&steps=2`, 'the address carries the ways');
   assert.equal(await viewAddress(l, { lens: { filter: { find: [`id ${made.a}`] }, time: { from: '-5d', to: '1d' } }, style: { shape: 'time' } }), `v?find=id+${made.a}&time=-5d%2C1d&shape=time`, 'and its window of time, as it was said');
   assert.equal(await viewAddress(l, { query: { filter: { find: [`id ${made.a}`] } }, style: { layout: 'grid' } }), await viewAddress(l, { lens: { filter: { find: [`id ${made.a}`] } }, style: { shape: 'grid' } }), 'query and layout are the words, the old ones still taken');
@@ -75,7 +76,7 @@ test("Only's plain words: each must hold of every seed, and the walk is not narr
     { op: 'link', type: 'part_of', from: 'live', to: made.p },
     { op: 'link', type: 'needs', from: 'live', to: 'lane' },
   ]);
-  const only = async (...words: string[]) => titles(await flatRead(l, { filter: { find: [`in ${made.p}`], only: words } }));
+  const only = async (...words: string[]) => titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], only: words } })));
   assert.deepEqual(await only('done'), ['Done already']);
   assert.deepEqual(await only('blocked'), ['Find in', 'Needs the lane'], 'depends on something open, or needs a resource that is not free: as attention says it');
   assert.deepEqual(await only('status doing'), ['Mine']);
@@ -99,11 +100,11 @@ test("Only's plain words: each must hold of every seed, and the walk is not narr
   assert.deepEqual(await only('done', 'by agent'), ['Sams']);
   assert.deepEqual(await only('done', 'by owner'), ['Done already']);
   // The walk from what Only keeps is not narrowed.
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`in ${made.f}`], only: ['blocked'] }, walk: { over: ['depends_on>'], steps: 1 } })), ['Elsewhere', 'Find in']);
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.f}`], only: ['blocked'] }, walk: { over: ['depends_on>'], steps: 1 } }))), ['Elsewhere', 'Find in']);
   // Written wrong, a word is refused; the address carries it.
-  await assert.rejects(flatRead(l, { filter: { find: [`in ${made.p}`], only: ['changed since then'] } }), /a time is/);
-  await assert.rejects(flatRead(l, { filter: { find: [`in ${made.p}`], only: ['status'] } }), /needs what follows/);
-  await assert.rejects(flatRead(l, { filter: { find: [`in ${made.p}`], only: ['nope'] } }), /"nope" is no term/);
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], only: ['changed since then'] } })), /a time is/);
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], only: ['status'] } })), /needs what follows/);
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], only: ['nope'] } })), /"nope" is no term/);
   assert.equal(await viewAddress(l, { lens: { filter: { find: [`in ${made.p}`], only: ['task', 'owner me'] } } }), `v?find=in+${made.p}&only=type+task&only=owner+me`);
 });
 
@@ -117,14 +118,14 @@ test('a name is never guessed: one item so named is answered by its id, two are 
     { op: 'link', type: 'serves', from: made.a, to: 'u' },
   ]);
   await make(l, [{ op: 'update', id: made.o, owner: more.bo }]);
-  const served = await flatRead(l, { filter: { find: ['serves urgent'] } });
+  const served = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['serves urgent'] } }));
   assert.deepEqual([titles(served), served.lens.find], [['Find in'], [`serves ${more.u}`]], 'the end named is said back by its id');
-  const owned = await flatRead(l, { filter: { find: [`id ${made.o}`, `id ${made.a}`], only: ['owner Bo'] } });
+  const owned = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`id ${made.o}`, `id ${made.a}`], only: ['owner Bo'] } }));
   assert.deepEqual([titles(owned), owned.lens.only], [['Elsewhere'], [`owner ${more.bo}`]]);
   await make(l, [{ op: 'create', type: 'aim', title: 'URGENT' }]);
-  await assert.rejects(flatRead(l, { filter: { find: ['serves Urgent'] } }), /2 items are named "Urgent".*by its id/);
-  await assert.rejects(flatRead(l, { filter: { find: [`in ${made.p}`], only: ['owner Sam'] } }), /2 items are named "Sam".*by its id/);
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`in ${made.p}`], only: [`owner ${more.sam}`] } })), [], 'by its id, the one meant');
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['serves Urgent'] } })), /2 items are named "Urgent".*by its id/);
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], only: ['owner Sam'] } })), /2 items are named "Sam".*by its id/);
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], only: [`owner ${more.sam}`] } }))), [], 'by its id, the one meant');
 });
 
 test('the same terms in every part: Find adds, Only keeps, Not takes away', async () => {
@@ -137,23 +138,23 @@ test('the same terms in every part: Find adds, Only keeps, Not takes away', asyn
     { op: 'update', id: made.o, owner: 'ann' },
   ]);
   const all = 'type task';
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: ['related Ann'] } })), ['Elsewhere', 'Find in'], 'related in Find: any link, the owner\'s too');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [all], only: ['related Ann'] } })), ['Elsewhere', 'Find in'], 'in Only');
-  assert.ok(!titles(await flatRead(l, { filter: { find: [all], not: ['related Ann'] } })).includes('Find in'), 'in Not');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [all], only: ['serves Urgent'] } })), ['Elsewhere'], 'a link in Only');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [all], only: ['text elsewhere'] } })), ['Elsewhere'], 'words in Only');
-  assert.ok(!titles(await flatRead(l, { filter: { find: [all], not: ['text elsewhere'] } })).includes('Elsewhere'), 'words in Not');
-  assert.ok(!titles(await flatRead(l, { filter: { find: [all], not: ['owner Ann'] } })).includes('Elsewhere'), 'an owner in Not');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`id ${made.a}`, `id ${made.o}`], not: ['blocked'] } })), ['Elsewhere'], 'what can only be checked, in Not');
-  await assert.rejects(flatRead(l, { filter: { find: ['done'] } }), /finds nothing itself/);
-  await assert.rejects(flatRead(l, { filter: { find: ['kind work'] } }), /finds nothing itself/);
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['related Ann'] } }))), ['Elsewhere', 'Find in'], 'related in Find: any link, the owner\'s too');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [all], only: ['related Ann'] } }))), ['Elsewhere', 'Find in'], 'in Only');
+  assert.ok(!titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [all], not: ['related Ann'] } }))).includes('Find in'), 'in Not');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [all], only: ['serves Urgent'] } }))), ['Elsewhere'], 'a link in Only');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [all], only: ['text elsewhere'] } }))), ['Elsewhere'], 'words in Only');
+  assert.ok(!titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [all], not: ['text elsewhere'] } }))).includes('Elsewhere'), 'words in Not');
+  assert.ok(!titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [all], not: ['owner Ann'] } }))).includes('Elsewhere'), 'an owner in Not');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`id ${made.a}`, `id ${made.o}`], not: ['blocked'] } }))), ['Elsewhere'], 'what can only be checked, in Not');
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['done'] } })), /finds nothing itself/);
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['kind work'] } })), /finds nothing itself/);
   void more;
 });
 
 test('a preview says what a term would change, reading nothing else', async () => {
   const { l, made } = await project();
-  const drawn = (await flatRead(l, { filter: { find: ['type task'] } })).items.map((i) => i.id);
-  const ask = (part: string, terms: string[]) => flatRead(l, { filter: { find: ['type task'] }, preview: { part, terms, ids: drawn } }) as unknown as Promise<{ preview: Record<string, string[]> }>;
+  const drawn = (await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['type task'] } }))).items.map((i) => i.id);
+  const ask = (part: string, terms: string[]) => queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['type task'] }, preview: { part, terms, ids: drawn } })) as unknown as Promise<{ preview: Record<string, string[]> }>;
   const { preview: found } = await ask('find', ['type record', `id ${made.p}`]);
   assert.deepEqual([found['type record'], found[`id ${made.p}`]], [[made.p], [made.p]], 'what it would find');
   const { preview: only } = await ask('only', ['done']);
@@ -161,28 +162,28 @@ test('a preview says what a term would change, reading nothing else', async () =
   const { preview: not } = await ask('not', ['done', 'blocked']);
   assert.deepEqual(not.done, [made.x], 'not says which it would take away');
   assert.ok(not.blocked.includes(made.a), 'one that can only be checked, too');
-  assert.deepEqual((await (flatRead(l, { filter: {}, preview: { part: 'find', terms: ['type record'] } }) as unknown as Promise<{ preview: Record<string, string[]> }>)).preview['type record'], [made.p], 'an empty canvas may ask');
-  await assert.rejects(flatRead(l, { filter: {}, preview: { part: 'nope', terms: [] } }), /preview\.part/);
+  assert.deepEqual((await (queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: {}, preview: { part: 'find', terms: ['type record'] } })) as unknown as Promise<{ preview: Record<string, string[]> }>)).preview['type record'], [made.p], 'an empty canvas may ask');
+  await assert.rejects(queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: {}, preview: { part: 'nope', terms: [] } })), /preview\.part/);
 });
 
 test('words keep to Not, however many terms it has', async () => {
   const { l } = await project();
   await make(l, [{ op: 'create', type: 'lens', title: 'Find in a view', props: { filter: { find: ['type task'] } } }]);
-  const titled = async (not?: string[]) => titles(await flatRead(l, { filter: { find: ['text find'], ...(not && { not }) } }));
+  const titled = async (not?: string[]) => titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['text find'], ...(not && { not }) } })));
   assert.ok(!(await titled()).includes('Find in a view'), 'the default Not leaves out what the system keeps');
   assert.ok((await titled([])).includes('Find in a view'), 'with nothing left out, it is found');
   assert.deepEqual(await titled(['kind system', 'status doing', 'done']), ['Find in'], 'three terms of Not, each a parameter of its own');
-  const two = await flatRead(l, { filter: { find: ['text find', 'text already'], not: ['kind system', 'status doing'] } });
+  const two = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['text find', 'text already'], not: ['kind system', 'status doing'] } }));
   assert.deepEqual(titles(two), ['Done already', 'Find in'], 'and with two sets of words');
 });
 
 test('Find held: the items a change held for the viewer would touch, and one step of what they are tied to', async () => {
   const { l, made } = await project();
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: ['held'] } })), [], 'nothing is held');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['held'] } }))), [], 'nothing is held');
   await l.change(agent, { reason: 'Finish it', hold: true, ops: [{ op: 'update', id: made.a, status: 'done' }, { op: 'create', ref: 'n', type: 'task', title: 'Loose new' }] });
-  const held = await flatRead(l, { filter: { find: ['held'] } });
+  const held = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['held'] } }));
   assert.deepEqual(titles(held), ['Find in'], 'the item it edits; what it would make is no item yet');
   assert.ok(held.items.every((i) => 'found' in i), 'found, so the page can say why it is there');
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: ['held'] }, walk: { over: 'all', steps: 1 } })), ['Elsewhere', 'Find in', 'The bar']);
-  assert.deepEqual(titles(await flatRead(l, { filter: { find: [`in ${made.p}`], only: ['held'] } })), ['Find in'], 'and Only takes it as a set');
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['held'] }, walk: { over: 'all', steps: 1 } }))), ['Elsewhere', 'Find in', 'The bar']);
+  assert.deepEqual(titles(await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`in ${made.p}`], only: ['held'] } }))), ['Find in'], 'and Only takes it as a set');
 });

@@ -6,14 +6,14 @@ import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { codeOf, codePath, layOut, versionCodeProblems } from '../src/pack-code.ts';
-import { headOf } from '../src/log.ts';
-import { Registry } from '../src/packs.ts';
-import { setIslands, setPack, syncPacks } from '../src/packstate.ts';
-import { hostFor, packTool } from '../src/packtools.ts';
-import type { Archipelago } from '../src/pelago.ts';
-import { registryAt } from '../src/registry-at.ts';
-import { callTool } from '../src/tools.ts';
+import { codeOf, codePath, layOut, versionCodeProblems } from '../packs/loader/kernel/pack-code.ts';
+import { headOf } from '../packs/log/kernel/log.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands, setPack, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { hostFor, packTool } from '../packs/loader/kernel/packtools.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { registryAt } from '../packs/loader/kernel/registry-at.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
 
 /** A map pack with one view its handler answers. */

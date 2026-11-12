@@ -3,12 +3,13 @@
 // type, a view's reads, a rule's refusals and holds, counted as they happen (src/uses.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { gist, packTouches, whenWords } from '../src/pack-touches.ts';
-import { packStates } from '../src/packstate.ts';
-import { withUse } from '../src/pack-use.ts';
-import { askView } from '../src/askview.ts';
-import { flushCounts } from '../src/pack-counts.ts';
+import { gist, packTouches, whenWords } from '../packs/loader/kernel/pack-touches.ts';
+import { packStates } from '../packs/loader/kernel/packstate.ts';
+import * as packUsePack from '../packs/usage/kernel/pack-use.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
+import { flushCounts } from '../packs/publish/kernel/pack-counts.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const PINNED = [
   'core/links/depends on: 1 (1 link here, 1 made in 30 days)',
@@ -44,12 +45,12 @@ test('a pack’s plate lists all it declares: shared words, kernel actions and r
 test('beside each, its use here: items, links, a view’s reads, a rule’s refusals and holds, and what was never used', async () => {
   const l = await fresh();
   await make(l, [{ op: 'create', ref: 'a', type: 'task', title: 'One' }, { op: 'create', ref: 'b', type: 'task', title: 'Two' }, { op: 'link', type: 'depends_on', from: 'a', to: 'b' }]);
-  await askView(l, human, 'frontier', {});
+  await askviewPack.askView(kernelContext(l, 'query'), human as Parameters<typeof askviewPack.askView>[1], 'frontier', ({}));
   await assert.rejects(l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'finding', title: 'A finding with no value' }] }));
   const held = await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Held' }], hold: true });
   assert.equal(held.status, 'proposed');
 
-  const states = await withUse(l, packStates(l));
+  const states = await packUsePack.withUse(kernelContext(l, 'usage'), (packStates(l)));
   const core = states.find((p) => p.id === 'core')!;
   const of = (pack: typeof core) => (key: string, pred: (t: { def: unknown }) => boolean) => pack.touches.find((g) => g.key === key)!.items.find(pred)!;
   const item = of(core);
@@ -75,13 +76,13 @@ test('the Packs screen’s use, pinned: written-down and held uses summed, items
   await flushCounts(async () => ({ pelago: gone }) as never); // what the tests before counted, out of the way
   const l = await fresh();
   await make(l, [{ op: 'create', ref: 'a', type: 'task', title: 'One' }, { op: 'create', ref: 'b', type: 'task', title: 'Two' }, { op: 'create', ref: 'c', type: 'question', title: 'Why?' }, { op: 'link', type: 'depends_on', from: 'a', to: 'b' }]);
-  await askView(l, human, 'frontier', {});
-  await askView(l, human, 'frontier', {});
+  await askviewPack.askView(kernelContext(l, 'query'), human as Parameters<typeof askviewPack.askView>[1], 'frontier', ({}));
+  await askviewPack.askView(kernelContext(l, 'query'), human as Parameters<typeof askviewPack.askView>[1], 'frontier', ({}));
   await assert.rejects(l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'finding', title: 'A finding with no value' }] }));
   await flushCounts(async () => ({ pelago: l }) as never); // these are written down in the uses stream
-  await askView(l, human, 'frontier', {}); // and these held in memory still
+  await askviewPack.askView(kernelContext(l, 'query'), human as Parameters<typeof askviewPack.askView>[1], 'frontier', ({})); // and these held in memory still
   await l.change(agent, { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Held' }], hold: true });
-  const states = await withUse(l, packStates(l));
+  const states = await packUsePack.withUse(kernelContext(l, 'usage'), (packStates(l)));
   const used = states.flatMap((p) => p.touches.flatMap((g) => g.items.filter((t) => t.used).map((t) => `${p.id}/${g.key}/${t.name}: ${t.used} (${t.said})`))).sort();
   assert.deepEqual(used, PINNED);
   assert.ok(states.every((p) => p.use_days === 30));
