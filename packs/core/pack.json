@@ -1205,18 +1205,6 @@
     },
     {
       "form": "screen",
-      "id": "home",
-      "title": "For you",
-      "at": "home",
-      "pieces": [
-        { "piece": "start", "title": "Start here" },
-        { "piece": "token_ask" },
-        { "piece": "held", "title": "Held for you" },
-        { "piece": "attention", "title": "Your move", "person": "me", "reasons": ["waits_on", "to_confirm", "due", "moved", "unsettled"], "limit": 5 }
-      ]
-    },
-    {
-      "form": "screen",
       "id": "tokens",
       "title": "Tokens for this",
       "on": ["place", "aim"],
