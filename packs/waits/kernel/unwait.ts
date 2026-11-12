@@ -2,9 +2,9 @@
 // waits_on to that person (bump e_2y6wwjkn), and its answer says so. Whose word it is: the person acting, or the one
 // an agent's token works for when it says it acts on a human's word.
 //
-// Moved from src/unwait.ts into the waits pack (task e_mhqvdzj6). What it follows an op with is still said at the
-// level of facts, inside the apply loop's transaction, which the write path hands it (`q`): as a write.follow its ops
-// would be judged by the rules, which is the owner's to choose, so it keeps its place there until they do.
+// Moved from src/unwait.ts into the waits pack (task e_mhqvdzj6). It fills write.follow.rides (the owner, 12 Nov 2026,
+// e_umv4gdqr): its unlinks ride the change that closed the item, with that change's verdict and authority, and no rule
+// judges them on their own. The write path asks it after each op, inside the apply's transaction (`q`).
 
 import type { KernelContext } from '#pelago/kernel';
 
@@ -33,6 +33,20 @@ export async function waitsOn(q: Q, reg: Reg, items: string[], person: string): 
     [items, person, reg.relationFamily('waits_on')],
   );
   return rows;
+}
+
+/** What the write path hands a filling of write.follow.rides, as this reads it (src/write-hooks.ts, Ride). */
+export interface Ride { q: Q; at: number; place: string; word: string | null; registry: Reg }
+
+/**
+ * The filling of write.follow.rides: after an op that closes an item on a person's word, an unlink of each of its
+ * waits_on to that person rides the change, and the change's answer names them (`unwaited`).
+ */
+export async function follow(_ctx: KernelContext, ops: Op[], ride: Ride): Promise<{ ops?: { op: 'unlink'; relation: string }[]; answer?: { unwaited: Unwaited[] } }> {
+  if (ride.place !== 'after' || !ops[ride.at]) return {};
+  const gone: Unwaited[] = [];
+  const unlinks = await unwaitFollows(ride.q, ride.registry, ops[ride.at], ride.word, gone, ops);
+  return unlinks.length ? { ops: unlinks.map(([, relation]) => ({ op: 'unlink' as const, relation })), answer: { unwaited: gone } } : {};
 }
 
 /**

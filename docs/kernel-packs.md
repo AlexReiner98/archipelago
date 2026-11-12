@@ -149,10 +149,11 @@ change(actor, input)
   write.rewrite    ops in, ops out          (placement: subject, islands)
   standing, mayWrite
   write.validate   ops in, refusals out     (lenses: twins; automations: checks)
-  write.follow     ops in, more ops out     (waits: unwait; sources)
+  write.follow     ops in, more ops out     (none of the server's own)
   plan, decide                              (the verdict covers every op above)
   apply  ── one transaction ──
     facts, root projection
+    write.follow.rides  op by op, ops that ride the verdict  (waits: unwait; placement: sources)
     log.project    facts in, own rows out   (mentions)
     append, projectDecision
   write.after      entry in, nothing out    (types applied, supersede)
@@ -164,12 +165,22 @@ change(actor, input)
 | `write.rewrite` | `(ctx, ops, judged) => ops` | Same ops, same order, same op, id, type and ends. It sets only the props its pack names in `fills`. Visibility may narrow, never widen. The write pack checks each answer and refuses the change, naming the pack, if any bound is broken. `judged` is the registry the change is judged by (`registry`), the island it was given (`island`) and the registry an island runs (`islandRegistry(island)`). |
 | `write.validate` | `(ctx, ops, who, judged) => { refusals, warnings }` | Pure: reads only, records nothing. Run before decide and again when a held change is approved. |
 | `write.follow` | `(ctx, ops) => Op[]` | Extra ops, refs allowed, tagged with the pack in the entry's header. Run before decide, so the verdict covers them, and again inside the apply transaction: if the second run differs, the new ops are judged there, and a change they would hold is refused as "the map moved, send again". |
+| `write.follow.rides` | `(ctx, ops, ride) => { ops?, is?, answer? }` | What rides the change that caused it (the owner, 12 Nov 2026, e_umv4gdqr): no rule judges it, it is not in the ops a change is judged or held with, and it applies in the change's own set with its verdict and authority, held with it and run when it is approved or applied. Asked op by op inside the apply's transaction, `ride` handing the transaction's query (`q`), the op (`at`, -1 for the change's own source), `place` (`source`: where the op names its source, what it adds said before the op's facts, `is` naming the item that source is; `after`: after the op's facts), the change's `authority`, whose `word` it is, and its `registry`. Its ops are only `create` (with a ref, minted by it) and `unlink`; `answer` lists join the change's answer. |
 | `log.project` | `(ctx, facts, rows) => void` | Writes only the rows of its own `tables`, which the database pack makes with row-level security read from the item each row names. Run in the transaction, after the root projection, and in every rebuild. The snapshot keeps each projector's hash; a new hash rebuilds its table from the log at open. |
 | `write.after` | `(ctx, entry) => void` | After the entry is on the log. A failure is a warning, never an error (`afterLog`). |
 | `write.retype` | `(ctx, from, to) => Op[]` | After a type or link type is renamed. |
 
 What follows an op at the level of facts (the owner's link, `ownerFollows`)
 stays in the write pack: facts-level followers are root code alone.
+
+As built (wave 4, e_umv4gdqr): unwait (`packs/waits`, `unwait.ts#follow`) and
+sources (`packs/placement`, `sources.ts#follow`) fill `write.follow.rides`; the
+apply loop (`packs/write/kernel/change-apply.ts`) names neither. A ride is a
+point of its own, not an answer of `write.follow`, so its fillings are never
+called before decide and never re-run as "the map moved". The log is as it was
+inline (`test/follow-rides.test.ts` pins a settle with waits_on and sources,
+applied and held then approved): each ride said where the old call was, a
+source minted under `source <uri>`, the change's `follows` header untouched.
 
 ## Slots
 
