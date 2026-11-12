@@ -6,7 +6,26 @@
   "kernel": {
     "trust": "service",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "act.capture.picture": {
+        "in": {
+          "actor": {
+            "kind": "string",
+            "name": "string"
+          },
+          "result": "id",
+          "data": "string",
+          "content_type": "string"
+        },
+        "out": {
+          "result": "id",
+          "size": "number",
+          "content_type": "string"
+        },
+        "run": "pictures.ts#pictureAct"
+      }
+    }
   },
   "uses": [
     "service:root.publish",

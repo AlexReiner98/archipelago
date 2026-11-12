@@ -34,7 +34,9 @@
         "in": {
           "for?": "string",
           "about?": "string",
-          "island?": "string"
+          "island?": "string",
+          "where": "string",
+          "fill?": "any"
         },
         "out": {
           "said": [

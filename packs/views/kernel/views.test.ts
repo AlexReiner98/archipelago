@@ -1,12 +1,11 @@
 // The views pack run without a database: a context whose reads answer from a few items in memory, the graph and the
-// tree's ladder out, and the plan note's count. Against a real map: test/standing-views.test.ts, test/roadmap.test.ts,
-// test/island-findings.test.ts and test/plan-note.test.ts, through the shims in src/.
+// tree's ladder out. Against a real map: test/standing-views.test.ts, test/roadmap.test.ts and
+// test/island-findings.test.ts, through the shims in src/.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';
 import { graph } from './answers.ts';
 import { holders } from './inside.ts';
-import { sections, structureAsText } from './plan-note.ts';
 import { forReader, readDocument, sectionIds } from './documents.ts';
 
 const at = new Date('2026-11-01T00:00:00Z');
@@ -46,13 +45,6 @@ test('a thing is inside the nearest kept thing that holds it', () => {
   const { parent, depths } = holders(links, 'part_of', new Set(['t', 'f', 'p']), kept);
   assert.equal(parent.get('t'), 'f', 'the feature, not the project it is also tied to');
   assert.equal(depths.get('t'), 2);
-});
-
-test('a note of several sections with fewer items tied is said back', () => {
-  const body = '## One\n## Two\n## Three\n## Four\n';
-  assert.equal(sections(body), 4);
-  assert.match(structureAsText([{ at: 1, op: 'create', body, ties: 1 }])!, /4 sections, 1 items tied/);
-  assert.equal(structureAsText([{ at: 1, op: 'create', body, ties: 4 }]), undefined);
 });
 
 test('a document is read whole: its text, each item it brings in where its line names it, and what is kept elsewhere', async () => {

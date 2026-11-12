@@ -2,42 +2,49 @@
 // agent's change points the owner's screen.
 
 import { z } from 'zod';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { bodyAfter } from '../../../src/ops.ts';
-import { pictureOf } from '../../../src/query-kept.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import { type Focus, point as setFocus, took } from '../../../src/presence.ts';
+import { type Noted, PLAN_SECTIONS, sections, structureAsText, tiedInChange, type TieTypes } from './plan-note.ts';
+import { transientOf } from './root-transient.ts';
 import { op, source, TITLE_MAX } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { keep, kept as keptFor, take } from './transient.ts';
 import { undo } from '../../../src/undo.ts';
 import { resolveRun } from '../../../src/sessions.ts';
 import { covering } from '../../../src/withdraw.ts'; import { proposals } from './map-reads.ts';
 import { holdsOff } from '../../../src/rules.ts';
-import { type Noted, PLAN_SECTIONS, sections, structureAsText, tiedInChange, type TieTypes } from '../../../src/plan-note.ts';
 import { closeOffers } from '../../../src/sessions.ts';
 import { logged } from '../../../src/logged.ts';
 
-// Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
+/** Where an agent last pointed the human's screen (the presence pack's Focus). */
+type Focus = { at: number; hash: string; actor: string; note?: string };
+
+/** Whose screen a map's acts move: its workspace's, as the person it is read as (the presence pack keeps one per each). */
+export const whose = (l: Archipelago) => ({ workspace: l.workspace, ...(l.viewer !== undefined && { viewer: l.viewer }) });
+
+/** A step on the owner's screen, kept at once by the presence pack (act.report.took). */
+const took = (l: Archipelago, step: Record<string, unknown>) => callAs(l, 'act.report.took', { whose: whose(l), step });
+
+// Where an agent pointed the screen and the steps it took are kept for any server to read (the presence pack's act.report.point).
 export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string, focus?: boolean, watch?: boolean): Promise<Focus> {
   const next = { at: Date.now(), hash, actor: actor.name, note };
-  const { db } = await bypassingRls(l);
-  await setFocus(db, l, next);
-  await took(db, l, { kind, actor: actor.name, did: note, hash, ...(pane && { pane }), ...(run && { run }), ...(focus && { focus }), ...(watch && { watch }) }, true);
+  const step = { kind, actor: actor.name, did: note, hash, ...(pane && { pane }), ...(run && { run }), ...(focus && { focus }), ...(watch && { watch }) };
+  await callAs(l, 'act.report.point', { whose: whose(l), focus: next, step });
   return next;
 }
 
 /** A session began: the owner's page opens it a tab of its own, on what it is working on. A show cannot ask for this. */
 export async function sessionOpened(l: Archipelago, actor: Actor, run: string, task?: string, takes?: string): Promise<void> {
-  const { db } = await bypassingRls(l);
-  await took(db, l, { kind: 'show', actor: actor.name, hash: `e/${task ?? run}`, opens: true, canvas: true, run, ...(takes && { takes }) }, true);
+  await took(l, { kind: 'show', actor: actor.name, hash: `e/${task ?? run}`, opens: true, canvas: true, run, ...(takes && { takes }) });
 }
 
 /** A session took up a task: the canvas of its tab moves to it. Nobody asked to read its page, so none opens. */
 export async function sessionTookUp(l: Archipelago, actor: Actor, run: string, task: string): Promise<void> {
-  const { db } = await bypassingRls(l);
-  await took(db, l, { kind: 'show', actor: actor.name, hash: `e/${task}`, canvas: true, run }, true);
+  await took(l, { kind: 'show', actor: actor.name, hash: `e/${task}`, canvas: true, run });
 }
+
+/** The transient store as the whole workspace of this map, as root.transient keeps it for the packs (./root-transient.ts). */
+const store = (l: Archipelago, ask: Parameters<typeof transientOf>[1]) => transientOf({ caller: 'surface', map: l }, ask);
 
 /**
  * Changes an agent sent that were refused, kept for a few minutes so that correcting one op does not mean writing
@@ -81,7 +88,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       const who = `${l.workspace}:${actor.token ?? ''}`;
       let input = given;
       if (retry) {
-        const kept = await keptFor<Refused>((await bypassingRls(l)).db, `refused:${retry}`);
+        const kept = retry.length > 300 ? undefined : ((await store(l, { kept: `refused:${retry}` })) as Refused | undefined); // the store reads a key of 400 at most
         if (!kept || kept.who !== who) throw new Error(`No refused change is kept as "${retry}": one is kept for ${REFUSED_MINUTES} minutes. Send the change whole.`);
         const ops = [...kept.input.ops];
         for (const fix of fixes ?? []) {
@@ -151,12 +158,12 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         if (actor.kind !== 'agent' || !message.startsWith('Change rejected')) throw err;
         // A refused change is kept, so that what is wrong with one op is all that has to be sent again.
         const name = retry ?? `k_${Math.random().toString(36).slice(2, 10)}`;
-        await keep((await bypassingRls(l)).db, `refused:${name}`, { who, input } satisfies Refused, REFUSED_MINUTES * 60_000);
+        await store(l, { keep: { key: `refused:${name}`, value: { who, input } satisfies Refused, ms: REFUSED_MINUTES * 60_000 } });
         throw new Error(
           `${message}\nNothing was changed. The change is kept for ${REFUSED_MINUTES} minutes as "${name}": to correct it, send change with only retry: "${name}" and fixes: [{ at: <the op’s number>, op: <the whole op as it should be> }]. Every other op is sent as it was.`,
         );
       }
-      if (retry) await take((await bypassingRls(l)).db, `refused:${retry}`);
+      if (retry) await store(l, { take: `refused:${retry}` });
       // A held change that sets again all an older one of the same proposer asked says so, so that one can be withdrawn.
       const covers = result.status === 'proposed' ? covering(await proposals(l)).get(result.proposal) : undefined;
       if (covers && result.status === 'proposed') result = { ...result, covers, note: `${result.note} It covers ${covers.join(', ')}, held before it: withdraw those (revise, action withdraw).` };
@@ -169,7 +176,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         const touched = (input.ops as { id?: string }[]).find((o) => o.id)?.id;
         const target = made ?? touched;
         // A lens or a style that was changed is seen in the picture it changes, not on its own page.
-        const picture = result.status !== 'proposed' && target ? await pictureOf(l, target) : undefined;
+        const picture = result.status !== 'proposed' && target ? (await callAs<{ hash?: string }>(l, 'answer.picture_of', { id: target })).hash : undefined;
         await point(l, actor, 'change', result.status === 'proposed' ? 'review' : (picture ?? (target ? `e/${target}` : 'activity')), input.reason, undefined, input.run).catch(logged("change: the owner's page could not be pointed at it"));
       }
       // What it closes was meant to fix what is still open: the answer names each, with the op that closes it.

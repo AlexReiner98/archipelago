@@ -124,3 +124,6 @@ export async function lookAt(ctx: KernelContext, w: Whose, look: string) {
   if (!got?.data) throw new Error(`No look "${look}" was taken on this screen in the last ${LOOK_MS / 60_000} minutes.`);
   return answer(look, got.value, got.data, true);
 }
+
+/** answer.look: a look taken for the tool surface (a show with look: true), on the screen it names (`whose`). */
+export const lookAnswer = (ctx: KernelContext, input: { whose: Whose; actor: string; hash: string; size?: Parameters<typeof takeLook>[4] }) => takeLook(ctx, input.whose, input.actor, input.hash, input.size);

@@ -367,6 +367,7 @@ moves with a shim to the pack named.
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
 | surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), packreads-flat and packreads-query (wave 6b: the query pack's reads), region, blocking, launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server) |
+| surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking, plan-note (wave 7: only the change tool reads it, so it is the surface's, not views'), launcher (wave 6b, e_wuqn82rf, from launch: the run writes handed in by tool-acts, the brief the agents pack's `answer.launch_brief`), connect-routes (wave 6b: the open routes under /connect/, /x/ and OAuth, out of connect; what is above the surface handed in by the server) |
 
 ### Service
 
@@ -374,7 +375,7 @@ moves with a shim to the pack named.
 |---|---|
 | query | query-flat, query-terms, query-steps, query-only, query-presets, askview, views, altitude, timeaxis, summary (query-held to the reads API, packreads-flat) |
 | lenses | query-kept, query-saved, saved-views, view-life, view-twins, query-names |
-| views | view-graph, view-tree, inside, brief, moved, timelanes, documents, plan-note |
+| views | view-graph, view-tree, inside, brief, moved, timelanes, documents |
 | attention | attention, bounds, confirm |
 | findings (exists) | findings |
 | styles | styles, style-move, layout-move, screens, colours |
@@ -611,6 +612,16 @@ A pack's tool declares its input as a JSON shape (wave 6b): the sketch above (`"
 field is for in `says`, by its path (`"authority.of"`). The surface builds the zod schema where the tools are
 registered (`declaredTools`, `packs/surface/kernel/tool-input.ts`), handing each run the pack's context its adapter
 makes; `test/pack-tool-inputs.test.ts` pins every such tool's schemas against what they were in zod.
+
+The surface's acts (wave 7, e_ybqc4nee: `tool-acts`, `tool-change`, `tool-human`) keep their words and ask what is
+above them by service name, with `callAs` as the map that asks: the owner's screen is the presence pack's
+(`act.report.point`, `act.report.took`, `act.report.screen`, `answer.sight`, each told `whose` screen: the workspace
+and the person the map is read as), a look look_draw's (`answer.look`), a picture publish's (`act.capture.picture`),
+a notification notifications' (`act.report.notify`), what a session is told agents' (`answer.instructions`) and where
+it stands runs' (`answer.frontier`), what the owner is to confirm attention's (`answer.to_confirm`), what no longer
+waits on them waits' (`answer.waiting_on`), where a change is seen lenses' (`answer.picture_of`), and a backup merged
+backup's (`act.capture.backup_merge`, on the whole map). A refused change is kept in the transient store through
+`root-transient.ts` as the surface's own. What is left of them is sessions' (audit, sessions, close-offer).
 
 ### Answers
 
