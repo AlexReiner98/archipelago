@@ -15,6 +15,7 @@ import { recordUsage, sessionStart, sessionUpdate } from '../src/sessions.ts';
 import { callTool } from '../src/tools.ts';
 import { askView } from '../src/askview.ts';
 import { human, agent, fresh, freshWith, make, packsWith } from './map.ts';
+import { proposals } from '../src/map-reads.ts';
 
 /** A place found by its folder and its remote, as a repository is: what launching and a run's report look for. */
 const YARD: PackFile = {
@@ -249,5 +250,5 @@ test('a run in GitHub Actions reports what it used, once', async () => {
   await assert.rejects(callTool(l, agent, 'run_report', { repo: 'acme/other', title: 'x' }), /No repository "acme\/other"/);
   const run = (await l.entity(first.run))!;
   assert.deepEqual([run.type, run.status, run.is_open, run.props.surface, run.props.tokens_used, run.props.cost_usd, run.props.turns, run.body], ['run', 'finished', false, 'github-actions', 42_000, 0.3134, 9, 'Closed one task.']);
-  assert.equal((await l.proposals()).length, 0, 'a report is not a change to review');
+  assert.equal((await proposals(l)).length, 0, 'a report is not a change to review');
 });

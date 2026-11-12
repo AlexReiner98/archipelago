@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Archipelago } from '../src/pelago.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { proposals } from '../src/map-reads.ts';
+import { readEvents } from '../src/eventlog.ts';
 
 const pair = (l: Archipelago) =>
   make(l, [
@@ -51,7 +53,7 @@ test('approving a stale held merge is refused, names itself, and leaves the map 
   });
   assert.equal((await l.entity(keep))!.body, body);
   assert.equal(await events(l), before, 'nothing was written, not even the decision');
-  assert.deepEqual((await l.proposals()).map((p: { id: string }) => p.id), [second], 'it waits to be declined');
+  assert.deepEqual((await proposals(l)).map((p: { id: string }) => p.id), [second], 'it waits to be declined');
 });
 
 test('one held merge approved twice at once is applied once', async () => {
@@ -62,7 +64,7 @@ test('one held merge approved twice at once is applied once', async () => {
   assert.equal(tries.filter((t) => t.status === 'fulfilled').length, 1);
   for (const t of tries) if (t.status === 'rejected') assert.match((t.reason as Error).message, /being decided already|already approved/);
   assert.equal((await l.entity(keep))!.body, 'The original.\n\nThe copy.');
-  assert.equal(((await l.events({ target: keep })) as any[]).filter((e) => e.action === 'entity.merge').length, 1);
+  assert.equal(((await readEvents(l.db, { target: keep })) as any[]).filter((e) => e.action === 'entity.merge').length, 1);
 });
 
 test('the owner merged into another person is that person: what waits on the owner still finds them', async () => {

@@ -9,6 +9,7 @@ import { VIEWS } from '../src/views.ts';
 import { askView } from '../src/askview.ts';
 import { human, agent, fresh, make } from './map.ts';
 import { searchMap } from '../src/search.ts';
+import { getItem, proposals } from '../src/map-reads.ts';
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
@@ -17,7 +18,7 @@ test('an agent can notify the human; a stale session raises one notification', a
   const l = await fresh();
   const made = await make(l, [{ op: 'create', ref: 't', type: 'task', title: 'Ship it' }]);
   await callTool(l, agent, 'notify', { title: 'Blocked on a certificate', level: 'warning', about: made.t });
-  assert.equal((await l.proposals()).length, 0);
+  assert.equal((await proposals(l)).length, 0);
   let unread = (await VIEWS.notifications.run(l, {})) as any[];
   assert.deepEqual([unread[0].title, unread[0].level, unread[0].from, unread[0].about_title], ['Blocked on a certificate', 'warning', 'agent:test', 'Ship it']);
 
@@ -176,7 +177,7 @@ test('a refused change is kept and corrected by its one wrong op; history says a
   // The name finds it, whatever the session calls itself this time.
   const sent = (await callTool(l, { ...agent, name: 'test/claude-code:elsewhere' }, 'change', { retry: name, fixes: [{ at: 2, op: { ...ops[1], type: 'decision' } }] })) as any;
   assert.equal(sent.status, 'proposed');
-  const held = (await l.proposals()).at(-1)!;
+  const held = (await proposals(l)).at(-1)!;
   assert.equal(held.reason, 'A plan to draw');
   assert.deepEqual(held.ops.map((o: any) => o.type), ['task', 'decision', 'depends_on']);
   // Once it has gone through it is no longer kept; nor is it anyone else's to send.
@@ -208,7 +209,7 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
     { op: 'create', ref: 'old', type: 'task', title: 'Old task', body: 'x'.repeat(500), props: { priority: 'low' } },
     { op: 'link', type: 'part_of', from: 'old', to: 'p' },
   ]);
-  const rel = (await l.get(base.old)).outgoing[0] as any;
+  const rel = (await getItem(l, base.old)).outgoing[0] as any;
   const second = await l.change(human, {
     reason: 'Reshuffle',
     ops: [
@@ -232,7 +233,7 @@ test('undo reverses a change set as a new change, and leaves later edits alone',
   const old = (await l.entity(base.old))!;
   assert.deepEqual([old.status, old.body.length, old.props.priority, old.props.due], ['todo', 500, 'urgent', undefined], 'long text comes back whole');
   assert.equal((await l.entity(base.p))!.archived_at, null, 'the archived aim is restored');
-  assert.deepEqual((await l.get(base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
+  assert.deepEqual((await getItem(l, base.old)).outgoing.map((r: any) => r.title), ['Proj'], 'the removed link is back');
   assert.deepEqual((await searchMap(l, { type: 'task' })).map((t) => t.title), ['Old task'], 'the created task is archived');
 
   await assert.rejects(undo(l, human, { changeset: set }), /already been undone/);

@@ -19,6 +19,12 @@ const show = (field: string, v: unknown) => {
   return text.length > 60 ? `${text.slice(0, 60)}…` : text;
 };
 
+/** The changes held, or decided, of one status (pending unless said), oldest first: the review queue as the asker may read it. */
+export async function proposalsOf(l: Pick<Archipelago, 'db'>, input: { status?: string } = {}): Promise<Proposal[]> {
+  const { rows } = await l.db.query<Proposal>(`select * from proposal where status = $1 order by ts -- index proposal_status`, [input.status ?? 'pending']);
+  return rows;
+}
+
 /**
  * Each field an update sets outright that someone has set since the base, to a value other than the one it asks for:
  * what was there, what is there now, and what it would make it. A note added to or a passage replaced is planned on

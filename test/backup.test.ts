@@ -14,6 +14,8 @@ import { Workspaces } from '../src/workspaces.ts';
 import { dumpVault } from '../src/vault.ts';
 import { human, agent, fresh, make } from './map.ts';
 import { searchMap } from '../src/search.ts';
+import { getItem, proposals } from '../src/map-reads.ts';
+import { readEvents } from '../src/eventlog.ts';
 
 test('a backup merges into a map that has moved on: nothing is lost, the later edit wins, and twice is the same as once', async () => {
   const a = await fresh();
@@ -29,7 +31,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   // b starts as a copy of a, then each goes its own way.
   const b = new Archipelago(await openDb(), a.registry);
   await restore(b.db, await snapshot(a));
-  const partOf = ((await a.get(made.t)) as any).outgoing[0].relation;
+  const partOf = ((await getItem(a, made.t)) as any).outgoing[0].relation;
 
   await make(b, [{ op: 'update', id: made.p, title: 'Proj, renamed in b' }, { op: 'create', type: 'finding', title: 'Only in b' }]);
   await make(a, [
@@ -39,7 +41,7 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
     { op: 'create', ref: 'n', type: 'task', title: 'New in a' },
     { op: 'link', type: 'part_of', from: 'n', to: made.p },
   ]);
-  const [pending] = await a.proposals();
+  const [pending] = await proposals(a);
   await a.decide(human, { proposal: pending.id, approve: false, note: 'no' });
   const session = await sessionStart(a, agent, { title: 'Still running in a', surface: 'test' });
   const from = await snapshot(a);
@@ -58,11 +60,11 @@ test('a backup merges into a map that has moved on: nothing is lost, the later e
   const title = async (l: Archipelago, id: string) => (await l.entity(id))!.title;
   assert.deepEqual([await title(b, made.t), await title(b, made.p)], ['Task, renamed in a', 'Proj, renamed in b'], "each side's edit survives");
   assert.ok((await b.entity(made.u))!.archived_at, 'archived there, archived here');
-  assert.deepEqual(((await b.get(made.t)) as any).outgoing, [], 'unlinked there, unlinked here');
+  assert.deepEqual(((await getItem(b, made.t)) as any).outgoing, [], 'unlinked there, unlinked here');
   assert.equal((await searchMap(b, { q: 'Only in b' })).filter((e) => e.title === 'Only in b').length, 1, 'and what b made is still there');
   assert.equal(await b.entity(session.run), undefined, 'a session still open there stays there');
-  assert.equal((await b.proposals()).length, 0);
-  assert.ok(((await b.get(made.t)) as any).recent_events.some((e: any) => e.action === 'entity.update'), 'with the history of what changed');
+  assert.equal((await proposals(b)).length, 0);
+  assert.ok(((await readEvents(b.db, { target: made.t, limit: 8 })) as any[]).some((e: any) => e.action === 'entity.update'), 'with the history of what changed');
 
   const again = await merge(b, from, { ...options, apply: true });
   assert.deepEqual([again.entities.added, again.entities.updated, again.relations, again.events.added, again.proposals], [0, 0, { added: 0, ended: 0 }, 0, { added: 0, decided: 0 }], 'a second time adds nothing');

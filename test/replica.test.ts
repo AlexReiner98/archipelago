@@ -18,6 +18,7 @@ import { callTool } from '../src/tools.ts';
 import { uiFile } from '../src/ui-files.ts';
 import { undo } from '../src/undo.ts';
 import { agent, all, fresh, human, make } from './map.ts';
+import { getItem } from '../src/map-reads.ts';
 
 /** The page's modules as the server serves them, loaded from a folder of their own as the browser would load them. */
 async function pageModules() {
@@ -83,7 +84,7 @@ test("the page's projector makes the server's rows from the log, row for row", a
   const kept = await make(l, [{ op: 'create', ref: 'k', type: 'task', title: 'Kept one' }, { op: 'link', type: 'link', from: 'k', to: made.p }]);
   await make(l, [{ op: 'merge', keep: made.t, drop: kept.k }]);
   await make(l, [{ op: 'forget', id: gone.g }]);
-  const link = ((await l.get(made.t)).outgoing as { type: string; relation: string }[]).find((o) => o.type === 'part_of')!;
+  const link = ((await getItem(l, made.t)).outgoing as { type: string; relation: string }[]).find((o) => o.type === 'part_of')!;
   await make(l, [{ op: 'unlink', relation: link.relation }, { op: 'link', type: 'part_of', from: made.t, to: made.q }]);
 
   const { project } = (await pageModules()).project;

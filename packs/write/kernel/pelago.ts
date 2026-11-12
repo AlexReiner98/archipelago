@@ -4,11 +4,11 @@
 import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type Policy } from '../../../src/rules.ts'; import { renamedQuery } from '../../../src/query-names.ts';
 import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomToStore, stillWritable } from '../../../src/standing.ts'; import { authorityOf } from '../../../src/authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from '../../../src/db.ts';
-import { once } from './merge.ts'; import type { EventQuery } from '../../../src/eventlog.ts'; import { doneFact, type Done } from '../../../src/activity.ts';
+import { once } from './merge.ts'; import { doneFact, type Done } from '../../../src/activity.ts';
 import type { Registry } from '../../../src/packs.ts'; import { currentNames } from '../../../src/type-items.ts'; import { follow, retyped, rewrite, type Who } from '../../../src/write-hooks.ts';
 import { readSecret, writeSecret } from '../../../src/secrets.ts';
 import { KEPT_FIELDS } from '../../../src/operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from '../../../src/streams.ts';
-import * as reads from '../../../src/map-reads.ts'; import { layoutOf } from '../../../src/layout-changes.ts';
+import { layoutOf } from '../../../src/layout-changes.ts';
 import { append, headOf, type Fact } from '../../../src/log.ts'; import { projectDecision, projectFacts, stamp } from '../../../src/replay.ts'; import { linkFacts } from '../../../src/facts.ts';
 import { decideProposal } from './proposals.ts'; import { needHuman } from '../../../src/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
@@ -313,12 +313,8 @@ export class Archipelago {
     return rows[0];
   }
 
-  // The map's reads (get, search, trail, events, proposals) are surface's, split off into src/map-reads.ts; search is
-  // asked there (searchMap, src/search.ts). The class still answers the others by name for its callers, until the gather step points
-  // those at the module.
-  hidden(id: string): Promise<boolean> { return reads.hidden(this, id); }
-  get(id: string) { return reads.getItem(this, id); }
-  trail(id: string) { return reads.trail(this, id); }
+  // The map's reads (get, search, trail, events, proposals) are surface's (src/map-reads.ts, src/search.ts): the class
+  // keeps its writes, and the reads they need.
   /**
    * What names an item in its text or its fields (a note that points at it, a document that brings it in, a
    * decision whose reasons cite it): the way back for a link written as an id, which no relation records.
@@ -332,8 +328,6 @@ export class Archipelago {
     );
     return rows;
   }
-  events(input: EventQuery) { return reads.events(this, input); }
-  proposals(input: { status?: string } = {}) { return reads.proposals(this, input); }
 }
 
 /**

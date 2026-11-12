@@ -13,7 +13,7 @@ import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './p
 import type { Pin } from './packreads-pin.ts';
 import { filled, kernelRead, type KernelRead } from './packreads-kernel.ts';
 import { serviceRead, type ServiceRead } from './packreads-service.ts';
-import { fillReads } from '../../loader/kernel/packhost.ts';
+import { fillReads } from '../../loader/kernel/packhost.ts'; import { trail } from './map-reads.ts';
 
 export type Read = KernelRead & ServiceRead & {
   get?: string;
@@ -80,7 +80,7 @@ export type Read = KernelRead & ServiceRead & {
 };
 
 // The loader's sandbox asks its packs' reads of this (the slot loader.reads, src/packhost.ts).
-fillReads((l, read) => answerRead(l, read));
+fillReads((l, read, pack) => answerRead(l, read, pack));
 
 /** The answer to a read, as the map asks it; `pack` is the internal pack asking, when one is (its own memory is read by it alone). */
 export async function answerRead(l: Archipelago, q: Read, pack?: string): Promise<unknown> {
@@ -132,7 +132,7 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
     );
     return answer(rows);
   }
-  if (q.trail !== undefined) return (await l.trail(q.trail)).map(({ id, type, title }) => typed({ id, type, title }));
+  if (q.trail !== undefined) return (await trail(l, q.trail)).map(({ id, type, title }) => typed({ id, type, title }));
   if (q.scope !== undefined) {
     // Its parts at any depth, along the part_of family as the registry has it. Walked, not read from the closure: a
     // pack's read may run for a public page, whose reader is not given the closure (src/closure.ts).

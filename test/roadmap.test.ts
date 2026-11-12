@@ -13,6 +13,7 @@ import { Registry, type PackFile } from '../src/packs.ts';
 import { askView } from '../src/askview.ts';
 import { lastSeq } from '../src/eventlog.ts';
 import { human, agent, fresh, freshWith, attend, make, packsWith } from './map.ts';
+import { getItem, proposals } from '../src/map-reads.ts';
 
 /** A view asked by its name, as the view tool asks it. */
 const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
@@ -196,9 +197,9 @@ test('a held change that asks only for what is already so leaves the queue as su
 
   // The human settles the decision and one of the two tasks themselves.
   const settled = await l.change(human, { reason: 'mine', ops: [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Supabase Storage' } }, { op: 'update', id: made.t, status: 'done' }] });
-  const pending = async () => (await l.proposals()).map((p) => p.id);
+  const pending = async () => (await proposals(l)).map((p) => p.id);
   assert.deepEqual(await pending(), [both, more, other], 'the answer already given is gone; what asks for more, or for something else, stays');
-  const [gone] = await l.proposals({ status: 'superseded' });
+  const [gone] = await proposals(l, { status: 'superseded' });
   assert.deepEqual([gone.id, gone.note, gone.decided_by], [answer, `Already so since ${(settled as { changeset: string }).changeset}`, 'agent:pelago']);
   const { rows: said } = await l.db.query<{ rule: { outcome: string; proposal: string; by: string } }>(`select head->'rule' as rule from log_entry where stream = 'facts' and head->'rule'->>'proposal' = $1 and head->'rule'->>'outcome' = 'superseded'`, [answer]);
   assert.deepEqual(said.map((s) => s.rule.by), [(settled as { changeset: string }).changeset], 'and the log says what overtook it');
@@ -227,9 +228,9 @@ test('a backup holds every row, and restores into an empty database that then ca
   assert.equal(counts.event, taken.tables.event.filter((e) => !logged.has(e.changeset)).length);
   assert.equal(counts.log_entry, taken.tables.log_entry.length);
 
-  const task = (await copy.get(made.t)) as any;
+  const task = (await getItem(copy, made.t)) as any;
   assert.deepEqual([task.entity.title, task.entity.props.due, task.outgoing[0].title], ['Task', '2026-11-01', 'Proj']);
-  assert.equal((await copy.proposals()).length, 1, 'what was waiting for review still is');
+  assert.equal((await proposals(copy)).length, 1, 'what was waiting for review still is');
   const before = Math.max(...taken.tables.event.map((e) => e.seq as number));
   await make(copy, [{ op: 'create', type: 'finding', title: 'After the restore' }]);
   assert.ok((await lastSeq(copy.db)) > before, 'new events are numbered after the restored ones');

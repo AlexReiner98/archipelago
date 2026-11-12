@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { contextFor, hostOf, KernelHost, openKernel } from '../src/kernel-context.ts';
-import { callService } from '../src/services.ts';
+import { serviceOf } from '../src/services.ts';
 import { readManifest, tierOf } from '../src/manifest.ts';
 import { PackHost } from '../src/packhost.ts';
 import { Registry, type PackFile } from '../src/packs.ts';
@@ -79,7 +79,7 @@ test('a service name is called only as the caller declares it, and answered by i
   const l = await freshWith(new Registry(dir));
   const host = openKernel(l);
   assert.equal(hostOf(l), host);
-  assert.deepEqual(await callService(l.registry, 'answer.probe', { said: 'by name' }), { said: 'by name', by: 'kernel_probe' }, 'filled at open: the kernel calls it by name');
+  assert.deepEqual(await serviceOf(l.registry, 'answer.probe')!({ said: 'by name' }), { said: 'by name', by: 'kernel_probe' }, 'filled at open: the kernel calls it by name');
   const caller: PackFile = { id: 'asker', version: '1', title: 'Asker', uses: ['service:answer.probe'] };
   assert.deepEqual(await host.call(l, caller, 'answer.probe', { said: 'hello' }), { said: 'hello', by: 'kernel_probe' });
   assert.deepEqual(await host.services(l).get('answer.probe')!({ said: 'hi' }), { said: 'hi', by: 'kernel_probe' }, 'what the loader hands fillServices');

@@ -40,6 +40,24 @@ export async function typeItems(l: Archipelago): Promise<TypeItem[]> {
   return rows;
 }
 
+/** The type items each open workspace's registry last took, to follow another server's change to them. */
+const taken = new WeakMap<Archipelago, string>();
+
+/** Take in the types and link types kept on the map, when they changed: ones that no longer load (a pack gone) are said, and left out. */
+export async function takeTypeItems(pelago: Archipelago): Promise<boolean> {
+  const items = await typeItems(pelago);
+  const now = JSON.stringify(items);
+  if (taken.get(pelago) === now) return false;
+  taken.set(pelago, now);
+  try {
+    pelago.registry.takeItems(items);
+  } catch (err) {
+    console.error(`the types kept on the map in ${pelago.workspace} do not load: ${(err as Error).message}`);
+    return false;
+  }
+  return true;
+}
+
 /**
  * The registry a change is checked and applied against: the workspace's own, or, when the change makes or changes a
  * type or link type, one with those as they will be, so a type made in a change can be used in it.
