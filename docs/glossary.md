@@ -150,7 +150,7 @@ kept hand places is retired: nothing appends to it, and since 11 Nov 2026
 node, a dashed wire, a badge. In the code: `ui/ghosts.js`.
 
 **pack.** A folder under `packs/` with a `pack.json`, its manifest of
-seventeen keys (`docs/packs.md`): the types, links, rules, views, actions,
+eighteen keys (`docs/packs.md`): the types, links, rules, views, actions,
 handlers, drawings and styles of one way of working, and what it may reach.
 Which packs a workspace has is a fact in its log. In the code:
 `packs/loader/kernel/manifest.ts` reads a manifest, `packs/loader/kernel/packs.ts` loads them. Replaces

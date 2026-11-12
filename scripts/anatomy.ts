@@ -112,7 +112,8 @@ const files = REPOS.flatMap(([repo, which]) => (run.extractors.length ? sources(
 const want = extract(files, run, new Set(island.byKey.keys()));
 const commits = REPOS.map(([, , name]) => `${name}@${heads[name]}`).join('\n');
 const moved = REPOS.some(([, , name]) => was[name] !== heads[name]);
-if (moved || !incremental) want.items.push({ key: 'sync', type: 'anatomy.sync', title: 'Where the island stands', body: '', props: { commits, full: !incremental } });
+// The sync item moves only with the commits: a full run on an island already at them changes nothing, its flag included.
+if (moved) want.items.push({ key: 'sync', type: 'anatomy.sync', title: 'Where the island stands', body: '', props: { commits, full: !incremental } });
 const { ops, counts } = plan(want, island, run);
 if (arg('out')) (await import('node:fs')).writeFileSync(arg('out')!, JSON.stringify(ops, null, 1));
 console.log(`${incremental ? `${changes.length} files changed since the last sync` : 'full run'}; ${run.extractors.map((e) => `${e.extractor.id}${e.only ? ` (${e.only.size})` : ''}`).join(', ') || 'no extractor reached'}; ${files.length} files read (${island.bulk ? 'island read in bulk' : 'island read item by item'}); ${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ')}`);

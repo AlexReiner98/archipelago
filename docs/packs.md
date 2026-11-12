@@ -8,7 +8,7 @@ design, the canvas's look and the rest) is the hosted service's, kept in
 `archipelago-hosted` and read from a folder `PELAGO_PACKS` names (decision
 e_8jd82drh, 9 Nov 2026). A pack's tests live beside it and reach the kernel
 only through `#pelago/test`. The manifest says what the pack declares, in
-seventeen keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
+eighteen keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
 reads it, `test/structure.test.ts` refuses any other key).
 
 ## The keys
@@ -27,6 +27,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `layouts`, `styles` | The code views are drawn by, and the presets of the map's own configuration: how things look, and (an entry with `type: "instruction"`, its words in `body`) what agents are told (`packs/agents/kernel/instructions.ts`), and (an entry with `type: "lens"`, its props a flat query and a style: `filter`, `walk`, `limit`, `style`) a view the pack ships, listed in the bar's picker and on Home until the owner saves their own version of it (`props.preset`); one `on` types, its query naming the item as `{here}`, is a view of each such item (a project's roadmap, an event's gate), offered on that item's page and drawn on the canvas (decision e_2mndpgdj: what a pack shows of an item is a view, not a screen). A style preset on nothing is used on every page; with `over: "workspace"` it lies over the workspace's own style; with `over: "chosen"` (a theme) only once the owner keeps a version of it. |
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`; an internal pack also `items`, the addresses the map's own items keep (a type and its field: connect's check of each connection). |
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
+| `kernel` | A kernel pack's code in the server process alone (the root packs and the service packs): its `trust`, where its `modules` are, the `service:` names it `provides` (each with the shapes it takes and gives, and the module and function that run it) and `calls`, its `hooks`, `timers`, `tables` and `memory`. Allowed only on the server's own packs; `docs/kernel-packs.md` says it whole. |
 | `moved_from` | The packs it took declarations from, keeping their ids (below, In time): it may name a rule, view, style, action or layout `<pack>.<name>` for each, as well as its own. The kernel's packs it never needs to name. |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
@@ -99,6 +100,7 @@ consumers stay active (`packs/loader/kernel/packorder.ts`). A name is one of:
 | `event:<kind>` | core for the kernel's (`item.due`, `notification.made`), else the pack whose handlers record it |
 | `field:<field>@<type>` | the pack declaring that type, when it or an ancestor has the field; or the pack adding it (`of`) |
 | `status:<status>@<type>`, `phase:<phase>@<type>` | the pack declaring that type, when its statuses (its own or inherited) have it, or one in that phase |
+| `service:<family>.<entry>` | the kernel pack whose `kernel.provides` names it (`service:answer.flat`, the query pack), checked by the shapes it takes and gives (`docs/kernel-packs.md`, Service names) |
 
 The last three are what a pack reads of a type it does not own, checked by
 shape (task e_f9x7ddeh): the type as its provider declares it may have more,
