@@ -1,8 +1,8 @@
 // A session started as a pack's answer. A pack that hears the kernel's clock tell it an item came due (item.due,
 // src/due.ts) may answer with one launch, and the kernel starts it (src/launcher.ts) only when what came due is an
-// enabled automation that says to launch just that: its own task, mode and instructions, checked as on write
-// (the automation_triggers pack's answer.automation_problems). An automation is made, changed or brought back by an agent only with a human's approval
-// (core's rule agent_automations, which nothing lifts), so the launch is on that human's authority, as the automation:
+// enabled automation that says to launch just that: its own task, mode and instructions, checked as on write (the
+// automation_triggers pack's answer.automation_problems). An automation is made, changed or brought back by an agent
+// only with a human's approval (core's rule agent_automations, which nothing lifts), so the launch is on that human's authority, as the automation:
 // the session it starts only proposes, and its run names the automation. Nothing else may launch this way: another
 // call, another event, an event another pack recorded, an item of another type, a paused automation, or a launch that
 // differs from what the automation says are each refused whole. Not while the session it last started is still open.

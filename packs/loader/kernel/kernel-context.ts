@@ -11,6 +11,7 @@
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
+import { codeFolder } from './code-folder.ts';
 import { readsAnswer } from './packhost.ts';
 import type { Read } from '../../../src/packreads.ts';
 import { guardedFetch } from '../../../src/outbound.ts';
@@ -90,7 +91,7 @@ export class KernelHost {
   /** A function of a pack's modules, by its `<file>.ts#<export>`: never a file outside its modules folder. */
   async fn(pack: Manifest, ref: ModuleRef): Promise<Fn> {
     const [file, name] = ref.split('#');
-    const dir = resolve(this.folderOf(pack.id), pack.kernel?.modules ?? 'kernel/');
+    const dir = resolve(codeFolder({ folderOf: this.folderOf }, pack), pack.kernel?.modules ?? 'kernel/');
     const path = resolve(dir, file);
     const inside = relative(dir, path);
     if (!inside || inside.startsWith('..') || isAbsolute(inside)) throw new Error(`The ${pack.id} pack names ${ref}, outside its modules`);

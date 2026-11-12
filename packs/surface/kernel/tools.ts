@@ -1,25 +1,21 @@
 // One table of named tools serves the human's surfaces, the CLI and the local API: same names, same inputs, same
 // write path. Agents are offered a small surface over it (src/surface.ts): query, change, undo and the six verbs,
 // each routed here onto the tool that runs it. The tools themselves live by what they do: reads (src/tool-reads.ts),
-// the write path (src/tool-change.ts), the kernel's actions (src/tool-acts.ts) and the human's own (src/tool-human.ts).
+// the write path (src/tool-change.ts), the kernel's actions (src/tool-acts.ts) and the human's own (src/tool-human.ts);
+// those an internal pack declares come through the slot surface.tools (./server-fillings.ts).
 
 import { z } from 'zod';
 import type { Actor, Archipelago } from '../../../src/pelago.ts';
 import { MEMBER_TOOLS } from '../../../src/members.ts';
 import { WORKSPACE_TOOLS } from './workspace-tools.ts';
-import { SERVER_PACK_TOOLS } from '../../../src/server-pack-tools.ts';
 import { PACK_STATE_TOOLS } from '../../../src/packstate.ts';
-import { SHARE_TOOLS, context as publishing } from '../../../src/share-tools.ts';
 import { BACKUP_TOOLS } from '../../../src/backup-tools.ts';
 import { FORMER_NAMES, REPORT_TOOLS } from './report-tool.ts';
 import { TOKEN_TOOLS } from '../../../src/token-tools.ts';
-import { ASK_TOOLS, context as connecting } from '../../../src/token-ask.ts';
-import { CONNECTION_TOOLS } from '../../../src/connection-tools.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
+import { callAs, kernelContext, type KernelContext } from '../../../src/kernel-context.ts';
 import { LOOK_READS } from '../../../src/look-pass.ts';
 import type { Registry } from '../../../src/packs.ts';
 import { packActionByShort, packTool, packTools } from '../../../src/packtools.ts';
-import { took } from '../../../src/presence.ts';
 import { withinScope } from '../../../src/scope.ts';
 import { viewsSaid } from '../../../src/askview.ts';
 import { actionsOf, listedChange, movedTo, route, surfaceNames, surfaceTools, type Action } from './surface.ts';
@@ -30,7 +26,8 @@ import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
 import { READ_TOOLS } from './tool-reads.ts';
-import { declaredTools } from './tool-input.ts';
+import { declaredTools, type DeclaredTool } from './tool-input.ts';
+import { serverFillings } from './server-fillings.ts';
 
 export { configureBackup, configureRestart, devMode } from './tool-config.ts';
 export { describeChanges, humanChanges, latestSeq, type HumanChange } from './tool-reads.ts';
@@ -41,6 +38,8 @@ export interface Tool {
   input: z.ZodRawShape;
   /** Not offered to agents. */
   humanOnly?: boolean;
+  /** A read an agent reaches through query, by its own name (./surface.ts, queryReads). */
+  query?: boolean;
   /** Exists only when the server runs in dev mode. */
   devOnly?: boolean;
   /** Sends what a system measured: the only kind of tool a token that may only report can call. */
@@ -54,7 +53,7 @@ export interface Tool {
   run(l: Archipelago, actor: Actor, input: any): Promise<unknown>;
 }
 
-// Where an agent pointed the screen and the steps it took are kept for any server to read (src/presence.ts).
+// Where an agent pointed the screen and the steps it took are kept for any server to read: the presence pack's (act.report.step).
 /** Tools that are no step of their own: those that point the screen themselves, and the one that only waits. */
 const UNWATCHED = new Set(['show', 'change', 'tell', 'watch', 'hook']);
 const READS = new Set(['get', 'events', 'proposals', 'picture', 'schema']);
@@ -76,13 +75,19 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
           : name.replaceAll('_', ' ');
   const kind = name === 'view' || name === 'search' ? name : READS.has(name) ? 'read' : 'other';
   const run = typeof input.run === 'string' && /^e_[a-z0-9]{8}$/.test(input.run) ? input.run : undefined;
-  await took((await bypassingRls(l)).db, l, { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'flat' ? 'graph?lens' : undefined, ...(run && { run }) });
+  await callAs(l, 'act.report.step', { step: { kind, actor: actor.name, did, hash: id ? `e/${id}` : name === 'view' && input.name === 'flat' ? 'graph?lens' : undefined, ...(run && { run }) }, viewer: l.viewer });
 }
+
+/**
+ * The tools the internal packs declare (surface.tools, ./server-fillings.ts), each run on its pack's context of the map
+ * it is called on. Filled once, before anything is called: the table is the server's, whatever a workspace runs.
+ */
+const PACK_TOOLS: Record<string, Tool> = Object.assign({}, ...(await serverFillings<Record<string, DeclaredTool<KernelContext>>>('surface.tools')).map(({ pack, filled }) => declaredTools(filled, (l) => kernelContext(l, pack))));
 
 export const TOOLS: Record<string, Tool> = {
   ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HOOK_TOOLS, ...HUMAN_TOOLS,
-  ...PACK_STATE_TOOLS, ...declaredTools(SHARE_TOOLS, publishing), ...BACKUP_TOOLS, ...REPORT_TOOLS,
-  ...TOKEN_TOOLS, ...declaredTools(ASK_TOOLS, connecting), ...MEMBER_TOOLS, ...SERVER_PACK_TOOLS, ...WORKSPACE_TOOLS, ...declaredTools(CONNECTION_TOOLS, connecting),
+  ...PACK_STATE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
+  ...TOKEN_TOOLS, ...MEMBER_TOOLS, ...WORKSPACE_TOOLS, ...PACK_TOOLS,
 };
 
 /** The view tool as a registry offers it: described with the lenses its core pack declares, then the kernel's own views. */

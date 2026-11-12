@@ -13,12 +13,9 @@ import { packsFor } from './pack-allow.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
 import { followMade, followPacks, islandsOn, packsOff, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
-import { onPacksChanged, onTypesChanged, takeTypeItems } from './type-items.ts';
+import { takeTypeItems } from './type-items.ts';
 import { syncTypes } from './typetable.ts';
 
-// The type table follows the types kept on the map as it follows the packs.
-onTypesChanged(syncTypes);
-onPacksChanged(followMade);
 
 export const OPEN: RootOpen = {
   packs: [

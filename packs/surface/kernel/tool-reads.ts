@@ -2,21 +2,16 @@
 // for an item, and listening for what the owner does. Agents reach each of them through query.
 
 import { z } from 'zod';
-import { NEWEST, summed } from '../../../src/summary.ts';
 import { lastSeq, readEvents } from '../../../src/eventlog.ts';
-import { listening } from '../../../src/presence.ts';
 import { askView, viewList, viewsSaid } from '../../../src/askview.ts';
-import { shownIn } from '../../../src/query-saved.ts';
 import { showingIn } from './public-views.ts';
 import { bypassingRls } from '../../../src/outbox.ts';
 import type { Archipelago } from '../../../src/pelago.ts';
-import { lookAt, takeLook } from '../../../src/looks.ts';
-import { getPicture } from '../../../src/pictures.ts';
-import { withScreens } from '../../../src/screens.ts';
+import { callAs } from '../../../src/kernel-context.ts';
+// A look is the look_draw pack's, asked by name on the screen of the map that asks (answer.look, answer.look_at).
+const whose = (l: Archipelago) => ({ workspace: l.workspace, ...(l.viewer !== undefined && { viewer: l.viewer }) });
+const looks = async <O>(l: Archipelago, name: string, input: object) => (await import('../../loader/kernel/kernel-context.ts')).callAs<O>(l, name, { whose: whose(l), ...input });
 import { islandVersion } from '../../../src/island-pin.ts';
-import { schemaBrief, schemaOf } from '../../../src/schema-brief.ts';
-import { NOW_MS, seeing, seenNow } from '../../../src/seeing.ts';
-import { withStyles } from '../../../src/styles.ts';
 import { LARGE, sizeOf } from '../../../src/head.ts';
 import { props } from './tool-ops.ts'; import { searchMap } from './search.ts'; import { getItem, proposals } from './map-reads.ts';
 import type { Tool } from './tools.ts';
@@ -137,6 +132,20 @@ function fewLinks<T extends { type: string }>(links: T[]) {
   return { links: links.slice(0, GET_LISTED), counted: { total: links.length, by_type } };
 }
 
+/** How many of the newest an agent is given whole of what changed: the rest are counted. */
+const NEWEST = 5;
+
+/**
+ * What changed, as an agent is given it (newest last, as it happened): its count by a key, the newest few in the order
+ * they came, and how many were left out. Few enough, they are given whole and nothing is counted.
+ */
+function summed<T>(items: T[], key: (item: T) => string): { counts?: Record<string, number>; newest: T[]; more?: number } {
+  if (items.length <= NEWEST) return { newest: items };
+  const counts = new Map<string, number>();
+  for (const item of items) counts.set(key(item), (counts.get(key(item)) ?? 0) + 1);
+  return { counts: Object.fromEntries([...counts].sort((a, b) => b[1] - a[1])), newest: items.slice(-NEWEST), more: items.length - NEWEST };
+}
+
 /** How many of what names an item `get` gives an agent before it counts them. */
 const GET_MENTIONS = 10;
 
@@ -215,7 +224,12 @@ export const READ_TOOLS: Record<string, Tool> = {
       const pinned = input.island ? await islandVersion(map, input.island) : undefined;
       if (input.island && !pinned) return { island: input.island, runs: 'map' };
       const l = pinned ? map.readIn(pinned.registry) : map;
-      const said = input.type ? schemaOf(l.registry.describe(), input.type) : actor.kind === 'human' || input.full ? await withStyles(l, await withScreens(l, l.registry.describe())) : schemaBrief(l.registry);
+      // What is said of it is the agents pack's (answer.schema_of, answer.schema_brief), its screens and styles the styles pack's.
+      const said = input.type
+        ? await callAs(l, 'answer.schema_of', { described: l.registry.describe(), type: input.type })
+        : actor.kind === 'human' || input.full
+          ? await callAs(l, 'answer.schema_styled', { described: l.registry.describe() })
+          : await callAs(l, 'answer.schema_brief', {});
       if (!pinned) return said;
       const title = (await map.entity(pinned.version.item))?.title ?? pinned.version.item;
       return { ...(said as object), island: input.island, version: { id: pinned.version.item, of: pinned.version.of, title } };
@@ -244,8 +258,9 @@ export const READ_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       // Its recent events are the activity log's (src/eventlog.ts), read beside the item as get read them.
       const [item_, events_] = await Promise.all([getItem(l, input.id), readEvents(l.db, { target: input.id, limit: 8 })]);
-      const found = { ...item_, recent_events: events_.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })), shown_in: [] as Awaited<ReturnType<typeof shownIn>> };
-      found.shown_in = await shownIn(l, input.id, found.trail);
+      const found = { ...item_, recent_events: events_.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })), shown_in: [] as unknown[] };
+      // The views it is drawn in are the lenses pack's to say (answer.shown_in).
+      found.shown_in = await callAs<unknown[]>(l, 'answer.shown_in', { id: input.id, trail: found.trail });
       // The public views that show it, frozen when shared: one marked behind has changed since, and sharing that view again
       // is the person's (an agent editing it tells them).
       const shared = await showingIn(l, input.id, found.entity.updated_at);
@@ -331,9 +346,10 @@ export const READ_TOOLS: Record<string, Tool> = {
     run: async (l, actor, input) => {
       if (input.after === undefined) return { latest: await latestSeq(l), changes: [] };
       const until = Date.now() + (input.wait_seconds ?? 0) * 1000;
-      // Counted on every server, so the web UI can say whether anyone will hear a decision the moment it is made.
+      // Counted on every server, so the web UI can say whether anyone will hear a decision the moment it is made: the
+      // presence pack's count (act.query.listening).
       const { db } = await bypassingRls(l);
-      await listening(db, l, 1);
+      await callAs(l, 'act.query.listening', 1);
       try {
         for (;;) {
           // A token revoked while it waits (its person removed, say) is told nothing more.
@@ -345,17 +361,19 @@ export const READ_TOOLS: Record<string, Tool> = {
           await new Promise((r) => setTimeout(r, 1000));
         }
       } finally {
-        await listening(db, l, -1).catch(() => {});
+        await callAs(l, 'act.query.listening', -1).catch(() => {});
       }
     },
   },
   picture: {
     description: 'The image kept for a test result, or the figure kept for a note or file, as base64 with its content type, or null when none is kept (the proof view says which results have one: stored; query document, which sections have a figure). Or, with look, a look taken in the last 30 minutes, again, as an image.',
     input: { result: z.string().optional().describe('The id of the test result, note or file.'), look: z.string().optional().describe('A look query look or show answered with.') },
+    // A look again is the looks pack's (its store is the transient store's: the database handed is not read), a kept
+    // picture the publish pack's (answer.picture).
     run: async (l, _actor, input) => {
-      if (input.look) return lookAt((await bypassingRls(l)).db, l, input.look);
-      if (!input.result) throw new Error('picture needs "result" or "look".');
-      return getPicture(l, { result: input.result });
+      if (input.look) return looks(l, 'answer.look_at', { look: input.look });
+      if (!input.result) throw new Error('picture needs the id of a result, or a look.');
+      return callAs(l, 'answer.picture', { result: input.result });
     },
   },
   look: {
@@ -371,7 +389,8 @@ export const READ_TOOLS: Record<string, Tool> = {
       published: z.boolean().optional().describe('With entity a document: draw the page publishing it now would give, as its preview does, not the app.'),
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
     },
-    run: async (l, actor, input) => takeLook((await bypassingRls(l)).db, l.db, l, actor.name, input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), input),
+    // Drawn by the looks pack, at the address the surface reads off what is asked (the databases handed are not read).
+    run: async (l, actor, input) => looks(l, 'answer.look', { actor: actor.name, hash: input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), size: input }),
   },
   seeing: {
     description:
@@ -379,10 +398,8 @@ export const READ_TOOLS: Record<string, Tool> = {
       'Nothing when no page of theirs has looked in the last ten minutes. The prompt hook says it in a line with each of their messages. ' +
       'With run, tab says whether the tab in sight is that session’s (yours), another chat’s, or one of the owner’s following a chat (own false).',
     input: { run: z.string().optional().describe('Your run id, to be told whether the tab in sight is yours.') },
-    run: async (l, _actor, input) => {
-      const s = await seenNow((await bypassingRls(l)).db, l);
-      return s && Date.now() - s.said <= NOW_MS ? { ...(await seeing(l, s, input.run)), address: s.at } : null;
-    },
+    // What the owner's page said it shows is the presence pack's (answer.seeing).
+    run: async (l, _actor, input) => callAs(l, 'answer.seeing', { run: input.run, viewer: l.viewer }),
   },
   // The one tool that names the page in a chat (src/mcp-view.ts). The page takes the look, at the size it has: this only
   // refuses what could not be drawn. Its inputs are cut short, since the tool list carries them on every request.

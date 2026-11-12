@@ -24,8 +24,7 @@ const CALLERS: Record<string, number> = {
   'packs/surface/kernel/root-transient.ts': 1, // root.transient: the store only the whole database reaches, for the packs roots.json lets keep there
   'src/token-tools.ts': 1,
   'src/tool-human.ts': 1, // import_backup: everything in the file goes in, whoever it is private to
-  'src/tool-reads.ts': 4,
-  'src/tools.ts': 1,
+  'src/tool-reads.ts': 1,
   'src/typetable.ts': 2,
   'src/workspace-tools.ts': 4, // root.counters, the usage view's whole count (was src/usage.ts's)
 };

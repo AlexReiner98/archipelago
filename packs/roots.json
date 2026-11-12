@@ -18,15 +18,15 @@
     },
     {
       "id": "identity",
-      "hash": "5b37f47b424cbcd85cb0f8722a75c9f8a023ae7784707f4c5a466c0f32b91ff9"
+      "hash": "d2b93d0382d3c3cb12462a26d524c1bf170c3f4313b0d2e498beeaa88178d23c"
     },
     {
       "id": "walls",
-      "hash": "f82b4d0b4bd8bf88ac3e6b2486d5610db6b3c5b12ea06f63ae56b9baa707783b"
+      "hash": "0650c2da5ada848fa0142cc967cf6ba1626d8777ad7eb34195480aef8c3d59b9"
     },
     {
       "id": "loader",
-      "hash": "468b786cbc7be1486e8765bc7dfe616e2fe8cade6edefc3cbcc0e766b850663c"
+      "hash": "0f600e402cd7d613f6f5683a9e0913b1afaf28464dc7bc2e20af4faa1f8dcfec"
     },
     {
       "id": "rules",
@@ -34,11 +34,11 @@
     },
     {
       "id": "write",
-      "hash": "103b96e34099185b0ed02c2a8a96c1839355c4e712d039359e87fbf9c9fe7537"
+      "hash": "12274075bdd0e72156b581fa15ad2363dea1c61f87f6c95172c373375edd9810"
     },
     {
       "id": "surface",
-      "hash": "415d3afb6b648b0d1d04fc19126ff0be0e20209fdb6a2745c26a959d899bce91"
+      "hash": "65a8a63f5cc358ba991f030b971bfe1493be12a28122e09afc9575aacaedd44a"
     }
   ],
   "calls": {

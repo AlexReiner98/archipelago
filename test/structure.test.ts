@@ -40,11 +40,9 @@ test('the kernel names no pack', () => {
 // bare name too. What was counted on that day is words that are also some pack's type name (a capability, a view, a
 // verb's action): no new one may be added. SQL strings count too (`type = 'run'`); run, works_on, notification, about are core's.
 const NAMES_PACK_TYPES: Record<string, number> = {
-  'src/altitude.ts': 1, 'src/capabilities.ts': 2, 'src/declared.ts': 3,
-  'src/look-pass.ts': 1,
-  'src/manifest.ts': 1, 'src/outside.ts': 1, 'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2,
-  'src/public-document.ts': 1, 'src/public.ts': 2, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2,
-  'src/session-hook.ts': 1, 'src/surface.ts': 2, 'src/tool-reads.ts': 1, 'src/ui-files.ts': 1,
+  'src/altitude.ts': 1, 'src/capabilities.ts': 2, 'src/declared.ts': 3, 'src/look-pass.ts': 1, 'src/manifest.ts': 1, 'src/outside.ts': 1,
+  'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/public-document.ts': 1,
+  'src/public.ts': 1, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2, 'src/session-hook.ts': 1, 'src/ui-files.ts': 1,
   'ui/doc.js': 1, 'ui/item-doc.js': 1,
 };
 
@@ -352,7 +350,7 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
 // (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
 const WHOLE_READS: Record<string, number> = {
-  'src/forget.ts': 2,
+  'src/forget.ts': 1,
   'src/log.ts': 1,
   'src/mentions.ts': 1,
   'src/pelago.ts': 1,

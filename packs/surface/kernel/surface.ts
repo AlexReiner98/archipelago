@@ -14,7 +14,10 @@ import { op, props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 
 /** The kernel's tools an agent reaches through query, each by its own name. Every view, lens and pack view is a name of query too. */
-export const QUERY_READS = ['schema', 'search', 'get', 'events', 'proposals', 'picture', 'watch', 'packs', 'acts', 'document', 'publish_plan', 'published', 'backup_download', 'look', 'seeing'];
+export const QUERY_READS = ['schema', 'search', 'get', 'events', 'proposals', 'picture', 'watch', 'packs', 'acts', 'backup_download', 'look', 'seeing'];
+
+/** The reads query reaches: the kernel's, then each a pack declares as a read (its tool's `query`), in the table's order. */
+export const queryReads = (tools: Record<string, Tool>): string[] => [...QUERY_READS, ...Object.keys(tools).filter((name) => tools[name].query && !QUERY_READS.includes(name))];
 
 /** What query lists when asked for nothing: the reads, then every view. */
 const LIST = 'actions';
@@ -51,7 +54,7 @@ export function actionsOf(reg: Registry, tools: Record<string, Tool>): Action[] 
     .filter(([name]) => tools[name])
     .map(([name, verb]): Action => ({ name, verb, tool: name, description: tools[name].description, params: schemaOf(tools[name].input), humanOnly: tools[name].humanOnly, devOnly: tools[name].devOnly }));
   const packs = [...reg.tools]
-    .filter(([, t]) => t.call === 'action')
+    .filter(([, t]) => t.call !== 'view') // an action, not a view
     .map(([tool, t]): Action => ({ name: t.def.id, verb: (t.def as ActionDef).verb, tool, description: `${t.def.description} (from the ${t.pack} pack)`, params: t.def.input, humanOnly: (t.def as ActionDef).humanOnly }));
   return [...kernel, ...packs];
 }
@@ -118,7 +121,7 @@ export const annotationsOf = (reg: Registry, name: string) => ANNOTATIONS[name] 
 /** query and the six verbs as tools, described with what this workspace offers (offered: an action an agent may call here). */
 export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered: (a: Action) => boolean): Record<string, Tool> {
   const actions = actionsOf(reg, tools);
-  const reads = QUERY_READS.map((name) => `${name} (${paramsSaid(schemaOf(tools[name].input))})`).join('; ');
+  const reads = queryReads(tools).map((name) => `${name} (${paramsSaid(schemaOf(tools[name].input))})`).join('; ');
   const out: Record<string, Tool> = {
     query: {
       description:
@@ -129,14 +132,14 @@ export function surfaceTools(reg: Registry, tools: Record<string, Tool>, offered
         `Every other name is a view: ${viewNames(reg).join(', ')}. flat is the query: filter { find, only, not }, walk { over (part_of< down, part_of> up), steps }, limit.`,
       input: { name: z.string().optional().describe('What to read: a read, a view or a lens. Left out, the list of them.'), params: props.optional().describe('Its inputs, as the list names them.') },
       run: async (l, actor, input) => {
-        if (input.name !== LIST) return { reads: Object.fromEntries(QUERY_READS.map((name) => [name, gist(tools[name].description)])), [LIST]: 'what each verb’s actions and change’s ops take', views: viewList(l) };
+        if (input.name !== LIST) return { reads: Object.fromEntries(queryReads(tools).map((name) => [name, gist(tools[name].description)])), [LIST]: 'what each verb’s actions and change’s ops take', views: viewList(l) };
         const { verb, action, read } = (input.params ?? {}) as { verb?: string; action?: string; read?: string };
         if (read) {
           // One name's whole text, without the list of every name.
           const views = viewList(l);
-          if (QUERY_READS.includes(read)) return { read, description: tools[read].description, params: schemaOf(tools[read].input) };
+          if (queryReads(tools).includes(read)) return { read, description: tools[read].description, params: schemaOf(tools[read].input) };
           if (views[read]) return { read, description: views[read] };
-          throw new Error(`No read or view "${read}". ${[...QUERY_READS, ...Object.keys(views)].join(', ')}`);
+          throw new Error(`No read or view "${read}". ${[...queryReads(tools), ...Object.keys(views)].join(', ')}`);
         }
         if (action === 'change') return [{ action, description: tools.change.description, params: schemaOf(tools.change.input) }];
         const mine = actionsOf(l.registry, tools).filter((a) => (actor.kind === 'human' || offered(a)) && (!verb || a.verb === verb) && (!action || a === findAction([a], action)));
@@ -169,7 +172,7 @@ export function route(reg: Registry, tools: Record<string, Tool>, name: string, 
     const asked = input.name as string | undefined;
     const params = (input.params ?? {}) as Record<string, unknown>;
     if (!asked || asked === LIST) return undefined;
-    if (QUERY_READS.includes(asked)) return { name: asked, input: params };
+    if (queryReads(tools).includes(asked)) return { name: asked, input: params };
     return { name: 'view', input: { name: asked, params } };
   }
   if (!reg.verbs.some((v) => v.id === name)) return undefined;
@@ -192,7 +195,7 @@ export function route(reg: Registry, tools: Record<string, Tool>, name: string, 
 export function movedTo(reg: Registry, tools: Record<string, Tool>, name: string): string | undefined {
   if (SURFACE.includes(name) || reg.verbs.some((v) => v.id === name)) return undefined;
   const until = `"${name}" still answers until the next release.`;
-  if (QUERY_READS.includes(name)) return `Moved: call query with { name: "${name}", params: <what you sent> }. ${until}`;
+  if (queryReads(tools).includes(name)) return `Moved: call query with { name: "${name}", params: <what you sent> }. ${until}`;
   if (name === 'view') return `Moved: call query with { name, params } as you sent them to view. ${until}`;
   const view = reg.tools.get(name);
   if (view?.call === 'view') return `Moved: call query with { name: "${view.def.id.slice(view.def.id.indexOf('.') + 1)}", params: <what you sent> }. ${until}`;

@@ -8,6 +8,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { fillAppended } from '../../../src/log.ts';
 import { isInternal, type Manifest } from './manifest.ts';
+import { codeFolder } from './code-folder.ts';
 import type { Q } from '../../../src/db.ts';
 import type { KernelContext } from '../../../src/kernel-context.ts';
 import type { Registry } from './packs.ts';
@@ -57,7 +58,7 @@ export function fillLogSlots(reg: Registry): void {
   for (const pack of reg.packs.filter(isInternal)) {
     for (const ref of [pack.kernel?.hooks?.['log.appended'] ?? []].flat()) {
       const [file, name] = ref.split('#');
-      const dir = resolve(reg.folderOf(pack.id), pack.kernel?.modules ?? 'kernel/');
+      const dir = resolve(codeFolder(reg, pack), pack.kernel?.modules ?? 'kernel/');
       const path = resolve(dir, file);
       const inside = relative(dir, path);
       if (!inside || inside.startsWith('..') || isAbsolute(inside)) throw new Error(`The ${pack.id} pack names ${ref}, outside its modules`);
