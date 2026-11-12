@@ -7,7 +7,7 @@
 // item had added (the log keeps a fact for each change, its words gone). The tables and their reads are the log's; the
 // server's counters read them (root.counters, packs/surface/kernel/workspace-tools.ts).
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 
 /** A fact as the log stores it, as JSON: what each is counted by, in an append and in a count made again. */
 const STORED = `case when f.op = '-' then jsonb_build_array(f.op, f.id, f.field) when f.meta is null then jsonb_build_array(f.op, f.id, f.field, f.value) else jsonb_build_array(f.op, f.id, f.field, f.value, f.meta) end`;

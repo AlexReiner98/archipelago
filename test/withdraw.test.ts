@@ -1,11 +1,11 @@
 // A held change taken back by its proposer, and a newer one that says which older one it covers (src/withdraw.ts).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Op } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { covering } from '../src/withdraw.ts';
+import type { Op } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { covering } from '../packs/write/kernel/withdraw.ts';
 import { human, agent, fresh, make, all, replayed } from './map.ts';
-import { proposals } from '../src/map-reads.ts';
+import { proposals } from '../packs/surface/kernel/map-reads.ts';
 
 const at = (minute: number) => new Date(Date.UTC(2026, 10, 3, 12, minute));
 const held = (id: string, minute: number, ops: Op[], actor = 'agent:test') => ({ id, ts: at(minute), actor, ops });

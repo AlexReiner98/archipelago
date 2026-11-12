@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import pg from 'pg';
-import { pgLeader, type Leader } from '../src/leader.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { pgLeader, type Leader } from '../packs/database/kernel/leader.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
 const server = process.env.PELAGO_TEST_DATABASE_URL;
 

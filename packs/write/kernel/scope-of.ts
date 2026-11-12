@@ -3,7 +3,7 @@
 // (wave 7), below the surface that reads it: a bounded scan, never a pack's, since the runs pack's places are answered by
 // name and the sessions pack is optional.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from './pelago.ts';
 import { notKernel } from '../../loader/kernel/head.ts';
 
 /** The link that ties a thing to this place: of the relations that are a kind of lives_in, the nearest one its type is made for. */

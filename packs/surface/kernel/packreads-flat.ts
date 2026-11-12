@@ -7,7 +7,7 @@
 // Every read is bounded by the ids in hand, an end of a link, the type index or the limit: a lens that finds nothing
 // itself is refused, never the whole map.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { kernelTypes, SYSTEM, WRAPS } from '../../loader/kernel/head.ts';
 import { ISLAND, onIslands } from '../../loader/kernel/island-items.ts';
 import { headPos } from '../../log/kernel/tail.ts';

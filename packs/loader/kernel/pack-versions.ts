@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { islandRegistry } from './island-pin.ts';
 import { isOptional } from './manifest.ts';
 import type { Registry } from './packs.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 export interface PackVersion {
   id: string;

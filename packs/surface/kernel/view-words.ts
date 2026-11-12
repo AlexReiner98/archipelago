@@ -2,7 +2,7 @@
 // query pack's words, its filling of the server slot surface.views (./server-fillings.ts), read once before anything is
 // called, so a description is made without asking a map. A view itself is asked by its name, answer.ask_view (askView).
 
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { serverFillings } from './server-fillings.ts';
 import type { words } from '../../query/kernel/askview.ts';
 

@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createToken } from '../src/auth.ts';
-import { dump } from '../src/backup.ts';
-import { workspacesOf } from '../src/control-index.ts';
-import { CODE_TRIES, linkFor } from '../src/members.ts';
-import { dumpVault } from '../src/vault.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import { dump } from '../packs/log/kernel/backup.ts';
+import { workspacesOf } from '../packs/identity/kernel/control-index.ts';
+import { CODE_TRIES, linkFor } from '../packs/identity/kernel/members.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
 import { codeSentTo, mailbox, serve } from './serve.ts';
 import { until } from './wait.ts';
 

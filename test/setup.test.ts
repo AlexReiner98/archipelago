@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { dumpVault } from '../src/vault.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
@@ -8,16 +8,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { gzipSync } from 'node:zlib';
-import { createToken, OPERATOR_RESET_FILE } from '../src/auth.ts';
+import { createToken, OPERATOR_RESET_FILE } from '../packs/identity/kernel/auth.ts';
 
 /** A workspace made bare, as no person makes one, for a test about a file taken of it: an admin token, no owner. */
 const bareMap = async (at: { create(id: string, name: string): Promise<{ pelago: { db: any } }> }, id: string, name: string) => (await createToken((await at.create(id, name)).pelago.db, id, { kind: 'human', name: 'owner', admin: true })).token;
-import { dump } from '../src/backup.ts';
-import { loadConfig } from '../src/config.ts';
-import { linkFor } from '../src/members.ts';
-import { createHttpServer, lenient } from '../src/server.ts';
-import { Workspaces } from '../src/workspaces.ts';
-import { setIslands } from '../src/packstate.ts';
+import { dump } from '../packs/log/kernel/backup.ts';
+import { loadConfig } from '../packs/database/kernel/config.ts';
+import { linkFor } from '../packs/identity/kernel/members.ts';
+import { createHttpServer, lenient } from '../packs/surface/kernel/server.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
 import { serve, closers } from './serve.ts';
 
 test('the setup shows what it will change and waits for a yes, keeps a copy of what it changes, and can be taken out again', async () => {
@@ -134,7 +134,7 @@ test('the hook script takes a Claude Code hook to whichever server the machine i
   const started = await hook('session-start', { session_id: 'desk-1', cwd: '/nowhere' }, { PELAGO_AGENT_TOKEN: robot });
   assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, /registered in Archipelago/, 'the server\u2019s answer comes back for Claude Code to read');
   // A project whose files are not the ones the server now hands out is told so, with the command that brings them up to date.
-  const SETUP_VERSION = (await import('../src/server-files.ts')).setupVersion();
+  const SETUP_VERSION = (await import('../packs/surface/kernel/server-files.ts')).setupVersion();
   const behind = /Archipelago files \(hooks, working rules, the bump skill\) are older than the server\u2019s|are older than the server's[^]*connect\/setup\.mjs/;
   assert.match(JSON.parse(started.out).hookSpecificOutput.additionalContext, behind, 'the script in this repository is not a hand-out: it says no version');
   const current = (await call('/hooks/session-start', robot, { session_id: 'desk-1', cwd: '/nowhere', setup: SETUP_VERSION })).hookSpecificOutput.additionalContext;

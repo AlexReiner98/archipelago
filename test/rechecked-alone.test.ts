@@ -2,8 +2,8 @@
 // the hosted service): saying one was done is refused in words, not with a missing view.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, PACKS } from './map.ts';
 
 test('rechecked on a map whose packs keep no re-checks says so', async () => {

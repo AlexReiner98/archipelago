@@ -7,8 +7,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { drawOnce } from '../src/drawing-box.ts';
-import { packLayout } from '../src/layouts.ts';
+import { drawOnce } from '../packs/walls/kernel/drawing-box.ts';
+import { packLayout } from '../packs/loader/kernel/layouts.ts';
 
 const HOSTILE = `
 const tried = {};

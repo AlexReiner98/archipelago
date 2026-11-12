@@ -16,7 +16,7 @@ import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } f
 import { hostFor } from './packtools.ts';
 import { takeTypeItems } from './type-items.ts';
 import { syncTypes } from './typetable.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 
 export const OPEN: RootOpen = {

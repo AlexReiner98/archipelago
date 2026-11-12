@@ -2,16 +2,16 @@
 // a call runs, the handler may ask for a server act it declared (ctx.act), for its keys (ctx.store), or for a request
 // to a host it declared (ctx.request), which the kernel makes with the secret it holds: nothing else. It reads no map.
 
-import { storeGet, storeList, storePut, storeTake } from '../../../src/control.ts';
-import type { Q } from '../../../src/db.ts';
-import { Sandbox, type Answerer } from '../../../src/packhost.ts';
+import { storeGet, storeList, storePut, storeTake } from '../../identity/kernel/control.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import { Sandbox, type Answerer } from '../../loader/kernel/packhost.ts';
 import { runAct, type ActPlaces } from './server-acts.ts';
 import { publishedAct } from './server-published.ts';
 import { signinGate } from './server-gates.ts';
-import { standingChanged } from '../../../src/standing.ts';
+import { standingChanged } from '../../identity/kernel/standing.ts';
 import { connectAct, connectionOf, type Connection } from './server-connect.ts';
-import { parts } from '../../../src/manifest.ts';
-import { loadServerPacks, PUBLIC_ACTS, type ServerAct, type ServerPack } from '../../../src/server-packs.ts';
+import { parts } from '../../loader/kernel/manifest.ts';
+import { loadServerPacks, PUBLIC_ACTS, type ServerAct, type ServerPack } from '../../loader/kernel/server-packs.ts';
 import { hostBase, hostRequest, type HostRequest } from './server-requests.ts';
 
 /** How long a call may take unless its pack says otherwise, and the most it may say. */

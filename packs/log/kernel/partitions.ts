@@ -8,7 +8,7 @@
 // Partitions are made ahead of need (at open, daily and by an append that finds its own missing), never by default: a
 // row outside every partition is refused, and a default partition would stop the one it overlaps from being made.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 
 /** The tables cut by time, and what their partitions are called: `log_entry_2026`. */
 export const PARTITIONED = ['log_entry', 'log_fact', 'log_op'] as const;

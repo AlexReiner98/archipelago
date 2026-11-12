@@ -3,24 +3,24 @@
 // own, a pack may provide a setting (setting.<key>, docs/kernel-packs.md): set here by its key, checked by its shape.
 
 import { z } from 'zod';
-import { endedOf, LIMITS, NEAR, useOf, type LimitName, type Limits } from '../../../src/standing.ts';
-import { limitOf, renameWorkspace } from '../../../src/members.ts';
+import { endedOf, LIMITS, NEAR, useOf, type LimitName, type Limits } from '../../identity/kernel/standing.ts';
+import { limitOf, renameWorkspace } from '../../identity/kernel/members.ts';
 /** The looks drawn for a map's workspace in the last hour, all and by who asked: the look_draw pack's count (answer.looks_counted). */
 const looksCounted = async (l: Archipelago) => (await import('../../loader/kernel/kernel-context.ts')).callAs<{ hour: number; by: [string, number][] }>(l, 'answer.looks_counted', {});
 import { sessionsAwake } from './session-calls.ts';
 import { awakeSessions, requestsBy, requestsThisMinute, SESSION_AWAKE_MS, storageOf, storageParts } from './workspace-use.ts';
-import { bytesByType, largestItems } from '../../../src/bytes.ts';
-import type { RootCall } from '../../../src/root-calls.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
-import { actorId, type Archipelago } from '../../../src/pelago.ts';
+import { bytesByType, largestItems } from '../../log/kernel/bytes.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
+import { actorId, type Archipelago } from '../../write/kernel/pelago.ts';
 import { askedLately } from './asked-lately.ts';
 import { atSetting, AT_MAX, countsTo, isAt, onReply } from './reply-words.ts';
-import { HOLDS_OFF, holdsOff, liftsOn } from '../../../src/rules.ts';
+import { HOLDS_OFF, holdsOff, liftsOn } from '../../rules/kernel/rules.ts';
 import type { Tool } from './tools.ts';
-import { notKernel } from '../../../src/head.ts';
-import { ISLANDS } from '../../../src/islands.ts';
-import { islandsOn, setIslands } from '../../../src/packstate.ts';
-import { kernelOf, serviceName, valueProblem } from '../../../src/services.ts';
+import { notKernel } from '../../loader/kernel/head.ts';
+import { ISLANDS } from '../../loader/kernel/islands.ts';
+import { islandsOn, setIslands } from '../../loader/kernel/packstate.ts';
+import { kernelOf, serviceName, valueProblem } from '../../loader/kernel/services.ts';
 
 /** The setting that runs a layout's code with no sandbox: in the page's own origin, with the network, files, fonts and links. */
 export const DRAWINGS_OPEN = 'drawings_open';

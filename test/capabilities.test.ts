@@ -2,15 +2,16 @@
 // kernel computes from instead of from field names.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { callTool } from '../src/tools.ts';
-import { checkCapabilities, occurs } from '../src/capabilities.ts';
-import { Archipelago, type Actor, type Op } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { askView } from '../src/askview.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { checkCapabilities, occurs } from '../packs/loader/kernel/capabilities.ts';
+import { Archipelago, type Actor, type Op } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
 import { freshWith, human, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A view asked by its name, as the view tool asks it. */
-const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
+const ask = (l: Archipelago, name: string, params: Record<string, unknown> = {}) => askviewPack.askView(kernelContext(l, 'query'), ({ kind: 'human', name: 'test' }) as Parameters<typeof askviewPack.askView>[1], name, params);
 
 const agent: Actor = { kind: 'agent', name: 'test' };
 

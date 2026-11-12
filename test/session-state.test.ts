@@ -5,10 +5,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fresh, human, make } from './map.ts';
 import { answerHook } from './claude-hook.ts';
-import { callTool } from '../src/tools.ts';
-import { sessionState, sessionStates } from '../src/session-state.ts';
-import { tell } from '../src/sessions.ts';
-import type { Archipelago } from '../src/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import * as sessionStatePack from '../packs/runs/kernel/session-state.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const post = (l: Archipelago, session_id: string, events: Record<string, unknown>[]) =>
   answerHook('events', { whole: l.db, pelago: l, within: [], body: { session_id, source: 'claude-code', events }, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' }) as Promise<Record<string, unknown>>;
@@ -29,13 +30,13 @@ test("a run's state and line move as its events arrive", async () => {
   ]);
 
   // No turn yet: idle, its line what it works on.
-  let s = await sessionState(l, run);
+  let s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, undefined);
   assert.equal(s?.state, 'idle');
   assert.equal(s?.line, 'Make the lane wait');
   assert.equal(s?.turns, 0);
 
   await post(l, 's1', [{ at: at(0), kind: 'turn.start', turn: 't1', by: 'person', gist: 'Make the lane wait.' }]);
-  s = await sessionState(l, run, at(1));
+  s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(1)));
   assert.equal(s?.state, 'working');
   assert.equal(s?.since, at(0));
   assert.equal(s?.turn?.turn, 't1');
@@ -44,7 +45,7 @@ test("a run's state and line move as its events arrive", async () => {
 
   // It stops to ask for a permission: waiting, for permission.
   await post(l, 's1', [{ at: at(2), kind: 'wait.start', turn: 't1', for: 'permission', gist: 'Run npm test' }]);
-  s = await sessionState(l, run, at(3));
+  s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(3)));
   assert.deepEqual([s?.state, s?.for, s?.since], ['waiting', 'permission', at(2)]);
   const [row] = await openRuns(l);
   assert.deepEqual(row.session, { state: 'waiting', for: 'permission', line: 'Run npm test', since: at(2) });
@@ -52,34 +53,34 @@ test("a run's state and line move as its events arrive", async () => {
 
   // Answered, then a beat told: working again, its line the beat.
   await post(l, 's1', [{ at: at(3), kind: 'wait.end', turn: 't1', for: 'permission' }]);
-  await tell(l, human, { run, said: 'The lane waits on its owner now.' });
-  s = await sessionState(l, run, at(4));
+  await sessionsPack.tell(ownContext(l, 'sessions'), human as sessionsPack.Actor, ({ run, said: 'The lane waits on its owner now.' }));
+  s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(4)));
   assert.deepEqual([s?.state, s?.line], ['working', 'The lane waits on its owner now.']);
   // A rule's ask at the reply's end is kept in the story too, and is never the line.
-  await tell(l, { kind: 'agent', name: 'core' }, { run, said: 'This reply worked and put nothing on the map.', asked: 'practice.record_findings' });
-  assert.equal((await sessionState(l, run, at(4)))?.line, 'The lane waits on its owner now.');
+  await sessionsPack.tell(ownContext(l, 'sessions'), ({ kind: 'agent', name: 'core' }) as sessionsPack.Actor, ({ run, said: 'This reply worked and put nothing on the map.', asked: 'practice.record_findings' }));
+  assert.equal((await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(4))))?.line, 'The lane waits on its owner now.');
 
   // It ends on a question: your move, its line the question.
   await post(l, 's1', [{ at: at(5), kind: 'turn.end', turn: 't1', ended: 'asked', question: 'Should the lane wait a day?' }]);
-  s = await sessionState(l, run, at(6));
+  s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(6)));
   assert.deepEqual([s?.state, s?.line, s?.since], ['your_move', 'Should the lane wait a day?', at(5)]);
   assert.equal((await openRuns(l))[0].turn?.question, 'Should the lane wait a day?', 'the view carries its latest turn');
 
   // Its turn ended: waiting on its person however long, never quiet.
-  s = await sessionState(l, run, at(5 + 90));
+  s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(5 + 90)));
   assert.equal(s?.state, 'your_move', 'a question waits');
   // A turn under way, silent past the house style's quiet_after (30 minutes): quiet.
   await post(l, 's1', [{ at: at(7), kind: 'turn.start', turn: 't2', by: 'person', gist: 'Make it a day.' }]);
-  s = await sessionState(l, run, at(7 + 29));
+  s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(7 + 29)));
   assert.equal(s?.state, 'working', 'not yet');
-  s = await sessionState(l, run, at(7 + 30));
+  s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(7 + 30)));
   assert.equal(s?.state, 'quiet');
 
   // What it works on waits on open work: blocked.
   const { other } = await make(l, [{ op: 'create', ref: 'other', type: 'task', title: 'The owner decides' }]);
   await make(l, [{ op: 'link', type: 'depends_on', from: task, to: other }]);
   await post(l, 's1', [{ at: at(7), kind: 'turn.start', turn: 't2', by: 'person' }, { at: at(8), kind: 'turn.end', turn: 't2', ended: 'done' }]);
-  s = await sessionState(l, run, at(9));
+  s = await sessionStatePack.sessionState(kernelContext(l, 'runs'), run, (at(9)));
   assert.equal(s?.state, 'blocked');
   assert.equal(s?.turns, 2);
 });
@@ -94,7 +95,7 @@ test('the sessions view orders open runs by attention, and many runs take one re
   const ids = (await openRuns(l)).map((r) => r.id);
   assert.deepEqual(ids, [made.c, made.b, made.a, made.d]);
 
-  const states = await sessionStates(l, [made.a, made.b, made.c, made.d, 'e_nothing'], at(3));
+  const states = await sessionStatePack.sessionStates(kernelContext(l, 'runs'), ([made.a, made.b, made.c, made.d, 'e_nothing']), (at(3)));
   assert.deepEqual([...states.keys()].sort(), [made.a, made.b, made.c, made.d].sort(), 'a run not found is left out');
   assert.equal(states.get(made.c)?.for, 'input');
   assert.equal(states.get(made.b)?.line, 'Which?');

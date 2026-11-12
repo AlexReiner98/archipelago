@@ -5,9 +5,9 @@
 // transaction by src/replay.ts.
 
 import { GENESIS, entryHash } from '../../../src/jcs.ts';
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
-import { openEntries, openValue, sealEntry } from '../../../src/seal.ts';
+import { openEntries, openValue, sealEntry } from '../../seal/kernel/seal.ts';
 
 export type Stream = 'facts' | 'pending';
 

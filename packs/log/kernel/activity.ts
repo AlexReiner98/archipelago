@@ -8,12 +8,12 @@
 // time (carryRows), and schema step 34 carried the last and dropped the table; a backup from before is carried the
 // same way as it is restored.
 
-import type { Db, Q } from '../../../src/db.ts';
+import type { Db, Q } from '../../database/kernel/db.ts';
 import { makePartitions } from './partitions.ts';
-import { openOps } from '../../../src/opseal.ts';
+import { openOps } from '../../seal/kernel/opseal.ts';
 import { record, type Light, type OpFact } from './streams.ts';
 import type { Retention } from './retention.ts';
-import type { EventQuery, LoggedEvent } from '../../../src/eventlog.ts';
+import type { EventQuery, LoggedEvent } from './eventlog.ts';
 
 /** Something done, as a caller says it: who, what, to what, why, and anything more. */
 export interface Done {

@@ -3,7 +3,7 @@
 // reads the same words, which it takes from here: a comparison's form, a pattern. Which settings lift a rule is the
 // rules' to name (a setting is read only as the lift of a rule): they fill the slot loader.lifts as they load.
 
-import { checkRetention } from '../../../src/retention.ts';
+import { checkRetention } from '../../log/kernel/retention.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts';
 import type { Registry } from './packs.ts';
 import { checkOnEvent } from './rule-events.ts';

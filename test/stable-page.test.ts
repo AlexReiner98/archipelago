@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { callTool } from '../src/tools.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { chrome, open } from './browser.ts';
 import { heard } from './tab-page.ts';
 import { fresh, human, make } from './map.ts';

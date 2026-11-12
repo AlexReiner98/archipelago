@@ -3,7 +3,7 @@
 // owned and actionable, so every type that had an owner or counted as work or a question through its kind still does.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry, type PackFile } from '../src/packs.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { fresh, freshWith, human, make, packsWith, replayed } from './map.ts';
 
 const LEDGER: PackFile = {

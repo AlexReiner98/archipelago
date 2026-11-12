@@ -3,8 +3,8 @@
 // and an item's visibility changed as the person or agent publishing it. Called only by the publish pack
 // (packs/roots.json); who may publish is asked of the rules first (root.may). Values in, values out.
 
-import type { RootCall } from '../../../src/root-calls.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { keepPublicView } from './public-view-store.ts';
 
 type Given = { path?: string | null; menu?: number | null; title?: unknown } & Record<string, unknown>;

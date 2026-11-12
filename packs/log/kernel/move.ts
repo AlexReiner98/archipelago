@@ -15,9 +15,9 @@ import type { Db, Q } from '../../database/kernel/db.ts';
 import { jcs } from '../../../src/jcs.ts';
 import { stored, verify, type Entry, type Stream } from './log.ts';
 import { KEPT_FIELDS } from './operational.ts';
-import type { Registry } from '../../../src/packs.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
 import { keepFields, PROJECTED, projectEntry } from './replay.ts';
-import { openEntries, openSaid } from '../../../src/seal.ts';
+import { openEntries, openSaid } from '../../seal/kernel/seal.ts';
 import { verifySegments } from './streams.ts';
 import { makePartitions } from './partitions.ts';
 

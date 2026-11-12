@@ -7,10 +7,10 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { drawHosts, drawHostServes } from '../src/draw-host.ts';
-import { drawPolicy, markPage } from '../src/page-policies.ts';
-import { createHttpServer } from '../src/server.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { drawHosts, drawHostServes } from '../packs/walls/kernel/draw-host.ts';
+import { drawPolicy, markPage } from '../packs/walls/kernel/page-policies.ts';
+import { createHttpServer } from '../packs/surface/kernel/server.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
 test('a configured drawing host frames for every page, and is never framed by its own origin', () => {
   const pages = ['http://127.0.0.1:3100', 'http://localhost:3100', 'https://app.example.com'];

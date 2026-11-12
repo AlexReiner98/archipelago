@@ -7,10 +7,10 @@ import { cpSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import type { LaunchInput, StartedBy } from '../src/launch-brief.ts';
-import { setActionLaunch } from '../src/pack-action-launch.ts';
-import { PackHost } from '../src/packhost.ts';
-import { Registry } from '../src/packs.ts';
+import type { LaunchInput, StartedBy } from '../packs/agents/kernel/launch-brief.ts';
+import { setActionLaunch } from '../packs/loader/kernel/pack-action-launch.ts';
+import { PackHost } from '../packs/loader/kernel/packhost.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { agent, freshWith, human } from './map.ts';
 
 const dir = mkdtempSync(join(tmpdir(), 'pelago-action-launch-'));

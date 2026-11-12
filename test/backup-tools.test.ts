@@ -1,22 +1,23 @@
 // The whole map as a file: the owner downloads it by a link good once; an agent only once the owner allows it.
 import assert from 'node:assert/strict';
-import { doneEvents } from '../src/activity.ts';
+import { doneEvents } from '../packs/log/kernel/activity.ts';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { dump, parseBackup, parseVault, readable, restore, restoreTo } from '../src/backup.ts';
-import { dumpVault, rewrap } from '../src/vault.ts';
-import { takeBackup } from '../src/backup-tools.ts';
-import { openDb } from '../src/db.ts';
-import { databaseFor, dropDatabaseFor } from '../src/pg.ts';
-import { share } from '../src/public-view.ts';
-import { configureOutbox } from '../src/outbox.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
+import { dump, parseBackup, parseVault, readable, restore, restoreTo } from '../packs/log/kernel/backup.ts';
+import { dumpVault, rewrap } from '../packs/seal/kernel/vault.ts';
+import { takeBackup } from '../packs/surface/kernel/backup-tools.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { databaseFor, dropDatabaseFor } from '../packs/database/kernel/pg.ts';
+import * as publicViewPack from '../packs/publish/kernel/public-view.ts';
+import { configureOutbox } from '../packs/identity/kernel/outbox.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Archipelago, type Actor } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const member: Actor = { kind: 'human', name: 'member' };
@@ -89,7 +90,7 @@ test('a public view is in the backup, and is public again where the backup is re
   const l = await map();
   const made = await l.change(owner, { reason: 'test', ops: [{ op: 'create', type: 'writing', title: 'Shared plan', visibility: 'shared' }] });
   const doc = Object.values((made as { created: Record<string, string> }).created)[0];
-  await share(l, owner, doc);
+  await publicViewPack.share(kernelContext(l, 'publish'), owner, doc);
   const file = (await fetched(l, (await callTool(l, owner, 'backup_download', {})) as Made))!;
   const there = await openDb();
   assert.equal((await restore(there, { ...parseBackup(file.file), vault: await dumpVault(l.db) })).public_view, 1);

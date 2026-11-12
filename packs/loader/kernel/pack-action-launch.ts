@@ -8,10 +8,10 @@
 //   pack), so the session's token only proposes, as an automation's does.
 // Asked by an agent, or by anything but an action, it is refused whole, before anything is written or started.
 
-import type { Brief, LaunchInput, LaunchMode, StartedBy } from '../../../src/launch-brief.ts';
+import type { Brief, LaunchInput, LaunchMode, StartedBy } from '../../agents/kernel/launch-brief.ts';
 import type { ActionDef } from './declared.ts';
 import type { Manifest } from './manifest.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 
 /** How a session is started: src/launcher.ts hands it in when it loads, since what it reads reaches back to the pack host. */
 type Launch = (l: Archipelago, actor: Actor, input: LaunchInput, by?: StartedBy) => Promise<{ run: string; mode: LaunchMode }>;

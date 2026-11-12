@@ -21,18 +21,18 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { controlValue, setControlValue } from './control.ts';
-import type { Q } from './db.ts';
+import { controlValue, setControlValue } from '../packs/identity/kernel/control.ts';
+import type { Q } from '../packs/database/kernel/db.ts';
 import { sha256Hex } from './hashes.ts';
 import { jcs } from './jcs.ts';
-import { readRootTable } from './root-calls.ts';
+import { readRootTable } from '../packs/loader/kernel/root-calls.ts';
 
 /** The repository: packs/ and roots.json are read from here unless told otherwise. */
 export const HOME = join(import.meta.dirname, '..');
 /** Where the root list is, under the repository. */
 export const ROOTS_FILE = 'packs/roots.json';
 /** The phases a workspace opens in, each a slot `open.<phase>` the packs fill (the order Workspaces.load had). */
-export { OPEN_PHASES } from './open-phases.ts'; import { OPEN_PHASES } from './open-phases.ts';
+export { OPEN_PHASES } from '../packs/identity/kernel/open-phases.ts'; import { OPEN_PHASES } from '../packs/identity/kernel/open-phases.ts';
 /** The control value the starts are kept under, and how many are kept. */
 export const STARTS_KEY = 'boot.starts';
 const STARTS_KEPT = 50;
@@ -292,7 +292,7 @@ export async function run(arg = process.argv[2]): Promise<void> {
       console.error((err as Error).message);
       process.exit(1);
     }
-    const { serve } = await import('./server.ts');
+    const { serve } = await import('../packs/surface/kernel/server.ts');
     serve(booted);
   }
 }

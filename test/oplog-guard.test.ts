@@ -6,13 +6,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fresh, make } from './map.ts';
-import { dump, restore } from '../src/backup.ts';
-import { openDb } from '../src/db.ts';
-import { verify } from '../src/log.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { isSealed } from '../src/seal.ts';
-import { opEntries, readOps, seal, verifySegments } from '../src/streams.ts';
-import { dumpVault } from '../src/vault.ts';
+import { dump, restore } from '../packs/log/kernel/backup.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { verify } from '../packs/log/kernel/log.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { isSealed } from '../packs/seal/kernel/seal.ts';
+import { opEntries, readOps, seal, verifySegments } from '../packs/log/kernel/streams.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
 
 const DAY = 86_400_000;
 const tomorrow = () => new Date(Date.now() + DAY);

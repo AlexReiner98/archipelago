@@ -3,7 +3,7 @@
 // as the person"). The rules then read the change as the drawing's (core's drawing_* rules): what it writes to the
 // types its layout declares (`writes`) applies, anything else waits for that person, even though it is theirs.
 
-import type { Actor, Archipelago, ChangeInput } from '../../../src/pelago.ts';
+import type { Actor, Archipelago, ChangeInput } from '../../write/kernel/pelago.ts';
 
 /** What a drawing may ask for: never a merge, a type, or a forget. */
 export const DRAWING_OPS = ['create', 'update', 'link', 'unlink', 'archive', 'restore'];

@@ -6,9 +6,9 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Archipelago, type Op } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
+import { Archipelago, type Op } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { freshWith, human, PACKS } from './map.ts';
 
 const CHORES = {

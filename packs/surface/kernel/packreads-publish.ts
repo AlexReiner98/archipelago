@@ -4,7 +4,7 @@
 // index), answered as the asker under row-level security; the published document through the database's narrow
 // function alone, as anyone reads it.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { finishedStatuses, readable } from '../../walls/kernel/public-document.ts';
 import { drawingsGiven } from './public-views.ts';
 

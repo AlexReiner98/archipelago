@@ -2,10 +2,10 @@
 // server's, off until the owner adds it, checked whole when it is written, and on the log as any pack is.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import '../src/workspaces.ts'; // as on a server: a change to a pack item makes the log and the packs on follow
-import { madeProblems } from '../src/pack-items.ts';
-import { setIslands, setPack } from '../src/packstate.ts';
-import { Registry } from '../src/packs.ts';
+import '../packs/identity/kernel/workspaces.ts'; // as on a server: a change to a pack item makes the log and the packs on follow
+import { madeProblems } from '../packs/loader/kernel/pack-items.ts';
+import { setIslands, setPack } from '../packs/loader/kernel/packstate.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { agent, fresh, freshWith, human, make, packsWith } from './map.ts';
 
 const RECIPES = {

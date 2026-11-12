@@ -16,13 +16,13 @@
 //     only the phases after it: types (once its host is open), begin, islands and ready.
 
 import { OPEN_PHASES } from './open-phases.ts';
-import type { Dump } from '../../../src/backup.ts';
-import type { Database } from '../../../src/db.ts';
+import type { Dump } from '../../log/kernel/backup.ts';
+import type { Database } from '../../database/kernel/db.ts';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Registry } from '../../../src/packs.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Workspace, WorkspacesConfig } from './workspaces.ts';
 
 export type Phase = (typeof OPEN_PHASES)[number];

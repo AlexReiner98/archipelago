@@ -17,11 +17,11 @@
 // both, as two packs declaring one type are. Swapping who fills one is taking one out and putting the other in.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { hostAt, hostOf } from '../../../src/kernel-context.ts';
+import { hostAt, hostOf } from '../../loader/kernel/kernel-context.ts';
 import { backupFile } from './backup-route.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import { actorId } from '../../../src/pelago-types.ts';
-import type { Workspaces } from '../../../src/workspaces.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
+import { actorId } from '../../write/kernel/pelago-types.ts';
+import type { Workspaces } from '../../identity/kernel/workspaces.ts';
 
 /** The slots the tool surface opens. */
 export const SURFACE_SLOTS = ['surface.act', 'surface.read', 'surface.route', 'surface.reads'] as const;

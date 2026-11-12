@@ -2,9 +2,10 @@
 // task, not work.task. A name it had before still reads as the one it has now, in a change, a lens and a search.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { flatRead } from '../src/query-flat.ts';
+import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
 import { fresh, make } from './map.ts';
-import { searchMap } from '../src/search.ts';
+import { searchMap } from '../packs/surface/kernel/search.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 test('a type and a link type are named by what they are, whichever pack ships them', async () => {
   const l = await fresh();
@@ -25,7 +26,7 @@ test('an old name still reads as the new one, in a change, a search and a lens',
   assert.equal((await l.entity(made.r))!.type, 'place');
   assert.deepEqual((await searchMap(l, { type: 'work.task' })).map((e) => e.id), [made.t]);
   assert.ok(l.registry.isA('task', 'work.task'));
-  const answer = await flatRead(l, { filter: { find: ['type work.task'] }, walk: { over: ['software.lives_in'], steps: 1 } });
+  const answer = await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: ['type work.task'] }, walk: { over: ['software.lives_in'], steps: 1 } }));
   assert.deepEqual(answer.items.map((i) => i.id).sort(), [made.r, made.t].sort());
   assert.deepEqual(answer.links.map((k) => k.type), ['lives_in']);
 });

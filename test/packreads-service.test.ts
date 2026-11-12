@@ -3,8 +3,8 @@
 // and who corrected what after an agent. Each answers as the asker, and only to the server's own packs.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { answerRead } from '../src/packreads.ts';
-import { headPos } from '../src/tail.ts';
+import { answerRead } from '../packs/surface/kernel/packreads.ts';
+import { headPos } from '../packs/log/kernel/tail.ts';
 import { fresh, human, make } from './map.ts';
 
 test('a service read is the server\'s own packs\', never a sandboxed pack\'s', async () => {

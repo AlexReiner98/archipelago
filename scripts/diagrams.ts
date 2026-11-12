@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import { join, relative } from 'node:path';
 import { moduleDiagram, type SourceFile } from './diagram-modules.ts';
 import { typeDiagram, type PackFile } from './diagram-types.ts';
-import { readManifest } from '../src/manifest.ts';
+import { readManifest } from '../packs/loader/kernel/manifest.ts';
 import { mxfile, type Page } from './diagram-xml.ts';
 
 /** Every diagram's pages, by the file they are written to, from the sources and pack files given. */

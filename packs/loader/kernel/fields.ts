@@ -1,7 +1,7 @@
 // A field's value checked against its definition: what a pack file says a field holds.
 
-import type { FieldDef } from '../../../src/packs.ts';
-import { cssProblem } from '../../../src/css-check.ts';
+import type { FieldDef } from './packs.ts';
+import { cssProblem } from '../../walls/kernel/css-check.ts';
 import { LARGE, sizeOf } from './head.ts';
 
 /** What is wrong with a value for a field, or nothing. */

@@ -11,9 +11,9 @@ import { readFileSync } from 'node:fs';
 import type { ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { GUARD, json, PRIVATE } from './reply.ts';
-import { loadServerPacks, type ServerPack, type ServerPackFile } from '../../../src/server-packs.ts';
-import type { FILLS } from '../../../src/server-reach.ts';
-import { workingRules } from '../../../src/working-rules.ts';
+import { loadServerPacks, type ServerPack, type ServerPackFile } from '../../loader/kernel/server-packs.ts';
+import type { FILLS } from '../../loader/kernel/server-reach.ts';
+import { workingRules } from '../../loader/kernel/working-rules.ts';
 
 export interface FileCall {
   /** The address this server is reached at. */

@@ -6,11 +6,11 @@
 // that writes is on it with its check, the tools that only read are named,
 // and anything else is refused. The surface's (wave 7): it checks a tool call before the tool runs.
 
-import { packTool } from '../../../src/packtools.ts';
+import { packTool } from '../../loader/kernel/packtools.ts';
 import { livesIn } from './packreads-scope.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { resolveRun } from './session-calls.ts';
-import { refuser, scopeWithin } from '../../../src/within.ts';
+import { refuser, scopeWithin } from '../../write/kernel/within.ts';
 
 /** What a tool says of a limited token: each input that names items it acts on (an id, or a list of ids), with what it would do to them. */
 export type WithinInputs = Record<string, string>;
@@ -25,7 +25,7 @@ export async function withinScope(l: Archipelago, actor: Actor, tool: string, in
     if (typeof id === 'string' && !scope.has(id)) refuse(`${await named(id)} is not part of it, so this token cannot ${doing}.`);
   };
   const isRepo = async (given: unknown) => {
-    const id = typeof given === 'string' && /^e_[a-z0-9]{8}$/.test(given) ? given : (await (await import('../../../src/kernel-context.ts')).callAs<{ place: { id: string } | null }>(l, 'answer.place_for', { remote: String(given ?? '') })).place?.id;
+    const id = typeof given === 'string' && /^e_[a-z0-9]{8}$/.test(given) ? given : (await (await import('../../loader/kernel/kernel-context.ts')).callAs<{ place: { id: string } | null }>(l, 'answer.place_for', { remote: String(given ?? '') })).place?.id;
     if (!id || !scope.has(id)) refuse('It cannot speak for another repository.');
   };
 

@@ -4,7 +4,7 @@
 // the one that began it. It is operational state, no fact about the map: it is written here, not through change, and
 // is in no backup. Only the whole database reaches it; no member's role is granted it.
 
-import type { Q } from '../../../src/db.ts';
+import type { Q } from './db.ts';
 
 /** The table, made by step 3 of the schema (src/migrate.ts). */
 export const TRANSIENT = `

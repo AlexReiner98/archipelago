@@ -4,7 +4,7 @@
 // drawing whose code is a pack's own is ever run here, found by its id among what the packs ship: a version changed on
 // the map is code anyone who may change the map wrote, and runs only in a reader's sandbox. Values in, values out.
 
-import type { RootCall } from '../../../src/root-calls.ts';
+import type { RootCall } from './root-calls.ts';
 import { startedFrom } from '../../database/kernel/config.ts';
 import { cssProblem } from '../../walls/kernel/css-check.ts';
 import { drawOnce } from '../../walls/kernel/drawing-box.ts';

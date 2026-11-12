@@ -3,7 +3,7 @@
 
 import type { PackFile } from './packs.ts';
 import { parts } from './manifest.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** How the server reaches its server packs for a workspace: the connection the workspace made, and a read through it. */
 export interface Reach {

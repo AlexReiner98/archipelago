@@ -5,23 +5,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { QuietSessions } from '../src/session-quiet.ts';
-import { flatRead } from '../src/query-flat.ts';
-import { takeEvents } from '../src/session-events.ts';
-import { sessionStart } from '../src/sessions.ts';
-import type { Archipelago } from '../src/pelago.ts';
+import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
+import * as sessionEventsPack from '../packs/sessions/kernel/session-events.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { agent, fresh, make } from './map.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
 /** A task and a session working on it, last heard from `minutes` ago. */
 async function quietFor(l: Archipelago, minutes: number, session_id = 'q1') {
   const { task } = await make(l, [{ op: 'create', ref: 'task', type: 'task', title: 'Capture probe' }]);
-  const { run } = await sessionStart(l, agent, { task, session_id, title: 'Quiet one' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ task, session_id, title: 'Quiet one' }));
   await l.db.query(`update entity set props = props || jsonb_build_object('last_seen', $2::text) where id = $1`, [run, ago(minutes)]);
   return { task, run };
 }
 
-const beside = async (l: Archipelago, task: string) => (await flatRead(l, { filter: { find: [`id ${task}`], not: [] }, walk: { over: ['works_on'], steps: 1 } })).items.map((i: { id: string }) => i.id);
+const beside = async (l: Archipelago, task: string) => (await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter: { find: [`id ${task}`], not: [] }, walk: { over: ['works_on'], steps: 1 } }))).items.map((i: { id: string }) => i.id);
 
 test('a run quiet past quiet_end_after is ended, says why, and leaves its task\'s canvas', async () => {
   const l = await fresh();
@@ -49,7 +50,7 @@ test('a run quiet for less is flagged, not ended', async () => {
 test('a run heard from again by a raw event is not ended', async () => {
   const l = await fresh();
   const { run } = await quietFor(l, 25 * 60);
-  assert.equal((await takeEvents(l, { session_id: 'q1', source: 'claude-code', events: [{ at: ago(1), kind: 'turn.start', turn: 't1', by: 'person' }] })).kept, 1);
+  assert.equal((await sessionEventsPack.takeEvents(kernelContext(l, 'sessions'), ({ session_id: 'q1', source: 'claude-code', events: [{ at: ago(1), kind: 'turn.start', turn: 't1', by: 'person' }] }))).kept, 1);
   await new QuietSessions(l).tick();
   const still = (await l.entity(run))!;
   assert.equal(still.is_open, true);

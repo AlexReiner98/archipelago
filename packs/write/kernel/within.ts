@@ -4,7 +4,7 @@
 // sees is not narrowed here: that stays the database's, its person's view.
 
 import { scopeOf } from './scope-of.ts';
-import { LINK_ITEM, TYPE_ITEM } from '../../../src/type-overlay.ts';
+import { LINK_ITEM, TYPE_ITEM } from '../../loader/kernel/type-overlay.ts';
 import type { Actor, Archipelago, Op } from './pelago.ts';
 
 /** Everything a token within these items may write to. */

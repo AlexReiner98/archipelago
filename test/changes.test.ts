@@ -3,13 +3,14 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Archipelago } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { importAudit } from '../src/audit.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import * as auditPack from '../packs/sessions/kernel/audit.ts';
 import { human, agent, fresh, make } from './map.ts';
-import { searchMap } from '../src/search.ts';
-import { getItem, proposals } from '../src/map-reads.ts';
-import { readEvents } from '../src/eventlog.ts';
+import { searchMap } from '../packs/surface/kernel/search.ts';
+import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A flavour of task with a field of its own, defined on the map as the owner would. */
 const EXPERIMENT = { id: 'local.experiment', title: 'Experiment', description: 'A test of a guess.', extends: 'task', fields: { method: { type: 'string' } } } as const;
@@ -208,9 +209,9 @@ test('a connection\'s tool-call log is imported once into the activity log', asy
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), 'not json', line('2026-10-01T10:00:05.000Z', 'run_command')].join('\n'));
   const made = await make(l, [{ op: 'create', ref: 'c', type: 'connection', title: 'Apex', props: { audit_log: log } }]);
 
-  assert.deepEqual(await importAudit(l, agent, { connection: made.c }), { imported: 2, skipped: 1, path: log });
+  assert.deepEqual(await auditPack.importAudit(kernelContext(l, 'sessions'), agent, ({ connection: made.c })), { imported: 2, skipped: 1, path: log });
   writeFileSync(log, [line('2026-10-01T10:00:00.000Z', 'nodegraph_add_node'), line('2026-10-01T10:00:09.000Z', 'form_snapshot')].join('\n'));
-  assert.equal((await importAudit(l, agent, { connection: made.c })).imported, 1, 'only entries after the cursor');
+  assert.equal((await auditPack.importAudit(kernelContext(l, 'sessions'), agent, ({ connection: made.c }))).imported, 1, 'only entries after the cursor');
 
   const external = (await readEvents(l.db, { origin: 'external' })) as any[];
   assert.deepEqual(external.map((e) => e.action), ['form_snapshot', 'run_command', 'nodegraph_add_node']);

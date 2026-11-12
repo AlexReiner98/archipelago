@@ -5,15 +5,15 @@
 // (sessions.bookkeeping, `then: "spare"`), so nothing here skips them. Each ask is one write the sessions pack made
 // through the map before it moved, on the map the caller's context is of, as the actor it names.
 
-import type { RootCall } from '../../../src/root-calls.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import type { Actor, ChangeInput } from './pelago-types.ts';
-import type { Done } from '../../../src/activity.ts';
-import { openOps } from '../../../src/opseal.ts';
-import { isSealed } from '../../../src/seal.ts';
-import { decide, type RuleDef } from '../../../src/rules.ts';
+import type { Done } from '../../log/kernel/activity.ts';
+import { openOps } from '../../seal/kernel/opseal.ts';
+import { isSealed } from '../../seal/kernel/seal.ts';
+import { decide, type RuleDef } from '../../rules/kernel/rules.ts';
 import { ownManifest } from '../../loader/kernel/root-calls.ts';
-import type { Registry } from '../../../src/packs.ts';
-import type { Light, OpFact, OpStream } from '../../../src/streams.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
+import type { Light, OpFact, OpStream } from '../../log/kernel/streams.ts';
 
 type Props = Record<string, unknown>;
 

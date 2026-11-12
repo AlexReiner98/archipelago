@@ -5,12 +5,12 @@
 // the page says it has drawn, with no page of the owner's open.
 
 import assert from 'node:assert/strict';
-import { setIslands } from '../src/packstate.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
 import { after, test } from 'node:test';
-import { createToken } from '../src/auth.ts';
-import { askedFace, fellBack, stopLayout } from '../src/look-draw.ts';
-import { passFor } from '../src/look-pass.ts';
-import { contentOf } from '../src/mcp.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import { askedFace, fellBack, stopLayout } from '../packs/look_draw/kernel/look-draw.ts';
+import { passFor } from '../packs/walls/kernel/look-pass.ts';
+import { contentOf } from '../packs/surface/kernel/mcp.ts';
 import { chrome, open } from './browser.ts';
 import { packsWith } from './map.ts';
 import { serve } from './serve.ts';

@@ -7,8 +7,8 @@
 // What it asks above itself is handed in: the documents an address owes (the surface's signin gates) and an address in
 // its one form (the mail pack's), so identity imports nothing above it.
 
-import type { Q } from '../../../src/db.ts';
-import type { Actor } from '../../../src/pelago.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { Actor } from '../../write/kernel/pelago.ts';
 import { workspacesOf } from './control-index.ts';
 import { emailOfLink, LINK_MINUTES, memberOf, redeem, redeemTyped, requestSignIn, signedIn, triesSpent, typedWorks, workspaceOfCode } from './members.ts';
 import { clearPassword, passwordProblem, passwordSet, passwordTriesSpent, passwordWorks, setPassword, TRIES_MINUTES } from './passwords.ts';

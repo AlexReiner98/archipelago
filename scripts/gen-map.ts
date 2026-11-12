@@ -13,9 +13,9 @@
 // Run it with no server on the database. It refuses one that already holds items.
 
 import { readdirSync, readFileSync } from 'node:fs';
-import { openDb } from '../src/db.ts';
-import { regatherAll } from '../src/closure.ts';
-import { projectAgainAtOpen } from '../src/log-project.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { regatherAll } from '../packs/log/kernel/closure.ts';
+import { projectAgainAtOpen } from '../packs/log/kernel/log-project.ts';
 
 const args = process.argv.slice(2);
 const opt = (name: string, dflt: string) => (args.includes(`--${name}`) ? args[args.indexOf(`--${name}`) + 1] : dflt);

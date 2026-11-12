@@ -7,13 +7,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { answerHook } from './claude-hook.ts';
-import { Archipelago, type Actor } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { checkRules, type RuleDef } from '../src/rules.ts';
-import { sessionStart, story } from '../src/sessions.ts';
-import { hookSessionStart } from '../src/session-hook.ts';
-import { callTool } from '../src/tools.ts';
+import { Archipelago, type Actor } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { checkRules, type RuleDef } from '../packs/rules/kernel/rules.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import * as sessionHookPack from '../packs/sessions/kernel/session-hook.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { freshWith } from './map.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
 const agent: Actor = { kind: 'agent', name: 'test' };
@@ -59,12 +60,12 @@ test('a rule on a reply ending has no say over a change', async () => {
 
 test('a reply that did what a rule names is asked once a turn, the asking kept in its story, until the owner turns it off', async () => {
   const l = await map();
-  const { run } = await sessionStart(l, agent, { session_id: 's1' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 's1' }));
   const changed = { changed: 1, showed: 0, read: 2 };
 
   const asked = (await stop(l, { session_id: 's1', turn: 'u1', reply: changed })) as any;
   assert.deepEqual(asked, { decision: 'block', reason: SHOW.say });
-  const beats = (await story(l, { run })).beats;
+  const beats = (await sessionsPack.story(ownContext(l, 'sessions'), ({ run }))).beats;
   assert.deepEqual(beats.map((b) => [b.said, b.asked]), [[SHOW.say, 'checks.show_changes']], 'kept as a step the owner sees');
 
   assert.deepEqual(await stop(l, { session_id: 's1', turn: 'u1', reply: changed, stop_hook_active: true }), {}, 'never while the agent goes on because it was asked');
@@ -82,7 +83,7 @@ test('a reply that did what a rule names is asked once a turn, the asking kept i
   assert.deepEqual(await stop(l, { session_id: 's1', turn: 'u4', reply: changed }), {}, 'turned off');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: false } });
   assert.equal(((await stop(l, { session_id: 's1', turn: 'u5', reply: changed })) as any).decision, 'block', 'and on again');
-  assert.equal((await story(l, { run })).beats.length, 3);
+  assert.equal((await sessionsPack.story(ownContext(l, 'sessions'), ({ run }))).beats.length, 3);
 });
 
 test('the hook counts what the reply did since the owner’s last message', async () => {
@@ -138,11 +139,11 @@ test('practice asks a reply that answered from the map and drew nothing to draw 
   const draw = l.registry.rules.find((r) => r.pack === 'practice' && r.id === 'draw_answers')!;
   assert.ok(draw && checkRules([draw], { types: new Map() }).length === 0, 'practice ships it, checked as data');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
-  const { run } = await sessionStart(l, agent, { session_id: 'd1' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'd1' }));
   const answered = { read: 2, surveyed: 1, showed: 0, changed: 0, edited: 0, committed: 0, pushed: 0 };
   const asked = (await stop(l, { session_id: 'd1', turn: 't1', reply: answered })) as any;
   assert.deepEqual(asked, { decision: 'block', reason: draw.say });
-  assert.deepEqual((await story(l, { run })).beats.map((b) => b.asked), ['practice.draw_answers']);
+  assert.deepEqual((await sessionsPack.story(ownContext(l, 'sessions'), ({ run }))).beats.map((b) => b.asked), ['practice.draw_answers']);
   // Not an answer to draw: what it read was only to then change the map, or to write code; one item, or nothing but a line.
   const not: [string, Record<string, number>][] = [
     ['read to change', { ...answered, changed: 1 }],
@@ -158,7 +159,7 @@ test('practice asks a reply that answered from the map and drew nothing to draw 
 
 test('the session-start text tells an agent to answer the owner with a drawing', async () => {
   const l = await map();
-  const text = await hookSessionStart(l, { session_id: 'd2', cwd: tmpdir() });
+  const text = await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'd2', cwd: tmpdir() }));
   assert.match(text, /report, action show/);
   assert.match(text, /A yes, a number or one item is a line in chat/);
 });
@@ -168,10 +169,10 @@ test('practice asks a reply that worked and put nothing on the map to tell what 
   const record = l.registry.rules.find((r) => r.pack === 'practice' && r.id === 'record_findings')!;
   assert.ok(record && checkRules([record], { types: new Map() }).length === 0, 'practice ships it, checked as data');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
-  const { run } = await sessionStart(l, agent, { session_id: 'f1' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'f1' }));
   const worked = { read: 1, worked: 12, edited: 3, changed: 0, told: 0 };
   assert.deepEqual(await stop(l, { session_id: 'f1', turn: 't1', reply: worked }), { decision: 'block', reason: record.say });
-  assert.deepEqual((await story(l, { run })).beats.map((b) => b.asked), ['practice.record_findings']);
+  assert.deepEqual((await sessionsPack.story(ownContext(l, 'sessions'), ({ run }))).beats.map((b) => b.asked), ['practice.record_findings']);
   const not: [string, Record<string, number>][] = [
     ['told', { ...worked, told: 1 }],
     ['an item changed, a note as much as a new one', { ...worked, changed: 1 }],
@@ -193,7 +194,7 @@ test('practice asks a reply that worked and put nothing on the map to tell what 
 
 test('the session-start text says the map, not the chat, is the record, and that telling is checked', async () => {
   const l = await map();
-  const text = await hookSessionStart(l, { session_id: 'f2', cwd: tmpdir() });
+  const text = await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'f2', cwd: tmpdir() }));
   assert.match(text, /The map is the record of this work, not the chat/);
   assert.match(text, /a reply that worked and told nothing is asked to/);
 });

@@ -7,8 +7,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { OPEN_PHASES } from '../src/boot.ts';
-import { kernelDuties, kernelFillings } from '../src/lifecycle.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { kernelDuties, kernelFillings } from '../packs/identity/kernel/lifecycle.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 import { PACKS, packsWith } from './map.ts';
 
 const seen: string[] = ((globalThis as { kernelOpenSeen?: string[] }).kernelOpenSeen ??= []);
@@ -25,7 +25,7 @@ async function until(what: string, ok: () => Promise<boolean> | boolean): Promis
 }
 
 test("what Workspaces.load did in a fixed order is the roots' and the kernel's fillings of the open phases, each under its pack", async () => {
-  await import('../src/workspaces.ts');
+  await import('../packs/identity/kernel/workspaces.ts');
   const filled = await kernelFillings();
   assert.deepEqual(filled, [
     { phase: 'restore', pack: 'log' },

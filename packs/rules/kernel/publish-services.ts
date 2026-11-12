@@ -4,7 +4,7 @@
 // what the workspace may store, written with the observation that says it, as the one who sent it. Values in, values out.
 
 import { createHash } from 'node:crypto';
-import type { RootCall } from '../../../src/root-calls.ts';
+import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import { svgRefused } from '../../walls/kernel/svg-figure.ts';
 import { mayDo } from './rules.ts';
 import { roomToStore } from '../../identity/kernel/standing.ts';

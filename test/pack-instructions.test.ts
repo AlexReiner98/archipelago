@@ -4,13 +4,14 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parts } from '../src/manifest.ts';
-import { connectText } from '../src/mcp.ts';
-import { Registry } from '../src/packs.ts';
-import { hookSessionStart } from '../src/session-hook.ts';
-import { surfaceFor } from '../src/tools.ts';
-import { workingRules } from '../src/working-rules.ts';
+import { parts } from '../packs/loader/kernel/manifest.ts';
+import { connectText } from '../packs/surface/kernel/mcp.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import * as sessionHookPack from '../packs/sessions/kernel/session-hook.ts';
+import { surfaceFor } from '../packs/surface/kernel/tools.ts';
+import { workingRules } from '../packs/loader/kernel/working-rules.ts';
 import { freshWith, PACKS, packsWith } from './map.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const short = (id: string) => id.slice(id.indexOf('.') + 1);
 
@@ -54,7 +55,7 @@ test('a core-only map is told nothing it lacks: rules, MCP words, tools and the 
   for (const [name, tool] of surfaceFor(core)) assert.deepEqual(lacking(tool.description, lacks), [], `the ${name} tool`);
 
   const l = await freshWith(core);
-  const start = await hookSessionStart(l, { session_id: 'core-only', cwd: 'C:\\code\\new' });
+  const start = await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'core-only', cwd: 'C:\\code\\new' }));
   assert.deepEqual(lacking(start, lacks), [], 'the session start');
   assert.doesNotMatch(start, /gets in your way/, 'recording a bump is practice’s habit, not core’s');
   assert.doesNotMatch(start, /repository|as an issue/);
@@ -73,7 +74,7 @@ const TRACKER = {
 
 test('with its pack on, a pack says it in its own types: its bump is an issue, in place of core’s', async () => {
   const l = await freshWith(new Registry(packsWith(TRACKER as never)));
-  const start = await hookSessionStart(l, { session_id: 'tracker', cwd: 'C:\\code\\new' });
+  const start = await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'tracker', cwd: 'C:\\code\\new' }));
   assert.match(start, /record it on the map as an issue/);
   assert.doesNotMatch(start, /a finding about the item it concerns/, 'core’s wording is replaced, not said beside it');
 });

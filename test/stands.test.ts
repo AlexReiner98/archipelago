@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { answerHook } from './claude-hook.ts';
-import type { Archipelago } from '../src/pelago.ts';
-import { sessionStart } from '../src/sessions.ts';
-import { standsOf } from '../src/stands.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { standsOf } from '../packs/sessions/kernel/stands.ts';
 import { agent, fresh } from './map.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const hook = (l: Archipelago, event: string, body: Record<string, unknown>) => answerHook(event, { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' });
 
@@ -17,7 +18,7 @@ test('where a session stands is kept as said, a small flat object, and read by n
 
 test('a turn end keeps where the session stands on its run, under its old name too', async () => {
   const l = await fresh();
-  const { run } = await sessionStart(l, agent, { session_id: 's1' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 's1' }));
   const stands = { branch: 'claude/probe', head: 'b'.repeat(40), worktree: 'C:/code/site', unpushed: 2, dirty: 0 };
   await hook(l, 'stop', { session_id: 's1', stands });
   assert.deepEqual((await l.entity(run))!.props.stands, standsOf(stands));

@@ -8,7 +8,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { blankImageFile } from '../src/db.ts';
+import { blankImageFile } from '../packs/database/kernel/db.ts';
 import { allTests, ENGINES, FIRST_STEPS, readWeights, ROOT, type Weights } from '../test/sets.ts';
 
 const [mode, ...rest] = process.argv.slice(2);

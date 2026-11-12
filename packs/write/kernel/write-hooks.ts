@@ -17,11 +17,11 @@
 // What follows an op at the level of facts (the owner's link, src/owner-link.ts) stays in the write path.
 
 import { BUILT_IN } from './write-fillings.ts';
-import { islandRegistry } from '../../../src/island-pin.ts';
+import { islandRegistry } from '../../loader/kernel/island-pin.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Authority, Op, SourceSpec } from './pelago-types.ts';
-import type { Q } from '../../../src/db.ts';
-import type { Registry } from '../../../src/packs.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
 
 /** The points the write path opens. */
 export const POINTS = ['write.rewrite', 'write.validate', 'write.follow', 'write.follow.rides', 'log.project', 'write.after', 'write.retype'] as const;

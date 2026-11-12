@@ -2,8 +2,8 @@
 // workspace from the beats the sessions kept on their runs. It was the sessions pack's (src/replies.ts); a read of the
 // whole workspace is a root's.
 
-import type { Q } from '../../../src/db.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** How far back a rule's askings are counted for the owner: a week. */
 const LATELY_MS = 7 * 86_400_000;

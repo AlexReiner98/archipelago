@@ -2,15 +2,16 @@
 // relation extends, naming kinds at their ends. What the kernel computes from a root holds for a pack's relation extending it.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { callTool } from '../src/tools.ts';
-import { openDb } from '../src/db.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { askView } from '../src/askview.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
 import { freshWith, human, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A view asked by its name, as the view tool asks it. */
-const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
+const ask = (l: Archipelago, name: string, params: Record<string, unknown> = {}) => askviewPack.askView(kernelContext(l, 'query'), ({ kind: 'human', name: 'test' }) as Parameters<typeof askviewPack.askView>[1], name, params);
 
 const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'place', 'system'];
 const ROOTS = ['part_of', 'depends_on', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'link', 'uses', 'produced'];

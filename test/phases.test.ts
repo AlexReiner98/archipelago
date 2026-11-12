@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { phasesOf } from '../src/phases.ts';
 
 test('a status unsaid is read from its place; a lone open status stands, and what stands ends', () => {

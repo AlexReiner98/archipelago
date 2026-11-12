@@ -2,7 +2,7 @@
 // the sessions pack's, on its context; what stays here is the timer that runs it while this server leads (started by
 // src/workspaces.ts), since an optional pack has no timers.
 
-import type { Archipelago } from './pelago.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
 import * as moved from '../packs/sessions/kernel/session-quiet.ts';
 
 export * from '../packs/sessions/kernel/session-quiet.ts';
@@ -30,7 +30,7 @@ export class QuietSessions {
     if (this.busy) return;
     this.busy = true;
     try {
-      await pass((await import('./kernel-context.ts')).ownContext(this.l, 'sessions'));
+      await pass((await import('../packs/loader/kernel/kernel-context.ts')).ownContext(this.l, 'sessions'));
     } finally {
       this.busy = false;
     }

@@ -6,11 +6,11 @@ import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
-import { syncTypes } from '../src/typetable.ts';
-import { callTool } from '../src/tools.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, human, PACKS } from './map.ts';
 
 /** A pack written for the test, as the hosted folder would hold one. */

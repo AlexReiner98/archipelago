@@ -1,0 +1,5 @@
+{
+  "src/session-quiet.ts": [
+    "packs/identity/kernel/workspaces.ts"
+  ]
+}

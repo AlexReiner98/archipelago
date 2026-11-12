@@ -1,7 +1,7 @@
 // Where an agent points the screen, and the steps it takes, reach a page that polls another server.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { kernelContext } from '../src/kernel-context.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 import * as one from '../packs/presence/kernel/presence.ts';
 import { fresh } from './map.ts';
 

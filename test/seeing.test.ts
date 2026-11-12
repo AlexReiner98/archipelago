@@ -3,11 +3,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { answerHook } from './claude-hook.ts';
-import { NOW_MS, seen, seenNow } from '../src/seeing.ts';
-import { keep } from '../src/transient.ts';
-import { whose } from '../src/presence.ts';
-import { callTool } from '../src/tools.ts';
+import { NOW_MS } from '../packs/presence/kernel/seeing.ts';
+import * as seeingPack from '../packs/presence/kernel/seeing.ts';
+import { keep } from '../packs/database/kernel/transient.ts';
+import { whose } from '../packs/presence/kernel/presence.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, fresh, human, make } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 test('the view and the open item the page says reach the prompt hook and query seeing', async () => {
   const l = await fresh();
@@ -33,9 +35,9 @@ test('the view and the open item the page says reach the prompt hook and query s
   assert.equal(((await callTool(l, agent, 'query', { name: 'seeing' })) as any).view, 'id "Draw the ridges", walk depends_on 2', 'the newest page wins');
 
   // A page that has not looked for a while is not what the owner is looking at now.
-  await keep(l.db, `seeing:${whose(l)}`, { ...(await seenNow(l.db, l))!, said: Date.now() - NOW_MS - 1000 }, 60_000);
+  await keep(l.db, `seeing:${whose(l)}`, { ...(await seeingPack.seenNow(kernelContext(l, 'presence'), l))!, said: Date.now() - NOW_MS - 1000 }, 60_000);
   assert.equal(await callTool(l, agent, 'query', { name: 'seeing' }), null);
-  await seen(l.db, l, 'p3', 'home');
+  await seeingPack.seen(kernelContext(l, 'presence'), l, 'p3', 'home', undefined, undefined);
   assert.equal(((await callTool(l, agent, 'query', { name: 'seeing' })) as any).screen, 'home');
 });
 

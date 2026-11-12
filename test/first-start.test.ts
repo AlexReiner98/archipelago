@@ -5,10 +5,10 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { FIRST_START_FILE, firstStart } from '../src/first-start.ts';
-import { setMailer, type Mail } from '../src/mail.ts';
-import { adminEmails } from '../src/members.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { FIRST_START_FILE, firstStart } from '../packs/surface/kernel/first-start.ts';
+import { setMailer, type Mail } from '../packs/mailer/kernel/mail.ts';
+import { adminEmails } from '../packs/identity/kernel/members.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
 async function started(run: (workspaces: Workspaces, root: string, logged: string[]) => Promise<void>) {
   const root = mkdtempSync(join(tmpdir(), 'pelago-first-'));

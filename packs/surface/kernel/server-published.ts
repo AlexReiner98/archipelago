@@ -11,7 +11,7 @@ import { onMap, published } from './above.ts';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { PATH, publicPath, publicView, publicViewAt, publicViewPicture, publicViews } from './public-views.ts';
 import type { ActPlaces } from './server-acts.ts';
-import type { ServerAct, ServerPackFile } from '../../../src/server-packs.ts';
+import type { ServerAct, ServerPackFile } from '../../loader/kernel/server-packs.ts';
 
 const WORKSPACE = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const ID = /^e_[a-z0-9]{8}$/;

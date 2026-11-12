@@ -5,14 +5,14 @@
 import { randomBytes } from 'node:crypto';
 import type { ServerResponse } from 'node:http';
 import { gzipSync } from 'node:zlib';
-import { dump, localPackOf } from '../../../src/backup.ts';
-import { dumpVault, rewrap } from '../../../src/vault.ts';
-import type { Q } from '../../../src/db.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
-import { actorId, type Actor } from '../../../src/pelago.ts';
-import { mayDo } from '../../../src/rules.ts';
-import type { Tool } from '../../../src/tools.ts';
-import { keep, take } from '../../../src/transient.ts';
+import { dump, localPackOf } from '../../log/kernel/backup.ts';
+import { dumpVault, rewrap } from '../../seal/kernel/vault.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
+import { actorId, type Actor } from '../../write/kernel/pelago.ts';
+import { mayDo } from '../../rules/kernel/rules.ts';
+import type { Tool } from './tools.ts';
+import { keep, take } from '../../database/kernel/transient.ts';
 
 const LINK_MINUTES = 5;
 // The file waits in the workspace's database, not in this process: the link works from whichever server answers it.

@@ -3,7 +3,7 @@
 // other way checks for itself, with these. The identity root's (who is asking), so every root above it names an actor
 // the same way.
 
-import type { Actor } from '../../../src/pelago-types.ts';
+import type { Actor } from '../../write/kernel/pelago-types.ts';
 
 /** An actor as the log names it: its kind and its name. */
 export const actorId = (actor: Pick<Actor, 'kind' | 'name'>) => `${actor.kind}:${actor.name}`;

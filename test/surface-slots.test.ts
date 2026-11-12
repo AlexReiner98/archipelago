@@ -6,11 +6,11 @@ import { cpSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { test } from 'node:test';
-import { openKernel } from '../src/kernel-context.ts';
-import { Registry } from '../src/packs.ts';
-import { filledTool, serveFilled, slotted, type RouteHost } from '../src/surface-slots.ts';
-import { annotationsOf } from '../src/surface.ts';
-import { callTool, surfaceFor } from '../src/tools.ts';
+import { openKernel } from '../packs/loader/kernel/kernel-context.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { filledTool, serveFilled, slotted, type RouteHost } from '../packs/surface/kernel/surface-slots.ts';
+import { annotationsOf } from '../packs/surface/kernel/surface.ts';
+import { callTool, surfaceFor } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, PACKS, packsWith } from './map.ts';
 
 test("rechecked is offered under report as before, the surface's own act", async () => {

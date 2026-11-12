@@ -8,13 +8,13 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { hashSecret, newSecret, OPERATOR_RESET_FILE, sameSecret, validWorkspaceId } from './auth.ts';
 import { QuietSessions } from '../../../src/session-quiet.ts';
-import type { Dump } from '../../../src/backup.ts';
+import type { Dump } from '../../log/kernel/backup.ts';
 import type { Booted } from '../../../src/boot.ts';
 import { addWorkspace, claimControlValue, controlValue, importControlFiles, listWorkspaces, nameWorkspace, OPERATOR, OPERATOR_RESET, removeWorkspace, setControlValue, takeControlValue } from './control.ts';
-import { openDb, type Database } from '../../../src/db.ts';
+import { openDb, type Database } from '../../database/kernel/db.ts';
 import { closeRoots, followRoots, openPhases, startDuties, whileLeading } from './lifecycle.ts';
-import { databaseFor, dropDatabaseFor } from '../../../src/pg.ts';
-import type { Archipelago, Policy } from '../../../src/pelago.ts';
+import { databaseFor, dropDatabaseFor } from '../../database/kernel/pg.ts';
+import type { Archipelago, Policy } from '../../write/kernel/pelago.ts';
 
 export const DEFAULT_WORKSPACE = 'default';
 /** How soon a pack switched on another server is followed here. */

@@ -4,7 +4,7 @@
 // and the headers every public answer carries; it is read through one function that sees everything and gives as
 // little as it can (the surface's packs/surface/kernel/public-documents.ts).
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /**
  * The types a document is read whole as and can be public: a flavour that cannot be (an invoice) is left out.

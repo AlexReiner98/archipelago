@@ -3,7 +3,7 @@
 // offers to close. Each is bounded by the ids it is given, a moment, a limit, or an index it names, and answered as the
 // asker under row-level security, as every read of packreads.ts is. The SQL is the modules' own, moved as it was.
 
-import type { Archipelago, Entity } from '../../../src/pelago.ts';
+import type { Archipelago, Entity } from '../../write/kernel/pelago.ts';
 import { scopeWithin } from '../../write/kernel/within.ts';
 import { packVersionsFor } from '../../loader/kernel/pack-versions.ts';
 import { itemLink } from '../../identity/kernel/members.ts';

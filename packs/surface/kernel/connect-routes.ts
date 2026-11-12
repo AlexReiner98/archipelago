@@ -7,8 +7,8 @@
 // A sign-in mail goes out as the mail pack's member-mail says, which the server loads with its first start (./first-start.ts).
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Archipelago } from '../../../src/pelago.ts';
-import type { Q } from '../../../src/db.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { bearer } from '../../identity/kernel/auth.ts';
 import { serveOAuth } from '../../identity/kernel/oauth.ts';
 import { SIGN_IN_PATHS, signIn, type OpenRoutes } from '../../identity/kernel/sign-in.ts';

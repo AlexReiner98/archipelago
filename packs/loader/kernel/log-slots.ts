@@ -6,11 +6,11 @@
 
 import { isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { fillAppended } from '../../../src/log.ts';
+import { fillAppended } from '../../log/kernel/log.ts';
 import { isInternal, type Manifest } from './manifest.ts';
 import { codeFolder } from './code-folder.ts';
-import type { Q } from '../../../src/db.ts';
-import type { KernelContext } from '../../../src/kernel-context.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { KernelContext } from './kernel-context.ts';
 import type { Registry } from './packs.ts';
 
 /** What a filling writes with: a function of the database's own, by name, handed one JSON argument. */

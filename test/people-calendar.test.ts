@@ -5,12 +5,12 @@ import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { openDb } from '../src/db.ts';
-import { hostFor } from '../src/packtools.ts';
-import { Registry } from '../src/packs.ts';
-import { followPacks, syncPacks } from '../src/packstate.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { syncTypes } from '../src/typetable.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { followPacks, syncPacks } from '../packs/loader/kernel/packstate.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { make, packsWith } from './map.ts';
 
 const registries: Registry[] = [];

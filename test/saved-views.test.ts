@@ -1,8 +1,8 @@
 // Saved views: every picture kept on the map, named by the style that draws it, with what it is of, the kept first.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { callTool } from '../src/tools.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { fresh, freshWith, human, make, packsWith } from './map.ts';
 
 /** A pack whose one type sits at the altitude of a project, as a pack that keeps projects declares it. */

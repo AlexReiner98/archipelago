@@ -5,15 +5,15 @@
 // (src/replay.ts, swapIn). The same walk, without the swap, takes a snapshot; with a stop, it answers a past position.
 
 import { setImmediate } from 'node:timers/promises';
-import type { Db, Q } from '../../../src/db.ts';
+import type { Db, Q } from '../../database/kernel/db.ts';
 import { headOf, stored, type Entry } from './log.ts';
 import { beforeTheLog, inOrder, type TypesRead, loadRows, projectEntry, projectedRows, PROJECTED, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
 import { projectsApart, regatherAll } from './closure.ts';
 import { projectAgain } from './log-project.ts';
-import { openAll } from '../../../src/seal.ts';
+import { openAll } from '../../seal/kernel/seal.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { newestValid, prune, takeSnapshot, type Positions, type Snapshot } from './snapshot.ts';
-import type { RegistryAt } from '../../../src/registry-at.ts';
+import type { RegistryAt } from '../../loader/kernel/registry-at.ts';
 import { rootFills } from '../../database/kernel/root-fills.ts';
 
 /**

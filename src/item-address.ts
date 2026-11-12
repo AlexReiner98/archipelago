@@ -3,7 +3,7 @@
 // for no token: it sends the browser to the page, which opens that workspace on the item (`?link=`, ui/item-link.js),
 // in the tab already open on it where there is one.
 
-import { mcpAddress } from './oauth.ts';
+import { mcpAddress } from '../packs/identity/kernel/oauth.ts';
 
 const ITEM = /^\/i\/([^/]+)\/(e_[a-z0-9]{8})\/?$/;
 

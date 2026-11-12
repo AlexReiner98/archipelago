@@ -7,9 +7,9 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome } from './browser.ts';
 import { agent, fresh, freshWith, human, make, packsWith } from './map.ts';
-import { Registry } from '../src/packs.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { savedCanvasPage } from './saved-canvas-page.ts';
-import { callTool } from '../src/tools.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 
 const browser = chrome();
 

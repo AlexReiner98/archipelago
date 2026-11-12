@@ -4,11 +4,12 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createToken, revokeToken } from '../src/auth.ts';
-import { presence } from '../src/presence.ts';
-import { callTool } from '../src/tools.ts';
+import { createToken, revokeToken } from '../packs/identity/kernel/auth.ts';
+import * as presencePack from '../packs/presence/kernel/presence.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, fresh, human, make } from './map.ts';
 import { until } from './wait.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const view = (l: Awaited<ReturnType<typeof fresh>>, who: typeof human, name: string, params: Record<string, unknown> = {}) => callTool(l, who, 'view', { name, params }) as Promise<any>;
 
@@ -66,7 +67,7 @@ test('a token revoked while it waits on watch is told nothing more', async () =>
   const { latest } = (await callTool(l, robot, 'watch', {})) as { latest: number };
   // Its refusal is expected from the start: it can come while the next lines still run, before anything awaits it.
   const refused = assert.rejects(callTool(l, robot, 'watch', { after: latest, wait_seconds: 10 }), /revoked while it waited/);
-  assert.ok(await until(async () => (await presence(l.db, l)).listening > 0, 10_000), 'it is waiting, its token good');
+  assert.ok(await until(async () => (await presencePack.presence(kernelContext(l, 'presence'), l)).listening > 0, 10_000), 'it is waiting, its token good');
   await revokeToken(l.db, made.id);
   await make(l, [{ op: 'create', type: 'task', title: 'Said after the revoke' }]);
   await refused;

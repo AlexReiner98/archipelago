@@ -4,19 +4,19 @@
 import { readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { z } from 'zod';
-import { parseBackup, parseVault, readable } from '../../../src/backup.ts';
+import { parseBackup, parseVault, readable } from '../../log/kernel/backup.ts';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
-import { launch } from '../../../src/launcher.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
-import type { TypeDef } from '../../../src/packs.ts';
-import { actorId } from '../../../src/pelago.ts';
+import { launch } from './launcher.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
+import type { TypeDef } from '../../loader/kernel/packs.ts';
+import { actorId } from '../../write/kernel/pelago.ts';
 import { whose } from './tool-change.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { eventsAfter, factsAfter, factsUpTo, HELD_MOST, headPos, ISLANDS_MOST } from '../../../src/tail.ts';
-import { typeItemsIn, typesTaken } from '../../../src/type-items.ts';
-import { movesAgain, syncTypes } from '../../../src/typetable.ts';
+import { eventsAfter, factsAfter, factsUpTo, HELD_MOST, headPos, ISLANDS_MOST } from '../../log/kernel/tail.ts';
+import { typeItemsIn, typesTaken } from '../../loader/kernel/type-items.ts';
+import { movesAgain, syncTypes } from '../../loader/kernel/typetable.ts';
 
 /** Moves when any file of the web UI is saved (the projector it runs too), so an open page knows to load itself again. */
 const UI_DIR = join(import.meta.dirname, '..', '..', '..', 'ui');

@@ -2,12 +2,12 @@
 // path keeps it to its bounds. Proved on a probe (test/packs/write_probe) and on the mentions pack (packs/mentions).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { rewriteProblem } from '../src/write-hooks.ts';
-import { openKernel } from '../src/kernel-context.ts';
-import { entries } from '../src/log.ts';
-import { rebuild } from '../src/replay.ts';
-import type { Archipelago, Op } from '../src/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { rewriteProblem } from '../packs/write/kernel/write-hooks.ts';
+import { openKernel } from '../packs/loader/kernel/kernel-context.ts';
+import { entries } from '../packs/log/kernel/log.ts';
+import { rebuild } from '../packs/log/kernel/replay.ts';
+import type { Archipelago, Op } from '../packs/write/kernel/pelago.ts';
 import { agent, freshWith, human, packsWith } from './map.ts';
 
 const dir = packsWith('write_probe');

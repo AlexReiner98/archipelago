@@ -4,7 +4,7 @@
 // called by its name on the pack's own context of the map: the surface imports none of its code.
 
 import { ownCall } from '../../loader/kernel/own-calls.ts';
-import type { Actor, Archipelago, Entity } from '../../../src/pelago.ts';
+import type { Actor, Archipelago, Entity } from '../../write/kernel/pelago.ts';
 import type * as S from '../../sessions/kernel/sessions.ts';
 
 type Rest<F> = F extends (ctx: never, ...rest: infer R) => unknown ? R : never;

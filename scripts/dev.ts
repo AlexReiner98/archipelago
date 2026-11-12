@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, watch } from 'node:fs';
 import { join } from 'node:path';
-import { loadConfig, RESTART_EXIT } from '../src/config.ts';
+import { loadConfig, RESTART_EXIT } from '../packs/database/kernel/config.ts';
 import { takePulled } from './pull.ts';
 
 const ROOT = join(import.meta.dirname, '..');

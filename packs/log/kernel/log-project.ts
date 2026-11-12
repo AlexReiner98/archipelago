@@ -10,12 +10,12 @@
 
 import { isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { Manifest } from '../../../src/manifest.ts';
+import type { Manifest } from '../../loader/kernel/manifest.ts';
 import { isLink, type TypesRead } from './project.ts';
-import type { Db, Q } from '../../../src/db.ts';
+import type { Db, Q } from '../../database/kernel/db.ts';
 import type { Fact } from './log.ts';
-import type { KernelContext } from '../../../src/kernel-context.ts';
-import type { Registry } from '../../../src/packs.ts';
+import type { KernelContext } from '../../loader/kernel/kernel-context.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
 
 type Row = Record<string, unknown>;
 

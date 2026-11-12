@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { configureConnections } from '../packs/surface/kernel/root-connections.ts';
-import { callTool } from '../src/tools.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { fresh } from './map.ts';
 
 const admin = { kind: 'human' as const, name: 'test', admin: true };

@@ -5,10 +5,10 @@
 // projects a whole stream into empty tables the same way (`rebuild`), and the two must agree row for row.
 
 import type { Entry, Fact } from './log.ts';
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { itemStep, isLink, linkStep, MOVED, runs, type TypesRead } from './project.ts';
 import { joined, regather } from './closure.ts';
-import { declaredTables, projectPacks } from '../../../src/log-project.ts';
+import { declaredTables, projectPacks } from './log-project.ts';
 
 // The pure part, one file the page runs too (src/project.ts): kept importable from here, where it always was.
 export { isLink, typesOf, MOVED, type TypesRead } from './project.ts';

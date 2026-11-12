@@ -10,7 +10,7 @@ import { openDb } from '../../database/kernel/db.ts';
 import { latest, versionOf } from '../../database/kernel/migrate.ts';
 import { databaseFor } from '../../database/kernel/pg.ts';
 
-async function deploy() {
+export async function deploy() {
   const { dataDir, databaseUrl } = loadConfig();
   if (!databaseUrl) {
     console.error('PELAGO_DATABASE_URL is not set. A database in a folder is migrated by the server that opens it, as it starts.');

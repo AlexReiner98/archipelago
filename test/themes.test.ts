@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { contrast, finishTheme, mergeTheme, mix, search } from '../src/colours.ts';
+import { contrast, finishTheme, mergeTheme, mix, search } from '../packs/styles/kernel/colours.ts';
 
 test('a colour is worked out from others: a name, a mix, a search, one for each scheme', () => {
   const t = finishTheme({

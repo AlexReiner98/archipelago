@@ -5,12 +5,12 @@ import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { readManifest } from '../src/manifest.ts';
-import { dependentsOf, orderPacks, providersOf } from '../src/packorder.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { reachOf } from '../src/reach.ts';
-import { packStates, setPack } from '../src/packstate.ts';
-import { hostFor } from '../src/packtools.ts';
+import { readManifest } from '../packs/loader/kernel/manifest.ts';
+import { dependentsOf, orderPacks, providersOf } from '../packs/loader/kernel/packorder.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { reachOf } from '../packs/loader/kernel/reach.ts';
+import { packStates, setPack } from '../packs/loader/kernel/packstate.ts';
+import { hostFor } from '../packs/loader/kernel/packtools.ts';
 import { freshWith, human, packsWith, PACKS } from './map.ts';
 
 /** A pack that provides a gathering: a type with when, and an event its handler records. Two of them, either will do. */

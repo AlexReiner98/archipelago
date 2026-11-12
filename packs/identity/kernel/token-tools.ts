@@ -7,9 +7,9 @@ import { needAdmin } from './actor-checks.ts';
 import { createToken, listTokens, revokeToken } from './auth.ts';
 import { humanTokenAllowed } from './members.ts';
 import { bypassingRls } from './outbox.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { createPersonToken, extendPersonToken, personTokensOf, revokePersonToken } from './person-tokens.ts';
-import type { Tool } from '../../../src/tools.ts';
+import type { Tool } from '../../surface/kernel/tools.ts';
 
 /** The sign-in addresses of the caller here, or of every member for an admin listing: who a person token acts for. */
 async function addresses(l: Archipelago, actor: Actor, every = false): Promise<string[]> {

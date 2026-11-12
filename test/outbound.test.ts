@@ -4,9 +4,10 @@ import assert from 'node:assert/strict';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, test } from 'node:test';
-import { guardedFetch, isPrivate } from '../src/outbound.ts';
+import { guardedFetch, isPrivate } from '../packs/walls/kernel/outbound.ts';
 import { fresh, human, make } from './map.ts';
-import { checkConnections } from '../src/check-connections.ts';
+import * as checkConnectionsPack from '../packs/connect/kernel/check-connections.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A server on this machine: one path answers, /hop redirects to it with a 307, which keeps a POST a POST. */
 const heard: string[] = [];
@@ -67,12 +68,12 @@ test('check_connections reaches no private address where they are refused, and f
   ]);
   heard.length = 0;
   await withEnv(refused, async () => {
-    const out = await checkConnections(l, human);
+    const out = await checkConnectionsPack.checkConnections(kernelContext(l, 'connect'), `${human.kind}:${human.name}`);
     assert.deepEqual(out.map((c) => c.status), ['unavailable', 'unavailable']);
     assert.deepEqual(heard, [], 'the scan reached nothing');
   });
   await withEnv(open, async () => {
-    const out = await checkConnections(l, human);
+    const out = await checkConnectionsPack.checkConnections(kernelContext(l, 'connect'), `${human.kind}:${human.name}`);
     assert.equal(out.find((c) => c.id === created.inside)!.status, 'available');
     assert.equal(out.find((c) => c.id === created.hop)!.status, 'unavailable', 'a redirect is not followed');
     assert.ok(!heard.some((h) => h.includes('/inside')));

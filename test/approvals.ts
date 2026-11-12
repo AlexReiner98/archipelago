@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { Archipelago, type Actor, type ChangeInput, type Op, type Policy } from '../src/pelago.ts';
-import { Registry } from '../src/packs.ts';
+import { Archipelago, type Actor, type ChangeInput, type Op, type Policy } from '../packs/write/kernel/pelago.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { freshWith, human, PACKS } from './map.ts';
 
 const FILE = join(import.meta.dirname, 'fixtures', 'approvals.json');

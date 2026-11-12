@@ -5,9 +5,9 @@
 // make of it is decide's alone (src/rules.ts): this only says which version each op runs under.
 
 import { islandVersion } from './island-pin.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import type { Op } from '../../../src/pelago-types.ts';
-import type { IslandRun } from '../../../src/rules.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import type { Op } from '../../write/kernel/pelago-types.ts';
+import type { IslandRun } from '../../rules/kernel/rules.ts';
 
 /** For each op, the versions its islands run, undefined for an island on the map's (an empty list: the map's rules alone). */
 export async function opRuns(map: Archipelago, ops: Op[]): Promise<(IslandRun | undefined)[][]> {

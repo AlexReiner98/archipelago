@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { createToken } from '../src/auth.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
 import { serve } from './serve.ts';
 
 const URI = 'ui://pelago/view';

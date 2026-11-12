@@ -7,9 +7,9 @@
 
 import { z } from 'zod';
 import { viewList, viewNames } from './view-words.ts';
-import { KERNEL_VERBS } from '../../../src/declared.ts';
-import type { ActionDef } from '../../../src/declared.ts';
-import type { Registry } from '../../../src/packs.ts';
+import { KERNEL_VERBS } from '../../loader/kernel/declared.ts';
+import type { ActionDef } from '../../loader/kernel/declared.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
 import { op, props } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 

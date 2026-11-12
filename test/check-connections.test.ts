@@ -8,10 +8,10 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { after, test } from 'node:test';
 import { fresh, human, make } from './map.ts';
-import { kernelContext, openKernel } from '../src/kernel-context.ts';
-import { readOps } from '../src/streams.ts';
-import { readEvents } from '../src/eventlog.ts';
-import { callTool } from '../src/tools.ts';
+import { kernelContext, openKernel } from '../packs/loader/kernel/kernel-context.ts';
+import { readOps } from '../packs/log/kernel/streams.ts';
+import { readEvents } from '../packs/log/kernel/eventlog.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 
 const local: Server = createServer((_req, res) => res.setHeader('connection', 'close').writeHead(204).end());
 await new Promise<void>((r) => local.listen(0, '127.0.0.1', r));

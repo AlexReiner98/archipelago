@@ -9,11 +9,11 @@
 // workspace's own rules, as any agent's is.
 
 import { randomBytes } from 'node:crypto';
-import { newId, type Q } from '../../../src/db.ts';
+import { newId, type Q } from '../../database/kernel/db.ts';
 import { sameBytes, sha256Hex } from '../../../src/hashes.ts';
 import { controlDb } from './control-index.ts';
 import { memberOf } from './members.ts';
-import type { Actor, May } from '../../../src/pelago.ts';
+import type { Actor, May } from '../../write/kernel/pelago.ts';
 
 export interface PersonToken {
   id: string;

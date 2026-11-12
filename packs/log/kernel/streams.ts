@@ -9,11 +9,11 @@
 import { createHash } from 'node:crypto';
 import { jcs } from '../../../src/jcs.ts';
 import { append, type Fact } from './log.ts';
-import type { Db, Q } from '../../../src/db.ts';
+import type { Db, Q } from '../../database/kernel/db.ts';
 import { newId } from '../../../src/ids.ts';
 import { kept, ruleFor, type OpEntry, type Retention } from './retention.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
-import { hashed, openOps, sealOp } from '../../../src/opseal.ts';
+import { hashed, openOps, sealOp } from '../../seal/kernel/opseal.ts';
 
 export type OpStream = 'sessions' | 'claims' | 'notifications' | 'automations' | 'settings' | 'access' | 'observations' | 'places' | 'activity' | 'uses' | `pack:${string}` | CountStream;
 /** A stream a server pack keeps its counts in, by the word its manifest names (src/pack-counts.ts). */

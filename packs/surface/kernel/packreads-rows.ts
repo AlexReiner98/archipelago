@@ -2,7 +2,7 @@
 // An item comes with what it is (is: its type and those it extends); a read that asks for some fields is given those
 // of its props and no note. A read past one page is given a cursor (next) to ask for the rest with, opaque to the asker.
 
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** The most rows one read, or one page of a read, gives back. */
 export const READ_LIMIT = 500;

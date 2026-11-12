@@ -4,13 +4,13 @@
 // agent, so what they write follows the workspace's policy, and both may read from hosts but never act.
 
 import { signedWith } from '../../../src/hashes.ts';
-import { parts } from '../../../src/manifest.ts';
+import { parts } from '../../loader/kernel/manifest.ts';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Registry } from '../../../src/packs.ts';
-import { hostFor } from '../../../src/packtools.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
+import { hostFor } from '../../loader/kernel/packtools.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { json } from './reply.ts';
-import { unseal } from '../../../src/secrets.ts';
+import { unseal } from '../../seal/kernel/secrets.ts';
 
 const asPack = (pack: string): Actor => ({ kind: 'agent', name: `pack:${pack}` });
 /** The most a webhook may carry. */

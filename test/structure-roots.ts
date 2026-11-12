@@ -32,14 +32,9 @@ function packOf(path: string): string | undefined {
 const imports = (text: string) =>
   [...text.matchAll(/(?:^|;)[ 	]*(?:import|export)\s+(?!type\b)[^;]*?from\s+['"]([^'"]+)['"]|\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)|(?:^|;)[ 	]*import\s+['"]([^'"]+)['"]/gm)].map((m) => m[1] ?? m[2] ?? m[3]);
 
-/** The files of each root pack's code: its row's modules wherever they are, and what is under its kernel/. */
+/** The files of each root pack's code: what is under its kernel/ (since the gather, every module of its row is there). */
 function rootFiles(): [string, string][] {
   const out = new Map<string, string>();
-  for (const [m, pack] of PACK_OF) {
-    if (rank(pack) < 0) continue;
-    const path = `src/${m}.ts`;
-    if (rawWalk('src').includes(path)) out.set(path, pack);
-  }
   for (const pack of ROOT_ORDER) for (const f of rawWalk(`packs/${pack}/kernel`)) if (f.endsWith('.ts') && !f.endsWith('.test.ts')) out.set(f, pack);
   return [...out];
 }

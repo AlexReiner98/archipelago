@@ -4,12 +4,14 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkDeclared } from '../src/declared.ts';
-import { said, filled, globNames } from '../src/instructions.ts';
-import { hookSessionStart } from '../src/session-hook.ts';
-import { VIEWS } from '../src/views.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
+import { checkDeclared } from '../packs/loader/kernel/declared.ts';
+import { said, filled, globNames } from '../packs/agents/kernel/instructions.ts';
+import * as sessionHookPack from '../packs/sessions/kernel/session-hook.ts';
+import { VIEWS } from '../packs/query/kernel/views.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { fresh, freshWith, make, packsWith } from './map.ts';
+import { ownContext } from '../packs/loader/kernel/kernel-context.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 // A place a session is found in by its folder, a pack's as a repository is, and a guide the pack says only when asked.
 const CHECKOUT = {
@@ -71,7 +73,7 @@ test('an instruction preset is checked as a style preset is: its words in body, 
 test('the session-start text is read from the instructions on the map', async () => {
   const l = await freshWith(new Registry(packsWith(CHECKOUT), ['core', 'sessions', 'practice', 'checkouts'])); // sessions and practice: what a session is told at its start
   await make(l, [{ op: 'create', type: 'checkout', title: 'Apex repo', props: { path: 'C:\\code\\Apex' } }]);
-  const text = await hookSessionStart(l, { session_id: 'i1', cwd: 'C:\\code\\Apex' });
+  const text = await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'i1', cwd: 'C:\\code\\Apex' }));
   const run = /as run (e_\w+)/.exec(text)?.[1];
   assert.match(text, /give it one: how many tokens/);
   assert.ok(text.includes(`report, action tell (run ${run})`), 'the run is filled in');
@@ -83,16 +85,16 @@ test('the session-start text is read from the instructions on the map', async ()
     { op: 'link', type: 'about', from: 'v', to: repo },
     { op: 'create', ref: 'off', type: 'instruction', title: 'No bumps', status: 'retired', props: { preset: 'core.bumps' } },
   ]);
-  const again = await hookSessionStart(l, { session_id: 'i1', cwd: 'C:\\code\\Apex' });
+  const again = await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'i1', cwd: 'C:\\code\\Apex' }));
   assert.match(again, /Here, estimate in hours\./);
   assert.doesNotMatch(again, /how many tokens|gets in your way/);
-  const far = await hookSessionStart(l, { session_id: 'i2', cwd: 'C:\\elsewhere' });
+  const far = await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'i2', cwd: 'C:\\elsewhere' }));
   assert.match(far, /how many tokens/, 'elsewhere the preset is said');
-  const view = (await VIEWS.instructions.run(l, { about: repo })) as { said: { id: string; preset?: string }[] };
+  const view = (await VIEWS.instructions.run(kernelContext(l, 'query'), { about: repo })) as { said: { id: string; preset?: string }[] };
   assert.deepEqual(view.said.map((s) => s.preset), ['core.estimate', 'core.report_in', 'practice.draw_answers']);
   assert.equal(view.said[0].id, made.v);
   // A guide is said only when asked for.
-  const guide = (await VIEWS.instructions.run(l, { for: 'guide:checkout_code' })) as { said: { preset?: string; text: string }[] };
+  const guide = (await VIEWS.instructions.run(kernelContext(l, 'query'), { for: 'guide:checkout_code' })) as { said: { preset?: string; text: string }[] };
   assert.deepEqual(guide.said.map((s) => s.preset), ['checkouts.guide']);
   assert.match(guide.said[0].text, /Draw a checkout as a folder/);
   assert.doesNotMatch(again, /Draw a checkout as a folder/);
@@ -101,9 +103,9 @@ test('the session-start text is read from the instructions on the map', async ()
 test('each working rule is said once: in the rules file a project is handed, from its preset, and nowhere else', async () => {
   const { readFileSync } = await import('node:fs');
   const { join } = await import('node:path');
-  const { presetsOf } = await import('../src/declared.ts');
-  const { checkoutPacks, workingRules } = await import('../src/working-rules.ts');
-  const { WRITE_TOOLS } = await import('../src/tool-change.ts');
+  const { presetsOf } = await import('../packs/loader/kernel/declared.ts');
+  const { checkoutPacks, workingRules } = await import('../packs/loader/kernel/working-rules.ts');
+  const { WRITE_TOOLS } = await import('../packs/surface/kernel/tool-change.ts');
   const presets = presetsOf(checkoutPacks(), 'instruction');
   const rules = presets.filter((p) => (p.props.for as string[]).includes('working_rules'));
   assert.deepEqual(rules.map((p) => p.id), ['findings.finding_line', 'practice.map_true', 'practice.names', 'practice.search_first', 'practice.plan_flow', 'practice.waits_on', 'core.authority']);

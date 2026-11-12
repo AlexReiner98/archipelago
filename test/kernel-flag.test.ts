@@ -3,10 +3,11 @@
 // declares it, so the same types are fenced as before, and the term `kind system` the kept views hold still works.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { flatRead } from '../src/query-flat.ts';
-import { kernelTypes, notKernel } from '../src/head.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
+import { kernelTypes, notKernel } from '../packs/loader/kernel/head.ts';
 import { fresh, make, packsWith } from './map.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 test('the types with the kernel flag are the types of the system kind', async () => {
   const l = await fresh();
@@ -39,7 +40,7 @@ test('kind system in a query reads the flag: left out by default, by the term, a
     { op: 'link', type: 'part_of', from: 't', to: 'p' },
     { op: 'link', type: 'part_of', from: 'v', to: 'p' },
   ]);
-  const ids = async (filter: Record<string, unknown>) => ((await flatRead(l, { filter })) as { items: { id: string }[] }).items.map((i) => i.id).sort();
+  const ids = async (filter: Record<string, unknown>) => ((await queryFlatPack.flatRead(kernelContext(l, 'query'), ({ filter }))) as { items: { id: string }[] }).items.map((i) => i.id).sort();
   assert.deepEqual(await ids({ find: [`in ${p}`] }), [t], 'the default Not leaves the view out');
   assert.deepEqual(await ids({ find: [`in ${p}`], not: ['kind system'] }), [t], 'as a kept view says it');
   assert.deepEqual(await ids({ find: [`in ${p}`], not: [] }), [t, v].sort(), 'and keeps it when asked');

@@ -3,11 +3,13 @@
 // when the kernel applied it itself, as the sender, past the rules, private, for the sender's person or the owner.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { alertOwner, resetAlerts } from '../src/alert.ts';
-import { notify } from '../src/notify.ts';
-import { callTool } from '../src/tools.ts';
+import { resetAlerts } from '../packs/alerts/kernel/alert.ts';
+import * as alertPack from '../packs/alerts/kernel/alert.ts';
+import * as notifyPack from '../packs/notifications/kernel/notify.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, fresh, human, make } from './map.ts';
-import type { Archipelago } from '../src/pelago.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** The entry that made an item, as the log keeps its header: who, on whose authority, by which rule. */
 async function madeBy(l: Archipelago, id: string) {
@@ -29,17 +31,17 @@ const latest = async (l: Archipelago, title: string) =>
 test('a notification is applied as its sender, past the rules, private, and names who sent it', async () => {
   const l = await fresh();
   const { task } = await make(l, [{ op: 'create', ref: 'task', type: 'task', title: 'Ship it' }]);
-  const { notification } = await notify(l, { kind: 'agent', name: 'claude' }, { title: 'The build broke', body: 'main is red', level: 'urgent', about: task });
+  const { notification } = await notifyPack.notify(kernelContext(l, 'notifications'), ({ kind: 'agent', name: 'claude' }), ({ title: 'The build broke', body: 'main is red', level: 'urgent', about: task }));
   assert.deepEqual(await madeBy(l, notification), SENT('agent:claude'));
   const made = await row(l, notification);
   assert.deepEqual([made.type, made.visibility, made.props.level, made.props.from], ['notification', 'private', 'urgent', 'agent:claude']);
-  await assert.rejects(notify(l, agent, { title: 'x', about: 'e_nothere0' }), /No item "e_nothere0"/);
+  await assert.rejects(notifyPack.notify(kernelContext(l, 'notifications'), agent, ({ title: 'x', about: 'e_nothere0' })), /No item "e_nothere0"/);
 });
 
 test("an alert is the scheduler's notification on the map it broke in", async () => {
   resetAlerts();
   const l = await fresh();
-  await alertOwner(Object.assign(Object.create(l), { workspace: 'customer' }), { key: 'k', title: 'Theirs broke', body: 'Details', level: 'warning', from: 'pelago' });
+  await alertPack.alertOwner(kernelContext((Object.assign(Object.create(l), { workspace: 'customer' })), 'alerts'), ({ key: 'k', title: 'Theirs broke', body: 'Details', level: 'warning', from: 'pelago' }));
   const id = await latest(l, 'Theirs broke');
   assert.ok(id, 'told on the map');
   assert.deepEqual(await madeBy(l, id!), SENT('agent:pelago'));

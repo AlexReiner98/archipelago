@@ -3,20 +3,21 @@
 // pack of the test's own (SHAPING).
 
 import assert from 'node:assert/strict';
-import { dumpVault } from '../src/vault.ts';
+import { dumpVault } from '../packs/seal/kernel/vault.ts';
 import { test } from 'node:test';
-import { dump, restore } from '../src/backup.ts';
-import { openDb } from '../src/db.ts';
-import { pictureOf } from '../src/query-kept.ts';
-import { Archipelago, type Op } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { askView } from '../src/askview.ts';
-import { lastSeq } from '../src/eventlog.ts';
+import { dump, restore } from '../packs/log/kernel/backup.ts';
+import { openDb } from '../packs/database/kernel/db.ts';
+import * as queryKeptPack from '../packs/lenses/kernel/query-kept.ts';
+import { Archipelago, type Op } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
+import { lastSeq } from '../packs/log/kernel/eventlog.ts';
 import { human, agent, fresh, freshWith, attend, make, packsWith } from './map.ts';
-import { getItem, proposals } from '../src/map-reads.ts';
+import { getItem, proposals } from '../packs/surface/kernel/map-reads.ts';
+import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A view asked by its name, as the view tool asks it. */
-const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
+const ask = (l: Archipelago, name: string, params: Record<string, unknown> = {}) => askviewPack.askView(kernelContext(l, 'query'), ({ kind: 'human', name: 'test' }) as Parameters<typeof askviewPack.askView>[1], name, params);
 
 /** Work that says how much an item in it holds before it is a hub, as a pack's type of work may. */
 const SHAPING = {
@@ -92,8 +93,8 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
     { op: 'create', ref: 'rs', type: 'style', title: 'Road opened', props: { open: 9 } },
     { op: 'link', type: 'about', from: 'rs', to: 'road' },
   ]);
-  const { keptPicture } = await import('../src/query-saved.ts');
-  const road = await keptPicture(l, kept.road);
+  const querySavedPack = await import('../packs/lenses/kernel/query-saved.ts');
+  const road = await querySavedPack.keptPicture(kernelContext(l, 'lenses'), kept.road);
   assert.deepEqual([road.items.map((i) => i.title).sort(), road.style.shape, road.style.open], [['C', 'Early', 'Late', 'P'], 'map', 4]);
 
   // A hub is an item that holds enough to need views of its own: how much is enough is its effort's to say.
@@ -112,7 +113,7 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   const folded = await free.change(agent, { reason: 'fold', ops: [{ op: 'merge', keep: drawn.ws, drop: drawn.spare }] });
   assert.deepEqual([plain.status, coded.status, born.status, folded.status], ['applied', 'proposed', 'proposed', 'proposed']);
   assert.equal((await run()).style.page_css, undefined, 'and until the human approves it, the page is drawn without it');
-  assert.deepEqual([await pictureOf(l, drawn.ps), await pictureOf(l, drawn.ws), await pictureOf(l, kept.road), await pictureOf(l, made.a)], [`graph?from=${made.p}`, 'graph?lens', `v?canvas=${kept.road}`, undefined], 'a style is seen at work in the picture it is about, a kept view as itself');
+  assert.deepEqual([await queryKeptPack.pictureOf(kernelContext(l, 'lenses'), drawn.ps), await queryKeptPack.pictureOf(kernelContext(l, 'lenses'), drawn.ws), await queryKeptPack.pictureOf(kernelContext(l, 'lenses'), kept.road), await queryKeptPack.pictureOf(kernelContext(l, 'lenses'), made.a)], [`graph?from=${made.p}`, 'graph?lens', `v?canvas=${kept.road}`, undefined], 'a style is seen at work in the picture it is about, a kept view as itself');
 });
 
 test('an item\'s unsettled questions are what needs settling in it, what holds up the most first', async () => {

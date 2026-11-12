@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import { join } from 'node:path';
 import { after, before, test } from 'node:test';
-import { hookAt } from '../src/server-adapter.ts';
-import { loadServerPacks } from '../src/server-packs.ts';
+import { hookAt } from '../packs/loader/kernel/server-adapter.ts';
+import { loadServerPacks } from '../packs/loader/kernel/server-packs.ts';
 import { serve } from './serve.ts';
 
 const FIXTURES = join(import.meta.dirname, 'server-packs', 'adapter');

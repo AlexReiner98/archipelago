@@ -5,18 +5,18 @@
 // those an internal pack declares come through the slot surface.tools (./server-fillings.ts).
 
 import { z } from 'zod';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import { MEMBER_TOOLS } from '../../../src/members.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
+import { MEMBER_TOOLS } from '../../identity/kernel/members.ts';
 import { WORKSPACE_TOOLS } from './workspace-tools.ts';
-import { PACK_STATE_TOOLS } from '../../../src/packstate.ts';
-import { BACKUP_TOOLS } from '../../../src/backup-tools.ts';
+import { PACK_STATE_TOOLS } from '../../loader/kernel/packstate.ts';
+import { BACKUP_TOOLS } from './backup-tools.ts';
 import { FORMER_NAMES, REPORT_TOOLS } from './report-tool.ts';
-import { TOKEN_TOOLS } from '../../../src/token-tools.ts';
-import { callAs, ownContext, type KernelContext } from '../../../src/kernel-context.ts';
-import { LOOK_READS } from '../../../src/look-pass.ts';
-import type { Registry } from '../../../src/packs.ts';
-import { packActionByShort, packTool, packTools } from '../../../src/packtools.ts';
-import { withinScope } from '../../../src/scope.ts';
+import { TOKEN_TOOLS } from '../../identity/kernel/token-tools.ts';
+import { callAs, ownContext, type KernelContext } from '../../loader/kernel/kernel-context.ts';
+import { LOOK_READS } from '../../walls/kernel/look-pass.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
+import { packActionByShort, packTool, packTools } from '../../loader/kernel/packtools.ts';
+import { withinScope } from './scope.ts';
 import { viewsSaid } from './view-words.ts';
 import { actionsOf, listedChange, movedTo, route, surfaceNames, surfaceTools, type Action } from './surface.ts';
 import { packAct } from './surface-slots.ts';

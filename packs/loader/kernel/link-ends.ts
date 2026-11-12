@@ -3,8 +3,8 @@
 // (`owned_by` goes from `has:owned`). A capability end is how the kernel's own links say their ends once types need
 // no kind (decision e_w46v6jf9).
 
-import { CAPABILITIES, type Capabilities } from '../../../src/capabilities.ts';
-import type { ResolvedType } from '../../../src/packs.ts';
+import { CAPABILITIES, type Capabilities } from './capabilities.ts';
+import type { ResolvedType } from './packs.ts';
 
 const HAS = 'has:';
 

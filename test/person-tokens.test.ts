@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { createToken } from '../src/auth.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
 import { serve } from './serve.ts';
 
 // One agent token per person (bug e_94ag6443): it reaches every workspace its person is a member of, as that person's

@@ -2,8 +2,8 @@
 // databases do not pile up while it runs (a few hundred MB each). The steps it took are kept first, so no flush is
 // left waiting to write to a database already closed, or to run while the process exits.
 import { after, afterEach } from 'node:test';
-import { openInMemory } from '../src/db.ts';
-import { flushAll } from '../src/presence.ts';
+import { openInMemory } from '../packs/database/kernel/db.ts';
+import { flushAll } from '../packs/presence/kernel/presence.ts';
 
 afterEach(async () => {
   await flushAll().catch(() => {});

@@ -3,9 +3,9 @@
 // the map's says only that, and the page keeps the map's model.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { Registry } from '../src/packs.ts';
-import { setIslands } from '../src/packstate.ts';
-import { callTool } from '../src/tools.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, make, packsWith } from './map.ts';
 
 const thing = { id: 'plain.thing', title: 'Thing', description: 'A thing.', extends: 'work' };

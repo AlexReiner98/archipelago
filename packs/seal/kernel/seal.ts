@@ -8,7 +8,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import type { Q } from '../../database/kernel/db.ts';
-import type { Entry, Fact } from '../../../src/log.ts';
+import type { Entry, Fact } from '../../log/kernel/log.ts';
 import { keysFor, keysIn, keysOf, type Key, type VaultDump } from './vault.ts';
 
 export type Sealed = { $k: number; $n: string; $c: string };

@@ -6,7 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, utimesSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { sweepLooks } from '../src/chrome.ts';
+import { sweepLooks } from '../packs/look_draw/kernel/chrome.ts';
 import { pruneKept } from '../scripts/pull.ts';
 import { sweepTemp } from './sweep.ts';
 

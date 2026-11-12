@@ -2,7 +2,7 @@
 // the registry a change is checked and applied against when it makes or changes one.
 
 import type { Registry, TypeDef } from './packs.ts';
-import type { Archipelago, Op } from '../../../src/pelago.ts';
+import type { Archipelago, Op } from '../../write/kernel/pelago.ts';
 import { PACK_ITEM } from './pack-items.ts'; import { versionRegistry } from './island-pin.ts';
 import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 import { followMade } from './packstate.ts';

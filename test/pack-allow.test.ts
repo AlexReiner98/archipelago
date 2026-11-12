@@ -6,11 +6,11 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { packsFor, readOnlyPacks, readWorkspacePacks } from '../src/pack-allow.ts';
-import { packStates, setPack } from '../src/packstate.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { packsFor, readOnlyPacks, readWorkspacePacks } from '../packs/loader/kernel/pack-allow.ts';
+import { packStates, setPack } from '../packs/loader/kernel/packstate.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 import { human, packsWith } from './map.ts';
-import { getItem } from '../src/map-reads.ts';
+import { getItem } from '../packs/surface/kernel/map-reads.ts';
 
 test('the lists are read from the environment, the kernel always on them', () => {
   assert.equal(readOnlyPacks(undefined), undefined);

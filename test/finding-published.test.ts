@@ -3,8 +3,8 @@
 // findings, read on their own island only.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { checkCapabilities } from '../src/capabilities.ts';
-import { setIslands } from '../src/packstate.ts';
+import { checkCapabilities } from '../packs/loader/kernel/capabilities.ts';
+import { setIslands } from '../packs/loader/kernel/packstate.ts';
 import { fresh, human, make } from './map.ts';
 
 async function twoIslands() {

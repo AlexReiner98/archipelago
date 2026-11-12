@@ -6,11 +6,11 @@
 // takes them out of what the pack is handed, so a key a host makes for the pack is never seen by it.
 
 import { createSign } from 'node:crypto';
-import { controlValue, setControlValue } from '../../../src/control.ts';
-import type { Q } from '../../../src/db.ts';
+import { controlValue, setControlValue } from '../../identity/kernel/control.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { env } from '../../../src/env.ts';
-import { seal, unseal } from '../../../src/secrets.ts';
-import { envSecret, type ServerHost, type ServerPackFile } from '../../../src/server-packs.ts';
+import { seal, unseal } from '../../seal/kernel/secrets.ts';
+import { envSecret, type ServerHost, type ServerPackFile } from '../../loader/kernel/server-packs.ts';
 
 export interface HostRequest {
   host: string;

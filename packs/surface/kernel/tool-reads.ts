@@ -2,22 +2,22 @@
 // for an item, and listening for what the owner does. Agents reach each of them through query.
 
 import { z } from 'zod';
-import { lastSeq, readEvents } from '../../../src/eventlog.ts';
+import { lastSeq, readEvents } from '../../log/kernel/eventlog.ts';
 import { askView, viewList, viewsSaid } from './view-words.ts';
 import { showingIn } from './public-views.ts';
-import { bypassingRls } from '../../../src/outbox.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
-import { callAs } from '../../../src/kernel-context.ts';
+import { bypassingRls } from '../../identity/kernel/outbox.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
 // A look is the look_draw pack's, asked by name on the screen of the map that asks (answer.look, answer.look_at).
 const whose = (l: Archipelago) => ({ workspace: l.workspace, ...(l.viewer !== undefined && { viewer: l.viewer }) });
 const looks = async <O>(l: Archipelago, name: string, input: object) => (await import('../../loader/kernel/kernel-context.ts')).callAs<O>(l, name, { whose: whose(l), ...input });
-import { islandVersion } from '../../../src/island-pin.ts';
-import { LARGE, sizeOf } from '../../../src/head.ts';
+import { islandVersion } from '../../loader/kernel/island-pin.ts';
+import { LARGE, sizeOf } from '../../loader/kernel/head.ts';
 import { props } from './tool-ops.ts'; import { searchMap } from './search.ts'; import { getItem, proposals } from './map-reads.ts';
 import type { Tool } from './tools.ts';
 import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
-import { withCovers } from '../../../src/withdraw.ts';
-import { itemLink } from '../../../src/members.ts';
+import { withCovers } from '../../write/kernel/withdraw.ts';
+import { itemLink } from '../../identity/kernel/members.ts';
 
 /** One thing the human did to the map, small enough to put in front of a model. */
 export interface HumanChange {

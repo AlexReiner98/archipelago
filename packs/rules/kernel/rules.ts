@@ -6,14 +6,14 @@
 // same form, and a setting only lifts a rule its pack declared liftable (`lifted`). `decide` answers for a change,
 // naming the rule that decided it; `mayDo` for an act that is not a change (publishing, downloading a backup).
 
-import type { Q } from '../../../src/db.ts';
-import type { Registry } from '../../../src/packs.ts';
-import type { Keep } from '../../../src/retention.ts';
-import { fieldInReach, inReach } from '../../../src/reach.ts';
+import type { Q } from '../../database/kernel/db.ts';
+import type { Registry } from '../../loader/kernel/packs.ts';
+import type { Keep } from '../../log/kernel/retention.ts';
+import { fieldInReach, inReach } from '../../loader/kernel/reach.ts';
 // What checks a pack's rules as it loads is the loader's; the words it checks by are read here too.
 import { COMPARE, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
 export { checkRules } from '../../loader/kernel/rule-check.ts';
-import { KERNEL_PACKS } from '../../../src/packorder.ts';
+import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
 
 type OneOrMany = string | string[];
 

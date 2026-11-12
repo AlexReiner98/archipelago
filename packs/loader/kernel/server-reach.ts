@@ -6,7 +6,7 @@
 
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { isCountStream } from '../../../src/retention.ts';
+import { isCountStream } from '../../log/kernel/retention.ts';
 
 /** The addresses a server pack may take, each by at most one pack (decision e_wptrr6tf). */
 export const MOUNTS = ['public', 'site', 'setup'] as const;

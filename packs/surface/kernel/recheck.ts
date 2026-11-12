@@ -4,8 +4,8 @@
 // The view is asked through the surface's slot surface.reads (`view`), which the pack that answers views fills: the
 // surface asks no module above it.
 
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import { actorId } from '../../../src/pelago-types.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
+import { actorId } from '../../write/kernel/pelago-types.ts';
 import { answerFilled } from './surface-slots.ts';
 
 /** `rechecked`: the projects the recheck view says waited for one start again; answers which, and when. */

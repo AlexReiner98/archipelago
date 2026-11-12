@@ -10,7 +10,7 @@ import type { ActionDef, LayoutDef, HearDef, HostDef, ReasonDef, ScheduleDef, Sc
 import { isName, KERNEL_PACKS, NAME_FORMS } from './packorder.ts';
 import { FAMILIES } from './services.ts';
 import type { FieldDef, RelationDef, TypeDef } from './packs.ts';
-import type { RuleDef } from '../../../src/rules.ts';
+import type { RuleDef } from '../../rules/kernel/rules.ts';
 import type { ServerHost, ServerReach } from './server-packs.ts';
 
 /** Fields a pack adds to a type another pack declares: an entry of its types with `of` in place of an id. */

@@ -7,7 +7,7 @@
 import type { Q } from '../../database/kernel/db.ts';
 import { digestOf, isSealed, openNoting, seal, sealable } from './seal.ts';
 import { keysFor, keysOf } from './vault.ts';
-import type { Light, OpFact } from '../../../src/streams.ts';
+import type { Light, OpFact } from '../../log/kernel/streams.ts';
 
 type Head = { reason?: unknown; [field: string]: unknown };
 

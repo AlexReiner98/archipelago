@@ -2,10 +2,10 @@
 // entry, a {ref} in its props is the id it makes, and a rule a setting lifted is named as what let it through.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Actor } from '../src/pelago.ts';
-import { callTool } from '../src/tools.ts';
-import { onTypesChanged } from '../src/type-items.ts';
-import { syncTypes } from '../src/typetable.ts';
+import type { Actor } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { onTypesChanged } from '../packs/loader/kernel/type-items.ts';
+import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { fresh, human } from './map.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };

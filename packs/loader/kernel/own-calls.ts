@@ -13,7 +13,7 @@ import { isInternal, type Manifest } from './manifest.ts';
 import { OWN_PACKS } from './pack-folders.ts';
 import { ownManifest } from './root-calls.ts';
 import { ownContext } from './kernel-context.ts';
-import type { Archipelago } from '../../../src/pelago.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 const POINT = 'loader.calls';
 

@@ -4,8 +4,8 @@
 // link it may send and everything inside that, the sessions at work on it, and who owns it all. One that goes near
 // reads what it walks to, and nothing inside it. Read by the brief and by a pack's read around an item.
 
-import type { Archipelago } from '../../../src/pelago.ts';
-import { notKernel } from '../../../src/head.ts';
+import type { Archipelago } from '../../write/kernel/pelago.ts';
+import { notKernel } from '../../loader/kernel/head.ts';
 
 export interface Row {
   id: string;

@@ -18,12 +18,12 @@ import type { AddressInfo } from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
-import { createToken } from '../src/auth.ts';
-import { parseBackup, readVault, type Dump } from '../src/backup.ts';
-import { storageBytes, bytes } from '../src/workspace-use.ts';
-import { configureSecrets } from '../src/secrets.ts';
-import { createHttpServer } from '../src/server.ts';
-import { Workspaces } from '../src/workspaces.ts';
+import { createToken } from '../packs/identity/kernel/auth.ts';
+import { parseBackup, readVault, type Dump } from '../packs/log/kernel/backup.ts';
+import { storageBytes, bytes } from '../packs/surface/kernel/workspace-use.ts';
+import { configureSecrets } from '../packs/seal/kernel/secrets.ts';
+import { createHttpServer } from '../packs/surface/kernel/server.ts';
+import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
 const { values: opt } = parseArgs({ options: { data: { type: 'string' }, 'database-url': { type: 'string' }, open: { type: 'string', default: '5' }, seconds: { type: 'string', default: '20' }, transcripts: { type: 'string' }, days: { type: 'string', default: '14' } } });
 const mb = (n: number) => `${Math.round(n / 1e6)} MB`;

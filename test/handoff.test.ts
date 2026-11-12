@@ -3,19 +3,20 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { heldResources } from '../src/blocking.ts';
-import { configureLauncher, launch, type Launcher } from '../src/launcher.ts';
-import { ServerPacks } from '../src/server-host.ts';
-import { packLauncher } from '../src/server-launch.ts';
-import { OWN_PACKS } from '../src/server-packs.ts';
-import { Archipelago } from '../src/pelago.ts';
-import { Registry, type PackFile } from '../src/packs.ts';
-import { configureSecrets, isSealed, seal, unseal } from '../src/secrets.ts';
-import { recordUsage, sessionStart, sessionUpdate } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
-import { askView } from '../src/askview.ts';
+import { heldResources } from '../packs/surface/kernel/blocking.ts';
+import { configureLauncher, launch, type Launcher } from '../packs/surface/kernel/launcher.ts';
+import { ServerPacks } from '../packs/surface/kernel/server-host.ts';
+import { packLauncher } from '../packs/surface/kernel/server-launch.ts';
+import { OWN_PACKS } from '../packs/loader/kernel/server-packs.ts';
+import { Archipelago } from '../packs/write/kernel/pelago.ts';
+import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
+import { configureSecrets, isSealed, seal, unseal } from '../packs/seal/kernel/secrets.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import * as askviewPack from '../packs/query/kernel/askview.ts';
 import { human, agent, fresh, freshWith, make, packsWith } from './map.ts';
-import { proposals } from '../src/map-reads.ts';
+import { proposals } from '../packs/surface/kernel/map-reads.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A place found by its folder and its remote, as a repository is: what launching and a run's report look for. */
 const YARD: PackFile = {
@@ -25,7 +26,7 @@ const YARD: PackFile = {
 const withYard = () => freshWith(new Registry(packsWith(YARD)));
 
 /** A view asked by its name, as the view tool asks it. */
-const ask = (l: Parameters<typeof askView>[0], name: string, params: Record<string, unknown> = {}) => askView(l, { kind: 'human', name: 'test' }, name, params);
+const ask = (l: Archipelago, name: string, params: Record<string, unknown> = {}) => askviewPack.askView(kernelContext(l, 'query'), ({ kind: 'human', name: 'test' }) as Parameters<typeof askviewPack.askView>[1], name, params);
 
 test('a note can name what the same change makes, and an agent can ask for its change to be held', async () => {
   const l = await fresh();
@@ -203,16 +204,16 @@ test('tokens: an estimate is asked for, what a session uses goes to its work, an
     { op: 'link', type: 'part_of', from: 'b', to: 'f' },
     { op: 'link', type: 'about', from: 'n', to: 'p' },
   ]);
-  const { run } = await sessionStart(l, agent, { session_id: 's1', title: 'Counting' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 's1', title: 'Counting' }));
   const before = (await l.entity(made.b))!.updated_at;
   // Used with nothing taken on: the session keeps it.
-  assert.deepEqual(await recordUsage(l, 's1', 10_000), { run, added: 10_000, to: [] });
-  assert.match(((await sessionUpdate(l, agent, { run, task: made.b })) as any).estimate, /"Task B" has no estimate.*tokens_estimated/);
-  assert.equal(((await sessionUpdate(l, agent, { run, task: made.a })) as any).estimate, undefined, 'one with an estimate is not asked about');
+  assert.deepEqual(await sessionsPack.recordUsage(ownContext(l, 'sessions'), 's1', 10_000), { run, added: 10_000, to: [] });
+  assert.match(((await sessionsPack.sessionUpdate(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ run, task: made.b }))) as any).estimate, /"Task B" has no estimate.*tokens_estimated/);
+  assert.equal(((await sessionsPack.sessionUpdate(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ run, task: made.a }))) as any).estimate, undefined, 'one with an estimate is not asked about');
   // The count is the session's total: only what is new is shared between what it is on.
-  assert.deepEqual((await recordUsage(l, 's1', 50_000))!.added, 40_000);
-  assert.equal((await recordUsage(l, 's1', 50_000))!.added, 0, 'the same count again adds nothing');
-  assert.equal(await recordUsage(l, 'nobody', 5), undefined);
+  assert.deepEqual((await sessionsPack.recordUsage(ownContext(l, 'sessions'), 's1', 50_000))!.added, 40_000);
+  assert.equal((await sessionsPack.recordUsage(ownContext(l, 'sessions'), 's1', 50_000))!.added, 0, 'the same count again adds nothing');
+  assert.equal(await sessionsPack.recordUsage(ownContext(l, 'sessions'), 'nobody', 5), undefined);
   const props = async (id: string) => (await l.entity(id))!.props;
   assert.deepEqual([(await props(run)).tokens_used, (await props(made.a)).tokens_used, (await props(made.b)).tokens_used], [50_000, 20_000, 20_000]);
   assert.deepEqual((await l.entity(made.b))!.updated_at, before, 'measuring does not make the work look newly confirmed');

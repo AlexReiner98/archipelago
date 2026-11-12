@@ -9,7 +9,7 @@
 // type declares them (core's in the core pack ("column": true), or is given them, ownHead), a flavour inherits them, and a write that sets one its type does
 // not declare is refused like any other undeclared field.
 
-import type { FieldDef, ResolvedType, TypeDef } from '../../../src/packs.ts';
+import type { FieldDef, ResolvedType, TypeDef } from './packs.ts';
 
 /** The word for the app's own configuration (views, styles, screens, runs): core's kind of it, and the query term `kind system`, read as the kernel flag. */
 export const SYSTEM = 'system';

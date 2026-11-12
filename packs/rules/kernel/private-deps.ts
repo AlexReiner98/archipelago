@@ -1,6 +1,6 @@
 // Nothing shared may wait on what is private to someone: checked by plan (src/pelago.ts) for every change.
 
-import type { Archipelago, Op } from '../../../src/pelago.ts';
+import type { Archipelago, Op } from '../../write/kernel/pelago.ts';
 
 /** Relations that make one thing wait on another. */
 export const BLOCKING_RELATIONS = ['depends_on', 'needs'];

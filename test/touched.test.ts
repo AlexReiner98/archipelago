@@ -6,12 +6,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { answerHook } from './claude-hook.ts';
-import type { Archipelago } from '../src/pelago.ts';
-import { sessionStart } from '../src/sessions.ts';
-import { callTool } from '../src/tools.ts';
-import { touchedBy } from '../src/touched.ts';
-import { Registry } from '../src/packs.ts';
+import type { Archipelago } from '../packs/write/kernel/pelago.ts';
+import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import * as touchedPack from '../packs/sessions/kernel/touched.ts';
+import { Registry } from '../packs/loader/kernel/packs.ts';
 import { agent, fresh, freshWith, laneSetup, make, PACKS } from './map.ts';
+import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A hook as Claude Code sends it, answered by this map. */
 const hook = (l: Archipelago, event: string, body: Record<string, unknown>) => answerHook(event, { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' });
@@ -22,15 +23,15 @@ test('what a session touched is kept with its run, apart from another session of
     { op: 'create', ref: 'mine', type: 'task', title: 'Read and left' },
     { op: 'create', ref: 'theirs', type: 'task', title: 'Read by the other' },
   ]);
-  const one = await sessionStart(l, agent, { session_id: 't1' });
-  const two = await sessionStart(l, agent, { session_id: 't2' });
+  const one = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 't1' }));
+  const two = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 't2' }));
   await hook(l, 'stop', { session_id: 't1', touched: [made.mine, 'not an id', 42] });
   await hook(l, 'prompt', { session_id: 't2', touched: [made.theirs] });
   await hook(l, 'stop', { session_id: 't1', touched: [made.mine] });
-  assert.deepEqual(await touchedBy(l, one.run), [made.mine], 'by run, not by actor, and only ids');
-  assert.deepEqual(await touchedBy(l, two.run), [made.theirs]);
+  assert.deepEqual(await touchedPack.touchedBy(kernelContext(l, 'sessions'), one.run), [made.mine], 'by run, not by actor, and only ids');
+  assert.deepEqual(await touchedPack.touchedBy(kernelContext(l, 'sessions'), two.run), [made.theirs]);
   await hook(l, 'stop', { session_id: 't2' });
-  assert.deepEqual(await touchedBy(l, two.run), [made.theirs], 'an older hook that sends none leaves the set as it was');
+  assert.deepEqual(await touchedPack.touchedBy(kernelContext(l, 'sessions'), two.run), [made.theirs], 'an older hook that sends none leaves the set as it was');
 
   // Its end names what it touched and left as it was, though it is in no repository; one word does not answer for it.
   const asked = (await callTool(l, agent, 'session_end', { run: one.run, cannot_tell_rest: true })) as any;
@@ -46,7 +47,7 @@ test('what a session touched is kept with its run, apart from another session of
 test('in a repository, what the session touched is asked about first', async () => {
   const l = await freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs')], ['core', 'checkout']));
   const made = await laneSetup(l);
-  const { run } = await sessionStart(l, agent, { cwd: 'C:\\code\\Apex', session_id: 'r1' });
+  const { run } = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ cwd: 'C:\\code\\Apex', session_id: 'r1' }));
   await hook(l, 'stop', { session_id: 'r1', touched: [made.gated, made.repo] });
   const asked = (await callTool(l, agent, 'session_end', { run })) as any;
   assert.deepEqual(asked.unreconciled.map((i: any) => [i.title, Boolean(i.touched)]), [['Tune the solver', true], ['Capture probe', false], ['Write unit tests', false]]);

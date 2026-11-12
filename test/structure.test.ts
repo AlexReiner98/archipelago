@@ -11,7 +11,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
-import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
+import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../packs/log/kernel/operational.ts';
 import { spacing } from './spacing.ts';
 import { codeFiles, count, counts, KEPT, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, VENDORED, walk } from './structure-kit.ts';
 import { rootImports } from './structure-roots.ts';
@@ -40,9 +40,9 @@ test('the kernel names no pack', () => {
 // bare name too. What was counted on that day is words that are also some pack's type name (a capability, a view, a
 // verb's action): no new one may be added. SQL strings count too (`type = 'run'`); run, works_on, notification, about are core's.
 const NAMES_PACK_TYPES: Record<string, number> = {
-  'src/altitude.ts': 1, 'src/capabilities.ts': 2, 'src/declared.ts': 3, 'src/look-pass.ts': 1, 'src/manifest.ts': 1, 'src/outside.ts': 1,
-  'src/packhost.ts': 4, 'src/packreads.ts': 1, 'src/packs.ts': 3, 'src/packtools.ts': 3, 'src/pelago.ts': 2, 'src/public-document.ts': 1,
-  'src/public.ts': 1, 'src/rules.ts': 1, 'src/schema.ts': 1, 'src/scope.ts': 2, 'src/ui-files.ts': 1,
+  'packs/loader/kernel/altitude.ts': 1, 'packs/loader/kernel/capabilities.ts': 2, 'packs/loader/kernel/declared.ts': 3, 'packs/walls/kernel/look-pass.ts': 1, 'packs/loader/kernel/manifest.ts': 1, 'packs/loader/kernel/outside.ts': 1,
+  'packs/loader/kernel/packhost.ts': 4, 'packs/surface/kernel/packreads.ts': 1, 'packs/loader/kernel/packs.ts': 3, 'packs/loader/kernel/packtools.ts': 3, 'packs/write/kernel/pelago.ts': 2, 'packs/walls/kernel/public-document.ts': 1,
+  'packs/surface/kernel/public.ts': 1, 'packs/rules/kernel/rules.ts': 1, 'packs/database/kernel/schema.ts': 1, 'packs/surface/kernel/scope.ts': 2, 'packs/surface/kernel/ui-files.ts': 1,
 };
 
 // Core's words until 11 Nov 2026 (people and calendar packs, e_wrdg6udh); `event` is also the kernel's for a log event.
@@ -88,7 +88,7 @@ test("the kernel imports no pack's code", () => {
 // The kernel reads no kind (the owner, e_w46v6jf9): core's eight are starter types, and what an item is comes from its type
 // (its starter, lineage, capabilities). The kind column is written from the starter, the `kind <k>` term read through the type;
 // left: the database's own fill of the column, a released schema step that is never edited (src/head.ts, ITEM_KIND).
-const READS_KINDS: Record<string, number> = { 'src/head.ts': 1 };
+const READS_KINDS: Record<string, number> = { 'packs/loader/kernel/head.ts': 1 };
 const KIND_READ = /\bkindsOf\b|\.kinds\(\)|\b(?:type|get)\([^)]*\)\??\.kind\b|\b(?:type|def|parent|resolved|item|entity)\??\.kind\b|\bkind\s*(?:[!=]==?|<>)\s*['"](?:actor|aim|work|question|record|occurrence|place|system)['"]|\be\.kind\s*(?:=|<>|!=)\s|def->>'kind'/g;
 test('the kernel reads no kind', () => {
   assert.deepEqual(ratchet(count(kernelFiles, KIND_READ), READS_KINDS), [], "Read the type: its starter, its lineage (registry.isA) or a capability it declares, never an item's kind.");
@@ -98,7 +98,7 @@ test('the kernel reads no kind', () => {
 // change for facts, projected by the projector it runs (src/replay.ts), and the operational writes and the restore path src/operational.ts names.
 // Every other store is named there too.
 const WRITES_ELSEWHERE: Record<string, number> = {};
-const WRITE_PATH = ['src/pelago.ts', 'src/change-apply.ts', 'src/replay.ts'];
+const WRITE_PATH = ['packs/write/kernel/pelago.ts', 'packs/write/kernel/change-apply.ts', 'packs/log/kernel/replay.ts'];
 
 test('items and relations are written in one place', () => {
   const others = srcCode.filter((f) => !WRITE_PATH.includes(f));
@@ -112,7 +112,7 @@ test('every store is named, with its rule', () => {
   const named = [...MAP_TABLES, ...Object.keys(STORES)];
   assert.deepEqual(tables.filter((t) => !named.includes(t)), [], 'Name the store in src/operational.ts, with the one rule it keeps.');
   assert.deepEqual(named.filter((t) => !tables.includes(t)), [], 'A store src/operational.ts names that no longer exists: take it out.');
-  assert.ok(read('src/pelago.ts').includes(`function ${RESTORE}(`), 'The restore path src/operational.ts names is in src/pelago.ts.');
+  assert.ok(read('packs/write/kernel/pelago.ts').includes(`function ${RESTORE}(`), 'The restore path src/operational.ts names is in src/pelago.ts.');
 });
 
 // Whether a change applies, waits for a person or is refused is decided by the rules (src/rules.ts, decide) and
@@ -121,12 +121,12 @@ test('every store is named, with its rule', () => {
 test('every approval is decided by a rule', () => {
   const src = srcCode;
   const held = count(src, /append\(tx, this\.workspace, 'pending'/g);
-  assert.deepEqual(held, { 'src/pelago.ts': 1 }, 'A change waits only where Archipelago.change holds it on the verdict of decide.');
-  assert.deepEqual(count(src, /insert\s+into\s+proposal\s*\(/gi), { 'src/replay.ts': 1 }, 'The queue is projected from the pending stream, nowhere else.');
-  assert.match(read('src/pelago.ts'), /verdict\.outcome === 'hold'/, 'Archipelago.change holds a change on the verdict of decide.');
-  const lifts = count(src.filter((f) => f !== 'src/rules.ts' && f !== 'src/schema.ts'), /['"`](?:agent_changes|agent_code|agent_publish|agent_backups)['"`]/g);
+  assert.deepEqual(held, { 'packs/write/kernel/pelago.ts': 1 }, 'A change waits only where Archipelago.change holds it on the verdict of decide.');
+  assert.deepEqual(count(src, /insert\s+into\s+proposal\s*\(/gi), { 'packs/log/kernel/replay.ts': 1 }, 'The queue is projected from the pending stream, nowhere else.');
+  assert.match(read('packs/write/kernel/pelago.ts'), /verdict\.outcome === 'hold'/, 'Archipelago.change holds a change on the verdict of decide.');
+  const lifts = count(src.filter((f) => f !== 'packs/rules/kernel/rules.ts' && f !== 'packs/database/kernel/schema.ts'), /['"`](?:agent_changes|agent_code|agent_publish|agent_backups)['"`]/g);
   assert.deepEqual(lifts, {}, 'A setting lifts a rule a pack declared liftable: read it through src/rules.ts (decide, mayDo, liftsOn).');
-  const policy = count(src.filter((f) => f !== 'src/rules.ts'), /\bpolicy\s*\[|['"]forbidden['"]|level\s*===/g);
+  const policy = count(src.filter((f) => f !== 'packs/rules/kernel/rules.ts'), /\bpolicy\s*\[|['"]forbidden['"]|level\s*===/g);
   assert.deepEqual(policy, {}, "The server's policy is read only by the rules: what it lifts, and what it forbids (serverRules).");
 });
 
@@ -135,6 +135,7 @@ test("a pack's code imports nothing of the kernel", () => {
   const reaching: string[] = [];
   for (const file of walk('packs').filter((f) => /\.(ts|js|mjs)$/.test(f) && !rootCode.includes(f))) { const text = read(file); // a root's: rule 22
     for (const { 1: spec, index } of text.matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)) {
+      if (/[\s,<>]/.test(spec)) continue; // words in a string that read like an import (a data: URL, 'Name <address>'), no module
       const own = spec.startsWith('./') || (spec.startsWith('../') && !relative(join(ROOT, 'packs', file.split('/')[1]), join(ROOT, file, '..', spec)).startsWith('..'));
       if (!own && !(spec === '#pelago/test' && /\.test\.ts$/.test(file)) && !(spec === '#pelago/kernel' && /^import\s+type\b/.test(text.slice(text.lastIndexOf('import', index), index))) && !spec.startsWith('node:')) reaching.push(`${file} imports ${spec}`);
     }
@@ -309,8 +310,8 @@ test('the UI and the tools use one name for each idea', () => {
 // instead of the work; every other is a view a pack declares, and the core pack's are lens presets, answered by the
 // lens query (src/query-presets.ts). A kernel view that is neither is refused.
 test('every kernel view is a lens preset or named as operational', async () => {
-  await import('../src/tools.ts'); // every module that adds a view of its own (src/sessions.ts adds story) is loaded
-  const { VIEWS } = await import('../src/views.ts');
+  await import('../packs/surface/kernel/tools.ts'); // every module that adds a view of its own (src/sessions.ts adds story) is loaded
+  const { VIEWS } = await import('../packs/query/kernel/views.ts');
   const unnamed = Object.keys(VIEWS).filter((name) => !(name in VIEWS_OPERATIONAL));
   assert.deepEqual(unnamed, [], 'Make it a lens preset (packs/core/pack.json views, with lens), or a pack view, or name it in src/operational.ts with what it reads.');
   assert.deepEqual(Object.keys(VIEWS_OPERATIONAL).filter((name) => !(name in VIEWS)), [], 'A view src/operational.ts names that the kernel no longer answers: take it out.');
@@ -325,7 +326,7 @@ test('every kernel view is a lens preset or named as operational', async () => {
 // (src/manifest.ts), and nothing else. A key of the shape before is one LEGACY maps, refused with where it went;
 // here no pack file uses one. A key that is neither is refused.
 test('every pack file is in the manifest shape, and every old key is mapped', async () => {
-  const { LEGACY, MANIFEST_KEYS, REACH_KEYS, SERVER_KEYS } = await import('../src/manifest.ts');
+  const { LEGACY, MANIFEST_KEYS, REACH_KEYS, SERVER_KEYS } = await import('../packs/loader/kernel/manifest.ts');
   const unmapped: string[] = [];
   for (const file of [...walk('packs'), ...walk('test'), ...walk('examples')].filter((f) => f.endsWith('/pack.json'))) {
     const m = JSON.parse(read(file)) as Record<string, unknown> & { reach?: Record<string, unknown> & { server?: Record<string, unknown> } };
@@ -342,11 +343,11 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
 // (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
 const WHOLE_READS: Record<string, number> = {
-  'src/forget.ts': 1,
-  'src/log.ts': 1,
-  'src/mentions.ts': 1,
-  'src/pelago.ts': 1,
-  'src/search.ts': 1,
+  'packs/write/kernel/forget.ts': 1,
+  'packs/log/kernel/log.ts': 1,
+  'packs/database/kernel/mentions.ts': 1,
+  'packs/write/kernel/pelago.ts': 1,
+  'packs/surface/kernel/search.ts': 1,
 };
 
 /** The tables that grow with the map. */
@@ -357,7 +358,7 @@ const BOUND = /=\s*any\s*\(|unnest\s*\(|\b(?:id|from_id|to_id|target_id|ancestor
 test('no read of the whole map', () => {
   const indexes = new Set(srcCode.flatMap((f) => [...read(f).matchAll(/create (?:unique )?index if not exists (\w+)/g)].map((m) => m[1])));
   const queries = (text: string) => [...text.matchAll(/`(?:[^`\\]|\\.)*`/gs)].map((m) => m[0]).filter((q) => /\bselect\b/i.test(q) && GROWS.test(q));
-  const files = srcCode.filter((f) => f !== 'src/read-indexes.ts');
+  const files = srcCode.filter((f) => f !== 'packs/database/kernel/read-indexes.ts');
   const named = files.flatMap((f) => queries(read(f)).flatMap((q) => [...q.matchAll(/--\s*index\s+([a-z_, ]+)/g)].flatMap((m) => m[1].split(',').map((n) => n.trim()).filter(Boolean)))).filter((name) => !indexes.has(name));
   assert.deepEqual(named, [], 'A read names an index the schema makes.');
   const counted = Object.fromEntries(files.map((f) => [f, queries(read(f)).filter((q) => !BOUND.test(q)).length]).filter(([, n]) => (n as number) > 0));
@@ -392,7 +393,7 @@ test('the page calls no more tools through /api than it did', () => {
 // nothing reads or appends to the places stream, which stays only so entries from before still read.
 test('the canvas draws no depth, and nothing keeps places', () => {
   assert.doesNotMatch(read('ui/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
-  assert.doesNotMatch(read('src/query-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
+  assert.doesNotMatch(read('packs/query/kernel/query-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
   const keepers = srcCode.filter((f) => /(?:readOps|record)\([^)]*'places'/.test(read(f)));
   assert.deepEqual(keepers, [], 'Nothing keeps where a person put a thing: a view is drawn from its query alone; grouping that matters is a link.');
 });

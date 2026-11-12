@@ -5,10 +5,10 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { Actor } from '../src/pelago.ts';
-import { answerRead } from '../src/packreads.ts';
+import type { Actor } from '../packs/write/kernel/pelago.ts';
+import { answerRead } from '../packs/surface/kernel/packreads.ts';
 import { publicView } from '../packs/surface/kernel/public-views.ts';
-import { callTool } from '../src/tools.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { fresh, make } from './map.ts';
 
 type Pictured = { lenses: Record<string, { items: { id: string; inside: string | null }[]; links: { id: string; kind: string; from: string; to: string }[]; hidden?: number }> };

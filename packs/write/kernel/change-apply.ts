@@ -1,17 +1,17 @@
 // Applying a change: each op planned into facts and projected at once, then appended to the log as one change set.
 // The apply loop of the one write path (src/pelago.ts), which calls it once the rules have let the change through.
 
-import { newId, type Q } from '../../../src/db.ts';
+import { newId, type Q } from '../../database/kernel/db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
-import { roomToStore, stillWritable } from '../../../src/standing.ts';
-import { after, followedStill, rewrite, riders, type Followed } from '../../../src/write-hooks.ts';
-import { typesAfter } from '../../../src/type-items.ts';
-import { KEPT_FIELDS } from '../../../src/operational.ts';
-import { append, type Decision, type Fact } from '../../../src/log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from '../../../src/replay.ts'; import { changedFacts, itemFacts, linkFacts } from '../../../src/facts.ts';
+import { roomToStore, stillWritable } from '../../identity/kernel/standing.ts';
+import { after, followedStill, rewrite, riders, type Followed } from './write-hooks.ts';
+import { typesAfter } from '../../loader/kernel/type-items.ts';
+import { KEPT_FIELDS } from '../../log/kernel/operational.ts';
+import { append, type Decision, type Fact } from '../../log/kernel/log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from '../../log/kernel/replay.ts'; import { changedFacts, itemFacts, linkFacts } from '../../log/kernel/facts.ts';
 import { asOwner, forgetIn, ownerRows } from './forget.ts';
 import type { Authority, ChangeInput, Op, SourceSpec } from './pelago-types.ts';
 import type { Archipelago } from './pelago.ts';
-import type { Verdict } from '../../../src/rules.ts';
+import type { Verdict } from '../../rules/kernel/rules.ts';
 
 type Props = Record<string, unknown>;
 

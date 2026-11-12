@@ -12,13 +12,13 @@ import { sha256Hex, workspaceSecret } from '../../../src/hashes.ts';
 import { z } from 'zod';
 import { actorId, needAdmin } from './actor-checks.ts';
 import { createToken } from './auth.ts';
-import type { Q } from '../../../src/db.ts';
+import type { Q } from '../../database/kernel/db.ts';
 import { normalEmail } from './email-address.ts';
 import { configureStanding, limitOf, stillWritable, type Limits, type Standing } from './standing.ts';
 import { indexMember } from './control-index.ts';
 import { bypassingRls } from './outbox.ts';
-import type { Actor, Archipelago } from '../../../src/pelago.ts';
-import type { Tool } from '../../../src/tools.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
+import type { Tool } from '../../surface/kernel/tools.ts';
 import { keep, kept, take } from '../../database/kernel/transient.ts';
 
 /** How long a sign-in lasts in a browser, how long a sign-in link works, and how long an invitation does. */
