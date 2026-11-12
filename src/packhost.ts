@@ -220,6 +220,8 @@ export class PackHost {
    * and what its pack reads through (src/pack-reach.ts); `answer` may answer some questions first (a run's tools).
    */
   async call(l: Archipelago, actor: Actor, pack: string, call: Call, name: string, input: unknown, ms = CALL_MS, answer?: (query: Record<string, unknown>, reads: Answerer) => Promise<unknown>): Promise<Done> {
+    // A root or service pack's code runs in the server's process (src/kernel-context.ts), never here.
+    if (l.registry.internal.has(pack)) throw new Error(`Pack "${pack}" runs in the server's process, not the sandbox.`);
     const folder = this.folderOf(pack);
     if (!existsSync(join(folder, 'handler.js'))) throw new Error(`Pack "${pack}" has no handler.`);
     const box = this.boxes.get(pack) ?? new Sandbox(folder);
