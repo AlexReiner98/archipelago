@@ -10,53 +10,15 @@
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { basename, join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../src/operational.ts';
 import { spacing } from './spacing.ts';
+import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, VENDORED, walk } from './structure-kit.ts';
 import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
 
-const ROOT = join(import.meta.dirname, '..');
 const MAX_LINES = 500;
-const CODE = /\.(ts|js|mjs|css|html)$/;
-/** Vendored as a file at the owner's asking (CLAUDE.md), not written here. */
-const VENDORED = ['ui/three.module.min.js'];
-
-const walk = (dir: string): string[] =>
-  !existsSync(join(ROOT, dir))
-    ? []
-    : readdirSync(join(ROOT, dir)).flatMap((name) => {
-        const path = `${dir}/${name}`;
-        return statSync(join(ROOT, path)).isDirectory() ? walk(path) : [path];
-      });
-const read = (path: string) => readFileSync(join(ROOT, path), 'utf8');
-const lines = (text: string) => text.split('\n').length - (text.endsWith('\n') ? 1 : 0);
-const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
-const kernelFiles = [...walk('src'), ...walk('ui')].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
-const packIds = readdirSync(join(ROOT, 'packs')).filter((p) => statSync(join(ROOT, 'packs', p)).isDirectory()), LEFT = JSON.parse(read('test/fixtures/left-packs.json')) as Record<string, string[]>; // LEFT: the packs gone to hosted (9 Nov 2026)
-/** The kernel's own packs: the kinds, the root relations and the system tier. */
-const KERNEL_PACKS = ['core', 'local'];
-
-/**
- * Compare what is counted with what is allowed: anything not listed may have up to `limit`; a listed
- * entry may not grow, and must be lowered (or removed, once within the limit) when it shrinks.
- */
-function ratchet(counted: Record<string, number>, frozen: Record<string, number>, limit = 0): string[] {
-  const problems: string[] = [];
-  for (const [what, n] of Object.entries(counted)) {
-    const cap = frozen[what] ?? limit;
-    if (n > cap) problems.push(`${what}: ${n}, over ${cap}`);
-  }
-  for (const [what, cap] of Object.entries(frozen)) {
-    const n = counted[what] ?? 0;
-    if (n < cap) problems.push(n <= limit ? `${what}: ${n} now, within ${limit}: remove its entry` : `${what}: ${n} now: lower its entry from ${cap} to ${n}`);
-  }
-  return problems;
-}
-
-const count = (files: string[], pattern: RegExp) =>
-  Object.fromEntries(files.map((f) => [f, read(f).match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
 
 // 1. No file over 500 lines.
 const LONG_FILES: Record<string, number> = {};
@@ -77,7 +39,7 @@ test('the kernel names no pack', () => {
 
 // A type or link type is named by what it is, not by its pack (decided 27 Oct 2026), so a pack's type is caught by its
 // bare name too. What was counted on that day is words that are also some pack's type name (a capability, a view, a
-// verb's action): no new one may be added.
+// verb's action): no new one may be added. SQL strings count too (`type = 'run'`); run, works_on, notification, about are core's.
 const NAMES_PACK_TYPES: Record<string, number> = {
   'src/altitude.ts': 1, 'src/attention.ts': 1, 'src/capabilities.ts': 2, 'src/confirm.ts': 1, 'src/declared.ts': 3,
   'src/eventlog.ts': 1, 'src/query-saved.ts': 1, 'src/looks.ts': 1,
@@ -97,6 +59,44 @@ test("the kernel names no pack's type by its bare name", () => {
   }).concat(Object.values(LEFT).flat());
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'));
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');
+});
+
+// Every part of the kernel becomes a pack (the owner, e_ykymc952). Until each moves, what the kernel
+// still knows of it is listed with the step on the map that takes it away; an entry may only shrink.
+const SESSIONS = 'e_xzwgetrg Sessions behaviour into its pack', CLAUDE = 'e_c35gg6nh Claude Code hooks into its pack', VIEWS = 'e_8f8m2xtf Kernel views as packs';
+
+// A surface is a pack that adapts a client's hooks or launches one (reach.server adapter or launchers), and the kernel
+// names none of it: not `claude_code`, `claude-code`, `claude-headless`, nor the client `claude`.
+const NAMES_SURFACES: Owed = {
+  'src/chat-run.ts': [2, CLAUDE], 'src/hook-tool.ts': [1, CLAUDE], 'src/install.ts': [2, CLAUDE], 'src/server-adapter.ts': [1, CLAUDE],
+  'src/server-launch.ts': [1, CLAUDE], 'src/server.ts': [1, CLAUDE], 'src/session-hook.ts': [1, CLAUDE], 'src/token-tools.ts': [1, CLAUDE],
+  'ui/agents-card.js': [2, VIEWS], 'ui/connect-agent.js': [4, VIEWS], 'ui/words.js': [1, VIEWS],
+};
+test('the kernel names no surface', () => {
+  const vendors = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
+    const server = (JSON.parse(read(`packs/${p}/pack.json`)) as { reach?: { server?: { adapter?: unknown; launchers?: unknown[] } } }).reach?.server;
+    return server?.adapter || server?.launchers?.length ? [p.split(/[_-]/)[0]] : [];
+  });
+  assert.ok(vendors.length, 'no pack declares a surface: this rule reads nothing');
+  const named = count(kernelFiles, new RegExp(`['"\`](?:${vendors.join('|')})(?:[-_][a-z]+)*['"\`]`, 'g'));
+  assert.deepEqual(ratchet(named, counts(NAMES_SURFACES)), [], 'Let the surface pack say it: its adapter, launcher or setup, read through the registry.');
+});
+
+// The sessions' actions, named here until the sessions pack declares them (e_xzwgetrg): the kernel switches on none.
+const NAMES_SESSION_ACTS: Owed = {
+  'src/scope.ts': [3, SESSIONS], 'src/session-hook.ts': [1, SESSIONS], 'src/tool-acts.ts': [1, SESSIONS], 'src/tools.ts': [2, SESSIONS],
+  'src/views.ts': [1, SESSIONS], 'ui/item.js': [1, VIEWS],
+};
+test("the kernel names no session's action", () => {
+  const named = count(kernelFiles, /['"`]session_(?:start|update|end)['"`]/g);
+  assert.deepEqual(ratchet(named, counts(NAMES_SESSION_ACTS)), [], 'An action is its pack\'s: let the pack declare what it checks.');
+});
+
+// The kernel runs a pack's code only as the pack's, through the registry: it imports none from packs/.
+const IMPORTS_PACKS: Owed = { 'src/session-measures.ts': [1, SESSIONS], 'src/session-state.ts': [2, SESSIONS], 'src/session-turns.ts': [1, SESSIONS] };
+test("the kernel imports no pack's code", () => {
+  const named = count(kernelFiles, /(?:\bfrom\s+|\bimport\s*\(\s*)['"`][^'"`]*\bpacks\//g);
+  assert.deepEqual(ratchet(named, counts(IMPORTS_PACKS)), [], "Move the code that needs it into the pack, or hand the pack's answer in.");
 });
 
 // The kernel reads no kind (the owner, e_w46v6jf9): core's eight are starter types, and what an item is comes from its type
