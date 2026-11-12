@@ -7,12 +7,12 @@
 // views, the checks among its rules), its controls come first. Packs that go together (a bundle, packs/loader/kernel/bundles.ts) are
 // one plate with one switch: each pack a band in it, its name on a line and what it touches under it.
 
-import { api, ask, h, state, tell } from './base.js';
+import { api, ask, h, may, state, tell } from './base.js';
 import { screenRows } from './nav.js';
 import { styleRows } from './styles-card.js';
 import { isTheme } from './themes-card.js';
 import { checkRow } from './agents-card.js';
-import { line } from './workspace-cards.js';
+import { line, secretBox } from './workspace-cards.js';
 import { plate } from './plates.js';
 
 /** The kernel's packs, which are never off. */
@@ -105,7 +105,35 @@ export function packsCard({ info, then, goTo }) {
         t.unused > 0 && h('span', { class: 'mark warn' }, `${t.unused} unused`),
       );
     };
-    return { open, rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : []] };
+    return { open, rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : [], ...secretRows(p)] };
+  };
+  // The secrets its hosts and webhooks need, one line each for the owner: its name, whether it is set, a field to give
+  // or replace it, and for a webhook's a Make whose value is shown once, under it, until the page is drawn again.
+  const owns = (p) => may('admin') && p.secrets?.length > 0;
+  const secretRows = (p) => {
+    if (!owns(p)) return [];
+    return p.secrets.flatMap((s) => {
+      const at = `${p.id}:${s.name}`;
+      const field = h('input', { type: 'password', autocomplete: 'off', spellcheck: false, placeholder: s.set ? 'Replace' : 'Give it', style: 'flex: 1; min-width: 0' });
+      const keep = (input, done) => api('pack_secret_set', { pack: p.id, name: s.name, ...input }).then(done, (err) => tell('That was not done', err.message));
+      const save = () => field.value.trim() && keep({ value: field.value.trim() }, () => ((field.value = ''), refresh()));
+      field.onkeydown = (e) => e.key === 'Enter' && save();
+      const make = async () => {
+        if (s.set && !(await ask({ title: `Make a new ${s.name}?`, message: 'The one it replaces stops working: give the new one to the sender.', action: 'Make', danger: true }))) return;
+        keep({ make: true }, (r) => (made.set(at, r.secret), refresh()));
+      };
+      const row = h(
+        'li',
+        { class: 'one', title: `${s.name}: the secret of its ${s.for} ${s.id}` },
+        h('strong', { class: 'grow' }, s.name),
+        s.set ? h('span', { class: 'mark', title: 'Set, kept sealed' }, 'set') : h('span', { class: 'mark warn', title: 'Not given yet' }, 'not set'),
+        field,
+        h('button', { onclick: save, title: 'Keep it, sealed' }, 'Save'),
+        s.for === 'webhook' && h('button', { onclick: make, title: 'Have one made, shown once, for the sender to sign with' }, 'Make'),
+      );
+      const shown = made.get(at);
+      return shown ? [row, h('li', {}, secretBox(`${s.name} for ${p.title}`, shown, undefined, 'Shown once. It is kept sealed and cannot be shown again.'))] : [row];
+    });
   };
   const toggle = (p, on) => {
     const box = h('input', { type: 'checkbox', role: 'switch', class: 'switch-toggle', checked: on, title: on ? 'On here: turn it off' : 'Off here: turn it on' });
@@ -117,7 +145,7 @@ export function packsCard({ info, then, goTo }) {
     const on = p.state !== 'off';
     const { open, rows } = touchRows(p);
     return plate({
-      wide: Boolean(open),
+      wide: Boolean(open) || owns(p),
       name: p.title,
       title: `${p.title} ${p.version}${p.why ? `: ${p.why}` : ''}${p.description ? `\n${p.description}` : ''}${p.requires?.length ? `\nNeeds: ${p.requires.join(', ')}` : ''}`,
       off: !on,
@@ -136,7 +164,7 @@ export function packsCard({ info, then, goTo }) {
 ${p.description}` : ''}` }, h('span', { class: 'grow' }, h('strong', {}, p.title), ' ', h('span', { class: 'muted small' }, p.description ?? '')), ...marksOf(p)), ...rows] };
     });
     return plate({
-      wide: bands.some((x) => x.open),
+      wide: bands.some((x) => x.open) || parts.some(owns),
       name: b.title,
       title: `${b.title}: ${parts.map((p) => p.title).join(' and ')}, on and off together${b.description ? `
 ${b.description}` : ''}`,
@@ -153,10 +181,10 @@ ${b.description}` : ''}`,
     return [bundlePlate(p.bundle, p.bundle.packs.map((id) => packs.find((q) => q.id === id)).filter(Boolean))];
   });
   let packs = [];
+  /** A secret made here, by pack and name, shown under its line until this card is drawn anew. */
+  const made = new Map();
   const draw = () => body.replaceChildren(...plates());
-  api('packs').then(
-    (all) => ((packs = all), draw()),
-    (err) => body.replaceChildren(h('div', { class: 'error' }, err.message)),
-  );
+  const refresh = () => api('packs').then((all) => ((packs = all), draw()));
+  refresh().catch((err) => body.replaceChildren(h('div', { class: 'error' }, err.message)));
   return h('section', { class: 'card wide' }, h('header', {}, h('h2', { class: 'hinted', title: 'Each way of working is a pack. Its plate shows what it touches; click a group to change it here. Turned off, its items stay, dormant, and its tools leave the list.' }, 'Packs')), body);
 }

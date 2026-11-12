@@ -14,6 +14,7 @@
 import { extract, runOf, type Change } from './extract.ts';
 import { keyOf, type Source } from './model.ts';
 import { plan, type Held, type Island } from './plan.ts';
+import { risen, rose } from './guard.ts';
 
 /** A repository the island stands on: its name on GitHub, the commit synced, and which repository it is to the code. */
 export interface Repo { name: string; sha: string; repo: Source['repo'] }
@@ -145,6 +146,10 @@ export async function fetched(input: any, ctx: Ctx) {
   const run = runOf(state.changes);
   const want = extract(files, run, new Set(island.byKey.keys()));
   const commits = state.repos.map((r) => `${r.name}@${r.name === state.pushed ? state.head : r.sha}`).join('\n');
+  // CI lets a ratchet list grow (the structure test takes it as the allowance), so the handler keeps the guard too: the
+  // island stays at its commit, and a later push still compares from there, until the code is fixed or a forced full run.
+  const rises = risen(want, island);
+  if (rises.length) return { answer: { synced: false, reason: rose(rises) } };
   want.items.push({ key: 'sync', type: 'anatomy.sync', title: 'Where the island stands', body: '', props: { commits, full: false } });
   const { ops, counts } = plan(want, island, run);
   const reason = `Pack anatomy: ${state.pushed} brought to ${state.head.slice(0, 8)} (${Object.entries(counts).filter(([, n]) => n).map(([k, n]) => `${k} ${n}`).join(', ') || 'only the commit'})`;

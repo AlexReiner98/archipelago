@@ -76,6 +76,20 @@ test('a push that changes what every module is read with is left to the full che
   assert.match(done.answer.reason, /--full/);
 });
 
+test('a push that adds a known break to a structure check leaves the island where it stands, naming the check', async () => {
+  const structure = (list: string) => src('test/structure.test.ts', `const LONG: Record<string, number> = { ${list} };\ntest('no file over 500 lines', () => {});\n`);
+  const { read } = mapAt([...BEFORE, structure("'a.ts': 600")]);
+  const comparison = { status: 200, request: { path: `/repos/${CORE}/compare/${OLD}...${NEW}` }, body: { files: [{ filename: 'test/structure.test.ts', status: 'modified', sha: 's2' }] } };
+  const [req] = ((await compared(comparison, { read })) as any).requests;
+  const answer = (text: string) => ({ status: 200, request: req, body: { data: { r0: Object.fromEntries((req.body.query.match(/f\d+(?=: object)/g) as string[]).map((f) => [f, { oid: 's2', text }])) } } });
+  const stopped: any = await fetched(answer(structure("'a.ts': 600, 'b.ts': 700").text), { read });
+  assert.equal(stopped.answer.synced, false);
+  assert.equal(stopped.ops, undefined, 'nothing sent, the sync item not moved');
+  assert.match(stopped.answer.reason, /"no file over 500 lines" rose from 1 to 2/);
+  const fell: any = await fetched(answer(structure('').text), { read });
+  assert.equal(fell.answer.synced, true, 'a count that falls is synced');
+});
+
 test('the sync item and GitHub\'s statuses are read as the plan reads them', () => {
   assert.deepEqual(reposOf(`${CORE}@${OLD}\n${HOSTED}@${HOSTED_AT}`).map((r) => r.repo), ['open_core', 'hosted']);
   assert.deepEqual(changesOf([{ filename: 'b', status: 'renamed', previous_filename: 'a' }, { filename: 'c', status: 'removed' }, { filename: 'd', status: 'added' }]), [{ status: 'R', path: 'b', from: 'a' }, { status: 'D', path: 'c' }, { status: 'A', path: 'd' }]);

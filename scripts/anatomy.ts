@@ -6,7 +6,10 @@
 // The difference goes as one change (packs/anatomy_sync/plan.ts), with the sync item brought to the new commits.
 // Run it from any worktree (git fetch both repositories first):
 //
-//   node scripts/anatomy.ts [--full] [--dry] [--ref origin/main] [--hosted <folder>] [--run <run id>]
+//   node scripts/anatomy.ts [--full] [--dry] [--force] [--ref origin/main] [--hosted <folder>] [--run <run id>]
+//
+// A structure check whose known breaks are more in the code than on the island stops it, sending nothing and naming the
+// check (packs/anatomy_sync/guard.ts); --force sends anyway, with a warning.
 //
 // It acts on the map PELAGO_URL names with PELAGO_AGENT_TOKEN (never printed), on the island that speaks the anatomy
 // pack. What a person added there is left alone: only what the extractors key is archived, and only the sync's own link
@@ -18,10 +21,12 @@ import { resolve } from 'node:path';
 import { extract, fullRun, read, readsIn, runOf, type Change, type Run } from '../packs/anatomy_sync/extract.ts';
 import { keyOf, type Source } from '../packs/anatomy_sync/model.ts';
 import { plan, type Held, type Island } from '../packs/anatomy_sync/plan.ts';
+import { risen, rose } from '../packs/anatomy_sync/guard.ts';
 
 const arg = (name: string) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : undefined; };
 const DRY = process.argv.includes('--dry');
 const FULL = process.argv.includes('--full');
+const FORCE = process.argv.includes('--force');
 const REF = arg('ref') ?? 'origin/main';
 const RUN = arg('run') ?? process.env.PELAGO_RUN;
 const ONE_CHANGE = 1500; // ops a change is sent in whole; a first fill past it goes in parts
@@ -114,6 +119,10 @@ const commits = REPOS.map(([, , name]) => `${name}@${heads[name]}`).join('\n');
 const moved = REPOS.some(([, , name]) => was[name] !== heads[name]);
 // The sync item moves only with the commits: a full run on an island already at them changes nothing, its flag included.
 if (moved) want.items.push({ key: 'sync', type: 'anatomy.sync', title: 'Where the island stands', body: '', props: { commits, full: !incremental } });
+// A structure check whose known breaks rose stops the run before it sends (packs/anatomy_sync/guard.ts), --force aside.
+const rises = risen(want, island);
+if (rises.length && !FORCE) { console.error(`Nothing sent. ${rose(rises)}`); process.exit(1); }
+if (rises.length) console.warn(`Sending anyway (--force). ${rose(rises)}`);
 const { ops, counts } = plan(want, island, run);
 if (arg('out')) (await import('node:fs')).writeFileSync(arg('out')!, JSON.stringify(ops, null, 1));
 console.log(`${incremental ? `${changes.length} files changed since the last sync` : 'full run'}; ${run.extractors.map((e) => `${e.extractor.id}${e.only ? ` (${e.only.size})` : ''}`).join(', ') || 'no extractor reached'}; ${files.length} files read (${island.bulk ? 'island read in bulk' : 'island read item by item'}); ${Object.entries(counts).map(([k, n]) => `${k} ${n}`).join(', ')}`);
