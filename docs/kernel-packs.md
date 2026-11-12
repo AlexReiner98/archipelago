@@ -20,7 +20,7 @@ above it, never more.
 | Tier | Runs | May | May not |
 |---|---|---|---|
 | `root` | in the server process, started by the stub | open the database as its owner, write projections, bypass row-level security through a named `security definer` function, read the whole log, open hook points and slots | require a service name; import a root pack above it; change without the owner's word |
-| `service` | in the server process, `internal: true` | read under row-level security, change through `change` as `system:<pack>`, keep the operational streams its rules declare, provide and require `service:` names, fill hook points | touch a table, the log or a key directly; import any kernel module; be carried on the map as code |
+| `service` | in the server process, `internal: true`, required or `optional` | read under row-level security, change through `change` as `system:<pack>`, keep the operational streams its rules declare, provide and require `service:` names, fill hook points | touch a table, the log or a key directly; import any kernel module; be carried on the map as code |
 | plain (no tier) | in the sandbox, as today (`src/packhost.ts`) | everything `docs/packs.md` gives a pack | anything in-process |
 
 Core stays what it is, the pack of words every map starts with (starter
@@ -47,10 +47,33 @@ trusted).
 ```
 
 - **`trust`**: `root` or `service`. Absent, the pack is plain.
-- **`internal`**: not offered on the Packs screen, never taken out, versioned
-  with the server. It replaces the hardcoded `KERNEL_PACKS` and the `core.x`
+- **`internal`**: shipped with the server, versioned with it, its code
+  in-process. It replaces the hardcoded `KERNEL_PACKS` and the `core.x`
   naming (`src/packorder.ts`). A service pack is always internal; a root
   pack always is.
+- **`optional`** (decision e_cenjpmrf, the owner, 12 Nov 2026): an internal
+  pack is **required** unless it says `optional: true`. A required one is
+  always on, whatever the server enables or a map says; the Packs screen shows
+  it "always on" and refuses to take it out. An optional one a map may switch
+  off on the Packs screen as it switches a plain pack: it is off for every
+  reason a plain pack is (turned off here, not enabled on this server, the
+  island rules), on by default where it was before, and found only where its
+  folder is read (a required one is added to every registry from the server's
+  own folder). It fills only the write path's points (`write.*`, read at each
+  change) and declares no `provides`, `tables` or `timers`, which are filled
+  once at a workspace's open and would outlive the switch. A root pack is
+  never optional. Sessions is optional. Automations stays a plain pack: its
+  handler runs in the sandbox, which a kernel pack may not have; its triggers
+  are the required `automation_triggers`, which does nothing on a map where
+  automations is off.
+  What a run records (`src/pack-versions.ts`): the required internal packs are
+  one entry, `internal`, the same on every map one server runs; an optional one
+  is recorded as a plain pack is, its own `id@version` entry while it is on and
+  none while it is off, so the record says the map's switch.
+- **`memory`** (decision e_a8dh8fg3, the owner, 12 Nov 2026): the settings
+  prefix a service pack's memory (the read `memory`) is kept under, in place of
+  its own `pack:<id>:`: a prefix the code it took over kept there already, so
+  nothing is migrated. Lower-case, ending in a colon, never `pack:`.
 - **`modules`**: its code, TypeScript under the pack's folder
   (`packs/<id>/kernel/`), loaded with `import()` by the loader. Never a file
   a pack item or a version carries: `pack_code` stays the sandbox's alone.
@@ -276,7 +299,7 @@ moves with a shim to the pack named.
 | placement | subject, island-start, `placeOnIslands`; `ensureSource` from change-apply |
 | waits | unwait |
 | mentions | mentions |
-| automations (exists) | automation-rules, due-on |
+| automation_triggers (required; automations stays plain, its handler in the sandbox) | automation-rules, due-on (what its edges met kept under `due_on:<automation>`, `kernel.memory`) |
 | clocks | due, duties |
 | sessions (exists) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-measures, session-name, session-parent, session-quiet, session-state, session-turns, sessiontime, touched, stands, spent, audit, working-rules, close-offer, file-said, frontier, frontier-prompt, places |
 | claude_code (exists) | hook-tool, session-hook |
@@ -444,9 +467,11 @@ and `packs/views`; every service step does the same, and none needs to edit
 - Every value import of the kernel becomes the context: `ctx.reads` for the
   map, `ctx.registry` for types, links and capabilities, `ctx.call` for
   another pack. Each function takes `ctx` where it took `l`.
-- An internal pack is the server's code: every registry reads it from the
-  server's own folder (`OWN_PACKS`, `src/pack-folders.ts`), so a test's map
-  or a copy of some packs has it as the server does.
+- An internal pack is the server's code: every registry reads a required one
+  from the server's own folder (`OWN_PACKS`, `src/pack-folders.ts`), so a
+  test's map or a copy of some packs has it as the server does. An optional
+  one (`kernel.optional`, sessions) is read only where its folder is, and a map
+  may turn it off.
 
 ### Reads
 

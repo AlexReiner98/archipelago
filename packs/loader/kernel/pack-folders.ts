@@ -7,7 +7,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { isInternal, isServerPack, readManifest, type Manifest } from './manifest.ts';
+import { isRequired, isServerPack, readManifest, type Manifest } from './manifest.ts';
 
 /** The server's own packs folder, beside its code: where its internal packs are read from, whatever else a registry reads. */
 export const OWN_PACKS = join(import.meta.dirname, '..', '..', '..', 'packs');
@@ -75,13 +75,13 @@ export function readPackFolders<P extends Manifest>(dirs: string[], skip: string
   }
   if (!found.has('core')) throw new Error(`No core pack in ${dirs.join(', ')}`);
   // The server's internal packs (root and service, docs/kernel-packs.md) are its code: a registry read from other
-  // folders (a test's, a copy of some packs) has them too, from the server's own folder, as the server does.
+  // folders (a test's, a copy of some packs) has the required ones too, from the server's own folder, as the server does.
   if (existsSync(OWN_PACKS)) for (const name of readdirSync(OWN_PACKS)) {
     const file = join(OWN_PACKS, name, 'pack.json');
     if (found.has(name) || !existsSync(file)) continue;
     const text = readFileSync(file, 'utf8');
     const pack = readManifest(text, `packs/${name}/pack.json`) as P;
-    if (!isInternal(pack) || pack.id !== name) continue;
+    if (!isRequired(pack) || pack.id !== name) continue; // an optional one is found where its folder is read, as a plain pack is
     const hash = createHash('sha256').update(text).digest('hex');
     found.set(name, pack), where.set(name, OWN_PACKS), hashes.set(name, hash), read.set(hash, text);
   }

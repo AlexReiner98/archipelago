@@ -118,6 +118,7 @@
   "test/note-max.test.ts": { "pglite": 2.6, "postgres": 1.1 },
   "test/oauth.test.ts": { "pglite": 15.2, "postgres": 8.1 },
   "test/oplog-guard.test.ts": { "pglite": 5.1, "postgres": 2.1 },
+  "test/optional-packs.test.ts": { "pglite": 0, "postgres": 0 },
   "test/outbound.test.ts": { "pglite": 2.6, "postgres": 1.5 },
   "test/outside.test.ts": { "pglite": 3.2, "postgres": 1.5 },
   "test/owner-link.test.ts": { "pglite": 8, "postgres": 4.3 },
