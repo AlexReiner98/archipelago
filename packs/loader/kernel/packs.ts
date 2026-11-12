@@ -11,7 +11,7 @@ import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import 
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts'; import { checkRules } from './rule-check.ts';
 import { isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
-import { OWN_PACKS, readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts';
+import { OWN_PACKS, readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts'; import { checkParts } from './ui-parts.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from '../../../src/phases.ts'; import { keepVersionTypes } from './version-types.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -276,7 +276,7 @@ export class Registry {
     const verbs = ordered.flatMap((pack) => parts(pack).verbs);
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
-      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), !!this.given || (pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js'))), [...providedOf(ordered.filter(isInternal), 'answer'), ...(this.given?.answers ?? [])]); // an internal pack's answers, always on: any view names them
+      const declared = checkDeclared(pack, types, verbs.map((v) => v.id), !!this.given || (pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js'))), [...providedOf(ordered.filter(isInternal), 'answer'), ...(this.given?.answers ?? [])]).concat(checkParts(pack, types, this.given ? undefined : this.folderOf(pack.id))); // an internal pack's answers, always on: any view names them; its parts (packs/loader/kernel/ui-parts.ts)
       if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
       for (const def of parts(pack).actions) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.
