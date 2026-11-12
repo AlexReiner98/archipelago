@@ -556,7 +556,11 @@ map that asks, any map, opened or not (`hostAt`, `src/kernel-context.ts`); a mod
 `src/service-reads.ts`), until its pack holds it: `told` (uses: the usage pack's code still
 imports the kernel, so it does not load from a copy of the packs), `touched` (sessions is
 optional, and an optional pack fills only `write.*`), `events`, `view` (with its pin) and
-`placed`. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
+`placed`. The query step (wave 6, e_5euvh74f) moved query-flat, query-terms, query-only, query-held, query-presets,
+askview, views and timeaxis into `packs/query/kernel` behind pure shims, still on the map (`l`) and naming the kernel
+at `../../../src/`: what they call is sessions' (optional, so it provides no name), or another pack's that provides
+none (attention's moved, views' timelanes, lenses' hubs, usage, styles, agents), so `view` and `placed` stay kernel
+fillings until those packs answer by name. What is a place's or an item's (`livesIn`, `livesInFor`, `SCOPE`, `scopeOf`) is the
 reads API's own bounded scan, `packreads-scope`, which places re-exports. `test/packreads-slots.test.ts`
 pins each answer against its service's own functions.
 

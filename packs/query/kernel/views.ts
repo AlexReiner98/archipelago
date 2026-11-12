@@ -1,0 +1,143 @@
+// The kernel's own views that are not lenses: each reads what is kept to run the map (runs, notifications, the log,
+// the styles and views kept) rather than a picture of the work, and src/operational.ts names each with its rule.
+// Every picture of the work is a lens: a lens preset a pack declares (src/query-presets.ts), asked by the same name.
+
+import { type Actor, type Entity, type Archipelago } from '../../../src/pelago.ts';
+import { spent } from '../../../src/spent.ts';
+import { usage } from '../../../src/usage.ts';
+import { factEvents } from '../../../src/eventlog.ts'; import { doneCounts } from '../../../src/activity.ts';
+import { byAttention, markOf, sessionStates } from '../../../src/session-state.ts';
+
+/** The most change sets' events changed_since counts: past that, its counts are of the newest. */
+const COUNTED = 20_000;
+import { livesIn } from '../../../src/places.ts';
+import { savedViews } from '../../../src/saved-views.ts'; import { pageStyle } from '../../../src/styles.ts'; import { instructionsFor } from '../../../src/instructions.ts';
+
+/**
+ * How kernel code asks a view a pack answers (a pack's read of another view). Handed in by src/askview.ts, which
+ * needs these views itself; without a pack that answers, there is no answer.
+ */
+type PackAsker = (l: Archipelago, name: string, params: Record<string, unknown>) => Promise<unknown>;
+let askPack: PackAsker | undefined;
+export const setPackAsker = (asker: PackAsker) => void (askPack = asker); export const askPackView: PackAsker = (l, name, params) => (askPack ? askPack(l, name, params) : Promise.reject(new Error(`No view "${name}"`)));
+
+async function changedSince(l: Archipelago, input: { since?: string; limit?: number }) {
+  if (!input.since || Number.isNaN(Date.parse(input.since))) throw new Error('changed_since needs "since" as an ISO date or date-time');
+  // The counts are of everything since; the events are the newest of them, few enough to read.
+  const events = await l.events({ since: input.since, limit: input.limit ?? 50 });
+  const counts = await doneCounts(l.db, input.since);
+  for (const ev of await factEvents(l.db, { since: input.since }, COUNTED)) counts.set(ev.action, (counts.get(ev.action) ?? 0) + 1);
+  const rows = [...counts].map(([action, n]) => ({ action, n })).sort((a, b) => b.n - a.n);
+  const total = rows.reduce((sum, r) => sum + r.n, 0);
+  return {
+    since: input.since,
+    counts: Object.fromEntries(rows.map((r) => [r.action, r.n])),
+    events,
+    ...(total > events.length && { more: `The newest ${events.length} of ${total} events. Ask with a higher limit (500 at most) or a later since for the rest.` }),
+  };
+}
+
+/** Minutes without a report before an open session is shown as stale. */
+const STALE_MINUTES = 30;
+
+async function sessions(l: Archipelago) {
+  const runs = l.registry.family('run');
+  const homes = livesIn(l), parents = l.registry.relationFamily('started_from');
+  const { rows: open } = await l.db.query<Entity>(`select * from entity where type = any($1::text[]) and is_open and archived_at is null order by created_at desc`, [runs]);
+  const { rows: links } = await l.db.query<{ run: string; type: string; id: string; title: string; entity_type: string }>(
+    `select r.from_id as run, r.type, e.id, e.title, e.type as entity_type from relation r join entity e on e.id = r.to_id
+     where r.from_id = any($1::text[]) and r.valid_to is null and r.type = any($2::text[])`,
+    [open.map((r) => r.id), ['works_on', 'holds', ...homes, ...parents]],
+  );
+  const { rows: ended } = await l.db.query(
+    `select id, title, status, updated_at from entity where type = any($1::text[]) and not is_open and archived_at is null order by updated_at desc limit 10`,
+    [runs],
+  );
+  const of = (run: string, ...types: string[]) => links.filter((x) => x.run === run && types.includes(x.type)).map(({ id, title, entity_type }) => ({ id, title, type: entity_type }));
+  // Each open run's state and latest turn (src/session-state.ts), and the open ones in the order they ask for attention.
+  const states = await sessionStates(l, open.map((r) => r.id));
+  const at = (id: string) => states.get(id) ?? { state: 'idle', line: '', since: null, turns: 0 };
+  open.sort((a, b) => byAttention(at(a.id), at(b.id)));
+  return {
+    stale_after_minutes: STALE_MINUTES,
+    open: open.map((r) => {
+      const seen = (r.props.last_seen as string | undefined) ?? r.created_at.toISOString();
+      return {
+        id: r.id,
+        title: r.title,
+        name: r.props.name,
+        label: r.props.label,
+        status: r.status,
+        surface: r.props.surface,
+        cwd: r.props.cwd,
+        started: r.created_at,
+        last_seen: seen,
+        stale: Date.now() - Date.parse(seen) > STALE_MINUTES * 60_000,
+        busy: r.props.busy === true,
+        working_on: of(r.id, 'works_on'),
+        holds: of(r.id, 'holds'),
+        repo: of(r.id, ...homes)[0],
+        parent: of(r.id, ...parents)[0],
+        session: markOf(at(r.id)),
+        turn: at(r.id).turn,
+      };
+    }),
+    recently_ended: ended,
+  };
+}
+
+async function notifications(l: Archipelago) {
+  const { rows } = await l.db.query(
+    `select n.id, n.title, n.body, n.props->>'level' as level, n.props->>'from' as from, n.created_at,
+            a.id as about_id, a.title as about_title
+     from entity n
+     left join relation r on r.from_id = n.id and r.type = 'about' and r.valid_to is null
+     left join entity a on a.id = r.to_id
+     where n.type = any($1::text[]) and n.is_open and n.archived_at is null
+     order by n.created_at desc limit 100`,
+    [l.registry.family('notification')],
+  );
+  return rows;
+}
+
+export interface View {
+  description: string;
+  /** `actor`: who asks, when the view answers some of it to an admin alone. */
+  run(l: Archipelago, input: Record<string, unknown>, actor?: Actor): Promise<unknown>;
+}
+
+export const VIEWS: Record<string, View> = {
+  changed_since: {
+    description: 'What changed since a moment in time: how many events of each kind, and the newest of them. Long notes are cut to their start, and a change set says its reason once. Params: since (ISO date-time, required), limit (events listed, default 50; an agent is given the newest five unless it asks), full (true for everything whole).',
+    run: changedSince,
+  },
+  spent: {
+    description: 'What agents spent over the last days, read from their runs: dollars where a run says what it cost, tokens where it does not, by where they ran. The time pack\u2019s costs view adds what is paid regularly. Params: days (default 30).',
+    run: spent,
+  },
+  usage: {
+    description: 'How much of each of its limits the workspace uses, and what that use is made of, answered as a query is (items and links), so a lens can draw it. Each limit (storage, agent sessions at once, requests this minute, looks this hour; members for an admin) is an item whose use says used, shown, of and of_shown (what the limit allows, where there is one), share, near and over; each part of it is an item part_of it: storage by what it is made of (facts, change sets, streams, images), then by type and the largest items (the bytes each has added to the log); sessions by name; requests and looks by who asked. A part that is an item names it (use.item). What you cannot see is summed with no title. Where nothing limits it, of is left out. Params: none.',
+    run: usage,
+  },
+  notifications: {
+    description: 'Unread notifications for the human, newest first.',
+    run: notifications,
+  },
+  sessions: {
+    description: 'Agent sessions and automation runs: what each open one is working on and holding, the session that started it (parent), its state (session: state, for, line, since) and latest turn, and the last ten that ended. The open ones come in the order they ask for attention: waiting, your_move, blocked, working, quiet, idle, each the longest in it first.',
+    run: sessions,
+  },
+  session_measures: { description: 'What sessions’ turns tell over a range: those waiting on their person now and since when (waiting), turns and tokens per item worked on (per_item), open sessions with an hour of turns and no test passed or commit since (stalled). Params: since, until (ISO; a week to now), stall_minutes (60).', run: async (l, input) => (await import('../../../src/session-measures.ts')).sessionMeasures(l, input) }, // read when asked: it reaches src/sessions.ts, which reads these views
+  saved_views: {
+    description: 'Every view kept on the map (a query, named by the style that draws it), with what it is a view of and its life (working, an agent’s; kept, on the owner’s word): the kept first, then the newest. A working view about items that have all closed is retired with them: left out, its id in ended. Params: limit (100).',
+    run: (l, input) => savedViews(l, input as { limit?: number }),
+  },
+  style: {
+    description: 'How a page looks: the style of one item (the presets the packs ship, the workspace’s, its kind’s, its own, nearest last, a named set merged name by name), or with no item the workspace’s; and which styles went in (used). What an item page, the pages that are not views and the canvas are drawn by. Params: of (an item id), style (the id of one kept on the map, used outright), view (a view kept on the map: the styles kept about it too), have (the hashes of the layouts the page holds: then the style carries the layout it names, its code left out when the page has it), try (a theme preset’s id: drawn as if the owner kept it, for this read only, nothing kept), `shape` (the form the reader chose for this view, as the view band’s switch names it: drawn in it, with its layout, over every style).',
+    run: (l, input) => pageStyle(l, input),
+  },
+  instructions: {
+    description: 'What agents are told where: the instructions the packs ship (presets), under the workspace’s kept on the map, under those kept about a repository, nearest last, in order, each with the item (and preset) that says it. A session is told those for session_start when it begins. Params: for (where: session_start, working_rules, tool:<name>, guide:<name> (a guide, as guide:style_code for how a style’s code is written), or file:<path>, what is said about that file by the instructions whose file:<glob> names it; session_start unless said), about (a repository: what is said to a session there), island (an island: what is said there, by the version of its pack it runs).',
+    run: async (l, input) => ({ said: await instructionsFor(l, typeof input.for === 'string' ? input.for : 'session_start', { ...(typeof input.about === 'string' && { about: input.about }), ...(typeof input.island === 'string' && { island: input.island }) }) }),
+  },
+};
