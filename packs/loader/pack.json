@@ -67,6 +67,15 @@
         "out": "any",
         "run": "layout-services.ts#scene"
       },
+      "root.parts": {
+        "in": {
+          "island?": "string",
+          "have?": "any",
+          "shipped?": "boolean"
+        },
+        "out": "any",
+        "run": "parts-read.ts#parts"
+      },
       "root.pack_view": {
         "in": {
           "pack": "string",

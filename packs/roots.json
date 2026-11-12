@@ -80,6 +80,9 @@
     "root.scene": [
       "publish"
     ],
+    "root.parts": [
+      "query"
+    ],
     "root.drawing": [
       "publish"
     ],

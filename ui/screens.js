@@ -3,7 +3,7 @@
 // rows from a pack's view, a pack action's form, a short note. An action a pack offers on a kind or type is offered on
 // the page of each such item too. What a pack shows of one item (a roadmap, a gate) is a view of it: ui/canvases.js.
 
-import { api, h } from './base.js';
+import { api, h, hooks } from './base.js';
 import { renderBody } from './body.js';
 import { section } from './item-sections.js';
 import { attentionCard } from './attention.js';
@@ -18,6 +18,7 @@ import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { turnsPiece } from './turns.js';
 import { findingsPiece } from './findings.js';
+import { drawPart } from './part-host.js';
 import { pageIsA, pageSchema } from './page-schema.js';
 import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
 
@@ -243,8 +244,25 @@ const unknownPiece = (p) => {
   };
   return { node, later };
 };
-/** A piece drawn as the kernel draws it, or as a stub when this page does not know it. */
-const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, p) : unknownPiece(p));
+/**
+ * A piece a pack's part draws (packs/surface/page/part-host.js): the part that fills its slot, `piece.<name>`, on an
+ * item's page as a section of it. When no part fills it here, the stub that says so.
+ */
+const partPiece = (ctx, p) => {
+  const body = h('div');
+  const node = ctx.e ? section(p.piece, p.title ?? p.screen?.title ?? p.piece, 0, body) : h('div', {}, body);
+  const later = async () => {
+    const drawn = await drawPart(body, { slot: `piece.${p.piece}`, item: ctx.e, redraw: () => ctx.redraw?.() ?? hooks.route?.() });
+    if (!drawn) {
+      const stub = unknownPiece(p);
+      node.replaceWith(stub.node);
+      await stub.later();
+    }
+  };
+  return { node, later };
+};
+/** A piece drawn as the kernel draws it, else by the part that fills it, else as a stub when this page does not know it. */
+const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, p) : partPiece(ctx, p));
 
 /** The pages the kernel still draws itself (packs/loader/kernel/declared.ts lists them). */
 const PAGES = { time };

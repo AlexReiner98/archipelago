@@ -15,6 +15,7 @@ import { setIslands, setPack } from '../packs/loader/kernel/packstate.ts';
 import { hostFor } from '../packs/loader/kernel/packtools.ts';
 import { HOST_SLOTS } from '../packs/loader/kernel/slots.ts';
 import { partsBy, partsFor } from '../packs/loader/kernel/ui-parts.ts';
+import { parts } from '../packs/loader/kernel/parts-read.ts';
 import { freshWith, human, make, packsWith } from './map.ts';
 
 /** A pack of words another reads: a type of its own. */
@@ -71,6 +72,9 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ opens: ['other.end'] }), /a slot it opens is named "shelf.<name>"/);
   assert.throws(refused({ modules: { 'look.js': 'parts/row/look.js' } }), /needs its modules, entered at index.js/);
   assert.throws(refused({ modules: { 'index.js': 'parts/row/gone.js' } }), /the pack has no file of/);
+  assert.throws(refused({ query: { find: 'island {here}' } }), /query is a filter's terms/);
+  assert.throws(refused({ query: { find: ['island {here}'], limit: 900 } }), /query's limit is a whole number up to 200/);
+  assert.throws(refused({ query: { find: ['island {here}'] }, reads: undefined }), /has a query but reads no type/);
   // Asked for, another pack's type reads; a slot asked for fills.
   const asked = new Registry(folder(shelf({ requires: ['core', 'field:size@bin.box', 'slot:shelf.end'] }, { reads: { 'bin.box': ['size', 'title'] }, slot: 'shelf.end', opens: [] }), bin));
   try {
@@ -128,6 +132,16 @@ test('a part goes to the page by its hash: the owner’s version over it, an isl
     assert.match(there.modules!['look.js'], /island/);
     assert.equal(partsFor(await islandRegistry(l, rest))[0].hash, partsFor(l.registry)[0].hash);
     assert.notEqual(there.hash, partsFor(l.registry)[0].hash);
+
+    // The page asks the same through root.parts (the view parts): the island's, what it refines, or as they ship.
+    const asked = await parts({ caller: 'query', map: l }, { island: trial, have: [there.hash, 'not a hash'] });
+    assert.equal(asked.refined?.pinned, v, 'the island pins a version that draws its own part');
+    assert.deepEqual(asked.refined?.parts, ['shelf.row']);
+    const shipped = await parts({ caller: 'query', map: l }, { island: trial, shipped: true });
+    assert.equal(shipped.shipped, true);
+    assert.equal(shipped.parts[0].hash, partsFor(l.registry)[0].hash, 'as the pack ships it: no island version, no owner’s version');
+    assert.ok(shipped.parts[0].modules, 'its modules come with it when the page has not got them');
+    assert.equal((await parts({ caller: 'query', map: l }, {})).refined, undefined, 'with no island, nothing is said of one');
   } finally {
     hostFor(l.registry).stop();
     rmSync(dir, { recursive: true, force: true });

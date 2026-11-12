@@ -20,7 +20,8 @@
     "service:answer.page_style",
     "service:answer.instructions",
     "service:root.uses",
-    "service:root.pack_view"
+    "service:root.pack_view",
+    "service:root.parts"
   ],
   "kernel": {
     "trust": "service",

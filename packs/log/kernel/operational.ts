@@ -63,6 +63,7 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
   style: 'How a page looks: the styles the packs ship and the map keeps, merged; the system tier, not the work.',
   saved_views: 'The views kept on the map, each named by the style that draws it: the system tier, not the work.',
   instructions: 'What agents are told: the instructions the packs ship and the map keeps, merged; the system tier, not the work.',
+  parts: "The parts of the page: the packs' code (an island's pinned version's there) and the owner's part items over it; the system tier, not the work.",
 };
 
 /** Restoring a backup writes the map's rows as they were, in packs/write/kernel/pelago.ts (restoreRows): never re-applied as changes. */
