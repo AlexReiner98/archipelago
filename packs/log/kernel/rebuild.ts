@@ -9,7 +9,7 @@ import type { Db, Q } from '../../../src/db.ts';
 import { headOf, stored, type Entry } from './log.ts';
 import { beforeTheLog, inOrder, type TypesRead, loadRows, projectEntry, projectedRows, PROJECTED, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
 import { projectsApart, regatherAll } from './closure.ts';
-import { mentionedAll } from '../../../src/mentions.ts';
+import { projectAgain } from './log-project.ts';
 import { openAll } from '../../../src/seal.ts';
 import { KEPT_FIELDS } from './operational.ts';
 import { newestValid, prune, takeSnapshot, type Positions, type Snapshot } from './snapshot.ts';
@@ -85,7 +85,7 @@ export async function catchUp(db: Db, reg: TypesRead, ws: string, swap: boolean,
       // they are to be swapped in. A snapshot alone never reads them.
       if (swap) {
         await regatherAll(tx, reg.relationFamily('part_of'));
-        await mentionedAll(tx);
+        await projectAgain(tx, reg);
       }
     });
     const report: RebuildReport = { from: start?.snapshot.id ?? 'start', to: at, entries: 0, chunks: 0, snapshots: [], ms: 0, snapshot_ms: 0 };

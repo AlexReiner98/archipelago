@@ -32,13 +32,14 @@ test("what Workspaces.load did in a fixed order is the roots' and the kernel's f
     { phase: 'restore', pack: 'identity' },
     { phase: 'packs', pack: 'loader' },
     { phase: 'packs', pack: 'write' },
+    { phase: 'types', pack: 'log' },
     { phase: 'types', pack: 'loader' },
     { phase: 'types', pack: 'loader' },
     { phase: 'begin', pack: 'rules' },
     { phase: 'islands', pack: 'placement' },
   ]);
   for (const f of filled) assert.ok((OPEN_PHASES as readonly string[]).includes(f.phase));
-  assert.deepEqual((await kernelDuties()).sort(), ['clocks', 'sessions', 'surface'], 'the clock is a timer of the clocks pack');
+  assert.deepEqual((await kernelDuties()).sort(), ['clocks', 'log', 'sessions', 'surface'], 'the clock is a timer of the clocks pack, and the log is kept by its root');
 });
 
 test('the clock runs only while this server leads, and stops when it loses the lead', async (t) => {

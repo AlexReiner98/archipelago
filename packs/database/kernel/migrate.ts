@@ -25,7 +25,7 @@ import { OPLOG, OPLOG_GUARDED, OPLOG_SERVER } from '../../../src/oplog.ts';
 import { PARTITION } from '../../../src/partitions.ts';
 import { SNAPSHOT } from '../../../src/snapshot.ts';
 import { CLOSURE } from '../../../src/closure.ts';
-import { MENTIONS } from '../../../src/mentions.ts';
+import { MENTIONS } from './mentions.ts';
 import { ITEM_BYTES } from '../../../src/bytes.ts';
 import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
 import { GUESTS_GONE, MEMBER_READ_ONLY, VAULT_KEY_POLICY } from './member-schema.ts';

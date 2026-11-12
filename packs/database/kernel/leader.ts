@@ -81,3 +81,33 @@ export async function pgLeader(url: string, { everyMs = 10_000, key = 'pelago.le
     },
   };
 }
+
+/**
+ * What runs for the whole server while `leader` leads, not per workspace (each workspace's duties are its packs',
+ * src/lifecycle.ts): each start answers what stops it, all started on taking the lead and stopped on losing it. One
+ * that fails to start is said and the rest still start. Answers what stops them all.
+ */
+export function whileLeads(leader: Leader, starts: (() => () => void)[]): () => void {
+  let stops: (() => void)[] = [];
+  const stop = () => {
+    for (const s of stops) s();
+    stops = [];
+  };
+  const start = () => {
+    stop();
+    for (const begin of starts) {
+      try {
+        stops.push(begin());
+      } catch (err) {
+        console.error(`starting a server duty failed: ${(err as Error).message}`);
+      }
+    }
+  };
+  leader.onChange((leading) => {
+    console.log(leading ? 'leading: this server runs the clocks' : 'no longer leading: another server runs the clocks');
+    if (leading) start();
+    else stop();
+  });
+  if (leader.leading) start();
+  return stop;
+}

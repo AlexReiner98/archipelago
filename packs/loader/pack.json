@@ -6,6 +6,19 @@
   "kernel": {
     "trust": "root",
     "internal": true,
-    "modules": "kernel/"
+    "modules": "kernel/",
+    "provides": {
+      "root.due": {
+        "in": {
+          "target": "id",
+          "reason": "string",
+          "detail": "any"
+        },
+        "out": {
+          "seq": "any"
+        },
+        "run": "due-event.ts#dueOf"
+      }
+    }
   }
 }

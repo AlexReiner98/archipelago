@@ -1,0 +1,15 @@
+{
+  "id": "clocks",
+  "version": "0.1.0",
+  "title": "Clocks",
+  "description": "The clock: once a minute, while this server leads, what came due in each workspace since the last pass, by an item's when or a watched query's edge, recorded as item.due and told to the packs that hear it. It decides nothing of what is then done.",
+  "uses": [
+    "service:root.due",
+    "service:act.report.due_on"
+  ],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/"
+  }
+}

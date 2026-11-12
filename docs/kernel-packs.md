@@ -189,6 +189,7 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `src/root-calls.ts`:
 | `root.merge` | log | backup | the writes a merge makes, and what they did |
 | `root.counters` | surface | usage | a workspace's limits, its use of each and what that use is made of |
 | `root.uses` | surface | usage | the uses stream's counts held in memory: added to, or read (the kernel's callers name a workspace, so `src/uses.ts` counts with `serverContext`) |
+| `root.due` | loader | clocks | an item came due: item.due recorded on the map's activity stream as the kernel's and told to the sandboxed packs that hear it; its seq |
 
 ## Write-path hooks
 
@@ -332,12 +333,12 @@ moves with a shim to the pack named.
 
 | Pack | Modules |
 |---|---|
-| database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), deploy, move, leader |
+| database | db, pg, schema, member-schema, migrate, read-indexes, public-schema, public-view-store, stats, config (policy half to identity), deploy, move, leader, mentions (step 25's table of what names what, kept as released) |
 | seal | seal, opseal, vault, secrets, backup-seal |
 | log | log, partitions, streams, oplog, retention, snapshot, rebuild, replay, project, facts, closure, activity, activity-steps, operational, tail, backup (dump and restore, and the root services root.dump and root.merge; the rest to backup), backup-log, bytes (the counts; its log.appended filling to usage) |
 | identity | auth, oauth, oauth-clients, passwords, person-tokens, token-tools, members (invite half to mail), control, control-index, scope, workspaces (tenancy; the load order becomes the stub's `open` phases) |
 | walls | page-policies, draw-host, svg-figure, css-check, public, public-document, outbound, outbox, address, outside, notify-mail, drawing-box, drawing-runner, look-pass |
-| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts |
+| loader | manifest, packorder, packs, packstate, pack-folders, pack-allow, pack-items, pack-code, pack-moved, island-pin, island-rules, islands, island-items (`placeOnIslands` to placement), reach, pack-reach, packhost, pack-runner, packtools, declared, capabilities (behaviour to `capability.*` providers), server-packs, server-reach, server-mounts, type-items, type-overlay, version-types, typetable, registry-at, registry-then, pack-launch, pack-action-launch, bundles, pack-versions, server-adapter, layouts, due-event (root.due) |
 | rules | rules (reply rules to sessions), actor-checks, authority, private-deps, layout-changes, standing |
 | write | pelago (reads to surface), change-apply, change-plan (automation checks to automations), ops, head, fields, link-ends, owner-link, within, pelago-types, proposals, withdraw, undo, merge, forget |
 | surface | server, tools, tool-change, tool-human, tool-ops, tool-acts (session acts to sessions), tool-reads (watch, pictures to presence, publish), tool-config, mcp, surface, hooks, cli, first-start, server-host, server-requests, server-routes, server-streams, server-published, server-connect, server-gates, server-launch, server-files, server-acts, reply, limit, drain, ui-files, may, workspace-tools (and root.counters), workspace-use, backup-tools, search, transient, view-address, listing, packreads (and the slot surface.reads), packreads-kernel, packreads-log, packreads-pin, packreads-rows, packreads-service, packreads-scope (the scope half of sessions' places, which it re-exports), region, blocking |
@@ -355,14 +356,14 @@ moves with a shim to the pack named.
 | agents | instructions, launch-brief, schema-brief |
 | placement | subject, island-start, `placeOnIslands`; `ensureSource` from change-apply |
 | waits | unwait |
-| mentions | mentions |
+| mentions | mentions (its projector; step 25's table went to database, its remake after a restore to log's `projectAgain`) |
 | automation_triggers (required; automations stays plain, its handler in the sandbox) | automation-rules, due-on (what its edges met kept under `due_on:<automation>`, `kernel.memory`) |
-| clocks | due, duties |
+| clocks | due (on its context: the reads `clock`, `timed`, `due_of` in `packreads-clocks`, item.due through `root.due`, a watched query's edges through automation_triggers' `act.report.due_on`; its timer is still registered in `src/open-steps.ts`, for the owner's alert on a failed pass, until alerts answers by a service name); duties went: stream and snapshot keeping to log's `LEADING`, the backup timer to backup's server duty (`backupDuty`), the server packs' schedules beside it in `whileLeads` (`src/leader.ts`) |
 | sessions (exists) | sessions, chat-run, hook-answers, replies, reply-rules, reconcile, run-record, session-events, session-measures, session-name, session-parent, session-quiet, session-state, session-turns, sessiontime, touched, stands, spent, audit, working-rules, close-offer, file-said, frontier, frontier-prompt, places |
 | claude_code (exists) | hook-tool, session-hook |
 | publish | published, published-data, published-frames, published-live, published-pictures, published-preview, public-bake, public-route, public-view, site, share-tools, drawing-files, pictures, pack-counts |
 | mcp_apps | mcp-view |
-| backup | backup's backupAll, upload and merge (through root services) |
+| backup | backup's backupAll, upload and merge (through root services), and the server duty that asks every five minutes whether a backup is due (`backupDuty`, serverContext) |
 | usage | usage (through root.counters), pack-touches, pack-use (reads `type_counts`, `uses_lately`; root.uses), uses (root.uses) |
 | notifications | notify |
 | mail | mail, smtp, bounces |
