@@ -303,7 +303,16 @@ Started in this order; each needs only those above it in the table.
 The `Archipelago` class (`src/pelago.ts`) is taken apart on the way: change
 and apply go to write, `search`, `get`, `trail` and `events` to surface,
 `secret` to seal, `claim` and `release` to write as ops, `checkConnections`
-to the connect pack.
+to the connect pack. As built (wave 5): `search` is surface's `searchMap`
+(`src/search.ts`), no longer the class's; `secret` and `setSecret` are the
+seal's `readSecret` and `writeSecret`, the class's names kept as adapters;
+`checkConnections` is the connect pack's (`src/check-connections.ts`),
+filling `surface.act` as `check_connections`, and hands what it saw to the
+class's `observed`, which keeps it on the write path. `get`, `trail`,
+`events` and `proposals` still go through the class (`src/map-reads.ts`)
+until the reads API calls them there. The rules root reads `rules.<on>`
+fillings from the internal packs' `kernel.hooks`; sessions declares
+`rules.reply_ended`.
 
 ## Where each module goes
 

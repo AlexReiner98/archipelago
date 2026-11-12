@@ -244,7 +244,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   check_connections: {
     description: 'Ping every connection (external tool) and record whether it is reachable. Work that needs an unreachable connection shows as blocked.',
     input: {},
-    run: async (l, actor) => l.checkConnections(actor),
+    run: slotted('surface.act', 'check_connections'), // what it does is the connect pack's filling (src/check-connections.ts)
   },
   rechecked: {
     description:

@@ -6,11 +6,11 @@ import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../load
 import { anyone, newId, scoped, type Db, type Q } from '../../../src/db.ts';
 import { once } from './merge.ts'; import type { EventQuery } from '../../../src/eventlog.ts'; import { doneFact, type Done } from '../../../src/activity.ts';
 import type { Registry } from '../../../src/packs.ts'; import { currentNames } from '../../../src/type-items.ts'; import { follow, retyped, rewrite, type Who } from '../../../src/write-hooks.ts';
-import { isSealed, seal, unseal } from '../../../src/secrets.ts';
+import { readSecret, writeSecret } from '../../../src/secrets.ts';
 import { KEPT_FIELDS } from '../../../src/operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from '../../../src/streams.ts';
-import * as reads from '../../../src/map-reads.ts'; import type { SearchInput } from '../../../src/search.ts'; import { layoutOf } from '../../../src/layout-changes.ts';
+import * as reads from '../../../src/map-reads.ts'; import { layoutOf } from '../../../src/layout-changes.ts';
 import { append, headOf, type Fact } from '../../../src/log.ts'; import { projectDecision, projectFacts, stamp } from '../../../src/replay.ts'; import { linkFacts } from '../../../src/facts.ts';
-import { decideProposal } from './proposals.ts'; import { guardedFetch } from '../../../src/outbound.ts'; import { needHuman } from '../../../src/actor-checks.ts';
+import { decideProposal } from './proposals.ts'; import { needHuman } from '../../../src/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
 import { planChange } from './change-plan.ts'; import { used } from '../../../src/uses.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../../src/island-rules.ts';
 
@@ -256,24 +256,15 @@ export class Archipelago {
     return { released: rows.length };
   }
 
-  /** Ping every connection's URL and record whether it is reachable. */
-  async checkConnections(actor: Actor) {
-    const { rows } = await this.db.query<Entity>(`select * from entity where type = any($1::text[]) and archived_at is null and is_open`, [this.registry.family('connection')]);
-    const out = [];
-    for (const conn of rows) {
-      const url = conn.props.url as string | undefined;
-      if (!url) continue;
-      // Any HTTP answer, even an error status, means something is listening; asked through the guard (src/outbound.ts).
-      const reachable = await guardedFetch(url, { signal: AbortSignal.timeout(2000) }).then(() => true, () => false);
-      const status = reachable ? 'available' : 'unavailable';
-      await this.record('observations', actorId(actor), [['+', conn.id, 'status', status]]);
-      if (status !== conn.status) {
-        await this.db.query(`update entity set status = $2, updated_at = now() where id = $1`, [conn.id, status]);
-        await this.log(this.db, { actor: actorId(actor), action: 'connection.check', target: conn.id, reason: 'Reachability changed', detail: { title: conn.title, from: conn.status, to: status } });
-      }
-      out.push({ id: conn.id, title: conn.title, url, status });
-    }
-    return out;
+  /**
+   * What a check of a connection saw (the connect pack's checkConnections, src/check-connections.ts, which calls out):
+   * kept as an observation, and the connection's status set, with a line in the activity, when it changed.
+   */
+  async observed(actor: Actor, conn: Entity, status: 'available' | 'unavailable'): Promise<void> {
+    await this.record('observations', actorId(actor), [['+', conn.id, 'status', status]]);
+    if (status === conn.status) return;
+    await this.db.query(`update entity set status = $2, updated_at = now() where id = $1`, [conn.id, status]);
+    await this.log(this.db, { actor: actorId(actor), action: 'connection.check', target: conn.id, reason: 'Reachability changed', detail: { title: conn.title, from: conn.status, to: status } });
   }
 
   // ---- settings --------------------------------------------------------
@@ -299,24 +290,9 @@ export class Archipelago {
     return id;
   }
 
-  /**
-   * A setting that is a secret the server has to use (a key, a signing
-   * secret): stored sealed, so the database and its backups do not hold it.
-   * One stored before secrets were sealed is sealed the first time it is
-   * read. One that cannot be opened here reads as not set.
-   */
-  async secret(key: string): Promise<string | undefined> {
-    const stored = await this.setting<string>(key);
-    if (typeof stored !== 'string' || !stored) return undefined;
-    if (!isSealed(stored)) await this.setSecret(key, stored);
-    return unseal(stored);
-  }
-
-  async setSecret(key: string, value: string | undefined): Promise<void> {
-    if (!value) await this.db.query(`delete from setting where key = $1`, [key]);
-    else await this.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [key, JSON.stringify(seal(value))]);
-    await this.record('settings', 'system', [value ? ['+', 'secret', key, true] : ['-', 'secret', key]]); // the name only: the value is the vault's
-  }
+  /** A setting that is a secret the server has to use, kept sealed: the seal's (readSecret, src/secrets.ts). */
+  secret(key: string): Promise<string | undefined> { return readSecret(this, key); }
+  setSecret(key: string, value: string | undefined): Promise<void> { return writeSecret(this, key, value); }
 
   /** Create (or find) the person this workspace belongs to and make them the default for views. */
   async init(actor: Actor, input: { name: string; email?: string }) {
@@ -337,9 +313,9 @@ export class Archipelago {
     return rows[0];
   }
 
-  // The map's reads (get, search, trail, events, proposals) are surface's, split off into src/map-reads.ts; the class
-  // still answers them by name for its callers, until the gather step points those at the module.
-  search(input: SearchInput) { return reads.searchMap(this, input); }
+  // The map's reads (get, search, trail, events, proposals) are surface's, split off into src/map-reads.ts; search is
+  // asked there (searchMap, src/search.ts). The class still answers the others by name for its callers, until the gather step points
+  // those at the module.
   hidden(id: string): Promise<boolean> { return reads.hidden(this, id); }
   get(id: string) { return reads.getItem(this, id); }
   trail(id: string) { return reads.trail(this, id); }

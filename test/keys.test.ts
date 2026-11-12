@@ -19,6 +19,7 @@ import { Archipelago } from '../src/pelago.ts';
 import { isSealed, open, openSaid, SealBroken, seal } from '../src/seal.ts';
 import { undo } from '../src/undo.ts';
 import { dumpVault, keysOf } from '../src/vault.ts';
+import { searchMap } from '../src/search.ts';
 
 async function all(l: Archipelago, read = entries) {
   const out: Entry[] = [];
@@ -162,8 +163,8 @@ test('a forgotten item is gone from every read', async () => {
 
   assert.equal(await l.entity(made.sam), undefined);
   await assert.rejects(l.get(made.sam));
-  assert.deepEqual(await l.search({ q: 'Quill' }), []);
-  assert.deepEqual(await l.search({ q: 'Salary' }), []);
+  assert.deepEqual(await searchMap(l, { q: 'Quill' }), []);
+  assert.deepEqual(await searchMap(l, { q: 'Salary' }), []);
   const task = (await l.get(made.t)) as { entity: { owner: string | null }; outgoing: { type: string }[] };
   assert.equal(task.entity.owner, null, 'what it owned is owned by no one');
   assert.deepEqual(task.outgoing.map((r) => r.type), ['part_of'], 'its links are gone with it');

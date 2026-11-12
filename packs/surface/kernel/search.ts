@@ -8,7 +8,7 @@
 // the most words first: "stale map unpushed commits" should still find the issue that "stale" finds (issue e_vb4ykndy).
 
 import type { Q } from '../../../src/db.ts';
-import type { Entity } from '../../../src/pelago.ts';
+import type { Archipelago, Entity } from '../../../src/pelago.ts';
 
 // The words of a title and its note, kept in an index on the very expression search matches with, so the index finds
 // exactly what reading every row found; and the trigrams of every title, for a match anywhere in it and for the
@@ -119,4 +119,10 @@ export async function search(db: Q, family: (type: string) => string[], input: S
     if (rows.length) return rows;
   }
   return run('any');
+}
+
+/** Search a map over titles and notes, the type named checked against its registry first: the kernel's read `search`. */
+export async function searchMap(l: Archipelago, input: SearchInput) {
+  if (input.type && !l.registry.type(l.registry.canonical(input.type))) throw new Error(`Unknown type "${input.type}"`);
+  return search(l.db, (type) => l.registry.family(type), input);
 }

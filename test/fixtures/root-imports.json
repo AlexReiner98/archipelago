@@ -138,7 +138,6 @@
   "src/tool-acts.ts -> src/presence.ts",
   "src/tool-acts.ts -> src/seeing.ts",
   "src/tool-acts.ts -> src/sessions.ts",
-  "src/tool-acts.ts -> src/surface-slots.ts",
   "src/tool-acts.ts -> src/unwait.ts",
   "src/tool-change.ts -> src/close-offer.ts",
   "src/tool-change.ts -> src/plan-note.ts",
