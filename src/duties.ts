@@ -5,6 +5,7 @@
 import { backupAll, newestBackup } from './backup.ts';
 import type { Config } from './config.ts';
 import type { Leader } from './leader.ts';
+import { every } from './lifecycle.ts';
 import type { ServerPacks } from './server-host.ts';
 import type { Workspaces } from './workspaces.ts';
 import { compact, seal } from './streams.ts';
@@ -78,20 +79,19 @@ export function serverDuties(leader: Leader, workspaces: Workspaces, serverPacks
     if (today !== keptOn) void keepStreams(workspaces).then(() => keepSnapshots(workspaces)).then(() => (keptOn = today), (err) => console.error('keeping the streams failed:', err));
   };
 
-  let timers: NodeJS.Timeout[] = [];
-  let stopSchedules = () => {};
+  // The server's timers, each under the pack its code moves to (docs/kernel-packs.md), run at once on taking the lead.
+  const timers: { pack: string; every_ms: number; run: () => void }[] = [
+    { pack: 'backup', every_ms: 5 * 60_000, run: backupSafely },
+    { pack: 'log', every_ms: 60 * 60_000, run: keepIfDue },
+  ];
+  let stops: (() => void)[] = [];
   const stop = () => {
-    for (const t of timers) clearTimeout(t);
-    timers = [];
-    stopSchedules();
+    for (const s of stops) s();
+    stops = [];
   };
   const start = () => {
     stop();
-    backupSafely();
-    keepIfDue();
-    timers = [setInterval(backupSafely, 5 * 60_000), setInterval(keepIfDue, 60 * 60_000)];
-    for (const t of timers) t.unref();
-    stopSchedules = serverPacks.runSchedules();
+    stops = [...timers.map((t) => every(t.every_ms, t.run, true)), serverPacks.runSchedules()];
   };
   leader.onChange((leading) => {
     console.log(leading ? 'leading: this server runs the clocks' : 'no longer leading: another server runs the clocks');

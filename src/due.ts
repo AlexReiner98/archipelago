@@ -4,10 +4,13 @@
 // item.due event and tells the packs that hear item.due, which do whatever is to be done: the kernel decides nothing
 // and names no pack. Its cursor is kept in the workspace's settings, so a pass after a restart catches up on what came
 // due while it was down, a day at most; the first pass ever starts from now. An automation that watches a query
-// comes due when it starts to match instead (src/due-on.ts), by the same fact. A hearer is told the event's seq, and in
+// comes due when it starts to match instead (src/due-on.ts), by the same fact. It runs as a timer of the clocks pack,
+// while this server leads (src/lifecycle.ts). A hearer is told the event's seq, and in
 // its detail the item's version (its last position in the fact stream), and the packs it came due under (src/pack-versions.ts), so what it does can name what it answered.
 
+import { alertOwner } from './alert.ts';
 import { onPass } from './due-on.ts';
+import { timer } from './lifecycle.ts';
 import { packVersionsFor } from './pack-versions.ts';
 import { hostFor } from './packtools.ts';
 import type { Archipelago, Entity } from './pelago.ts';
@@ -80,15 +83,8 @@ async function versionsOf(l: Archipelago, ids: string[]): Promise<Map<string, nu
   return new Map(rows.map((r) => [r.id, r.pos]));
 }
 
-const clocks = new WeakMap<Archipelago, ReturnType<typeof setInterval>>();
-
-/** Start the workspace's clock; the leader alone runs it (src/leader.ts). */
-export function startClock(l: Archipelago, onError: (err: Error) => void): void {
-  stopClock(l);
-  clocks.set(l, setInterval(() => void duePass(l).catch(onError), EVERY_MS).unref());
-}
-
-export function stopClock(l: Archipelago): void {
-  clearInterval(clocks.get(l));
-  clocks.delete(l);
-}
+// The clock is a timer of the clocks pack (src/lifecycle.ts): run in each workspace while this server leads
+// (src/leader.ts), a failed pass told to the workspace's owner.
+timer('clocks', EVERY_MS, (ws) => duePass(ws.pelago), {
+  failed: (ws, err) => void alertOwner(ws.pelago, { key: 'clock', title: 'The clock failed', body: `A pass over what came due failed: ${err.message}`, from: 'pelago' }),
+});
