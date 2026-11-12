@@ -20,8 +20,11 @@ export async function resolveRun(l: Archipelago, key: string, openOnly = false):
   return rows[0];
 }
 
-/** A run that is a chat's: a surface named it and keeps it, where a run this server launched (src/launcher.ts) is the server's to end. */
-export const isChat = (run: Entity) => Boolean(run.props.session_id && run.props.surface) && run.props.surface !== 'claude-headless' && !String(run.props.surface).startsWith('pack:');
+/**
+ * A run that is a chat's: a surface named it and keeps it, where a run this server launched (src/launcher.ts) is the
+ * server's to end: its surface is pack:<the launcher's pack>, or <client>-headless as launches were named before that.
+ */
+export const isChat = (run: Entity) => Boolean(run.props.session_id && run.props.surface) && !/-headless$/.test(String(run.props.surface)) && !String(run.props.surface).startsWith('pack:');
 
 /** The actor a session's hooks act as, whatever surface it is in: named claude-code since before there were surfaces, as the log keeps it. */
 export const HOOK_ACTOR: Actor = { kind: 'agent', name: 'claude-code' };

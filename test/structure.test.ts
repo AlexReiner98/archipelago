@@ -67,8 +67,8 @@ const SESSIONS = 'e_xzwgetrg Sessions behaviour into its pack', CLAUDE = 'e_c35g
 // A surface is a pack that adapts a client's hooks or launches one (reach.server adapter or launchers), and the kernel
 // names none of it: not `claude_code`, `claude-code`, `claude-headless`, nor the client `claude`.
 const NAMES_SURFACES: Owed = {
-  'src/chat-run.ts': [2, CLAUDE], 'src/hook-tool.ts': [1, CLAUDE], 'src/install.ts': [2, CLAUDE], 'src/server-adapter.ts': [1, CLAUDE],
-  'src/server-launch.ts': [1, CLAUDE], 'src/server.ts': [1, CLAUDE], 'src/session-hook.ts': [1, CLAUDE], 'src/token-tools.ts': [1, CLAUDE],
+  'src/chat-run.ts': [1, CLAUDE], 'src/install.ts': [2, CLAUDE], 'src/server-adapter.ts': [1, CLAUDE],
+  'src/server-launch.ts': [1, CLAUDE], 'src/server.ts': [1, CLAUDE], 'src/token-tools.ts': [1, CLAUDE],
   'ui/agents-card.js': [2, VIEWS], 'ui/connect-agent.js': [4, VIEWS], 'ui/words.js': [1, VIEWS],
 };
 test('the kernel names no surface', () => {
