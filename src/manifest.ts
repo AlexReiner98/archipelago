@@ -80,8 +80,10 @@ export interface KernelSpec {
   internal: true;
   /** The folder of its code under the pack's own, `kernel/` unless said. */
   modules?: string;
-  /** The service names it provides, each with its shapes and the function that answers it. */
-  provides?: Record<string, { in?: unknown; out?: unknown; run: ModuleRef }>;
+  /** The service names it provides (`<family>.<name>`), each with its shapes (src/services.ts) and the function that answers it. */
+  provides?: Record<string, { in?: unknown; out?: unknown; read?: string; run: ModuleRef }>;
+  /** The shapes it calls service names with: what it gives and reads, checked against the provider's (src/packorder.ts). */
+  calls?: Record<string, { in?: unknown; out?: unknown }>;
   /** The hook points and slots it fills, each with its function (or several, in order). */
   hooks?: Record<string, ModuleRef | ModuleRef[]>;
   /** The tables of its own that a log.project filling writes, each a column by its shape. */
@@ -89,13 +91,13 @@ export interface KernelSpec {
   /** What it runs on a clock, on the server that leads. */
   timers?: { run: ModuleRef; every_ms: number; leading?: boolean }[];
 }
-export const KERNEL_KEYS = ['trust', 'internal', 'modules', 'provides', 'hooks', 'tables', 'timers'] as const;
+export const KERNEL_KEYS: readonly string[] = 'trust internal modules provides calls hooks tables timers'.split(' ');
 const MODULE_REF = /^[\w./-]+\.ts#[A-Za-z_$][\w$]*$/;
 
 /** Problems with a manifest's `kernel`, as sentences. Where a pack may carry it is the registry's (kernelRefused). */
 export function kernelProblems(k: unknown): string[] {
   if (k === undefined) return [];
-  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, hooks?, tables?, timers? }'];
+  if (typeof k !== 'object' || k === null || Array.isArray(k)) return ['kernel is an object: { trust, internal, modules?, provides?, calls?, hooks?, tables?, timers? }'];
   const s = k as Raw, problems: string[] = [];
   for (const key of Object.keys(s)) if (!(KERNEL_KEYS as readonly string[]).includes(key)) problems.push(`"kernel.${key}" is not a key of a manifest: in kernel, one of ${KERNEL_KEYS.join(', ')}`);
   if (s.trust !== 'root' && s.trust !== 'service') problems.push('kernel.trust is root or service');

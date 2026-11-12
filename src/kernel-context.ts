@@ -95,6 +95,11 @@ export class KernelHost {
     return out;
   }
 
+  /** Each service name the active internal packs provide, bound to its provider's context: what the loader hands fillServices (src/services.ts). */
+  services(l: Archipelago): Map<string, (input: unknown) => Promise<unknown>> {
+    return new Map(this.packs(l).flatMap((pack) => Object.entries(pack.kernel?.provides ?? {}).map(([name, p]) => [name, async (input: unknown) => (await this.fn(pack, p.run))(contextFor(l, pack, this), input)] as const)));
+  }
+
   /** A service name called by a pack: only one it requires or uses, answered by its one active provider. */
   async call<O>(l: Archipelago, from: Manifest, name: string, input: unknown): Promise<O> {
     const want = `service:${name}`;

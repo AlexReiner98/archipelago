@@ -18,7 +18,7 @@ const probe = (reg: Registry) => reg.found.find((p) => p.id === 'kernel_probe')!
 const manifest = (kernel: unknown, more: Record<string, unknown> = {}) => () => readManifest(JSON.stringify({ id: 'k', version: '1', title: 'K', kernel, ...more }), 'k');
 
 test('the manifest key kernel says a tier, and is refused when it says anything else', () => {
-  assert.equal(tierOf(manifest({ trust: 'service', internal: true, hooks: { 'write.follow': 'a.ts#follow' } })()), 'service');
+  assert.equal(tierOf(manifest({ trust: 'service', internal: true, hooks: { 'write.follow': 'a.ts#follow' }, calls: { 'answer.brief': { in: { task: 'id' } } } })()), 'service');
   assert.throws(manifest({ trust: 'trusted', internal: true }), /kernel.trust is root or service/);
   assert.throws(manifest({ trust: 'service' }), /kernel.internal is true/);
   assert.throws(manifest({ trust: 'service', internal: true, colour: 1 }), /"kernel.colour" is not a key/);
@@ -74,9 +74,10 @@ test("a service pack's change goes through change as the pack, and it reads what
 test('a service name is called only as the caller declares it, and answered by its one provider', async () => {
   const l = await freshWith(new Registry(dir));
   const host = new KernelHost((p) => l.registry.folderOf(p));
-  const caller: PackFile = { id: 'asker', version: '1', title: 'Asker', uses: ['service:probe.echo'] };
-  assert.deepEqual(await host.call(l, caller, 'probe.echo', { said: 'hello' }), { said: 'hello', by: 'kernel_probe' });
-  await assert.rejects(host.call(l, { ...caller, uses: [] }, 'probe.echo', {}), /neither requires nor uses/);
+  const caller: PackFile = { id: 'asker', version: '1', title: 'Asker', uses: ['service:answer.probe'] };
+  assert.deepEqual(await host.call(l, caller, 'answer.probe', { said: 'hello' }), { said: 'hello', by: 'kernel_probe' });
+  assert.deepEqual(await host.services(l).get('answer.probe')!({ said: 'hi' }), { said: 'hi', by: 'kernel_probe' }, 'what the loader hands fillServices');
+  await assert.rejects(host.call(l, { ...caller, uses: [] }, 'answer.probe', {}), /neither requires nor uses/);
   await assert.rejects(host.call(l, { ...caller, uses: ['service:nobody'] }, 'nobody', {}), /No active pack provides service:nobody/);
 });
 

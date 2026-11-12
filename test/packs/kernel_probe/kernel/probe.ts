@@ -8,7 +8,7 @@ export function follow(_ctx: KernelContext, ops: Op[]): Op[] {
   return ops.filter((o) => o.op === 'create' && o.type === 'task').map((o, i) => ({ op: 'create', ref: `seen${i}`, type: 'task', title: `Seen: ${o.title}` }));
 }
 
-/** service:probe.echo: what it was given, and who answered. */
+/** service:answer.probe: what it was given, and who answered. */
 export function echo(ctx: KernelContext, input: { said: string }) {
   return { said: input.said, by: ctx.pack.id };
 }

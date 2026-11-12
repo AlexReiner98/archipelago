@@ -2,13 +2,13 @@
   "id": "kernel_probe",
   "version": "0.1.0",
   "title": "Kernel probe",
-  "description": "A service pack for testing the in-process tier: it fills write.follow, provides service:probe.echo and runs a timer that changes and reads the map through its context.",
+  "description": "A service pack for testing the in-process tier: it fills write.follow, provides service:answer.probe and runs a timer that changes and reads the map through its context.",
   "requires": ["type:task"],
   "kernel": {
     "trust": "service",
     "internal": true,
     "modules": "kernel/",
-    "provides": { "probe.echo": { "in": { "said": "string" }, "out": { "said": "string" }, "run": "probe.ts#echo" } },
+    "provides": { "answer.probe": { "in": { "said": "string" }, "out": { "said": "string" }, "run": "probe.ts#echo" } },
     "hooks": { "write.follow": "probe.ts#follow" },
     "timers": [{ "run": "probe.ts#tick", "every_ms": 60000 }]
   }
