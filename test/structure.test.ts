@@ -87,15 +87,15 @@ test("the kernel imports no pack's code", () => {
 
 // The kernel reads no kind (the owner, e_w46v6jf9): core's eight are starter types, and what an item is comes from its type
 // (its starter, lineage, capabilities). The kind column is written from the starter, the `kind <k>` term read through the type;
-// left: the database's own fill of the column, a released schema step that is never edited (src/head.ts, ITEM_KIND).
+// left: the database's own fill of the column, a released schema step that is never edited (packs/loader/kernel/head.ts, ITEM_KIND).
 const READS_KINDS: Record<string, number> = { 'packs/loader/kernel/head.ts': 1 };
 const KIND_READ = /\bkindsOf\b|\.kinds\(\)|\b(?:type|get)\([^)]*\)\??\.kind\b|\b(?:type|def|parent|resolved|item|entity)\??\.kind\b|\bkind\s*(?:[!=]==?|<>)\s*['"](?:actor|aim|work|question|record|occurrence|place|system)['"]|\be\.kind\s*(?:=|<>|!=)\s|def->>'kind'/g;
 test('the kernel reads no kind', () => {
   assert.deepEqual(ratchet(count(kernelFiles, KIND_READ), READS_KINDS), [], "Read the type: its starter, its lineage (registry.isA) or a capability it declares, never an item's kind.");
 });
 
-// 3. Writes to items and relations go through the write path (src/pelago.ts, its apply loop in src/change-apply.ts):
-// change for facts, projected by the projector it runs (src/replay.ts), and the operational writes and the restore path src/operational.ts names.
+// 3. Writes to items and relations go through the write path (packs/write/kernel/pelago.ts, its apply loop in packs/write/kernel/change-apply.ts):
+// change for facts, projected by the projector it runs (packs/log/kernel/replay.ts), and the operational writes and the restore path packs/log/kernel/operational.ts names.
 // Every other store is named there too.
 const WRITES_ELSEWHERE: Record<string, number> = {};
 const WRITE_PATH = ['packs/write/kernel/pelago.ts', 'packs/write/kernel/change-apply.ts', 'packs/log/kernel/replay.ts'];
@@ -110,12 +110,12 @@ test('every store is named, with its rule', () => {
   const made = (re: RegExp) => new Set(srcCode.flatMap((f) => [...read(f).matchAll(re)].map((m) => m[1])));
   const tables = [...made(/create table if not exists (\w+)/gi)].filter((t) => !made(/drop table if exists (\w+)/gi).has(t)); // one a later step drops is no store
   const named = [...MAP_TABLES, ...Object.keys(STORES)];
-  assert.deepEqual(tables.filter((t) => !named.includes(t)), [], 'Name the store in src/operational.ts, with the one rule it keeps.');
-  assert.deepEqual(named.filter((t) => !tables.includes(t)), [], 'A store src/operational.ts names that no longer exists: take it out.');
-  assert.ok(read('packs/write/kernel/pelago.ts').includes(`function ${RESTORE}(`), 'The restore path src/operational.ts names is in src/pelago.ts.');
+  assert.deepEqual(tables.filter((t) => !named.includes(t)), [], 'Name the store in packs/log/kernel/operational.ts, with the one rule it keeps.');
+  assert.deepEqual(named.filter((t) => !tables.includes(t)), [], 'A store packs/log/kernel/operational.ts names that no longer exists: take it out.');
+  assert.ok(read('packs/write/kernel/pelago.ts').includes(`function ${RESTORE}(`), 'The restore path packs/log/kernel/operational.ts names is in packs/write/kernel/pelago.ts.');
 });
 
-// Whether a change applies, waits for a person or is refused is decided by the rules (src/rules.ts, decide) and
+// Whether a change applies, waits for a person or is refused is decided by the rules (packs/rules/kernel/rules.ts, decide) and
 // nowhere else: a change is held only with the rule that held it, a setting is read only as the lift of a rule, and
 // the server's policy only as the rules it lifts or adds.
 test('every approval is decided by a rule', () => {
@@ -125,7 +125,7 @@ test('every approval is decided by a rule', () => {
   assert.deepEqual(count(src, /insert\s+into\s+proposal\s*\(/gi), { 'packs/log/kernel/replay.ts': 1 }, 'The queue is projected from the pending stream, nowhere else.');
   assert.match(read('packs/write/kernel/pelago.ts'), /verdict\.outcome === 'hold'/, 'Archipelago.change holds a change on the verdict of decide.');
   const lifts = count(src.filter((f) => f !== 'packs/rules/kernel/rules.ts' && f !== 'packs/database/kernel/schema.ts'), /['"`](?:agent_changes|agent_code|agent_publish|agent_backups)['"`]/g);
-  assert.deepEqual(lifts, {}, 'A setting lifts a rule a pack declared liftable: read it through src/rules.ts (decide, mayDo, liftsOn).');
+  assert.deepEqual(lifts, {}, 'A setting lifts a rule a pack declared liftable: read it through packs/rules/kernel/rules.ts (decide, mayDo, liftsOn).');
   const policy = count(src.filter((f) => f !== 'packs/rules/kernel/rules.ts'), /\bpolicy\s*\[|['"]forbidden['"]|level\s*===/g);
   assert.deepEqual(policy, {}, "The server's policy is read only by the rules: what it lifts, and what it forbids (serverRules).");
 });
@@ -220,7 +220,7 @@ test('every UI module parses', () => {
 });
 
 // 10. How anything looks is a style on the map, never kernel code, the defaults included ("Where does style live?",
-// decided by the owner 20 Oct 2026). The packs ship the defaults as style presets (StyleDef, src/styles.ts); the UI
+// decided by the owner 20 Oct 2026). The packs ship the defaults as style presets (StyleDef, packs/styles/kernel/styles.ts); the UI
 // keeps the mechanism (layouts, renderers, CSS rules that read variables) and no values: no colours, no lengths, no
 // numeric constants. Counted here as hex colours, CSS lengths and UPPER_CASE number constants, as of 20 Oct 2026.
 const LOOKS_IN_KERNEL: Record<string, number> = {
@@ -248,7 +248,7 @@ test('no term or control is wrapped in a capsule', () => {
 });
 
 // 11. Every picture is drawn by a drawing: code a pack ships, which the owner changes on the map and which runs in
-// the sandbox (src/layouts.ts, ui/layout.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
+// the sandbox (packs/loader/kernel/layouts.ts, ui/layout.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
 // kernel keeps the frame every picture has. Counted here as the shapes the page still draws itself, as of 22 Oct
 // 2026; a shape moved into a pack's drawing comes off its list, with its modules in ui/.
 const KERNEL_SHAPES: Record<string, number> = {};
@@ -306,15 +306,15 @@ test('the UI and the tools use one name for each idea', () => {
 });
 
 // 13. One way to read (Rule 6 of the rework's target model, the owner, 23 Oct 2026): every picture, view and agent
-// read is a lens. A view the kernel answers with its own code is one src/operational.ts names, with what it reads
+// read is a lens. A view the kernel answers with its own code is one packs/log/kernel/operational.ts names, with what it reads
 // instead of the work; every other is a view a pack declares, and the core pack's are lens presets, answered by the
-// lens query (src/query-presets.ts). A kernel view that is neither is refused.
+// lens query (packs/query/kernel/query-presets.ts). A kernel view that is neither is refused.
 test('every kernel view is a lens preset or named as operational', async () => {
-  await import('../packs/surface/kernel/tools.ts'); // every module that adds a view of its own (src/sessions.ts adds story) is loaded
+  await import('../packs/surface/kernel/tools.ts'); // every module that adds a view of its own (packs/sessions/kernel/sessions.ts adds story) is loaded
   const { VIEWS } = await import('../packs/query/kernel/views.ts');
   const unnamed = Object.keys(VIEWS).filter((name) => !(name in VIEWS_OPERATIONAL));
-  assert.deepEqual(unnamed, [], 'Make it a lens preset (packs/core/pack.json views, with lens), or a pack view, or name it in src/operational.ts with what it reads.');
-  assert.deepEqual(Object.keys(VIEWS_OPERATIONAL).filter((name) => !(name in VIEWS)), [], 'A view src/operational.ts names that the kernel no longer answers: take it out.');
+  assert.deepEqual(unnamed, [], 'Make it a lens preset (packs/core/pack.json views, with lens), or a pack view, or name it in packs/log/kernel/operational.ts with what it reads.');
+  assert.deepEqual(Object.keys(VIEWS_OPERATIONAL).filter((name) => !(name in VIEWS)), [], 'A view packs/log/kernel/operational.ts names that the kernel no longer answers: take it out.');
   const core = JSON.parse(read('packs/core/pack.json')) as { views?: { id: string; lens?: unknown; form?: string }[] };
   const reads = (core.views ?? []).filter((v) => !v.form);
   assert.deepEqual(reads.filter((v) => !v.lens).map((v) => v.id), [], 'The core pack carries no code: each of its views is a lens preset.');
@@ -323,7 +323,7 @@ test('every kernel view is a lens preset or named as operational', async () => {
 });
 
 // 14. A small pack manifest (Rule 8 of the target model): a pack file says what it declares in the manifest's keys
-// (src/manifest.ts), and nothing else. A key of the shape before is one LEGACY maps, refused with where it went;
+// (packs/loader/kernel/manifest.ts), and nothing else. A key of the shape before is one LEGACY maps, refused with where it went;
 // here no pack file uses one. A key that is neither is refused.
 test('every pack file is in the manifest shape, and every old key is mapped', async () => {
   const { LEGACY, MANIFEST_KEYS, REACH_KEYS, SERVER_KEYS } = await import('../packs/loader/kernel/manifest.ts');
@@ -341,7 +341,7 @@ test('every pack file is in the manifest shape, and every old key is mapped', as
 // 15. No read of the whole map ("Refuse unscoped reads", 24 Oct 2026). At millions of items a query of the items,
 // links, log or queue with nothing to bound it reads them all: each is bounded by an id or a set of them, a subtree
 // (the part_of closure), a person, a time or place in the log, or a limit; or names the index it goes by
-// (`-- index <name>`), one the schema makes (src/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
+// (`-- index <name>`), one the schema makes (packs/database/kernel/read-indexes.ts has those made for it). What already broke it on 24 Oct is listed, and may only shrink.
 const WHOLE_READS: Record<string, number> = {
   'packs/write/kernel/forget.ts': 1,
   'packs/log/kernel/log.ts': 1,
@@ -480,6 +480,6 @@ test("a root pack's code imports only plumbing and the roots before it", () => {
   const owed = new Set(JSON.parse(read('test/fixtures/root-imports.json')) as string[]), added = rootImports().filter((e) => !owed.has(e));
   assert.deepEqual(added, [], 'Open a slot the higher pack fills, or hand the value in (docs/kernel-packs.md, "Slots").');
 });
-// 23. A service name is answered as the map that asks it (callAs, src/kernel-context.ts): callService ran its provider as the map the names were filled for, and is gone (wave 6); none comes back.
+// 23. A service name is answered as the map that asks it (callAs, packs/loader/kernel/kernel-context.ts): callService ran its provider as the map the names were filled for, and is gone (wave 6); none comes back.
 const CALLS_SERVICE: Record<string, number> = {}, servicePacks = walk('packs').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
 test('a service name is answered as the map that asks it', () => assert.deepEqual(ratchet(count([...kernelFiles, ...servicePacks], /(?<!function )\bcallService\s*[<(]/g), CALLS_SERVICE), [], 'Call it with callAs(l, name, input): its provider reads as the asker, under row-level security.'));
