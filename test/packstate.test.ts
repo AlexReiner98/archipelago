@@ -61,6 +61,12 @@ async function serve() {
   return { base, api };
 }
 
+test("taking a pack out asks the rules: core's root_off refuses a root pack", async () => {
+  const l = await freshWith(new Registry(PACKS));
+  await assert.rejects(setPack(l, human, { pack: 'database', on: false }), /A root pack is the server's own code: it is never taken out of a map/);
+  await assert.rejects(setPack(l, human, { pack: 'core', on: false }), /The core pack is the kernel's own/, 'core as before');
+});
+
 test('packs wait for what they require, and the server starts whatever their states', () => {
   const pack = (id: string, requires: string[] = ['core']): PackFile => ({ id, version: '1', title: id, requires });
   const found = new Map([pack('core', []), pack('clock'), pack('billing', ['clock']), pack('crm', ['nowhere'])].map((p) => [p.id, p]));
