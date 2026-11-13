@@ -26,29 +26,24 @@ export async function savedCanvasPage() {
   const picked = `document.querySelector('#query .q-pick')?.dataset.title`;
   const canvases = async () => (await call('/api/search', undefined, { type: 'lens', limit: 50 })).result as { id: string; title: string; props: Record<string, any> }[];
   const width = (w: number) => page.send('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 1, mobile: false });
-  /** A canvas of the task and its parts, kept as the bar keeps one saved at `at` px: what a pass before this one left. */
-  const keptBefore = (at: number) => call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: `Saved at ${at}`, props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }] });
-
-  /** The rows of the switcher's panel, opened from the bar if it is not open; none while the bar is still being drawn. */
-  const panelRows = `(() => { const p = document.querySelector('.view-panel'); const b = document.querySelector('#query .q-pick'); if (!p || (!p.matches(':popover-open') && !b)) return []; if (!p.matches(':popover-open')) b.click(); return [...p.querySelectorAll('[data-view]')].map((r) => ((r.dataset.title = (r.querySelector('.pm-grow') ?? r).textContent), r)); })()`;
-
-  /** At `w` px: a canvas saved from the bar and listed in its switcher, one line each. */
-  async function savePass(w: number) {
-    await width(w);
-    const name = `Saved at ${w}`;
-    await page.go(`${base}/#/v?find=id+${made.p}&over=part_of&steps=1`);
+  /** A canvas of the task and its parts (${await page.evaluate('location.hash')})`);
     assert.ok(await page.until(drawn(made.a)), `drawn: ${page.logs().join('\n')}`);
     assert.ok(await page.until(`document.querySelector('#query .q-pick')?.title.startsWith('Not saved')`), 'the bar says what is up is not saved');
 
-    // Saved from the bar: a name asked in the page.
-    await page.evaluate(`document.querySelector('#query .q-save[aria-label="Save this view"]').click()`);
-    assert.ok(await page.until(`Boolean(document.querySelector('dialog.ask[open] textarea'))`), 'a name is asked');
-    await page.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = ${JSON.stringify(name)}; d.querySelector('button[value="ok"]').click(); })()`);
+    // Saved from the bar: the band's part (menu.band) asks a name in the band, its field and a Save of its own.
+    const bandButton = (tip: string) => `[...document.querySelectorAll('#query .pm-button')].find((b) => b.title === ${JSON.stringify(tip)})`;
+    // Once the band's part has drawn: it draws after the views are read.
+    assert.ok(await page.until(`Boolean(${bandButton('Save this view')})`), `the band offers Save: ${page.logs().join(' | ')}`);
+    await page.evaluate(`${bandButton('Save this view')}.click()`);
+    assert.ok(await page.until(`Boolean(document.querySelector('#query input[aria-label="The view’s name"]'))`), 'a name is asked');
+    await page.evaluate(`(() => { const i = document.querySelector('#query input[aria-label="The view’s name"]'); i.value = ${JSON.stringify(name)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await page.evaluate(`${bandButton('Keep what is up under this name')}.click()`);
     assert.ok(await page.until(`${picked} === ${JSON.stringify(name)}`), `the bar names it: ${await page.evaluate(picked)}`);
     const saved = (await canvases()).find((c) => c.title === name)!;
     assert.ok(saved, 'kept on the map');
     assert.deepEqual([saved.props.filter.find, saved.props.walk], [[`id ${made.p}`], { over: ['part_of'], steps: 1 }], 'its lens: the filter, the walk');
-    assert.equal(await canvasUp(), saved.id, 'its id in the address');
+    // The part goes to the view as kept once Save has answered: the address follows the bar naming it.
+    assert.ok(await page.until(`new URLSearchParams(location.hash.split('?')[1] ?? '').get('canvas') === ${JSON.stringify(saved.id)}`), `its id in the address: ${await canvasUp()} (${await page.evaluate('location.hash')})`);
 
     // The switcher: one line each, opening in one click.
     // Waited for by its name: a canvas saved before is listed already.

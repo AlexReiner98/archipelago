@@ -55,7 +55,8 @@ test('in a browser, a saved canvas is opened and switched to from the bar; a vie
     assert.ok(await page.until(`${picked} === 'A page’s picture'`), 'named while it is up');
 
     // A view made, then changed, after the page read the saved views opens as saved, not as new or changed since (bump e_4j6xvm82).
-    const saved = `(() => { const b = [...document.querySelectorAll('#query .q-save')].find((x) => x.getAttribute('aria-label') === 'Save this view'); return b?.disabled === true && b.textContent === 'Save'; })()`;
+    // The band's part (the menu pack's menu.band) says a view kept as it is as Saved, in words, where it would offer Save.
+    const saved = `[...document.querySelectorAll('#query .pm-text')].some((t) => t.textContent === 'Saved') && ![...document.querySelectorAll('#query .pm-button')].some((b) => ['Save', 'Save •', 'Keep'].includes(b.textContent))`;
     const late = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'l', type: 'lens', title: 'Made since', status: 'kept', props: { filter: { find: [`id ${made.q}`] }, walk: { over: ['part_of'], steps: 1 } } }] })).result.created.l as string;
     await page.go(`${base}/#/v?canvas=${late}`);
     assert.ok(await page.until(`${picked} === 'Made since'`), 'named in the bar');
