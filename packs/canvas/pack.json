@@ -6,7 +6,7 @@
   "requires": ["type:style", "type:layout"],
   "uses": ["service:answer.graph"],
   "parts": [
-    { "id": "canvas.note", "title": "Note", "slot": "piece.note", "opens": ["piece.note"], "modules": { "index.js": "parts/note/index.js" } }
+    { "id": "canvas.note", "title": "Note", "slot": "piece.note", "opens": ["piece.note"], "marks": ["note", "box"], "modules": { "index.js": "parts/note/index.js" } }
   ],
   "views": [
     {
