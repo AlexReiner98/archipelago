@@ -102,6 +102,7 @@ test('the styles pack’s actions answer with the ops each action makes, and tou
   assert.deepEqual(use('flow.gone', true, presets, versions).ops, [{ op: 'update', id: 'e_gone0001', status: 'current' }]);
   assert.deepEqual(use('core.sea', false, presets, versions).ops, [{ op: 'update', id: 'e_sea00001', status: 'retired' }]);
   assert.deepEqual(use('flow.kept', true, presets, versions).ops, [], 'already used');
+  assert.equal(use('core.dusk', true, presets, versions).answer.looks, true, 'the page reads its look again, ending a try');
   assert.deepEqual(use('core.dusk', true, presets, versions).ops.map((o) => [o.op, o.id]), [['update', 'e_sea00001'], ['create', undefined]], 'a theme chosen retires the one kept');
   assert.throws(() => use('core.none', true, presets, versions), /not a style preset/);
   assert.deepEqual(deleteLayout({ id: 'e_lay00001', type: 'layout', title: 'Mine' }).ops, [{ op: 'archive', id: 'e_lay00001' }]);

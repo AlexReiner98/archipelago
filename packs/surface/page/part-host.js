@@ -211,6 +211,9 @@ async function workerOf(version, parts, pack) {
     postMessage(message) {
       port.postMessage(message);
       if (message?.type === 'acted' && !message.error) for (const m of one.mounted.values()) void m.refresh();
+      // An action whose answer says it changed how the page looks (`looks`, a theme kept) has the page read its look
+      // again, which also ends a theme tried on this screen: the page then shows what was kept.
+      if (message?.type === 'acted' && !message.error && message.answer?.looks === true) void import('./swatch.js').then((s) => s.tryTheme('')).catch(() => {});
     },
   };
   // A part that declares `go` names another address after a gesture; the app checks it and moves (hooks.go, ui/canvas.js).
