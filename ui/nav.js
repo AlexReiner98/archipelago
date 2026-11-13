@@ -3,8 +3,7 @@
 // screens as presets; the owner adds one, takes it out and puts it back on its pack's card on the Workspace page, where each
 // screen is (a page in the nav, or a part of every item of a kind) is a row with its switch.
 
-import { api, ask, h, may, part, state, tell } from './base.js';
-import { drawScreen } from './screens.js';
+import { api, ask, h, hooks, may, part, state, tell } from './base.js';
 import { loadSchema, menu, typeTitle } from './words.js';
 
 const byPlace = (a, b) => a.nav - b.nav;
@@ -30,7 +29,7 @@ export async function screenPage(id) {
   const main = part('screen');
   const screen = (state.schema?.screens ?? []).find((s) => s.id === id);
   if (!screen) return main.replaceChildren(h('div', { class: 'empty' }, 'There is no such screen here. ', h('a', { href: '#/workspace' }, 'Screens are in Settings.')));
-  const drawn = drawScreen(screen, () => screenPage(id));
+  const drawn = hooks.drawScreen(screen, () => screenPage(id));
   // A screen that holds one of the kernel's own pages has that page's head; any other is named by its title.
   const own = screen.pieces.some((p) => p.piece === 'page');
   main.replaceChildren(...[!own && h('div', { class: 'page-head' }, h('h1', {}, screen.title)), drawn.column].filter(Boolean));

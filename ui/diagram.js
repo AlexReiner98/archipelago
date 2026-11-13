@@ -3,10 +3,9 @@
 // How it looks is the workspace's style, as every lens's is (ui/diagram.css reads it): the data says only what each
 // box is.
 
-import { h, state } from './base.js';
+import { h, hooks, state } from './base.js';
 import { dress, numberOf } from './query-base.js';
 import { panZoom } from './pan-zoom.js';
-import { sheetAside } from './sheet-follow.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const svg = (tag, attrs = {}, ...kids) => {
@@ -67,7 +66,7 @@ export function drawDiagram(host, data, { download } = {}) {
   host.replaceChildren(stage);
   // The stage drawn before goes, and its observers with it.
   host.stopMoves?.();
-  const moves = panZoom(stage, picture, { width: data.width, height: data.height, style: state.style, beside: sheetAside });
+  const moves = panZoom(stage, picture, { width: data.width, height: data.height, style: state.style, beside: () => hooks.sheetAside() });
   host.stopMoves = moves.stop;
   const zoom = h(
     'span',

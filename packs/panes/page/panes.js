@@ -15,7 +15,6 @@ import { numberOf } from './query-base.js';
 import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf } from './pane-route.js';
 import { filterSaid } from './query-bar.js';
-import { sheetAside } from './sheet-follow.js';
 import { frameIn, reframe } from './pane-web.js';
 import { BLANK, asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
 import { titles } from './words.js';
@@ -241,7 +240,7 @@ export function draw() {
   host.dataset.dir = dir;
   // The panes share the room left of an open sheet, one alone too, so whatever a pane draws stands beside the sheet and
   // none of it behind: this is the one place a canvas gives way to it.
-  const aside = sheetAside();
+  const aside = hooks.sheetAside();
   const room = 1 - aside;
   let from = 0;
   frames = layout.groups.map((g, n) => {

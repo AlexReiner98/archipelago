@@ -48,6 +48,11 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/panes/page/panes.js': 3,
   'packs/panes/page/tab-bar.js': 3,
   'packs/panes/page/tabs.js': 1,
+  // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
+  // type's views (canvases), a document's menus (item-doc) and find's terms (query-bar), screens.js for a diagram and
+  // the start page, each going as that module becomes a part.
+  'packs/sheet/page/item.js': 3,
+  'packs/sheet/page/screens.js': 2,
 };
 
 test("the host's page imports one way along roots.json", () => {
@@ -82,26 +87,17 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/doc-lens.js': 4,
   'ui/doc-sheet.js': 2,
   'ui/doc.js': 7,
-  'ui/draft.js': 4,
-  'ui/field-edit.js': 2,
-  'ui/fields.js': 2,
   'ui/find-choices.js': 2,
   'ui/find.js': 3,
   'ui/home.js': 1,
   'ui/island-new.js': 2,
   'ui/item-doc.js': 4,
-  'ui/item-links.js': 2,
-  'ui/item-sections.js': 3,
-  'ui/item.js': 6,
   'ui/keep-in-view.js': 2,
-  'ui/link-pick.js': 2,
   'ui/look-marks.js': 1,
   'ui/nav.js': 2,
   'ui/public.js': 3,
   'ui/query-bar.js': 3,
   'ui/query-light.js': 2,
-  'ui/screens.js': 8,
-  'ui/sheet-follow.js': 2,
   'ui/start.js': 1,
   'ui/style-code.js': 2,
   'ui/term-kinds.js': 2,

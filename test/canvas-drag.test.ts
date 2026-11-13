@@ -1,7 +1,7 @@
 // A step cannot be moved, in a real browser (skipped where there is no Chrome): a press and move on it pans the plane
 // as it does anywhere, leaves the step where its layout put it, opens nothing and writes nothing. A view is drawn from
 // its query alone (the owner, 3 Nov 2026: Home wore down under places put by hand on other pictures), and nothing is
-// made or linked by dragging on it (the owner, 10 Nov 2026: a link starts from Link on an item's page, ui/link-pick.js).
+// made or linked by dragging on it (the owner, 10 Nov 2026: a link starts from Link on an item's page, packs/sheet/page/link-pick.js).
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

@@ -9,7 +9,6 @@ import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { flatView } from './query.js';
-import { keptView } from './canvases.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { drawPart } from './part-host.js';
@@ -152,7 +151,7 @@ const PIECES = {
     const filter = typeof p.lens === 'object' && p.lens ? { ...p.lens.filter } : {};
     for (const k of ['find', 'only', 'not']) if (filter[k]) filter[k] = filter[k].map(here);
     if (Object.values(filter).some((v) => Array.isArray(v) && v.includes(null))) return null;
-    const view = typeof p.lens === 'string' ? keptView(p.lens, { key, style }) : flatView({ lens: { ...p.lens, filter }, style, of: ctx.id, key, only: p.only, quiet: true });
+    const view = typeof p.lens === 'string' ? hooks.keptView(p.lens, { key, style }) : flatView({ lens: { ...p.lens, filter }, style, of: ctx.id, key, only: p.only, quiet: true });
     return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, p.title ?? p.screen.title)), view) };
   },
   // Some of the item's fields, together under the screen's name.
@@ -282,9 +281,9 @@ const piecesOn = (data) => {
   const used = packsUsed(data);
   return piecesFor(data.entity.type).filter((p) => !p.screen.pack || p.screen.pack === 'core' || used.has(p.screen.pack) || mapPack(p.screen.pack));
 };
-/** The buttons the screens on this item declare: they stand in its page's head (ui/item.js), not in the column. */
+/** The buttons the screens on this item declare: they stand in its page's head (packs/sheet/page/item.js), not in the column. */
 export const buttonsOn = (data) => piecesOn(data).filter((p) => p.piece === 'button');
-/** What the screens on this item add to its bare page (ui/item.js), as sections of it: each a node, filled once it is read. */
+/** What the screens on this item add to its bare page (packs/sheet/page/item.js), as sections of it: each a node, filled once it is read. */
 export const sectionsOn = (data) =>
   piecesOn(data)
     .filter((p) => SECTIONS.includes(p.piece))
@@ -296,5 +295,8 @@ export const sectionsOn = (data) =>
     .filter(Boolean);
 /** The pieces the bare page draws as sections of its own. */
 const SECTIONS = ['turns', 'findings', 'picture', 'view'];
-/** The count a screen on this item declares: it stands at the foot of its note while it is written (ui/note-count.js). */
+/** The count a screen on this item declares: it stands at the foot of its note while it is written (packs/sheet/page/note-count.js). */
 export const countOn = (data) => piecesOn(data).find((p) => p.piece === 'count');
+
+/** Asked by name by the app's pages that hold screens (Home, a nav page): the host's, so they import no file of it. */
+hooks.drawScreen = drawScreen;

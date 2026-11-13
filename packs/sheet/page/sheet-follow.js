@@ -2,7 +2,7 @@
 // the page shown is the document in sight, as it is scrolled to. Moving on from one is a step of no one's history (the
 // address is replaced), and never leaves unsaved words behind: while there are any, the sheet stays.
 
-import { state } from './base.js';
+import { hooks, state } from './base.js';
 import { numberOf } from './query-base.js';
 
 const HERE = /^#\/e\/(e_[a-z0-9]{8})/;
@@ -62,3 +62,6 @@ export function followSheet(host, picture, bring) {
   let wait;
   host.addEventListener('scroll', () => (clearTimeout(wait), (wait = setTimeout(follow, numberOf(state.style, 'sheet_follow_after')))), { passive: true });
 }
+
+/** Asked by name by the app's pages that leave room for the sheet (the panes, a diagram): the host's, so they import no file of it. */
+hooks.sheetAside = sheetAside;
