@@ -95,8 +95,8 @@ test('a note holds words in the dialect, a menu holds buttons, and any mark on t
   refused(['menu', {}, ['button', { key: 'a' }, 'A']], /a menu with no label/);
   refused(['note', {}, ['text', 'x']], /a note holding a mark/);
   refused(['note', { tick: true }, '- [ ] a'], /a note that ticks with no key/);
-  refused(['paint', { width: 10, height: 10 }, ['path', { d: 'M0 0', tip: 'x' }]], /the attribute "tip" on a path/);
-  refused(['paint', { width: 10, height: 10 }, ['text', { x: 1, y: 1, tip: 'x' }, 'a']], /a tip on a text on a paint surface/);
+  // What lies on a paint surface may say itself (a tip) and lead out (an href): a diagram's boxes do (test/part-marks-asked.test.ts).
+  refused(['paint', { width: 10, height: 10 }, ['path', { d: 'M0 0', tip: 'x'.repeat(partLimits.label + 1) }]], /tip: more than 200 characters/);
   refused(['text', { tip: 'x'.repeat(partLimits.label + 1) }, 'a'], /tip: more than 200 characters/);
   refused(['note', {}, 'x'.repeat(partLimits.words + 1)], /more than 200000 characters/);
 });
@@ -146,7 +146,7 @@ test('an input may be a pick, a day, a time, yes or no, a title; text may open a
   refused(['input', { key: 's', kind: 'colour' }], /kind: "colour", not one of/);
   refused(['text', { href: 'javascript:alert(1)' }, 'x'], /not an address on the web/);
   refused(['text', { href: 'https://x.test/"onmouseover' }, 'x'], /not an address on the web/);
-  refused(['paint', { width: 9, height: 9 }, ['text', { x: 1, y: 1, href: 'https://x.test' }, 'x']], /an href on text on a paint surface/);
+  refused(['paint', { width: 9, height: 9 }, ['path', { d: 'M0 0', href: 'javascript:alert(1)' }]], /not an address on the web/);
 });
 
 test('an item is found by name or picked on the canvas, the host doing the finding', () => {

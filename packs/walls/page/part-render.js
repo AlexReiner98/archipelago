@@ -44,19 +44,25 @@ const partTold = 50;
  * said)` draws a canvas at a pane's address in `el` (said(name, value) tells the part what is done in it), answering
  * with a way to stop it; `hue(words)` is a session's hue named by words; `swatch(preset, el)` paints a style preset's
  * colours into `el`, and `tryTheme(preset)` paints this screen alone in one ('' the workspace's own again);
- * `replay({ at, steps } | null)` shows the canvas under the part the missed steps up to `at`, or the map as it is now. `find(q, types, link)` answers the items an item
+ * `replay({ at, steps } | null)` shows the canvas under the part the missed steps up to `at`, or the map as it is now;
+ * `ghosts(list)` is handed the ghosts each answer holds (each mark's attributes), for the canvas to draw where they land. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
  * `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {} } = {}) {
-  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {} } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts };
   let ended = false;
   return {
     draw(node) {
       if (ended) return;
       if (!isChecked(node)) throw new Error('Only marks the check made are drawn: give the part’s answer to checkMarks first');
       place(root, [node], ctx);
+      // The ghosts it holds, as data: the canvas reads them back into its answer (none is drawn here).
+      const held = [];
+      const walk = (n) => (n.mark === 'ghost' ? held.push({ ...n.at }) : (n.kids ?? []).forEach(walk));
+      walk(node);
+      ctx.ghosts(held);
     },
     stop() {
       ended = true;
@@ -105,6 +111,7 @@ function build(node, ctx) {
   else if (node.mark === 'pane') el = buildPane(ctx.tell);
   else if (node.mark === 'panes') el = make('div', 'pm-panes');
   else if (node.mark === 'trace') (el = make('span', 'pm-trace')), (el.hidden = true);
+  else if (node.mark === 'ghost') (el = make('span', 'pm-ghost')), (el.hidden = true);
   else if (node.mark === 'replay') (el = make('span', 'pm-replay')), (el.hidden = true), (el.pmReplay = ctx.replay);
   else if (node.mark === 'swatch') {
     // A swatch is pressed as a button is: the part hears it by its key.
@@ -147,7 +154,7 @@ function build(node, ctx) {
   }
   else if (node.mark === 'picture') el = make('div', 'pm-picture');
   else if (node.mark === 'paint') {
-    const surface = paintSurface(node, { style: ctx.style, drawn: drawOnPlane });
+    const surface = paintSurface(node, { style: ctx.style, drawn: drawOnPlane, controls: Boolean(node.at.controls) });
     surfaces.set(surface.el, surface);
     if (node.at.pixels) ctx.canvas(node.key, surface.pixels);
     drawnFrom.set(surface.el, node);
@@ -368,6 +375,20 @@ function lit(el, node, ctx, fresh) {
 
 /** A mark on a paint surface: a path or placed text, in the surface's own units. */
 function drawOnPlane(node) {
+  const { at } = node;
+  const mark = drawnOnPlane(node);
+  // What it says of itself is its tip (a title the page's tooltip shows); an address on the web opens apart.
+  if (at.tip !== undefined) mark.append(Object.assign(document.createElementNS(SVG, 'title'), { textContent: at.tip }));
+  if (at.href === undefined) return mark;
+  const a = document.createElementNS(SVG, 'a');
+  a.setAttribute('href', at.href);
+  a.setAttribute('target', '_blank');
+  a.setAttribute('rel', 'noopener noreferrer');
+  a.append(mark);
+  return a;
+}
+
+function drawnOnPlane(node) {
   const { at } = node;
   const el = document.createElementNS(SVG, node.mark === 'path' ? 'path' : 'text');
   const cls = [`pm-${node.mark}`];

@@ -185,3 +185,26 @@ test('the host rewinds the store, plays each step once, and ends where the map i
   assert.equal(store.playing, false);
   assert.equal(store.at.get('e_abcdefgh'), 9);
 });
+
+test('a ghost is data: an item, a link or a mark on one, held for the owner', () => {
+  const g = checkMarks(['list', {},
+    ['ghost', { of: 'item', id: 'p_ab12:ref', type: 'task', title: 'Draft', proposal: 'p_ab12', op: 'create', by: 'Session Sark' }],
+    ['ghost', { of: 'link', id: 'p_ab12:#2', type: 'depends_on', from: 'p_ab12:ref', to: 'e_abcdefgh', proposal: 'p_ab12', op: 'link' }],
+    ['ghost', { of: 'mark', on: 'e_abcdefgh', proposal: 'p_ab12', op: 'archive' }],
+  ]);
+  assert.equal(g.kids[1].at.from, 'p_ab12:ref');
+  refused(['ghost', { of: 'item', id: 'p_ab12:ref', type: 'task', proposal: 'p_ab12', op: 'create' }], /a ghost of an item with no title/);
+  refused(['ghost', { of: 'mark', on: 'e_abcdefgh', proposal: 'p_ab12', op: 'create' }], /a ghost of a mark that is create/);
+  refused(['ghost', { of: 'item', id: 'x', type: 'task', title: 'a', proposal: 'p_ab12', op: 'create' }], /not a ghost's id/);
+});
+
+test('shapes on a paint surface may be filled as a diagram is, say themselves and lead out; a surface may keep its zoom', () => {
+  const p = checkMarks(['paint', { width: 100, height: 50, controls: true },
+    ['path', { d: 'M0 0H10V10Z', look: 'box', tip: 'The server', href: 'https://github.com/x/y/blob/main/a.ts' }],
+    ['text', { x: 2, y: 8, tip: 'A label', href: 'https://x.test' }, 'Server'],
+  ]);
+  assert.equal(p.at.controls, true);
+  assert.equal(p.kids[0].at.look, 'box');
+  assert.equal(p.kids[1].at.href, 'https://x.test');
+  refused(['paint', { width: 9, height: 9 }, ['path', { d: 'M0 0', look: 'cloud' }]], /look: "cloud"/);
+});

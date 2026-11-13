@@ -24,6 +24,8 @@
 //   panes   panes side by side (dir row) or one over another (column), each given room by its share; the host draws
 //           the lines between them and tells the part when one is dragged
 //   swatch  a style preset's colours, painted by the host from the preset the part names: a part paints no colour
+//   ghost   nothing where it stands: a change held for the owner, as data the canvas reads back into its answer and draws
+//           where it would land (of an item, a link, or a mark on one)
 //   replay  nothing where it stands: the canvas under it shows what the person missed, up to step `at` of its steps
 //   trace   nothing where it stands: its item's marks on the canvas painted with its line (`tip`), in a session's hue,
 //           until the person has seen them; then the part is told `seen`
@@ -90,6 +92,11 @@ const share = (v, why) => (typeof v === 'number' && v > 0 && v <= 1 ? v : why('n
 const handled = { drag: key, selected: flag, ring: flag, hue: words(partLimits.key), aux: flag };
 /** A style preset tried on this screen alone, or null ('' too) for the workspace's own again. */
 const tryOn = (v, why) => (v === null || v === '' ? '' : key(v, why));
+/** A ghost's own id: its proposal and what in it (p_x:ref, p_x:#n, p_x:n). */
+const GHOST = /^p_[a-z0-9]+:#?[A-Za-z0-9_.-]+$/;
+const ghostId = (v, why) => (typeof v === 'string' && v.length <= partLimits.key && GHOST.test(v) ? v : why("not a ghost's id (p_x:ref, p_x:#n)"));
+const proposal = (v, why) => (typeof v === 'string' && /^p_[a-z0-9]+$/.test(v) ? v : why("not a proposal's id"));
+const rowId = (v, why) => (typeof v === 'string' && (/^[er]_[a-z0-9]{8}$/.test(v) || GHOST.test(v)) ? v : why("not an item's, a link's or a ghost's id"));
 /** An item's or a link's id, as a step of a replay names what it plays. */
 const ROW = /^[er]_[a-z0-9]{8}$/;
 /** The steps of a replay: each the position of an entry of the log and the ids whose facts it plays. */
@@ -116,8 +123,8 @@ export const MARKS = {
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
   input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag }, holds: 'nothing', keyed: true },
   button: { attrs: { ...anyMark, ...handled, look: oneOf('main', 'quiet', 'tab'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(2000), try: tryOn }, holds: 'words', keyed: true },
-  paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag }, holds: 'drawn' },
-  path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
+  paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag, controls: flag }, holds: 'drawn' },
+  path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash', 'area', 'box', 'strong'), tone, weight: step(1, 4), tip: words(partLimits.label), href }, holds: 'nothing', plane: true, needs: ['d'] },
   note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
   menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet'), open: flag }, holds: 'marks', only: ['button', 'box', 'text', 'list', 'input', 'menu'], needs: ['label'] },
   thumb: { attrs: { key, view, tip: anyMark.tip }, holds: 'nothing', needs: ['view'] },
@@ -125,6 +132,7 @@ export const MARKS = {
   web: { attrs: { key, tip: anyMark.tip, url: href, reload: words(partLimits.key) }, holds: 'nothing', needs: ['url'] },
   pane: { attrs: { key, tip: anyMark.tip, at: address, share, ring: flag, drag: key, selected: flag }, holds: 'marks', keyed: true, needs: ['at'] },
   panes: { attrs: { key, dir: oneOf('row', 'column') }, holds: 'marks', only: ['pane'], keyed: true },
+  ghost: { attrs: { key, of: oneOf('item', 'link', 'mark'), id: ghostId, type: key, title: words(partLimits.label), status: key, body: words(4000), proposal, by: words(partLimits.label), reason: words(partLimits.label), op: oneOf('create', 'link', 'update', 'archive', 'unlink'), from: rowId, to: rowId, on: rowId }, holds: 'nothing', needs: ['of', 'proposal', 'op'] },
   replay: { attrs: { key, at: step(0, 1000000), steps: replaySteps }, holds: 'nothing', needs: ['at', 'steps'] },
   trace: { attrs: { key, item, tip: words(500), hue: words(partLimits.key) }, holds: 'nothing', needs: ['item'] },
   swatch: { attrs: { key, tip: anyMark.tip, preset: key, label: words(partLimits.label), on: oneOf('kept', 'trying') }, holds: 'nothing', needs: ['preset'] },
@@ -174,10 +182,14 @@ function node(mark, seen, where, onPlane) {
   }
   const placed = at.x !== undefined || at.y !== undefined || at.anchor !== undefined;
   if (kind === 'text' && onPlane && (at.x === undefined || at.y === undefined)) why('text on a paint surface with no x and y');
-  if (onPlane && at.tip !== undefined) why(`a tip on ${a(kind)} on a paint surface: what lies there keeps none`);
   if (kind === 'note' && at.tick && at.key === undefined) why('a note that ticks with no key: a tick goes back by its key');
-  if (kind === 'text' && onPlane && at.href !== undefined) why('an href on text on a paint surface');
   if (kind === 'text' && onPlane && at.hue !== undefined) why('a hue on text on a paint surface');
+  if (kind === 'ghost') {
+    const wants = { item: ['id', 'type', 'title'], link: ['id', 'type', 'from', 'to'], mark: ['on'] }[at.of];
+    for (const name of wants) if (at[name] === undefined) why(`a ghost of ${a(at.of)} with no ${name}`);
+    const ops = { item: ['create'], link: ['link'], mark: ['update', 'archive', 'unlink'] }[at.of];
+    if (!ops.includes(at.op)) why(`a ghost of ${a(at.of)} that is ${at.op}: it is ${ops.join(' or ')}`);
+  }
   if (kind === 'input' && (at.kind === 'pick') !== (at.values !== undefined)) why(at.values === undefined ? 'a pick with no values' : 'values on an input that is not a pick');
   if (kind === 'input' && at.names !== undefined && at.names.length !== (at.values ?? []).length) why('names that are not one for each value');
   if (kind === 'input' && at.kind !== 'item' && (at.types !== undefined || at.link !== undefined)) why('types or link on an input that finds no item');
