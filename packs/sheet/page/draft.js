@@ -54,7 +54,7 @@ export const mayLeave = async () => !unsaved() || Boolean(await ask({ title: 'Le
  * (a document, read whole). `reading`: what the note reads as, where it is not the note itself (a document, with the
  * sections it brings in). `writing`: the note opens as words to write, not as it reads (read beside it already, the
  * pages). `call`: the map it is written on, this one unless said. `saved(id)` is told when the change is made. `count`:
- * the count piece its screens declare, which says how its note is counted while it is written (ui/note-count.js).
+ * the count piece its screens declare, which says how its note is counted while it is written (packs/sheet/page/note-count.js).
  */
 export function draftOf({ base, style, editable = true, note = true, reading, writing = false, call = api, saved, count }) {
   const isNew = !base.id;
@@ -100,7 +100,7 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     if (sheet) sheet.style.scrollPaddingBottom = bar.offsetHeight ? `${bar.offsetHeight + parseFloat(getComputedStyle(bar).marginBottom)}px` : '';
   };
   new ResizeObserver(clear).observe(bar);
-  // Fields written in place wait here for the same Save (ui/field-edit.js): a name, what it held, what it holds now.
+  // Fields written in place wait here for the same Save (packs/sheet/page/field-edit.js): a name, what it held, what it holds now.
   const fields = new Map();
   const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
   const props = () => Object.fromEntries([...fields].filter(([, f]) => !same(f.now, f.was)).map(([k, f]) => [k, f.now ?? null]));
