@@ -16,8 +16,11 @@ import { goingOut } from './part-going.js';
 const pressLasts = 2000;
 /** What the person does that a part may answer with one action as theirs: a press, a tick in a note's checklist, and a pick (a day, yes or no, one of a field's values, an item found), and an item picked on the canvas. */
 const GESTURES = ['press', 'tick', 'pick', 'picked'];
-/** What the person does that a part may answer by moving the page: those, Enter in its input, and scrolling the reading (told to the sheet's part). */
-const MOVES = [...GESTURES, 'submit', 'scrolled'];
+/**
+ * What the person does that a part may answer by moving the page: those, Enter in its input, scrolling the reading (told
+ * to the sheet's part), a step back or forth in the browser, and a show landing (told to the part on `tabs`).
+ */
+const MOVES = [...GESTURES, 'submit', 'scrolled', 'step', 'land'];
 
 /**
  * Bridge one pack version's port. `partOf(id)` is the part mounted under that id ({ id, title, sends, hash, island?, host? }):
@@ -66,7 +69,7 @@ export function partBridge(port, { partOf, go, state } = {}) {
     moved.delete(id);
     if (!part?.go || !(at && performance.now() - at < pressLasts)) return;
     pressed.delete(id);
-    go?.(said.address);
+    go?.(said.address, part);
   }
 
   // Page state a part publishes (`state` in its manifest): only a name it declared, and only its own, so one name has

@@ -26,7 +26,10 @@ import { itemOf, waysBetween } from './layout-asks.js';
 import { lightItems } from './light-items.js';
 import { sessionHue } from './words.js';
 import { addressSaid, queryGiven } from './part-lens.js';
-import { DECISION_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
+import { readFor } from './part-read.js';
+import { hearAway, tellAway } from './part-away.js';
+import { focusWindow, goHash, hearPage, openWindow, pageOf } from './part-page.js';
+import { AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -114,8 +117,9 @@ function paramsFor(params, item, piece) {
 
 /** The named reads a part declared, each asked as the person looking, by name: one that fails is handed as null. */
 async function viewsOf(part, item, piece) {
-  const asked = await Promise.all(part.views.map((v) => api('view', { name: v.name, params: paramsFor(v.params, item, piece) }).catch(() => null)));
-  return Object.fromEntries(part.views.map((v, i) => [v.name, asked[i] ?? null]));
+  const views = part.views.filter((v) => !v.live);
+  const asked = await Promise.all(views.map((v) => api('view', { name: v.name, params: paramsFor(v.params, item, piece) }).catch(() => null)));
+  return Object.fromEntries(views.map((v, i) => [v.name, asked[i] ?? null]));
 }
 
 /**
@@ -124,7 +128,8 @@ async function viewsOf(part, item, piece) {
  * long as the page.
  */
 const keptMost = 100000;
-const keptKey = (part, item, name = '') => `pelago-part:${part.id}:${item?.id ?? '-'}:${name}`;
+// A part on an item keeps by the item; one that stands on none (the tabs, find) by the workspace, so two maps keep apart.
+const keptKey = (part, item, name = '') => `pelago-part:${part.id}:${item?.id ?? `ws.${state.workspace?.id ?? '-'}`}:${name}`;
 function keepFor(part, item, name, value) {
   try {
     const said = value === null || value === undefined ? null : JSON.stringify(value);
@@ -176,7 +181,7 @@ async function pickFor(from, kind) {
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }) };
+  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
@@ -213,7 +218,7 @@ async function workerOf(version, parts, pack) {
   };
   // A part that declares `go` names another address after a gesture; the app checks it and moves (hooks.go, ui/canvas.js).
   // A part that declares `state` publishes page state; the runtime writes it on the root (publishState).
-  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part, go: (address) => hooks.go?.(address), state: publishState });
+  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part, go: (address, part) => (PAGE_SLOTS.includes(part?.slot) && address?.hash ? goHash(address) : hooks.go?.(address)), state: publishState });
   one.port.onmessage = (ev) => {
     const said = ev.data ?? {};
     if (one.bridge.heard(said)) return;
@@ -226,6 +231,8 @@ async function workerOf(version, parts, pack) {
         m.failed(err.message);
       }
     } else if (said.type === 'decided') m.decided?.(said.asked, said.value);
+    else if (said.type === 'read') void readFor(m, said, (message) => one.port.postMessage(message));
+    else if ((said.type === 'window' || said.type === 'focus') && PAGE_SLOTS.includes(m.part.slot)) (said.type === 'window' ? openWindow : focusWindow)(said);
     else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
     else if (said.type === 'error') m.failed(said.message);
   };
@@ -318,7 +325,24 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
   one.mounted.set(id, { part: { ...part, island: pinFor(item) }, item, node, render, failed, refresh, address: JSON.stringify(hooks.address?.() ?? null), answer: hooks.answer?.()?.answer });
   one.bridge.send({ type: 'mount', id, part: part.id, input: await hand() });
   shownWhile();
+  if (AWAY_SLOTS.includes(part.slot)) hearAway(mountedNow);
+  if (PAGE_SLOTS.includes(part.slot)) hearPage((event) => tellSlot(part.slot, event), () => refreshOn(PAGE_SLOTS));
 }
+
+// Words one window kept are handed to the same part in every other window of this browser (the tabs across windows).
+addEventListener('storage', (ev) => {
+  if (!ev.key?.startsWith('pelago-part:')) return;
+  for (const { m } of mountedNow()) if (ev.key.startsWith(keptKey(m.part, m.item))) void m.refresh();
+});
+
+/** Hand every part on these slots its input again. */
+const refreshOn = (slots) => { for (const { m } of mountedNow()) if (slots.includes(m.part.slot)) void m.refresh(); };
+/** Every part mounted now, each with a way to tell it an event. */
+function* mountedNow() {
+  for (const one of versions.values()) for (const [id, m] of one.mounted) yield { m, tell: (event) => one.bridge.send({ type: 'event', id, event }) };
+}
+/** Another pane took the focus: the parts on find's slots are away (the canvas says so by name, packs/surface/page/canvas.js). */
+hooks.partsAway = () => tellAway(mountedNow);
 
 /** The island an item is on: its own id when it is one (its type has the field an island pins a version by), else its island. */
 function islandOf(item) {

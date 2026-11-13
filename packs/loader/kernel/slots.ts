@@ -42,7 +42,7 @@ export const PAGES: string[] = ['doc', 'public'];
  */
 export const FRAME_SLOTS = {
   panes: [],
-  tabs: ['tabs', 'current'],
+  tabs: ['tabs', 'current', 'page'],
   'tab.mark': ['tab', 'current'],
   bar: ['current', 'home'],
   'bar.views': ['current', 'home'],
@@ -53,7 +53,7 @@ export const FRAME_SLOTS = {
   traces: ['query'],
   sheet: ['reading'],
   'item.menu': [],
-  find: ['query'],
+  find: ['query', 'shapes'],
   home: [],
   nav: [],
   look: ['drawn', 'why'],

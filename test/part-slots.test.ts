@@ -7,7 +7,7 @@ import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
 import { added, filterSaid, idsNamed, moved, namer, without } from '../packs/walls/page/lens-terms.js';
 // @ts-expect-error a page module, plain JavaScript
-import { ANSWER_SLOTS, DECISION_SLOTS, QUERY_SLOTS, SHOWN_WHILE, answerBrief, withSaid } from '../packs/walls/page/part-slots.js';
+import { ANSWER_SLOTS, AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHAPE_SLOTS, SHOWN_WHILE, answerBrief, withSaid } from '../packs/walls/page/part-slots.js';
 import { DECISION_SLOTS as DECIDES, FRAME_SLOTS, SHOWN_WHILE as SHOWN } from '../packs/loader/kernel/slots.ts';
 
 const words = { types: { task: { title: 'Task' } }, links: { part_of: 'is part of' } };
@@ -53,6 +53,9 @@ test("the page's slot lists are the contract's", () => {
   const handed = (key: string) => Object.entries(FRAME_SLOTS).filter(([, given]) => (given as readonly string[]).includes(key)).map(([slot]) => slot).sort();
   assert.deepEqual([...QUERY_SLOTS].sort(), handed('query'), 'the slots handed the canvas query');
   assert.deepEqual([...ANSWER_SLOTS].sort(), handed('answer'));
+  assert.deepEqual([...SHAPE_SLOTS].sort(), handed('shapes'));
+  assert.deepEqual([...PAGE_SLOTS].sort(), handed('page'));
+  for (const slot of AWAY_SLOTS) assert.ok(slot in FRAME_SLOTS, `${slot} is a frame slot`);
   assert.deepEqual(DECISION_SLOTS, DECIDES);
   assert.deepEqual(SHOWN_WHILE, SHOWN);
   for (const slot of [...DECISION_SLOTS, ...Object.keys(SHOWN_WHILE)]) assert.ok(slot in FRAME_SLOTS, `${slot} is a frame slot`);

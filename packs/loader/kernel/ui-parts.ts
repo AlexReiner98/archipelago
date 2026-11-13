@@ -62,6 +62,8 @@ export interface PartQuery {
 export interface PartView {
   name: string;
   params?: Record<string, string | number | boolean>;
+  /** Asked when the part asks (`tools.read`), not handed at mount: a read it needs as the person types. */
+  live?: boolean;
 }
 
 /** A part as the page is sent it. */
@@ -192,6 +194,9 @@ function queryProblems(at: string, query: unknown, reads: unknown): string[] {
 const VIEWS_MOST = 4;
 
 /** What is wrong with a part's named reads: each a view its pack answers or asks for (rule: ask for what you need), its params words, numbers or yes and no. */
+/** The kernel's reads a part may declare live with no pack answering them (packs/surface/page/part-read.js). */
+export const LIVE_KERNEL_READS = ['search'];
+
 function viewProblems(at: string, views: unknown, pack: Manifest): string[] {
   if (views === undefined) return [];
   if (!Array.isArray(views) || !views.length || views.length > VIEWS_MOST) return [`${at}: views is a list of up to ${VIEWS_MOST} named reads, { name, params? }`];
@@ -205,6 +210,9 @@ function viewProblems(at: string, views: unknown, pack: Manifest): string[] {
     if (names.has(name)) problems.push(`${at} reads the view "${name}" twice`);
     names.add(name);
     const service = `answer.${name}`;
+    if (v.live !== undefined && typeof v.live !== 'boolean') problems.push(`${at}: the view "${name}"'s live is true or false`);
+    // A kernel read declared live (search) is anyone's who may read the map: no pack answers it.
+    if (v.live && LIVE_KERNEL_READS.includes(name)) continue;
     if (!provides.includes(service) && !asked.includes(`service:${service}`)) problems.push(`${at} reads the view "${name}", which ${pack.id} does not answer: ask for it, as service:${service} in requires or uses`);
     const params = v.params ?? {};
     if (typeof params !== 'object' || params === null || Array.isArray(params) || !Object.values(params).every((p) => (typeof p === 'string' && p.length <= 200) || (typeof p === 'number' && Number.isFinite(p)) || typeof p === 'boolean')) problems.push(`${at}: the view "${name}"'s params are words, numbers or true and false, {here} for the item it stands on`);

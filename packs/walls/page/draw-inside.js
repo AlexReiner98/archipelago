@@ -223,6 +223,8 @@ function partInside() {
     marks: (said) => marks(id, said),
     // One of its pack's declared actions; the page checks it is, shows it as it goes out and answers what came of it.
     act: (action, params) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'act', id, asked: asks, action: String(action), params: params ?? {} }))),
+    // A read it declared live (`views` with `live: true`), asked now as the person looking: its answer, or null.
+    read: (name, params) => new Promise((resolve) => (asked.set(++asks, (said) => resolve(said.value ?? null)), send({ type: 'read', id, asked: asks, name: String(name), params: params ?? {} }))),
     // Words the person has not saved yet, kept by the page in its browser for this part on this item (and `name`), and
     // handed back as `kept` when it is mounted again; nothing (null) lets them go.
     keep: (value, name = '') => send({ type: 'keep', id, name: String(name), value: value ?? null }),
@@ -231,12 +233,15 @@ function partInside() {
     // Page state this part publishes (`state` in its manifest): the runtime writes it on the root, where anything
     // watching the page from outside reads it. A name the part did not declare is refused; nothing (null) takes it off.
     state: (name, value) => send({ type: 'state', id, name: String(name), value: value ?? null }),
+    // For the part on `tabs`: a window of its own for a tab (`key`), at an address of this page, and one brought forward.
+    window: (key, hash) => send({ type: 'window', id, key: String(key), hash: String(hash) }),
+    focus: (key) => send({ type: 'focus', id, key: String(key) }),
   });
 
   // One part's words at a time, in the order they came: a part is never told of an event before it is mounted.
   let ready = Promise.resolve();
   const heard = (said) => {
-    if (said.type === 'acted') return void (asked.get(said.asked)?.(said), asked.delete(said.asked));
+    if (said.type === 'acted' || said.type === 'readed') return void (asked.get(said.asked)?.(said), asked.delete(said.asked));
     const id = String(said.id);
     ready = ready.then(async () => {
       try {

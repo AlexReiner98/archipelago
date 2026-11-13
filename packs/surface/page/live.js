@@ -87,9 +87,10 @@ export function follow(steps = []) {
   // What a session does may move its state, which the tab bar counts (ui/tab-bar.js).
   if (fresh.some((s) => s.run)) hooks.sessionsMoved?.();
   // A chat that ended closes its tab here (ui/tab-life.js).
-  for (const s of fresh) if (s.ends && s.run) hooks.sessionEnded?.(s.run, s.did);
+  // The part on `tabs` is told the same, as data (hooks.tellSlot, packs/surface/page/part-host.js), where one is mounted.
+  for (const s of fresh) if (s.ends && s.run) (hooks.sessionEnded?.(s.run, s.did), hooks.tellSlot?.('tabs', { name: 'ended', run: s.run, why: s.did ?? null }));
   // One gone quiet or waiting lets its tab go too, until it next shows something.
-  for (const s of fresh) if (s.rests && s.run) hooks.sessionRested?.(s.run);
+  for (const s of fresh) if (s.rests && s.run) (hooks.sessionRested?.(s.run), hooks.tellSlot?.('tabs', { name: 'rested', run: s.run }));
   // A beat told, or a session gone quiet, waiting or ended, moves its node on every canvas that draws it.
   const moved = [...new Set(fresh.filter((s) => s.run && (s.kind === 'story' || s.rests || s.ends)).map((s) => s.run))];
   if (moved.length) hooks.sessionsTold?.(moved);
@@ -100,7 +101,10 @@ export function follow(steps = []) {
     const was = waiting.get(sessionOf(s));
     waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens, focus: s.focus || was?.focus });
   }
-  if (!hooks.land || document.querySelector('dialog[open]')) return;
+  if (document.querySelector('dialog[open]')) return;
+  // A part on `tabs` is told each show, and keeps what waits itself (it decides where a show lands, task e_dswpuaft).
+  for (const [session, s] of waiting) if (hooks.tellSlot?.('tabs', { name: 'land', step: s })) waiting.delete(session);
+  if (!hooks.land) return;
   // One the reader is busy where it would land stays, and is tried again at the next look.
   for (const [session, s] of waiting) if (hooks.land(s) !== 'later') waiting.delete(session);
 }
