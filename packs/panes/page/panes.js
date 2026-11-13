@@ -63,11 +63,14 @@ export function drawPane(at, el, said) {
   el.replaceChildren(host);
   // A view a drawing names finds its pane by it (packs/walls/page/view-frame.js).
   const pane = /^pane:(.+)$/.exec(el.closest('[data-key]')?.dataset.key ?? '')?.[1];
+  // The pane it stands in (none for a page's lone pane, which is always the one in focus).
+  const paneEl = el.closest('.pm-pane');
+  const selected = () => !paneEl || paneEl.getAttribute('aria-selected') === 'true';
   if (pane) el.dataset.pane = pane;
   // What it draws now; in focus, with no page over it, the page's address is this pane's (decision e_h2pqjy2q).
   let now = at;
   const hrefOf = (to) => (!to || to === 'v' ? '#/' : `#/${to}`);
-  const inFocus = () => el.closest('[aria-selected]')?.getAttribute('aria-selected') === 'true' && document.body.dataset.sheet !== 'open';
+  const inFocus = () => selected() && document.body.dataset.sheet !== 'open';
   const moved = (to) => {
     if (!live) return;
     now = to;
@@ -102,7 +105,7 @@ export function drawPane(at, el, said) {
       naming();
       canvas.show(lens, here, style);
       // The bar and find act on the pane in focus alone: a pane drawn beside it does not take them.
-      if (el.closest('[aria-selected]')?.getAttribute('aria-selected') !== 'false') activate(canvas);
+      if (selected()) activate(canvas);
     }, (err) => live && host.replaceChildren(h('div', { class: 'error' }, err.message)));
   // What it draws, told again as it is drawn anew (the map changed, another lens): a tab that watches what it draws reads it.
   let told = '';
@@ -113,7 +116,10 @@ export function drawPane(at, el, said) {
   let soon;
   const watching = new MutationObserver(() => (clearTimeout(soon), (soon = setTimeout(tell, 300))));
   watching.observe(host, { childList: true, subtree: true });
-  return () => ((live = false), watching.disconnect(), clearTimeout(soon), canvas.close());
+  // Its pane coming into focus (pressed, a tab brought into sight, the part's choice) gives it the bar and find.
+  const focus = new MutationObserver(() => live && selected() && activate(canvas));
+  if (paneEl) focus.observe(paneEl, { attributes: true, attributeFilter: ['aria-selected'] });
+  return () => ((live = false), watching.disconnect(), focus.disconnect(), clearTimeout(soon), canvas.close());
 }
 hooks.paneFrame = drawPane;
 
