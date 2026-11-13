@@ -80,7 +80,7 @@ test('the host offers these slots, each handing the part what it is named with',
     find: ['query'],
     home: [],
     nav: [],
-    look: ['drawn'],
+    look: ['drawn', 'why'],
     'workspace.card': ['workspace', 'section'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
