@@ -7,7 +7,7 @@
 // (packs/walls/page/style-code.js). A document's preview (ui/doc.js) says so itself, once it has drawn the page.
 //
 // What the look reads of the first word is look_draw's part (packs/look_draw/parts/page): the runtime mounts it in the
-// slot `look` two frames on (packs/surface/page/base.js), and the part publishes it as page state on the root.
+// slot `look` two frames on (packs/kit/page/base.js), and the part publishes it as page state on the root.
 
 export const lookMode = new URLSearchParams(location.search).has('look');
 /** A page that draws once and follows nothing: a look. */

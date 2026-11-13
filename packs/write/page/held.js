@@ -1,8 +1,11 @@
 // Held for you: the changes that wait for the owner's word before they apply. Home keeps one line that leads to the
 // canvas of them (the owner, 31 Oct 2026: the canvas finds them, the item's sheet decides them, packs/write/page/item-held.js).
 
-import { api, ask, h, may, tell } from './base.js';
-import { canvasAt, savedCanvases } from './views-kept.js';
+import { api, ask, h, hooks, may, tell } from './base.js';
+
+// The saved views and the address of one, as the canvas's root keeps them (packs/surface/page/views-kept.js, by name).
+const savedCanvases = () => hooks.savedCanvases?.() ?? Promise.resolve([]);
+const canvasAt = (c) => hooks.canvasAt?.(c) ?? '#/';
 import { gist, loadSchema, relations, typeTitle } from './words.js';
 
 /** The kept view that draws what held changes touch: the one whose query finds what is held, and only that (a pack ships it). */

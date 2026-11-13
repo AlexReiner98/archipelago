@@ -269,3 +269,7 @@ function viewPicker({ current, label, title, changed, isHome, open }) {
   });
   return button;
 }
+
+// Asked for by name by a root before this one (the held changes' card, packs/write/page/held.js).
+hooks.savedCanvases = savedCanvases;
+hooks.canvasAt = canvasAt;

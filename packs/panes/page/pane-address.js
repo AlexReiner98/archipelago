@@ -1,4 +1,4 @@
-// What an address of the page draws in a pane (packs/surface/page/app.js gives the pane in focus the page's address).
+// What an address of the page draws in a pane (packs/shell/page/app.js gives the pane in focus the page's address).
 // The browser's back and forward are the runtime's, told to the panes part (packs/surface/page/part-page.js).
 
 import { readAddress } from './query.js';

@@ -44,7 +44,7 @@ export async function entity(id, here) {
   // On an island that runs a version of its pack, the page is drawn by that version: its screens, views and fields.
   const version = await readPageModel(e);
   const type = pageType(e.type);
-  // Whether this session may change the map: every control that writes is drawn only then (packs/surface/page/base.js may).
+  // Whether this session may change the map: every control that writes is drawn only then (packs/kit/page/base.js may).
   const writes = may('write');
   const change = async (ops, reason) => {
     try {

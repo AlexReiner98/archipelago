@@ -40,13 +40,15 @@ export { h };
 /**
  * Ask for a slot by its name: the one part that fills it (`drawSlot`, true when one does, so the caller draws what it
  * did before when none does) or every part that fills it, each in a node of its own (`drawSlots`, how many). Here, so
- * a page of any root asks the host by name and reaches the runtime that draws parts without importing it
- * (packs/surface/page/part-host.js, loaded the first time a slot is asked for).
+ * a page of any root asks the host by name and reaches the runtime that draws parts without importing it: the runtime
+ * (packs/surface/page/part-host.js) is loaded the first time a slot is asked for, through `hooks.partsRuntime`, which
+ * the page's entry sets (packs/shell/page/app.js). The kit is the first root, so it names no later one's file.
  */
-export const drawSlot = (node, asked) => import('./part-host.js').then((m) => m.drawPart(node, asked));
-export const drawSlots = (node, asked) => import('./part-host.js').then((m) => m.drawParts(node, asked));
+const runtime = () => hooks.partsRuntime?.() ?? Promise.reject(new Error('This page draws no parts'));
+export const drawSlot = (node, asked) => runtime().then((m) => m.drawPart(node, asked));
+export const drawSlots = (node, asked) => runtime().then((m) => m.drawParts(node, asked));
 /** Ask the part that fills a decision slot (`tabs.land`, `tabs.life`) to decide on `input`: its value, or undefined when none does. */
-export const askSlot = (slot, input) => import('./part-host.js').then((m) => m.askSlot(slot, input));
+export const askSlot = (slot, input) => runtime().then((m) => m.askSlot(slot, input));
 
 /**
  * Look mode (`?look`): on the first word of a drawing, from the canvas or from a page that draws one, mount the part
@@ -485,7 +487,7 @@ export async function showIdentity() {
       h('div', { class: 'ws-head', id: 'ws-head' }, 'Signed in to'),
       h('div', { class: 'ws-rows', role: 'group', 'aria-labelledby': 'ws-head' }, Object.entries({ [me.workspace.id]: me.workspace, ...known.all() }).map(row)),
       h('a', { href: '#', class: 'ws-row ws-add', title: 'Sign in by email to a workspace you belong to; this one stays a click away', onclick: go(() => signIn('', 'Sign in to another workspace', { back: true, email: who })) }, h('span', { class: 'gist' }, '+ Sign in to another workspace')),
-      me.actor.kind === 'human' && who && h('a', { href: '#', class: 'ws-row', title: `Sign in as ${who} with a password as well as by email`, onclick: go(() => import('./password.js').then((m) => m.passwordPage())) }, h('span', { class: 'gist' }, 'Password')),
+      me.actor.kind === 'human' && who && h('a', { href: '#', class: 'ws-row', title: `Sign in as ${who} with a password as well as by email`, onclick: go(() => hooks.passwordPage?.()) }, h('span', { class: 'gist' }, 'Password')),
       h('div', { class: 'ws-foot' }, h('span', { class: 'muted small gist', title: `Signed in as ${me.actor.name}` }, me.actor.name), h('a', { href: '#', class: 'small gist', title: `Sign out of ${me.workspace.name} on this browser; the others stay signed in`, onclick: go(signedOut) }, `Sign out of ${me.workspace.name}`)),
     );
   } catch {

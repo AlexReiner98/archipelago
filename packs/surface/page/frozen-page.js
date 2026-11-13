@@ -6,7 +6,7 @@
 // as the host draws any part's (./part-render.js). What only the page can do is the host's: its theme and page_css,
 // its site's head and foot, pictures, where a link leads, sheets, copy and print (./frozen-chrome.js).
 
-import { SignInNeeded, authHeaders, call, h } from './base.js';
+import { SignInNeeded, authHeaders, call, h, hooks } from './base.js';
 import { drawFrozen } from './doc-lens.js';
 import { carried } from './doc-ref.js';
 import { closeSheet, openSheet, plainMarks, readingStyle, startAddress } from './frozen-chrome.js';
@@ -17,6 +17,9 @@ import { checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
 import { applyTheme } from './theme.js';
 import { startTips } from './tip.js';
+
+// The runtime that draws parts, asked for by name by the kit (packs/kit/page/base.js): look mode mounts its part here too.
+hooks.partsRuntime = () => import('./part-host.js');
 
 startTips();
 

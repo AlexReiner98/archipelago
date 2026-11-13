@@ -259,7 +259,7 @@ export function drawWith(host, answer, style, keep) {
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
   // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
   const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
-  // What the session may do (packs/surface/page/base.js may): a drawing that opts into gestures draws no handle where it may not write.
+  // What the session may do (packs/kit/page/base.js may): a drawing that opts into gestures draws no handle where it may not write.
   const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, may: [...(state.may ?? [])] };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;

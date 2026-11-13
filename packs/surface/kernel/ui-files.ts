@@ -13,7 +13,7 @@ export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
   '/': 'index.html',
   '/app.js': 'app.js',
-  // The reads every page waits on, asked as it starts, before its modules have loaded (packs/surface/page/base.js takes them).
+  // The reads every page waits on, asked as it starts, before its modules have loaded (packs/kit/page/base.js takes them).
   '/early.js': 'early.js',
   // The house style's lengths as a stylesheet, so the page is laid out before the workspace's style is read (packs/styles/kernel/styles.ts).
   '/layout.css': 'layout.css',
