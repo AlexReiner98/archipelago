@@ -242,7 +242,7 @@ async function workerOf(version, parts, pack) {
     if (!m) return;
     if (said.type === 'marks') {
       try {
-        m.render.draw(checkMarks(said.marks, { kinds: m.part.marks }));
+        m.render.draw(checkMarks(said.marks, { kinds: m.part.marks, opens: m.part.opens ?? [] }));
       } catch (err) {
         m.failed(err.message);
       }
