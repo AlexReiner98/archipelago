@@ -69,11 +69,18 @@ test("a token limited to some work may call a pack's action on that work only", 
   await assert.rejects(callTool(l, limited, 'demo_order', { item: 'nails' }), /act outside the map/);
 });
 
+/** A pack's declarations that do not hold leave it waiting with why: thrown here, so a test reads the why. */
+const waits = (reg: Registry, id: string) => {
+  const state = reg.states.get(id);
+  if (state?.state !== 'active') throw new Error(state?.why ?? `${id} is not loaded`);
+};
+
 test('a declared action with no handler, or of no verb, stops its pack from loading', () => {
   const dir = packs();
   const pack = JSON.parse(JSON.stringify({ id: 'demo', version: '1', title: 'D', requires: ['core'], actions: [{ id: 'demo.x', title: 'X', description: '', verb: 'shout', input: { type: 'object' } }] }));
   writeFileSync(join(dir, 'demo', 'pack.json'), JSON.stringify(pack));
-  assert.throws(() => new Registry(dir), /specialises "shout", which is not a verb/);
+  // It waits with why, and the map loads without it (e_6g34wqdm).
+  assert.throws(() => waits(new Registry(dir), 'demo'), /specialises "shout", which is not a verb/);
 });
 
 test('screens are declared in pack files, checked when the pack loads, and listed in the schema', async () => {
@@ -90,7 +97,7 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   const dir = packs();
   const bad = (screens: unknown[]) => {
     writeFileSync(join(dir, 'demo', 'pack.json'), JSON.stringify({ id: 'demo', version: '1', title: 'D', requires: ['core'], views: screens.map((v) => ({ form: 'screen', ...(v as object) })) }));
-    return () => new Registry(dir);
+    return () => waits(new Registry(dir), 'demo');
   };
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['nothing'], pieces: [{ piece: 'figure' }] }]), /is on unknown type "nothing"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'chart' }] }]), /"chart" is not a piece/);

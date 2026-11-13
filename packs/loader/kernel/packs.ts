@@ -148,8 +148,8 @@ export class Registry {
     this.local = [...local];
     this.reload();
   }
-
-  reload(): void {
+  reload(): void { const held = new Map<string, string>(); while (this.loadOnce(held)); } /** One load: true when it held back a pack whose declarations did not hold (it waits with why), to be loaded again without it. */
+  private loadOnce(held: Map<string, string>): boolean {
     // A workspace's own types are in its database, never in a folder another server started from here would read.
     const { found, hashes, where } = this.given ? { found: new Map(this.given.found), hashes: new Map(this.given.hashes), where: new Map(this.given.where) } : readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
     this.where = where;
@@ -162,7 +162,7 @@ export class Registry {
     for (const id of this.turnedOff) off.set(id, 'turned off here');
     for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
     if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why); const refused = new Map(kernelRefused(found.values(), (id) => !this.made.has(id) && this.swap?.of !== id && (!!this.given || this.where.get(id) === this.dir || this.where.get(id) === OWN_PACKS))); for (const p of found.values()) if (isRequired(p)) off.delete(p.id); for (const [id, why] of refused) off.set(id, why); this.internal = new Set([...found.values()].filter((p) => isInternal(p) && !refused.has(p.id)).map((p) => p.id)); // a required internal pack is always on, an optional one off where the map turned it off (kernel.optional); kernel code from anywhere but the server's own folder never runs
-    const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK);
+    const { ordered: loaded, states } = orderPacks(found, off, LOCAL_PACK, held);
     // What a pack names of a pack it uses is registered only while that one is active (packs/loader/kernel/manifest.ts, uses); a name it uses is read as the pack that provides it.
     const declaredBy = new Map([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((t) => [t.id, p.id] as const)));
     const usesPacks = (pack: PackFile) => (pack.uses?.length ? { ...pack, uses: pack.uses.flatMap((u) => { const by = providersOf(u, found.values()); return by.length ? by : [u]; }) } : pack); const ordered = withVersions(loaded.map((pack) => { const read = usesPacks(pack), kept = withoutAbsent(read, (id) => states.get(id)?.state === 'active', (name) => declaredBy.get(name)); return kept === read ? pack : kept; }), this.items);
@@ -277,7 +277,8 @@ export class Registry {
     const tools = new Map<string, { pack: string; call: 'action' | 'view'; def: ActionDef | ViewDef }>();
     for (const pack of ordered) {
       const declared = checkDeclared(pack, types, verbs.map((v) => v.id), !!this.given || (pack.id !== LOCAL_PACK && !this.made.has(pack.id) && existsSync(join(this.folderOf(pack.id), 'handler.js'))), [...providedOf(ordered.filter(isInternal), 'answer'), ...(this.given?.answers ?? [])]).concat(checkParts(pack, types, this.given ? undefined : this.folderOf(pack.id))); // an internal pack's answers, always on: any view names them; its parts (packs/loader/kernel/ui-parts.ts)
-      if (declared.length) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`);
+      // A pack whose declarations do not hold waits with why, and the map loads without it (e_6g34wqdm); the kernel's own, and the map's own types, must hold.
+      if (declared.length) { if (KERNEL_PACKS.includes(pack.id) || pack.id === LOCAL_PACK || held.has(pack.id)) throw new Error(`Pack "${pack.id}": ${declared.join('; ')}`); held.set(pack.id, declared.join('; ')); return true; }
       for (const def of parts(pack).actions) tools.set(toolName(def.id), { pack: pack.id, call: 'action', def });
       // A lens preset is asked through the view tool, as any lens is: it is no tool of its own.
       for (const def of parts(pack).views) if (!def.lens) tools.set(toolName(def.id), { pack: pack.id, call: 'view', def });
@@ -295,7 +296,7 @@ export class Registry {
     this.relations = relations; this.renamed = new Map([...[...types.values()].flatMap((t) => (t.movedFrom ?? []).map((o) => [o, t.id] as const)), ...[...relations.values()].flatMap((r) => (r.moved_from ?? []).map((o) => [o, r.id] as const))]);
     this.trees = trees; this.verbs = verbs;
     this.tools = tools;
-    this.keep(this.kept); if (!this.swap) keepVersionTypes(this); // what versions add, dormant and retired here (packs/loader/kernel/version-types.ts)
+    this.keep(this.kept); if (!this.swap) keepVersionTypes(this); return false; // what versions add, dormant and retired here (packs/loader/kernel/version-types.ts)
   }
 
   /**

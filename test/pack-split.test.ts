@@ -117,7 +117,11 @@ test('the practice half waits while no pack declares the types it requires', asy
 
 test('a pack may name only its own ids, the kernel’s, and those of the packs in its moved_from', async () => {
   const dir = packsWith(vocabulary, { ...stranger, id: 'loose', moved_from: undefined } as unknown as PackFile);
-  assert.throws(() => registries.push(new Registry(dir)), /garden\.other.*must be named "loose\.<name>"/);
+  // It waits with why, and the map loads without it (e_6g34wqdm).
+  const reg = new Registry(dir);
+  registries.push(reg);
+  assert.equal(reg.states.get('loose')?.state, 'waiting');
+  assert.match(reg.states.get('loose')?.why ?? '', /garden\.other.*must be named "loose\.<name>"/);
 });
 
 test('a bare name is the kernel’s: kept only by a pack whose moved_from names core outright', () => {
@@ -125,5 +129,8 @@ test('a bare name is the kernel’s: kept only by a pack whose moved_from names 
   const taken = { ...practice, id: 'took_core', moved_from: ['garden', 'core'], views: [screen] } as unknown as PackFile;
   registries.push(new Registry(packsWith(vocabulary, taken)));
   const loose = { ...practice, id: 'bare', views: [screen] } as unknown as PackFile;
-  assert.throws(() => registries.push(new Registry(packsWith(vocabulary, loose))), /needs_here.*must be named "bare\.<name>"/);
+  const reg = new Registry(packsWith(vocabulary, loose));
+  registries.push(reg);
+  assert.equal(reg.states.get('bare')?.state, 'waiting');
+  assert.match(reg.states.get('bare')?.why ?? '', /needs_here.*must be named "bare\.<name>"/);
 });
