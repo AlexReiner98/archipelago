@@ -6,8 +6,10 @@
 // make one item and to link what is drawn, nothing more; a session that may not write is told so.
 
 import { api, ask, hooks, may, tell } from './base.js';
-import { store } from './live.js';
 import { fits, isA, kept, relations, typeChoice, types, workType } from './words.js';
+
+/** The page's one store, as the canvas's root keeps it (packs/surface/page/live.js), by name: empty before it is made. */
+const storeNow = () => hooks.store?.() ?? { views: [], items: new Map() };
 
 const ITEM = /^e_[a-z0-9]{8}$/;
 
@@ -17,7 +19,7 @@ const ITEM = /^e_[a-z0-9]{8}$/;
  */
 async function packOf(island) {
   if (!island) return null;
-  for (const view of store.views) {
+  for (const view of storeNow().views) {
     const isle = (view.islands ?? []).find((i) => i.id === island);
     if (isle) return isle.pack ?? null;
   }
@@ -25,7 +27,7 @@ async function packOf(island) {
 }
 
 /** An item by its id, as the page holds it where a view drew it, else as the map has it. */
-export const itemOf = async (id) => store.items.get(id) ?? (ITEM.test(String(id)) ? (await api('get', { id }).catch(() => null))?.entity : null);
+export const itemOf = async (id) => storeNow().items.get(id) ?? (ITEM.test(String(id)) ? (await api('get', { id }).catch(() => null))?.entity : null);
 
 /** The types an item on an island of this pack may be: the pack's first, then the shared set's, the work type leading. */
 function typesOf(pack) {
@@ -111,7 +113,7 @@ async function putToPerson(said) {
  * view and the drawing's hash so the server checks it is one the view's pack sends (packs/loader/kernel/view-calls.ts).
  * Answers { answer } (with `created` and `changed` when it wrote), or { error }. What the drawing needs said first it names in data
  * (`asks`: each { field, title, input: { placeholder }, choices: [[value, label, hint]], action, danger }), and the
- * page asks it in its own dialog (`ask` in packs/surface/page/base.js), one at a time, before anything is sent: a
+ * page asks it in its own dialog (`ask` in packs/kit/page/base.js), one at a time, before anything is sent: a
  * drawing never hears a key.
  */
 export async function drawingActs(said, view, hash) {

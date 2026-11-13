@@ -12,7 +12,7 @@
 //   button  words the person presses; the press goes back to the part, or (pick) the item then clicked on the canvas
 //   paint   a surface in its own units that pans and zooms in the host, holding paths and placed text
 //   path    a line or a shape on a paint surface
-//   note    words in the map's note dialect, drawn as the item page draws a note (packs/walls/page/body.js)
+//   note    words in the map's note dialect, drawn as the item page draws a note (packs/kit/page/body.js)
 //   menu    what is done rarely, behind a few words, placed in sight by the host: buttons, and the text, boxes, lists
 //           and inputs that make steps of them (a head, a field that narrows what is under it, a way back)
 //   thumb   a kept view drawn small, as the host keeps it (its thumbnail): the part names the view, never draws it

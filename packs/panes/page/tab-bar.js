@@ -95,7 +95,7 @@ hooks.sessionsMoved = () => {
 hooks.drawStrip = () => hooks.tellSlot?.('tabs', { name: 'sessions' });
 
 let started = false;
-/** Draw the tabs and the panes, once the map's schema is read (packs/surface/page/app.js): what they draw is read through it. */
+/** Draw the tabs and the panes, once the map's schema is read (packs/shell/page/app.js): what they draw is read through it. */
 export function startTabs() {
   if (started) return;
   started = true;

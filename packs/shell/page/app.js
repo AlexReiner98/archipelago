@@ -21,6 +21,11 @@ import { hrefNow, toAddress } from './panes.js';
 import { startTips } from './tip.js';
 import { workspace } from './workspace.js';
 
+// What the kit asks for by name (packs/kit/page/base.js), loaded the first time it is asked: the runtime that draws
+// parts, and the password page.
+hooks.partsRuntime = () => import('./part-host.js');
+hooks.passwordPage = () => import('./password.js').then((m) => m.passwordPage());
+
 /** The pages the sheet holds, by the name in their address. */
 /** The address of an item a held change would make, as a drawing links it (packs/surface/page/replica.js). */
 const GHOST = /^p_[a-z0-9]+:/;
@@ -62,7 +67,7 @@ async function route(pulse = false) {
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
   try {
     if (!state.schema) await loadSchema();
-    // What this session may do, before anything is drawn: each control is drawn only where it may (packs/surface/page/base.js may).
+    // What this session may do, before anything is drawn: each control is drawn only where it may (packs/kit/page/base.js may).
     await loadMay();
     // One signed in who only reads has no map of their own to change either: shown the same way to one.
     if (!may('write')) startOwn();

@@ -6,7 +6,7 @@
 // written there, by that map's `call`. Until then a copy of the words is kept in this browser alone (`kept`), so a
 // reload or a closed tab does not lose them: put back when the sheet opens again, still unsaved.
 
-import { api, ask, h, may, state, tell } from './base.js';
+import { api, ask, h, hooks, may, state, tell } from './base.js';
 import { renderBody } from './body.js';
 import { followLoose, refreshCanvas } from './canvas.js';
 import { countMark } from './note-count.js';
@@ -47,6 +47,8 @@ export const unsaved = () => Boolean(document.querySelector('#sheet [data-draft=
 
 /** Ask before leaving words unsaved; true when there are none, or the person lets them go. */
 export const mayLeave = async () => !unsaved() || Boolean(await ask({ title: 'Leave without saving?', message: 'What you wrote here is not on the map yet.', action: 'Leave', danger: true }));
+/** Asked for by name by a root before the sheet (the page's Refresh, packs/surface/page/live.js). */
+hooks.mayLeave = mayLeave;
 
 /**
  * The title, the note and the bar that saves them. `base` is the item as the sheet opened it ({ id, type, title, body,

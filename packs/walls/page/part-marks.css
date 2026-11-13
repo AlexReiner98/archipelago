@@ -71,7 +71,7 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 .pm-path-dash { stroke-dasharray: var(--space-5) var(--space-3); }
 .pm-plane text { fill: currentColor; font-size: var(--pm-size, var(--text-3)); }
 
-/* A note, as the item page and a part's note mark read it (packs/walls/page/body.js). A callout's colour is the one the
+/* A note, as the item page and a part's note mark read it (packs/kit/page/body.js). A callout's colour is the one the
    style names for its tone (notes.callouts), set on it as --callout. */
 .body-text { max-width: var(--note-measure, var(--measure)); }
 .body-text em { font-style: italic; }

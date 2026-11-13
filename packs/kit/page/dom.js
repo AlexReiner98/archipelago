@@ -1,4 +1,4 @@
-// How the host makes an element: the one helper every page module draws with (packs/surface/page/base.js hands it on
+// How the host makes an element: the one helper every page module draws with (packs/kit/page/base.js hands it on
 // to the app as `h`). Kept in walls, before every root that draws, so a host module draws without the page's state.
 
 /** An element: `attrs` set as properties where the element has one, `on…` as listeners; kids flattened, words as text. */

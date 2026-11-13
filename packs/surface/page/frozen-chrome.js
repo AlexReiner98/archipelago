@@ -9,7 +9,7 @@ import { mountPart } from './part-render.js';
 /**
  * How a page read with no session reads its notes: whole, as a document is (page.notes), every title a heading. Read
  * whole, a note asks its style only how long a title may be; the look a page keeps does not hold the style's numbers
- * yet, so it reads titles as the dialect does when it is told none (packs/walls/page/text.js, readText).
+ * yet, so it reads titles as the dialect does when it is told none (packs/kit/page/text.js, readText).
  */
 export const readingStyle = { page: { notes: 'whole' }, numbers: { note_title_most: 90 } };
 

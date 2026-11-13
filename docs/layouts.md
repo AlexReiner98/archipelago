@@ -188,7 +188,7 @@ A part (a pack's piece of the app, run walled in a worker: decision e_xeqhcums) 
 | `button` | words | `key` (needed), `look` main or quiet, `label`, `pick` (item or link: pressed, the next item clicked on the canvas is told back) |
 | `paint` | paths and placed text | `width` and `height` in its own units, `start`, `pixels` |
 | `path` | nothing | `d` (commands and numbers only), `look` line, fill or dash, `weight` (a step 1 to 4 of the style's borders) |
-| `note` | words | the map's note dialect (`packs/walls/page/text.js`), drawn as the item page draws a note (`packs/walls/page/body.js`), folded as the style's `page.notes` says; `tick` (with a `key`) lets the person tick its checklist |
+| `note` | words | the map's note dialect (`packs/kit/page/text.js`), drawn as the item page draws a note (`packs/kit/page/body.js`), folded as the style's `page.notes` says; `tick` (with a `key`) lets the person tick its checklist |
 | `menu` | buttons | `label` (needed), `look` main or quiet: what is done rarely, opened in sight by the host |
 
 Any mark may say its `key` and the `item` it stands for, any mark on the page a `tip` (what it says of itself, shown by the page's one tooltip, `packs/walls/page/tip.js`), and a box, text, button or path a `tone` (accent, muted, ok, warn, bad, closed). What is not listed is refused whole with where it was, as are a key used twice, a path off a paint surface, and more than the caps in `partLimits`. A tone, a step or a look is a class or a `var()` the style gives its value (`packs/walls/page/part-marks.css`): a part names no colour and no length.

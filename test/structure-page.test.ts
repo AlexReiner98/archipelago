@@ -13,58 +13,12 @@ import { pageImports, ratchet, ROOT, rootOrder, uiFiles, VENDORED, walk } from '
 /** A served path's root, and so its place in the order; none for the app's own files. */
 const rootOf = (path: string) => /^packs\/([\w-]+)\/page\//.exec(path)?.[1];
 
-// Frozen again 13 Nov 2026, as the runtime moved out of ui/ (task e_6hhx2ub8, decision e_6d2g62tg): eleven modules
-// stay runtime (they boot or mount, render a mark the slot contract names, or are data the runtime hands parts) and
-// now sit in surface, walls and loader, so what the host used to reach into ui/ for it now has (layout.js 8 to 3,
-// live.js 5). The moved modules bring their own imports of the app with them (app.js, canvas.js, query-base.js and
-// the rest), each going as the module it reaches becomes a part. The panes and tabs moved to the panes root the same
-// day as host code (task e_d5ewsvgf): they bring their imports of the app with them, and their ui/ entries went.
-const AGAINST_THE_ORDER: Record<string, number> = {
-  'packs/identity/page/agents-card.js': 2,
-  'packs/identity/page/authorize.js': 1,
-  'packs/identity/page/members-card.js': 2,
-  'packs/identity/page/password.js': 1,
-  'packs/identity/page/token-ask.js': 2,
-  'packs/identity/page/token-piece.js': 2,
-  'packs/identity/page/workspace-cards.js': 3,
-  'packs/identity/page/workspace.js': 3,
-  // Connecting an agent, the server's connections and Start here left ui/ for the identity root as host code (task
-  // e_u2phc9rq, 13 Nov 2026): each reaches the page's base (and words, for a menu), going as each becomes a part.
-  'packs/identity/page/connect-agent.js': 1,
-  'packs/identity/page/connections-card.js': 2,
-  'packs/identity/page/start.js': 1,
-  'packs/identity/page/workspaces-card.js': 2,
-  'packs/walls/page/layout-asks.js': 3,
-  'packs/walls/page/layout-tip.js': 1,
-  'packs/walls/page/layout.js': 3,
-  'packs/walls/page/plates.js': 1,
-  'packs/walls/page/query-base.js': 2,
-  'packs/walls/page/surface.js': 1,
-  // A layout's code, runtime since 13 Nov 2026 (rule e_6d2g62tg: it mounts the walled frame), with its import of the base.
-  'packs/walls/page/style-code.js': 1,
-  'packs/walls/page/view-frame.js': 1,
-  'packs/loader/page/packs.js': 1,
-  'packs/loader/page/page-schema.js': 1,
-  'packs/loader/page/words.js': 2,
-  'packs/write/page/held-card.js': 1,
-  'packs/write/page/held.js': 2,
-  'packs/write/page/item-held.js': 1,
-  // ui/nav.js's switches for a pack's screens (task e_pe3fjd75), with its import of the page's base.
-  'packs/loader/page/screen-rows.js': 1,
-  // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar, item-doc and thumbs.
-  // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of item-doc and thumbs.
-  'packs/surface/page/app.js': 5,
-  'packs/surface/page/live.js': 3,
-  // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
-  // type's views (canvases) and a document's menus (item-doc), screens.js for a diagram and
-  // the start page, each going as that module becomes a part.
-  // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar and thumbs.
-  // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
-  // type's views (canvases), a document's menus (item-doc) and find's terms (query-bar), each going as that module
-  // becomes a part.
-  // type's views (canvases) and find's terms (query-bar), screens.js for a diagram and
-  // the start page, each going as that module becomes a part.
-};
+// Emptied 13 Nov 2026 (task e_bjeev9py, the port's last step): the page kit every root draws with (base, theme, words,
+// dom, body, text, menu-place, plates) is its own root, kit, before identity; the page's entry (app.js) is the last root,
+// shell; the host's readers of what the panes publish (tabs.js, pane-route.js) are surface's; what a root needs of a
+// later one it asks by name (hooks: partsRuntime, passwordPage, store, savedCanvases, canvasAt, mayLeave). Nothing
+// imports against the order, and a new entry is never added: ask by name, or move the module to the root it belongs after.
+const AGAINST_THE_ORDER: Record<string, number> = {};
 
 test("the host's page imports one way along roots.json", () => {
   const counted: Record<string, number> = {};

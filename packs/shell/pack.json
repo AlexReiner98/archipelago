@@ -1,0 +1,10 @@
+{
+  "id": "shell",
+  "version": "0.1.0",
+  "title": "Shell",
+  "description": "The page's entry (app.js): it starts the page once every root's page has loaded, and routes an address to the root that draws it. The last root, so it imports every one before it in order (packs/roots.json). A root pack, so its code changes only through a root re-pin.",
+  "kernel": {
+    "trust": "root",
+    "internal": true
+  }
+}

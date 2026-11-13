@@ -99,10 +99,9 @@ export async function tellMissed(view) {
 }
 // The canvas asks for it by name (packs/surface/page/canvas.js), never by importing this file.
 hooks.tellMissed = tellMissed;
-// Refresh throws away words not yet saved, so it asks first (ui/draft.js); loaded when clicked, as draft.js reaches
-// this module through the canvas and a static import would close the loop.
+// Refresh throws away words not yet saved, so it asks first: the sheet's draft says so by name (packs/sheet/page/draft.js).
 const refresh = async () => {
-  if (!(await (await import('./draft.js')).mayLeave())) return;
+  if (!(await (hooks.mayLeave?.() ?? true))) return;
   return outdated ? location.reload() : route();
 };
 export const stale = h('div', { id: 'stale', hidden: true }, 'The map has changed.', h('button', { onclick: refresh }, 'Refresh'));
@@ -213,6 +212,8 @@ export const kinds = {
 
 /** The page's one store of items and links by id, shared by every view (the owner, 5 Nov 2026, e_5cdm9bfg). */
 export const store = new Store(kinds);
+/** The store by name, for a root before this one (packs/walls/page/layout-asks.js). */
+hooks.store = () => store;
 
 /**
  * A view of what `read` answers (a flat lens's answer, asked with `follow`), its rows in the page's one store and kept

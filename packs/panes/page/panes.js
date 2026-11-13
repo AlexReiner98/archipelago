@@ -132,7 +132,7 @@ hooks.besidePane = (from, view) => hooks.tellSlot?.('tabs', { name: 'beside', pa
 // ---- A page with no tabs (a look's, a frozen link's): its one view in a pane of its own, at the page's address.
 
 let lone = null;
-/** The page's address given to the lone pane of a page with no tabs (packs/surface/page/app.js): drawn again only for another. */
+/** The page's address given to the lone pane of a page with no tabs (packs/shell/page/app.js): drawn again only for another. */
 export function toAddress(at) {
   if (!lone || at === undefined || at === lone.at) return;
   lone.stop?.();
