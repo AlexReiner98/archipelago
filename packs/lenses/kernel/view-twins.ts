@@ -13,7 +13,7 @@ const canonical = (v: unknown): string =>
   Array.isArray(v) ? `[${v.map(canonical).join(',')}]` : v && typeof v === 'object' ? `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonical((v as Props)[k])}`).join(',')}}` : JSON.stringify(v ?? null);
 
 /** What a view is the same by: its query, as flat reads it. */
-const query = (p: Props) => canonical({ filter: p.filter, walk: p.walk, view: p.view, time: p.time });
+const query = (p: Props) => canonical({ filter: p.filter, walk: p.walk, view: p.view, time: p.time, sessions: p.sessions === false ? false : undefined });
 
 /** The views each view an agent makes in these ops is one of already: the same name or query, about the same items. */
 export async function twinsOf(ctx: KernelContext, ops: Op[]): Promise<string[]> {

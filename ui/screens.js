@@ -12,7 +12,6 @@ import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { flatView } from './query.js';
 import { keptView } from './canvases.js';
-import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { drawPart } from './part-host.js';
@@ -245,8 +244,8 @@ const partPiece = (ctx, p) => {
 /** A piece drawn as the kernel draws it, else by the part that fills it, else as a stub when this page does not know it. */
 const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, p) : partPiece(ctx, p));
 
-/** The pages the kernel still draws itself (packs/loader/kernel/declared.ts lists them). */
-const PAGES = { time };
+/** The pages the kernel still draws itself (packs/loader/kernel/declared.ts lists them): none since the time pack's week and day became views (task e_7tgvuyrs). */
+const PAGES = {};
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
 const OF_ITEM = ['fields', 'token', 'button', 'count', 'turns', 'findings'];

@@ -14,7 +14,7 @@ import { entity } from './item.js';
 import { heldPage } from './item-held.js';
 import { linkFirst } from './item-link.js';
 import { stale } from './live.js';
-import { drawNav, screenOfPage, screenPage } from './nav.js';
+import { drawNav, screenPage } from './nav.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
 import { atOf } from './pane-address.js';
 import { startTabs } from './pane-land.js';
@@ -65,7 +65,6 @@ async function route(pulse = false) {
   }
   // In a workspace: the page is the app again, whatever signed-out page was up.
   ungate();
-  if (name === 'time') return void (location.hash = screenOfPage('time') ? `#/s/${screenOfPage('time').id}` : '#/workspace');
   drawFind();
   drawNav();
   startTabs();

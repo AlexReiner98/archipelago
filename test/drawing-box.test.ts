@@ -64,10 +64,12 @@ test('each drawing the canvas pack ships draws its scene in the box, its imports
   const packs = { folderOf: () => folder, packs: [file] };
   const house = file.styles.find((s: { id: string }) => s.id === 'core.house').props;
   const answer = { items: [{ id: 'e_a', type: 'task', title: 'A' }, { id: 'e_b', type: 'task', title: 'B' }], links: [{ id: 'r_1', kind: 'depends_on', from: 'e_a', to: 'e_b' }] };
-  for (const { id } of file.layouts as { id: string }[]) {
+  // A layout along a time axis is drawn by a view that has one (its lens's time window), as the time layout asks.
+  const week = { lens: { time: { from: '2026-11-09T00:00:00.000Z', to: '2026-11-15T23:59:59.000Z', zone: 'UTC' } } };
+  for (const { id, shape } of file.layouts as { id: string; shape?: string }[]) {
     const entry = packLayout(packs, id)?.entry;
     assert.ok(entry, id);
-    const scene = await drawOnce(entry, { answer, style: { ...house, noLit: true, still: true }, types: {}, fields: {}, relations: {}, reduced: false });
+    const scene = await drawOnce(entry, { answer: shape === 'time' ? { ...answer, ...week } : answer, style: { ...house, noLit: true, still: true }, types: {}, fields: {}, relations: {}, reduced: false });
     assert.ok(scene && 'svg' in scene, id);
   }
 });

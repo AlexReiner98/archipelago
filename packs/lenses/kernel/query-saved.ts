@@ -39,7 +39,7 @@ export function viewQuery(props: Props) {
   const filter = { ...((props.filter ?? {}) as Props) };
   const ids = stepIds(props.steps).map((id) => `id ${id}`);
   if (ids.length) filter.find = [...new Set([...list(filter.find), ...ids])];
-  return { filter, walk: props.walk ?? { over: [], steps: 0 }, ...(typeof props.limit === 'number' && { limit: props.limit }), ...(props.time != null && { time: props.time }) };
+  return { filter, walk: props.walk ?? { over: [], steps: 0 }, ...(typeof props.limit === 'number' && { limit: props.limit }), ...(props.time != null && { time: props.time }), ...(props.sessions === false && { sessions: false }) };
 }
 
 /** Whether an item's type is a kept view. */

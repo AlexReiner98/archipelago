@@ -118,6 +118,7 @@ export function readAddress(query) {
   if (p.has('limit')) lens.limit = Number(p.get('limit'));
   const [from, to] = list(p.get('time'));
   if (from && to) lens.time = { from, to };
+  if (p.get('sessions') === 'off') lens.sessions = false;
   return { lens, style };
 }
 
@@ -141,6 +142,7 @@ export function addressOf(lens, style = {}) {
   if (steps || over === 'all' || over.length) p.set('steps', String(steps));
   if (lens.limit) p.set('limit', String(lens.limit));
   if (lens.time) p.set('time', `${lens.time.from},${lens.time.to}`);
+  if (lens.sessions === false) p.set('sessions', 'off');
   for (const key of ['lit', 'shape', 'style', 'canvas']) if (style[key]) p.set(key, style[key]);
   return p.toString();
 }

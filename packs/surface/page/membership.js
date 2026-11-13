@@ -48,6 +48,9 @@ export function reads(lens) {
       else (field('type'), seeds && (out.unanchored = true));
     }
   }
+  // The sessions running on what it finds come with it unless the lens turns them off (bug e_s37r8ych): a session
+  // starting work on an item held, or one held ending, may change the answer.
+  if (lens && !lens.view && lens.sessions !== false) (link('works_on'), (out.sessions = true));
   const walk = lens?.walk;
   if (walk && (walk.steps ?? 1) > 0) {
     const over = walk.over === 'all' || !walk.over ? ['*'] : [walk.over].flat();
@@ -58,7 +61,7 @@ export function reads(lens) {
 
 /**
  * Whether facts may change which items a lens finds: `view` is { lens, items (the ids it holds), islands (those its
- * items live on) }; `touches` are the facts as the store saw them before folding them in (Store.apply): { id, field,
+ * items live on), sessions (the sessions it holds) }; `touches` are the facts as the store saw them before folding them in (Store.apply): { id, field,
  * op, link?: { type, from, to }, made?: true, island? }; `made`: how many items the tail says were made anywhere.
  */
 export function mayMove(view, touches, made = 0) {
@@ -80,6 +83,8 @@ export function mayMove(view, touches, made = 0) {
       continue;
     }
     if (!(near(t.id) || onIsland)) continue;
+    // A session it holds that ends leaves it.
+    if (r.sessions && t.field === 'status' && view.sessions?.has(t.id)) return true;
     // Brought back from the archive: whether it is found again is the server's to say.
     if (t.field === 'archived' && t.op === '-') return true;
     if (r.all || r.fields === '*' || r.fields.has(t.field)) return true;

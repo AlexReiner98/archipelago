@@ -62,6 +62,9 @@ test('a window may be said from today, worked out in the zone', () => {
   assert.deepEqual(resolveAxis({ from: '-6d', to: '7d' }, 'America/Toronto', now), { from: '2026-10-22', to: '2026-11-04', zone: 'America/Toronto' });
   assert.deepEqual(resolveAxis({ from: 'today', to: '+0d' }, 'UTC', now), { from: '2026-10-29', to: '2026-10-29', zone: 'UTC' });
   assert.throws(() => resolveAxis({ from: '3d', to: '-3d' }, 'UTC', now), /comes after/);
+  // From this week's Monday: 29 Oct 2026 is a Thursday.
+  assert.deepEqual(resolveAxis({ from: 'monday', to: 'monday+6d' }, 'UTC', now), { from: '2026-10-26', to: '2026-11-01', zone: 'UTC' });
+  assert.deepEqual(resolveAxis({ from: 'monday-7d', to: 'monday+13d' }, 'UTC', now), { from: '2026-10-19', to: '2026-11-08', zone: 'UTC' });
 });
 
 test('a flat lens on a time axis places each item it sends, and says its window as dates', async () => {

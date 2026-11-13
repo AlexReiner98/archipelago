@@ -17,7 +17,7 @@
 export const PIECES = { figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [] } as const;
 
 /** The pages the host still draws itself, which a screen can hold as a piece until a pack draws them from pieces. Others are the family page.<name>. */
-export const PAGES = ['time'];
+export const PAGES: string[] = [];
 
 /** The frame the host draws, every page's: the bar of saved views, the canvas, the sheet over it, find at its foot, and Home. */
 export const FRAME = ['bar', 'canvas', 'sheet', 'find', 'home'];

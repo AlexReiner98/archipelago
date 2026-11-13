@@ -6,7 +6,7 @@
 // paints in its worker shown on a canvas laid over its picture (surface.js).
 
 import { drawFrame, h, state } from './base.js';
-import { drawingAsked } from './layout-asks.js';
+import { drawingActs, drawingAsked } from './layout-asks.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
@@ -240,6 +240,8 @@ export function drawWith(host, answer, style, keep) {
       // A change it asks for is put to the person, and sent as theirs (packs/walls/page/layout-asks.js); what came of it goes back.
       // What it made is not yet in the answer the canvas keeps, which follows only what it holds: the lens is read again.
       else if (said.type === 'change') drawingAsked(said).then((came) => (Object.keys(came.created ?? {}).length && host.dispatchEvent(new CustomEvent('lens-read', { bubbles: true })), !ended && port.postMessage({ type: 'changed', asked: said.asked, ...came })));
+      // An action its view sends, called as the person (packs/loader/kernel/view-calls.ts checks it); a change it made reads the lens again.
+      else if (said.type === 'act') drawingActs(said, style.canvas ?? style.shipped, drawing.hash).then((came) => (came.changed && host.dispatchEvent(new CustomEvent('lens-read', { bubbles: true })), !ended && port.postMessage({ type: 'changed', asked: said.asked, ...came })));
       else if (said.type === 'error') failed(said.message);
     } catch (err) {
       end();

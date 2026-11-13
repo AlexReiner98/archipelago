@@ -56,6 +56,8 @@ export type FlatRead = {
     /** Notes whole for the first items sent, or (`all`) for every item sent. */
     whole?: boolean | 'all';
     me: string | null;
+    /** The open sessions working on what is sent come with it, the newest first, SESSIONS_MOST at most (bug e_s37r8ych). */
+    sessions?: boolean;
     /** A term offered, read before it is added: what it would find (find), or which drawn items it would leave out. */
     preview?: { part: 'find' | 'only' | 'not'; terms: { raw: string; term: FlatTerm }[]; ids: string[] };
   };
@@ -74,6 +76,8 @@ const NOTE_START = 280;
 const NOTES_WHOLE_MOST = 100;
 const PREVIEW_MOST = 200;
 const PREVIEW_TERMS = 80;
+/** The most running sessions an answer brings of those working on what it sends: enough to see who is at work, never a crowd. */
+const SESSIONS_MOST = 8;
 
 const wayOf = (term: string): { link: string; way: 'out' | 'in' | 'either' } => {
   const way = term.endsWith('>') ? 'out' : term.endsWith('<') ? 'in' : 'either';
@@ -328,6 +332,21 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
     level = await unless(await find((k) => `select id from (${way(k)}) w order by updated_at desc, id limit $3`, [level, [...sent], room(), ...typed, ...(sessions.length ? [sessions] : [])]), notChecked);
     for (const id of level) if (!sent.has(id)) stepOf.set(id, n + 1);
     add(level);
+  }
+
+  // The sessions at work on what is sent (the owner, 12 Nov 2026, e_s37r8ych): the open runs linked works_on to an item
+  // sent, the newest first, a few at most and inside the limit; an ended one never. Under the default Not they come
+  // although a run is the kernel's own; a Not the lens said holds of them as of everything.
+  const most = Math.min(SESSIONS_MOST, lens.limit - sent.size);
+  if (lens.sessions && most > 0 && sent.size) {
+    const own = [[...sent], [...working], l.registry.family('run'), most];
+    const cond = saidNot ? keep(own.length + 1) : 'e.archived_at is null';
+    const { rows } = await l.db.query<{ id: string }>(
+      `select e.id from (select distinct r.from_id as id from relation r where r.to_id = any($1::text[]) and r.type = any($2::text[]) and r.valid_to is null) w join entity e on e.id = w.id where e.type = any($3::text[]) and e.is_open and e.id <> all($1::text[]) and ${cond} order by e.updated_at desc, e.id limit $4`,
+      [...own, ...(saidNot ? leftOut : [])]);
+    const runs = await unless(rows.map((r) => r.id), notChecked);
+    for (const id of runs) stepOf.set(id, 1);
+    add(runs);
   }
 
   const cut = sent.size > lens.limit;

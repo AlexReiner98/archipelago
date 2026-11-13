@@ -46,7 +46,7 @@ const pickable = (all, up) => all.filter((c) => !c.inDocument || c.id === up);
 export function viewParts(item) {
   const p = item.props ?? {};
   const filter = p.filter ?? {};
-  const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }), ...(p.time && { time: p.time }) };
+  const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }), ...(p.time && { time: p.time }), ...(p.sessions === false && { sessions: false }) };
   return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }) } };
 }
 
@@ -61,7 +61,8 @@ export const presetSettings = (lens) => {
   // A view of one item is its address with that item where it says {here}.
   const fits = (p) => new RegExp(`^${addressOf(viewParts({ ...p, preset: true, props: p.props }).lens).replace(/[.*+?^$()|[\]\\]/g, '\\$&').replaceAll(encodeURIComponent('{here}'), 'e_[a-z0-9]+')}$`).test(at);
   const preset = [...(state.schema?.canvases ?? []), ...versionCanvases()].find(fits);
-  return preset ? settingsOf({ props: preset.props }) : {};
+  // `shipped` names the view its pack ships, which its drawing sends its actions as (packs/walls/page/layout-asks.js drawingActs).
+  return preset ? { ...settingsOf({ props: preset.props }), shipped: preset.id } : {};
 };
 
 /**
@@ -131,9 +132,9 @@ async function save(lens, style, current, open, fresh = false) {
   if (title === null) return;
   if (!title) return tell('Not saved', 'A view needs a name.');
   if (title.length > 60) return tell('Not saved', 'A name is a few words: 60 characters at most.');
-  const { filter, walk, limit, time } = lens;
+  const { filter, walk, limit, time, sessions } = lens;
   // A pack's view saved under its own name is the owner's version of it, standing in its place.
-  const props = { filter, walk, limit: limit ?? null, time: time ?? null, style: { ...settingsOf(current), ...keptStyle(style) }, ...(current?.preset && title === current.title && { preset: current.id }) };
+  const props = { filter, walk, limit: limit ?? null, time: time ?? null, sessions: sessions === false ? false : null, style: { ...settingsOf(current), ...keptStyle(style) }, ...(current?.preset && title === current.title && { preset: current.id }) };
   const same = all.find((c) => !c.preset && c.title.toLowerCase() === title.toLowerCase());
   const made = same
     ? await api('change', { ops: [{ op: 'update', id: same.id, status: 'kept', props }], reason: 'Saved from the query bar' })
