@@ -297,7 +297,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
       if (!host.isConnected) return unfollow(store);
       // What the query finds may have moved (packs/surface/page/membership.js), or on a time axis an item changed may fall elsewhere:
       // both are the server's to work out, so the lens is read again. Not while the store is played from where its
-      // reader last looked (ui/catch-up.js): it ends as the map is.
+      // reader last looked (the replay mark, ./replay.js): it ends as the map is.
       if (!store.store?.playing && (changed.ask || (lens.time && changed.items.changed.length))) return load(true);
       draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, true);
     });

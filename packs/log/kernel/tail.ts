@@ -154,7 +154,7 @@ export async function eventsAfter(db: Q, input: { seq?: number; ids: string[] })
 /**
  * What the ids held were up to a position: every fact said of them at or before `pos`, in order, as the viewer may
  * read them now (an id they cannot see is left out), for the page to fold with its projector into the rows as they
- * stood then. What a page caught up from where its reader last looked starts from (ui/catch-up.js). Bounded by the ids.
+ * stood then. What a page caught up from where its reader last looked starts from (tellMissed, packs/surface/page/live.js). Bounded by the ids.
  */
 export async function factsUpTo(db: Q, input: { pos: number; ids: string[] }): Promise<{ pos: number; entries: { pos: number; at: string; facts: Fact[] }[] }> {
   const ids = [...new Set(input.ids ?? [])];

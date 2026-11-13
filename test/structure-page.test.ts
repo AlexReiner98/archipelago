@@ -41,8 +41,8 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/write/page/held.js': 2,
   'packs/write/page/item-held.js': 1,
   'packs/surface/page/app.js': 8,
-  'packs/surface/page/canvas.js': 3,
-  'packs/surface/page/live.js': 6,
+  'packs/surface/page/canvas.js': 2,
+  'packs/surface/page/live.js': 4,
   'packs/surface/page/query.js': 2,
   'packs/surface/page/replica.js': 1,
   'packs/panes/page/panes.js': 2,
@@ -81,7 +81,6 @@ test("the host's page imports one way along roots.json", () => {
 const APP_ON_HOST: Record<string, number> = {
   'ui/canvas-menu.js': 2,
   'ui/canvases.js': 5,
-  'ui/catch-up.js': 3,
   'ui/connect-agent.js': 2,
   'ui/connections-card.js': 2,
   'ui/find-choices.js': 2,
@@ -99,7 +98,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/term-kinds.js': 2,
   'ui/term-pick.js': 2,
   'ui/thumbs.js': 5,
-  'ui/traces.js': 3,
 };
 
 /** Whether a served path is the host's: a root pack's page/ folder. */
