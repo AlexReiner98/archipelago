@@ -6,7 +6,7 @@
 // which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
 // themselves (a page opened or shut then leaves it be).
 
-import { api, hooks, idsOf, state } from './base.js';
+import { api, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { catchUp } from './catch-up.js';
 import { canvasSwitch } from './canvases.js';
@@ -14,6 +14,26 @@ import { numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
+
+/** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
+let overlay;
+const actorOf = (a) => (typeof a === 'string' ? a : a?.kind ? `${a.kind}:${a.name}` : undefined);
+/**
+ * Catch the first canvas up from where its reader last looked: the overlay (the slot `traces`, handed the person as
+ * `me`) is mounted and told what was missed (hooks.tellMissed, packs/surface/page/live.js). Until the host draws the
+ * overlay's marks (trace, replay), the catch-up of ui/catch-up.js does it as before.
+ */
+async function caughtUp(view) {
+  const { MARKS } = await import('./part-check.js');
+  if (!('trace' in MARKS && 'replay' in MARKS)) return catchUp(view);
+  if (!overlay) {
+    overlay = h('div', { id: 'traces' });
+    document.body.append(overlay);
+    const me = await whoami().then((j) => actorOf(j?.actor), () => undefined);
+    await drawSlots(overlay, { slot: 'traces', piece: { ...(me && { me }) } });
+  }
+  return hooks.tellMissed?.(view);
+}
 
 /**
  * Home: what agents' recent work reaches that needs attention now (the frontier, the same answer a session starts
@@ -189,8 +209,8 @@ export function canvasIn(host, pane) {
       view.addEventListener('lens-answer', () => at?.view === view && current === c && barNow());
       if (current === c) barNow();
       host.replaceChildren(view);
-      // The first canvas a page draws is caught up from where its reader last looked (ui/catch-up.js).
-      view.ready?.then(() => catchUp(view.store)).catch(() => {});
+      // The first canvas a page draws is caught up from where its reader last looked (caughtUp).
+      view.ready?.then(() => caughtUp(view.store)).catch(() => {});
     },
     mark(here) {
       if (!at || at.here === here) return;

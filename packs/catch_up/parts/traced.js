@@ -16,7 +16,7 @@ export default function traced(input, tools) {
   const draw = () => ['box', { key: 'traces' }, ...traceMarks(book)];
   const keep = () => tools?.keep?.('traces', keptOf(book, Date.now(), days()));
   // A part mounted after the runtime told the slot hears the last beat it told as `told` (hooks.tellSlot).
-  if (input?.told?.name === 'beat' && Array.isArray(input.told.rows) && trace(book, changeSet(input.told), input.me ?? input.told.me)) keep();
+  if (input?.told?.name === 'beat' && Array.isArray(input.told.rows) && trace(book, changeSet(input.told), input.piece?.me ?? input.me)) keep();
   return {
     marks: draw(),
     update(next) {
@@ -25,7 +25,7 @@ export default function traced(input, tools) {
     },
     on(event) {
       if (event?.name === 'beat' && Array.isArray(event.rows)) {
-        if (!trace(book, changeSet(event), now?.me ?? event.me)) return undefined;
+        if (!trace(book, changeSet(event), now?.piece?.me ?? now?.me)) return undefined;
         keep();
         return draw();
       }

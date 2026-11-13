@@ -31,7 +31,7 @@ test('rows as they were and are make a change set, and the line a trace says', (
   const book = traceBook(undefined);
   assert.equal(trace(book, set, 'agent:claude'), false, 'one\'s own change is not traced');
   assert.equal(trace(book, set, 'human:alex'), true);
-  assert.deepEqual(traceMarks(book)[0], ['trace', { item: 'e_aaaaaaaa', tip: 'Session Coll, doing: Started it', word: 'Coll' }]);
+  assert.deepEqual(traceMarks(book)[0], ['trace', { item: 'e_aaaaaaaa', tip: 'Session Coll, doing: Started it', hue: 'Coll' }]);
   assert.equal(sawIt(book, 'e_aaaaaaaa', 10), true);
   const kept = keptOf(book, 10, 30);
   assert.equal(trace(traceBook(kept), set, 'human:alex'), true, 'the others still wait');
