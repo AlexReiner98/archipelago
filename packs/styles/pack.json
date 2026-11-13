@@ -48,6 +48,47 @@
           ]
         },
         "run": "schema-styled.ts#schemaStyled"
+      },
+      "answer.style_presets": {
+        "in": {},
+        "out": {
+          "styles": [
+            "any"
+          ]
+        },
+        "run": "part-reads.ts#stylePresets"
+      },
+      "answer.layouts": {
+        "in": {},
+        "out": {
+          "shapes": [
+            "any"
+          ],
+          "kept": [
+            "any"
+          ]
+        },
+        "run": "part-reads.ts#layoutsListed"
+      },
+      "act.capture.keep": {
+        "in": "any",
+        "out": "any",
+        "run": "part-acts.ts#keepAct"
+      },
+      "act.revise.use": {
+        "in": "any",
+        "out": "any",
+        "run": "part-acts.ts#useAct"
+      },
+      "act.revise.choose_theme": {
+        "in": "any",
+        "out": "any",
+        "run": "part-acts.ts#chooseThemeAct"
+      },
+      "act.revise.delete_layout": {
+        "in": "any",
+        "out": "any",
+        "run": "part-acts.ts#deleteLayoutAct"
       }
     },
     "hooks": {
@@ -56,5 +97,217 @@
       "surface.page_style": "styles.ts#pageStyle",
       "surface.lengths": "styles.ts#lengthsOf"
     }
-  }
+  },
+  "actions": [
+    {
+      "id": "styles.keep",
+      "title": "Keep your own version of a style",
+      "description": "Keep the owner's version of a style preset on the map, as the preset is, to change.",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "type": "string",
+            "description": "The preset, by id."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "props": {
+            "type": "object",
+            "description": "The preset's fields, as it ships them."
+          },
+          "on": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The types it is on."
+          }
+        },
+        "required": [
+          "preset",
+          "title",
+          "props"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "styles.use",
+      "title": "Use a style again, or not",
+      "description": "Use the owner's version of a preset again (true), or retire it (false): retired, the preset is not used.",
+      "verb": "revise",
+      "input": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "description": "The owner's version, by id."
+          },
+          "use": {
+            "type": "boolean",
+            "description": "Whether it is used."
+          }
+        },
+        "required": [
+          "item",
+          "use"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "styles.choose_theme",
+      "title": "Choose the workspace's theme",
+      "description": "Make a theme preset the workspace's: the owner's version of it kept (or used again), and every other theme kept retired, so one is chosen.",
+      "verb": "revise",
+      "input": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "type": "string",
+            "description": "The theme preset, by id."
+          },
+          "title": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "props": {
+            "type": "object",
+            "description": "The preset's fields, as it ships them."
+          },
+          "item": {
+            "type": "string",
+            "description": "The owner's version of it, retired, to use again."
+          },
+          "others": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The other themes' versions kept now, to retire."
+          }
+        },
+        "required": [
+          "preset",
+          "title",
+          "props"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "styles.delete_layout",
+      "title": "Delete a layout",
+      "description": "Archive a layout kept on the map: it leaves every choice and stays in the history; the views that draw in it go to the default.",
+      "verb": "revise",
+      "input": {
+        "type": "object",
+        "properties": {
+          "layout": {
+            "type": "string",
+            "description": "The layout, by id."
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "parts": [
+    {
+      "id": "styles.presets",
+      "title": "Styles",
+      "slot": "workspace.card",
+      "views": [
+        {
+          "name": "style_presets"
+        }
+      ],
+      "sends": [
+        "styles.keep",
+        "styles.use"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "list",
+        "button"
+      ],
+      "modules": {
+        "index.js": "parts/presets/index.js",
+        "rows.js": "parts/presets/rows.js"
+      }
+    },
+    {
+      "id": "styles.themes",
+      "title": "Theme",
+      "slot": "workspace.card",
+      "views": [
+        {
+          "name": "style_presets"
+        }
+      ],
+      "sends": [
+        "styles.choose_theme",
+        "styles.use"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "list",
+        "button"
+      ],
+      "modules": {
+        "index.js": "parts/themes/index.js",
+        "tiles.js": "parts/themes/tiles.js"
+      }
+    },
+    {
+      "id": "styles.layout_switch",
+      "title": "Layout",
+      "slot": "bar.layouts",
+      "go": true,
+      "views": [
+        {
+          "name": "layouts"
+        }
+      ],
+      "sends": [
+        "styles.delete_layout"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "input",
+        "button",
+        "menu"
+      ],
+      "modules": {
+        "index.js": "parts/layout-switch/index.js",
+        "choices.js": "parts/layout-switch/choices.js"
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "styles.style_presets",
+      "shape": "data",
+      "lens": {},
+      "answer": "style_presets",
+      "description": "Every style preset the packs ship, each with its pack, what it is on, whether it is a theme (over: chosen), and the owner’s version of it (item, retired): what the Workspace page’s style and theme cards read. Params: none."
+    },
+    {
+      "id": "styles.layouts",
+      "shape": "data",
+      "lens": {},
+      "answer": "layouts",
+      "description": "The layouts a view may be drawn in: the packs’ drawings by shape (the first is the default), then the layouts kept on the map, each with how many kept views draw in it: what the view band’s layout switch reads. Params: none."
+    }
+  ]
 }
