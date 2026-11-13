@@ -3,11 +3,12 @@
 // page. The model keeps beside its tabs who was heard (`heard`), where each session last landed (`landed`, by
 // `<tab>:<pane>`) and the chats the owner closed a tab of (`dismissed`). Where a step lands is ./route.js's rule.
 //
-// Not here yet, so a tab that watches what it draws takes no show (task e_8c6rgqb8): the items each pane draws, and
-// whether the reader is busy in a pane.
+// What the page tells the part beside: the items each pane draws (`ids` on the pane, from its canvas), for a tab that
+// watches what it draws, and when the reader last worked in each pane (`m.busy`, by pane, not kept), so a show passes
+// them by.
 
 import * as M from './model.js';
-import { route, sessionOf } from './route.js';
+import { route, sessionOf, SHOWN, WATCH } from './route.js';
 
 const isRun = (key) => /^e_[a-z0-9]{8}$/.test(key ?? '');
 /** An item's page, as a show names one: it opens over the pane that draws it when that pane is in focus. */
@@ -35,15 +36,38 @@ export const nameOf = (m, key) => m.heard?.[key]?.called ?? (isRun(key) ? key : 
 /** What a tab opened for a chat carries: whom it follows, whose it is, what it is called and its hue's word. */
 export const chatTab = (m, run) => ({ follows: run, chat: run, by: run, named: nameOf(m, run), word: m.heard?.[run]?.name });
 
+/** How long a press, a scroll or a key keeps a pane busy, in milliseconds. */
+const quietAfter = 20_000;
+/** Whether the reader is at work in pane `id` now. */
+const busy = (m, id, now) => now - (m.busy?.[id] ?? 0) < quietAfter;
+/** What tab `t` watches, when it watches: the items its panes draw, but for the one its sessions share. */
+export const watched = (t) => (t.follows === WATCH ? [...new Set(t.groups.filter((g) => t.panes[g]?.slot !== SHOWN).flatMap((g) => t.panes[g]?.ids ?? []))] : undefined);
+
 /** The tabs as the rule reads them. */
-function tabsFor(m, step, at) {
+function tabsFor(m, step, at, now) {
   return m.list.map((t) => ({
     id: t.id,
     follows: t.follows ?? 'none',
     chat: t.chat,
+    watches: watched(t),
     front: t.id === m.front,
-    panes: t.groups.map((id) => ({ id, slot: t.panes[id]?.slot, held: t.panes[id]?.held, by: t.panes[id]?.by, focus: id === M.focusOf(t), landed: m.landed[`${t.id}:${id}`], draws: M.named(t.panes[id]?.at) === M.named(at), blank: t.panes[id]?.at === M.BLANK })),
+    panes: t.groups.map((id) => ({ id, slot: t.panes[id]?.slot, held: t.panes[id]?.held, by: t.panes[id]?.by, focus: id === M.focusOf(t), landed: m.landed[`${t.id}:${id}`], draws: M.named(t.panes[id]?.at) === M.named(at), blank: t.panes[id]?.at === M.BLANK, busy: t.id === m.front && busy(m, id, now) })),
   }));
+}
+
+/** Tab `t` watches what it draws from now on: the owner's, as a tab kept is, following no one session. */
+export function watchTab(t) {
+  delete t.chat;
+  delete t.ended;
+  for (const g of t.groups) (delete t.panes[g].by, delete t.panes[g].held);
+  Object.assign(t, { follows: WATCH, named: undefined, word: undefined });
+  return t;
+}
+/** Make the tab session `run` last landed in watch what it draws: the owner approved the plan shown. */
+function watchFrom(m, run) {
+  const last = (t) => Math.max(0, ...t.groups.map((g) => m.landed[`${t.id}:${g}`]).filter((l) => l?.session === run).map((l) => l.at));
+  const t = m.list.filter((o) => last(o) > 0).sort((a, b) => last(b) - last(a))[0];
+  if (t) watchTab(t);
 }
 
 /**
@@ -52,13 +76,18 @@ function tabsFor(m, step, at) {
  */
 export function land(m, step, newId, now = Date.now()) {
   sides(m);
+  const did = landing(m, step, newId, now);
+  if (step.watch) watchFrom(m, sessionOf(step));
+  return did;
+}
+function landing(m, step, newId, now) {
   hear(m, step);
   const at = M.asPane(String(step.hash ?? ''));
   const page = step.canvas ? undefined : itemOf(at);
   const session = sessionOf(step);
   if (step.takes) takeOver(m, step.takes, session);
   revive(m, session);
-  const to = route(step, tabsFor(m, step, at), { drawable: M.drawable(at) });
+  const to = route(step, tabsFor(m, step, at, now), { drawable: M.drawable(at) });
   const lit = (t, pane) => {
     m.landed[`${t.id}:${pane}`] = { session, at: now };
     const p = t.panes[pane];

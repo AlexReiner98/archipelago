@@ -10,9 +10,15 @@
 
 import * as M from './model.js';
 import { strip } from './strip.js';
-import { ended, land, leaving, mirror, rested, sides } from './life.js';
+import { ended, land, leaving, mirror, rested, sides, watchTab } from './life.js';
 
 const KEEP = 'tabs';
+/** In a window popped out of the main one, the tab it draws (its key, as the runtime hands it); null in the main one. */
+let popped = null;
+/** Where the tabs are kept: the main page's list, or a popped window's one tab, which the main page reads too. */
+const keepName = () => (popped ? `out:${popped}` : KEEP);
+/** The tabs popped out into windows of their own, as each window keeps it: drawn at the strip's end, pressed to go to it. */
+let outs = [];
 let n = 0;
 const newId = (prefix) => `${prefix}${Date.now().toString(36)}${(++n).toString(36)}`;
 
@@ -29,6 +35,11 @@ const sheetOf = (hash) => /^#\/(e\/e_[a-z0-9]{8}|s\/[^?]*|workspace|you|new[^?]*
 
 /** The model kept, or a fresh one on the address the page opened on. */
 function modelOf(input) {
+  if (popped) {
+    const own = input?.kept?.[keepName()];
+    const t = M.sound(own) ? own : { ...M.freshTab(newId, M.atOf(input?.page?.hash ?? '#/') ?? 'v'), id: popped };
+    return sides(M.model([t], t.id));
+  }
   const kept = input?.kept?.[KEEP];
   const list = Array.isArray(kept?.list) ? kept.list.filter(M.sound) : [];
   if (list.length) return sides({ ...M.model(list, kept.front), heard: kept.heard ?? {}, landed: kept.landed ?? {}, dismissed: kept.dismissed ?? [] });
@@ -58,12 +69,13 @@ function panesMarks(t) {
   return ['panes', { key: 'panes', dir: t.dir ?? 'row' }, ...t.groups.map(pane)];
 }
 
-const marksFor = (slot) => (slot === 'panes' ? panesMarks(M.frontOf(m)) : strip(m, { sessions: sessionsOf() }));
+// A popped window draws its one tab's panes, and no strip.
+const marksFor = (slot) => (slot === 'panes' ? panesMarks(M.frontOf(m)) : popped ? ['box', {}] : strip(m, { sessions: sessionsOf(), out: outs }));
 
 /** Keep the model, publish what the host reads of it, and redraw every mount: the strip and the panes read the same tabs. */
 function changed() {
   const t = M.frontOf(m);
-  driver?.tools.keep({ list: m.list, front: m.front, heard: m.heard, landed: m.landed, dismissed: m.dismissed }, KEEP);
+  driver?.tools.keep(popped ? t : { list: m.list, front: m.front, heard: m.heard, landed: m.landed, dismissed: m.dismissed }, keepName());
   driver?.tools.state?.('front', m.front);
   driver?.tools.state?.('lands_in', M.landsIn(m, t).join(' ') || null);
   driver?.tools.state?.('front_chat', t.chat ?? null);
@@ -93,10 +105,11 @@ export function act(event) {
   const t = M.frontOf(m);
   if (name === 'press' || name === 'close') {
     if (what === 'new') return Boolean(M.openTab(m, newId, M.BLANK)) && (say(false), true);
-    if (what === 'front') return show(a);
+    if (what === 'front') return show(a) || goOut(a);
     if ((what === 'tab' && name === 'close') || (what === 'close' && a?.startsWith('t'))) return M.closeTab(m, a) && (say(false), true);
     if (what === 'close') return M.closePane(t, a) && (say(false), true);
     if (what === 'totab') return Boolean(M.paneToTab(m, newId, a)) && (say(false), true);
+    if (what === 'follow' && b === 'watch') return Boolean(M.tabOf(m, a)) && (watchTab(M.tabOf(m, a)), true);
     if (what === 'follow') return (Object.assign(M.tabOf(m, a) ?? {}, { follows: b }), true);
     if (what === 'keep') return (M.keepTab(M.tabOf(m, a)), true);
     if (what === 'merge') return (M.joinTab(m, M.tabOf(m, a), M.tabOf(m, b)), say(false), true);
@@ -105,6 +118,7 @@ export function act(event) {
   }
   if (name === 'share' && what === 'panes') return Number.isInteger(value?.index) && value.index + 1 < t.sizes.length && (M.share(t, value.index, Number(value.at)), true);
   if (name === 'focus' && what === 'pane') return t.focus !== a && t.groups.includes(a) && ((t.focus = a), say(false), true);
+  if (name === 'drawn' && what === 'pane') return void (t.panes[a] && (t.panes[a].ids = (Array.isArray(value) ? value : []).slice(0, 500))), false;
   if (name === 'named' && what === 'pane') return Boolean(t.panes[a]) && t.panes[a].name !== value && ((t.panes[a].name = String(value ?? '').slice(0, 120)), true);
   if ((name === 'open' || name === 'go') && what === 'pane') {
     const at = M.asPane(String(value?.at ?? value ?? ''));
@@ -127,11 +141,39 @@ export function act(event) {
 function popOut(id) {
   const t = M.tabOf(m, id);
   if (!t || !driver?.tools.window) return false;
+  driver.tools.keep(t, `out:${id}`);
   driver.tools.window(id, M.tabHref(t));
-  m.out = [...(m.out ?? []).filter((o) => o.id !== id), t];
+  outs = [...outs.filter((o) => o.id !== id), t];
   m.list = m.list.filter((o) => o !== t);
   if (m.front === id) (m.front = m.list[0].id), say(false);
   return true;
+}
+
+/** Go to the window tab `id` was popped out into, opening it again if it was closed. */
+function goOut(id) {
+  const t = outs.find((o) => o.id === id);
+  if (t) driver?.tools.window?.(id, M.tabHref(t));
+  return false;
+}
+
+/**
+ * What each window keeps, handed again when another changes it: the tabs popped out are drawn at the strip's end, and
+ * one docked back comes into this page's tabs, in sight. True when the tabs changed.
+ */
+function keptMoved(kept) {
+  if (popped || !kept) return false;
+  const out = Object.entries(kept).filter(([k, v]) => k.startsWith('out:') && M.sound(v));
+  let changes = false;
+  for (const [name, t] of out.filter(([, v]) => v.docked)) {
+    const { docked: _, ...back } = t;
+    m.list = [...m.list.filter((o) => o.id !== back.id), back];
+    m.front = back.id;
+    driver?.tools.keep(null, name);
+    changes = true;
+  }
+  const before = outs.map((o) => o.id).join(' ');
+  outs = out.filter(([, v]) => !v.docked && !m.list.some((o) => o.id === v.id)).map(([, v]) => v);
+  return changes || before !== outs.map((o) => o.id).join(' ');
 }
 
 /** The page moved to `hash` (a link followed, a page opened over the canvas): the tab in sight keeps the page, its pane in focus the lens. */
@@ -180,6 +222,8 @@ async function readOpen() {
 
 /** What the strip's mount hears of the page and the sessions: true when the tabs changed. */
 function heard(event) {
+  if (event?.name === 'busy') return void (m.busy = { ...m.busy, [String(event.pane)]: Date.now() }), waiting.size > 0;
+  if (event?.name === 'dock' && popped) return (driver?.tools.keep({ ...M.frontOf(m), docked: true }, keepName()), false);
   if (event?.name === 'split') return act({ key: 'split', name: 'press' });
   if (event?.name === 'step') return stepped(event.step === -1 ? -1 : 1);
   if (event?.name === 'land' && event.step) return (landed(event.step), void readOpen(), true);
@@ -189,12 +233,14 @@ function heard(event) {
 }
 
 export default function panes(input, tools) {
+  popped ??= typeof input?.page?.popped === 'string' ? input.page.popped : null;
   m ??= modelOf(input);
   const mount = { slot: (input?.slot ?? input?.piece?.slot) === 'panes' ? 'panes' : 'tabs', tools, hash: input?.page?.hash };
   mounts.add(mount);
   // The strip's mount hears the page: the address it opened on goes to the pane in focus, as the page's own panes took it.
   if (mount.slot === 'tabs') {
     driver = mount;
+    keptMoved(input?.kept);
     if (input?.page?.hash) moved(input.page.hash);
     queueMicrotask(changed);
     void readOpen();
@@ -207,6 +253,7 @@ export default function panes(input, tools) {
         mount.hash = hash;
         if (moved(hash)) changed();
       }
+      if (mount === driver && keptMoved(next?.kept)) (say(false), changed());
       if (mount === driver && waiting.size) (retry(), changed());
       return marksFor(mount.slot);
     },
@@ -225,4 +272,4 @@ export default function panes(input, tools) {
 }
 
 /** For tests: start again with this model. */
-export const reset = (list = [], front = null) => ((m = list.length ? sides(M.model(list, front)) : null), mounts.clear(), (driver = null), waiting.clear());
+export const reset = (list = [], front = null) => ((m = list.length ? sides(M.model(list, front)) : null), mounts.clear(), (driver = null), waiting.clear(), (popped = null), (outs = []));

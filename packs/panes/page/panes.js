@@ -408,7 +408,16 @@ hooks.paneFrame = (at, el, said) => {
       canvas.show(lens, here, style);
       activate(canvas);
     }, (err) => live && el.replaceChildren(h('div', { class: 'error' }, err.message)));
-  return () => ((live = false), canvas.close());
+  // What it draws, told again as it is drawn anew (the map changed, another lens): a tab that watches what it draws reads it.
+  let told = '';
+  const tell = () => {
+    const ids = canvas.ids?.() ?? [];
+    if (live && ids.join(' ') !== told) ((told = ids.join(' ')), said('drawn', ids.slice(0, 500)));
+  };
+  let soon;
+  const watching = new MutationObserver(() => (clearTimeout(soon), (soon = setTimeout(tell, 300))));
+  watching.observe(el, { childList: true, subtree: true });
+  return () => ((live = false), watching.disconnect(), clearTimeout(soon), canvas.close());
 };
 
 let started = false;

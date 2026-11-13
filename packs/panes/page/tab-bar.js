@@ -221,7 +221,8 @@ function tabEl(t, out) {
   return el;
 }
 export function drawStrip() {
-  if (byPart.on) return;
+  // The part draws the strip; the count of sessions waiting on the owner beside it is still drawn here.
+  if (byPart.on) return void (poppedTab || drawCount([]));
   if (!strip || poppedTab) return;
   const out = outTabs().filter((t) => !tabOf(t.id));
   // The owner's tabs first, then the chats', each in the order they opened.
@@ -383,12 +384,22 @@ export function startTabs() {
   // The panes pack's part draws the tabs and the panes (packs/panes/parts/index.js), asked for with ?panes=part until a
   // press inside a dragged mark reaches its button (task e_rq9d73mg); the page's own draw them otherwise, and where
   // no part fills them.
-  if (!poppedTab && new URLSearchParams(location.search).get('panes') === 'part') {
+  if (partAsked()) {
     byPart.on = true;
     void startPart().then((drawn) => drawn || ((byPart.on = false), startHost(), dispatchEvent(new HashChangeEvent('hashchange'))));
     return;
   }
   startHost();
+}
+
+/** Whether the panes part is asked for: ?panes=part, kept for this window's session and the windows it pops out. */
+function partAsked() {
+  try {
+    if (new URLSearchParams(location.search).get('panes') === 'part') sessionStorage.setItem('pelago-panes-part', '1');
+    return sessionStorage.getItem('pelago-panes-part') === '1';
+  } catch {
+    return new URLSearchParams(location.search).get('panes') === 'part';
+  }
 }
 
 /**
@@ -414,7 +425,11 @@ async function startPart() {
     button('Back', 'Back to what this pane drew before', '‹', () => history.back()),
     button('Forward', 'Forward again', '›', () => history.forward()),
     button('Split', 'Split: a new pane beside this one', '◫', () => hooks.tellSlot?.('tabs', { name: 'split' })),
-  ];
+    // In a popped window, its tab goes back into the main one as it closes.
+    poppedTab && button('Dock back', 'Dock this window back into the main one, as a tab', '⇲', () => (hooks.tellSlot?.('tabs', { name: 'dock' }), setTimeout(() => window.close(), 300))),
+  ].filter(Boolean);
+  // The count beside the strip reads the sessions open, as it did beside the page's own strip.
+  if (!poppedTab) (firstDrawn.then(readOpen), document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && readOpen()));
   return true;
 }
 
