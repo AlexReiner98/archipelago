@@ -1,4 +1,4 @@
-// A change set (packs/surface/page/changes.js): what came, left and changed between two positions of the log, worked out with the
+// A change set (ui/changes.js): what came, left and changed between two positions of the log, worked out with the
 // projector the page runs, from facts alone and with no page; and the tail sends who made each entry and why.
 
 import assert from 'node:assert/strict';
@@ -11,7 +11,7 @@ import { factsAfter, headPos } from '../packs/log/kernel/tail.ts';
 import { uiFile } from '../packs/surface/kernel/ui-files.ts';
 import { fresh, human, make } from './map.ts';
 
-/** packs/surface/page/changes.js and the projector it imports, as the server serves them. */
+/** ui/changes.js and the projector it imports, as the server serves them. */
 async function changes() {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-changes-'));
   writeFileSync(join(dir, 'package.json'), '{"type":"module"}');

@@ -3,9 +3,6 @@
   "version": "0.1.0",
   "title": "Bar",
   "description": "Find's input in the bar and the terms it is made of: what a term is of, what it lights, which terms are offered and in what order, and the words a term goes by. Find's choices are the find pack's. A root pack, so its parts change only through a root re-pin (task e_yxkdcdh6).",
-  "requires": [
-    "core"
-  ],
   "kernel": {
     "trust": "root",
     "internal": true

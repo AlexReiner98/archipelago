@@ -111,8 +111,8 @@ export async function workspace() {
     grid,
   );
   // What other packs say on this workspace, each a part of its own under the cards this screen draws (slot
-  // workspace.card). None fills it until its pack's cluster lands, and then nothing is added here.
-  void drawSlots(grid, { slot: 'workspace.card', piece: { workspace: me.workspace.id }, redraw: workspace });
+  // workspace.card), told which section is open so a card lands in one. None fills it until its pack's cluster lands.
+  void drawSlots(grid, { slot: 'workspace.card', piece: { workspace: me.workspace.id, section: open }, redraw: workspace });
   // Brought into view only as far as it must be, so the page's head and its sections stay in sight above it.
   if (step) setTimeout(() => main.querySelector(`[data-at="${CSS.escape(step)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 400);
 }
