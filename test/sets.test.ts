@@ -30,8 +30,10 @@ test('a change runs the tests that import it or name it, the structure test, and
   assert.deepEqual(affected(['test/kinds.test.ts']).files, ['test/kinds.test.ts', 'test/sets.test.ts', 'test/structure.test.ts'], 'a test alone, with the structure test (and this one, which names it)');
 
   const page = affected(['ui/canvas.js']).files;
-  assert.ok(page.includes('test/layouts.test.ts') && page.includes('test/page-css.test.ts'), 'a page: the browser tests, and the tests that read the pages as text');
+  assert.ok(page.includes('test/layouts.test.ts'), 'a page of the app: the browser tests');
   assert.ok(!page.includes('test/rules.test.ts'), 'but not a test that never reads a page');
+  const host = affected(['packs/walls/page/marks.js']).files;
+  assert.ok(host.includes('test/layouts.test.ts') && host.includes('test/page-css.test.ts'), "a page of the host (a root's page/): the browser tests, and the tests that read it as text");
 
   const flow = affected(['packs/canvas/layouts/flow/islands.js']).files;
   for (const f of ['packs/canvas/map-story.test.ts', 'test/layouts.test.ts']) assert.ok(flow.includes(f), `a layout's code: ${f}, which imports it or draws that layout`);

@@ -17,7 +17,7 @@ const KINDS = ['actor', 'aim', 'work', 'question', 'record', 'occurrence', 'plac
 const ROOTS = ['part_of', 'depends_on', 'waits_on', 'needs', 'holds', 'involves', 'serves', 'lives_in', 'about', 'bears_on', 'link', 'uses', 'produced'];
 /** The kernel's own that stand on a starter of the work: a connection to the outside and a document another workspace shares, which live on no island. */
 const KERNEL_OF_WORK = ['connection', 'shared_document'];
-const SYSTEM = ['lens', 'style', 'layout', 'instruction', 'screen', 'type', 'link_type', 'pack', 'source', 'run', 'notification', 'automation', 'island'];
+const SYSTEM = ['lens', 'style', 'layout', 'part', 'instruction', 'screen', 'type', 'link_type', 'pack', 'source', 'run', 'notification', 'automation', 'island'];
 
 /** A copy of the shipped packs, with one more pack beside them when given. */
 test('every shipped type comes from one of core’s starter types, the system tier included', () => {

@@ -220,6 +220,8 @@ const lists = (test: string, folder: string) => new RegExp(`['"\`/]${folder}/|['
 export function reads(test: string, file: string, wide = false): boolean {
   if (reaches(test).has(file) || textOf(test).includes(file)) return true;
   const browser = SLOW[test] === 'browser';
+  // A root pack's page/ is the host's part of the page, served beside ui/: a browser test reads it as it reads ui/.
+  if (browser && /^packs\/[\w-]+\/page\//.test(file)) return true;
   const top = file.split('/')[0];
   if (LISTED.includes(top)) return (top === 'ui' && browser) || lists(test, top);
   const inPack = /^packs\/[^/]+\/(.+)$/.exec(file)?.[1];
