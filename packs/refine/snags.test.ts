@@ -2,6 +2,7 @@
 // them in, groups out. What a touches value reads as, then the grouping, its order and counts, then the runs.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import { TOUCHES, TOUCH_KINDS, snagsOf, touchesOf } from './snags.js';
@@ -13,11 +14,14 @@ test('a touches value reads as its kind:ref parts, each once, the malformed left
   assert.deepEqual(touchesOf(undefined), []);
   assert.deepEqual(touchesOf(42), []);
   assert.ok(TOUCH_KINDS.includes('instruction'));
+  assert.deepEqual(touchesOf('part:findings.island page:item'), ['part:findings.island', 'page:item']);
 });
 
 test('the form the rule holds a value to is the one touchesOf reads', () => {
-  for (const ok of ['pack:core', 'tool:change rule:finding_note', 'pack:core, tool:query', ' hook:Stop ']) assert.ok(TOUCHES.test(ok), ok);
+  for (const ok of ['pack:core', 'tool:change rule:finding_note', 'pack:core, tool:query', ' hook:Stop ', 'part:findings.island tool:change']) assert.ok(TOUCHES.test(ok), ok);
   for (const bad of ['', 'bad', 'tool:', 'pack:core junk', 'colour:red']) assert.ok(!TOUCHES.test(bad), bad);
+  const rule = JSON.parse(readFileSync(new URL('./pack.json', import.meta.url), 'utf8')).rules.find((r: { id: string }) => r.id === 'touches_form');
+  assert.ok(rule.when.matches.touches.includes(`(?:${TOUCH_KINDS.join('|')})`), 'the rule names the kinds touchesOf reads');
 });
 
 test('open snags are grouped by what they touched, the most first, a snag in each group it names', () => {
@@ -36,6 +40,17 @@ test('open snags are grouped by what they touched, the most first, a snag in eac
   assert.deepEqual(change.snags.map((s: { id: string }) => s.id), ['b', 'a'], 'the heaviest first');
   assert.deepEqual(answer.kinds, { tool: 2, rule: 1, view: 1 });
   assert.deepEqual(answer.untouched, { count: 1, snags: [{ id: 'd', title: 'Something vague', type: 'issue', status: 'open' }] });
+});
+
+test("a snag that names a part is grouped by the part, and the group names the part's pack for its refiner", () => {
+  const answer = snagsOf([
+    { id: 'a', title: 'Stand by does nothing', type: 'issue', status: 'open', severity: 'high', touches: 'part:findings.island' },
+    { id: 'b', title: 'Rows cut too soon', type: 'issue', status: 'open', touches: 'part:findings.island page:item' },
+  ]);
+  const part = answer.groups[0];
+  assert.deepEqual([part.touches, part.kind, part.ref, part.pack, part.count], ['part:findings.island', 'part', 'findings.island', 'findings', 2]);
+  assert.equal(answer.groups[1].pack, undefined, 'only a part names a pack beside its ref');
+  assert.deepEqual(answer.kinds, { part: 2, page: 1 });
 });
 
 test('a group names the runs that wrote its snags, each once, with the packs they ran under', () => {
