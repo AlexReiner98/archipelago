@@ -46,7 +46,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(n)}.querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
   };
-  const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input[type=search]'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
+  const find = (words: string) => page.evaluate(`(() => { const input = document.querySelector('#find input[name=q]'); input.value = ${JSON.stringify(words)}; input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
   try {
     await ready(page);
     // A session's show opens a tab of its own, out of sight: the reader's pane, the bar and the address stay theirs.
