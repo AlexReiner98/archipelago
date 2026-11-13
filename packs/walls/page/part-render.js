@@ -23,6 +23,7 @@ import { menuSteps } from './part-menu.js';
 import { buildPane, frameWeb, layPanes, paneBody, paneGone, sashes } from './part-pane.js';
 import { draggable } from './part-drag.js';
 import { traceGone, traceMark } from './part-trace.js';
+import { setsField } from './part-echo.js';
 
 /** What each element was drawn from, and the surface that runs a paint mark. */
 const drawnFrom = new WeakMap();
@@ -320,12 +321,10 @@ function update(el, node, ctx, fresh = false) {
     // one they already sent (an echo, perhaps behind what they have typed since) is let be; a value of the part's own
     // (the field cleared once its words were taken) is set.
     const value = at.value ?? '';
-    const heard = told(el);
     const now = at.kind === 'check' ? String(el.checked) : el.value;
-    if (now !== value && (document.activeElement !== el || !heard.includes(value))) {
+    if (setsField(told(el), value, now, document.activeElement === el)) {
       if (at.kind === 'check') el.checked = value === 'true';
       else el.value = value;
-      heard.length = 0;
     }
     if (fresh) requestAnimationFrame(() => fit(el));
     if (at.focus && el.tagName !== 'SPAN') focusSoon(el);
