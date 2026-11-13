@@ -20,15 +20,15 @@ export const UI_FILES: Record<string, string> = {
   '/style.css': 'style.css',
   '/shell.css': 'shell.css',
   '/flow.css': 'flow.css',
-  '/diagram.css': 'diagram.css',
+  
   '/notes.css': 'notes.css',
   '/story.css': 'story.css',
   '/menus.css': 'menus.css',
   // How a part's marks look: classes and steps the style gives values to (packs/walls/page/part-render.js).
   '/part-marks.css': 'part-marks.css',
-  '/public.js': 'public.js',
+  
   '/public.css': 'public.css',
-  '/doc.js': 'doc.js',
+  
   '/doc.css': 'doc.css',
   '/doc-lens.css': 'doc-lens.css',
   '/packs.js': 'packs.js',
