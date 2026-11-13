@@ -148,6 +148,8 @@ function layoutMenu(rows) {
     if (layoutList.matches(':popover-open')) return layoutList.hidePopover();
     layoutList.replaceChildren(...rows.filter(Boolean).map((m) => m.element ?? item(m.text, m.title, m.act, m.danger)));
     layoutList.showPopover();
+    // A row a part fills is drawn once it is in the page: one mounted while the menu was shut is swept as detached.
+    for (const m of rows) m?.opened?.();
     placeBy(layoutList, button, { end: true });
   });
   return button;
@@ -207,10 +209,10 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
     // The parts that fill the band, side by side: what the person keeps of the view up, and an island made.
     const parts = floatMenus(h('span', { class: 'q-parts' }));
-    // The layout up and its switch are the styles pack's part (slot bar.layouts): drawn once the view is, so its reads wait.
+    // The layout up and its switch are the styles pack's part (slot bar.layouts), drawn as the menu opens, so its reads
+    // wait for the person and it is never mounted on a row the menu has not put in the page; once, as the row is kept.
     const layout = h('div', { class: 'q-look-row' });
-    void firstDrawn.then(() => drawPart(layout, { slot: 'bar.layouts', piece: {} }));
-    const rows = [{ element: layout }, may('write') && current && !current.preset && { text: 'Share it', title: 'Public for anyone, frozen as it is now', act: () => shareView(current) }];
+    const rows = [{ element: layout, opened: () => void (layout.firstChild ?? drawPart(layout, { slot: 'bar.layouts', piece: {} })) }, may('write') && current && !current.preset && { text: 'Share it', title: 'Public for anyone, frozen as it is now', act: () => shareView(current) }];
     part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, parts, ...own.filter((b) => !travel.includes(b)), layoutMenu(rows));
     fitBar();
     const piece = { ...(current && !current.preset && { current: current.id }), home: Boolean(isHome), ...((await islandsHere()) ? islandPiece() : {}) };
