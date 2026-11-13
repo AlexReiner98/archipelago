@@ -1,5 +1,6 @@
 import { api, h, hooks, main, route, state } from './base.js';
 import { changeSet } from './changes.js';
+import { beatRows, missedRows } from './beat-rows.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { trace } from './traces.js';
 import { looked } from './catch-up.js';
@@ -179,6 +180,16 @@ function touchedBy(beat, pos) {
   return { ids: [...ids], made: beat.made ?? 0 };
 }
 
+/**
+ * What was missed since the person last looked (ui/catch-up.js says when, by name), handed to the parts on `traces`:
+ * entry by entry from the rows as they were (each row's island is on it), and one beat for the whole span.
+ */
+hooks.tellMissed = (then, kinds, entries, { from, to, gone = [] }) => {
+  if (!hooks.slotFilled?.('traces')) return;
+  hooks.tellSlot('traces', { name: 'missed', from, to, entries: missedRows(then, kinds, entries) });
+  hooks.tellSlot('traces', { name: 'beat', ...beatRows(then, kinds, entries, { after: from, gone }) });
+};
+
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;
 export async function checkTail() {
@@ -199,7 +210,10 @@ export async function checkTail() {
     if (beat.entries && following) {
       try {
         // What the facts changed of what the store held, worked out before they are folded in, once: traced until seen (ui/traces.js).
-        const set = changeSet(store, kinds, store.fresh(beat.entries), { after: store.pos, gone: beat.gone });
+        const fresh = store.fresh(beat.entries);
+        const set = changeSet(store, kinds, fresh, { after: store.pos, gone: beat.gone });
+        // The parts on `traces` are handed the rows the beat touched, as they were and are, and decide what to trace.
+        if (hooks.slotFilled?.('traces')) hooks.tellSlot('traces', { name: 'beat', ...beatRows(store, kinds, fresh, { after: store.pos, gone: beat.gone }) });
         store.apply(beat);
         trace(set).catch(() => {});
       } catch (err) {

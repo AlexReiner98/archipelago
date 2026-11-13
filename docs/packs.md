@@ -175,6 +175,7 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace`, `section` |
 | `tabs.land` | A decision: where a show lands among the tabs and panes. | `step`, `tabs`, `drawable` |
 | `tabs.life` | A decision: which kept tabs' sessions have ended or rested. | `open`, `tabs` |
+| `ghosts` | A decision: what the changes held would look like, read back into the canvas's answer. | `held`, `drawn`, `loose` |
 
 **What the query slots are handed.** `bar.find`, `bar.find.rows`, `find`,
 `canvas` and `traces` are handed the lens the canvas in focus draws as
@@ -190,12 +191,29 @@ which `ui/query-bar.js` then leaves to the part.
 **The runtime tells a slot what it saw** (`tellSlot(slot, event)`, as
 `hooks.tellSlot`): every part mounted there hears it as an event in `on`,
 and one mounted later is handed the last as `told`. The sheet's reading
-position is told to `sheet` as `{ name: 'scrolled', reading: { open, sight,
-unsaved, holding } }` (`open` the item whose page is shown, `sight` the
-document in sight); a part there names the page to show with
+position is told to `sheet` as `{ name: 'scrolled', reading: { item, open,
+held, unsaved } }` (`item` the document in sight, `open` the item whose page
+is shown, `held` while the sheet waits for the frames above to settle); a
+part there names the page to show with
 `tools.go({ item, replace: true })`, which replaces the address and never
 leaves words not yet saved. With no part told, the page follows the reading
 itself.
+
+**What the traces are told.** A part on `traces` is handed `me` (the
+person's actor, as the log names one) and told each beat of the log as
+`{ name: 'beat', from, to, rows: [{ id, was, now, by?, at?, pos }] }`: the
+rows the beat touched as they were and are (null where not held, or gone),
+projected by the runtime, which keeps the store and the projector
+(`packs/surface/page/beat-rows.js`); the part compares them. On the first
+canvas of a page it is told `{ name: 'missed', from, to, entries: [{ pos, at,
+by?, moved?, facts, rows: [{ id, was, now }] }] }`, entry by entry from where
+the person last looked, then one beat for the whole span. Neither is worked
+out unless a part is mounted on `traces`.
+
+**A part may hold other parts** (`['slot', { name }]`, decision
+e_hp9xmrbq): only a slot in its own `opens`. The runtime draws whatever parts
+fill it in the mark's node; the holding part never sees them, nor they it,
+and nesting stops four deep.
 
 **What find's parts are told.** `find` is handed `shapes`, the layouts the
 packs ship (`{ shape, title }`). A part on `find`, `bar.find` or
@@ -234,7 +252,7 @@ by naming the change, never by working it out: `tools.go({ add: { find |
 only | not: term } })` adds a term, `tools.go({ take: { part, value } })`
 takes one out, and the runtime makes the lens and draws it.
 
-**A slot that asks a decision** (`tabs.land`, `tabs.life`) is filled by a
+**A slot that asks a decision** (`tabs.land`, `tabs.life`, `ghosts`) is filled by a
 part that answers a value, not marks: it exports `decide(input)` beside
 `marks` (none), may name no mark, and the root that asks
 (`askSlot(slot, input)` in `base.js`) checks the value and applies it. No
