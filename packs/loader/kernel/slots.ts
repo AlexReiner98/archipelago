@@ -31,7 +31,9 @@ export const PAGES: string[] = ['doc', 'public'];
  * - `canvas`, `traces` the canvas itself, and the overlay of traces over it
  * - `sheet`           the sheet over the canvas, an item's one page, handed where the documents beside it are read
  *                     (`reading`), so a part decides which page is shown; `item.menu` what is done rarely to that item
- * - `find`            find at the canvas's foot; `home` the page with no query up
+ * - `find`            find at the canvas's foot; `home` the page with no query up; `nav` what the menu leads to
+ * - `look`            drawn by nothing: a part that is handed whether the canvas has drawn (`drawn`) and publishes it
+ *                     as page state, so a picture is taken at the right moment
  * - `workspace.card`  a card on the workspace page, one pack's say on this workspace
  */
 export const FRAME_SLOTS = {
@@ -48,7 +50,9 @@ export const FRAME_SLOTS = {
   'item.menu': [],
   find: ['query'],
   home: [],
-  'workspace.card': ['workspace'],
+  nav: [],
+  look: ['drawn'],
+  'workspace.card': ['workspace', 'section'],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Every slot of the frame, in the order the page draws them. */

@@ -161,7 +161,9 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       else if (personal.has(a)) problems.push(`${at} sends "${a}", which only a person or an admin may call: a part never sends it`);
     }
     // By shape alone: whether the host draws them is asked where the part is drawn, so a host's change never refuses the pack.
-    if (!Array.isArray(part.marks) || !part.marks.length || part.marks.some((m) => typeof m !== 'string' || !MARK.test(m))) problems.push(`${at} names the marks it answers with: marks is a list of mark kinds, such as ["box", "text"] (packs/walls/page/part-check.js)`);
+    // A part that only publishes page state draws nothing, so it may name no mark; every other part names at least one.
+    const draws = !(Array.isArray(part.state) && part.state.length && Array.isArray(part.marks) && !part.marks.length);
+    if (!Array.isArray(part.marks) || (draws && !part.marks.length) || part.marks.some((m) => typeof m !== 'string' || !MARK.test(m))) problems.push(`${at} names the marks it answers with: marks is a list of mark kinds, such as ["box", "text"] (packs/walls/page/part-check.js); a part that only publishes state names none`);
     else if (new Set(part.marks).size !== part.marks.length) problems.push(`${at} names a mark twice`);
     if (typeof part.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);
     for (const [name, file] of Object.entries(part.modules ?? {})) {

@@ -354,7 +354,8 @@ export async function drawParts(node, { slot, item, piece, redraw = () => {}, op
   wayBackFor(island, shipped ? undefined : refined, async () => redraw());
   const filling = parts.filter((p) => p.slot === slot);
   for (const part of filling) {
-    const mine = h('div', { class: 'part-in' });
+    // Its name on the node, so a step that names a card (#/workspace?at=agent) brings this part into view.
+    const mine = h('div', { class: 'part-in', 'data-at': part.id.split('.').slice(1).join('.') || part.id });
     node.append(mine);
     if (part.waiting) mine.replaceChildren(h('div', { class: 'muted', title: `${part.title} waits: ${part.waiting}` }, `${part.title} waits`));
     else if (!part.modules) mine.replaceChildren(h('div', { class: 'muted' }, `${part.title}: its code did not come`));

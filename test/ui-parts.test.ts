@@ -79,7 +79,9 @@ test('the host offers these slots, each handing the part what it is named with',
     'item.menu': [],
     find: ['query'],
     home: [],
-    'workspace.card': ['workspace'],
+    nav: [],
+    look: ['drawn'],
+    'workspace.card': ['workspace', 'section'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
   assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'diagram', 'button', 'count']);
@@ -116,6 +118,9 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ state: [] }), /state is the page state it publishes/);
   assert.throws(refused({ state: ['Look!'] }), /state is the page state it publishes/);
   assert.throws(refused({ state: ['look', 'look'] }), /which another of its pack's parts publishes: one name, one owner/);
+  // A part that only publishes state draws nothing, so it may name no mark; one that names none and publishes none is refused.
+  assert.throws(refused({ marks: [] }), /names the marks it answers with/);
+  assert.doesNotThrow(refused({ marks: [], state: ['look'] }), 'a part that only publishes state names no mark');
   assert.throws(refused({ modules: { 'look.js': 'parts/row/look.js' } }), /needs its modules, entered at index.js/);
   assert.throws(refused({ modules: { 'index.js': 'parts/row/gone.js' } }), /the pack has no file of/);
   assert.throws(refused({ query: { find: 'island {here}' } }), /query is a filter's terms/);

@@ -169,7 +169,9 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `item.menu` | What is done rarely to that item. | — |
 | `find` | Find at the canvas's foot. | `query` |
 | `home` | The page with no query up. | — |
-| `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace` |
+| `nav` | What the menu leads to. | — |
+| `look` | Drawn by nothing: the part is handed whether the canvas has drawn and publishes it as page state, so a picture is taken at the right moment. | `drawn` |
+| `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace`, `section` |
 
 A part is handed the item it stands on cut to the fields it `reads`, its
 query's items, its named reads, and, where it declares `go`, the page's
