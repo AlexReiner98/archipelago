@@ -3,6 +3,9 @@
 // scheme the reader's system is in, set again when that changes. The server finishes the colours (packs/styles/kernel/colours.ts):
 // the page works none out, it only paints. Only a plain hex colour, a plain length and a plain list of families are
 // painted: a style is written by anyone who can change the map.
+//
+// It is the host's, not a part's (task e_md3v7bj4): it writes the page's own variables, which no part may touch, and
+// the signed-out, public and document pages paint by it before any part runs.
 
 const dark = matchMedia('(prefers-color-scheme: dark)');
 const NAME = /^[a-z][a-z0-9_]*$/;
