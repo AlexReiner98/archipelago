@@ -101,12 +101,17 @@ test('addresses: a pane draws a canvas, an item or a web page, and the page read
   assert.equal(M.tabHref(t), '#/e/e_abcdefgh?f=a');
 });
 
-test("a chat's tab carries the mark of its session's state, and in its tip what it waits for", async () => {
+test("each tab opens tab.mark, handed the tab, the one in sight, and its session's state and what it waits for", async () => {
   // @ts-ignore: a part's module, plain JavaScript
   const { strip } = await import('../packs/panes/parts/strip.js');
   const newId = ids();
+  const mine = M.freshTab(newId, 'v');
   const t = { ...M.freshTab(newId, 'v'), follows: 'e_run00001', chat: 'e_run00001' };
-  const said = JSON.stringify(strip(M.model([M.freshTab(newId, 'v'), t]), { sessions: { e_run00001: { name: 'Chat', state: 'waiting', for: 'a review' } } }));
-  assert.match(said, /"look":"mark","tip":"waits on you: a review"\},"\?"/);
-  assert.doesNotMatch(JSON.stringify(strip(M.model([t]), { sessions: { e_run00001: { name: 'Chat', state: 'working' } } })), /"look":"mark"/, 'working draws no mark');
+  const m = M.model([mine, t]);
+  const slots: { name: string; piece: Record<string, string> }[] = [];
+  const walk = (x: unknown): void => void (Array.isArray(x) && (x[0] === 'slot' ? slots.push(x[1]) : x.slice(1).forEach(walk)));
+  walk(strip(m, { sessions: { e_run00001: { name: 'Chat', state: 'waiting', for: 'a review' } } }));
+  assert.deepEqual(slots.map((x) => x.name), ['tab.mark', 'tab.mark'], 'one for each tab');
+  assert.deepEqual(slots[0].piece, { tab: mine.id, current: m.front });
+  assert.deepEqual(slots[1].piece, { tab: t.id, current: m.front, state: 'waiting', for: 'a review' });
 });

@@ -17,7 +17,8 @@
         "button",
         "menu",
         "panes",
-        "pane"
+        "pane",
+        "slot"
       ],
       "go": true,
       "state": [
@@ -27,19 +28,22 @@
         "front_follows",
         "pane_at"
       ],
+      "views": [
+        {
+          "name": "sessions",
+          "live": true
+        }
+      ],
+      "opens": [
+        "tab.mark"
+      ],
       "modules": {
         "index.js": "parts/index.js",
         "model.js": "parts/model.js",
         "strip.js": "parts/strip.js",
         "route.js": "parts/route.js",
         "life.js": "parts/life.js"
-      },
-      "views": [
-        {
-          "name": "sessions",
-          "live": true
-        }
-      ]
+      }
     }
   ],
   "kernel": {
