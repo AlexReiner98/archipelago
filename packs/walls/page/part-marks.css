@@ -45,8 +45,6 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 /* A note is the host's note (below); a menu is the page's menu (ui/menus.css), keeping its width in a row. */
 .pm-note { min-width: 0; }
 .pm-picture { min-width: 0; }
-/* A slot mark holds the parts that fill it, as wide as its place. */
-.pm-slot { min-width: 0; }
 .pm-menu { flex: none; }
 .pm-menu-main > summary { color: var(--accent); font-weight: 600; }
 .pm-menu-quiet > summary { color: var(--muted); }

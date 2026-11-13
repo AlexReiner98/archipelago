@@ -5,8 +5,7 @@
 // an item once they have named it and, where its island speaks more than one, picked its type. A drawing may ask to
 // make one item and to link what is drawn, nothing more; a session that may not write is told so.
 
-import { api, ask, may, tell } from './base.js';
-import { keepInView } from './keep-in-view.js';
+import { api, ask, hooks, may, tell } from './base.js';
 import { store } from './live.js';
 import { fits, isA, kept, relations, typeChoice, types, workType } from './words.js';
 
@@ -142,7 +141,7 @@ export async function drawingActs(said, view, hash) {
 
 /**
  * Add an item on an island, from the page's own button by its legend: put to the person (its type, its name) and sent
- * as theirs, and kept in sight on the canvas up, its query as it was but for the item (ui/keep-in-view.js). A refusal
+ * as theirs, and kept in sight on the canvas up, its query as it was but for the item (hooks.keepInView, packs/surface/page/canvas.js). A refusal
  * is told.
  */
 export async function addOn(island) {
@@ -150,5 +149,5 @@ export async function addOn(island) {
   if (came.error && !/^Not added/.test(came.error)) await tell('Nothing was added', came.error);
   else if (came.proposal) await tell('Held for approval', came.held || 'A rule holds this change for a person to approve before it applies.');
   const id = came.created?.new;
-  if (id) await keepInView([{ id, term: `id ${id}` }]);
+  if (id) await hooks.keepInView?.([{ id, term: `id ${id}` }]);
 }

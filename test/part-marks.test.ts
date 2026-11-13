@@ -173,3 +173,10 @@ test('a slot mark names a slot, which the host fills with the parts that fill it
   refused(['slot', { name: 'Sheet Bands' }], /not a slot's name/);
   refused(['slot', { name: 'sheet.bands' }, ['text', 'inside']], /slot/);
 });
+
+test('a slot mark may hand the parts that fill it a piece of words', () => {
+  const node = checkMarks(['slot', { name: 'tab.mark', piece: { tab: 't1', current: true, state: 'busy', for: ['e_aaaaaaaa'] } }], { kinds: ['slot'] });
+  assert.deepEqual(node.at.piece, { tab: 't1', current: true, state: 'busy', for: ['e_aaaaaaaa'] });
+  refused(['slot', { name: 'tab.mark', piece: { tab: { deep: 1 } } }], /not settings/);
+  refused(['slot', { name: 'tab.mark', piece: ['t1'] }], /not settings/);
+});

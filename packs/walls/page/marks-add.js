@@ -7,7 +7,7 @@
 
 import { addOn } from './layout-asks.js';
 
-/** Make `el` a button that adds an item on the island it stands for; what it makes stays in sight (ui/keep-in-view.js). */
+/** Make `el` a button that adds an item on the island it stands for; what it makes stays in sight (hooks.keepInView, packs/surface/page/canvas.js). */
 export function addable(el) {
   el.setAttribute('role', 'button');
   el.setAttribute('tabindex', '0');

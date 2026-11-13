@@ -47,7 +47,7 @@ const partTold = 50;
  * colours into `el`, and `tryTheme(preset)` paints this screen alone in one ('' the workspace's own again);
  * `replay({ at, steps } | null)` shows the canvas under the part the missed steps up to `at`, or the map as it is now;
  * `ghosts(list)` is handed the ghosts each answer holds (each mark's attributes), for the canvas to draw where they land;
- * `slot(name, el)` draws the parts that fill a slot this part opens into `el`. `find(q, types, link)` answers the items an item
+ * `slot(name, el, piece)` draws the parts that fill a slot this part opens into `el`, handed `piece` when the mark gives one. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
  * `draw(node)` for each answer the part gives, and `stop()`.
@@ -150,7 +150,6 @@ function build(node, ctx) {
   } else if (node.mark === 'input') el = field(node, ctx);
   else if (node.mark === 'note') el = make('div', 'pm-note');
   else if (node.mark === 'thumb') el = make('span', 'pm-thumb');
-  else if (node.mark === 'slot') el = make('div', 'pm-slot');
   else if (node.mark === 'menu') {
     el = make('details', 'menu pm-menu');
     el.append(make('summary', ''), make('div', 'menu-items'));
@@ -270,7 +269,7 @@ function update(el, node, ctx, fresh = false) {
   if (node.mark === 'web') frameWeb(el, at.url, at.reload ?? '');
   if (node.mark === 'trace') return (traceMark(el, node, ctx), el);
   // A slot the part opens: the parts that fill it are drawn in it by whoever hosts this one, again only for another slot.
-  if (node.mark === 'slot' && (fresh || was.at.name !== at.name)) (el.replaceChildren(), (el.dataset.slot = at.name), ctx.slot(at.name, el));
+  if (node.mark === 'slot' && (fresh || was.at.name !== at.name || JSON.stringify(was.at.piece ?? null) !== JSON.stringify(at.piece ?? null))) (el.replaceChildren(), (el.dataset.slot = at.name), ctx.slot(at.name, el, at.piece));
   if (node.mark === 'slot') return el;
   // A replay: the canvas under the part shows the missed steps up to `at`; the host holds the store, the part the timer.
   if (node.mark === 'replay') return (ctx.replay({ at: at.at, steps: at.steps }), el);
@@ -289,8 +288,6 @@ function update(el, node, ctx, fresh = false) {
   if (node.view !== undefined && el.tagName !== 'BUTTON') (el.tabIndex = 0, el.setAttribute('role', 'link'));
   else if (el.tagName !== 'BUTTON' && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') (el.removeAttribute('tabindex'), el.removeAttribute('role'));
   // The view's picture is drawn again only when it names another view: the host keeps it current.
-  // The parts filling a slot are drawn by the host, once in the page, and again only for another slot.
-  if (node.mark === 'slot' && (fresh || was.at.name !== at.name)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.slot(at.name, el)));
   if (node.mark === 'thumb' && (fresh || was.at.view !== at.view)) el.replaceChildren(...[ctx.thumb(at.view)].filter(Boolean));
   // Drawn once it is in the page, where its width is known, and again only for another item.
   if (node.mark === 'picture' && (fresh || was.item !== node.item)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.picture(node.item, el)));

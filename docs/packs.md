@@ -213,7 +213,9 @@ the person last looked, then one beat for the whole span. Neither is worked
 out unless a part is mounted on `traces`.
 
 **A part may hold other parts** (`['slot', { name }]`, decision
-e_hp9xmrbq): only a slot in its own `opens`. The runtime draws whatever parts
+e_hp9xmrbq): only a slot in its own `opens`, and it may hand them a `piece` of words, numbers, yes and no (a
+tab's `tab.mark`: `{ tab, current, state, for }`). A root pack is the host, so its part may open a slot of the frame
+(panes opens `tab.mark`); a map pack's part may not. The runtime draws whatever parts
 fill it in the mark's node; the holding part never sees them, nor they it,
 and nesting stops four deep.
 

@@ -32,7 +32,7 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/identity/page/connections-card.js': 2,
   'packs/identity/page/start.js': 1,
   'packs/identity/page/workspaces-card.js': 2,
-  'packs/walls/page/layout-asks.js': 4,
+  'packs/walls/page/layout-asks.js': 3,
   'packs/walls/page/layout-tip.js': 1,
   'packs/walls/page/layout.js': 3,
   'packs/walls/page/plates.js': 1,

@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { parts as declared, type Manifest } from './manifest.ts';
 import { KERNEL_PACKS, needOf, ownsId } from './packorder.ts';
 import type { ResolvedType } from './packs.ts';
-import { DECISION_SLOTS, HOST_SLOTS, SLOT, slotsOpenTo } from './slots.ts';
+import { DECISION_SLOTS, FRAME, HOST_SLOTS, SLOT, slotsOpenTo } from './slots.ts';
 
 /** A part a pack declares: what it fills, reads, sends and opens, and its code. */
 export interface PartDef {
@@ -134,7 +134,9 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
     else if (!open.includes(part.slot)) problems.push(`${at} fills "${part.slot}", which is not open to it: a slot of the host (${HOST_SLOTS.filter((s) => !s.includes('.')).join(', ')}, piece.<name>, page.<name>), one its pack's parts open, or one it asks for as slot:${part.slot}`);
     for (const s of part.opens ?? []) {
       if (typeof s !== 'string' || !SLOT.test(s)) { problems.push(`${at}: opens names slots`); continue; }
-      if (HOST_SLOTS.includes(s)) problems.push(`${at} opens "${s}", which the host draws: one name, one owner (the step that moves it takes it off the host's list)`);
+      // A root pack is the host: its part may open a slot of the host's frame (panes holds each tab's `tab.mark`).
+      const rootFrame = (pack.kernel as { trust?: string } | undefined)?.trust === 'root' && FRAME.includes(s);
+      if (HOST_SLOTS.includes(s)) rootFrame || problems.push(`${at} opens "${s}", which the host draws: one name, one owner (the step that moves it takes it off the host's list)`);
       else if (!ownsId(pack, s) && !/^(?:piece|page)\.[a-z][a-z0-9_-]*$/.test(s)) problems.push(`${at} opens "${s}": a slot it opens is named "${pack.id}.<name>", or is a piece or page (piece.<name>, page.<name>)`);
       if (opened.has(s)) problems.push(`${at} opens "${s}", which another of its pack's parts opens`);
       opened.add(s);
