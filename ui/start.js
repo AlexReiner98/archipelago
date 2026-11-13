@@ -1,6 +1,9 @@
 // Start here: what a new workspace's admin does in its first minutes, one row a step, each ticked once it is done:
 // connect GitHub, connect an agent, invite the team. It goes once every
 // step is done, or once the admin hides it in this browser. Only an admin sees it, on a server where people sign in.
+//
+// The host's for now (decision e_cm7dw9rh): its steps are read from the person's tokens and the members, which no
+// pack's code is handed, and each leads to a Settings section, which a mark cannot.
 
 import { api, h, may, whoami } from './base.js';
 
