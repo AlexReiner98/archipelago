@@ -50,7 +50,7 @@ function modelOf(input) {
 }
 
 /** The sessions as the strip names and marks them: what each is called, the word its hue is made from, whether it ended. */
-const sessionsOf = () => Object.fromEntries(Object.entries(m.heard ?? {}).map(([k, s]) => [k, { name: s.called, word: s.name, ended: s.ended }]));
+const sessionsOf = () => Object.fromEntries(Object.entries(m.heard ?? {}).map(([k, s]) => [k, { name: s.called, word: s.name, ended: s.ended, state: s.state, for: s.for }]));
 
 /** A web page framed in a pane is named by its host. */
 function hostOf(at) {

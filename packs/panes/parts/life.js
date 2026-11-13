@@ -208,7 +208,7 @@ export function mirror(m, newId, open) {
   for (const [run, s] of Object.entries(m.heard)) if (isRun(run) && !live.has(run)) s.ended = true;
   for (const s of open) {
     const was = m.heard[s.id];
-    m.heard[s.id] = { name: s.name ?? was?.name ?? s.title, called: s.title ?? was?.called, at: Date.parse(s.last_seen) || was?.at || 0, run: s.id, ended: false };
+    m.heard[s.id] = { name: s.name ?? was?.name ?? s.title, called: s.title ?? was?.called, at: Date.parse(s.last_seen) || was?.at || 0, run: s.id, ended: false, ...(s.session?.state && { state: s.session.state }), ...(s.session?.for && { for: String(s.session.for).slice(0, 200) }) };
     if (kept.has(s.id) && (s.status === 'waiting' || (s.stale && !s.busy))) rested(m, newId, s.id);
   }
 }

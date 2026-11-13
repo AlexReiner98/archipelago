@@ -100,3 +100,13 @@ test('addresses: a pane draws a canvas, an item or a web page, and the page read
   const t = { ...M.freshTab(ids(), 'v?f=a'), sheet: 'e/e_abcdefgh' };
   assert.equal(M.tabHref(t), '#/e/e_abcdefgh?f=a');
 });
+
+test("a chat's tab carries the mark of its session's state, and in its tip what it waits for", async () => {
+  // @ts-ignore: a part's module, plain JavaScript
+  const { strip } = await import('../packs/panes/parts/strip.js');
+  const newId = ids();
+  const t = { ...M.freshTab(newId, 'v'), follows: 'e_run00001', chat: 'e_run00001' };
+  const said = JSON.stringify(strip(M.model([M.freshTab(newId, 'v'), t]), { sessions: { e_run00001: { name: 'Chat', state: 'waiting', for: 'a review' } } }));
+  assert.match(said, /"look":"mark","tip":"waits on you: a review"\},"\?"/);
+  assert.doesNotMatch(JSON.stringify(strip(M.model([t]), { sessions: { e_run00001: { name: 'Chat', state: 'working' } } })), /"look":"mark"/, 'working draws no mark');
+});
