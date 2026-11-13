@@ -11,6 +11,25 @@
       "go": true,
       "marks": [
         "box",
+        "text"
+      ],
+      "modules": {
+        "index.js": "parts/query/line.js",
+        "bar.js": "parts/query/bar.js",
+        "terms.js": "parts/query/terms.js",
+        "kinds.js": "parts/query/kinds.js",
+        "rank.js": "parts/query/rank.js",
+        "lit-by.js": "parts/query/lit-by.js",
+        "only-words.js": "parts/query/only-words.js"
+      }
+    },
+    {
+      "id": "bar.rows",
+      "title": "Query rows",
+      "slot": "bar.find.rows",
+      "go": true,
+      "marks": [
+        "box",
         "text",
         "list",
         "input",
@@ -18,7 +37,8 @@
         "menu"
       ],
       "modules": {
-        "index.js": "parts/query/index.js",
+        "index.js": "parts/query/rows.js",
+        "bar.js": "parts/query/bar.js",
         "terms.js": "parts/query/terms.js",
         "kinds.js": "parts/query/kinds.js",
         "rank.js": "parts/query/rank.js",

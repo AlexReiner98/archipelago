@@ -1,17 +1,17 @@
 // A canvas: the map drawn in a pane (ui/panes.js), every pane alike. What is drawn is a flat lens (a filter, a walk and
 // a limit: decision e_sdsaxxq4), kept as the pane's address (v?..., ui/tabs.js) and shown and edited in the query bar
-// (ui/query-bar.js) while its pane is in focus: every change of what is drawn is a change of that lens. A click on an
+// (the bar pack's parts, ./bar-band.js) while its pane is in focus: every change of what is drawn is a change of that lens. A click on an
 // item opens its page and leaves the lens as it was (decision e_jedng69e); the find bar sets its words. It is drawn in the drawing its style names (the
 // flow, by the canvas pack's preset, unless a nearer style says otherwise), so a canvas has no look of its own: it keeps
 // which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
 // themselves (a page opened or shut then leaves it be).
 
-import { api, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
+import { api, drawSlot, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { canvasSwitch } from './views-kept.js';
 import { moved, numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
-import { drawQuery } from './query-bar.js';
+import { drawBand } from './bar-band.js';
 import { unfollow } from './replica.js';
 
 /** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
@@ -66,8 +66,22 @@ export function activate(c) {
 }
 function barNow() {
   const c = current;
-  if (c?.view) drawQuery(c.lens, c.view, c.pane.go, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
+  mountBar();
+  if (c?.view) drawBand(c.lens, c.view, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
   hooks.addressMoved?.();
+}
+/**
+ * Find's line and the rows above it, the bar pack's parts (`bar.find`, `bar.find.rows`): mounted once, in the nodes find
+ * holds them in, and handed the lens and its answer as they move (./part-lens.js).
+ */
+let barMounted = false;
+function mountBar() {
+  if (barMounted) return;
+  barMounted = true;
+  for (const [slot, id] of [['bar.find', 'find-lens'], ['bar.find.rows', 'find-rows']]) {
+    const node = document.getElementById(id);
+    if (node) drawSlot(node, { slot }).catch((err) => console.warn(`${slot}: ${err?.message ?? err}`));
+  }
 }
 /** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */
 hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: current.view.failed } : null);

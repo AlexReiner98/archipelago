@@ -1,5 +1,5 @@
 // Find: the bar at the canvas's foot that is the query's (decision e_2a4mddx8). At rest it says the lens of the pane
-// the bar acts on in one line (drawn by ui/query-bar.js). A click or / opens it to type, and the lens's rows (Find,
+// the bar acts on in one line (drawn by the bar pack's part). A click or / opens it to type, and the lens's rows (Find,
 // Only, Not, Walk, Limit) rise above it. Typing swaps the rows for the choices of what the words could be, each said
 // by its kind (ui/find-choices.js): Words first and lit, so nothing is guessed (decision e_45sgrfqd). ↑↓ move the
 // light; Enter takes it and find stays open, emptied, to refine further: words in place of the words find set before,
@@ -9,14 +9,10 @@
 // box and the choices are that part's; Backspace in an empty box goes back to Find. Escape empties what was typed, then
 // leaves the part, then shuts find; so does a click away from it.
 
-import { api, h, state, wordsOf, withWords } from './base.js';
-import { lightItems } from './query-light.js';
-import { changes } from './lit-by.js';
-import { viewUp } from './query-bar.js';
+import { api, h, hooks, state, wordsOf, withWords } from './base.js';
 import { drawIn, goQuery, home, queryNow, openHere, openOver } from './canvas.js';
 import { MODES, choicesFor, ledBy, wordsChoice } from './find-choices.js';
-import { numberOf } from './query-base.js';
-import { added, fitBar } from './query-bar.js';
+import { added, numberOf } from './query-base.js';
 
 const bar = document.getElementById('find');
 const list = bar.querySelector('.find-choices');
@@ -35,13 +31,15 @@ let shownFor = '';
 let lit = 0;
 
 const lensUp = () => queryNow() ?? home();
+/** Whether a term of Only or Not would change what is drawn: it leaves out something, and not everything. */
+const changes = (left, drawn) => left > 0 && left < drawn;
 
 /** Open find to type in: the lens's rows rise above it. */
 function open() {
   if (bar.classList.contains('open')) return input.focus();
   bar.classList.add('open');
   input.focus();
-  fitBar();
+  hooks.fitBar?.();
 }
 /** Empty find to type the next term: back in Find, its rows in sight with what was just added, the cursor kept in it. */
 function again() {
@@ -93,7 +91,7 @@ function take(choice, add = false) {
 
 /** Draw the choices, the lit one marked. */
 function drawChoices() {
-  list.replaceChildren(...choices.map((c, i) => h('button', { type: 'button', role: 'option', class: `term-pick-item find-choice${i === lit ? ' lit' : ''}`, 'aria-selected': String(i === lit), title: c.title, onpointerenter: () => c.leaves && lightItems(viewUp(), c.leaves), onpointerleave: () => lightItems(viewUp(), null), onclick: (ev) => take(c, ev.shiftKey) },
+  list.replaceChildren(...choices.map((c, i) => h('button', { type: 'button', role: 'option', class: `term-pick-item find-choice${i === lit ? ' lit' : ''}`, 'aria-selected': String(i === lit), title: c.title, onpointerenter: () => c.leaves && hooks.lights?.([...c.leaves]), onpointerleave: () => hooks.lights?.([]), onclick: (ev) => take(c, ev.shiftKey) },
     h('span', { class: 'q-label' }, c.kind),
     h('span', { class: 'find-name' }, c.label),
     c.note && h('span', { class: 'find-note' }, c.note),
@@ -140,7 +138,7 @@ async function look() {
  * asked in one read of the choices in sight. Pointing at a choice that leaves things out fades them.
  */
 async function countChoices(all, lens, mine) {
-  const answer = viewUp()?.answer;
+  const answer = hooks.answer?.()?.answer;
   if (!answer?.items || lens.view) return;
   const drawn = answer.items.map((i) => i.id);
   const here = new Set(drawn);

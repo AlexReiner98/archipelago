@@ -12,7 +12,7 @@ import { api, drawSlots, firstDrawn, h, hooks, idsOf, may, state, tell, wordsOf,
 import { drawPart } from './part-host.js';
 import { placeBy } from './menu-place.js';
 import { addressOf, flatView, stepsOf } from './query.js';
-import { filterSaid, fitBar } from './query-bar.js';
+import { fitBar, lensSaid } from './bar-band.js';
 import { sharePublicly } from './item-doc.js';
 import { thumbOf } from './thumbs.js';
 import { pageIsA, pageSchema, versionCanvases } from './page-schema.js';
@@ -199,7 +199,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const current = upOf(all, lens, style);
     const changed = current && edited(current, lens, style);
     // Not saved, it is named as its tab and its pane are: by what its filter finds.
-    const label = current ? current.title : isHome ? 'Home' : filterSaid(lens.filter, () => {}) || 'View';
+    const label = current ? current.title : isHome ? 'Home' : lensSaid(lens.filter) || 'View';
     const pick = viewPicker({ current, label, changed, isHome, open, title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it' });
     const own = hooks.paneButtons?.() ?? [];
     const travel = own.filter((b) => b.classList.contains('q-travel'));

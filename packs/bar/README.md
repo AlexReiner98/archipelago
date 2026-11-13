@@ -3,39 +3,45 @@
 Find's input in the bar and the terms it is made of. A root pack: its parts
 change only through a root re-pin, never by the refiner.
 
-| Part | Slot | Code | Was |
-|---|---|---|---|
-| `bar.query` | `bar.find` | `parts/query/` | `ui/query-bar.js`, `ui/query-light.js`, `ui/lit-by.js`, `ui/term-kinds.js`, `ui/term-pick.js`, `ui/picker-rank.js`, `ui/only-words.js` |
+| Part | Slot | Code |
+|---|---|---|
+| `bar.query` | `bar.find` | `parts/query/line.js` |
+| `bar.rows` | `bar.find.rows` | `parts/query/rows.js` |
 
-## bar.query
+Both were `ui/query-bar.js` and the modules beside it (`query-light`,
+`lit-by`, `term-kinds`, `term-pick`, `picker-rank`, `only-words`), gone from
+`ui/` on 13 Nov 2026 (task e_yxkdcdh6).
 
-The lens the canvas draws, said in one line; pressed, a row for each of its
-parts (Find, Only, Not, Walk, the limit). A term's × takes it out; a row's +
-offers its kinds, then the things of that kind, those used here first. Every
-change is a new lens the part names as the page's address (`go`).
+## The line and the rows
 
-- `index.js`: the part: what it draws, and what each gesture does (`heard`).
-- `terms.js`: a term's sort and words, the lens in words, a term added or taken out.
+`bar.query` says the lens in one line in find: each part by its word and as
+many of its terms as fit (the host counts the rest), a term of Find lighting
+what it brought on the canvas, the walk's steps never cut, and how many are
+drawn. A press on it opens find, and while find is open `bar.rows` draws a
+row for each part above it (Find, Only, Not, Walk, the limit). A term's ×
+takes it out; a row's count of what did not fit shows them all; a row's + is
+a menu of kinds, then the things of that kind, those used here first. Each
+step that leads on is a pick, so the menu stays open; the last step's
+choices are buttons. Every change is a new lens the part names as the page's
+address (`go`).
+
+- `bar.js`: what both draw, and what each gesture does (`heard`).
+- `line.js`, `rows.js`: each part, drawing with `bar.js`.
+- `terms.js`: a term's sort and words, a term added or taken out.
 - `kinds.js`: the kinds a term is made from, as steps.
 - `rank.js`, `lit-by.js`, `only-words.js`: what is offered first, what a
   term brought, Only's plain words.
 
-It is handed the page's address (the lens, how many were drawn), the
-schema's words and the style's numbers. Where the host also hands the
-answer (`answer`: items and links) it ranks by what is used here and a term
-of Find lights what it brought (`lights`); where it hands `names` (titles
-of the ids the lens names) it names those items. A row's terms are as many
-as fit (`fits`). A row's + is a menu: each step that leads on is a pick, so
-the menu stays open, and the last step's choices are buttons.
+Each is handed what the query slots hand (`docs/packs.md`): the canvas's
+lens (Home's when no query is up), the answer in brief, the names of the
+items the lens names; and the schema's words and the style's numbers.
 
-## Waiting on the runtime
+## What stays the host's
 
-The old modules stay in `ui/` until the runtime takes the lens algebra
-other modules import (`added`, `filterSaid`, task e_926g89jb), splits the
-band from `drawQuery` and fills `bar.find` with this part, hands the
-answer, the names and the rows' slot (e_gaa2ubge), and takes the lighting
-`lights` asks for (`hooks.lights`, set in `ui/query-light.js` for now) with
-the canvas's view.
+The band over the canvas (the `bar` frame slot) and the lens in words that
+the page's own modules ask for by name (`hooks.lensSaid`, `hooks.fitBar`,
+`hooks.lights`) are `packs/surface/page/bar-band.js`; the canvas mounts the
+two parts (`packs/surface/page/canvas.js`).
 
 Find's choices are the find pack's, and the layout a view is drawn in is the
-slot `bar.layouts`. What each slot hands a part is in `docs/packs.md`.
+slot `bar.layouts`.

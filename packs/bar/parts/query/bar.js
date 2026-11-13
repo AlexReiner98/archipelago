@@ -1,14 +1,15 @@
-// The query in find (decisions e_sdsaxxq4, e_2a4mddx8), as the bar pack's part (task e_yxkdcdh6; was ui/query-bar.js
-// and the modules beside it): the lens the canvas draws, said in one line, and pressed, a row for each of its parts,
-// each saying what it is in a word (decision e_drt4g872): Find (any of its terms adds), Only (all must hold), Not (left
-// out of everything, the walk's reach included), Walk (the links it follows, each its own way, and how many steps) and
-// the limit. A term's × takes it out; a row's + offers its kinds, then the things of that kind (./kinds.js), never
-// words taken for a term, those used on this canvas first (./rank.js). Every change is a new lens, named to the page
-// as its address (`go`), which the canvas checks and draws. No term or part is a box inside a box (rule e_vgs9vt5j).
+// The query in find (decisions e_sdsaxxq4, e_2a4mddx8), as the bar pack's two parts (task e_yxkdcdh6; was
+// ui/query-bar.js and the modules beside it): the lens the canvas draws, said in one line in find (./line.js, slot
+// bar.find), and while find is open a row for each of its parts above it (./rows.js, slot bar.find.rows), each saying
+// what it is in a word (decision e_drt4g872): Find (any of its terms adds), Only (all must hold), Not (left out of
+// everything, the walk's reach included), Walk (the links it follows, each its own way, and how many steps) and the
+// limit. A term's × takes it out; a row's + offers its kinds, then the things of that kind (./kinds.js), never words
+// taken for a term, those used on this canvas first (./rank.js). Every change is a new lens, named to the page as its
+// address (`go`), which the canvas checks and draws. No term or part is a box inside a box (rule e_vgs9vt5j).
 //
-// It is handed the page's address (the lens, how many it drew), the schema's words and the style's numbers; where the
-// host hands the answer too (`answer`: items and links), it ranks by what is used here, and a term of Find lights what
-// it brought (`lights`). A row's terms are as many as fit (`fits`): the host measures and counts the rest.
+// Each is handed the canvas's lens (Home's when no query is up), the answer in brief, the names of the items the lens
+// names, the schema's words and the style's numbers. A term of Find lights what it brought (`lights`), and what does
+// not fit in a line is counted by the host (`fits`).
 
 import { ranked, uses } from './rank.js';
 import { litBy } from './lit-by.js';
@@ -27,14 +28,19 @@ const cut = (s, n = 200) => String(s ?? '').slice(0, n);
 const PARTS = { find: 'Find', only: 'Only', not: 'Not' };
 const WAY_TIP = { either: 'Either way along this link', out: 'Out along this link, from what it starts at', in: 'In along this link, to what it starts at' };
 
-/** The state a mounted bar keeps: whether its rows are open, what is being added, the names it knows, a word refused. */
-const fresh = (input) => ({ input, open: false, adding: null, wrong: false, names: new Map(Object.entries({ ...(input?.kept?.names ?? {}), ...(input?.names ?? {}) }).filter(([, v]) => typeof v === 'string')) });
+/** The state a mounted part keeps: what is being added, the names it knows, a word refused. */
+export const fresh = (input) => ({ input, adding: null, wrong: false, names: new Map(Object.entries({ ...(input?.kept?.names ?? {}), ...(input?.names ?? {}) }).filter(([, v]) => typeof v === 'string')) });
 
-/** What the bar reads of its input: the lens (none on Home), how many were drawn, and the answer where it is handed. */
+/**
+ * What the bar reads of its input: the lens (the slot's, Home's when no query is up, else the address's), whether it
+ * is Home's, how many were drawn, and the answer in brief.
+ */
 function read(input) {
   const address = input?.address ?? null;
-  const lens = address?.query ?? null;
-  return { lens, home: !lens, drawn: address?.drawn ?? null, answer: input?.answer ?? null, words: input?.words ?? { types: {}, links: {} }, numbers: input?.style?.numbers ?? {} };
+  const lens = input?.query ?? address?.query ?? null;
+  const answer = input?.answer ?? null;
+  const drawn = address?.drawn ?? (answer?.items && { count: answer.items.length, ...(answer.cut && { cut: true }) }) ?? null;
+  return { lens, home: input?.home ?? !address?.query, drawn, answer, words: input?.words ?? { types: {}, links: {} }, numbers: input?.style?.numbers ?? {} };
 }
 
 /** The kinds a part's + offers, ranked by what this canvas uses. */
@@ -67,31 +73,51 @@ function walkKinds(s) {
   };
 }
 
-/** The line: the lens in one line, each part by its row's word, and how many are drawn. */
-function lineMarks(s, said) {
-  const { lens, drawn, home } = read(s.input);
+/** What a term of Find lit on the canvas while it is pointed at: what it brought, or nothing without the answer. */
+function litOf(answer, part, t) {
+  return part === 'find' && answer?.items ? [...litBy(answer, t)].filter((id) => ITEM.test(id)) : null;
+}
+
+/**
+ * The line in find: each part of the lens by its row's word and its terms, as many as fit (the host counts the rest),
+ * a term of Find lighting what it brought; and how many are drawn. Pressed, find opens (ui/find.js holds the row).
+ */
+function lineOf(s, said) {
+  const { lens, drawn, answer } = read(s.input);
   const f = lens?.filter ?? {};
   const { over = [], steps = 0 } = lens?.walk ?? {};
+  const word = (w) => ['text', { look: 'muted', bold: true }, w];
+  const terms = (part, list) => inOrder(list).map((t) => {
+    const lit = litOf(answer, part, t);
+    return ['text', { tip: cut(said.termSaid(t)), ...(lit?.length && { lights: lit.slice(0, LIT) }) }, cut(said.termSaid(t), 80)];
+  });
+  // Find's terms are joined by "or" (any of them adds), the others' by commas (all must hold), as the line said them.
+  const or = (list) => list.flatMap((m, i) => (i ? [['text', { look: 'muted' }, 'or'], m] : [m]));
+  const comma = (list) => list.map((m, i) => (i < list.length - 1 ? [m[0], m[1], `${m[2]},`] : m));
+  const out = notOf(f).filter((t) => t !== 'kind system');
   const walked = over === 'all' ? ['every link'] : over.map(said.waySaid);
   const parts = [
-    f.find?.length > 0 && `Find ${inOrder(f.find).map(said.termSaid).join(' or ')}`,
-    f.only?.length > 0 && `Only ${inOrder(f.only).map(said.termSaid).join(', ')}`,
-    notOf(f).filter((t) => t !== 'kind system').length > 0 && `Not ${inOrder(notOf(f).filter((t) => t !== 'kind system')).map(said.termSaid).join(', ')}`,
-    walked.length > 0 && steps > 0 && `Walk ${walked.join(', ')} ×${steps}`,
-  ].filter(Boolean);
-  const words = parts.length ? parts.join(' · ') : 'Find on the map';
+    ...(f.find?.length ? [word('Find'), ...or(terms('find', f.find))] : []),
+    ...(f.only?.length ? [word('Only'), ...comma(terms('only', f.only))] : []),
+    ...(out.length ? [word('Not'), ...comma(terms('not', out))] : []),
+    ...(walked.length && steps > 0 ? [word('Walk'), ...comma(walked.map((w) => ['text', {}, cut(w, 80)]))] : []),
+  ];
   const limit = lens?.limit ?? '';
-  const count = drawn && !home ? [['text', { look: 'muted', size: 2, ...(drawn.cut && { tone: 'warn' }), tip: drawn.cut ? 'The limit cut what the lens finds' : 'Items drawn, of the limit' }, `${drawn.count ?? 0}${drawn.cut ? '+' : ''}${limit ? ` of ${limit}` : ''}`]] : [];
-  return ['box', { flow: 'row', gap: 3, align: 'between' },
-    ['button', { key: 'line', look: 'quiet', tip: cut(parts.length ? `${words}: change it` : 'Find on the map') }, cut(words)],
-    ...count];
+  const count = drawn ? [['text', { look: 'muted', size: 2, ...(drawn.cut && { tone: 'warn' }), tip: drawn.cut ? 'The limit cut what the lens finds' : 'Items drawn, of the limit' }, `${drawn.count ?? 0}${drawn.cut ? '+' : ''}${limit ? ` of ${limit}` : ''}`]] : [];
+  const failed = answer?.failed ? [['text', { tone: 'bad', tip: cut(answer.failed) }, '!']] : [];
+  return ['box', { flow: 'row', gap: 3, align: 'between', tip: cut(lens?.said ? `${lens.said}: change it` : 'Find on the map') },
+    parts.length ? ['box', { flow: 'row', gap: 2, fits: true, grow: true }, ...parts] : ['text', { look: 'muted' }, 'Find on the map'],
+    // The walk's steps stand past what fits, so they are never what is cut.
+    ...(walked.length && steps > 0 ? [['text', { look: 'muted' }, `×${steps}`]] : []),
+    ...count, ...failed];
 }
 
 /** A term: its words, toned by its sort, and an × to take it away. */
 function termMark(s, said, part, t, i) {
   const { answer } = read(s.input);
-  const lit = part === 'find' && answer?.items ? [...litBy(answer, t)].filter((id) => ITEM.test(id)) : null;
-  const tip = `${MEANT[sortOf(t)] ?? ''}${lit === null ? '' : `: ${lit.length} drawn`}`;
+  const lit = litOf(answer, part, t);
+  // Its own words first, so a count of what did not fit names what it holds; then what such a term finds, and how many it drew.
+  const tip = `${said.termSaid(t)}: ${MEANT[sortOf(t)] ?? ''}${lit === null ? '' : `, ${lit.length} drawn`}`;
   const sort = sortOf(t);
   const tone = part === 'not' ? 'muted' : part === 'only' ? 'warn' : TONE[sort];
   // Pointing at a term of Find lights what it brought on the canvas (was ui/query-light.js): the host does it.
@@ -142,17 +168,23 @@ function plusMenu(s, part, word) {
   ];
 }
 
-/** A row of the editor: its word, its terms as many as fit (the host counts the rest), and its own +. */
+/**
+ * A row of the editor: its word, its terms as many as fit (the host counts the rest; pressed, the count shows them all,
+ * each with its ×, until pressed again), and its own +.
+ */
 function row(s, key, word, tip, terms, extra = []) {
+  const all = s.expanded === key;
   return ['box', { flow: 'row', gap: 3, tip: cut(tip) },
     ['text', { look: 'muted', bold: true, tip: cut(tip) }, word],
-    ['box', { flow: 'row', gap: 2, fits: true, grow: true }, ...terms],
+    all
+      ? ['box', { flow: 'row', gap: 2, wrap: true, grow: true }, ...terms, ['button', { key: `more:${key}`, look: 'quiet', tip: 'Fewer' }, '‹']]
+      : ['box', { flow: 'row', gap: 2, fits: true, more: `more:${key}`, grow: true }, ...terms],
     plusMenu(s, key, word),
     ...extra];
 }
 
 /** The rows: Find, Only, Not, Walk and the limit. */
-function rowsMarks(s, said) {
+function rowsOf(s, said) {
   const { lens, drawn } = read(s.input);
   const l = lens ?? BLANK;
   const f = l.filter ?? {};
@@ -186,12 +218,12 @@ function rowsMarks(s, said) {
   ];
 }
 
-/** Everything the part draws: the line, and its rows while open. */
-export function barMarks(s) {
-  const { words } = read(s.input);
-  const said = namer(words, s.names);
-  return ['box', { flow: 'column', gap: 2 }, lineMarks(s, said), ...(s.open ? [rowsMarks(s, said)] : [])];
-}
+/** The words the part names things by: the schema's, and the names it was handed or found. */
+const saidFor = (s) => namer(read(s.input).words, s.names);
+/** What bar.query draws: the line. */
+export const lineMarks = (s) => lineOf(s, saidFor(s));
+/** What bar.rows draws: the rows. */
+export const rowsMarks = (s) => rowsOf(s, saidFor(s));
 
 /**
  * What a gesture does to the bar: the state it leaves, and the lens to go to, if any. Plain, so a test runs it: `s` the
@@ -208,7 +240,6 @@ export function heard(s, event) {
   const { over = [], steps = 0 } = l.walk ?? {};
   const walked = over === 'all' ? [] : over;
   const walk = (change) => done({ ...l, walk: { over, steps, ...change } });
-  if (head === 'line' && name === 'press') return { ...s, open: !s.open, adding: null, wrong: false };
   if (head === 'x' && name === 'press') {
     const list = inOrder(a === 'not' ? notOf(f) : (f[a] ?? []));
     return list[Number(b)] === undefined ? s : done(without(l, a, list[Number(b)]));
@@ -230,6 +261,8 @@ export function heard(s, event) {
     return n >= 1 ? done({ ...l, limit: Math.round(n) }) : s;
   }
   // What a row's + does: `a` is the row's part, `b` the step a pick is at.
+  // A row's count of what did not fit, pressed: the row shows all its terms until pressed again.
+  if (head === 'more' && name === 'press') return { ...s, expanded: s.expanded === a ? null : a };
   if (!['find', 'only', 'not', 'walk'].includes(a)) return s;
   const mine = s.adding?.part === a ? s.adding : { part: a, path: [], q: '' };
   if (head === 'kind' && name === 'pick') {
@@ -256,22 +289,25 @@ export function heard(s, event) {
   return s;
 }
 
-export default function query(input, tools) {
-  let s = fresh(input);
-  return {
-    marks: barMarks(s),
-    update(next) {
-      s = { ...s, input: next, names: new Map([...s.names, ...Object.entries(next?.names ?? {}).filter(([, v]) => typeof v === 'string')]) };
-      return barMarks(s);
-    },
-    on(event) {
-      const next = heard(s, event);
-      if (next === s) return undefined;
-      const { go, keepNames, ...rest } = next;
-      s = rest;
-      if (keepNames) tools?.keep?.(Object.fromEntries([...s.names].slice(-NAMES)), 'names');
-      if (go) tools?.go?.({ query: go });
-      return barMarks(s);
-    },
+/** A part of the bar that draws with `draw` (lineMarks or rowsMarks): handed the lens as it moves, it answers gestures with a new lens. */
+export function barPart(draw) {
+  return function part(input, tools) {
+    let s = fresh(input);
+    return {
+      marks: draw(s),
+      update(next) {
+        s = { ...s, input: next, names: new Map([...s.names, ...Object.entries(next?.names ?? {}).filter(([, v]) => typeof v === 'string')]) };
+        return draw(s);
+      },
+      on(event) {
+        const next = heard(s, event);
+        if (next === s) return undefined;
+        const { go, keepNames, ...rest } = next;
+        s = rest;
+        if (keepNames) tools?.keep?.(Object.fromEntries([...s.names].slice(-NAMES)), 'names');
+        if (go) tools?.go?.({ query: go });
+        return draw(s);
+      },
+    };
   };
 }

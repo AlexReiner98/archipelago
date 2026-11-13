@@ -17,7 +17,6 @@ import { placeBy } from './menu-place.js';
 import { windowOf, windows } from './pane-busy.js';
 import { followable, heard, hearOpen, nameOf, WATCH } from './pane-route.js';
 import { activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
-import { filterSaid } from './query-bar.js';
 import { countGoes, countTip, onYou, stateSaid } from './tab-count.js';
 import { BLANK, byPart, dismissed, focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
 import { sessionHue, titles } from './words.js';
@@ -158,7 +157,7 @@ function nameOfTab(t) {
   if (lens && !lens.filter.find?.length) return { name: 'New tab' };
   // Named by what it finds but its types, which say little of a tab; by its types only when it has nothing else.
   const { types, ...rest } = lens?.filter ?? {};
-  return { name: (lens && (filterSaid(rest, drawStrip) || filterSaid(lens.filter, drawStrip))) || 'Home' };
+  return { name: (lens && (hooks.lensSaid?.(rest, drawStrip) || hooks.lensSaid?.(lens.filter, drawStrip))) || 'Home' };
 }
 /** The items a tab is named by whose titles were asked for, once each. */
 const asked = new Set();

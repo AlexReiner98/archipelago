@@ -11,8 +11,19 @@
 
 import { api, notOf, state } from './base.js';
 import { canvasAt } from './views-kept.js';
-import { offered } from './only-words.js';
 import { ARROW, isA, relations, titles, typeChoice, typeTitle, types, withWay } from './words.js';
+
+/** Only's plain words (decision e_xe5dx55e), each with what it keeps: those that take nothing after them. */
+const WORD_MEANS = {
+  done: 'What is done or closed',
+  blocked: 'What waits on something open, someone, or a resource that is not free',
+  'no owner': 'What nobody owns',
+  'over estimate': 'What has used more tokens than it was estimated to take',
+  'by owner': 'What the owner last set the status of, or an agent on their word',
+  'by agent': 'What an agent last set the status of, on its own judgment',
+};
+/** The words a choice offers in one go, those already in the lens left out. */
+const offered = (have) => Object.keys(WORD_MEANS).filter((word) => !have.includes(word)).map((word) => ({ word, title: WORD_MEANS[word] }));
 
 /** The parts find can be in, by the word that puts it there. */
 export const MODES = ['Find', 'Only', 'Not', 'Walk', 'Limit', 'View', 'Style'];
