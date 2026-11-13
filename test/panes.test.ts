@@ -6,10 +6,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
+import * as F from './find-dom.ts';
 import { ready } from './tab-page.ts';
 import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
-import * as F from './find-dom.ts';
 
 const browser = chrome();
 
@@ -47,8 +47,8 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(n)}.querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
   };
-  // Typed in find as a person does (the find pack's part: test/find-dom.ts), then Enter.
-  const find = async (words: string) => (await page.evaluate(F.type(words)), await page.evaluate(F.key('Enter')));
+  // Words found through find, the find pack's part (test/find-dom.ts): typed, then Enter.
+  const find = (words: string) => page.evaluate(`(() => { ${F.type(words)}; ${F.key('Enter')}; })()`);
   try {
     await ready(page);
     // A session's show opens a tab of its own, out of sight: the reader's pane, the bar and the address stay theirs.
