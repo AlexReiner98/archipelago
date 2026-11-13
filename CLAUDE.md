@@ -342,8 +342,10 @@ runs stay small, CI runs the rest). Do not run `npm test`, `test:changed` or
 and a broad run slows every one of them for minutes. CI runs every file
 before anything reaches main, and a failure there names its file: fix it then.
 
-One test run uses the machine at a time: `scripts/test.ts` waits for any run
-in another worktree to end first, and says whose. Never start tests with a
+One heavy test run uses the machine at a time: `scripts/test.ts` waits for any
+run in another worktree to end first, and says whose. Up to five files named
+by hand, none of them in `SLOW`, run beside it without waiting (the owner,
+13 Nov 2026). Never start tests with a
 bare `node --test`; it skips that wait and the force exit, and a hung file
 then runs for hours.
 
