@@ -93,9 +93,10 @@ hooks.go = (address) => {
   // A page of the app the host draws, by name: what the menu leads to, so a part may go there without knowing an address.
   if (typeof address.page === 'string') {
     if (!PAGES_GO.includes(address.page)) return;
-    const of = typeof address.of === 'string' && /^e_[a-z0-9]{8}$/.test(address.of) ? address.of : undefined;
+    // A screen by its id: one kept on the map (e_...) or one a pack offers (core.run_worked).
+    const of = typeof address.of === 'string' && /^(?:e_[a-z0-9]{8}|[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_-]*)*)$/.test(address.of) ? address.of : undefined;
     if (address.page === 'screen' && !of) return;
-    return void openHere(address.page === 'screen' ? `#/s/${of}` : `#/${address.page}`);
+    return void openHere(address.page === 'screen' ? `#/s/${encodeURIComponent(of)}` : `#/${address.page}`);
   }
   let lens = null;
   try {

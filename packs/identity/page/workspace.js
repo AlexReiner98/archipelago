@@ -5,7 +5,7 @@
 // names a card, and lands on its section with that card in view.
 
 import { api, ask, drawSlots, h, may, part, state, whoami } from './base.js';
-import { screenRows } from './nav.js';
+import { screenRows } from './screen-rows.js';
 import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
 import { membersCard } from './members-card.js';

@@ -2,7 +2,7 @@
   "id": "menu",
   "version": "0.1.0",
   "title": "Menus",
-  "description": "The view band's own buttons as a part: Save what is up, into the view up or as a new one named in the band, and in its menu Save as new view and Delete, each a person's change to a kept view (core's lens).",
+  "description": "The page's menus as parts: the menu's pages (For you, the screens in the nav, Settings), and the view band's own buttons (Save what is up, into the view up or as a new one named in the band; in its menu Save as new view and Delete), each a person's change to a kept view (core's lens).",
   "uses": [
     "service:answer.saved_views"
   ],
@@ -15,17 +15,50 @@
       "input": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "description": "The kept view to save into, by id; left out, a new one is made." },
-          "title": { "type": "string", "minLength": 1, "maxLength": 60, "description": "Its name, a few words." },
-          "filter": { "type": "object", "description": "The query's filter: find, only, not." },
-          "walk": { "type": "object", "description": "The query's walk: over and steps." },
-          "limit": { "type": "integer", "minimum": 1, "description": "How many it draws at most." },
-          "time": { "type": "object", "description": "The time the query is asked at, when it is." },
-          "sessions": { "type": "boolean", "description": "false to leave sessions out." },
-          "style": { "type": "object", "description": "How it is drawn: shape, style (a layout's id) and lit." },
-          "preset": { "type": "string", "description": "The view a pack ships that this is the owner's version of." }
+          "id": {
+            "type": "string",
+            "description": "The kept view to save into, by id; left out, a new one is made."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "Its name, a few words."
+          },
+          "filter": {
+            "type": "object",
+            "description": "The query's filter: find, only, not."
+          },
+          "walk": {
+            "type": "object",
+            "description": "The query's walk: over and steps."
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "How many it draws at most."
+          },
+          "time": {
+            "type": "object",
+            "description": "The time the query is asked at, when it is."
+          },
+          "sessions": {
+            "type": "boolean",
+            "description": "false to leave sessions out."
+          },
+          "style": {
+            "type": "object",
+            "description": "How it is drawn: shape, style (a layout's id) and lit."
+          },
+          "preset": {
+            "type": "string",
+            "description": "The view a pack ships that this is the owner's version of."
+          }
         },
-        "required": ["title", "filter"],
+        "required": [
+          "title",
+          "filter"
+        ],
         "additionalProperties": false
       }
     },
@@ -34,12 +67,21 @@
       "title": "Delete a view",
       "description": "Retire a kept view: it leaves the bar and Home, and can be used again from its page.",
       "verb": "revise",
-      "on": ["lens"],
+      "on": [
+        "lens"
+      ],
       "item": "id",
       "input": {
         "type": "object",
-        "properties": { "id": { "type": "string", "description": "The kept view, by id." } },
-        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The kept view, by id."
+          }
+        },
+        "required": [
+          "id"
+        ],
         "additionalProperties": false
       }
     }
@@ -50,10 +92,43 @@
       "title": "Save this view",
       "slot": "bar",
       "go": true,
-      "views": [{ "name": "saved_views", "params": { "limit": 200, "pick": true } }],
-      "sends": ["menu.save_view", "menu.drop_view"],
-      "marks": ["box", "text", "button", "input", "menu"],
-      "modules": { "index.js": "parts/band/index.js", "views.js": "parts/band/views.js" }
+      "views": [
+        {
+          "name": "saved_views",
+          "params": {
+            "limit": 200,
+            "pick": true
+          }
+        }
+      ],
+      "sends": [
+        "menu.save_view",
+        "menu.drop_view"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "button",
+        "input",
+        "menu"
+      ],
+      "modules": {
+        "index.js": "parts/band/index.js",
+        "views.js": "parts/band/views.js"
+      }
+    },
+    {
+      "id": "menu.nav",
+      "title": "Menu",
+      "slot": "nav",
+      "go": true,
+      "marks": [
+        "box",
+        "button"
+      ],
+      "modules": {
+        "index.js": "parts/nav/index.js"
+      }
     }
   ]
 }

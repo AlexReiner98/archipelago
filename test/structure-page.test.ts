@@ -33,13 +33,17 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/walls/page/query-base.js': 2,
   'packs/walls/page/surface.js': 1,
   'packs/walls/page/view-frame.js': 1,
-  'packs/loader/page/packs.js': 4,
+  'packs/loader/page/packs.js': 3,
+  // ui/nav.js's switches for a pack's screens (task e_pe3fjd75), with its import of the page's base.
+  'packs/loader/page/screen-rows.js': 1,
   'packs/loader/page/page-schema.js': 1,
   'packs/loader/page/words.js': 2,
   'packs/write/page/held-card.js': 1,
   'packs/write/page/held.js': 2,
   'packs/write/page/item-held.js': 1,
-  'packs/surface/page/app.js': 8,
+  'packs/surface/page/app.js': 7,
+  // ui/nav.js's screen page (task e_pe3fjd75), composed from ui/screens.js until the sheet's cluster makes that a part.
+  'packs/surface/page/screen-page.js': 1,
   'packs/surface/page/canvas.js': 2,
   // ui/canvases.js's plumbing, moved in on 13 Nov 2026 (task e_pe3fjd75) with its imports of query-bar, item-doc, look-switch and thumbs.
   'packs/surface/page/views-kept.js': 4,
@@ -94,7 +98,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/link-pick.js': 2,
   'ui/look-marks.js': 1,
   'ui/look-switch.js': 3,
-  'ui/nav.js': 2,
   'ui/pane-address.js': 1,
   'ui/pane-busy.js': 1,
   'ui/pane-drag.js': 1,

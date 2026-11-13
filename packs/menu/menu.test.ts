@@ -107,3 +107,21 @@ test('a refusal is said in the band, and nothing moves', async () => {
   assert.ok(texts(after).includes('This session may only read the map.'));
   assert.deepEqual(went, []);
 });
+
+// @ts-expect-error: a plain module of the pack, with no types of its own.
+import nav, { pagesOf } from './parts/nav/index.js';
+
+test('the menu offers For you, the screens in the nav in their places and Settings where one may write, the page open marked', () => {
+  const piece = { screens: ['core.run_worked', 'e_scr00001'], names: ['Worked on', 'Mine'], at: 'screen:core.run_worked', writes: true };
+  assert.deepEqual(pagesOf(piece).map((p: { key: string }) => p.key), ['you', 'screen:core.run_worked', 'screen:e_scr00001', 'workspace']);
+  assert.deepEqual(pagesOf({ writes: false }).map((p: { key: string }) => p.key), ['you'], 'one who only reads has no Settings');
+  const drawn = nav({ piece }, { go() {} }).marks;
+  assert.deepEqual(drawn[3], ['button', { key: 'screen:core.run_worked', look: 'quiet', tip: 'Worked on', tone: 'accent' }, 'Worked on']);
+});
+
+test('a press goes to the page by name, never an address', () => {
+  const went: unknown[] = [];
+  const part = nav({ piece: { screens: ['core.run_worked'], names: ['Worked on'], writes: true } }, { go: (a: unknown) => went.push(a) });
+  for (const key of ['you', 'screen:core.run_worked', 'workspace', 'nothing']) part.on({ name: 'press', key });
+  assert.deepEqual(went, [{ page: 'you' }, { page: 'screen', of: 'core.run_worked' }, { page: 'workspace' }]);
+});
