@@ -12,6 +12,16 @@ import { addressOf, opening, readAddress } from './query.js';
 import { filterSaid } from './query-bar.js';
 import { titles } from './words.js';
 
+/**
+ * The item a canvas opened last, and the lens it opened it over: a drawing's own click on it opens it again by its bare
+ * address (packs/walls/page/layout.js), which then keeps that lens, as the address it was opened at said.
+ */
+let lastOpened = { item: null, query: '' };
+addEventListener('hashchange', () => {
+  const item = /^#\/e\/(e_[a-z0-9]{8})$/.exec(location.hash)?.[1];
+  if (item && item === lastOpened.item && lastOpened.query) history.replaceState(history.state, '', `#/e/${item}?${lastOpened.query}`);
+});
+
 /** The address of a pane beside a replay that has reached no milestone yet: it draws nothing. */
 const NONE = 'v?shown=none';
 
@@ -73,7 +83,8 @@ export function drawPane(at, el, said) {
       // This pane is the one touched before its item's page opens over it (a click with no press before it too).
       host.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
       said('opened', { item, at: `v?${addressOf(lens, canvas.asked)}` });
-      location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
+      lastOpened = { item, query: addressOf(lens, canvas.asked) };
+      location.hash = `#/e/${item}?${lastOpened.query}`;
     },
   });
   // Pressed, or the focus gone into a drawing's frame in it, it is the canvas the bar and find act on.
@@ -91,7 +102,8 @@ export function drawPane(at, el, said) {
       const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? filterSaid(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
       naming();
       canvas.show(lens, here, style);
-      activate(canvas);
+      // The bar and find act on the pane in focus alone: a pane drawn beside it does not take them.
+      if (el.closest('[aria-selected]')?.getAttribute('aria-selected') !== 'false') activate(canvas);
     }, (err) => live && host.replaceChildren(h('div', { class: 'error' }, err.message)));
   // What it draws, told again as it is drawn anew (the map changed, another lens): a tab that watches what it draws reads it.
   let told = '';

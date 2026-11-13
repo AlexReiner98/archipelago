@@ -30,13 +30,6 @@ async function startPart() {
   canvas.replaceChildren(panes);
   await drawSlot(panes, { slot: 'tabs', piece: { slot: 'panes' } });
   document.body.dataset.panesBy = 'part';
-  // An item's page opened by its bare address (a drawing's own click, a link) over a pane drawing another lens keeps that
-  // lens in the address, as an item's page opened from the canvas does; over its own canvas, the bare address stays.
-  addEventListener('hashchange', () => {
-    const item = /^#\/e\/(e_[a-z0-9]{8})$/.exec(location.hash)?.[1];
-    const query = (document.documentElement.dataset.pane_at ?? '').split('?')[1];
-    if (item && query && query !== `find=id+${item}&over=part_of%2Cdepends_on%2Cwaits_on&steps=1`) history.replaceState(history.state, '', `#/e/${item}?${query}`);
-  });
   // The pane in focus's frame moved (the runtime lays the panes out, packs/walls/page/part-pane.js): what fits itself to it
   // (find's line, the canvas) is told, as the page's own panes told it.
   let frame = '';
