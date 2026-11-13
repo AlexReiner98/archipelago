@@ -2,33 +2,31 @@
 
 The sheet over the canvas, an item's one page. A root pack: its parts change
 only through a root re-pin, never by the refiner, because what keeps a person
-in control here stays protected (decision e_gyzm7rj3).
+in control here stays protected (decisions e_gyzm7rj3, e_bn76z5fu).
 
-Its parts are the host's (e_gyzm7rj3: the frame, field editing, link picking
-and settling stay the host's), so their code is in `page/`, loaded with the
-page and pinned by this root's hash, not run in a worker (task e_zhxd9bhb):
+## Its parts, walled
 
 | Part | Slot | Code |
 |---|---|---|
-| `sheet.frame` | `sheet` | `page/item.js`, `page/item-sections.js`, `page/screens.js` |
-| `sheet.fields` | `sheet.fields` | `page/fields.js`, `page/field-edit.js` |
-| `sheet.links` | `sheet.links` | `page/link-pick.js`, `page/item-links.js` |
-| `sheet.draft` | `sheet.draft` | `page/draft.js`, `page/note-count.js` |
-| `sheet.follow` | `sheet` (`reading`) | `page/sheet-follow.js` |
+| `sheet.page` | `sheet` | `parts/page/`: the title, head, note, fields, choices, source, links picked, Save and history |
+| `sheet.follow` | `sheet` | `parts/follow/`: the page shown follows the reading |
 
-`sheet.frame` opens the three slots under it. Other packs' sections sit below
-the fields and source and above history (e_axz9au5f), and the page carries two
-menus, the part's and the frame's (e_dd7gdy8z); what is done rarely to the item
-is the slot `item.menu`. What each slot hands a part is in `docs/packs.md`.
+`sheet.page` reads items whole and writes the starter types as the person
+(`reads: "*"`, `writes`, a root pack's part alone). Frame, fields, links and
+draft are one part because the note and every field share one Save. It
+opens two slots: `sheet.bands`, under the title, and `sheet.sections`,
+below the source and above history, where other packs' sections stand
+(e_axz9au5f).
 
-The app asks for what is here by name, never by file: `hooks.drawScreen` (a
-screen on Home or a nav page) and `hooks.sheetAside` (the share of the page an
-open sheet takes).
+## What stays the host's
 
-## Still to do
+`page/item.js` is the frame. It holds the frame's menu with the kernel's
+acts (publish, share, launch, end a session, a pack's actions) beside the
+part's own menu (e_dd7gdy8z), and the public mark. It reads the item once
+and tells the parts as data (`page`: the item, its links, source, owner,
+history, and the names of the items its fields name). It fills the two slots
+with what the host draws: the changes held on it and a pack's action form,
+and the screens' sections.
 
-- A manifest form for a host part: `parts` holds worker parts only
-  (`packs/loader/kernel/ui-parts.ts` wants modules entered at `index.js`), so
-  these are named here, not in `pack.json`.
-- `sheet.follow` as a worker part, once the runtime hands the sheet slot its
-  `reading`: today the page measures the scroll itself.
+`page/screens.js` draws the screens' pieces. `page/draft.js` and
+`page/note-count.js` are kept for a new item, which no part makes yet.

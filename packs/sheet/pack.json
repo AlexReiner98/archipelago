@@ -12,6 +12,17 @@
       "id": "sheet.page",
       "title": "Page",
       "slot": "sheet",
+      "reads": "*",
+      "writes": [
+        "actor",
+        "aim",
+        "work",
+        "question",
+        "record",
+        "occurrence",
+        "place",
+        "system"
+      ],
       "opens": [
         "sheet.sections",
         "sheet.bands"
@@ -27,7 +38,8 @@
         "input",
         "button",
         "note",
-        "menu"
+        "menu",
+        "slot"
       ],
       "modules": {
         "index.js": "parts/page/index.js",

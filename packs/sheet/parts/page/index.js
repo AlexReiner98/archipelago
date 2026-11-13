@@ -17,9 +17,19 @@ import { linkEvent, linkMarks } from './links.js';
 /** The link types it walks from, read from this end: what it holds walks part_of down only. */
 export function along(view) {
   const out = view?.outgoing ?? [], into = view?.incoming ?? [];
-  const holds = into.some((r) => r.type === 'part_of' || r.root === 'part_of');
-  return [...new Set([...out, ...into].map((r) => r.type).filter((t) => typeof t === 'string' && !t.startsWith('sys.')).map((t) => (holds && t === 'part_of' ? 'part_of<' : t)))];
+  const holds = into.some((r) => (r.root ?? r.type) === 'part_of');
+  return [...new Set([...out, ...into].filter((r) => typeof r?.type === 'string' && !r.type.startsWith('sys.')).map((r) => (holds && (r.root ?? r.type) === 'part_of' ? `${r.type}<` : r.type)))];
 }
+
+/** What the head says, which the schema hands as fields too (the starters' columns): not shown again among the fields. */
+const HEAD = ['status', 'owner', 'confidence', 'visibility', 'source'];
+
+/**
+ * What the host's frame tells the part of the page it stands on ({ name: 'page', item, views, count }): the item as
+ * the frame read it, its links, source and owner, and its history, read once by the frame beside its own menu. Told
+ * again each time the page is drawn again, so the part is not mounted anew under the person's typing.
+ */
+export const pageTold = (now, told) => (told?.name === 'page' && told.item?.id ? { ...now, item: told.item, views: { ...(now?.views ?? {}), ...(told.views ?? {}) }, piece: { ...(now?.piece ?? {}), ...(told.count && { count: told.count }) } } : now);
 
 /** The page's state as one value: what is open, what is written, what is asked, what was said. */
 const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) } }, open: new Set(), emptyOpen: false, writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined });
@@ -49,13 +59,13 @@ export function pageMarks(input, s) {
     linkMarks({ finding: s.finding, picked: s.picked }),
     s.said && ['text', { tone: 'bad', tip: s.said.slice(0, 200) }, s.said],
     s.archiving && ['box', { look: 'sunk', flow: 'row', gap: 2, pad: 2 }, ['text', {}, `Archive "${item.title}"? It leaves every view but stays in the history.`], ['button', { key: 'archive-yes', look: 'main', tone: 'bad' }, 'Archive'], ['button', { key: 'archive-no', look: 'quiet' }, 'Cancel']],
-    ['slot', { name: 'sheet.bands' }],
+    ['slot', { key: 'slot-bands', name: 'sheet.bands' }],
     headMarks({ ...item, owner_title: view.owner?.title }, type, { writes }),
     section('note', 'Note', 0, noteMarks(item, s.draft, { writes, writing: s.writing, count })),
     c && choicesMarks(item, c, { writes, asking: s.asking }),
-    section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: c ? [c.field] : [] }) ?? ['text', { look: 'muted' }, 'None']),
+    section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : [])], titles: view.titles ?? {} }) ?? ['text', { look: 'muted' }, 'None']),
     sourceMarks(view.source),
-    ['slot', { name: 'sheet.sections' }],
+    ['slot', { key: 'slot-sections', name: 'sheet.sections' }],
     barMarks(s.draft, item, { saving: s.saving, said: s.saveSaid }),
     historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names }),
   ].filter(Boolean);
@@ -68,7 +78,9 @@ const today = () => {
 };
 
 export default function page(input, tools) {
-  let now = input;
+  // What the frame told last of the page: a refresh of the input by the runtime keeps it.
+  let told = input?.told?.name === 'page' ? input.told : null;
+  let now = pageTold(input, told);
   let s = fresh(input?.kept);
   const draw = () => pageMarks(now, s);
   const item = () => now?.item ?? {};
@@ -95,6 +107,13 @@ export default function page(input, tools) {
     return event.name !== 'edit' || was !== unsaved(s.draft, item()) ? draw() : undefined;
   };
   async function on(event) {
+    if (event?.name === 'page') {
+      told = event;
+      const next = pageTold(now, event);
+      if (next.item?.id !== now?.item?.id) s = fresh(undefined);
+      now = next;
+      return draw();
+    }
     const it = item();
     if (!it.id || !event?.key) return undefined;
     const k = event.key;
@@ -130,7 +149,7 @@ export default function page(input, tools) {
       if (f.keep) return written(() => (s.draft = { ...s.draft, fields: { ...s.draft.fields, [f.keep[0]]: f.keep[1] } }), event);
       if (f.bad) return undefined;
       if (f.save) return on({ key: 'draft:save', name: 'press' });
-      if (f.pick) return (await change({ ops: [{ op: 'update', id: it.id, props: { [f.pick[0]]: f.pick[1] } }], reason: `${label(f.pick[0])} set in the UI` }), draw());
+      if (f.pick) return (s.open.delete(f.pick[0]), await change({ ops: [{ op: 'update', id: it.id, props: { [f.pick[0]]: f.pick[1] } }], reason: `${label(f.pick[0])} set in the UI` }), draw());
     }
     // The head: its status and who may see it.
     const h = headEvent(event, it);
@@ -178,9 +197,11 @@ export default function page(input, tools) {
   return {
     marks: draw(),
     update(next) {
+      if (next?.told?.name === 'page') told = next.told;
+      const was = now?.item?.id;
+      now = pageTold(next, told?.item?.id === next?.item?.id ? told : null);
       // Another item: what was written of the last one stays kept by the host, under its own id.
-      if (next?.item?.id !== now?.item?.id) s = fresh(next?.kept);
-      now = next;
+      if (now?.item?.id !== was) s = fresh(next?.kept);
       return draw();
     },
     on,
