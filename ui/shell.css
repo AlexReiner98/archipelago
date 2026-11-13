@@ -139,8 +139,7 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #find .q-lens > .q-count { flex: none; }
 /* While find is open with nothing typed, a row for each part rises above it, the width of find, its word in a column of its own and its terms after it, as many as fit (ui/query-bar.js fitRows). */
 #find .q-edit { display: grid; grid-template-columns: max-content minmax(0, 1fr); box-sizing: border-box; margin: 0 0 var(--space-4); padding: 0 var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); font-size: var(--text-4); white-space: nowrap; }
-/* Open and typing are find's page state (the find pack's part publishes find_open, find_typing on the root). */
-:root:not([data-find_open]) #find .q-edit, :root[data-find_typing] #find .q-edit, :root[data-find_open] #find .q-lens { display: none; }
+#find:not(.open) .q-edit, #find.typing .q-edit, #find.open .q-lens, #find:not(.open) input[type=search] { display: none; }
 #find .q-edit > .q-part { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--box-8); }
 #find .q-edit > .q-part + .q-part { border-top: var(--border-1) solid var(--line); }
 #find .q-edit > .q-part > .q-label { padding-right: var(--space-8); cursor: pointer; }
@@ -228,19 +227,21 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%))) / 2); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%)) - 2 * var(--space-9))); }
 #find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); cursor: text; transition: border-color 0.12s; }
 /* At rest it reads as a field to type in: a magnifier before it, its edge lit under the pointer; open, lit as focused. */
-#find .find-row:hover, :root[data-find_open] #find .find-row { border-color: var(--accent); }
+#find .find-row:hover, #find.open .find-row { border-color: var(--accent); }
 #find .find-icon { flex: none; width: var(--box-5); height: var(--box-5); margin-left: var(--space-5); fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; }
-#find .find-row:hover .find-icon, :root[data-find_open] #find .find-icon { stroke: var(--accent); }
+#find .find-row:hover .find-icon, #find.open .find-icon { stroke: var(--accent); }
 /* Open or at rest, the bar is the same height: the box is the line's height. */
-/* Find's part (the find pack): its field fills the row; at rest it lies over the lens line, unseen, so a press on the row lands in it; its choices stand above the row, in the look of every dropdown. */
-#find .find-row { position: relative; }
-#find .find-part { flex: 1; min-width: 0; }
-:root:not([data-find_open]) #find .find-part { position: absolute; inset: 0; opacity: 0; }
-#find .find-part input { width: 100%; box-sizing: border-box; height: var(--box-9); border: 0; background: none; padding: 0 var(--space-6); font-size: var(--text-6); outline: none; }
-#find .find-part .pm-list { position: absolute; left: 0; right: 0; bottom: 100%; margin: 0 0 var(--space-4); padding: var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); white-space: nowrap; }
-:root:not([data-find_typing]) #find .find-part .pm-list { display: none; }
-#find .find-part .pm-list .pm-box { flex-wrap: nowrap; min-width: 0; }
-#find .find-part .pm-list .pm-button { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+#find input[type=search] { flex: 1; min-width: 0; box-sizing: border-box; height: var(--box-9); border: 0; background: none; padding: 0 var(--space-6); font-size: var(--text-6); outline: none; }
+#find:not(.open) .find-mode { display: none; }
+/* Typed, the choices of what the words could be, each said by its kind, the lit one first (Words): what Enter takes. In the look of every dropdown (ui/menus.css). */
+#find .find-choices { display: grid; margin: 0 0 var(--space-4); padding: var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); white-space: nowrap; }
+#find .find-choices[hidden], #find:not(.typing) .find-choices { display: none; }
+#find .find-choice { display: flex; gap: var(--space-6); align-items: center; min-width: 0; max-width: none; }
+#find .find-choice.lit { background: var(--accent-soft); }
+#find .find-choice > .q-label { width: var(--box-10); }
+#find .find-choice > .find-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#find .find-choice > .find-note { flex: none; color: var(--muted); font-size: var(--text-2); }
+#find .find-choice > .find-count { flex: none; color: var(--muted); font-size: var(--text-2); font-variant-numeric: tabular-nums; }
 
 /* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
    (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */
