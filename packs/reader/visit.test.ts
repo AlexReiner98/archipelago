@@ -7,7 +7,7 @@ import { pageOf, siteOf, visitOf } from './reader.js';
 import { isVisit, sourceOf, tagOf } from './visit.js';
 
 const BROWSER = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
-const TEMPLATE = '<html><head><title>Document</title></head><body><main id="main"></main><script type="module" src="/doc.js"></script></body></html>';
+const TEMPLATE = '<html><head><title>Document</title></head><body><main id="main"></main><script type="module" src="/frozen-page.js"></script></body></html>';
 const D = 'e_doc00001';
 const home = { id: D, title: 'Home', path: 'home', parts: [{ text: 'Words.' }] };
 const act = async (name: string, input: Record<string, unknown>) =>

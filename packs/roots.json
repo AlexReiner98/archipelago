@@ -22,11 +22,11 @@
     },
     {
       "id": "walls",
-      "hash": "76f0dc2ee93bb1d98f7785e6eece49d2733473ed4b01d07ac8ece461c6a4bc53"
+      "hash": "6b6670ea1d3c551d5e255b4d269e34bbe72e000afeae4ca4e5762aa232dcd9b2"
     },
     {
       "id": "loader",
-      "hash": "9fc96a5d7b64c30f7446a12f83da8dc936850defcc95a1fef270e41b6b23737d"
+      "hash": "96f877e6db0b2ec6d66868c76c6deb7054a36415c417ce261c9ffec670503fe4"
     },
     {
       "id": "rules",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "c237055c57ad1ce4626fcbdce551af424116deba79a1fad6f7fd1ea024409eda"
+      "hash": "dbf584b55497a3285caa62abbd7d2cd427987d783d4315ab40fdcb2c246d3a09"
     },
     {
       "id": "panes",
@@ -90,6 +90,9 @@
       "publish"
     ],
     "root.scene": [
+      "publish"
+    ],
+    "root.part_marks": [
       "publish"
     ],
     "root.parts": [

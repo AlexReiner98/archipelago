@@ -76,16 +76,14 @@ test("the host's page imports one way along roots.json", () => {
 // Frozen again 13 Nov 2026, as the runtime moved out of ui/ (task e_6hhx2ub8, decision e_6d2g62tg): eleven modules
 // left ui/ and their entries went with them; a module still in ui/ that imports one of them counts it from now on,
 // and that import goes when its own cluster makes it a part of a map pack. A number here may be re-frozen only when
-// the boundary itself moves, as it did here and on 12 Nov; otherwise it falls.
+// the boundary itself moves, as it did here and on 12 Nov; otherwise it falls. It moved once more the same day:
+// doc-lens.js, the picture mark's drawing, went to surface (task e_atxefw2s), so doc.js and item-doc.js count it.
 const APP_ON_HOST: Record<string, number> = {
   'ui/canvas-menu.js': 2,
   'ui/canvases.js': 5,
   'ui/catch-up.js': 3,
   'ui/connect-agent.js': 2,
   'ui/connections-card.js': 2,
-  'ui/doc-lens.js': 4,
-  'ui/doc-sheet.js': 2,
-  'ui/doc.js': 7,
   'ui/find-choices.js': 2,
   'ui/find.js': 3,
   'ui/home.js': 1,
@@ -94,7 +92,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/keep-in-view.js': 2,
   'ui/look-marks.js': 1,
   'ui/nav.js': 2,
-  'ui/public.js': 3,
   'ui/query-bar.js': 3,
   'ui/query-light.js': 2,
   'ui/start.js': 1,
