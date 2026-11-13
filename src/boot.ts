@@ -113,14 +113,14 @@ function filesUnder(packDir: string, sub: string): string[] {
 
 /**
  * A root pack's hash: SHA-256 of the canonical JSON of each file's own hash by path. pack.json is hashed as
- * canonical JSON, so spacing and key order do not count; kernel/** and page/** (the host's page modules) as text
- * with LF line endings.
+ * canonical JSON, so spacing and key order do not count; kernel/**, page/** (the host's page modules) and parts/**
+ * (a root's walled parts, which keep the human in control as its page does) as text with LF line endings.
  */
 export function hashPack(packDir: string): string {
   const manifest = join(packDir, 'pack.json');
   if (!existsSync(manifest)) throw new BootRefused(`${packDir} has no pack.json.`);
   const files: Record<string, string> = { 'pack.json': sha256Hex(jcs(JSON.parse(text(manifest)))) };
-  for (const f of [...filesUnder(packDir, 'kernel'), ...filesUnder(packDir, 'page')]) files[f] = sha256Hex(text(join(packDir, f)));
+  for (const f of [...filesUnder(packDir, 'kernel'), ...filesUnder(packDir, 'page'), ...filesUnder(packDir, 'parts')]) files[f] = sha256Hex(text(join(packDir, f)));
   return sha256Hex(jcs(files));
 }
 

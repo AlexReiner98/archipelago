@@ -1,5 +1,6 @@
 import { api, h, hooks, main, route, state } from './base.js';
 import { changeSet } from './changes.js';
+import { beatRows, missedRows } from './beat-rows.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { trace } from './traces.js';
 import { looked } from './catch-up.js';
@@ -87,9 +88,10 @@ export function follow(steps = []) {
   // What a session does may move its state, which the tab bar counts (ui/tab-bar.js).
   if (fresh.some((s) => s.run)) hooks.sessionsMoved?.();
   // A chat that ended closes its tab here (ui/tab-life.js).
-  for (const s of fresh) if (s.ends && s.run) hooks.sessionEnded?.(s.run, s.did);
+  // The part on `tabs` is told the same, as data (hooks.tellSlot, packs/surface/page/part-host.js), where one is mounted.
+  for (const s of fresh) if (s.ends && s.run) (hooks.sessionEnded?.(s.run, s.did), hooks.tellSlot?.('tabs', { name: 'ended', run: s.run, why: s.did ?? null }));
   // One gone quiet or waiting lets its tab go too, until it next shows something.
-  for (const s of fresh) if (s.rests && s.run) hooks.sessionRested?.(s.run);
+  for (const s of fresh) if (s.rests && s.run) (hooks.sessionRested?.(s.run), hooks.tellSlot?.('tabs', { name: 'rested', run: s.run }));
   // A beat told, or a session gone quiet, waiting or ended, moves its node on every canvas that draws it.
   const moved = [...new Set(fresh.filter((s) => s.run && (s.kind === 'story' || s.rests || s.ends)).map((s) => s.run))];
   if (moved.length) hooks.sessionsTold?.(moved);
@@ -100,7 +102,10 @@ export function follow(steps = []) {
     const was = waiting.get(sessionOf(s));
     waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens, focus: s.focus || was?.focus });
   }
-  if (!hooks.land || document.querySelector('dialog[open]')) return;
+  if (document.querySelector('dialog[open]')) return;
+  // A part on `tabs` is told each show, and keeps what waits itself (it decides where a show lands, task e_dswpuaft).
+  for (const [session, s] of waiting) if (hooks.tellSlot?.('tabs', { name: 'land', step: s })) waiting.delete(session);
+  if (!hooks.land) return;
   // One the reader is busy where it would land stays, and is tried again at the next look.
   for (const [session, s] of waiting) if (hooks.land(s) !== 'later') waiting.delete(session);
 }
@@ -175,6 +180,16 @@ function touchedBy(beat, pos) {
   return { ids: [...ids], made: beat.made ?? 0 };
 }
 
+/**
+ * What was missed since the person last looked (ui/catch-up.js says when, by name), handed to the parts on `traces`:
+ * entry by entry from the rows as they were (each row's island is on it), and one beat for the whole span.
+ */
+hooks.tellMissed = (then, kinds, entries, { from, to, gone = [] }) => {
+  if (!hooks.slotFilled?.('traces')) return;
+  hooks.tellSlot('traces', { name: 'missed', from, to, entries: missedRows(then, kinds, entries) });
+  hooks.tellSlot('traces', { name: 'beat', ...beatRows(then, kinds, entries, { after: from, gone }) });
+};
+
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;
 export async function checkTail() {
@@ -195,7 +210,10 @@ export async function checkTail() {
     if (beat.entries && following) {
       try {
         // What the facts changed of what the store held, worked out before they are folded in, once: traced until seen (ui/traces.js).
-        const set = changeSet(store, kinds, store.fresh(beat.entries), { after: store.pos, gone: beat.gone });
+        const fresh = store.fresh(beat.entries);
+        const set = changeSet(store, kinds, fresh, { after: store.pos, gone: beat.gone });
+        // The parts on `traces` are handed the rows the beat touched, as they were and are, and decide what to trace.
+        if (hooks.slotFilled?.('traces')) hooks.tellSlot('traces', { name: 'beat', ...beatRows(store, kinds, fresh, { after: store.pos, gone: beat.gone }) });
         store.apply(beat);
         trace(set).catch(() => {});
       } catch (err) {

@@ -36,6 +36,11 @@ test("a root pack's hash is its folder's, whatever the line endings and the mani
   assert.equal(hashPack(join(a, 'packs', 'x')), hashPack(join(b, 'packs', 'x')));
   writeFileSync(join(a, 'packs', 'x', 'kernel', 'index.ts'), 'export const a = 2;\n');
   assert.notEqual(hashPack(join(a, 'packs', 'x')), hashPack(join(b, 'packs', 'x')));
+  // A root's walled parts are its own as much as its kernel: a changed part is a changed root.
+  const before = hashPack(join(b, 'packs', 'x'));
+  mkdirSync(join(b, 'packs', 'x', 'parts', 'row'), { recursive: true });
+  writeFileSync(join(b, 'packs', 'x', 'parts', 'row', 'index.js'), 'export default () => ({ marks: [] });\n');
+  assert.notEqual(hashPack(join(b, 'packs', 'x')), before, 'parts/** is in the hash');
 });
 
 test('a changed root pack stops the start, naming it and both hashes', async () => {
