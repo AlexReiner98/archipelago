@@ -66,7 +66,7 @@ export default function find(first, tools) {
   /** Empty find to type the next term: back in Find, open, its choices gone. */
   const again = () => ((typed = ''), (mode = 'Find'), (choices = []), (shownFor = ''), (lit = 0), clearTimeout(wait), asked++);
   /** Shut find: what was typed goes. */
-  const shut = () => (again(), (open = false));
+  const shut = () => (again(), (open = false), (kept = undefined));
   /** Put find in a part of the lens, and read its choices. */
   const toMode = (m) => ((mode = m), (choices = []), (lit = 0), (focus = true), look());
 
@@ -87,6 +87,10 @@ export default function find(first, tools) {
     if (c.term) tools.go?.({ query: added({ ...lens, filter: lens.filter ?? {} }, c.term) });
   }
 
+  /** The views the person may pick, read once find is typed in (never at mount: the first drawing comes first), kept while it is open. */
+  let kept;
+  const keptViews = () => (mode === 'Find' || mode === 'View' ? (kept ??= read('saved_views', { limit: 200, pick: true })) : Promise.resolve(null));
+
   /** What the words could be: the words at once, the rest once the reads answer; how many the words find, which Enter brings. */
   async function look() {
     const q = typed.trim();
@@ -102,7 +106,7 @@ export default function find(first, tools) {
     const lens = lensUp();
     const { only, not } = lens.filter ?? {};
     const most = num(input, 'find_choice_items', 3);
-    const c = { most, wide: num(input, 'term_find_most', 12), lens, schema: schemaOf(input?.words), read, views: viewsOf(input), shapes: input?.shapes };
+    const c = { most, wide: num(input, 'term_find_most', 12), lens, schema: schemaOf(input?.words), read, views: viewsOf(await keptViews()), shapes: input?.shapes };
     const [all, counted] = await Promise.all([
       choicesFor(mode, q, c).catch(() => []),
       finding && q ? read('flat', { filter: { find: [`text ${q}`], ...(only && { only }), ...(not && { not }) }, limit: most }) : null,
@@ -211,8 +215,8 @@ export default function find(first, tools) {
   };
 }
 
-/** The views the person may pick, from the saved_views read: not those a document brings in. */
-function viewsOf(input) {
-  const pictures = input?.views?.saved_views?.pictures;
+/** The views the person may pick, from a saved_views answer: not those a document brings in. */
+function viewsOf(answer) {
+  const pictures = answer?.pictures;
   return Array.isArray(pictures) ? pictures.filter((c) => typeof c?.lens === 'string' && typeof c?.title === 'string' && !c.document) : [];
 }

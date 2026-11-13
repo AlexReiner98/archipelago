@@ -27,11 +27,14 @@ const drawnIn = (view: Kept) => {
 
 /**
  * The layouts a view may be drawn in: the packs' drawings by their shape (the first is the default), and the layouts
- * kept on the map that are not the owner's version of a pack's, by name, each with how many kept views draw in it.
+ * kept on the map that are not the owner's version of a pack's, by name, each with how many kept views draw in it; and
+ * the styles kept on the map by name (`named`), so one a view is drawn with (Use here) is called by its title, not listed.
  */
-export async function layoutsListed(ctx: KernelContext): Promise<{ shapes: { shape: string; title: string }[]; kept: { id: string; title: string; views: number }[] }> {
+export async function layoutsListed(ctx: KernelContext): Promise<{ shapes: { shape: string; title: string }[]; kept: { id: string; title: string; views: number }[]; named: { id: string; title: string }[] }> {
   const shapes = (ctx.registry.packs as { layouts?: { shape: string; title: string }[] }[]).flatMap((p) => (p.layouts ?? []).map((d) => ({ shape: d.shape, title: d.title })));
-  const looks = (await ctx.reads({ looks: { types: ['layout'] } })) as Kept[];
+  const all = (await ctx.reads({ looks: { types: ['layout', 'style'] } })) as Kept[];
+  const looks = all.filter((k) => ctx.registry.isA(k.type ?? 'layout', 'layout'));
+  const named = all.filter((k) => !looks.includes(k) && !k.props?.preset).map((k) => ({ id: k.id, title: k.title }));
   // The views kept on the map, one page of them (as many as the switch ever counted): open ones alone draw.
   const page = (await ctx.reads({ items: { type: 'lens' }, page: { size: VIEWS_COUNTED } })) as { rows: (Kept & { is_open?: boolean })[] };
   const views = page.rows.filter((v) => v.is_open !== false);
@@ -39,5 +42,5 @@ export async function layoutsListed(ctx: KernelContext): Promise<{ shapes: { sha
     .filter((k) => !k.props?.preset)
     .map((k) => ({ id: k.id, title: k.title, views: views.filter((v) => drawnIn(v) === k.id).length }))
     .sort((a, b) => a.title.localeCompare(b.title));
-  return { shapes, kept };
+  return { shapes, kept, named };
 }

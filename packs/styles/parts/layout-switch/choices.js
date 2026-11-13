@@ -16,7 +16,9 @@ export function layoutOf(value) {
 export function choicesOf(listed, layout) {
   const [first, ...shapes] = listed?.shapes ?? [];
   const kept = [...(listed?.kept ?? [])];
-  if (layout?.style && !kept.some((k) => k.id === layout.style)) kept.push({ id: layout.style, title: 'Style', views: 0 });
+  // A style the view is drawn with that is no layout (Use here) is one more choice while it is, called by its title.
+  const named = (listed?.named ?? []).find((n) => n.id === layout?.style);
+  if (layout?.style && !kept.some((k) => k.id === layout.style)) kept.push({ id: layout.style, title: named?.title ?? 'Style', views: 0 });
   const values = ['', ...shapes.map((s) => `shape:${s.shape}`), ...kept.map((k) => `style:${k.id}`)];
   const names = [first?.title ?? 'Default', ...shapes.map((s) => s.title), ...kept.map((k) => k.title)];
   const now = chosenOf(layout);

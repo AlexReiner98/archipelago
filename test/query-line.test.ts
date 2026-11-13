@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
+import * as F from './find-dom.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
@@ -37,7 +38,7 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
   };
   const find = (words: string) =>
-    page.evaluate(`(() => { if (!document.getElementById('find').classList.contains('open')) document.getElementById('find-lens').click(); const i = document.querySelector('#find input[name=q]'); i.value = ${JSON.stringify(words)}; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
+    page.evaluate(`(() => { ${F.type(words)}; ${F.key('Enter')}; })()`);
   const shots = process.env.PELAGO_SHOTS;
   try {
     assert.ok(await page.until(`${drawn(0, made.roof)} && ${drawn(0, made.tiles)} && ${drawn(0, made.site)}`), `the lens is drawn: ${page.logs().join('\n')}`);
