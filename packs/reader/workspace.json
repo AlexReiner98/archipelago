@@ -1,0 +1,20 @@
+{
+  "id": "reader",
+  "version": "0.1.0",
+  "title": "Reader",
+  "description": "The reader's workspace half: the part that draws a document's page as its reader meets it, at /p/, on a site's own domain, and read with a sign-in at /read/ (pack.json serves those addresses).",
+  "parts": [
+    {
+      "id": "reader.doc",
+      "title": "A document's page",
+      "slot": "page.doc",
+      "marks": ["box", "text", "note", "list", "button", "picture"],
+      "reads": {},
+      "modules": {
+        "index.js": "parts/doc/index.js",
+        "page.js": "parts/doc/page.js",
+        "sheet.js": "parts/doc/sheet.js"
+      }
+    }
+  ]
+}

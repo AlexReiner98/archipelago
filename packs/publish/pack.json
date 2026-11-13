@@ -93,6 +93,16 @@
         "index.js": "parts/reading/index.js",
         "sections.js": "parts/reading/sections.js"
       }
+    },
+    {
+      "id": "publish.public",
+      "title": "A product's public page",
+      "slot": "page.public",
+      "marks": ["box", "text", "list", "input", "button", "picture"],
+      "reads": {},
+      "modules": {
+        "index.js": "parts/public/index.js"
+      }
     }
   ]
 }
