@@ -1,11 +1,11 @@
-// The tab bar's count of the sessions waiting on the owner (ui/tab-count.js, task e_82rggead, docs/sessions.md):
+// The tab bar's count of the sessions waiting on the owner (the sessions pack's part sessions.tab_count, task e_82rggead, docs/sessions.md):
 // which open sessions count, in what order, what the tooltip says, where a press goes, and a tab's state mark.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 type Open = { id: string; title?: string; session?: { state: string; for?: string; line?: string; since: string } };
-// A UI module, plain JavaScript with no types of its own.
-const { countGoes, countTip, onYou, stateSaid } = (await import(`../ui/${'tab-count.js'}`)) as {
+// A part's module, plain JavaScript with no types of its own.
+const { countGoes, countTip, onYou, stateSaid } = (await import(`./parts/tab_count/${'state.js'}`)) as {
   onYou: (open: Open[]) => Open[];
   countTip: (yours: Open[], nameOf: (s: Open) => string) => string;
   countGoes: (yours: Open[], tabs: { id: string; chat?: string; follows?: string }[]) => { tab?: string; page?: string } | null;
@@ -55,3 +55,4 @@ test('a tab’s state: a mark where it waits on the owner or is blocked, words w
   assert.equal(stateSaid(undefined), null);
   assert.equal(stateSaid({ state: 'unheard', since: at(0) }), null);
 });
+
