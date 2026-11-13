@@ -30,14 +30,11 @@ const drawnFrom = new WeakMap();
 const surfaces = new WeakMap();
 /** The tip each element was given last. */
 const drawnTip = new WeakMap();
-/** The values each field has sent the part, latest last, so its echo is known from a value of its own. */
+/** The number of the last words each field sent the part (what `tell` answered), so an answer behind them is known (./part-echo.js). */
 const sent = new WeakMap();
-const told = (el) => sent.get(el) ?? (sent.set(el, []), sent.get(el));
-/** How many of a field's values are kept to know an echo by. */
-const partTold = 50;
 
 /**
- * Draw a part into `root`. `tell(event)` hears what the person does; `style` is the workspace's style (a paint surface
+ * Draw a part into `root`. `tell(event, mark)` hears what the person does (with the mark pressed, for a press); `style` is the workspace's style (a paint surface
  * moves by its numbers); `canvas(key, el)` is handed a paint surface's pixel canvas (`pixels: true`) once, for whoever
  * hosts the part to give it to the part; `thumb(view)` answers with the element that shows a view small, or nothing;
  * `picture(item, el)` draws a picture mark's item into its element; `lights(ids)` lights those items on the canvas
@@ -50,14 +47,16 @@ const partTold = 50;
  * `slot(name, el, piece)` draws the parts that fill a slot this part opens into `el`, handed `piece` when the mark gives one. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
- * `draw(node)` for each answer the part gives, and `stop()`.
+ * `draw(node, seen)` for each answer the part gives, `seen` the number of the last message the part had heard when it
+ * gave it (what `tell` answers each event with), and `stop()`.
  */
 export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {}, slot = async () => 0 } = {}) {
   const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts, slot };
   let ended = false;
   return {
-    draw(node) {
+    draw(node, seen) {
       if (ended) return;
+      ctx.seen = seen;
       if (!isChecked(node)) throw new Error('Only marks the check made are drawn: give the part’s answer to checkMarks first');
       place(root, [node], ctx);
       // The ghosts it holds, as data: the canvas reads them back into its answer (none is drawn here).
@@ -121,7 +120,7 @@ function build(node, ctx) {
     el = make('button', 'pm-swatch');
     el.type = 'button';
     el.append(make('span', 'pm-swatch-tile'), make('span', 'pm-swatch-name'));
-    el.addEventListener('click', () => drawnFrom.get(el)?.key !== undefined && ctx.tell({ key: drawnFrom.get(el).key, name: 'press' }));
+    el.addEventListener('click', () => drawnFrom.get(el)?.key !== undefined && ctx.tell({ key: drawnFrom.get(el).key, name: 'press' }, drawnFrom.get(el)));
   }
   else if (node.mark === 'text' && node.at.href) {
     // An address on the web, opened apart: the page never follows it in place, and tells it nothing of where it came from.
@@ -139,13 +138,15 @@ function build(node, ctx) {
       // A button that tries a theme paints this screen in it alone, keeping nothing; the part hears the press too.
       if (at.try !== undefined) void Promise.resolve(ctx.tryTheme(at.try)).catch(() => {});
       // A button that copies: its words go to the clipboard, the button says whether they went, and the part hears it.
-      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', ...shift, copied: await copied(el, at.copy) });
-      if (!at.pick) return ctx.tell({ key, name: 'press', ...shift });
+      // Told with the mark pressed, so the press lands on it though the part has moved its marks since (part-host.js).
+      const node = drawnFrom.get(el);
+      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', ...shift, copied: await copied(el, at.copy) }, node);
+      if (!at.pick) return ctx.tell({ key, name: 'press', ...shift }, node);
       // A pick waits for the item clicked on the canvas; told back either way, null when it was let go.
       el.setAttribute('aria-pressed', 'true');
       const value = await ctx.pick(at.pick).catch(() => null);
       el.removeAttribute('aria-pressed');
-      ctx.tell({ key, name: 'picked', value });
+      ctx.tell({ key, name: 'picked', value }, node);
     });
   } else if (node.mark === 'input') el = field(node, ctx);
   else if (node.mark === 'note') el = make('div', 'pm-note');
@@ -182,7 +183,10 @@ function field(node, ctx) {
   const el = kind === 'pick' ? make('select', 'pm-input') : make(many ? 'textarea' : 'input', 'pm-input');
   if (el.tagName === 'INPUT') el.type = FIELD_TYPES[kind];
   const value = () => (kind === 'check' ? String(el.checked) : el.value);
-  const said = (name, more = {}) => (told(el).push(value()), told(el).splice(0, told(el).length - partTold), ctx.tell({ key: drawnFrom.get(el).key, name, value: value(), ...more }));
+  const said = (name, more = {}) => {
+    const n = ctx.tell({ key: drawnFrom.get(el).key, name, value: value(), ...more });
+    if (Number.isFinite(n)) sent.set(el, n);
+  };
   // The keys the part asked for (`keys`) are its own: the page does nothing with them, and the part hears which, and
   // whether the field was empty. Escape goes no further, so the page's own Escape does not act too.
   el.addEventListener('keydown', (e) => {
@@ -314,12 +318,11 @@ function update(el, node, ctx, fresh = false) {
     if (el.tagName === 'SELECT' && (fresh || JSON.stringify([was.at.values, was.at.names]) !== JSON.stringify([at.values, at.names]))) {
       el.replaceChildren(...at.values.map((v, i) => Object.assign(document.createElement('option'), { value: v, textContent: at.names?.[i] ?? v })));
     }
-    // The person's words are theirs while they type: in the field they are in, a value the part answers with that is
-    // one they already sent (an echo, perhaps behind what they have typed since) is let be; a value of the part's own
-    // (the field cleared once its words were taken) is set.
+    // The person's words are theirs: a value the part drew before it heard what they last typed is let be; a value
+    // of the part's own, drawn once it had (the field cleared once its words were taken), is set.
     const value = at.value ?? '';
     const now = at.kind === 'check' ? String(el.checked) : el.value;
-    if (setsField(told(el), value, now, document.activeElement === el)) {
+    if (setsField(value, now, sent.get(el), ctx.seen)) {
       if (at.kind === 'check') el.checked = value === 'true';
       else el.value = value;
     }

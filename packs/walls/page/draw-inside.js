@@ -179,11 +179,13 @@ function inside(home, given) {
  *
  * The page says: mount { id, part, input }, update { id, input }, event { id, event }, decide { id, asked, input }
  * (on a slot that asks a decision), unmount { id }, and acted { asked, ... } (what came of an action). The parts say:
- * marks { id, marks }, decided { id, asked, value }, act { id, asked, action, params }, keep { id, name, value } (unsaved words for the page to keep)
+ * marks { id, marks, seen }, seen { id, seen } (an update heard that drew nothing new), decided { id, asked, value }, act { id, asked, action, params }, keep { id, name, value } (unsaved words for the page to keep)
  * and error { id?, message }. A part (`<pack>.<name>`, as its manifest declares it, with its modules entered at
  * index.js, packs/loader/kernel/ui-parts.ts) exports by default a function (input, tools), answering
  * { marks, update?(input), on?(event), decide?(input), end?() }, where update and on may answer new marks and decide a
- * value. The page checks every word.
+ * value. The page checks every word. Each message of the page's to a part is numbered (`seq`), and marks say the number
+ * of the last one the part had heard when it drew them (`seen`), of its own accord too: so the page knows an answer
+ * that is behind what the person has since done (packs/walls/page/part-echo.js).
  */
 function partInside() {
   const text = (err) => String(err?.message ?? err).slice(0, 300);
@@ -207,6 +209,8 @@ function partInside() {
   const parts = new Map();
   let port;
   const mounted = new Map();
+  /** The number of the last message each mounted part was handed. */
+  const seen = new Map();
   const asked = new Map();
   let asks = 0;
   // What cannot be sent (a function, a node) is an error of the part's, not a worker that stops answering.
@@ -217,7 +221,7 @@ function partInside() {
       port.postMessage({ type: 'error', id: message.id, message: text(err) });
     }
   };
-  const marks = (id, said) => said !== undefined && mounted.has(id) && send({ type: 'marks', id, marks: said });
+  const marks = (id, said) => said !== undefined && mounted.has(id) && send({ type: 'marks', id, marks: said, ...(seen.has(id) && { seen: seen.get(id) }) });
   const tools = (id) => ({
     // New marks of its own accord: a part that moves or has waited on something.
     marks: (said) => marks(id, said),
@@ -247,6 +251,7 @@ function partInside() {
     if (said.type === 'acted' || said.type === 'readed') return void (asked.get(said.asked)?.(said), asked.delete(said.asked));
     const id = String(said.id);
     ready = ready.then(async () => {
+      if (Number.isFinite(said.seq)) seen.set(id, said.seq);
       try {
         if (said.type === 'mount') {
           const make = parts.get(String(said.part));
@@ -256,11 +261,16 @@ function partInside() {
           if (!mounted.has(id)) return void made?.end?.();
           mounted.set(id, made);
           marks(id, made?.marks);
-        } else if (said.type === 'update' && mounted.get(id)?.update) marks(id, await mounted.get(id).update(said.input));
+        } else if (said.type === 'update') {
+          // Heard, whether or not it drew anew: the page waits on a part's answer to a newer page before it passes a press on.
+          const drew = mounted.get(id)?.update ? await mounted.get(id).update(said.input) : undefined;
+          if (drew !== undefined) marks(id, drew);
+          else if (mounted.has(id)) send({ type: 'seen', id, seen: said.seq });
+        }
         else if (said.type === 'event' && mounted.get(id)?.on) marks(id, await mounted.get(id).on(said.event));
         // A slot that asks a decision (tabs.land, tabs.life): the part answers a value, the root that asked applies it.
         else if (said.type === 'decide') send({ type: 'decided', id, asked: said.asked, value: mounted.get(id)?.decide ? ((await mounted.get(id).decide(said.input)) ?? null) : null });
-        else if (said.type === 'unmount') (mounted.get(id)?.end?.(), mounted.delete(id));
+        else if (said.type === 'unmount') (mounted.get(id)?.end?.(), mounted.delete(id), seen.delete(id));
       } catch (err) {
         send({ type: 'error', id, message: text(err) });
       }

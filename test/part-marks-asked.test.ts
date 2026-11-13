@@ -223,22 +223,3 @@ test('a slot mark names a slot the part opens, and no other', () => {
   refused(['slot', {}], /a slot with no name/);
   refused(['slot', { name: 'a' }, ['text', 'x']], /a slot holding something/);
 });
-
-test("a field keeps the person's words against an echo, but takes a value the part sends once it has caught up", async () => {
-  // @ts-ignore
-  const { setsField } = await import('../packs/walls/page/part-echo.js');
-  // Typed '', then 'only ': the part echoes '' (behind), then 'only ' (caught up), then clears it with '' on purpose.
-  const heard = ['', 'o', 'on', 'onl', 'only', 'only '];
-  assert.equal(setsField(heard, '', 'only ', true), false, 'an echo of what was typed earlier is let be');
-  assert.equal(setsField(heard, 'onl', 'only ', true), false);
-  assert.deepEqual(heard, ['onl', 'only', 'only ']);
-  assert.equal(setsField(heard, 'only ', 'only ', true), false);
-  assert.deepEqual(heard, []);
-  assert.equal(setsField(heard, '', 'only ', true), true, 'the part clearing the field is set');
-  // The reported case: the answer to 'only ' clears it, while '' is still among what was sent.
-  assert.equal(setsField(['', 'only '], '', 'only ', true), false, 'still ambiguous without an answer between');
-  const h2 = ['', 'only '];
-  setsField(h2, 'only ', 'only ', true);
-  assert.equal(setsField(h2, '', 'only ', true), true);
-  assert.equal(setsField(['x'], 'x', 'y', false), true, 'out of the field, the part has its way');
-});

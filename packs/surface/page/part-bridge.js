@@ -30,6 +30,8 @@ const MOVES = [...GESTURES, 'submit', 'scrolled', 'step', 'land'];
  */
 export function partBridge(port, { partOf, go, state } = {}) {
   const pressed = new Map(), moved = new Map(), busy = new Set();
+  // Every message to the parts is numbered, in the order sent: the parts answer with the last they had heard (`seen`).
+  let seq = 0;
   const answer = (asked, result) => port.postMessage({ type: 'acted', asked, ...result });
   // A press that sent an action may move the page once the action has answered (Save, then the view as kept), however
   // long it took to go out: its move is counted from the answer, not from the press. Only a press's, never one of the
@@ -123,12 +125,14 @@ export function partBridge(port, { partOf, go, state } = {}) {
   }
 
   return {
-    /** Send the version's parts a message: a `press` (or a note's `tick`) lets that part send one action as its own. */
+    /** Send the version's parts a message, numbered, and answer its number: a `press` (or a note's `tick`) lets that part send one action as its own. */
     send(message) {
+      message = { ...message, seq: ++seq };
       if (message?.type === 'event' && GESTURES.includes(message.event?.name)) pressed.set(String(message.id), performance.now());
       if (message?.type === 'event' && MOVES.includes(message.event?.name)) moved.set(String(message.id), performance.now());
       if (message?.type === 'unmount') (pressed.delete(String(message.id)), moved.delete(String(message.id)), busy.delete(String(message.id)));
       port.postMessage(message);
+      return message.seq;
     },
     /** A message from the port: true when it was an action or a move, taken here. */
     heard(said) {

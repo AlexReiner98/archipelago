@@ -19,21 +19,27 @@ export async function namesOf(lens, answer) {
   return Object.fromEntries(ids.map((id, i) => [id, read[i]]).filter(([, t]) => typeof t === 'string'));
 }
 
+/**
+ * What the canvas in focus says now, read at once: what a part is handed is worked out from this, however long the
+ * names take to read, so a hand begun later never says an older lens than one begun before it.
+ */
+export const canvasNow = () => ({ address: hooks.address?.() ?? null, answer: hooks.answer?.() ?? null, home: hooks.homeLens?.() ?? null });
+
 /** The page's address as a part that declares `go` is handed it: its lens with `said`, as every lens handed to a part. */
-export async function addressSaid(words) {
-  const at = hooks.address?.() ?? null;
+export async function addressSaid(words, now = canvasNow()) {
+  const at = now.address;
   // Home draws a lens too: handed as `home`, so a term a part adds there adds to Home's.
-  if (at && !at.query) return { ...at, home: withSaid(hooks.homeLens?.() ?? null, words, {}) };
+  if (at && !at.query) return { ...at, home: withSaid(now.home, words, {}) };
   if (!at?.query) return at;
-  return { ...at, query: withSaid(at.query, words, await namesOf(at.query, hooks.answer?.()?.answer)) };
+  return { ...at, query: withSaid(at.query, words, await namesOf(at.query, now.answer?.answer)) };
 }
 
 /** What a part filling `slot` is handed of the canvas's query, or nothing for a slot that is not handed it. */
-export async function queryGiven(slot, words) {
+export async function queryGiven(slot, words, now = canvasNow()) {
   if (!QUERY_SLOTS.includes(slot)) return {};
-  const at = hooks.address?.() ?? null;
-  const up = hooks.answer?.() ?? null;
-  const lens = at?.query ?? hooks.homeLens?.() ?? null;
+  const at = now.address;
+  const up = now.answer;
+  const lens = at?.query ?? now.home;
   const names = await namesOf(lens, up?.answer);
   return {
     query: withSaid(lens, words, names),

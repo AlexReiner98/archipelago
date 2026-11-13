@@ -22,9 +22,10 @@ import { endPart, partPort } from './layout.js';
 import { MARKS, checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
 import { sessionHue } from './words.js';
-import { addressSaid, queryGiven } from './part-lens.js';
+import { addressSaid, canvasNow, queryGiven } from './part-lens.js';
 import { cut, findFor, keepFor, keptFor, keptKey, pickFor, settingsOf, styleValues, viewsOf, wholeWords } from './part-input.js';
 import { readFor } from './part-read.js';
+import { inOrder, pressesHeld } from './part-order.js';
 import { hearAway, tellAway } from './part-away.js';
 import { focusWindow, goHash, hearPage, openWindow, pageOf } from './part-page.js';
 import { AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
@@ -78,13 +79,19 @@ async function styleOn(island) {
 const versionOf = (parts, pack) => `${pack}:${parts.filter((p) => p.pack === pack).map((p) => p.hash.slice(0, 12)).join('.')}`;
 
 
-/** What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read them, and its piece's settings. */
+/**
+ * What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read
+ * them, and its piece's settings. What the page says now is read before anything is awaited, so of two hands the one
+ * begun later is never the older (the host delivers only the latest begun: `mountOn`).
+ */
 async function inputOf(part, item, given) {
-  const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
-  const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
+  const now = canvasNow();
   // The theme this screen alone is painted in, if one is being tried (a button's `try`), so a part can say Keep or Stop;
   // and the page's origin, for a part that shows an address of this server (connect's MCP address): words only.
-  given = { ...given, up: hooks.viewUp?.() ?? null, trying: state.trying ?? null, origin: location.origin, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
+  const page = { up: hooks.viewUp?.() ?? null, trying: state.trying ?? null, origin: location.origin, ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
+  const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
+  const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
+  given = { ...given, ...page, ...(part.go && { address: await addressSaid(given.words, now) }), ...(await queryGiven(part.slot, given.words, now)) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
@@ -141,11 +148,14 @@ async function workerOf(version, parts, pack) {
     if (!m) return;
     if (said.type === 'marks') {
       try {
-        m.render.draw(checkMarks(said.marks, { kinds: m.part.marks, opens: m.part.opens ?? [] }));
+        const marks = checkMarks(said.marks, { kinds: m.part.marks, opens: m.part.opens ?? [] });
+        m.render.draw(marks, said.seen);
+        m.heard?.(said.seen, marks);
       } catch (err) {
         m.failed(err.message);
       }
-    } else if (said.type === 'decided') m.decided?.(said.asked, said.value);
+    } else if (said.type === 'seen') m.heard?.(said.seen);
+    else if (said.type === 'decided') m.decided?.(said.asked, said.value);
     else if (said.type === 'read') void readFor(m, said, (message) => one.port.postMessage(message));
     else if ((said.type === 'window' || said.type === 'focus') && PAGE_SLOTS.includes(m.part.slot)) (said.type === 'window' ? openWindow : focusWindow)(said);
     else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
@@ -245,10 +255,19 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
   const given = { words, style: styleValues(style), piece: settingsOf(piece) };
   // A picture mark is drawn out of what the part was handed last, never out of what it sent.
   let handed;
-  const hand = async () => (handed = await inputOf(part, item, given));
+  // A press on marks the part has since moved past (it was handed a newer page) lands on what was pressed.
+  const presses = pressesHeld((event) => one.bridge.send({ type: 'event', id, event }));
+  // Hands are worked out apart and may finish in any order: only one begun after the last delivered is delivered, the
+  // first as `mount`, so a part is never handed an older page after a newer one (two quick moves of the canvas).
+  const handOne = inOrder((input, first) => {
+    if (!one.mounted.has(id) || (!first && !node.isConnected)) return false;
+    presses.handed(one.bridge.send(first ? { type: 'mount', id, part: part.id, input } : { type: 'update', id, input }));
+    handed = input;
+  });
+  const hand = () => handOne(() => inputOf(part, item, given));
   const render = mountPart(body, {
     style,
-    tell: (event) => one.bridge.send({ type: 'event', id, event }),
+    tell: (event, mark) => presses.tell(event, mark),
     thumb: (view) => hooks.viewThumb?.(view) ?? null,
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),
@@ -270,10 +289,10 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
     // A `slot` mark: a slot this part opens, filled by its parts in the mark's node, unseen by the holder; a few deep at most.
     slot: (name, el, given) => ((part.opens ?? []).includes(name) && depthOf(node) < slotsDeep ? drawParts(el, { slot: name, item, piece: given ?? piece, openView, picture }) : Promise.resolve(0)),
   });
-  const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
+  const refresh = async () => node.isConnected && one.mounted.has(id) && hand();
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
-  one.mounted.set(id, { part: { ...part, island: pinFor(item) }, item, node, render, failed, refresh, address: JSON.stringify(hooks.address?.() ?? null), answer: hooks.answer?.()?.answer });
-  one.bridge.send({ type: 'mount', id, part: part.id, input: await hand() });
+  one.mounted.set(id, { part: { ...part, island: pinFor(item) }, item, node, render, failed, refresh, heard: presses.heard, address: JSON.stringify(hooks.address?.() ?? null), answer: hooks.answer?.()?.answer });
+  await hand();
   shownWhile();
   if (AWAY_SLOTS.includes(part.slot)) hearAway(mountedNow);
   if (PAGE_SLOTS.includes(part.slot)) hearPage((event) => tellSlot(part.slot, event), () => refreshOn(PAGE_SLOTS));
