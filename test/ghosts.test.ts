@@ -1,10 +1,10 @@
-// What changes held for the owner add to a picture (packs/walls/page/ghosts.js): a new item where its links reach what is drawn, a
+// What changes held for the owner add to a picture (ui/ghosts.js): a new item where its links reach what is drawn, a
 // link between what is drawn, an edit marked on its item, and nothing that would land nowhere in sight.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { ghostsOf, HELD, withGhosts } from '../packs/walls/page/ghosts.js';
+import { ghostsOf, HELD, withGhosts } from '../ui/ghosts.js';
 
 const drawn = new Set(['e_aaaaaaaa', 'e_bbbbbbbb']);
 const holds = (id: string) => drawn.has(id);

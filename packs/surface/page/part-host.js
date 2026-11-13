@@ -208,7 +208,8 @@ async function workerOf(version, parts, pack) {
     },
   };
   // A part that declares `go` names another address after a gesture; the app checks it and moves (hooks.go, ui/canvas.js).
-  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part, go: (address) => hooks.go?.(address) });
+  // A part that declares `state` publishes page state; the runtime writes it on the root (publishState).
+  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part, go: (address) => hooks.go?.(address), state: publishState });
   one.port.onmessage = (ev) => {
     const said = ev.data ?? {};
     if (one.bridge.heard(said)) return;
@@ -224,6 +225,22 @@ async function workerOf(version, parts, pack) {
     else if (said.type === 'error') m.failed(said.message);
   };
   return one;
+}
+
+/** Which part publishes each name of page state: one name, one owner, and a second part naming it is ignored. */
+const publishing = new Map();
+
+/**
+ * Page state a part publishes (`state` in its manifest): written on the root as `data-<name>`, where anything watching
+ * the page from outside reads it (the picture taken once the canvas has drawn). The part never touches the page: it
+ * says a name and a value, and this writes it. Nothing (null) takes the name off.
+ */
+function publishState(name, value, part) {
+  const owner = publishing.get(name);
+  if (owner !== undefined && owner !== part.id) return;
+  publishing.set(name, part.id);
+  if (value === null) delete document.documentElement.dataset[name];
+  else document.documentElement.dataset[name] = value;
 }
 
 /** The address the page draws has changed: the app says so by name (`hooks.addressMoved`, set below), never by importing this file. */
@@ -257,7 +274,7 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
   const body = h('div', { class: 'part-body', 'data-part-id': part.id, onclick: opens, onkeydown: (ev) => ev.key === 'Enter' && ev.target.dataset?.view && opens(ev) });
   node.replaceChildren(body);
   const failed = (message) => node.isConnected && node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
-  const style = await styleOn(islandOf(item));
+  const style = await styleOn(pinFor(item));
   // What every part is handed beside its items: the island's words, the style's values (none of its looks), and what
   // its piece says of it on its screen (a title, a limit).
   const given = { words, style: styleValues(style), piece: settingsOf(piece) };
@@ -274,7 +291,7 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
-  one.mounted.set(id, { part: { ...part, island: islandOf(item) }, item, node, render, failed, refresh, address: JSON.stringify(hooks.address?.() ?? null) });
+  one.mounted.set(id, { part: { ...part, island: pinFor(item) }, item, node, render, failed, refresh, address: JSON.stringify(hooks.address?.() ?? null) });
   one.bridge.send({ type: 'mount', id, part: part.id, input: await hand() });
 }
 
@@ -282,6 +299,17 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
 function islandOf(item) {
   if (!item) return undefined;
   return pageType(item.type)?.fields?.pack_version ? item.id : (item.props?.island ?? item.island ?? undefined);
+}
+
+/**
+ * Which pinned version of a part is mounted and fetched, given what the part stands on: the island of the item, where
+ * it stands on one. A part that stands on nothing (the tabs, the panes, Home, the menu, a bar over a canvas that spans
+ * islands) is the chrome, and is to be pinned per person (decision e_x6bqupud, task e_fpm9n7er); until that lands the
+ * chrome runs the map's version, which is what `undefined` asks for here. Every place that resolves a version goes
+ * through this one function, so that change is one function's.
+ */
+function pinFor(item) {
+  return islandOf(item);
 }
 
 /** Show the way back for an island while it draws anything but the shipped parts, and take down another island's. */
@@ -300,7 +328,7 @@ function wayBackFor(island, refined, redraw) {
  */
 export async function drawPart(node, { slot, item, piece, redraw = () => {}, openView, picture }) {
   sweep();
-  const island = islandOf(item);
+  const island = pinFor(item);
   const shipped = Boolean(island && shippedOn(island));
   const { parts, refined, words } = await partsOn(island, shipped);
   wayBackFor(island, shipped ? undefined : refined, async () => redraw());
@@ -320,13 +348,14 @@ export async function drawPart(node, { slot, item, piece, redraw = () => {}, ope
  */
 export async function drawParts(node, { slot, item, piece, redraw = () => {}, openView, picture }) {
   sweep();
-  const island = islandOf(item);
+  const island = pinFor(item);
   const shipped = Boolean(island && shippedOn(island));
   const { parts, refined, words } = await partsOn(island, shipped);
   wayBackFor(island, shipped ? undefined : refined, async () => redraw());
   const filling = parts.filter((p) => p.slot === slot);
   for (const part of filling) {
-    const mine = h('div', { class: 'part-in' });
+    // Its name on the node, so a step that names a card (#/workspace?at=agent) brings this part into view.
+    const mine = h('div', { class: 'part-in', 'data-at': part.id.split('.').slice(1).join('.') || part.id });
     node.append(mine);
     if (part.waiting) mine.replaceChildren(h('div', { class: 'muted', title: `${part.title} waits: ${part.waiting}` }, `${part.title} waits`));
     else if (!part.modules) mine.replaceChildren(h('div', { class: 'muted' }, `${part.title}: its code did not come`));
