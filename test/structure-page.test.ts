@@ -39,7 +39,7 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/write/page/held-card.js': 1,
   'packs/write/page/held.js': 2,
   'packs/write/page/item-held.js': 1,
-  'packs/surface/page/app.js': 8,
+  'packs/surface/page/app.js': 7,
   'packs/surface/page/canvas.js': 3,
   'packs/surface/page/live.js': 7,
   'packs/surface/page/query.js': 2,

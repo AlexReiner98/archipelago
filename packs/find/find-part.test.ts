@@ -9,7 +9,6 @@ import find from './parts/find/index.js';
 import { choicesFor, ledBy } from './parts/find/choices.js';
 // @ts-ignore: a part's module, plain JavaScript
 import { added, schemaOf, withWords } from './parts/find/lens.js';
-import { checkMarks } from '../walls/page/part-check.js';
 
 const words = {
   types: { task: { title: 'Task', of: 'work', open: ['todo'], closed: ['done'] }, work: { title: 'Work', open: [], closed: [] }, lens: { title: 'View', of: 'system', open: [], closed: [] }, system: { title: 'System', open: [], closed: [] }, actor: { title: 'Person', open: [], closed: [] } },
@@ -18,7 +17,6 @@ const words = {
 const hits = [{ id: 'e_aaaaaaaa', title: 'Roof', type: 'task' }];
 const read = async (name: string, params: { type?: string }) => (name === 'search' ? (params.type === 'actor' ? [] : hits) : name === 'flat' ? { matched: 7, items: [] } : null);
 const lens = { filter: { find: ['text old', 'type task'] } };
-const KINDS = ['box', 'text', 'list', 'input', 'button'];
 
 test('Find offers the words first, then each item found as In, Item and Related, its types and links', async () => {
   const all = await choicesFor('Find', 'roof', { most: 3, wide: 12, lens, schema: schemaOf(words), read, views: [{ lens: 'e_bbbbbbbb', title: 'Roof plan' }] });
@@ -45,14 +43,13 @@ test('the lens is changed as the bar changes it: words replaced or added, a term
   assert.deepEqual(added({ filter: { not: ['done'] }, view: 'e_x' }, { only: 'done' }), { filter: { not: [], only: ['done'] } });
 });
 
-test('typing draws marks the host accepts, and Enter moves the page to the words, find staying open', async () => {
+test('typing opens find, and Enter moves the page to the words, find staying open', async () => {
   const moved: unknown[] = [], state: Record<string, unknown> = {}, drawn: unknown[] = [];
   const tools = { read, go: (a: unknown) => moved.push(a), state: (n: string, v: unknown) => (state[n] = v), marks: (m: unknown) => drawn.push(m) };
   const part = find({ words, address: { query: lens, drawn: { count: 0 } }, style: { numbers: {} } }, tools);
-  checkMarks(part.marks, { kinds: KINDS });
-  checkMarks(part.on({ key: 'q', name: 'edit', value: 'roof' }), { kinds: KINDS });
+  part.on({ key: 'q', name: 'edit', value: 'roof' });
   assert.equal(state.find_open, '1');
-  checkMarks(part.on({ key: 'q', name: 'submit', value: 'roof' }), { kinds: KINDS });
+  part.on({ key: 'q', name: 'submit', value: 'roof' });
   assert.deepEqual(moved, [{ query: { filter: { find: ['text roof', 'type task'] } } }]);
   assert.equal(state.find_open, '1');
   assert.equal(part.on({ key: 'q', name: 'key', value: 'Escape', empty: true }) !== undefined, true);

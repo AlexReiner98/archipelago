@@ -30,12 +30,12 @@ export default function find(first, tools) {
   let input = first;
   let open = false, mode = 'Find', typed = '', choices = [], shownFor = '', lit = 0, asked = 0, wait, focus = false;
 
-  const lensUp = () => input?.piece?.query ?? input?.address?.query ?? { filter: {} };
+  const lensUp = () => input?.address?.query ?? input?.piece?.query ?? { filter: {} };
   const read = (name, params) => (tools.read ? tools.read(name, params).catch(() => null) : Promise.resolve(null));
   const publish = () => (tools.state?.('find_open', open ? '1' : null), tools.state?.('find_typing', open && (typed.trim() || mode !== 'Find') ? '1' : null));
 
   /** One choice as a row: its kind, its name to press, what it is, and what it would change. */
-  const row = (c, i) => ['box', { key: `c${i}`, flow: 'row', gap: 4, pad: 2, tip: cut(c.title), ...(i === lit && { tone: 'accent', look: 'band' }) },
+  const row = (c, i) => ['box', { key: `c${i}`, flow: 'row', gap: 4, pad: 2, tip: cut(c.title), ...(i === lit && { tone: 'accent', look: 'band' }), ...(c.leaves && { lights: c.leaves.slice(0, 200) }) },
     ['text', { look: 'mark' }, cut(c.kind, 40)],
     ['button', { key: `c${i}.take`, look: 'quiet', tip: cut(c.title), ...(c.view && { view: c.view }) }, cut(c.label)],
     ...(c.note ? [['text', { look: 'muted', size: 2 }, cut(c.note, 80)]] : []),
@@ -130,6 +130,9 @@ export default function find(first, tools) {
         c.count = got.length > shown ? `+${shown}+` : `+${got.filter((id) => !here.has(id)).length}`;
       } else {
         c.count = `−${got.length}`;
+        // Pointing at it lights what it keeps, the rest faded.
+        const gone = new Set(got);
+        c.leaves = ids.filter((id) => !gone.has(id));
         c.idle = !drawn.cut && ids.length > 0 && (got.length === 0 || got.length === ids.length);
       }
     }
