@@ -1,11 +1,12 @@
-// The tab bar's count of the sessions waiting on the owner (ui/tab-count.js, task e_82rggead, docs/sessions.md):
+// The tab bar's count of the sessions waiting on the owner (the sessions pack's part sessions.tab_count, task e_82rggead, docs/sessions.md):
 // which open sessions count, in what order, what the tooltip says, where a press goes, and a tab's state mark.
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 type Open = { id: string; title?: string; session?: { state: string; for?: string; line?: string; since: string } };
-// A UI module, plain JavaScript with no types of its own.
-const { countGoes, countTip, onYou, stateSaid } = (await import(`../ui/${'tab-count.js'}`)) as {
+// A part's module, plain JavaScript with no types of its own.
+const { countGoes, countTip, onYou, stateSaid } = (await import(`./parts/tab_count/${'state.js'}`)) as {
   onYou: (open: Open[]) => Open[];
   countTip: (yours: Open[], nameOf: (s: Open) => string) => string;
   countGoes: (yours: Open[], tabs: { id: string; chat?: string; follows?: string }[]) => { tab?: string; page?: string } | null;
@@ -54,4 +55,24 @@ test('a tab’s state: a mark where it waits on the owner or is blocked, words w
   assert.equal(stateSaid(open[0].session)?.mark, undefined);
   assert.equal(stateSaid(undefined), null);
   assert.equal(stateSaid({ state: 'unheard', since: at(0) }), null);
+});
+
+// @ts-ignore: a module of the page, plain JavaScript
+const { checkMarks } = await import('../walls/page/part-check.js');
+// @ts-expect-error: a plain module of the pack, with no types of its own.
+const { default: part } = await import('./parts/tab_count/index.js');
+const kinds = JSON.parse(readFileSync(new URL('./pack.json', import.meta.url), 'utf8')).parts.find((p: { id: string }) => p.id === 'sessions.tab_count').marks;
+
+test('the part marks a tab by its session’s state, handed in words as the slot’s piece', () => {
+  const draw = (piece: object) => {
+    const marks = part({ piece }).marks;
+    checkMarks(marks, { kinds });
+    return marks;
+  };
+  assert.deepEqual(draw({ tab: 't1', current: 't0', state: 'waiting', for: 'approval' }), ['text', { look: 'mark', tone: 'accent', tip: 'waits on you: approval' }, '?']);
+  assert.deepEqual(draw({ tab: 't1', current: 't0', state: 'your_move' }), ['text', { look: 'mark', tone: 'accent', tip: 'your move' }, '↩']);
+  assert.deepEqual(draw({ tab: 't2', current: 't0', state: 'blocked' }), ['text', { look: 'mark', tone: 'bad', tip: 'blocked' }, '⊘']);
+  assert.deepEqual(draw({ tab: 't3', state: 'working' }), ['box', {}], 'working draws no mark');
+  assert.deepEqual(draw({ tab: 't4' }), ['box', {}], 'the owner’s own tab draws none');
+  assert.deepEqual(part({ piece: { tab: 't4' } }).update({ piece: { tab: 't4', state: 'waiting' } }).at(-1), '?', 'drawn again as its state changes');
 });
