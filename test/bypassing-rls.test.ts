@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { read, walk } from './structure-kit.ts'; // every module is counted at its own place
 
-const files = ['src', 'ui', 'packs'].flatMap(walk).filter((f) => /\.(ts|js|mjs)$/.test(f));
+const files = ['src', 'packs'].flatMap(walk).filter((f) => /\.(ts|js|mjs)$/.test(f));
 const count = (pattern: RegExp) =>
   Object.fromEntries(files.map((f) => [f, read(f).match(pattern)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
 

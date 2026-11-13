@@ -51,12 +51,11 @@ export const UI_FILES: Record<string, string> = {
 };
 
 const PACKS = join(import.meta.dirname, '..', '..');
-const UI_DIR = join(PACKS, '..', 'ui');
 /**
- * Where the files are: the app's, in ui/, and the host's, in each root pack's page/ (packs/roots.json), where its hash
+ * Where the files are: each root pack's page/ (packs/roots.json), where its hash
  * keeps them. A file is served by its name alone, whichever folder holds it, so a name is in one folder only.
  */
-export const UI_DIRS = [UI_DIR, ...(JSON.parse(readFileSync(join(PACKS, 'roots.json'), 'utf8')) as { roots: { id: string }[] }).roots.map((r) => join(PACKS, r.id, 'page')).filter((d) => existsSync(d))];
+export const UI_DIRS = [...(JSON.parse(readFileSync(join(PACKS, 'roots.json'), 'utf8')) as { roots: { id: string }[] }).roots.map((r) => join(PACKS, r.id, 'page')).filter((d) => existsSync(d))];
 const DIR_OF = new Map<string, string>();
 for (const dir of UI_DIRS)
   for (const f of readdirSync(dir)) {
@@ -65,7 +64,7 @@ for (const dir of UI_DIRS)
   }
 /** Files served to the page from the kernel's source, as the page names them: TypeScript of erasable syntax only, its types stripped. */
 const FROM_SOURCE: Record<string, string> = { 'project.js': join(PACKS, 'log', 'kernel', 'project.ts'), 'css-check.js': join(PACKS, 'walls', 'kernel', 'css-check.ts') };
-const pathOf = (f: string) => FROM_SOURCE[f] ?? join(DIR_OF.get(f) ?? UI_DIR, f);
+const pathOf = (f: string) => FROM_SOURCE[f] ?? join(DIR_OF.get(f) ?? join(PACKS, 'surface', 'page'), f);
 const readText = async (f: string) => (FROM_SOURCE[f] ? stripTypeScriptTypes(await readFile(FROM_SOURCE[f], 'utf8')) : readFile(pathOf(f), 'utf8'));
 /** The pages a browser opens, and so asks for again on every visit; read whole, with the files they name versioned. */
 const PAGES = ['index.html', 'doc.html', 'public.html', 'draw.html'];

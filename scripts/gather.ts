@@ -394,7 +394,7 @@ if (existsSync(join(ROOT, ROOT_IMPORTS))) {
 const keptJson = `${JSON.stringify(Object.fromEntries(Object.entries(found.kept).sort()), null, 2)}\n`;
 const noneKept = !Object.keys(found.kept).length; // with none kept, the list goes
 if (!noneKept && (!existsSync(join(ROOT, KEPT_FILE)) || raw(KEPT_FILE).replace(/\r\n/g, '\n') !== keptJson)) writes.set(KEPT_FILE, keptJson);
-const TEXT = ['package.json', 'CLAUDE.md', 'README.md', ...walk('.github'), ...walk('docs'), ...walk('ui'), ...walk('packs'), ...walk('scripts'), ...walk('test')]
+const TEXT = ['package.json', 'CLAUDE.md', 'README.md', ...walk('.github'), ...walk('docs'), ...walk('packs'), ...walk('scripts'), ...walk('test')]
   .filter((f) => /\.(md|json|ya?ml|ts|js|mjs|html)$/.test(f) && f !== 'scripts/gather.ts' && !UNTOUCHED.has(f) && existsSync(join(ROOT, f)));
 for (const f of TEXT) {
   const text = writes.get(f) ?? raw(f), next = runsByPath(text, removable, f, found);

@@ -5,8 +5,10 @@
 // it needs moves to the host (task e_qhrvu922).
 
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { pageImports, ratchet, rootOrder, uiFiles, VENDORED, walk } from './structure-kit.ts';
+import { pageImports, ratchet, ROOT, rootOrder, uiFiles, VENDORED, walk } from './structure-kit.ts';
 
 /** A served path's root, and so its place in the order; none for the app's own files. */
 const rootOf = (path: string) => /^packs\/([\w-]+)\/page\//.exec(path)?.[1];
@@ -87,20 +89,14 @@ test("the host's page imports one way along roots.json", () => {
 // and that import goes when its own cluster makes it a part of a map pack. A number here may be re-frozen only when
 // the boundary itself moves, as it did here and on 12 Nov; otherwise it falls. It moved once more the same day:
 // doc-lens.js, the picture mark's drawing, went to surface (task e_atxefw2s), so doc.js and item-doc.js count it.
-const APP_ON_HOST: Record<string, number> = {
-  'ui/keep-in-view.js': 2,
-};
 
 /** Whether a served path is the host's: a root pack's page/ folder. */
 const isHost = (path: string) => rootOf(path) !== undefined;
 
-test('the app asks the host by name, not by importing its files', () => {
-  const counted: Record<string, number> = {};
-  for (const f of uiFiles.filter((f) => f.startsWith('ui/') && f.endsWith('.js') && !VENDORED.includes(f))) {
-    const onHost = pageImports(f).filter(isHost).length;
-    if (onHost) counted[f] = onHost;
-  }
-  assert.deepEqual(ratchet(counted, APP_ON_HOST), [], 'Ask the host by name (a slot, a piece, a service the bridge offers), or make the module a part that does.');
+// The page is packs alone (the owner, 13 Nov 2026: everything a part, flat like the back end): ui/ is gone, every module a
+// part of a map pack or a root pack's own (task e_m6frzed9). Nothing brings it back.
+test("the page has no ui/ folder: every module is a pack's", () => {
+  assert.ok(!existsSync(join(ROOT, 'ui')), "Put a module of the page in a pack: a part in a map pack, or a root pack's page/ if it is the runtime.");
 });
 
 // A part (a map pack's parts/, run walled, its manifest's parts) imports only its own pack's files: everything else it

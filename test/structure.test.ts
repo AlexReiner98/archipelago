@@ -254,7 +254,7 @@ test('how things look lives in style presets, not in the kernel', () => {
 const CAPSULES: Record<string, number> = { 'packs/surface/page/shell.css': 1 };
 const CAPSULE = /(?:class(?:Name)?:\s*[`'"][^`'"]*?|\.)(?<![\w-])(?:pill|chip|[\w-]+-pill)(?![\w-])|999px|radius-pill/g;
 test('no term or control is wrapped in a capsule', () => {
-  const files = [...walk('ui'), ...walk('packs')].filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
+  const files = walk('packs').filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
   assert.deepEqual(ratchet(count(files, CAPSULE), CAPSULES), [], 'Draw it as a word with class mark and a tone (open, closed, ok, warn, bad): no background, padding or round ends.');
 });
 

@@ -37,7 +37,7 @@ export const rootPacks = rootPacksOf(Object.fromEntries(packIds.map((p) => [p, m
 export const rootCode = rootCodeOf(rootPacks.flatMap((p) => walk(`packs/${p}/kernel`)), rootPacks);
 /** The kernel's TypeScript: src/, and the root packs' code. */
 export const srcCode = kernelCodeOf([...walk('src'), ...rootCode], rootPacks);
-export const codeFiles = ['src', 'ui', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
+export const codeFiles = ['src', 'test', 'packs', 'scripts', 'examples'].flatMap(walk).filter((f) => CODE.test(f) && !VENDORED.includes(f));
 /** How many value imports of a file (static, re-exported or dynamic) name a pack that is not a root (a service pack's code, or a plain pack's). */
 export const serviceImports = (f: string) => valueImports(read(f), f).filter(({ kind, to }) => {
   const pack = kind !== 'bare' && kind !== 'require' && to ? packOfPath(to) : undefined;
@@ -46,7 +46,7 @@ export const serviceImports = (f: string) => valueImports(read(f), f).filter(({ 
 /** The order the roots start in (packs/roots.json): a root's page imports only from its own and those before it. */
 export const rootOrder = (JSON.parse(raw('packs/roots.json')) as { roots: { id: string }[] }).roots.map((r) => r.id);
 /** The files the page is served: the app's, in ui/, and the host's, in each root pack's page/. */
-export const uiFiles = [...walk('ui'), ...rootOrder.flatMap((p) => walk(`packs/${p}/page`))];
+export const uiFiles = [...rootOrder.flatMap((p) => walk(`packs/${p}/page`))];
 /** A served file by the name the page asks for it by. */
 export const served = servedNames(uiFiles);
 /** A page module's value imports of other served files, as paths: by served name, as the browser loads them. */
