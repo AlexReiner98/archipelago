@@ -89,6 +89,9 @@ test('the layout switch offers the packs’ layouts and the kept ones, moves the
   assert.deepEqual(sent, [['styles.delete_layout', { layout: 'e_lay00001' }]]);
   assert.deepEqual(went.pop(), { query, layout: {} }, 'then the default');
   check(part.update({ views: { layouts }, address: { query: null, layout: {} } }));
+  const styled = part.update({ views: { layouts: { ...layouts, named: [{ id: 'e_sty00001', title: 'Harbour blueprint' }] } }, address: { query, layout: { style: 'e_sty00001' } } });
+  check(styled);
+  assert.match(JSON.stringify(styled), /"names":\["Flow","Grid","Mine","Harbour blueprint"\]/, 'a style drawn with (Use here) is called by its title');
 });
 
 test('the styles pack’s actions answer with the ops each action makes, and touches nothing but a style or layout', async () => {
