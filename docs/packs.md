@@ -139,6 +139,7 @@ answering with marks the host checks.
 | `sends` | The actions it may send. | Each its own pack's. |
 | `opens` | The slots it draws for others to fill. | Named `<pack>.<name>`, or a piece or page the host no longer draws. |
 | `marks` | The marks it answers with (`box`, `text`, ...). | A list of mark kinds, checked by shape. One the host does not draw (`packs/walls/page/part-check.js`) makes the part wait, its pack still active; at draw, a mark it did not name is refused. |
+| `go` | Whether it may move the page: it is handed the page's `address` and, after a press or Enter, may name another (`tools.go`), which the canvas checks. | true or false. |
 | `modules` | Its code, files of the pack entered at `index.js`, as a layout's. | The files are there. |
 
 **A slot has one owner** (`packs/loader/kernel/slots.ts`). The host owns its

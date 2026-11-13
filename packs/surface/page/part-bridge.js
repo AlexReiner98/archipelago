@@ -16,6 +16,8 @@ import { goingOut } from './part-going.js';
 const pressLasts = 2000;
 /** What the person does that a part may answer with one action as theirs: a press, a tick in a note's checklist, and a pick (a day, yes or no, one of a field's values, an item found), and an item picked on the canvas. */
 const GESTURES = ['press', 'tick', 'pick', 'picked'];
+/** What the person does that a part may answer by moving the page: those, and Enter in its input. */
+const MOVES = [...GESTURES, 'submit'];
 
 /**
  * Bridge one pack version's port. `partOf(id)` is the part mounted under that id ({ id, title, sends, hash, island?, host? }):
@@ -23,8 +25,8 @@ const GESTURES = ['press', 'tick', 'pick', 'picked'];
  * the parts everything through `send`, so a press is counted; hand each message from the port to `heard`, which
  * answers true when it was an action it took.
  */
-export function partBridge(port, { partOf } = {}) {
-  const pressed = new Map(), busy = new Set();
+export function partBridge(port, { partOf, go } = {}) {
+  const pressed = new Map(), moved = new Map(), busy = new Set();
   const answer = (asked, result) => port.postMessage({ type: 'acted', asked, ...result });
 
   async function act(said) {
@@ -57,15 +59,27 @@ export function partBridge(port, { partOf } = {}) {
     }
   }
 
+  // A move is a part naming another address for the page (`go` in its manifest): only just after the person pressed,
+  // ticked or pressed Enter in it, so a part never moves the page on its own. The page (`go`) checks the address.
+  function moveTo(said) {
+    const id = String(said.id), part = partOf?.(id), at = moved.get(id);
+    moved.delete(id);
+    if (!part?.go || !(at && performance.now() - at < pressLasts)) return;
+    pressed.delete(id);
+    go?.(said.address);
+  }
+
   return {
     /** Send the version's parts a message: a `press` (or a note's `tick`) lets that part send one action as its own. */
     send(message) {
       if (message?.type === 'event' && GESTURES.includes(message.event?.name)) pressed.set(String(message.id), performance.now());
-      if (message?.type === 'unmount') (pressed.delete(String(message.id)), busy.delete(String(message.id)));
+      if (message?.type === 'event' && MOVES.includes(message.event?.name)) moved.set(String(message.id), performance.now());
+      if (message?.type === 'unmount') (pressed.delete(String(message.id)), moved.delete(String(message.id)), busy.delete(String(message.id)));
       port.postMessage(message);
     },
-    /** A message from the port: true when it was an action, taken here. */
+    /** A message from the port: true when it was an action or a move, taken here. */
     heard(said) {
+      if (said?.type === 'go') return (moveTo(said), true);
       if (said?.type !== 'act') return false;
       void act(said);
       return true;

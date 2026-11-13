@@ -76,3 +76,31 @@ test('in a browser, a part’s own change is shown going out, a pressed one is n
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('in a browser, a part that declares go moves the page after a press or Enter, never on its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base } = await serve('off');
+  const page = await open(`${base}/`);
+  try {
+    const got: any = await page.evaluate(`(async () => {
+      const { partBridge } = await import('/part-bridge.js');
+      const went = [];
+      const parts = { a: { id: 'shelf.find', title: 'Find', go: true }, b: { id: 'shelf.row', title: 'Row' } };
+      const bridge = partBridge({ postMessage() {} }, { partOf: (id) => parts[id], go: (address) => went.push(address) });
+      const to = (id, n) => bridge.heard({ type: 'go', id, address: { query: { filter: { find: ['type task'] } }, n } });
+      to('a', 'unasked');
+      bridge.send({ type: 'event', id: 'a', event: { name: 'edit', value: 'ta' } });
+      to('a', 'typing');
+      bridge.send({ type: 'event', id: 'a', event: { name: 'submit', value: 'task' } });
+      to('a', 'enter');
+      to('a', 'again');
+      bridge.send({ type: 'event', id: 'a', event: { name: 'press' } });
+      to('a', 'press');
+      bridge.send({ type: 'event', id: 'b', event: { name: 'press' } });
+      to('b', 'undeclared');
+      return went.map((a) => a.n);
+    })()`);
+    assert.deepEqual(got, ['enter', 'press'], 'one move for each press or Enter, none unasked, none from a part that does not declare go');
+  } finally {
+    await page.close();
+  }
+});

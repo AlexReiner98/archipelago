@@ -225,6 +225,8 @@ function partInside() {
     // Words the person has not saved yet, kept by the page in its browser for this part on this item (and `name`), and
     // handed back as `kept` when it is mounted again; nothing (null) lets them go.
     keep: (value, name = '') => send({ type: 'keep', id, name: String(name), value: value ?? null }),
+    // Another address for the page, from a part that declares `go`: the page checks it and moves, after a gesture only.
+    go: (address) => send({ type: 'go', id, address }),
   });
 
   // One part's words at a time, in the order they came: a part is never told of an event before it is mounted.
