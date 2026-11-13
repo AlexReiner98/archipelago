@@ -51,8 +51,7 @@ const onYou = (open = []) =>
     .filter((s) => YOURS[s.session?.state])
     .sort((a, b) => (Date.parse(a.session.since) || 0) - (Date.parse(b.session.since) || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 /** The count's tooltip: one line for each waiting on the owner, by its line, oldest first. */
-const countTip = (yours, nameOf) => yours.map((s) => `${YOURS[s.session.state].mark} ${nameOf(s)}: ${s.session.line ?? YOURS[s.session.state].said}`).join('
-');
+const countTip = (yours, nameOf) => yours.map((s) => `${YOURS[s.session.state].mark} ${nameOf(s)}: ${s.session.line ?? YOURS[s.session.state].said}`).join('\n');
 
 /** The sessions open now, as the `sessions` view last answered. */
 let open = [];
