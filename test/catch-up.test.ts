@@ -18,7 +18,7 @@ import { agent, fresh, human, make } from './map.ts';
 async function pageModules() {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-catch-up-'));
   writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
-  for (const f of ['project.js', 'ghosts.js', 'replica.js', 'membership.js', 'changes.js', 'catch-up-steps.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
+  for (const f of ['project.js', 'replica.js', 'membership.js', 'changes.js', 'catch-up-steps.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
   const load = (f: string) => import(pathToFileURL(join(dir, f)).href);
   return { replica: await load('replica.js'), changes: await load('changes.js'), steps: await load('catch-up-steps.js') };
 }

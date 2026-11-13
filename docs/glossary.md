@@ -147,7 +147,7 @@ kept hand places is retired: nothing appends to it, and since 11 Nov 2026
 (e_yt84zyvj) no rule keeps it, so compaction leaves what little is left.
 
 **ghost.** A held change drawn where it would land on the canvas: a faint
-node, a dashed wire, a badge. In the code: `ui/ghosts.js`.
+node, a dashed wire, a badge. In the code: the write pack's part on the slot `ghosts` decides them, `packs/surface/page/replica.js` draws them in.
 
 **pack.** A folder under `packs/` with a `pack.json`, its manifest of
 twenty keys (`docs/packs.md`): the types, links, rules, views, actions,
