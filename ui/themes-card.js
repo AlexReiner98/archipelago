@@ -2,6 +2,9 @@
 // chosen), each a swatch painted in its own paper, ink and sea for the scheme the screen is in. A click tries one on
 // this screen alone; Keep makes it the workspace's and retires any other kept theme; the house swatch lets the kept
 // one go. Nothing here is a colour of the page's own: each swatch is painted from its preset.
+//
+// Stays here until the host can hold it as a map pack's part (decision e_85tk2x7d): a slot on the Workspace page, a
+// swatch mark painted from a preset, and a try on one screen. The styles pack is internal: its change is the pack's.
 
 import { api, ask, h, may, state, tell } from './base.js';
 import { loadSchema } from './words.js';
