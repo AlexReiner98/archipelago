@@ -50,14 +50,16 @@ export const askSlot = (slot, input) => import('./part-host.js').then((m) => m.a
 
 /**
  * Look mode (`?look`): on the first word of a drawing, from the canvas or from a page that draws one, mount the part
- * that fills `look` on a hidden node, two frames on, so the page has painted before it says so. The part is handed
- * what was drawn and publishes it as page state; with no part, or a part that fails, the state is said here instead,
- * so whatever is waiting for the picture is never left waiting. Mounting a frame slot is the runtime's, not the app's.
+ * that fills `look` on a hidden node, two frames on, so the page has painted before it says so. The part is handed what
+ * was drawn and publishes it as page state (packs/look_draw/parts/page). Mounting a frame slot is the runtime's work,
+ * not the app's, so no module of the app reaches for drawSlot.
+ *
+ * Nothing is said here when no part fills the slot: the page's own word is the page's, and saying "error" for an empty
+ * slot told every look it had failed (test/looks.test.ts at bbb5e593). A part that throws is a real failure and is said.
  */
 if (typeof location === 'object' && new URLSearchParams(location.search).has('look')) {
-  const root = document.documentElement;
-  const said = (why, state = 'error') => ((root.dataset.look_why = String(why).slice(0, 300)), (root.dataset.look = state));
   const first = (ev) => {
+    const root = document.documentElement;
     if (ev.target !== root && !ev.target.closest?.('#canvas')) return;
     document.removeEventListener('view-drawn', first);
     const { state, why } = ev.detail ?? {};
@@ -66,7 +68,10 @@ if (typeof location === 'object' && new URLSearchParams(location.search).has('lo
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const node = Object.assign(document.createElement('div'), { hidden: true });
       document.body.append(node);
-      drawSlot(node, { slot: 'look', piece }).then((drawn) => drawn || said('No part fills the slot look.'), (err) => said(err?.message ?? err));
+      drawSlot(node, { slot: 'look', piece }).then(
+        (drawn) => drawn || node.remove(),
+        (err) => ((node.remove(), (root.dataset.look_why = String(err?.message ?? err).slice(0, 300)), (root.dataset.look = 'error'))),
+      );
     }));
   };
   document.addEventListener('view-drawn', first);

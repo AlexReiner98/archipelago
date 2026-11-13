@@ -1,4 +1,4 @@
-// The Follows menu of a tab (ui/tab-bar.js): the chats open now, by title. Beside test/show-lands.test.ts.
+// The Follows menu of a tab (packs/panes/page/tab-bar.js): the chats open now, by title. Beside test/show-lands.test.ts.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

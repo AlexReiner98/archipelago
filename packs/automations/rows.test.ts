@@ -1,5 +1,5 @@
 // Automations as rows, run without a database: the automations, their spans and firings in, one row of marks each out.
-// How the page draws a row's marks is the kernel's (ui/screens.js).
+// How the page draws a row's marks is the kernel's (packs/sheet/page/screens.js).
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

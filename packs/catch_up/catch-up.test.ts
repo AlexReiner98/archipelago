@@ -31,7 +31,7 @@ test('rows as they were and are make a change set, and the line a trace says', (
   const book = traceBook(undefined);
   assert.equal(trace(book, set, 'agent:claude'), false, 'one\'s own change is not traced');
   assert.equal(trace(book, set, 'human:alex'), true);
-  assert.deepEqual(traceMarks(book)[0], ['trace', { item: 'e_aaaaaaaa', tip: 'Session Coll, doing: Started it', word: 'Coll' }]);
+  assert.deepEqual(traceMarks(book)[0], ['trace', { item: 'e_aaaaaaaa', tip: 'Session Coll, doing: Started it', hue: 'Coll' }]);
   assert.equal(sawIt(book, 'e_aaaaaaaa', 10), true);
   const kept = keptOf(book, 10, 30);
   assert.equal(trace(traceBook(kept), set, 'human:alex'), true, 'the others still wait');
@@ -46,4 +46,15 @@ test('steps are chapters by maker, each island its own', () => {
   const steps = stepsOf(entries, { islands: { e_aaaaaaaa: 'e_islanda1', e_bbbbbbbb: 'e_islandb1' } });
   assert.deepEqual(steps.map((s: any) => [s.chapter, s.island, s.pos, s.ids]), [[0, 'e_islanda1', 2, ['e_aaaaaaaa']], [0, 'e_islandb1', 2, ['e_bbbbbbbb']], [1, 'e_islanda1', 3, ['e_aaaaaaaa']]]);
   assert.equal(changedCount(steps), 2);
+});
+
+test('a part mounted after the slot was told hears the last it was told', async () => {
+  // @ts-expect-error: plain modules of the pack, with no types of their own.
+  const replay = (await import('./parts/replay.js')).default;
+  // @ts-expect-error: plain modules of the pack, with no types of their own.
+  const traced = (await import('./parts/traced.js')).default;
+  const entries = [{ pos: 2, by, facts: [['+', 'e_aaaaaaaa', 'status', 'doing']], rows: [{ id: 'e_aaaaaaaa', was: task('A'), now: task('A', 'doing') }] }];
+  assert.match(JSON.stringify(replay({ told: { name: 'missed', entries } }, {}).marks), /"1 changed"/);
+  const rows = [{ id: 'e_aaaaaaaa', was: task('A'), now: task('A', 'doing'), by, pos: 2 }];
+  assert.equal(traced({ me: 'human:alex', told: { name: 'beat', from: 1, to: 2, rows } }, {}).marks.length, 3);
 });

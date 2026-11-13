@@ -1,4 +1,4 @@
-import { api, h, hooks, state } from './base.js';
+import { api, h, state } from './base.js';
 import { changeSet, touched as marked } from './changes.js';
 import { before, replay, rewind, rowsAt, stepsOf } from './catch-up-steps.js';
 import { project } from './project.js';
@@ -73,8 +73,6 @@ export async function catchUp(view) {
   const { kinds } = view;
   const then = before(view, rowsAt(kinds, was.entries), entries);
   trace(changeSet(then, kinds, entries, { after: from, gone })).catch(() => {});
-  // The parts on `traces` are handed what was missed, entry by entry (each row's island is on it), and one beat for the whole span (task e_p3tygg6p).
-  hooks.tellMissed?.(then, kinds, entries, { from, to, gone });
   const me = await whoami();
   const steps = stepsOf(kinds, then, entries, me.actor);
   if (!steps.length) return;

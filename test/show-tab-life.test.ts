@@ -1,4 +1,4 @@
-// A chat's tab over its life (ui/tab-life.js, the tab lifecycle e_p6fr4uye): opened by its first show, out of sight;
+// A chat's tab over its life (packs/panes/page/tab-life.js, the tab lifecycle e_p6fr4uye): opened by its first show, out of sight;
 // closed by hand or gone quiet it stays closed until its next show; it ends with the chat. Beside test/show-lands.test.ts.
 
 import assert from 'node:assert/strict';

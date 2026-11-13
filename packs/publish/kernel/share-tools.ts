@@ -14,6 +14,7 @@ import { sharedViews, sharePlan } from './public-view-freeze.ts';
 import { publish, publishAll, unpublish } from './published.ts';
 import { publishedState, publishPlan } from './published-freeze.ts';
 import { picturesOf } from './published-pictures.ts';
+import { pageMarks } from './page-marks.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 
@@ -64,6 +65,16 @@ const DOCUMENT = 'The document.';
 const WITHIN = 'The item that holds the documents.';
 
 /** answer.reading: a document read whole with the drawing of each view it brings in, as publishing would keep it: what its sheet reads (its pack's part, parts/reading). */
+/**
+ * A document as its reader meets it with their own sign-in (/read/<id>): read whole as they may see it, with the look
+ * its style gives a page and the marks the reader's part draws it with (./page-marks.ts).
+ */
+export async function readPage(ctx: KernelContext, input: { id: string }) {
+  const doc = await reading(ctx, input);
+  const page = { ...doc, ...(await ctx.call<Record<string, unknown>, Record<string, unknown>>('page.look', { ...doc, id: input.id })) };
+  return { ...page, ...(await pageMarks(ctx, 'page.doc', page, { own: true })) };
+}
+
 export async function reading(ctx: KernelContext, input: { id: string }) {
   const doc = await readDocument(ctx, input.id);
   const sections = doc.parts.flatMap((p) => ('section' in p ? [p.section] : []));
@@ -77,9 +88,9 @@ export const SHARE_TOOLS: Record<string, ShareTool> = {
     description:
       'A document read whole, as its reader meets it (any other item is read the same way, by its note): its text, and in their places the items it brings in (a line of its note holding only an item’s id), each with its title, state and note. ' +
       'To write one, make an item of type document (or any type a screen reads whole) whose note is the text, and put an item’s id alone on a line where that item belongs; a lens’s id brings in its view, drawn live in the app. Write each such item for the document’s reader, and make it part of the document (part_of), so the document holds its sections and what the document is part of shows the document, not each section; not_inside names the sections kept elsewhere. A section can be brought into other documents too. Only the owner can give someone a link to it.',
-    input: { id: 'string', 'drawn?': 'boolean' },
-    says: { drawn: 'true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft.' },
-    run: async (ctx, _actor, input: { id: string; drawn?: boolean }) => (input.drawn ? reading(ctx, input) : readDocument(ctx, input.id)),
+    input: { id: 'string', 'drawn?': 'boolean', 'page?': 'boolean' },
+    says: { drawn: 'true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft.', page: 'with drawn, as its page is read: with the look its style gives a page and the marks its reader draws it with (/read/<id>).' },
+    run: async (ctx, _actor, input: { id: string; drawn?: boolean; page?: boolean }) => (input.drawn && input.page ? readPage(ctx, input) : input.drawn ? reading(ctx, input) : readDocument(ctx, input.id)),
   },
   share_create: {
     description: 'Make a view, a document or any item public as it stands now, frozen, at /p/<workspace>/<id> for anyone and for search engines (and at its path on its site, when it has one). What is private is left out; share_plan says what goes out first. Sharing it again replaces what is public. Only a person shares: an agent asks with the ask verb, action share_ask.',

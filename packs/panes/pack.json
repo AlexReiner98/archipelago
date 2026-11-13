@@ -2,7 +2,45 @@
   "id": "panes",
   "version": "0.1.0",
   "title": "Panes",
-  "description": "The panes of the page and the bar of tabs across them: where each pane stands, what it holds, how one is dragged, landed and addressed, and the tab bar over them with each tab's life. A root pack, so its parts change only through a root re-pin (task e_d5ewsvgf).",
+  "description": "The panes of the page and the bar of tabs across them: where each pane stands, what it holds, how one is dragged, landed and addressed, and the tab bar over them with each tab's life. A root pack, so its code changes only through a root re-pin (task e_d5ewsvgf).",
+  "uses": [
+    "service:answer.sessions"
+  ],
+  "parts": [
+    {
+      "id": "panes.panes",
+      "title": "Panes and tabs",
+      "slot": "tabs",
+      "marks": [
+        "box",
+        "text",
+        "button",
+        "menu",
+        "panes",
+        "pane"
+      ],
+      "go": true,
+      "state": [
+        "front",
+        "lands_in",
+        "front_chat",
+        "front_follows"
+      ],
+      "modules": {
+        "index.js": "parts/index.js",
+        "model.js": "parts/model.js",
+        "strip.js": "parts/strip.js",
+        "route.js": "parts/route.js",
+        "life.js": "parts/life.js"
+      },
+      "views": [
+        {
+          "name": "sessions",
+          "live": true
+        }
+      ]
+    }
+  ],
   "kernel": {
     "trust": "root",
     "internal": true

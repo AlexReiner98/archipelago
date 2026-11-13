@@ -55,8 +55,8 @@ test('parts is a key of the manifest, and a map pack’s alone', () => {
   const both = readManifest(JSON.stringify({ ...shelf(), types: bin.types }), 'test');
   const kernel = sharedOf([readManifest(JSON.stringify({ id: 'core', version: '1', title: 'core', shared: [] }), 'core')]);
   assert.match(islandProblems(both, kernel).join(), /a map pack \(actions, parts\): split it/);
-  // The host owns its frame, the pieces it draws, and the two pages it still draws itself: a document read whole and a
-  // published page (ui/doc.js, ui/public.js), each a slot until the reader and publish packs draw it (task e_atxefw2s).
+  // The host owns its frame, the pieces it draws, and the two pages read with no login: a document's and a product's,
+  // whose parts (publish.doc, publish.public) run as the page is published and are drawn frozen (decision e_rhz4dvpk).
   assert.ok(HOST_SLOTS.includes('piece.figure') && HOST_SLOTS.includes('canvas'), 'the host owns its frame and the pieces it draws');
   assert.deepEqual(HOST_SLOTS.filter((s) => s.startsWith('page.')), ['page.doc', 'page.public'], 'the pages the host still draws');
 });
@@ -88,7 +88,7 @@ test('the host offers these slots, each handing the part what it is named with',
     ghosts: ['held', 'drawn', 'loose'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
-  assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'diagram', 'button', 'count']);
+  assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'button', 'count']);
   // One name, one owner: no slot is named twice, and every one of them is open to any pack.
   assert.equal(new Set(HOST_SLOTS).size, HOST_SLOTS.length);
 });

@@ -42,7 +42,10 @@ export async function publishedAct(at: ActPlaces, pack: ServerPackFile, act: Ser
       const doc = l && ((act === 'public.read' ? await publicView(l, key) : await publicViewAt(l, key)) as Doc | null);
       if (!l || !doc) return null;
       const id = String(doc.id);
-      return (await published()).pageData({ ...doc, id, ...(await callAs<Record<string, unknown>>(l, 'page.look', { ...doc, id })) }, publicPath(workspace, id));
+      const page = { ...doc, id, ...(await callAs<Record<string, unknown>>(l, 'page.look', { ...doc, id })) };
+      // One published before pages kept their marks has them made the first time it is served (the publish pack's surface.page_marks).
+      const marked = doc.marks ? page : { ...page, ...(await onMap<Record<string, unknown>>(l, 'surface.page_marks', page).catch((err: Error) => ({ marks_error: String(err?.message ?? err).slice(0, 300) }))) };
+      return (await published()).pageData(marked, publicPath(workspace, id));
     }
     case 'public.picture': {
       const id = word(input.id, ID, 'An id');

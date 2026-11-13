@@ -79,6 +79,14 @@
         "out": "any",
         "run": "parts-read.ts#parts"
       },
+      "root.part_marks": {
+        "in": {
+          "slot": "string",
+          "input": "any"
+        },
+        "out": "any",
+        "run": "part-marks.ts#partMarks"
+      },
       "root.pack_view": {
         "in": {
           "pack": "string",

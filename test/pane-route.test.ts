@@ -1,4 +1,4 @@
-// Where an agent's step lands among the owner's tabs and their panes (ui/pane-route.js), from whom each tab follows:
+// Where an agent's step lands among the owner's tabs and their panes (packs/panes/page/pane-route.js), from whom each tab follows:
 // decisions e_622ev534 (a place per session), e_nwmx4tbd (an agent's panes by name), e_y7uz9pk9 (changes as shows),
 // and for tabs e_mzer5m4t (tabs at the top, each with its splits), e_q3amet26 (no most), e_xjrpyysn (a background tab
 // when the reader is busy), and a pane of its own for each session, never the reader's in focus (the owner, 28 Oct 2026);
@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // A UI module, plain JavaScript with no types of its own.
-const { followable, hear, heard, hearOpen, nameOf, route } = (await import(`../ui/${'pane-route.js'}`)) as {
+const { followable, hear, heard, hearOpen, nameOf, route } = (await import(`../packs/panes/page/${'pane-route.js'}`)) as {
   followable: (at: { now: number; recent: number }) => string[];
   nameOf: (key: string) => string;
   hear: (step: object) => void;

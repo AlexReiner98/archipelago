@@ -2,7 +2,7 @@
   "roots": [
     {
       "id": "core",
-      "hash": "42ad63072073fbb28e4a90361fa14d92ae11658ff0dfe1a8275ed9793cae518e"
+      "hash": "d212eaef179cdad4c482058f4020bd68c693824b59ae9b16659973adf7135209"
     },
     {
       "id": "database",
@@ -18,15 +18,15 @@
     },
     {
       "id": "identity",
-      "hash": "9f4ed8aa986af14209e347bb38cfe028ada7c587918e77ae47f2bf8d8414ac15"
+      "hash": "43c1f8d948f2d32868b309abb98e5a38bf18d02d2f7f831596bc5a7a69f86e1f"
     },
     {
       "id": "walls",
-      "hash": "dc48f9cb85bb107cb6311224badf209ab1782414b6fc630d69dd74fc8dcb4a46"
+      "hash": "6254f3d5f2736e24b82e53f5883316beb7d34ec3fb408c26e4c514fa1098a41d"
     },
     {
       "id": "loader",
-      "hash": "e9ba8a9c31af693c1732fc4b5b08eaedd1204bb10ec6b38027ae1dd32835501f"
+      "hash": "cd3ac02e7c83f534226663cb626138b575ccd5365a824d21e9d8b96d913afda0"
     },
     {
       "id": "rules",
@@ -34,23 +34,23 @@
     },
     {
       "id": "write",
-      "hash": "adcf1846610736ef5d03f2983a6edf489e1aef541a4203db04b82fa6606e20d4"
+      "hash": "0703ca96a636477621b20f42c5ba0fd4c8984cb08ab829fe3464dc25d76baa44"
     },
     {
       "id": "surface",
-      "hash": "7423634be77c82afd601521cc30a93aeab24e4534c62e2fe93dcc763575282ff"
+      "hash": "a7325f1e4e99dde0edf9c76ff46f45bd940f96efcf1b77090a3b39e192cc1d19"
     },
     {
       "id": "panes",
-      "hash": "ace59170fbe15cc19fd809c143089eea296fe870f3115831cf2ae345d3c2f473"
+      "hash": "23281fa866f7a74952369192305103845241dd6d9c3f6fc8c6dedaf9f23e902d"
     },
     {
       "id": "bar",
-      "hash": "7d7e229542e5123e5fc1969714cff618d858e728d1fce4e19de17d9fcdae19d6"
+      "hash": "6deeffcd831901a7fee37f24a7cc5d432f66f45182a49e208100ddd9c7dbef85"
     },
     {
       "id": "sheet",
-      "hash": "fab34b6295cb97225e071eedc07a37dfd2e020761e0e1acf9719e471dcae1a30"
+      "hash": "1fa991cd4b3d9e93a576e98dde277ff298302a826c830b51db7d10a8d3beaf27"
     }
   ],
   "calls": {
@@ -90,6 +90,9 @@
       "publish"
     ],
     "root.scene": [
+      "publish"
+    ],
+    "root.part_marks": [
       "publish"
     ],
     "root.parts": [

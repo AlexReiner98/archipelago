@@ -1,9 +1,8 @@
-import { api, h, hooks, main, route, state } from './base.js';
+import { api, h, hooks, main, route, state, whoami } from './base.js';
 import { changeSet } from './changes.js';
-import { beatRows, missedRows } from './beat-rows.js';
+import { project } from './project.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { trace } from './traces.js';
-import { looked } from './catch-up.js';
 import { still } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { numberOf } from './query-base.js';
@@ -20,6 +19,113 @@ import { relations, starterOf, types } from './words.js';
 // offers the refresh instead. A change elsewhere on the map leaves the page still.
 export let uiFiles;
 export let outdated = false;
+
+// ---- what changed, handed to the trace overlay as data (the slot `traces`, the catch_up pack's parts) -------------
+//
+// The runtime holds the store and the projector (packs/log/kernel/project.ts); the parts decide what a change was and
+// what to trace or play. So each beat is told as the rows it touched, as they stood before it and after, projected on
+// a copy (the store itself is never moved here), with the maker of the last entry that touched each.
+
+const rowOf = (held, id) => (id.startsWith('r_') ? held.links : held.items).get(id) ?? null;
+/** The rows `entries` touch in `held` ({ items, links }), as they were and are, each with its latest maker; `gone` left. Answers the rows and the copy as it ends. */
+function rowsOf(held, kinds, entries, gone = []) {
+  const now = { items: new Map(held.items), links: new Map(held.links) };
+  const first = new Map();
+  const last = new Map();
+  const note = (id) => first.has(id) || first.set(id, rowOf(now, id));
+  for (const e of entries) {
+    for (const f of e.facts) {
+      note(f[1]);
+      if (f[2] === 'forgotten') for (const [rid, r] of now.links) if (r.from_id === f[1] || r.to_id === f[1]) note(rid);
+    }
+    const moved = project(now, kinds, e.at, e.facts, Boolean(e.moved));
+    for (const id of [...moved.items, ...moved.links, ...moved.gone]) last.set(id, { ...(e.by && { by: e.by }), at: e.at, pos: e.pos });
+  }
+  for (const id of gone) if (rowOf(now, id)) (note(id), now.items.delete(id), now.links.delete(id));
+  const to = Math.max(0, ...entries.map((e) => e.pos));
+  return { rows: [...first].map(([id, was]) => ({ id, was, now: rowOf(now, id), ...(last.get(id) ?? { pos: to }) })), now };
+}
+
+/** Where the log stood when the person last looked, kept in this browser for each workspace: read once, as the page opens. */
+const lookedKey = whoami().then((j) => `pelago-looked-${j?.workspace?.id ?? 'default'}`, () => 'pelago-looked-default');
+const lookedAt = lookedKey.then((k) => {
+  try {
+    const v = Number(localStorage.getItem(k));
+    return Number.isFinite(v) && v > 0 ? v : undefined;
+  } catch {
+    return undefined;
+  }
+});
+/** The person has looked at the map as it stands at `pos`: kept for the next page, only while it is in sight. */
+function looked(pos) {
+  if (document.hidden || pos === undefined) return;
+  lookedAt.then(() => lookedKey).then((k) => {
+    try {
+      localStorage.setItem(k, String(pos));
+    } catch {
+      // Without storage a page opened later has nothing to catch up from.
+    }
+  });
+}
+
+/** What a view held before `entries`, from what it holds now and every fact said of their rows up to then (`was`). */
+function rowsBefore(view, kinds, was, entries) {
+  const at = { items: new Map(), links: new Map() };
+  for (const e of was) project(at, kinds, e.at, e.facts);
+  const out = { items: new Map(view.items), links: new Map(view.links) };
+  const made = new Set(entries.flatMap((e) => e.facts.filter((f) => f[0] === '+' && (f[2] === 'type' || f[2] === 'link')).map((f) => f[1])));
+  for (const e of entries) for (const f of e.facts) {
+    const key = f[1].startsWith('r_') ? 'links' : 'items';
+    const row = at[key].get(f[1]);
+    const held = view[key];
+    if (row && held.has(f[1])) out[key].set(f[1], held.get(f[1])?.session ? { ...row, session: held.get(f[1]).session } : row);
+    else if (made.has(f[1])) out[key].delete(f[1]);
+  }
+  return out;
+}
+
+let missedTold = false;
+/**
+ * Tell the trace overlay what changed on a canvas's store since the person last looked, once a page: the whole span
+ * as a beat (traced until seen), and each entry with its rows (`missed`, played by catch_up.replay). The view's store
+ * keeps where it was (`store.missed`), so a replay mark can take it back there.
+ */
+export async function tellMissed(view) {
+  if (missedTold || !view?.store) return;
+  missedTold = true;
+  const from = await lookedAt;
+  const to = view.pos;
+  if (from === undefined || !(from < to)) return;
+  const most = numberOf(state.style, 'catch_up_entries_most');
+  const ids = [...view.ids, ...view.links.keys()];
+  const entries = [];
+  let gone = [];
+  for (let after = from; after < to; ) {
+    const beat = await api('tail', { after, ids });
+    entries.push(...(beat.entries ?? []).filter((e) => e.pos <= to));
+    gone = [...gone, ...(beat.gone ?? [])];
+    if (entries.length > most) return;
+    if (!beat.more || beat.pos <= after) break;
+    after = beat.pos;
+  }
+  if (!entries.length) return;
+  const touched = [...new Set(entries.flatMap((e) => e.facts.map((f) => f[1])))];
+  const { was } = await api('tail', { was: from, ids: touched });
+  const { kinds } = view;
+  const then = rowsBefore(view, kinds, was.entries ?? [], entries);
+  view.store.missed = { view, then, entries, from, to };
+  hooks.tellSlot?.('traces', { name: 'beat', from, to, rows: rowsOf(then, kinds, entries, gone).rows });
+  let at = then;
+  const each = entries.map((e) => {
+    const { rows, now } = rowsOf(at, kinds, [e]);
+    at = now;
+    return { pos: e.pos, at: e.at, by: e.by, ...(e.moved && { moved: e.moved }), facts: e.facts, rows: rows.map(({ id, was, now }) => ({ id, was, now })) };
+  });
+  const islands = Object.fromEntries([...then.items].map(([id, r]) => [id, r.props?.island ?? '']));
+  hooks.tellSlot?.('traces', { name: 'missed', from, to, entries: each, islands });
+}
+// The canvas asks for it by name (packs/surface/page/canvas.js), never by importing this file.
+hooks.tellMissed = tellMissed;
 // Refresh throws away words not yet saved, so it asks first (ui/draft.js); loaded when clicked, as draft.js reaches
 // this module through the canvas and a static import would close the loop.
 const refresh = async () => {
@@ -180,16 +286,6 @@ function touchedBy(beat, pos) {
   return { ids: [...ids], made: beat.made ?? 0 };
 }
 
-/**
- * What was missed since the person last looked (ui/catch-up.js says when, by name), handed to the parts on `traces`:
- * entry by entry from the rows as they were (each row's island is on it), and one beat for the whole span.
- */
-hooks.tellMissed = (then, kinds, entries, { from, to, gone = [] }) => {
-  if (!hooks.slotFilled?.('traces')) return;
-  hooks.tellSlot('traces', { name: 'missed', from, to, entries: missedRows(then, kinds, entries) });
-  hooks.tellSlot('traces', { name: 'beat', ...beatRows(then, kinds, entries, { after: from, gone }) });
-};
-
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;
 export async function checkTail() {
@@ -209,13 +305,15 @@ export async function checkTail() {
     // Only an answer that read the facts moves the store: one that says only where the log stands would skip them.
     if (beat.entries && following) {
       try {
-        // What the facts changed of what the store held, worked out before they are folded in, once: traced until seen (ui/traces.js).
+        // What the facts changed of what the store held, worked out before they are folded in, once: told to the trace
+        // overlay as rows (catch_up.changes); where no part hears it yet, traced as before (ui/traces.js).
         const fresh = store.fresh(beat.entries);
-        const set = changeSet(store, kinds, fresh, { after: store.pos, gone: beat.gone });
-        // The parts on `traces` are handed the rows the beat touched, as they were and are, and decide what to trace.
-        if (hooks.slotFilled?.('traces')) hooks.tellSlot('traces', { name: 'beat', ...beatRows(store, kinds, fresh, { after: store.pos, gone: beat.gone }) });
+        const from = store.pos;
+        const { rows } = rowsOf(store, kinds, fresh, beat.gone);
+        const set = changeSet(store, kinds, fresh, { after: from, gone: beat.gone });
         store.apply(beat);
-        trace(set).catch(() => {});
+        const told = rows.length ? hooks.tellSlot?.('traces', { name: 'beat', from, to: beat.pos, rows }) ?? 0 : 0;
+        if (!told) trace(set).catch(() => {});
       } catch (err) {
         console.error(err);
       }

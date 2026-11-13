@@ -21,13 +21,17 @@ import { pageType } from './page-schema.js';
 import { endPart, partPort } from './layout.js';
 import { MARKS, checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
-import { pickOnCanvas } from './canvas-pick.js';
-import { itemOf, waysBetween } from './layout-asks.js';
+import { lightItems } from './light-items.js';
+import { sessionHue } from './words.js';
 import { addressSaid, queryGiven } from './part-lens.js';
+import { cut, findFor, keepFor, keptFor, keptKey, pickFor, settingsOf, styleValues, viewsOf, wholeWords } from './part-input.js';
 import { readFor } from './part-read.js';
 import { hearAway, tellAway } from './part-away.js';
 import { focusWindow, goHash, hearPage, openWindow, pageOf } from './part-page.js';
 import { AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
+import { paintSwatch, tryTheme } from './swatch.js';
+import { replayIn } from './replay.js';
+import { project } from './project.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -70,127 +74,18 @@ async function styleOn(island) {
   return styles.get(at);
 }
 
-const NAME = /^[a-z][a-z0-9_]*$/;
-/** What of a style a part is handed: its numbers, and its page settings that are words, numbers or yes and no. */
-function styleValues(style) {
-  const plain = (o, keep) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([k, v]) => NAME.test(k) && keep(v)));
-  return { numbers: plain(style?.numbers, Number.isFinite), page: plain(style?.page, (v) => ['string', 'number', 'boolean'].includes(typeof v)) };
-}
 
 /** A pack version's name for its worker: the pack and the hashes of its parts, so new code is a new worker. */
 const versionOf = (parts, pack) => `${pack}:${parts.filter((p) => p.pack === pack).map((p) => p.hash.slice(0, 12)).join('.')}`;
 
-/** The types an item is, nearest first: its own and each it is a flavour of. */
-function typesOf(item) {
-  const out = [item.type];
-  for (let t = pageType(item.type)?.flavour_of; t && !out.includes(t); t = pageType(t)?.flavour_of) out.push(t);
-  return [...out, ...(item.is ?? []).filter((t) => !out.includes(t))];
-}
-
-/** An item cut to what a part reads of its type: its id and type always, else nothing when it reads none of it. */
-/** An item as a part that reads items whole (`*`, a root pack's) is handed it: its head and every field. */
-const WHOLE = ['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'];
-/** The words with each type's fields and capabilities beside them, for a part that reads items whole. */
-const wholeWords = (words, schema) => ({ ...words, types: Object.fromEntries(Object.entries(words.types).map(([t, w]) => [t, { ...w, ...(schema[t] ?? {}) }])) });
-
-function cut(item, reads) {
-  if (reads === '*') return Object.fromEntries(WHOLE.filter((f) => item[f] !== undefined).map((f) => [f, item[f]]));
-  const fields = typesOf(item).map((t) => reads[t]).find(Boolean);
-  if (!fields) return null;
-  const all = { ...(item.props ?? {}), ...(item.fields ?? {}), ...item };
-  return { id: item.id, type: item.type, ...Object.fromEntries(fields.filter((f) => all[f] !== undefined).map((f) => [f, all[f]])) };
-}
-
-/** What of a piece's settings on its screen a part is handed: words, numbers, yes and no, and lists of words. */
-function settingsOf(piece) {
-  const fit = (v) => ['string', 'number', 'boolean'].includes(typeof v) || (Array.isArray(v) && v.length <= 50 && v.every((w) => typeof w === 'string'));
-  return Object.fromEntries(Object.entries(piece ?? {}).filter(([k, v]) => NAME.test(k) && k !== 'piece' && fit(v)));
-}
-
-/**
- * A view's param filled for where the part stands: `{here}` is the item's id, and a param that is only `{piece.<name>}`
- * is that setting of its piece, list or not. A param that is only one of these, with nothing to fill it, is left out.
- */
-function paramsFor(params, item, piece) {
-  const out = {};
-  for (const [k, p] of Object.entries(params ?? {})) {
-    if (typeof p !== 'string') { out[k] = p; continue; }
-    const set = /^\{piece\.([a-z][a-z0-9_]*)\}$/.exec(p)?.[1];
-    if (set) { if (piece[set] !== undefined) out[k] = piece[set]; continue; }
-    if (p === '{here}' && !item) continue;
-    out[k] = p.replaceAll('{here}', item?.id ?? '');
-  }
-  return out;
-}
-
-/** The named reads a part declared, each asked as the person looking, by name: one that fails is handed as null. */
-async function viewsOf(part, item, piece) {
-  const views = part.views.filter((v) => !v.live);
-  const asked = await Promise.all(views.map((v) => api('view', { name: v.name, params: paramsFor(v.params, item, piece) }).catch(() => null)));
-  return Object.fromEntries(views.map((v, i) => [v.name, asked[i] ?? null]));
-}
-
-/**
- * Words a part has not saved yet, kept in this browser by part, item and name until it lets them go (tools.keep): a
- * walled worker has no storage of its own. Storage may be blocked or full: then nothing is kept, and the words last as
- * long as the page.
- */
-const keptMost = 100000;
-// A part on an item keeps by the item; one that stands on none (the tabs, find) by the workspace, so two maps keep apart.
-const keptKey = (part, item, name = '') => `pelago-part:${part.id}:${item?.id ?? `ws.${state.workspace?.id ?? '-'}`}:${name}`;
-function keepFor(part, item, name, value) {
-  try {
-    const said = value === null || value === undefined ? null : JSON.stringify(value);
-    if (said === null || said.length > keptMost) localStorage.removeItem(keptKey(part, item, name));
-    else localStorage.setItem(keptKey(part, item, name), said);
-  } catch {
-    // Not kept: the words are still on the page.
-  }
-}
-function keptFor(part, item) {
-  const out = {};
-  try {
-    const prefix = keptKey(part, item);
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k?.startsWith(prefix)) out[k.slice(prefix.length)] = JSON.parse(localStorage.getItem(k));
-    }
-  } catch {
-    // Nothing could be kept, so nothing is handed back.
-  }
-  return out;
-}
-
-/** An item as a part is told of it when the person picks it, with the ways it may be linked to `from` when asked. */
-const pickedItem = (from, x, link) => {
-  const said = { id: x.id, title: x.title, type: x.type };
-  if (!link || !from) return said;
-  return { ...said, ways: waysBetween(from, x).map((w) => ({ type: w.type, from: w.from, to: w.to, verb: w.verb })) };
-};
-
-/** The items an item input offers as the person types: found as they may see them, of the types it names, and, for a link, only those it may be linked to. */
-async function findFor(from, q, types, link) {
-  const hits = (await Promise.all((types?.length ? types : [undefined]).map((type) => api('search', { q, ...(type && { type }), limit: 8 }).catch(() => [])))).flat();
-  return hits
-    .filter((x) => x.id !== from?.id && !String(x.type).startsWith('sys.'))
-    .map((x) => pickedItem(from, x, link))
-    .filter((x) => !link || x.ways.length)
-    .slice(0, 8);
-}
-
-/** The item clicked on the canvas for a pick button, as the person may read it; null when let go or unread. */
-async function pickFor(from, kind) {
-  const id = await pickOnCanvas(from?.id);
-  const other = id && (await itemOf(id));
-  return other ? pickedItem(from, other, kind === 'link') : null;
-}
 
 /** What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read them, and its piece's settings. */
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  // The page's origin, for a part that shows an address of this server (connect's MCP address): words only.
-  given = { ...given, origin: location.origin, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
+  // The theme this screen alone is painted in, if one is being tried (a button's `try`), so a part can say Keep or Stop;
+  // and the page's origin, for a part that shows an address of this server (connect's MCP address): words only.
+  given = { ...given, up: hooks.viewUp?.() ?? null, trying: state.trying ?? null, origin: location.origin, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
@@ -330,8 +225,19 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),
     pick: (kind) => pickFor(item, kind),
-    // What a mark lights while the person points at it: the app lights those items on the canvas and fades the rest.
-    lights: (ids) => hooks.lights?.(ids),
+    // What a mark lights while the person points at it: those items lit on the canvas in sight, the rest faded.
+    lights: (ids) => lightItems(hooks.viewUp?.() ?? null, ids?.length ? ids : null),
+    // A pane's canvas, drawn at its address by whoever keeps the panes (hooks.paneFrame), told back what is done in it.
+    frame: (at, el, said) => hooks.paneFrame?.(at, el, said) ?? null,
+    // A session's hue, named by its words, as every session is marked.
+    hue: (words) => sessionHue(words),
+    // A style preset's colours, and a theme tried on this screen alone: the page's, as a part paints no colour.
+    swatch: (preset, el) => paintSwatch(preset, el),
+    tryTheme: (preset) => tryTheme(preset),
+    // What the person missed, played on the canvas the part stands over (its store, hooks.storeUnder: ./canvas.js).
+    replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
+    // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
+    ghosts: (list) => hooks.ghosts?.(node, list),
     // A `slot` mark (decided 13 Nov 2026): a slot this part opens, filled by whatever parts fill it, drawn by the runtime
     // in the mark's node. The part holding it never sees them, nor they it; nested a few deep at most.
     slot: (name, el) => ((part.opens ?? []).includes(name) && depthOf(node) < slotsDeep ? drawParts(el, { slot: name, item, piece, openView, picture }) : Promise.resolve(0)),
