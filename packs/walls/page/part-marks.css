@@ -93,6 +93,9 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 
 /* A box that fits shows one line of its marks and counts the rest (packs/walls/page/part-fits.js). */
 .pm-fits { flex-wrap: nowrap; overflow: hidden; }
+/* Its marks keep their width rather than shrinking to an ellipsis, so the box overflows and the host can count what
+   does not fit (packs/walls/page/part-fits.js); without this they shrink, nothing overflows and nothing is counted. */
+.pm-fits > * { flex-shrink: 0; }
 .pm-fits > .pm-fits-rest { flex: none; cursor: default; }
 .pm-fits > button.pm-fits-rest { cursor: pointer; }
 /* A mark that lights items on the canvas says so when it is pointed at. */
@@ -170,3 +173,14 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 
 /* What a part says that is drawn nowhere itself: a trace (painted on its item's marks) and a replay (played on the canvas). */
 .pm-trace, .pm-replay { display: none; }
+
+/* A ghost is data the canvas reads back into its answer, drawn there where it would land, never here. */
+.pm-ghost { display: none; }
+/* Shapes on a paint surface filled as a diagram's are: an area, a box wires pass under, a strong box. */
+.pm-path-area { fill: var(--ln-inner, var(--panel)); stroke: var(--ln-line, currentColor); }
+.pm-path-box { fill: var(--ln-land, var(--bg)); stroke: var(--ln-line, currentColor); }
+.pm-path-strong { fill: var(--ln-text, var(--text)); stroke: var(--ln-line, currentColor); }
+.pm-plane a:is(:hover, :focus) > .pm-path { stroke: var(--ln-text, currentColor); }
+/* A paint surface's −, Fit and + in its corner. */
+.pm-zooms { position: absolute; right: var(--space-3); bottom: var(--space-3); display: flex; gap: var(--space-2); z-index: 2; }
+.pm-zoom { padding: var(--space-2) var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); color: var(--text); cursor: pointer; }

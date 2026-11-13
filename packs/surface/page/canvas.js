@@ -6,14 +6,34 @@
 // which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
 // themselves (a page opened or shut then leaves it be).
 
-import { api, hooks, idsOf, state } from './base.js';
+import { api, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { catchUp } from './catch-up.js';
 import { canvasSwitch } from './canvases.js';
-import { numberOf } from './query-base.js';
+import { moved, numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
+
+/** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
+let overlay;
+const actorOf = (a) => (typeof a === 'string' ? a : a?.kind ? `${a.kind}:${a.name}` : undefined);
+/**
+ * Catch the first canvas up from where its reader last looked: the overlay (the slot `traces`, handed the person as
+ * `me`) is mounted and told what was missed (hooks.tellMissed, packs/surface/page/live.js). Until the host draws the
+ * overlay's marks (trace, replay), the catch-up of ui/catch-up.js does it as before.
+ */
+async function caughtUp(view) {
+  const { MARKS } = await import('./part-check.js');
+  if (!('trace' in MARKS && 'replay' in MARKS)) return catchUp(view);
+  if (!overlay) {
+    overlay = h('div', { id: 'traces' });
+    document.body.append(overlay);
+    const me = await whoami().then((j) => actorOf(j?.actor), () => undefined);
+    await drawSlots(overlay, { slot: 'traces', piece: { ...(me && { me }) } });
+  }
+  return hooks.tellMissed?.(view);
+}
 
 /**
  * Home: what agents' recent work reaches that needs attention now (the frontier, the same answer a session starts
@@ -42,6 +62,7 @@ let current = null;
 hooks.storeUnder = (node) => [...all].find((c) => c.host?.contains(node))?.view?.store ?? null;
 /** Make this canvas the one the bar acts on. */
 export function activate(c) {
+  if (current && current !== c) hooks.partsAway?.();
   current = c;
   barNow();
 }
@@ -50,6 +71,10 @@ function barNow() {
   if (c?.view) drawQuery(c.lens, c.view, c.pane.go, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
   hooks.addressMoved?.();
 }
+/** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */
+hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: current.view.failed } : null);
+/** The lens Home draws, handed where no query is up. */
+hooks.homeLens = () => home();
 /** The lens the canvas in focus draws now. */
 export const queryNow = () => current?.lens ?? null;
 /** Draw this lens in the canvas in focus. */
@@ -77,9 +102,11 @@ hooks.address = () => {
     query: current.home ? null : current.lens,
     layout: { ...(shape && { shape }), ...(style && { style }), ...(canvas && { canvas }) },
     ...(current.here && { item: current.here }),
-    drawn: { count: answer?.items?.length ?? 0, ...(answer?.cut && { cut: true }) },
+    drawn: { count: answer?.items?.length ?? 0, ids: (answer?.items ?? []).slice(0, idsHanded).map((i) => i.id), ...(answer?.cut && { cut: true }) },
   };
 };
+/** How many of the ids drawn a part is handed in the address, for what a term would add or take away. */
+const idsHanded = 500;
 /** The pages of the app a part may name in an address (`page`), each one the host draws over the canvas. */
 const PAGES_GO = ['you', 'workspace', 'screen'];
 /** A name a layout goes by in an address: a shape's or a kept style's. */
@@ -91,13 +118,27 @@ const NAMED = /^[A-Za-z0-9_.-]{1,80}$/;
  */
 hooks.go = (address) => {
   if (!current || !address || typeof address !== 'object') return;
-  if (typeof address.item === 'string' && /^e_[a-z0-9]{8}$/.test(address.item)) return void openOver(address.item);
+  if (typeof address.item === 'string' && /^e_[a-z0-9]{8}$/.test(address.item)) {
+    // Following the reading (`replace`, the sheet's part after the person scrolled): the page in sight in place of the one
+    // open, a step of no one's history, and never over words not yet saved.
+    if (!address.replace) return void openOver(address.item);
+    const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(location.hash);
+    if (!open || document.querySelector('#sheet [data-draft="unsaved"]')) return;
+    return void location.replace(location.hash.replace(open[1], address.item));
+  }
   // A page of the app the host draws, by name: what the menu leads to, so a part may go there without knowing an address.
   if (typeof address.page === 'string') {
     if (!PAGES_GO.includes(address.page)) return;
     const of = typeof address.of === 'string' && /^e_[a-z0-9]{8}$/.test(address.of) ? address.of : undefined;
     if (address.page === 'screen' && !of) return;
     return void openHere(address.page === 'screen' ? `#/s/${of}` : `#/${address.page}`);
+  }
+  // A saved view, by its id: opened as the bar's switcher opens one (hooks.openView, ui/canvases.js).
+  if (typeof address.view === 'string' && /^e_[a-z0-9]{8}$/.test(address.view)) return void hooks.openView?.(address.view);
+  // A term added to the lens up or taken out of it (`add`, `take`): the runtime makes the lens, so no part keeps the algebra.
+  if (address.add || address.take) {
+    const next = moved(current.home ? home() : current.lens, address);
+    return void (next && goQuery(next));
   }
   let lens = null;
   try {
@@ -191,8 +232,8 @@ export function canvasIn(host, pane) {
       view.addEventListener('lens-answer', () => at?.view === view && current === c && barNow());
       if (current === c) barNow();
       host.replaceChildren(view);
-      // The first canvas a page draws is caught up from where its reader last looked (ui/catch-up.js).
-      view.ready?.then(() => catchUp(view.store)).catch(() => {});
+      // The first canvas a page draws is caught up from where its reader last looked (caughtUp).
+      view.ready?.then(() => caughtUp(view.store)).catch(() => {});
     },
     mark(here) {
       if (!at || at.here === here) return;

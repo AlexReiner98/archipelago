@@ -1,11 +1,12 @@
 // What anyone may open at /p/<workspace>/<id> that the reader pack (packs/reader) does not answer: a product's
-// public page (ui/public.html), its data and its results' pictures. A published document is the reader's; a product's
+// public page (ui/public.html, drawn by packs/surface/page/frozen-page.js), its data and its results' pictures. A published document is the reader's; a product's
 // page stays here while it reads software's proof and changelog views, which no act gives a pack (packs/surface/kernel/public.ts):
 // this route names them (PAGE_VIEWS), and the surface asks each as anyone.
 // Everything is read as the public role sees the map (root.public_product, the surface's), so there is nothing here to
 // guard: what is not public is not there to be found.
 
 import type { KernelContext } from '#pelago/kernel';
+import { pageMarks } from './page-marks.ts';
 
 /** What a GET is answered on: a response as node's http server hands it, only what is written here. */
 export interface Reply {
@@ -35,7 +36,9 @@ export async function servePublic(ctx: Pick<KernelContext, 'call' | 'workspace'>
   if (what === 'data') {
     if (!product.page) return none();
     const look = await ctx.call<Record<string, unknown> | undefined, Record<string, unknown>>('page.look', undefined);
-    return res.writeHead(200, { ...guard, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...product.page, ...look }));
+    // Read live, with the marks its part draws it with now (./page-marks.ts): its reader is sent marks, never the part's code.
+    const page = { ...product.page, ...look };
+    return res.writeHead(200, { ...guard, 'content-type': 'application/json', 'cache-control': 'no-cache' }).end(JSON.stringify({ ...page, ...(await pageMarks(ctx, 'page.public', page, { published: true })) }));
   }
   if (what !== 'picture') return none();
   // Anything public in its own right shows its own picture.
