@@ -17,9 +17,12 @@ import { added, schemaOf, walked, withWords, wordsOf } from './lens.js';
 const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn', View: 'A saved view, by its name', Style: 'A style, by its name' };
 const MODE_TIP = 'The part find is in: type another part’s word and a space to go there; Backspace goes back to Find';
 const FIELD_TIP = 'Choose what the words are: ↑↓, then Enter; Shift+Enter adds the words as another set';
-/** The keys find hears on its field, beyond typing and Enter: asked of the host when it draws them (the input's `keys`), until then none. */
-const KEYS = ['ArrowUp', 'ArrowDown', 'Escape', 'Backspace'];
-const HOST_KEYS = false;
+/**
+ * The keys find hears on its field, each held from the field while it means something to find: ↑↓ with choices to
+ * move through, Backspace only in an empty field in another part (else it deletes as ever), and Escape while find is open (else
+ * it is the page's).
+ */
+const keysNow = (open, choices, typed, mode) => !open ? [] : [...(choices.length ? ['ArrowUp', 'ArrowDown'] : []), 'Escape', ...(!typed && mode !== 'Find' ? ['Backspace'] : [])];
 /** How long typing rests before what it could be is read, in milliseconds. */
 const REST = 160;
 
@@ -47,7 +50,7 @@ export default function find(first, tools) {
   ];
 
   const marks = () => {
-    const field = ['input', { key: 'q', kind: 'search', value: typed, hint: PLACEHOLDER[mode], label: 'Find on the map', tip: FIELD_TIP, grow: true, ...(HOST_KEYS && { keys: KEYS }), ...(focus && { focus: true }) }];
+    const field = ['input', { key: 'q', kind: 'search', value: typed, hint: PLACEHOLDER[mode], label: 'Find on the map', tip: FIELD_TIP, grow: true, keys: keysNow(open, choices, typed, mode), ...(focus && { focus: true }) }];
     focus = false;
     return ['box', { flow: 'column', gap: 2 },
       ...(open && choices.length ? [['list', { look: 'rows' }, ...choices.map(row)]] : []),
