@@ -48,6 +48,37 @@
           ]
         },
         "run": "schema-styled.ts#schemaStyled"
+      },
+      "answer.style_presets": {
+        "in": {},
+        "out": {
+          "styles": [
+            "any"
+          ]
+        },
+        "run": "part-reads.ts#stylePresets"
+      },
+      "answer.layouts": {
+        "in": {},
+        "out": {
+          "shapes": [
+            "any"
+          ],
+          "kept": [
+            "any"
+          ]
+        },
+        "run": "part-reads.ts#layoutsListed"
+      },
+      "act.revise.use": {
+        "in": "any",
+        "out": "any",
+        "run": "part-acts.ts#useAct"
+      },
+      "act.revise.delete_layout": {
+        "in": "any",
+        "out": "any",
+        "run": "part-acts.ts#deleteLayoutAct"
       }
     },
     "hooks": {
@@ -56,5 +87,138 @@
       "surface.page_style": "styles.ts#pageStyle",
       "surface.lengths": "styles.ts#lengthsOf"
     }
-  }
+  },
+  "actions": [
+    {
+      "id": "styles.use",
+      "title": "Use a style",
+      "description": "Use a style preset (your version of it kept, or used again; a theme chosen retires the others), or not.",
+      "verb": "revise",
+      "input": {
+        "type": "object",
+        "properties": {
+          "preset": {
+            "type": "string",
+            "description": "The preset, by id."
+          },
+          "use": {
+            "type": "boolean",
+            "description": "false retires it."
+          }
+        },
+        "required": [
+          "preset"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "styles.delete_layout",
+      "title": "Delete a layout",
+      "description": "Archive a layout kept on the map.",
+      "verb": "revise",
+      "input": {
+        "type": "object",
+        "properties": {
+          "layout": {
+            "type": "string",
+            "description": "The layout, by id."
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "parts": [
+    {
+      "id": "styles.presets",
+      "title": "Styles",
+      "slot": "workspace.card",
+      "views": [
+        {
+          "name": "style_presets"
+        }
+      ],
+      "sends": [
+        "styles.use"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "list",
+        "button"
+      ],
+      "modules": {
+        "index.js": "parts/presets/index.js",
+        "rows.js": "parts/presets/rows.js"
+      }
+    },
+    {
+      "id": "styles.themes",
+      "title": "Theme",
+      "slot": "workspace.card",
+      "views": [
+        {
+          "name": "style_presets"
+        }
+      ],
+      "sends": [
+        "styles.use"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "list",
+        "button"
+      ],
+      "modules": {
+        "index.js": "parts/themes/index.js",
+        "tiles.js": "parts/themes/tiles.js"
+      }
+    },
+    {
+      "id": "styles.layout_switch",
+      "title": "Layout",
+      "slot": "bar.layouts",
+      "go": true,
+      "views": [
+        {
+          "name": "layouts"
+        }
+      ],
+      "sends": [
+        "styles.delete_layout"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "input",
+        "button",
+        "menu"
+      ],
+      "modules": {
+        "index.js": "parts/layout-switch/index.js",
+        "choices.js": "parts/layout-switch/choices.js"
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "styles.style_presets",
+      "shape": "data",
+      "lens": {},
+      "answer": "style_presets",
+      "description": "Style presets with your version of each. Params: none."
+    },
+    {
+      "id": "styles.layouts",
+      "shape": "data",
+      "lens": {},
+      "answer": "layouts",
+      "description": "Layouts a view may be drawn in. Params: none."
+    }
+  ]
 }

@@ -20,7 +20,7 @@ function open(anchor, more) {
   placeBy(list, anchor, { end: true });
 }
 
-/** The ⋯ and its menu; `more` are what the band adds for what is up (the layout switch, Delete style, ui/look-switch.js). */
+/** The ⋯ and its menu; `more` are what the band adds for what is up (the layout switch, Delete style, the styles pack's styles.layout_switch). */
 export function canvasMenu(more = []) {
   const button = h('button', { type: 'button', class: 'q-save q-band-menu', title: 'More for this view', 'aria-label': 'More for this view', 'aria-haspopup': 'menu' }, '⋯');
   button.addEventListener('click', () => (list.matches(':popover-open') ? list.hidePopover() : open(button, more)));

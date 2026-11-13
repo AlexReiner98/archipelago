@@ -1,6 +1,6 @@
-// How a reader hears of an agent's show (packs/surface/page/live.js, ui/pane-land.js): no line at the foot, a note on the pane in its
+// How a reader hears of an agent's show (packs/surface/page/live.js, packs/panes/page/pane-land.js): no line at the foot, a note on the pane in its
 // chat's tab, a page that is no canvas opened there, a show held while a question is open; and a chat's tab merged into
-// the owner's, whose pane goes with the chat as it ends while the owner's stay (ui/tab-bar.js, ui/tab-life.js, the tab
+// the owner's, whose pane goes with the chat as it ends while the owner's stay (packs/panes/page/tab-bar.js, packs/panes/page/tab-life.js, the tab
 // lifecycle e_p6fr4uye). The rest of how a show lands is in test/show-tab-life.test.ts, test/show-follows.test.ts and
 // test/show-web.test.ts: each test in a file of its own, as the steps a server keeps outlive a test in one process, so
 // a session of one would be heard by a page in another.

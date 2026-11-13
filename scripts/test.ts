@@ -12,7 +12,7 @@ import { dirname, join } from 'node:path';
 import { blankImageFile } from '../packs/database/kernel/db.ts';
 import { lock, unlock } from '../test/lock.ts';
 import { keys, passed, remember } from '../test/passes.ts';
-import { affected, allTests, fastTests, heaviestFirst, ROOT, shard, UNPRIVILEGED } from '../test/sets.ts';
+import { affected, allTests, fastTests, heaviestFirst, ROOT, shard, SLOW, UNPRIVILEGED } from '../test/sets.ts';
 import { sweepTemp } from '../test/sweep.ts';
 
 const flags = process.argv.slice(2).filter((a) => a.startsWith('--') && a !== '--no-cache');
@@ -50,10 +50,14 @@ process.env.PELAGO_START_PACKS ??= 'all';
 // The blank database image is kept in the machine's temp folder, made once for many runs (packs/database/kernel/db.ts).
 if (!process.env.PELAGO_TEST_DATABASE_URL) process.env.PELAGO_TEST_IMAGE ??= await blankImageFile();
 
-// One run on the machine at a time, whichever worktree it is in (test/lock.ts). CI's runners run one each.
+// One heavy run on the machine at a time, whichever worktree it is in (test/lock.ts). CI's runners run one each.
+// A few files named by hand, none slow (no browser, no whole-map move), run beside it: several sessions check
+// their own pack at once, and only what loads the machine waits (the owner, 13 Nov 2026).
 const what = ['npm', 'test', ...process.argv.slice(2)].join(' ');
-if (!process.env.CI) await lock(tmpdir(), { cwd: ROOT, what });
-process.on('exit', () => unlock(tmpdir()));
+const light = args.length > 0 && args.length <= 5 && args.every((f) => f.startsWith('test/') && !SLOW[f]);
+const locked = !process.env.CI && !light;
+if (locked) await lock(tmpdir(), { cwd: ROOT, what });
+process.on('exit', () => { if (locked) unlock(tmpdir()); });
 
 // A run of a set skips the files that passed on this same code (test/passes.ts), here or in another worktree; a file
 // named on the command line always runs, and so does a run that picks tests by name or asks --no-cache.

@@ -153,7 +153,7 @@ reply ending) is `docs/agents.md`.
   refuses a read of it. A value over 4000 characters needs a field declared
   `"large": true`, which only a type with the kernel flag may have. What a pack adds to the page of an item of a
   type is a screen there too (a view of `form: "screen"`: pieces the kernel draws, listed in
-  `packs/loader/kernel/declared.ts`); the item page (`ui/item.js`) names no pack's type.
+  `packs/loader/kernel/declared.ts`); the item page (`packs/sheet/page/item.js`) names no pack's type.
 - **The UI has no build step and no framework.** Plain files: the app's in
   `ui/`, the host's (what keeps humans in control) in the root packs'
   `page/`, under their hash (`npm run roots` after a change there).
@@ -342,8 +342,10 @@ runs stay small, CI runs the rest). Do not run `npm test`, `test:changed` or
 and a broad run slows every one of them for minutes. CI runs every file
 before anything reaches main, and a failure there names its file: fix it then.
 
-One test run uses the machine at a time: `scripts/test.ts` waits for any run
-in another worktree to end first, and says whose. Never start tests with a
+One heavy test run uses the machine at a time: `scripts/test.ts` waits for any
+run in another worktree to end first, and says whose. Up to five files named
+by hand, none of them in `SLOW`, run beside it without waiting (the owner,
+13 Nov 2026). Never start tests with a
 bare `node --test`; it skips that wait and the force exit, and a hung file
 then runs for hours.
 
