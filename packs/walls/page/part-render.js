@@ -9,13 +9,19 @@
 // Pan and zoom of a paint surface stay here (packs/walls/page/part-paint.js): the part is never asked where the reader looks.
 // A thumb is what whoever hosts the part draws for the view it names (`thumb(view)`): a part never paints one.
 // A picture is drawn by whoever hosts the part (`picture(item, el)`), out of what it handed the part, once it is in the page.
+// A pane's canvas is drawn by whoever hosts the part too (`frame(at, el, said)`); a web page is framed here, sandboxed.
+// A dragged mark goes back as `drop { onto, zone }`, a line between panes as `share { index, at }`, a pane pressed as
+// `focus`, a mark with `aux` pressed with the middle button as `close`, and the +N of a box that fits as `press` (value N).
 
 import { isChecked, PICKS } from './part-check.js';
 import { paintSurface } from './part-paint.js';
 import { renderBody } from './body.js';
 // A menu opened is placed in sight (its listener is the page's).
 import './menu-place.js';
-import { fits } from './part-fits.js';
+import { fits, fitOnce } from './part-fits.js';
+import { menuSteps } from './part-menu.js';
+import { buildPane, frameWeb, paneBody, paneGone, sashes } from './part-pane.js';
+import { draggable } from './part-drag.js';
 
 /** What each element was drawn from, and the surface that runs a paint mark. */
 const drawnFrom = new WeakMap();
@@ -33,13 +39,15 @@ const partTold = 50;
  * moves by its numbers); `canvas(key, el)` is handed a paint surface's pixel canvas (`pixels: true`) once, for whoever
  * hosts the part to give it to the part; `thumb(view)` answers with the element that shows a view small, or nothing;
  * `picture(item, el)` draws a picture mark's item into its element; `lights(ids)` lights those items on the canvas
- * while the person points at a mark that names them, and fades the rest (nothing, or an empty list, takes it off). `find(q, types, link)` answers the items an item
+ * while the person points at a mark that names them, and fades the rest (nothing, or an empty list, takes it off). `frame(at, el,
+ * said)` draws a canvas at a pane's address in `el` (said(name, value) tells the part what is done in it), answering
+ * with a way to stop it; `hue(words)` is a session's hue named by words. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
  * `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {} } = {}) {
-  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue };
   let ended = false;
   return {
     draw(node) {
@@ -80,7 +88,8 @@ function place(parent, kids, ctx, wrap = null) {
     // Moved only when it is not already in its place: an element taken out and put back loses the person's focus.
     if (parent.children[i] !== el) parent.insertBefore(el, parent.children[i] ?? null);
   });
-  for (const el of old) if (!kept.has(el)) (gone(el), el.remove());
+  // What the host put beside the marks (a count, the lines between panes) is its own to keep or take away.
+  for (const el of old) if (!kept.has(el) && drawnFrom.has(wrap ? el.firstElementChild : el)) (gone(el), el.remove());
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -89,6 +98,9 @@ const make = (tag, cls) => Object.assign(document.createElement(tag), { classNam
 function build(node, ctx) {
   let el;
   if (node.mark === 'box') el = make('div', 'pm-box');
+  else if (node.mark === 'web') el = make('div', 'pm-web');
+  else if (node.mark === 'pane') el = buildPane(ctx.tell);
+  else if (node.mark === 'panes') el = make('div', 'pm-panes');
   else if (node.mark === 'text' && node.at.href) {
     // An address on the web, opened apart: the page never follows it in place, and tells it nothing of where it came from.
     el = make('a', 'pm-text');
@@ -117,6 +129,7 @@ function build(node, ctx) {
     el.append(make('summary', ''), make('div', 'menu-items'));
     // A choice made shuts the menu, as every menu on the page does.
     el.addEventListener('click', (ev) => ev.target.closest?.('.menu-items button') && (el.open = false));
+    menuSteps(el);
   }
   else if (node.mark === 'picture') el = make('div', 'pm-picture');
   else if (node.mark === 'paint') {
@@ -127,6 +140,7 @@ function build(node, ctx) {
     tipped(surface.el, node.at.tip);
     return surface.el;
   } else throw new Error(`No way to draw a ${node.mark} on the page`);
+  if (['box', 'button', 'pane'].includes(node.mark)) handle(el, ctx);
   drawnFrom.set(el, node);
   update(el, node, ctx, true);
   return el;
@@ -209,6 +223,10 @@ function update(el, node, ctx, fresh = false) {
   }
   looks(el, node);
   lit(el, node, ctx, fresh);
+  if (['box', 'button', 'pane'].includes(node.mark)) handled(el, node, was, fresh, ctx);
+  if (node.mark === 'web') frameWeb(el, at.url, at.reload ?? '');
+  if (node.mark === 'pane') (paneBody(el, node, ctx.frame, ctx.tell), place(el.firstElementChild, node.kids, ctx));
+  if (node.mark === 'panes') (el.dataset.key = node.key, place(el, node.kids, ctx), sashes(el, node, ctx.tell));
   // A box that fits shows as many of its marks as the page has room for; the host measures, never the part.
   if (node.mark === 'box' && (fresh || Boolean(was.at.fits) !== Boolean(at.fits))) fits(el, Boolean(at.fits));
   if (node.item !== undefined && node.mark !== 'picture') el.dataset.item = node.item;
@@ -233,6 +251,8 @@ function update(el, node, ctx, fresh = false) {
   if (node.mark === 'menu') {
     el.firstElementChild.textContent = at.label;
     place(el.lastElementChild, node.kids, ctx);
+    // Asked open, it opens; it stays as the person leaves it while its key stays.
+    if (at.open && (fresh || !was.at.open)) el.open = true;
   }
   if (node.mark === 'button' || node.mark === 'input') at.label !== undefined ? el.setAttribute('aria-label', at.label) : el.removeAttribute('aria-label');
   if (node.mark === 'input' && at.kind === 'item') el.firstElementChild.placeholder = at.hint ?? '';
@@ -258,6 +278,9 @@ function update(el, node, ctx, fresh = false) {
   }
   if (node.mark === 'text' && at.href && el.getAttribute('href') !== at.href) el.setAttribute('href', at.href);
   if (node.mark === 'box') place(el, node.kids, ctx);
+  // Its count goes back by `more` when the part names one: the count is then a button, pressed with how many it holds.
+  if (node.mark === 'box') el.fitsMore = at.more !== undefined ? (n) => ctx.tell({ key: drawnFrom.get(el).at.more, name: 'press', value: n }) : null;
+  if (node.mark === 'box' && at.fits) fitOnce(el);
   if (node.mark === 'list') place(el, node.kids, ctx, (made) => (make('li', 'pm-row').append(made), made.parentElement));
   return el;
 }
@@ -277,11 +300,14 @@ function looks(el, node) {
   if (at.look) cls.push(`pm-${kind}-${at.look}`);
   if (at.tone) cls.push(`pm-tone-${at.tone}`);
   if (at.flow) cls.push(`pm-flow-${at.flow}`);
+  if (kind === 'panes') cls.push(`pm-dir-${at.dir ?? 'row'}`);
   if (at.align) cls.push(`pm-align-${at.align}`);
   if (at.grow) cls.push('pm-grow');
   if (at.wrap) cls.push('pm-wrap');
   if (at.bold) cls.push('pm-bold');
   if (at.fits) cls.push('pm-fits');
+  if (at.selected) cls.push('pm-selected');
+  if (el.classList.contains('pm-ring')) cls.push('pm-ring');
   el.className = [...(kind === 'menu' ? ['menu'] : []), ...cls].join(' ');
   tipped(el, at.tip);
   for (const [name, scale, value] of [['--pm-gap', 'space', at.gap], ['--pm-pad', 'space', at.pad], ['--pm-size', 'text', at.size]]) {
@@ -298,7 +324,7 @@ function lit(el, node, ctx, fresh) {
   const ids = node.at.lights;
   if (fresh) {
     el.addEventListener('pointerenter', () => drawnFrom.get(el)?.at.lights?.length && ctx.lights(drawnFrom.get(el).at.lights));
-    el.addEventListener('pointerleave', () => ctx.lights([]));
+    el.addEventListener('pointerleave', () => drawnFrom.get(el)?.at.lights?.length && ctx.lights([]));
   }
   if (!ids?.length) el.classList.remove('pm-lights');
   else el.classList.add('pm-lights');
@@ -327,7 +353,43 @@ function drawOnPlane(node) {
   return el;
 }
 
-/** An element leaving the page: a paint surface in it stops listening. */
+/** An element leaving the page: a paint surface in it stops listening, a pane's canvas stops drawing. */
 function gone(el) {
   for (const s of [el, ...el.querySelectorAll('.pm-paint')]) surfaces.get(s)?.stop();
+  for (const p of [el, ...el.querySelectorAll('.pm-pane')]) if (p.classList?.contains('pm-pane')) paneGone(p);
+}
+
+/** What a box, a button or a pane may be when it stands for something moved or picked between: listened for once, when made. */
+function handle(el, ctx) {
+  draggable(el, () => drawnFrom.get(el)?.key, ctx.tell);
+  // Pressed with the middle button, a mark with `aux` goes back as `close`; the page's own scroll on that press is not started.
+  el.addEventListener('mousedown', (ev) => ev.button === 1 && drawnFrom.get(el)?.at.aux && ev.preventDefault());
+  el.addEventListener('auxclick', (ev) => {
+    const { key, at } = drawnFrom.get(el) ?? {};
+    if (ev.button !== 1 || !at?.aux) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    ctx.tell({ key, name: 'close' });
+  });
+  el.addEventListener('animationend', (ev) => ev.animationName.startsWith('pm-ring') && el.classList.remove('pm-ring'));
+}
+
+/** Whether it is selected, the session hue it takes, whether it is dragged or docks, and a ring once as it is asked for. */
+function handled(el, node, was, fresh, ctx) {
+  const { at } = node;
+  if (at.selected !== undefined) el.setAttribute('aria-selected', String(at.selected));
+  else el.removeAttribute('aria-selected');
+  const hue = at.hue !== undefined ? ctx.hue(at.hue) : undefined;
+  if (hue) el.style.setProperty('--session-hue', hue);
+  else el.style.removeProperty('--session-hue');
+  if (at.drag !== undefined) el.dataset.drag = at.drag;
+  else delete el.dataset.drag;
+  if (at.dock) el.dataset.dock = '';
+  else delete el.dataset.dock;
+  if (at.key !== undefined) el.dataset.key = at.key;
+  if (at.ring && (fresh || !was?.at.ring)) {
+    el.classList.remove('pm-ring');
+    void el.offsetWidth;
+    el.classList.add('pm-ring');
+  }
 }
