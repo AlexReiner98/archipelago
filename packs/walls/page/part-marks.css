@@ -26,6 +26,17 @@
 
 textarea.pm-input { font: inherit; color: var(--text); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); padding: var(--space-4) var(--space-6); resize: vertical; }
 .pm-input { min-width: 0; }
+/* A title written in place reads as the title it is: no box around it until it is being written. */
+.pm-input-title { font: inherit; font-size: var(--text-7); font-weight: 600; color: var(--text); background: none; border: var(--border-1) solid transparent; border-radius: var(--radius-2); padding: 0; width: 100%; }
+.pm-input-title:hover, .pm-input-title:focus { border-color: var(--line); }
+textarea.pm-input-plain { width: 100%; }
+/* An item found by name: the box, and what it finds on one line beside it, cut where it does not fit. */
+.pm-finder { display: flex; gap: var(--space-4); align-items: baseline; min-width: 0; overflow: hidden; }
+.pm-hits { display: flex; gap: var(--space-3); min-width: 0; overflow: hidden; }
+.pm-hit { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: var(--measure); flex: 0 1 auto; }
+.pm-button[aria-pressed="true"] { color: var(--accent); }
+a.pm-text { color: inherit; text-decoration: none; border-bottom: var(--border-1) solid var(--accent-soft); }
+a.pm-text:hover { border-bottom-color: var(--accent); }
 /* A press is a few words on one line: it keeps its width, and what is beside it gives way (a row never wraps). */
 .pm-button { white-space: nowrap; flex: none; }
 .pm-button-main { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }

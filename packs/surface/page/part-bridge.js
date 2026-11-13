@@ -14,8 +14,8 @@ import { goingOut } from './part-going.js';
 
 /** How long, in milliseconds, a press lets its part send one action as the press's own. */
 const pressLasts = 2000;
-/** What the person does that a part may answer with one action as theirs: a press, and a tick in a note's checklist. */
-const GESTURES = ['press', 'tick'];
+/** What the person does that a part may answer with one action as theirs: a press, a tick in a note's checklist, and a pick (a day, yes or no, one of a field's values, an item found), and an item picked on the canvas. */
+const GESTURES = ['press', 'tick', 'pick', 'picked'];
 
 /**
  * Bridge one pack version's port. `partOf(id)` is the part mounted under that id ({ id, title, sends, hash, island?, host? }):

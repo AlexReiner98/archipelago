@@ -195,7 +195,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `live.js`, `replica.js`, `membership.js`, `ghosts.js` | tailing the log; the one store, keyed by item, shared by views; when a view asks again; held changes drawn into it |
 | `panes.js`, `pane-drag.js`, `pane-address.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's |
 | `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
-| `item.js` and the sheet's parts | the item's page (being settled) |
+| `item.js`, `item-sections.js`, `field-edit.js`, `link-pick.js`, `settle.js` | the item's page, the host's by who owns what (the owner, 13 Nov 2026): its frame, fields, links, choices and settling for any type; a piece only one type or screen has is a part of the pack that owns it (a screen's note: `canvas.note`) |
 | `fields.js` | a field's value by its kind, else by its shape; the choices a question settles by |
 | `text.js`, `body.js` | the one dialect a note is written in, and the note drawn from it, folded |
 

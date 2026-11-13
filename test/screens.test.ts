@@ -17,7 +17,7 @@ const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
 
 /** A pack that offers one screen for the nav, to try what the owner does with it. */
-const WEEK: PackFile = { id: 'tp', version: '1', title: 'Week', requires: ['core'], views: [{ form: 'screen', id: 'tp.week', title: 'Week', nav: true, pieces: [{ piece: 'note', text: 'A week' }] }] } as PackFile;
+const WEEK: PackFile = { id: 'tp', version: '1', title: 'Week', requires: ['core'], views: [{ form: 'screen', id: 'tp.week', title: 'Week', nav: true, pieces: [{ piece: 'figure' }] }] } as PackFile;
 
 async function map(extra?: PackFile) {
   const reg = new Registry(extra ? packsWith(extra) : join(import.meta.dirname, '..', 'packs'));
@@ -31,7 +31,7 @@ const one = async (l: Archipelago, id: string) => (await screens(l)).find((s) =>
 test('a pack offers a screen for the nav; the owner puts it there, takes it out and puts it back', async () => {
   const l = await map(WEEK);
   const week = (await one(l, 'tp.week'))!;
-  assert.deepEqual([week.pack, week.offered, week.nav, week.pieces], ['tp', true, undefined, [{ piece: 'note', text: 'A week' }]]);
+  assert.deepEqual([week.pack, week.offered, week.nav, week.pieces], ['tp', true, undefined, [{ piece: 'figure' }]]);
 
   const made = (await l.change(human, { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'screen', title: 'My week', status: 'current', props: { preset: 'tp.week', nav: 1 } }] })) as { created: Record<string, string> };
   const id = made.created.s;
