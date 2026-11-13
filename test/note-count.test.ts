@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page's module, plain JavaScript with no types
-import { counted, sectionOf, weigh } from '../packs/sheet/page/note-count.js';
+import { counted, sectionOf, weigh } from '../packs/sheet/parts/page/note-count.js';
 
 const piece = {
   piece: 'count',
