@@ -61,7 +61,8 @@ export const presetSettings = (lens) => {
   // A view of one item is its address with that item where it says {here}.
   const fits = (p) => new RegExp(`^${addressOf(viewParts({ ...p, preset: true, props: p.props }).lens).replace(/[.*+?^$()|[\]\\]/g, '\\$&').replaceAll(encodeURIComponent('{here}'), 'e_[a-z0-9]+')}$`).test(at);
   const preset = [...(state.schema?.canvases ?? []), ...versionCanvases()].find(fits);
-  return preset ? settingsOf({ props: preset.props }) : {};
+  // `shipped` names the view its pack ships, which its drawing sends its actions as (packs/walls/page/layout-asks.js drawingActs).
+  return preset ? { ...settingsOf({ props: preset.props }), shipped: preset.id } : {};
 };
 
 /**

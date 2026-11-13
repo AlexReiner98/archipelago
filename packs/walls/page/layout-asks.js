@@ -108,6 +108,39 @@ async function putToPerson(said) {
 }
 
 /**
+ * Answer an action or view a drawing asked for (`act`): one its view sends, called as the person looking, naming the
+ * view and the drawing's hash so the server checks it is one the view's pack sends (packs/loader/kernel/view-calls.ts).
+ * Answers { answer } (with `created` and `changed` when it wrote), or { error }. What the drawing needs said first it names in data
+ * (`asks`: each { field, title, input: { placeholder }, choices: [[value, label, hint]], action, danger }), and the
+ * page asks it in its own dialog (`ask` in packs/surface/page/base.js), one at a time, before anything is sent: a
+ * drawing never hears a key.
+ */
+export async function drawingActs(said, view, hash) {
+  if (typeof view !== 'string' || !view) return { error: 'Only a view a pack ships sends its actions.' };
+  const name = String(said?.name ?? '').replaceAll('.', '_');
+  const params = said?.params && typeof said.params === 'object' && !Array.isArray(said.params) ? { ...said.params } : {};
+  const asks = Array.isArray(said?.asks) ? said.asks.slice(0, 4) : [];
+  if (asks.length && asking) return { error: 'The person is answering another question.' };
+  asking = asks.length > 0;
+  try {
+    for (const a of asks) {
+      const choices = Array.isArray(a?.choices) ? a.choices.slice(0, 12).map(([v, label, hint]) => [v, String(label ?? v).slice(0, 80), hint && String(hint).slice(0, 200)]) : undefined;
+      const got = await ask({ title: String(a?.title ?? 'Go on?').slice(0, 120), ...(a?.message && { message: String(a.message).slice(0, 300) }), ...(a?.input && { input: { placeholder: String(a.input.placeholder ?? '').slice(0, 80) } }), ...(choices && { choices }), action: String(a?.action ?? 'OK').slice(0, 30), danger: a?.danger === true });
+      if (got === null || got === '') return { error: 'Not sent.' };
+      if (typeof a?.field === 'string' && got !== true) params[a.field] = got;
+    }
+  } finally {
+    asking = false;
+  }
+  try {
+    const came = await api(name, { ...params, part: { view, hash } });
+    return { answer: came?.answer ?? came ?? null, ...(came?.created && { created: came.created }), ...((came?.changeset || came?.status) && { changed: true }) };
+  } catch (err) {
+    return { error: String(err.message).slice(0, 300) };
+  }
+}
+
+/**
  * Add an item on an island, from the page's own button by its legend: put to the person (its type, its name) and sent
  * as theirs, and kept in sight on the canvas up, its query as it was but for the item (ui/keep-in-view.js). A refusal
  * is told.

@@ -37,14 +37,14 @@ const DAY = 86_400_000;
 /** The most days a window may cover when repeats are worked out. */
 const MAX_DAYS = 366 * 5;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-/** A day said from today: today, or so many days before or after it (-6d, 7d). */
-const FROM_TODAY = /^(today|[+-]?\d{1,4}d)$/;
+/** A day said from today: today, or so many days before or after it (-6d, 7d), or from this week's Monday (monday, monday-7d, monday+6d). */
+const FROM_TODAY = /^(today|monday(?:[+-]\d{1,4}d)?|[+-]?\d{1,4}d)$/;
 
 /** Read and check a lens's time axis. Its ends may be said from today, worked out by `resolveAxis` when it is read. */
 export function readAxis(input: unknown): TimeAxis {
   const t = input as Partial<TimeAxis> | undefined;
   const ok = (d: unknown) => typeof d === 'string' && (FROM_TODAY.test(d) || !Number.isNaN(Date.parse(d)));
-  if (!t || !ok(t.from) || !ok(t.to)) throw new Error('time is { from, to } (dates, date-times, today, or days from today as -6d or 7d), and by: ["when", "bound"] if not both');
+  if (!t || !ok(t.from) || !ok(t.to)) throw new Error('time is { from, to } (dates, date-times, today, or days from today as -6d or 7d, or from this week’s Monday as monday or monday+6d), and by: ["when", "bound"] if not both');
   const fixed = !FROM_TODAY.test(t.from!) && !FROM_TODAY.test(t.to!);
   if (fixed && Date.parse(t.to!) < Date.parse(t.from!)) throw new Error('time.to comes after time.from');
   if (t.by !== undefined && (!Array.isArray(t.by) || t.by.some((b) => b !== 'when' && b !== 'bound'))) throw new Error('time.by is a list of when and bound');
@@ -57,6 +57,7 @@ function dayFrom(value: string, zone: string, now: number): string {
   if (!said) return value;
   const parts = Object.fromEntries(clock(zone).formatToParts(now).map((p) => [p.type, p.value]));
   const today = Date.UTC(+parts.year, +parts.month - 1, +parts.day);
+  if (said[1].startsWith('monday')) return new Date(today + (((parseInt(said[1].slice(6), 10) || 0) - ((new Date(today).getUTCDay() + 6) % 7)) * DAY)).toISOString().slice(0, 10);
   return new Date(today + (said[1] === 'today' ? 0 : parseInt(said[1], 10)) * DAY).toISOString().slice(0, 10);
 }
 

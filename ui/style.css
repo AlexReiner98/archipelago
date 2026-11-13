@@ -53,33 +53,7 @@ details.fold > summary .n { color: var(--muted); font-size: var(--text-2); }
 .body-text table.text-table th { padding: var(--space-3) var(--space-6) var(--space-3) 0; color: var(--muted); font-weight: 600; font-size: var(--text-2); border-bottom: var(--border-1) solid var(--line); }
 .body-text table.text-table td { padding: var(--space-3) var(--space-6) var(--space-3) 0; border-bottom: var(--border-1) solid var(--line); }
 /* Time: the week on the left, what is owed beside it. */
-.tq-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(var(--side-least), var(--card-least)); gap: var(--space-8); align-items: start; }
-@media (max-width: 900px) { .tq-grid { grid-template-columns: minmax(0, 1fr); } }
-.tq-main, .tq-side { display: flex; flex-direction: column; gap: var(--space-7); min-width: 0; }
-.tq-add, .tq-edit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); }
-.tq-add { padding: var(--space-6) var(--space-7); }
-.tq-add input[type="date"], .tq-edit input[type="date"] { width: var(--date-field); }
-.tq-hours { width: var(--hours-field); }
-.tq-what { flex: 2 1 var(--field-grow); min-width: var(--field-least); }
-.tq-note { flex: 2 1 var(--field-grow); min-width: var(--field-least); }
-.tq-picker { position: relative; flex: 2 1 var(--field-grow); min-width: var(--field-least); }
-.tq-picker .tq-work { width: 100%; }
-.tq-picks { position: absolute; z-index: 20; top: calc(100% + var(--space-3)); left: 0; right: 0; overflow: hidden; }
-.tq-bill { display: inline-flex; align-items: center; gap: var(--space-4); font-size: var(--text-4); color: var(--muted); white-space: nowrap; }
 /* A card clips what it holds; an entry's menu has to open past its edge. */
-.tq-day, .tq-money { padding: 0; overflow: visible; }
-.tq-entry details.menu { position: relative; }
-.tq-entry details.menu > .menu-items { z-index: 30; }
-.tq-dayhead { display: flex; align-items: center; gap: var(--space-6); padding: var(--space-6) var(--space-8); border-bottom: var(--border-1) solid var(--line); font-weight: 600; }
-.tq-h { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.rows > li.tq-entry, .tq-money .rows > li { padding: var(--space-4) var(--space-8); gap: var(--space-6); white-space: nowrap; min-width: 0; flex-wrap: nowrap; align-items: center; }
-.tq-entry .gist { overflow: hidden; text-overflow: ellipsis; }
-.tq-entry .tq-what-text { flex: 0 0 auto; max-width: 42%; color: inherit; text-decoration: none; font-weight: 500; }
-.tq-entry .tq-what-text:hover { text-decoration: underline; }
-.tq-entry .tq-note-text { flex: 1 1 0; min-width: 0; }
-.tq-entry .tq-work-text { flex: 0 1 auto; max-width: 26%; margin-left: auto; }
-.tq-edit { width: 100%; }
-.tq-money .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 img.doc-figure { display: block; max-width: 100%; height: auto; margin: var(--space-3) 0 var(--space-6); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--figure); }
 .card .empty, .card .error { padding: var(--space-8); color: var(--muted); }
 .card .error { color: var(--bad); }
@@ -93,7 +67,6 @@ img.doc-figure { display: block; max-width: 100%; height: auto; margin: var(--sp
 .row-top > * { flex: none; }
 .row-top > .grow { flex: 1 1 0; }
 /* One line, cut with an ellipsis; the whole of it is in the tooltip. */
-.cut, .row-top > .grow, .rows > li.one > .grow, .nowrap-row > .gist, .plate-head > .grow, .lens-view .lens-error, .fields details.long > summary, .body-text details.section > summary, .tile-head strong, .tile.kind span, .cal-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-sub { margin-top: var(--space-3); color: var(--muted); font-size: var(--text-3); }
 .grow { flex: 1; min-width: 0; }
 
@@ -397,51 +370,11 @@ details.menu.ok > summary { font-size: var(--text-2); color: var(--warn); }
 .body-text .align-center { text-align: center; }
 /* Time: the week as a calendar. A column a day, your lane wide and an agent's narrow, time running down. */
 .cal { padding: 0; margin-bottom: var(--space-8); }
-.cal > .cal-legend { display: flex; justify-content: flex-start; flex-wrap: nowrap; gap: var(--space-4) var(--space-8); padding: var(--space-6) var(--space-8); border-bottom: var(--border-1) solid var(--line); overflow: hidden; white-space: nowrap; }
-.cal-key { display: inline-flex; align-items: center; gap: var(--space-4); min-width: 0; max-width: var(--chip-most); overflow: hidden; text-overflow: ellipsis; color: inherit; text-decoration: none; font-size: var(--text-4); }
-.cal-key::before { content: ""; flex: 0 0 auto; width: var(--box-4); height: var(--box-4); border-radius: var(--radius-1); background: var(--cal-hue); }
-.cal-key:hover { text-decoration: underline; }
-.cal-scroll { overflow-x: auto; }
-.cal-grid { display: grid; grid-template-columns: var(--cal-gutter) repeat(7, minmax(var(--cal-day-least), 1fr)); min-width: var(--cal-least); }
-.cal-axis, .cal-day { display: flex; flex-direction: column; min-width: 0; }
-.cal-day { border-left: var(--border-1) solid var(--line); }
-.cal-today { background: color-mix(in srgb, var(--accent-soft) 55%, transparent); }
-.cal-head { display: flex; align-items: baseline; gap: var(--space-4); height: var(--cal-head); padding: var(--space-5) var(--space-4) 0; white-space: nowrap; overflow: hidden; font-size: var(--text-4); font-weight: 600; }
-.cal-head .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.cal-head .tq-h { margin-left: auto; font-weight: 400; }
-.cal-loose { display: flex; gap: var(--space-2); height: var(--box-2); margin: 0 var(--space-3) var(--space-4); }
-.cal-chip { display: block; min-width: var(--box-1); border-radius: var(--radius-1); background: var(--cal-hue); }
-.cal-body { position: relative; display: flex; gap: var(--space-2); padding: 0 var(--space-3); border-top: var(--border-1) solid var(--line); overflow: hidden; height: max(var(--cal-body-least), calc(100vh - var(--cal-room))); }
-.cal-hour { position: absolute; right: var(--space-4); transform: translateY(-50%); font-size: var(--text-1); color: var(--muted); font-variant-numeric: tabular-nums; }
-.cal-rule { position: absolute; left: 0; right: 0; border-top: var(--border-1) dashed var(--line); pointer-events: none; }
-.cal-lane { position: relative; min-width: 0; }
-.cal-owner { flex: 1 1 0; }
 /* Agents take at most half the day, however many there are. */
-.cal-agent { flex: 0 1 var(--box-3); max-width: calc(50% / max(var(--cal-agents), 1)); min-width: var(--box-1); }
-.cal-block { position: absolute; left: 0; right: 0; display: block; overflow: hidden; border-radius: var(--radius-1); background: var(--cal-hue); color: var(--on-mark); text-decoration: none; }
-.cal-run { opacity: 0.75; border-radius: var(--radius-1); }
-.cal-block:hover { outline: var(--border-3) solid var(--text); outline-offset: calc(-1 * var(--border-1)); opacity: 1; z-index: 2; }
-.cal-what { display: block; padding: var(--space-2) var(--space-3); font-size: var(--text-1); line-height: 1.25; }
-@media (max-width: 760px) { .cal-head .tq-h { display: none; } }
 /* Planned time is set aside, not yet worked: hatched in its colour, with a dashed edge. */
-.cal-planned { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--cal-hue) 40%, transparent) 0 var(--hatch), color-mix(in srgb, var(--cal-hue) 18%, transparent) var(--hatch) calc(2 * var(--hatch))); outline: var(--border-2) dashed var(--cal-hue); outline-offset: calc(-1 * var(--border-2)); color: var(--text); }
-.cal-owner { cursor: crosshair; touch-action: none; }
-.cal-mine { cursor: grab; touch-action: none; user-select: none; }
-.cal-grip { position: absolute; left: 0; right: 0; bottom: 0; height: var(--box-2); cursor: ns-resize; }
-.cal-ghost { background: color-mix(in srgb, var(--accent) 30%, transparent); outline: var(--border-2) dashed var(--accent); outline-offset: calc(-1 * var(--border-2)); pointer-events: none; }
-dialog.cal-ask .tq-picker { flex: none; }
-dialog.cal-ask .tq-picks { position: static; margin-top: var(--space-3); }
-dialog.cal-ask .cal-when { display: flex; align-items: center; gap: var(--space-5); }
 /* Something this week lies outside what is shown: a dot on the toggle. */
-.cal-more::after { content: ""; display: inline-block; width: var(--box-2); height: var(--box-2); margin-left: var(--space-4); border-radius: 50%; background: var(--accent); vertical-align: middle; }
 /* The first and last hours sit inside the day, at its top and bottom edges. */
-.cal-hour.cal-first { transform: none; }
-.cal-hour.cal-last { transform: translateY(-100%); }
 /* A routine for nothing (dinner) only holds the time: grey, quiet. */
-.cal-own { --cal-hue: var(--closed); background: color-mix(in srgb, var(--closed) 35%, transparent); outline: none; color: var(--muted); }
-.cal-routine .cal-what::before { content: "\21bb  "; }
-dialog.cal-ask .cal-days { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
-dialog.cal-ask [hidden] { display: none; }
 
 /* A held change on the sheet it touches: a thing to act on, set apart by its tone and room (Alex, 11 Nov 2026; packs/write/page/item-held.js). */
 .held-band { margin: var(--space-6) 0 var(--space-9); padding: var(--space-7) var(--space-8); background: var(--warn-soft); border-left: var(--border-4) solid var(--warn); border-radius: var(--radius-2); }
