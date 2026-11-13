@@ -74,7 +74,7 @@ test('a pack waits while what it requires is missing, and what names a pack it u
     id: 'tally', version: '1', title: 'Tally', requires: ['core'], uses: ['clock'],
     types: [{ id: 'tally.thing', title: 'Thing', description: 'A thing it counts.', extends: 'record' }, { of: 'clock.entry', fields: { tally: { type: 'number' } } }],
     links: [{ id: 'tally.counts', extends: 'about', title: 'counts', inverse: 'is counted by', from: ['tally.thing'], to: ['clock.entry'], description: 'What it counts.' }],
-    views: [{ form: 'screen', id: 'tally.on_entry', title: 'Tally', on: ['clock.entry'], pieces: [{ piece: 'note', text: 'Counted.' }] }],
+    views: [{ form: 'screen', id: 'tally.on_entry', title: 'Tally', on: ['clock.entry'], pieces: [{ piece: 'figure' }] }],
   };
   const dir = packsWith(CLOCK, tally, { id: 'needy', version: '1', title: 'Needy', requires: ['core', 'nowhere'] });
   const reg = new Registry(dir);

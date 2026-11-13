@@ -113,8 +113,8 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T', action: 'demo.none' }] }]), /declares no action "demo.none"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', nav: true, pieces: [{ piece: 'page', page: 'nowhere' }] }]), /draws no page "nowhere"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'picture', lens: {}, style: { code: 'x' } }] }]), /a view's style has no code/);
-  assert.throws(bad([{ id: 'demo.s', title: 'S', pieces: [{ piece: 'note', text: 'Hi' }] }]), /the kinds or types it is on or a place offered in the nav/);
-  assert.doesNotThrow(bad([{ id: 'demo.s', title: 'S', on: ['work'], pieces: [{ piece: 'note', text: 'Hello' }] }]));
+  assert.throws(bad([{ id: 'demo.s', title: 'S', pieces: [{ piece: 'figure' }] }]), /the kinds or types it is on or a place offered in the nav/);
+  assert.doesNotThrow(bad([{ id: 'demo.s', title: 'S', on: ['work'], pieces: [{ piece: 'figure' }] }]));
 });
 
 test("the loader checks a pack's attention reasons against the very reasons attention gives", () => {

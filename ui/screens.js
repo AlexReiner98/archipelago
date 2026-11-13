@@ -4,7 +4,6 @@
 // the page of each such item too. What a pack shows of one item (a roadmap, a gate) is a view of it: ui/canvases.js.
 
 import { api, h, hooks } from './base.js';
-import { renderBody } from './body.js';
 import { section } from './item-sections.js';
 import { canvasesPiece } from './canvases.js';
 import { drawDiagram } from './diagram.js';
@@ -142,7 +141,6 @@ const PIECES = {
     const tool = (pageSchema()?.pack_tools ?? []).find((t) => t.action === p.action);
     return tool && !ctx.e?.archived_at && { node: actionForm(tool, ctx.id, ctx.redraw) };
   },
-  note: (ctx, p) => ({ node: h('section', { class: 'card wide note' }, renderBody(p.text)) }),
   // A picture: a view kept on the map (by its id), or a flat lens where "{here}" is the item the page is of. A style
   // named by id is read by the server; one written into the screen is its fields only, never code.
   picture: (ctx, p) => {

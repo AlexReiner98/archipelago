@@ -5,6 +5,9 @@
   "description": "How the map looks and is drawn: the house style, the map and rails drawings, the graph view and a style's Use here. Every map starts with it. Moved out of core with their ids (decision e_fgsgw8ja).",
   "requires": ["type:style", "type:layout"],
   "uses": ["service:answer.graph"],
+  "parts": [
+    { "id": "canvas.note", "title": "Note", "slot": "piece.note", "opens": ["piece.note"], "modules": { "index.js": "parts/note/index.js" } }
+  ],
   "views": [
     {
       "id": "core.graph",

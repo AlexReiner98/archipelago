@@ -14,7 +14,7 @@
  * A button stands in the page's head, not its column: it opens the pack's action's form, or draws the canvas up as it says.
  * A count stands under the note while it is written: how long it is, against the limit its field's value picks.
  */
-export const PIECES = { figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [] } as const;
+export const PIECES = { figure: [], document: [], view: ['view'], action: ['action'], picture: ['lens'], fields: ['fields'], page: ['page'], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [] } as const;
 
 /** The pages the host still draws itself, which a screen can hold as a piece until a pack draws them from pieces. Others are the family page.<name>. */
 export const PAGES: string[] = [];

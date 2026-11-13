@@ -22,7 +22,7 @@ test('schema with island answers in the version the island runs, and the map’s
     // The version: a field more, a screen on its type and a view of one of its items.
     { op: 'create', ref: 'v2', type: 'pack', title: 'Plain, saying why', props: { version_of: 'plain', version: '1.1.0', manifest: {
       types: [{ ...thing, fields: { why: { type: 'string', description: 'Why it is so.' } } }],
-      views: [{ form: 'screen', id: 'plain.why', title: 'Why', on: ['plain.thing'], pieces: [{ piece: 'note', text: 'Say why.' }] }],
+      views: [{ form: 'screen', id: 'plain.why', title: 'Why', on: ['plain.thing'], pieces: [{ piece: 'figure' }] }],
       styles: [{ id: 'plain.parts', type: 'lens', title: 'Its parts', on: ['plain.thing'], props: { filter: { find: ['part_of {here}'] } } }],
     } } },
   ]);
