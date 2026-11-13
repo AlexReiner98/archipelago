@@ -1,10 +1,13 @@
 // Snags grouped by what they touched: the read the refiner starts from (task "1. Snags the refiner can read"). Pure:
 // the open snags and the runs that wrote them in, the groups out, the same groups for the same input. A snag names
 // what it touched in its `touches` field, one or more `kind:ref` separated by spaces or commas (pack:core,
-// tool:change, rule:finding_note); a snag that names none is counted apart, so the refiner sees what it cannot group.
+// tool:change, rule:finding_note, part:findings.island); a snag that names none is counted apart, so the refiner sees what it cannot group.
 
 /** The kinds of thing a snag may touch, each read as `kind:ref`. */
-export const TOUCH_KINDS = ['pack', 'instruction', 'tool', 'rule', 'view', 'hook', 'page'];
+export const TOUCH_KINDS = ['pack', 'instruction', 'tool', 'rule', 'view', 'hook', 'page', 'part'];
+
+/** The pack a touch reaches beside its own ref: a part's id is `<pack>.<name>`, so what got in its way reaches that pack's refiner too. */
+const packOf = (kind, ref) => (kind === 'part' && ref.includes('.') ? ref.slice(0, ref.indexOf('.')) : undefined);
 
 const KIND = TOUCH_KINDS.join('|');
 /** One touch, as the field holds it. */
@@ -31,7 +34,7 @@ const weight = (s) => SEVERITY[s.severity] ?? 0;
 
 /**
  * The open snags grouped by what they touched, the most snags first (then the heaviest, then by name). A snag that
- * touched two things is in both groups. Each group: `touches` (kind:ref), `kind`, `ref`, `count`, `severity` (the
+ * touched two things is in both groups. Each group: `touches` (kind:ref), `kind`, `ref`, `pack` (for a part: its pack), `count`, `severity` (the
  * highest of its snags), its `snags` (id, title, type, status, severity) and the `runs` that wrote them in or added
  * to them (id, title, and the pack versions they ran under where the run says), each run once.
  *
@@ -62,7 +65,8 @@ export function snagsOf(snags, runs = []) {
     const top = Math.max(0, ...g.snags.map(weight));
     g.snags.sort((a, b) => weight(b) - weight(a) || String(a.title).localeCompare(String(b.title)));
     const severity = Object.keys(SEVERITY).find((k) => SEVERITY[k] === top);
-    return { touches: g.touches, kind: g.kind, ref: g.ref, count: g.snags.length, ...(severity && { severity }), snags: g.snags, runs: g.runs };
+    const pack = packOf(g.kind, g.ref);
+    return { touches: g.touches, kind: g.kind, ref: g.ref, ...(pack && { pack }), count: g.snags.length, ...(severity && { severity }), snags: g.snags, runs: g.runs };
   });
   list.sort((a, b) => b.count - a.count || (SEVERITY[b.severity] ?? 0) - (SEVERITY[a.severity] ?? 0) || a.touches.localeCompare(b.touches));
   const kinds = {};

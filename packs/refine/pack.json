@@ -5,14 +5,14 @@
   "description": "How the harness refines itself: snags read by what they touched, so a refiner can propose a pack change for what keeps getting in the way. A snag names what it touched in touches, a field each snag's type declares in its own pack (an issue's, in the work pack).",
   "uses": ["type:replays.set"],
   "rules": [
-    {"id": "touches_form", "when": {"op": ["create", "update"], "matches": {"touches": "^(?!\\s*(?:pack|instruction|tool|rule|view|hook|page):[^\\s,]+(?:[\\s,]+(?:pack|instruction|tool|rule|view|hook|page):[^\\s,]+)*\\s*$)"}}, "then": "refuse", "say": "\"{title}\": touches names what a snag touched as kind:ref, separated by spaces: pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event> or page:<name>."}
+    {"id": "touches_form", "when": {"op": ["create", "update"], "matches": {"touches": "^(?!\\s*(?:pack|instruction|tool|rule|view|hook|page|part):[^\\s,]+(?:[\\s,]+(?:pack|instruction|tool|rule|view|hook|page|part):[^\\s,]+)*\\s*$)"}}, "then": "refuse", "say": "\"{title}\": touches names what a snag touched as kind:ref, separated by spaces: pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event>, page:<name> or part:<pack>.<name> (a part's id)."}
   ],
   "views": [
     {
       "id": "refine.snags",
       "shape": "data",
       "limit_ms": 30000,
-      "description": "Open snags grouped by what they touched (touches: pack:, instruction:, tool:, rule:, view:, hook:, page:), the most first: each group with its count, its highest severity, its snags and the runs that wrote them, with the packs they ran under. Params: within (an item id, such as the friction feature: every open snag inside it, those that name nothing counted under untouched); without it, the open snags that name what they touched; types (the types read as snags; issue unless said).",
+      "description": "Open snags grouped by what they touched (touches: pack:, instruction:, tool:, rule:, view:, hook:, page:, part:; a part's group also names its pack), the most first: each group with its count, its highest severity, its snags and the runs that wrote them, with the packs they ran under. Params: within (an item id, such as the friction feature: every open snag inside it, those that name nothing counted under untouched); without it, the open snags that name what they touched; types (the types read as snags; issue unless said).",
       "input": {
         "type": "object",
         "properties": {
@@ -62,6 +62,6 @@
   ],
   "reach": { "launch": 10 },
   "styles": [
-    { "id": "refine.touches", "type": "instruction", "title": "Say what a bump touched", "body": "A bump is recorded as an issue part_of the friction feature (search type feature, q friction). Put what it touched in its touches: one or more of pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event> or page:<name>, separated by spaces. A refusal names its rule, so rule:<that id>. The snags view groups bumps by it.", "props": { "for": ["session_start"], "order": 31 } }
+    { "id": "refine.touches", "type": "instruction", "title": "Say what a bump touched", "body": "A bump is recorded as an issue part_of the friction feature (search type feature, q friction). Put what it touched in its touches: one or more of pack:<id>, instruction:<id>, tool:<name>, rule:<id>, view:<name>, hook:<event>, page:<name> or part:<pack>.<name> (a part of the page, by its id, such as part:findings.island), separated by spaces. A refusal names its rule, so rule:<that id>. The snags view groups bumps by it.", "props": { "for": ["session_start"], "order": 31 } }
   ]
 }

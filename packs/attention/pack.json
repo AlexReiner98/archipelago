@@ -68,6 +68,7 @@
       "slot": "piece.attention",
       "opens": ["piece.attention"],
       "views": [{ "name": "attention", "params": { "person": "{piece.person}", "reasons": "{piece.reasons}", "within": "{here}" } }],
+      "marks": ["box", "text", "list", "button"],
       "modules": { "index.js": "parts/attention/index.js", "rows.js": "parts/attention/rows.js" }
     }
   ],

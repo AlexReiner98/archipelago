@@ -31,6 +31,7 @@
       "reads": { "run": ["title"] },
       "views": [{ "name": "turns", "params": { "run": "{here}" } }, { "name": "story", "params": { "run": "{here}" } }],
       "sends": ["turns.follow_up"],
+      "marks": ["box", "text", "list", "button"],
       "modules": { "index.js": "parts/turns/index.js", "rows.js": "parts/turns/rows.js" }
     }
   ],

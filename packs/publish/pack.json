@@ -76,6 +76,7 @@
       "id": "publish.reading",
       "title": "Reading",
       "slot": "piece.document",
+      "marks": ["box", "text", "note", "button", "picture"],
       "opens": [
         "piece.document"
       ],

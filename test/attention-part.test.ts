@@ -4,9 +4,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-ignore: a module of the page, plain JavaScript
-import { checkMarks } from '../packs/walls/page/part-check.js';
+import { checkMarks as checkAny } from '../packs/walls/page/part-check.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import attention from '../packs/attention/parts/attention/index.js';
+import { readFileSync } from 'node:fs';
+
+/** The marks the part names in its manifest: the host refuses any other it answers with. */
+const kinds = JSON.parse(readFileSync(new URL('../packs/attention/pack.json', import.meta.url), 'utf8')).parts[0].marks;
+const checkMarks = (marks: unknown) => checkAny(marks, { kinds });
 
 const top = { id: 'e_top00001', title: 'Build the UI as packs' };
 const items = [

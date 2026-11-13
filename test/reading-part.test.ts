@@ -6,7 +6,12 @@ import { test } from 'node:test';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import reading from '../packs/publish/parts/reading/index.js';
 // @ts-ignore: a module of the page, plain JavaScript
-import { checkMarks } from '../packs/walls/page/part-check.js';
+import { checkMarks as checkAny } from '../packs/walls/page/part-check.js';
+import { readFileSync } from 'node:fs';
+
+/** The part is held to the marks its pack entry names, as the host holds it. */
+const kinds = JSON.parse(readFileSync(new URL('../packs/publish/pack.json', import.meta.url), 'utf8')).parts[0].marks;
+const checkMarks = (marks: unknown) => checkAny(marks, { kinds });
 
 const doc = {
   parts: [

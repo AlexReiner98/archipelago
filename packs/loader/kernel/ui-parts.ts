@@ -9,6 +9,12 @@
 // island runs the part of the version it pins. Each part goes to the page by the hash of its modules, so a module is
 // fetched once and kept. The owner's version of a part is an item of core's `part` type naming it as its `preset`,
 // its `code` (modules by name) standing in for the pack's file by file, as a layout's `modules` do.
+//
+// A part names the marks it answers with (`marks`), the contract it leans on the host for (task e_jqj87va8). The host's
+// vocabulary is its page's (packs/walls/page/part-check.js), timed by commit, and the page hands it in when it asks for
+// its parts: the loader checks only a list's shape, so a host that drops a mark leaves the pack active and sends the
+// parts that use it to waiting, their code never sent, rather than refusing them at draw (the rule "users leave before
+// the provider").
 
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
@@ -34,6 +40,8 @@ export interface PartDef {
   sends?: string[];
   /** The slots it draws for other parts to fill, each named `<pack>.<name>`, or a piece or page the host no longer draws (piece.<name>, page.<name>). */
   opens?: string[];
+  /** The marks it answers with, each a kind the host draws (box, text, ...): the host refuses any other, and a part naming one the host lacks waits. */
+  marks: string[];
   /** Its modules by name, each a file in the pack's folder, entered at index.js. */
   modules: Record<string, string>;
 }
@@ -63,14 +71,25 @@ export interface Part {
   views?: PartView[];
   sends: string[];
   opens: string[];
+  marks: string[];
   hash: string;
-  /** Left out when the page says it has them (`have`). */
+  /** Why it is not drawn: it names a mark the host that asked does not draw. Its modules are then never sent. */
+  waiting?: string;
+  /** Left out when the page says it has them (`have`), and for a waiting part. */
   modules?: Record<string, string>;
 }
 
 /** An item's head and the fields every starter type keeps in the row: a part may read them of any type (packs/loader/kernel/head.ts). */
 const HEAD = ['id', 'type', 'title', 'body', 'visibility', 'created_at', 'updated_at', 'status', 'owner', 'confidence', 'source'];
 const MODULE = /^[a-z][a-z0-9_-]*\.js$/;
+/** A mark's kind, as a part names it and a host says it draws. */
+export const MARK = /^[a-z][a-z0-9_]*$/;
+
+/** Why a part waits on a host: the marks it names that the host (the kinds it draws) does not draw, or nothing. */
+export function marksWaiting(marks: unknown, host: string[]): string | undefined {
+  const lacking = (Array.isArray(marks) ? marks : []).filter((m) => !host.includes(m));
+  return lacking.length ? `it answers with ${lacking.map((m) => `"${String(m).slice(0, 40)}"`).join(', ')}, which this host does not draw` : undefined;
+}
 
 /** Whether a pack may read a type's fields: its own, core's, or one it asks for by name (type:, field:, status:, phase: of it). */
 function asksFor(pack: Manifest, type: string, field: string, types: Map<string, ResolvedType>): boolean {
@@ -126,6 +145,9 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       // What only a person or an admin may call is theirs to choose, never a part's to send (packs/loader/kernel/part-calls.ts).
       else if (personal.has(a)) problems.push(`${at} sends "${a}", which only a person or an admin may call: a part never sends it`);
     }
+    // By shape alone: whether the host draws them is asked where the part is drawn, so a host's change never refuses the pack.
+    if (!Array.isArray(part.marks) || !part.marks.length || part.marks.some((m) => typeof m !== 'string' || !MARK.test(m))) problems.push(`${at} names the marks it answers with: marks is a list of mark kinds, such as ["box", "text"] (packs/walls/page/part-check.js)`);
+    else if (new Set(part.marks).size !== part.marks.length) problems.push(`${at} names a mark twice`);
     if (typeof part.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);
     for (const [name, file] of Object.entries(part.modules ?? {})) {
       if (!MODULE.test(name) || typeof file !== 'string' || file.includes('..') || file.startsWith('/')) problems.push(`${at}: "${name}" is not a module's name (a-z, ending .js) with a file in the pack`);
@@ -193,15 +215,16 @@ function modulesOf(packs: Packs, d: PartDef & { pack: string }, mine?: Kept): Re
 /**
  * The parts a page draws, each by the hash of its modules, which are sent only when the page does not have them yet
  * (`have`). Read from the registry it is given: an island's, where it pins a version, gives that version's code. A
- * part the owner retired (their version of it closed) is not drawn.
+ * part the owner retired (their version of it closed) is not drawn. Given the marks the asking host draws (`host`), a
+ * part naming another waits, sent without its code.
  */
-export function partsFor(packs: Packs, kept: Kept[] = [], have: string[] = []): Part[] {
+export function partsFor(packs: Packs, kept: Kept[] = [], have: string[] = [], host?: string[]): Part[] {
   const out: Part[] = [];
   for (const d of partsOf(packs.packs)) {
     const mine = kept.find((v) => v.props.preset === d.id);
     if (mine && !mine.is_open) continue;
-    const modules = modulesOf(packs, d, mine), hash = hashOf(modules);
-    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], opens: d.opens ?? [], hash, ...(!have.includes(hash) && { modules }) });
+    const modules = modulesOf(packs, d, mine), hash = hashOf(modules), waiting = host && marksWaiting(d.marks, host);
+    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], opens: d.opens ?? [], marks: d.marks ?? [], hash, ...(waiting ? { waiting } : !have.includes(hash) && { modules }) });
   }
   return out;
 }

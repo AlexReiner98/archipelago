@@ -38,6 +38,7 @@
       "reads": { "finding": ["title", "body", "value", "unit", "as_of", "published"], "island": ["title"] },
       "query": { "find": ["island {here}"], "only": ["type finding"], "limit": 60 },
       "sends": ["findings.stand_by"],
+      "marks": ["box", "text", "list", "button", "menu", "note"],
       "modules": { "index.js": "parts/findings/index.js", "rows.js": "parts/findings/rows.js" }
     }
   ],

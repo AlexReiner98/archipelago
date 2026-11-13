@@ -21,7 +21,7 @@ const shelfs = <T extends { pack: string }>(parts: T[]) => parts.filter((p) => p
 /** A map pack with one part, its look a module of its own. */
 const shelf = {
   id: 'shelf', version: '1.0.0', title: 'Shelf', description: 'A part of the page.', requires: ['core'],
-  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', reads: { task: ['title'] }, modules: { 'index.js': 'parts/row/index.js', 'look.js': 'parts/row/look.js' } }],
+  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', marks: ['box', 'text', 'button'], reads: { task: ['title'] }, modules: { 'index.js': 'parts/row/index.js', 'look.js': 'parts/row/look.js' } }],
 };
 
 function folder(): string {
