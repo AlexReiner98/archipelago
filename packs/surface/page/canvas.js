@@ -9,7 +9,7 @@
 import { api, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { canvasSwitch } from './views-kept.js';
-import { moved, numberOf } from './query-base.js';
+import { added, moved, numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
@@ -164,6 +164,23 @@ export const mark = (here) => current?.mark(here);
  * the facts (packs/surface/page/replica.js), and is not read again.
  */
 export const refreshCanvas = (tail = false) => all.forEach((c) => c.refresh(tail));
+
+/**
+ * What a person makes on the canvas stays in sight, and the canvas stays the one they had (the owner, 10 Nov 2026): its
+ * query is kept as it was, and only what it would not find is added to it, a term each (an item by its id, a new island
+ * by `island <id>`), as a click adds to the filter. Whether the query finds it is the server's to judge (the page never
+ * runs a query, packs/surface/page/membership.js): asked once, and the canvas read again either way. `made` is
+ * [{ id, term }]. By name (hooks.keepInView), so a drawing's step (packs/walls/page/layout-asks.js) reaches it.
+ */
+hooks.keepInView = async (made) => {
+  const lens = queryNow();
+  if (!lens?.filter || !made.length) return refreshCanvas();
+  const answer = await api('view', { name: 'flat', params: { filter: lens.filter, ...(lens.walk && { walk: lens.walk }), ...(lens.limit && { limit: lens.limit }) } }).catch(() => null);
+  const found = new Set((answer?.items ?? []).map((i) => i.id));
+  const missing = made.filter((m) => !found.has(m.id));
+  if (!answer || !missing.length) return refreshCanvas();
+  goQuery(missing.reduce((l, m) => added(l, { find: m.term }), lens));
+};
 /**
  * Read again each canvas that draws one of these sessions: what the server says of a session on its node (its state and
  * the line of its latest beat) is worked out as the lens is read, not kept current by the facts, so a beat asks again.
