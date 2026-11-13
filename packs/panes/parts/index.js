@@ -43,11 +43,12 @@ const sessionsOf = () => Object.fromEntries(Object.entries(m.heard ?? {}).map(([
 
 /** The panes of the tab in sight, as marks: each its canvas at its address, its strip its name, its mark and its two buttons. */
 function panesMarks(t) {
+  const focus = M.focusOf(t);
   const pane = (id) => {
     const p = t.panes[id];
     const share = t.sizes[t.groups.indexOf(id)];
     const who = p.slot ?? (p.held ? m.heard?.[p.held]?.called ?? '' : '');
-    return ['pane', { key: `pane:${id}`, at: p.at, share, drag: 'pane', ...(p.ring && Date.now() - p.ring < 2000 && { ring: true }), tip: String(p.said ? `${who}: ${p.said}` : 'Drag its name to dock it elsewhere').slice(0, 200) },
+    return ['pane', { key: `pane:${id}`, at: p.at, share, drag: 'pane', selected: id === focus, ...(p.ring && Date.now() - p.ring < 2000 && { ring: true }), tip: String(p.said ? `${who}: ${p.said}` : 'Drag its name to dock it elsewhere').slice(0, 200) },
       ['text', {}, String(p.name ?? 'Canvas').slice(0, 120)],
       ...(who ? [['text', { look: 'mark' }, String(who).slice(0, 40)]] : []),
       ['button', { key: `totab:${id}`, look: 'quiet', tip: 'Move this pane to a new tab' }, '⧉'],
@@ -191,7 +192,13 @@ export default function panes(input, tools) {
   m ??= modelOf(input);
   const mount = { slot: (input?.slot ?? input?.piece?.slot) === 'panes' ? 'panes' : 'tabs', tools, hash: input?.page?.hash };
   mounts.add(mount);
-  if (mount.slot === 'tabs') ((driver = mount), void readOpen());
+  // The strip's mount hears the page: the address it opened on goes to the pane in focus, as the page's own panes took it.
+  if (mount.slot === 'tabs') {
+    driver = mount;
+    if (input?.page?.hash) moved(input.page.hash);
+    queueMicrotask(changed);
+    void readOpen();
+  }
   return {
     marks: marksFor(mount.slot),
     update(next) {

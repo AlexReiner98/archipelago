@@ -46,3 +46,34 @@ test('a pane dragged onto the strip goes to a tab of its own; the line between t
   assert.equal(panes.on({ key: first, name: 'named', value: 'Tasks' }) !== undefined, true);
   assert.match(JSON.stringify(strip.on({ key: 'new', name: 'press' })), /Tasks/, 'a tab is named by what its pane draws');
 });
+
+test("a chat's first show opens its tab out of sight; its next lands there; its end closes it", () => {
+  const { strip, kept } = mountBoth();
+  const gone: string[] = [];
+  const step = (n: number) => ({ hash: `#/v?f=${n}`, run: 'e_run00001', actor: 'agent:Ada', title: 'Port the panes', at: n });
+  strip.on({ name: 'land', step: step(1) });
+  const tabs = () => (kept.tabs as { list: { chat?: string; groups: string[]; panes: Record<string, { at: string }> }[]; front: string }).list;
+  assert.equal(tabs().length, 2, 'a tab of its own');
+  const chat = tabs().find((t) => t.chat === 'e_run00001')!;
+  assert.ok(chat, 'the chat’s tab');
+  assert.notEqual((kept.tabs as { front: string }).front, (chat as unknown as { id: string }).id, 'out of sight');
+  strip.on({ name: 'land', step: step(2) });
+  assert.equal(tabs().length, 2, 'no second tab');
+  assert.equal(Object.values(tabs().find((t) => t.chat === 'e_run00001')!.panes)[0].at, 'v?f=2');
+  assert.match(JSON.stringify(strip.marks), /./);
+  strip.on({ name: 'ended', run: 'e_run00001' });
+  for (const t of tabs()) gone.push(t.chat ?? 'owner');
+  assert.deepEqual(gone, ['owner'], 'its tab goes, the owner’s stays');
+});
+
+test('a step back takes the pane in focus back, and the page moving takes the pane there', () => {
+  reset();
+  const went: { hash: string; push: boolean }[] = [];
+  const kept: Record<string, unknown> = {};
+  const tools = { marks: () => {}, keep: (v: unknown, n: string) => (kept[n] = v), state: () => {}, go: (g: { hash: string; push: boolean }) => went.push(g) };
+  const strip = part({ slot: 'tabs', page: { hash: '#/v?f=a' } }, tools) as Said;
+  strip.update({ page: { hash: '#/v?f=b' } });
+  strip.on({ name: 'step', step: -1, hash: '#/v?f=a' });
+  assert.equal(went.at(-1)?.hash, '#/v?f=a');
+  assert.equal(went.at(-1)?.push, false);
+});

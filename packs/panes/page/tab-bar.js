@@ -380,9 +380,10 @@ export function startTabs() {
     tabs.front = tabs.list[0].id;
     return startPanes();
   }
-  // The panes pack's part draws the tabs and the panes where it is loaded (packs/panes/parts/index.js); the page's own
-  // stay as they were until it says none fills them.
-  if (!poppedTab) {
+  // The panes pack's part draws the tabs and the panes (packs/panes/parts/index.js), asked for with ?panes=part until a
+  // press inside a dragged mark reaches its button (task e_rq9d73mg); the page's own draw them otherwise, and where
+  // no part fills them.
+  if (!poppedTab && new URLSearchParams(location.search).get('panes') === 'part') {
     byPart.on = true;
     void startPart().then((drawn) => drawn || ((byPart.on = false), startHost(), dispatchEvent(new HashChangeEvent('hashchange'))));
     return;
@@ -398,7 +399,8 @@ export function startTabs() {
 async function startPart() {
   const canvas = document.getElementById('canvas');
   if (!strip || !canvas) return false;
-  const top = h('div', { class: 'tabs-part' });
+  // The strip lets presses through but for its tabs (ui/shell.css): the part's strip takes them.
+  const top = h('div', { class: 'tabs-part', style: 'pointer-events: auto' });
   const filled = await drawSlot(top, { slot: 'tabs' }).catch(() => false);
   if (!filled) return false;
   strip.replaceChildren(top);
