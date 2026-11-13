@@ -51,7 +51,7 @@ import { configureSecrets } from '../../seal/kernel/secrets.ts'; import { serveF
 import { adapterBefore, answerAt, hookAt } from '../../loader/kernel/server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY, SIGNED_IN_READER_POLICY } from '../../walls/kernel/page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from '../../walls/kernel/draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
-import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../identity/kernel/workspaces.ts';
+import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../identity/kernel/workspaces.ts'; import { guestOf, guestsDue, guestStanding } from '../../identity/kernel/guests.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
 const BODY_MAX = 32_000_000; /** What a route open to anyone takes: a form's worth, or a webhook's delivery. */ const OPEN_BODY_MAX = 64_000, HOOK_BODY_MAX = 1_000_000;
@@ -101,7 +101,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : origins[0];
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token);
+  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : guestStanding(await guestOf(await workspaces.control(), id)) ?? standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => [...(await dueForDeletion(serverPacks, await workspaces.control(), now)), ...(await guestsDue(await workspaces.control(), now))]; slowTokensAt(options.limits?.token);
   void mailing().then((mail) => mail.setBounced(async (email) => onMap<boolean>((await workspaces.get(DEFAULT_WORKSPACE)).pelago, 'surface.bounced', email)), (err: Error) => console.error(`mail: ${err.message}`)); // a bounced address is sent nothing (the mailer's bounces)
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.

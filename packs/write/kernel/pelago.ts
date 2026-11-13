@@ -2,7 +2,7 @@
 // by the rules (packs/rules/kernel/rules.ts), then either applied or stored as a proposal for a human, and always logged.
 
 import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type Policy } from '../../rules/kernel/rules.ts';
-import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomToStore, stillWritable } from '../../identity/kernel/standing.ts'; import { authorityOf } from '../../rules/kernel/authority.ts';
+import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomForItems, roomToStore, stillWritable } from '../../identity/kernel/standing.ts'; import { authorityOf } from '../../rules/kernel/authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from '../../database/kernel/db.ts';
 import { once } from './merge.ts'; import { doneFact, type Done } from '../../log/kernel/activity.ts';
 import type { Registry } from '../../loader/kernel/packs.ts'; import { currentNames } from '../../loader/kernel/type-items.ts'; import { follow, retyped, rewrite, type Who } from './write-hooks.ts';
@@ -101,6 +101,9 @@ export class Archipelago {
     return agentChanges(this.db, this.policy);
   }
 
+  /** How many items there are, counted up to most and one past it: what a guest map's cap is held against. */
+  private itemsHeld = async (most: number) => (await this.db.query<{ n: number }>(`select count(*)::int as n from (select 1 from entity where archived_at is null limit $1) x`, [most + 1])).rows[0].n;
+
   // ---- writes ----------------------------------------------------------
 
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
@@ -108,7 +111,7 @@ export class Archipelago {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
     // The write path's hook points (packs/write/kernel/write-hooks.ts): rewrite, then who may write, then what follows the change, then
     // validate as it is planned. The verdict covers every op, what followed included.
-    currentNames(this.registry, input.ops); await rewrite({ map: this, reg: this.registry, island: input.island }, input.ops); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
+    currentNames(this.registry, input.ops); await rewrite({ map: this, reg: this.registry, island: input.island }, input.ops); await stillWritable(this.workspace); await roomToStore(this.workspace); await roomForItems(this.workspace, input.ops.filter((o) => o.op === 'create').length, this.itemsHeld); await mayWrite(this, actor, input.ops, measured);
     const followed = await follow({ map: this, reg: this.registry }, input.ops);
     if (followed.length) input = { ...input, ops: [...input.ops, ...followed.flatMap((f) => f.ops)] };
     const { warnings } = await this.plan(input.ops, { human: actor.kind === 'human', pack: input.pack });

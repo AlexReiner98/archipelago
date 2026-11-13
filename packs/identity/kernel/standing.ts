@@ -43,6 +43,8 @@ export interface Limits {
   sessions?: number;
   /** The most looks an hour. */
   looks?: number;
+  /** The most items it holds: set by the kernel for a guest map (./guests.ts), never by a pack. */
+  items?: number;
   /** What to say to whoever meets a limit: how to make room. */
   note?: string;
 }
@@ -151,6 +153,14 @@ export async function roomToStore(workspace: string): Promise<void> {
   if (!limits?.storage) return;
   const used = await storageOf(workspace);
   if (used >= limits.storage) throw await overLimit(workspace, limits, 'storage', used, 'nothing more is written until there is room. What is there can still be read and its backup downloaded');
+}
+
+/** Refuse a change that makes items past the most a workspace holds, counting those there (`held`, up to `most`). */
+export async function roomForItems(workspace: string, making: number, held: (most: number) => Promise<number>): Promise<void> {
+  const most = making ? (await limitOf(workspace))?.items : undefined;
+  if (!most) return;
+  const n = await held(most);
+  if (n + making > most) throw new Error(`${await workspaceName(workspace)} has room for ${most} items, and has ${n}: this change makes ${making} more. ${(await limitOf(workspace))?.note ?? ''}`.trim());
 }
 
 /** Refuse one more agent session past the limit, counting those at work (`awake`) now. */
