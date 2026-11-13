@@ -284,7 +284,7 @@
   "test/surface.test.ts": { "pglite": 4.8, "postgres": 2.7 },
   "test/svg-figure.test.ts": { "pglite": 0, "postgres": 0 },
   "test/sweep.test.ts": { "pglite": 0.2, "postgres": 0.2 },
-  "test/tab-count.test.ts": { "pglite": 0, "postgres": 0 },
+  "test/tab-count-part.test.ts": { "pglite": 0, "postgres": 0 },
   "test/tabs-busy.test.ts": { "pglite": 29.9, "postgres": 28.9 },
   "test/tabs-canvas.test.ts": { "pglite": 7.5, "postgres": 6.1 },
   "test/tabs.test.ts": { "pglite": 10, "postgres": 7.1 },
