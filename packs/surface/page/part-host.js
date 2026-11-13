@@ -189,7 +189,8 @@ async function pickFor(from, kind) {
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
+  // The page's origin, for a part that shows an address of this server (connect's MCP address): words only.
+  given = { ...given, origin: location.origin, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };

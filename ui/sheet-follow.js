@@ -60,7 +60,7 @@ export function followSheet(host, picture, bring) {
     const id = row?.dataset.item;
     // The reading position, handed to a part on the sheet (sheet.follow), which decides which page is shown and names
     // it (`go` with `replace`); with none, the page follows it here.
-    if (hooks.tellSlot?.('sheet', { name: 'scrolled', reading: { item: id ?? null, open: open[1], held: holding, unsaved } })) return;
+    if (hooks.tellSlot?.('sheet', { name: 'scrolled', reading: { open: open[1], sight: id ?? null, unsaved, holding } })) return;
     if (unsaved || holding) return;
     if (id && id !== open[1]) location.replace(location.hash.replace(open[1], id));
   };

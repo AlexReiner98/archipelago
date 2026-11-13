@@ -191,9 +191,9 @@ which `ui/query-bar.js` then leaves to the part.
 **The runtime tells a slot what it saw** (`tellSlot(slot, event)`, as
 `hooks.tellSlot`): every part mounted there hears it as an event in `on`,
 and one mounted later is handed the last as `told`. The sheet's reading
-position is told to `sheet` as `{ name: 'scrolled', reading: { item, open,
-held, unsaved } }` (`item` the document in sight, `open` the item whose page
-is shown, `held` while the sheet waits for the frames above to settle); a
+position is told to `sheet` as `{ name: 'scrolled', reading: { open, sight,
+unsaved, holding } }` (`open` the item whose page is shown, `sight` the
+document in sight, `holding` while the sheet waits for the frames above); a
 part there names the page to show with
 `tools.go({ item, replace: true })`, which replaces the address and never
 leaves words not yet saved. With no part told, the page follows the reading
