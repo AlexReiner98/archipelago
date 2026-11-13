@@ -45,11 +45,10 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar, item-doc and thumbs.
   'packs/surface/page/views-kept.js': 3,
   'packs/surface/page/app.js': 7,
-  'packs/surface/page/canvas.js': 2,
-  'packs/surface/page/live.js': 6,
+  'packs/surface/page/canvas.js': 1,
+  'packs/surface/page/live.js': 4,
   'packs/surface/page/query.js': 2,
-  'packs/panes/page/panes.js': 2,
-  'packs/surface/page/replica.js': 1,
+  'packs/panes/page/panes.js': 1,
   'packs/panes/page/tab-bar.js': 3,
   'packs/panes/page/tabs.js': 1,
   // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
@@ -83,7 +82,6 @@ test("the host's page imports one way along roots.json", () => {
 // the boundary itself moves, as it did here and on 12 Nov; otherwise it falls. It moved once more the same day:
 // doc-lens.js, the picture mark's drawing, went to surface (task e_atxefw2s), so doc.js and item-doc.js count it.
 const APP_ON_HOST: Record<string, number> = {
-  'ui/catch-up.js': 3,
   'ui/connect-agent.js': 2,
   'ui/connections-card.js': 2,
   'ui/find-choices.js': 3,
