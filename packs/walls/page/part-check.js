@@ -30,8 +30,6 @@
 //   replay  nothing where it stands: the canvas under it shows what the person missed, up to step `at` of its steps
 //   trace   nothing where it stands: its item's marks on the canvas painted with its line (`tip`), in a session's hue,
 //           until the person has seen them; then the part is told `seen`
-//   slot    the parts that fill a slot the part opens (`name`, one of its `opens`), drawn here by the host: the part
-//           never sees them, nor they it (decision e_hp9xmrbq)
 // Any mark may also carry `lights`: the items it stands for, lit on the canvas while the person points at it, the rest
 // faded. A box may be `fits`: it shows as many of its marks as fit on one line and says how many are left (`more`: the
 // key a press on the count goes back by). A box, a button or a pane may carry `drag`: the host follows it when it is
@@ -52,6 +50,13 @@ const ITEM = /^e_[a-z0-9]{8}$/;
 /** A view: one kept on the map (its id), one a pack ships (its id, `<pack>.<name>`), or home. */
 /** A slot's name, as packs/loader/kernel/slots.ts names one. */
 const SLOT_NAME = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_-]*)*$/;
+/** What a slot mark hands the parts that fill it, as a screen hands a piece its settings: words, numbers, yes and no, lists of words. */
+const settings = (v, why) => {
+  if (!v || typeof v !== 'object' || Array.isArray(v) || Object.keys(v).length > 20) return why('not settings: up to 20 names, each words, a number, yes or no, or a list of words');
+  const fit = (x) => (typeof x === 'string' && x.length <= partLimits.label) || (typeof x === 'number' && Number.isFinite(x)) || typeof x === 'boolean' || (Array.isArray(x) && x.length <= 50 && x.every((w) => typeof w === 'string' && w.length <= partLimits.label));
+  for (const [k, x] of Object.entries(v)) if (!/^[a-z][a-z0-9_]*$/.test(k) || !fit(x)) return why(`not settings: "${k.slice(0, 40)}" is not words, a number, yes or no`);
+  return v;
+};
 const slotName = (v, why) => (typeof v === 'string' && v.length <= partLimits.key && SLOT_NAME.test(v) ? v : why("not a slot's name"));
 const VIEW = /^(?:e_[a-z0-9]{8}|home|[a-z][a-z0-9_]*(?:.[a-z][a-z0-9_-]*)+)$/;
 /** A path says only where it goes: its commands and numbers, nothing that could name or fetch anything. */
@@ -140,11 +145,10 @@ export const MARKS = {
   web: { attrs: { key, tip: anyMark.tip, url: href, reload: words(partLimits.key) }, holds: 'nothing', needs: ['url'] },
   pane: { attrs: { key, tip: anyMark.tip, at: address, share, ring: flag, drag: key, selected: flag }, holds: 'marks', keyed: true, needs: ['at'] },
   panes: { attrs: { key, dir: oneOf('row', 'column') }, holds: 'marks', only: ['pane'], keyed: true },
-  slot: { attrs: { key, name: key }, holds: 'nothing', needs: ['name'] },
+  slot: { attrs: { key, name: slotName, piece: settings }, holds: 'nothing', needs: ['name'] },
   ghost: { attrs: { key, of: oneOf('item', 'link', 'mark'), id: ghostId, type: key, title: words(partLimits.label), status: key, body: words(4000), proposal, by: words(partLimits.label), reason: words(partLimits.label), op: oneOf('create', 'link', 'update', 'archive', 'unlink'), from: rowId, to: rowId, on: rowId }, holds: 'nothing', needs: ['of', 'proposal', 'op'] },
   replay: { attrs: { key, at: step(0, 1000000), steps: replaySteps }, holds: 'nothing', needs: ['at', 'steps'] },
   trace: { attrs: { key, item, tip: words(500), hue: words(partLimits.key) }, holds: 'nothing', needs: ['item'] },
-  slot: { attrs: { key, name: slotName }, holds: 'nothing', needs: ['name'] },
   swatch: { attrs: { key, tip: anyMark.tip, preset: key, label: words(partLimits.label), on: oneOf('kept', 'trying') }, holds: 'nothing', needs: ['preset'] },
 };
 
