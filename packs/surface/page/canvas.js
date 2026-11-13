@@ -6,11 +6,11 @@
 // which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
 // themselves (a page opened or shut then leaves it be).
 
-import { api, hooks, idsOf, state } from './base.js';
+import { api, drawSlot, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { catchUp } from './catch-up.js';
 import { canvasSwitch } from './canvases.js';
-import { numberOf } from './query-base.js';
+import { moved, numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
@@ -45,9 +45,28 @@ export function activate(c) {
 }
 function barNow() {
   const c = current;
+  mountBar();
   if (c?.view) drawQuery(c.lens, c.view, c.pane.go, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
   hooks.addressMoved?.();
 }
+/**
+ * Find's line and the rows above it, where a part fills `bar.find` or `bar.find.rows`: mounted once, in the nodes the
+ * bar drew them in, and handed the lens and its answer as they move (packs/surface/page/part-lens.js). The bar leaves a
+ * node a part holds alone; with no part, it draws them as before.
+ */
+let barMounted = false;
+function mountBar() {
+  if (barMounted) return;
+  barMounted = true;
+  for (const [slot, id] of [['bar.find', 'find-lens'], ['bar.find.rows', 'find-rows']]) {
+    const node = document.getElementById(id);
+    if (node) drawSlot(node, { slot }).catch((err) => console.warn(`${slot}: ${err?.message ?? err}`));
+  }
+}
+/** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */
+hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: current.view.failed } : null);
+/** The lens Home draws, handed where no query is up. */
+hooks.homeLens = () => home();
 /** The lens the canvas in focus draws now. */
 export const queryNow = () => current?.lens ?? null;
 /** Draw this lens in the canvas in focus. */
@@ -96,6 +115,11 @@ hooks.go = (address) => {
     const of = typeof address.of === 'string' && /^e_[a-z0-9]{8}$/.test(address.of) ? address.of : undefined;
     if (address.page === 'screen' && !of) return;
     return void openHere(address.page === 'screen' ? `#/s/${of}` : `#/${address.page}`);
+  }
+  // A term added to the lens up or taken out of it (`add`, `take`): the runtime makes the lens, so no part keeps the algebra.
+  if (address.add || address.take) {
+    const next = moved(current.home ? home() : current.lens, address);
+    return void (next && goQuery(next));
   }
   let lens = null;
   try {
