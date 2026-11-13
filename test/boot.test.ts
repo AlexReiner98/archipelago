@@ -41,21 +41,17 @@ test("a root pack's hash is its folder's, whatever the line endings and the mani
 // A root pack's parts are the owner's too: what the refiner may not change is pinned, wherever in the pack it lives
 // (decision e_bn76z5fu, the sheet's parts). Its layouts likewise.
 test("a root pack's parts and layouts are pinned with its kernel and its page", () => {
-  const h = home({ x: { kernel: root, files: { 'index.ts': 'export {};
-' } } }, ['x']);
+  const h = home({ x: { kernel: root, files: { 'index.ts': 'export {};\n' } } }, ['x']);
   const at = join(h, 'packs', 'x');
   const was = hashPack(at);
   mkdirSync(join(at, 'parts', 'row'), { recursive: true });
-  writeFileSync(join(at, 'parts', 'row', 'index.js'), 'export default () => [];
-');
+  writeFileSync(join(at, 'parts', 'row', 'index.js'), 'export default () => [];\n');
   const withPart = hashPack(at);
   assert.notEqual(withPart, was, 'a part added to a root pack changes its hash');
-  writeFileSync(join(at, 'parts', 'row', 'index.js'), 'export default () => [["text", "changed"]];
-');
+  writeFileSync(join(at, 'parts', 'row', 'index.js'), 'export default () => [["text", "changed"]];\n');
   assert.notEqual(hashPack(at), withPart, 'and so does changing one');
   mkdirSync(join(at, 'layouts', 'flow'), { recursive: true });
-  writeFileSync(join(at, 'layouts', 'flow', 'index.js'), 'export default () => [];
-');
+  writeFileSync(join(at, 'layouts', 'flow', 'index.js'), 'export default () => [];\n');
   assert.notEqual(hashPack(at), withPart, 'a layout counts too');
 });
 
