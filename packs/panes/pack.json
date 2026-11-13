@@ -3,9 +3,6 @@
   "version": "0.1.0",
   "title": "Panes",
   "description": "The panes of the page and the bar of tabs across them: where each pane stands, what it holds, how one is dragged, landed and addressed, and the tab bar over them with each tab's life. A root pack, so its parts change only through a root re-pin (task e_d5ewsvgf).",
-  "requires": [
-    "core"
-  ],
   "kernel": {
     "trust": "root",
     "internal": true
