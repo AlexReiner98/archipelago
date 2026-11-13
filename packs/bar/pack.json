@@ -6,6 +6,29 @@
   "requires": [
     "core"
   ],
+  "parts": [
+    {
+      "id": "bar.query",
+      "title": "Query",
+      "slot": "bar.find",
+      "go": true,
+      "marks": [
+        "box",
+        "text",
+        "list",
+        "input",
+        "button"
+      ],
+      "modules": {
+        "index.js": "parts/query/index.js",
+        "terms.js": "parts/query/terms.js",
+        "kinds.js": "parts/query/kinds.js",
+        "rank.js": "parts/query/rank.js",
+        "lit-by.js": "parts/query/lit-by.js",
+        "only-words.js": "parts/query/only-words.js"
+      }
+    }
+  ],
   "kernel": {
     "trust": "root",
     "internal": true
