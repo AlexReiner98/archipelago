@@ -49,12 +49,14 @@ export const drawSlots = (node, asked) => import('./part-host.js').then((m) => m
 /**
  * Look mode (`?look`): on the first word of a drawing, from the canvas or from a page that draws one, mount the part
  * that fills `look` on a hidden node, two frames on, so the page has painted before it says so. The part is handed
- * what was drawn and publishes it as page state; with no part, or a part that fails, the state is said here instead,
- * so whatever is waiting for the picture is never left waiting. Mounting a frame slot is the runtime's, not the app's.
+ * what was drawn and publishes it as page state. Mounting a frame slot is the runtime's, not the app's.
+ *
+ * What the page says of itself stays the page's: with no part filling the slot, or a part that fails, nothing is said
+ * here, and the state is whatever said it before (ui/look.js). Saying "error" for a slot nobody fills would make every
+ * look fail while look_draw's part is being written.
  */
 if (typeof location === 'object' && new URLSearchParams(location.search).has('look')) {
   const root = document.documentElement;
-  const said = (why, state = 'error') => ((root.dataset.look_why = String(why).slice(0, 300)), (root.dataset.look = state));
   const first = (ev) => {
     if (ev.target !== root && !ev.target.closest?.('#canvas')) return;
     document.removeEventListener('view-drawn', first);
@@ -64,7 +66,7 @@ if (typeof location === 'object' && new URLSearchParams(location.search).has('lo
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const node = Object.assign(document.createElement('div'), { hidden: true });
       document.body.append(node);
-      drawSlot(node, { slot: 'look', piece }).then((drawn) => drawn || said('No part fills the slot look.'), (err) => said(err?.message ?? err));
+      drawSlot(node, { slot: 'look', piece }).then((drawn) => drawn || node.remove(), (err) => (node.remove(), console.warn(err?.message ?? err)));
     }));
   };
   document.addEventListener('view-drawn', first);

@@ -1,0 +1,23 @@
+
+> archipelago@0.2.0 test
+> node scripts/test.ts test/looks.test.ts test/mcp-view-host.test.ts
+
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-reader-publish-e31a78 (npm test test/reader-publish-parts.test.ts test/part-marks.test.ts test/structure.test.ts test/structure-page.test.ts test/text.test.ts test/ui-parts.test.ts test/doc-ref.test.ts packs/reader/reader.test.ts packs/reader/visit.test.ts test/published-frames.test.ts test/server-mounts.test.ts test/site.test.ts test/workspace-tokens.test.ts packs/publish/reading.test.ts packs/publish/kernel/publish.test.ts test/reading-part.test.ts, pid 47172, for 1 min).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-bar-82fc9c (npm test test/bar-query.test.ts, pid 26244, for 0 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-cards-82b511 (npm test test/surface.test.ts, pid 38892, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\vibrant-sanderson-3dee94 (npm test --no-cache test/looks.test.ts, pid 38420, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-cards-82b511 (npm test test/surface.test.ts, pid 48388, for 0 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-sheet-a67aa8 (npm test packs/sheet/page-part.test.ts test/note-count.test.ts test/ui-parts.test.ts test/structure.test.ts test/structure-page.test.ts, pid 26348, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-snags-marks-e60832 (npm test test/boot.test.ts test/root-calls.test.ts test/looks.test.ts test/first-drawing.test.ts test/canvas-pan.test.ts test/structure.test.ts, pid 17872, for 0 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-slots-347a6f (npm test test/part-slots.test.ts test/ui-parts.test.ts test/structure.test.ts, pid 31864, for 2 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-cards-82b511 (npm test --no-cache test/surface.test.ts, pid 45960, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-snags-marks-e60832 (npm test test/looks.test.ts, pid 40084, for 2 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\blissful-dijkstra-688a6c (npm test packs/catch_up/catch-up.test.ts test/structure.test.ts, pid 33420, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-marks-dcca68 (npm test test/part-marks-asked.test.ts test/part-marks.test.ts test/structure.test.ts, pid 45260, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-slots-347a6f (npm test test/part-slots.test.ts test/structure.test.ts, pid 14828, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\blissful-dijkstra-688a6c (npm test packs/catch_up/catch-up.test.ts test/structure.test.ts test/ui-parts.test.ts, pid 37504, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\vigilant-jang-fab4af (npm test packs/diagrams/diagram.test.ts test/diagram-part.test.ts test/structure.test.ts test/structure-page.test.ts test/ui-parts.test.ts test/ghosts.test.ts, pid 40300, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\epic-mirzakhani-39a3a8 (npm test packs/menu/menu.test.ts, pid 33456, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-cards-82b511 (npm test test/surface.test.ts test/styles-parts.test.ts, pid 31408, for 1 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\blissful-dijkstra-688a6c (npm test packs/catch_up/catch-up.test.ts test/catch-up-parts.test.ts test/structure.test.ts test/ui-parts.test.ts, pid 7576, for 0 s).
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\ui-sheet-a67aa8 (npm test test/sheet-page-part.test.ts test/note-count.test.ts test/ui-parts.test.ts test/structure.test.ts test/structure-page.test.ts, pid 34668, for 0 s).
