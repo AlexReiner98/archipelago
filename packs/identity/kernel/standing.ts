@@ -60,6 +60,8 @@ export interface Ended {
 export interface Standing {
   limits?: Limits;
   ended?: Ended;
+  /** A guest map, made with no account (./guests.ts): what would make the server act outward waits for sign-in. */
+  guest?: true;
 }
 
 /** The limits a pack can set, as the Limits card shows them. */

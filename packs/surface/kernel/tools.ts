@@ -29,6 +29,7 @@ import { READ_TOOLS } from './tool-reads.ts';
 import { readsSaid, toolsSaid } from './tool-said.ts';
 import { declaredTools, type DeclaredTool } from './tool-input.ts';
 import { serverFillings } from './server-fillings.ts';
+import { guestGate } from './guest-gate.ts';
 
 export { configureBackup, configureRestart, devMode } from './tool-config.ts';
 export { describeChanges, humanChanges, latestSeq, type HumanChange } from './tool-reads.ts';
@@ -154,6 +155,7 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   const tool: Tool | undefined = TOOLS[name] ?? surface ?? pack;
   if (!tool) throw new Error(`No tool "${name}". Tools: ${(actor.kind === 'human' ? toolsFor(l.registry) : surfaceFor(l.registry)).map(([t]) => t).join(', ')}`);
   if (tool.devOnly && !devMode()) throw new Error(`"${name}" is available only in dev mode (npm run dev).`);
+  actor = await guestGate(l, actor, name, routed ? routed.input : input); // a guest map: what waits for sign-in, and its owner's acts (./guest-gate.ts)
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
   if (actor.may === 'read' && !MEMBER_READS.has(name)) throw new Error(`This sign-in only reads the map: it cannot call ${name}.`);
   if (actor.may === 'report' && !tool.report) throw new Error(`This token may only report: it cannot call ${name}. Send what was measured with report.`);
