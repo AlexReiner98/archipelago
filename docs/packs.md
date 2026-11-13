@@ -134,7 +134,7 @@ answering with marks the host checks.
 | Field | What it says | Checked when the pack loads |
 |---|---|---|
 | `id`, `title` | The part, `<pack>.<name>`. | Its pack's name. |
-| `slot` | The slot it fills. | The host's, one its pack's parts open, or one it asks for as `slot:<name>`. |
+| `slot` | The slot it fills, or the slots: a part drawn in two places (the strip in `tabs` and the panes in `panes`) is one part, mounted once per slot and handed `slot` to say which (decision e_tq3fk4g8). | Each the host's, one its pack's parts open, or one it asks for as `slot:<name>`. |
 | `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). |
 | `sends` | The actions it may send. | Each its own pack's. |
 | `opens` | The slots it draws for others to fill. | Named `<pack>.<name>`, or a piece or page the host no longer draws. |
