@@ -6,9 +6,8 @@ import { api, ask, h, may, part, state, tell } from './base.js';
 import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
 import { viewsOn } from './canvases.js';
 import { draftOf } from './draft.js';
-import { documentMenu, figureOf, publicMark, publicOf, readDocument, shareMenu } from './item-doc.js';
+import { documentMenu, figureOf, publicMark, publicOf, readDocument, readingOf, shareMenu } from './item-doc.js';
 import { heldBand, heldOn } from './item-held.js';
-import { readingOf } from './item-read.js';
 import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { linkAdder } from './item-links.js';
@@ -147,8 +146,8 @@ export async function entity(id, here) {
 
   redraw.inPlace = inPlace;
   // Its title and note, written in place and saved as one change (ui/draft.js).
-  // A document reads in its note's place as it will publish (ui/item-read.js).
-  const reading = doc && readingOf(doc, looks);
+  // A document reads in its note's place as it will publish: the publish pack's part (ui/item-doc.js).
+  const reading = doc && readingOf(e, doc, looks, again);
   // Read beside its draft (the pages), a document opens as words to write: it reads on the left already.
   const writing = Boolean(doc && document.querySelector('.lens-view.beside-sheet'));
   const draft = draftOf({ base: e, style: looks, editable: writes && !e.archived_at, reading, writing, saved: again, count: countOn(data) });

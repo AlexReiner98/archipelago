@@ -197,7 +197,6 @@ const PIECES = {
   },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,
-  document: () => null,
 };
 
 /** The commit the server ran when this page's code was loaded: a piece this code does not know is newer than it. */

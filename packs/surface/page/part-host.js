@@ -170,8 +170,8 @@ function sweep() {
   }
 }
 
-/** Mount one part under `node` on its version's worker, with what it reads. */
-async function mount(node, part, parts, item, words, piece) {
+/** Mount one part under `node` on its version's worker, with what it reads; `picture(item, el, input)` draws a picture mark out of what it was handed. */
+async function mount(node, part, parts, item, words, piece, picture) {
   const version = versionOf(parts, part.pack);
   const one = await workerOf(version, parts, part.pack);
   const id = `m${++mounts}`;
@@ -183,11 +183,14 @@ async function mount(node, part, parts, item, words, piece) {
   // What every part is handed beside its items: the island's words, the style's values (none of its looks), and what
   // its piece says of it on its screen (a title, a limit).
   const given = { words, style: styleValues(style), piece: settingsOf(piece) };
-  const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }) });
-  const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await inputOf(part, item, given) });
+  // A picture mark is drawn out of what the part was handed last, never out of what it sent.
+  let handed;
+  const hand = async () => (handed = await inputOf(part, item, given));
+  const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }), picture: (at, el) => handed && picture?.(at, el, handed) });
+  const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
   one.mounted.set(id, { part: { ...part, island: islandOf(item) }, node, render, failed, refresh });
-  one.bridge.send({ type: 'mount', id, part: part.id, input: await inputOf(part, item, given) });
+  one.bridge.send({ type: 'mount', id, part: part.id, input: await hand() });
 }
 
 /** The island an item is on: its own id when it is one (its type has the field an island pins a version by), else its island. */
@@ -206,9 +209,10 @@ function wayBackFor(island, refined, redraw) {
 
 /**
  * Draw the part that fills `slot` in `node`, standing on `item`: true when a part fills it, false when none does (the
- * caller draws what it did before). `piece` is what its screen says of it; `redraw` draws the page again when the way back is pressed.
+ * caller draws what it did before). `piece` is what its screen says of it; `redraw` draws the page again when the way back is pressed;
+ * `picture(item, el, input)` draws a picture mark's item out of the input the part was handed.
  */
-export async function drawPart(node, { slot, item, piece, redraw = () => {} }) {
+export async function drawPart(node, { slot, item, piece, redraw = () => {}, picture }) {
   sweep();
   const island = islandOf(item);
   const shipped = Boolean(island && shippedOn(island));
@@ -217,6 +221,6 @@ export async function drawPart(node, { slot, item, piece, redraw = () => {} }) {
   const part = parts.find((p) => p.slot === slot);
   if (!part) return false;
   if (!part.modules) throw new Error(`${part.title}: its code did not come`);
-  await mount(node, part, parts, item, words, piece);
+  await mount(node, part, parts, item, words, piece, picture);
   return true;
 }

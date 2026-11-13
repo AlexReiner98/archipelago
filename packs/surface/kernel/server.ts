@@ -233,7 +233,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       // A document read by someone signed in, to print or save as a PDF: the same page a link opens, which reads the
       // document with the reader's own token. The page holds nothing; what it shows is what that token may see.
       if (req.method === 'GET' && /^\/read\/e_[a-z0-9]{8}\/?$/.test(url.pathname)) {
-        // Framed by this server's own page alone, to read a private document on the canvas (ui/reader-frame.js).
+        // Framed by this server's own page alone, to read a private document on the canvas (packs/walls/page/reader-frame.js).
         res.writeHead(200, { ...PRIVATE, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': SIGNED_IN_READER_POLICY });
         return res.end(await uiPage('doc.html'));
       }

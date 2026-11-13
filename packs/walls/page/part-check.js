@@ -3,7 +3,7 @@
 // marks, and the host alone makes them into the page (packs/walls/page/part-render.js), under the workspace's style.
 //
 // A mark is [kind, attributes, ...what is in it], as a drawing's is (packs/walls/page/marks.js); the attributes may be left out
-// (['text', 'Hello']). Nine kinds, nothing richer:
+// (['text', 'Hello']). Ten kinds, nothing richer:
 //   box     a group of marks, in a row or a column
 //   text    words
 //   list    marks one under another, a row each
@@ -13,12 +13,14 @@
 //   path    a line or a shape on a paint surface
 //   note    words in the map's note dialect, drawn as the item page draws a note (packs/walls/page/body.js)
 //   menu    buttons behind a few words, for what is done rarely, placed in sight by the host
+//   picture an item's picture, out of what the host handed the part (a view frozen as publishing keeps it, a figure):
+//           the part names the item, the host draws it, so a part never sends an answer or an address
 // Any mark on the page may carry a `tip`: what it says of itself, shown by the page's one tooltip.
 // Every look is a name the style gives its value (packs/walls/page/part-marks.css): a tone, a gap or a size is a word or a step on
 // the style's scale, never a colour or a length. This module reads no page: it is run without a browser in tests.
 
 /** How much one part may say at once: past it, what it sent is refused whole. */
-export const partLimits = { marks: 5000, depth: 32, words: 20000, path: 100000, key: 80, label: 200, side: 1000000 };
+export const partLimits = { marks: 5000, depth: 32, words: 200000, path: 100000, key: 80, label: 200, side: 1000000 };
 
 const KEY = /^[A-Za-z0-9_:.-]+$/;
 const ITEM = /^e_[a-z0-9]{8}$/;
@@ -57,6 +59,7 @@ export const MARKS = {
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
   note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
   menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet') }, holds: 'marks', only: ['button'], needs: ['label'] },
+  picture: { attrs: anyMark, holds: 'nothing', needs: ['item'] },
 };
 
 /** The nodes this module made: the renderer draws nothing else. */

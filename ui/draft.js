@@ -142,7 +142,7 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     update();
     area.focus();
   };
-  if (read && editable) read.addEventListener('click', (ev) => !ev.target.closest('a, summary, button, input, .doc-lens') && write());
+  if (read && editable) read.addEventListener('click', (ev) => !ev.target.closest('a, summary, button, input, .doc-lens, .pm-picture') && write());
   title.addEventListener('input', () => (keep(), update()));
   title.addEventListener('keydown', (ev) => ev.key === 'Enter' && (ev.preventDefault(), note ? write() : title.blur()));
   area.addEventListener('input', () => (grow(), keep(), update()));

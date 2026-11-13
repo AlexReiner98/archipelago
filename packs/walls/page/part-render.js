@@ -6,6 +6,7 @@
 // (./body.js), under the style; a tip is the element's title, which the page's one tooltip shows (./tip.js).
 // Looks are classes and steps the style gives values to (packs/walls/page/part-marks.css); the renderer writes no colour or length.
 // Pan and zoom of a paint surface stay here (packs/walls/page/part-paint.js): the part is never asked where the reader looks.
+// A picture is drawn by whoever hosts the part (`picture(item, el)`), out of what it handed the part, once it is in the page.
 
 import { isChecked } from './part-check.js';
 import { paintSurface } from './part-paint.js';
@@ -27,10 +28,11 @@ const partTold = 50;
 /**
  * Draw a part into `root`. `tell(event)` hears what the person does; `style` is the workspace's style (a paint surface
  * moves by its numbers); `canvas(key, el)` is handed a paint surface's pixel canvas (`pixels: true`) once, for whoever
- * hosts the part to give it to the part. Answers with `draw(node)` for each answer the part gives, and `stop()`.
+ * hosts the part to give it to the part; `picture(item, el)` draws a picture mark's item into its element. Answers with
+ * `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {} } = {}) {
-  const ctx = { tell, style, canvas };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, picture = () => {} } = {}) {
+  const ctx = { tell, style, canvas, picture };
   let ended = false;
   return {
     draw(node) {
@@ -94,6 +96,7 @@ function build(node, ctx) {
     // A choice made shuts the menu, as every menu on the page does.
     el.addEventListener('click', (ev) => ev.target.closest?.('.menu-items button') && (el.open = false));
   }
+  else if (node.mark === 'picture') el = make('div', 'pm-picture');
   else if (node.mark === 'paint') {
     const surface = paintSurface(node, { style: ctx.style, drawn: drawOnPlane });
     surfaces.set(surface.el, surface);
@@ -130,8 +133,10 @@ function update(el, node, ctx, fresh = false) {
     return made;
   }
   looks(el, node);
-  if (node.item !== undefined) el.dataset.item = node.item;
+  if (node.item !== undefined && node.mark !== 'picture') el.dataset.item = node.item;
   else delete el.dataset.item;
+  // Drawn once it is in the page, where its width is known, and again only for another item.
+  if (node.mark === 'picture' && (fresh || was.item !== node.item)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.picture(node.item, el)));
   if (node.mark === 'note') {
     // Drawn again only when its words, whether it ticks, or the style changed: a section the reader opened stays open.
     if (fresh || was.words !== node.words || was.at.tick !== at.tick || el.drawnUnder !== ctx.style) {

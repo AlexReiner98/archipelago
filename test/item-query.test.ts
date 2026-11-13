@@ -9,7 +9,7 @@ import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context
 
 /** A pack written for the test: a paper, read whole on its page, as a document is. */
 const PAPERS = {
-  id: 'papers', version: '1', title: 'Papers', description: 'Writing read whole.', requires: ['core'],
+  id: 'papers', version: '1', title: 'Papers', description: 'Writing read whole.', requires: ['core'], uses: ['slot:piece.document'],
   types: [{ id: 'paper', title: 'Paper', description: 'Writing read whole on its page.', extends: 'record' }],
   views: [{ form: 'screen', id: 'papers.reading', title: 'Reading', on: ['paper'], pieces: [{ piece: 'document' }] }],
 } as unknown as PackFile;
