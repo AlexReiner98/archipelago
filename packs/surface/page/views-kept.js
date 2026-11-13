@@ -13,7 +13,7 @@ import { drawPart } from './part-host.js';
 import { placeBy } from './menu-place.js';
 import { addressOf, flatView, stepsOf } from './query.js';
 import { fitBar, lensSaid } from './bar-band.js';
-import { sharePublicly } from './item-doc.js';
+import { sharePublicly } from './item-share.js';
 import { thumbOf } from './thumbs.js';
 import { pageIsA, pageSchema, versionCanvases } from './page-schema.js';
 import { isA, typeChoice, types, workType } from './words.js';
@@ -115,7 +115,7 @@ const edited = (item, lens, style) => {
 
 /**
  * Share the view that is up (decision e_nwdn7ce6): as a public view anyone opens, frozen as it is now, with what goes
- * out said first (ui/item-doc.js). A share shows a view kept on the map: one not kept is saved first, in the band.
+ * out said first (./item-share.js). A share shows a view kept on the map: one not kept is saved first, in the band.
  */
 async function shareView(current) {
   if (!current || current.preset) return tell('Not shared', 'Save this view first: a share shows a view kept on the map.');

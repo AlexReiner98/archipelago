@@ -50,7 +50,6 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   // ui/nav.js's switches for a pack's screens (task e_pe3fjd75), with its import of the page's base.
   'packs/loader/page/screen-rows.js': 1,
   // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar, item-doc and thumbs.
-<<<<<<< HEAD
   // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of item-doc and thumbs.
   'packs/surface/page/views-kept.js': 2,
   'packs/surface/page/app.js': 6,
@@ -62,14 +61,15 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   // the start page, each going as that module becomes a part.
   'packs/sheet/page/item.js': 1,
   'packs/sheet/page/screens.js': 1,
-=======
+  // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar and thumbs.
   'packs/surface/page/canvas.js': 1,
   'packs/panes/page/panes.js': 1,
   'packs/panes/page/tabs.js': 1,
   // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
   // type's views (canvases), a document's menus (item-doc) and find's terms (query-bar), each going as that module
   // becomes a part.
->>>>>>> 3b9e3340
+  // type's views (canvases) and find's terms (query-bar), screens.js for a diagram and
+  // the start page, each going as that module becomes a part.
 };
 
 test("the host's page imports one way along roots.json", () => {
@@ -98,11 +98,7 @@ test("the host's page imports one way along roots.json", () => {
 const APP_ON_HOST: Record<string, number> = {
   'ui/find-choices.js': 3,
   'ui/find.js': 3,
-  'ui/item-doc.js': 5,
   'ui/keep-in-view.js': 2,
-<<<<<<< HEAD
-=======
->>>>>>> dd4bd57a
 };
 
 /** Whether a served path is the host's: a root pack's page/ folder. */
