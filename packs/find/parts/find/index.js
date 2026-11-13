@@ -30,7 +30,11 @@ export default function find(first, tools) {
   let input = first;
   let open = false, mode = 'Find', typed = '', choices = [], shownFor = '', lit = 0, asked = 0, wait, focus = false;
 
-  const lensUp = () => input?.address?.query ?? input?.piece?.query ?? { filter: {} };
+  // The lens up: the canvas's query as the slot is handed it (Home's when none), without the words the host says it in.
+  const lensUp = () => {
+    const { said: _said, ...lens } = input?.query ?? input?.address?.query ?? input?.address?.home ?? { filter: {} };
+    return { ...lens, filter: lens.filter ?? {} };
+  };
   const read = (name, params) => (tools.read ? tools.read(name, params).catch(() => null) : Promise.resolve(null));
   const publish = () => (tools.state?.('find_open', open ? '1' : null), tools.state?.('find_typing', open && (typed.trim() || mode !== 'Find') ? '1' : null));
 
@@ -95,7 +99,7 @@ export default function find(first, tools) {
     const lens = lensUp();
     const { only, not } = lens.filter ?? {};
     const most = num(input, 'find_choice_items', 3);
-    const c = { most, wide: num(input, 'term_find_most', 12), lens, schema: schemaOf(input?.words), read, views: viewsOf(input), shapes: input?.piece?.shapes ?? input?.shapes };
+    const c = { most, wide: num(input, 'term_find_most', 12), lens, schema: schemaOf(input?.words), read, views: viewsOf(input), shapes: input?.shapes };
     const [all, counted] = await Promise.all([
       choicesFor(mode, q, c).catch(() => []),
       finding && q ? read('flat', { filter: { find: [`text ${q}`], ...(only && { only }), ...(not && { not }) }, limit: most }) : null,

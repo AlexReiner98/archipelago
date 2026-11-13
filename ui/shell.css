@@ -240,6 +240,7 @@ body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(
 #find .find-part .pm-list { position: absolute; left: 0; right: 0; bottom: 100%; margin: 0 0 var(--space-4); padding: var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); white-space: nowrap; }
 :root:not([data-find_typing]) #find .find-part .pm-list { display: none; }
 #find .find-part .pm-list .pm-box { flex-wrap: nowrap; min-width: 0; }
+#find .find-part .pm-list .pm-box > .pm-text:first-child { flex: none; width: var(--box-10); }
 #find .find-part .pm-list .pm-button { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 
 /* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
