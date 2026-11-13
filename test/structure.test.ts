@@ -238,9 +238,8 @@ test('every UI module parses', () => {
 const LOOKS_IN_KERNEL: Record<string, number> = {
   'ui/draw.html': 6,
   'ui/public.css': 1,
-  'ui/style.css': 8,
+  'ui/style.css': 5,
   'packs/identity/page/token-ask.js': 1,
-  'ui/week.js': 1,
 };
 const LOOKS = /#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|rem|em|ch|vh|vw)\b|^(?:export )?const [A-Z][A-Z0-9_]* = -?[\d.]/gm;
 
@@ -383,7 +382,7 @@ const PAGE_CALLS = [
   'launch', 'member_add', 'member_list', 'member_set', 'pack_set', 'packs', 'picture',
   'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
   'share_create', 'share_list', 'share_plan', 'share_revoke', 'tail',
-  'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',
+  'token_create', 'token_list',
   'token_request_answer', 'token_requests', 'token_revoke', 'undo', 'unpublish', 'view', 'workspace_info', 'workspace_set',
 ];
 

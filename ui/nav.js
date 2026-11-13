@@ -25,9 +25,6 @@ export function drawNav(open) {
   );
 }
 
-/** The screen that draws one of the kernel's own pages, for an old address of it. */
-export const screenOfPage = (page) => (state.schema?.screens ?? []).find((s) => s.pieces.some((p) => p.piece === 'page' && p.page === page));
-
 /** A screen as a page of its own. */
 export async function screenPage(id) {
   const main = part('screen');
