@@ -306,7 +306,12 @@ export function barPart(draw) {
         const { go, keepNames, ...rest } = next;
         s = rest;
         if (keepNames) tools?.keep?.(Object.fromEntries([...s.names].slice(-NAMES)), 'names');
-        if (go) tools?.go?.({ query: go });
+        // The lens gone to is the one the next gesture builds on, before the page hands it back: two quick presses
+        // (an × and another) each take their own term out, rather than the second undoing the first.
+        if (go) {
+          s = { ...s, input: { ...s.input, query: go } };
+          tools?.go?.({ query: go });
+        }
         return draw(s);
       },
     };

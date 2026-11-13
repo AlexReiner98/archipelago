@@ -72,6 +72,16 @@ test('a term’s × names the lens without it', () => {
   assert.deepEqual(went, [{ query: { ...lens, filter: { ...lens.filter, find: ['part_of e_abcdefgh'] } } }]);
 });
 
+test('two ×s pressed before the page answers each take their own term out', () => {
+  const { part, went } = mount();
+  part.on({ key: 'x:find:0', name: 'press' });
+  // The page has not handed the new lens back yet: the next × builds on the one just gone to, not on the old one.
+  part.on({ key: 'x:find:0', name: 'press' });
+  const last = went.at(-1) as { query: typeof lens };
+  assert.deepEqual(last.query.filter.find ?? [], [], 'neither Find term is left');
+  assert.deepEqual(last.query.filter.only, lens.filter.only, 'the rest of the lens stays');
+});
+
 test('adding is a kind, then the thing of that kind: never words taken for a term', () => {
   const { part, went } = mount();
   const kindsShown = part.marks;
