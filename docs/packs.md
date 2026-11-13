@@ -170,7 +170,7 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `find` | Find at the canvas's foot. | `query` |
 | `home` | The page with no query up. | — |
 | `nav` | What the menu leads to. | — |
-| `look` | Drawn by nothing: the part is handed whether the canvas has drawn and publishes it as page state, so a picture is taken at the right moment. | `drawn` |
+| `look` | Drawn by nothing: the part is handed whether the canvas has drawn (`drawn`, and `why` when there is one) and publishes it as page state, so a picture is taken at the right moment. The host mounts it under `?look`. | `drawn`, `why` |
 | `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace`, `section` |
 
 A part is handed the item it stands on cut to the fields it `reads`, its
@@ -197,6 +197,11 @@ painting is a mark the contract names. Three shapes to write against:
 Where a part must say something about the page rather than draw it (that the
 canvas has finished drawing, say), it publishes page state it declared
 (`state`), and the runtime writes it on the root.
+
+**Where a part may go.** A part that declares `go` names an address after a
+gesture and the canvas checks it: an item (`item`), a query and the layout
+to draw it in (`query`, `layout`), or a page of the app the host draws
+(`page`: `you`, `workspace`, or `screen` with `of`, the screen's id).
 
 **Which version of a part runs** depends on what it stands on: the island of
 the item it stands on, as today. A part that stands on nothing — the tabs,
