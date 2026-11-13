@@ -2,6 +2,7 @@
   "id": "diagrams",
   "version": "0.1.0",
   "title": "Diagrams",
+  "app": true,
   "description": "A diagram made from the code, drawn on its item's page: the boxes, areas and wires its props.diagram keeps, on a surface that pans and zooms, with the draw.io file it was drawn from.",
   "uses": ["type:diagram"],
   "parts": [
