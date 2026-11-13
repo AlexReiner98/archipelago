@@ -196,7 +196,12 @@ function moved(hash) {
   let changes = t.sheet !== sheet;
   t.sheet = sheet;
   const at = M.atOf(hash);
-  if (at) changes = M.goPane(t, M.focusOf(t), at, true) || changes;
+  if (at) return M.goPane(t, M.focusOf(t), at, true) || changes;
+  // An item's page with no lens: the pane in focus keeps what it draws when that holds the item, else draws the
+  // item's own canvas, as an item's page opened by its address always did.
+  const item = /^#\/e\/(e_[a-z0-9]{8})$/.exec(hash ?? '')?.[1];
+  const pane = t.panes[M.focusOf(t)];
+  if (item && !pane?.ids?.includes(item)) changes = M.goPane(t, M.focusOf(t), M.paneAt(`e/${item}`), true) || changes;
   return changes;
 }
 

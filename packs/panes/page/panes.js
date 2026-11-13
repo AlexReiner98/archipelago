@@ -70,12 +70,16 @@ export function drawPane(at, el, said) {
   // What it draws now; in focus, with no page over it, the page's address is this pane's (decision e_h2pqjy2q).
   let now = at;
   const hrefOf = (to) => (!to || to === 'v' ? '#/' : `#/${to}`);
-  const inFocus = () => selected() && document.body.dataset.sheet !== 'open';
   const moved = (to) => {
     if (!live) return;
     now = to;
     said('open', { at: to });
-    if (inFocus() && location.hash !== hrefOf(to)) location.hash = hrefOf(to);
+    if (!selected()) return;
+    // An item's page open over it stays open, over the lens it draws now; another page over it keeps the address its own.
+    const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(location.hash)?.[1];
+    const query = to.split('?')[1];
+    const href = document.body.dataset.sheet !== 'open' ? hrefOf(to) : open ? `#/e/${open}${query ? `?${query}` : ''}` : null;
+    if (href && location.hash !== href) location.hash = href;
   };
   const canvas = canvasIn(host, {
     go: (lens) => moved(lens ? `v?${addressOf(lens, canvas.asked)}` : 'v'),

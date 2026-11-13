@@ -31,7 +31,7 @@ test("in a browser, an agent's change is traced in its session's hue and clears 
     assert.ok(await page.until(`Boolean(${row})`), 'the task is on the canvas');
     assert.ok(await page.until(`[...document.querySelectorAll('#canvas .lens-wrap')].some((w) => w.store)`), 'held in a store');
     // Out of sight: the pane is hidden while the change lands.
-    await page.evaluate(`${row}.closest('.pane').hidden = true`);
+    await page.evaluate(`${row}.closest('.pm-pane').hidden = true`);
     await change([{ op: 'update', id: made.a, status: 'doing' }], { run: session.run, reason: 'Started on the tail. The rest is detail.', authority: { of: 'agent' } });
     // Waited for whole: a drawing may put a new row in its place between a wait and a read, traced a moment later.
     const line = `Session ${session.name}, doing: Started on the tail`;
@@ -44,7 +44,7 @@ test("in a browser, an agent's change is traced in its session's hue and clears 
     // moment never comes. It is given well past that moment.
     await wait(2500);
     assert.ok(await page.evaluate(`${row}.classList.contains('traced')`), 'a hidden pane never counts as seen');
-    await page.evaluate(`${row}.closest('.pane').hidden = false`);
+    await page.evaluate(`${row}.closest('.pm-pane').hidden = false`);
     // Over the row, the page's one tip says the trace.
     await page.evaluate(`${row}.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }))`);
     assert.equal(await page.evaluate(`document.querySelector('.tip')?.textContent`), traced.line, 'the tip says who and why');
