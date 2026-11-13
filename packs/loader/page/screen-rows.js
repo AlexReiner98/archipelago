@@ -1,40 +1,13 @@
-// The menu and the screens in it. The Workspace page is always there; before it come the screens the owner has given
-// a place (what is a view is a canvas a pack ships, in the bar's picker: decision e_yxp78scv), each a page of its own drawn from its pieces, opened in the sheet. Packs offer
-// screens as presets; the owner adds one, takes it out and puts it back on its pack's card on the Workspace page, where each
-// screen is (a page in the nav, or a part of every item of a kind) is a row with its switch.
+// The screens on a pack's card (task e_pe3fjd75, from ui/nav.js): each screen a pack offers or the owner keeps, with the
+// switch that puts it on Home or in the nav, or takes it away, as the person's change. The menu that lists the nav's
+// pages is the menu pack's part (menu.nav); this draws it again, by name, once a screen moves (hooks.drawNav).
 
-import { api, ask, h, hooks, may, part, state, tell } from './base.js';
+import { api, ask, h, hooks, may, state, tell } from './base.js';
 import { loadSchema, menu, typeTitle } from './words.js';
 
 const byPlace = (a, b) => a.nav - b.nav;
 /** The screens in the nav, in their places. */
 const inNav = () => (state.schema?.screens ?? []).filter((s) => typeof s.nav === 'number').sort(byPlace);
-
-/** The menu's pages: the screens the owner has given a place, then the workspace, the one open marked. */
-export function drawNav(open) {
-  const host = document.getElementById('menu-pages');
-  if (!host) return;
-  const at = location.hash.split('?')[0];
-  host.replaceChildren(
-    // For you: what waits on the person, the canvases kept and where to start (the core pack's home screen).
-    h('a', { href: '#/you', class: at === '#/you' ? 'active' : '' }, 'For you'),
-    ...inNav().map((s) => h('a', { href: `#/s/${s.id}`, class: open === s.id || at === `#/s/${s.id}` ? 'active' : '' }, s.title)),
-    // Settings are the workspace's to change: a session that may only read has none.
-    may('write') && h('a', { href: '#/workspace', class: at === '#/workspace' ? 'active' : '' }, 'Settings'),
-  );
-}
-
-/** A screen as a page of its own. */
-export async function screenPage(id) {
-  const main = part('screen');
-  const screen = (state.schema?.screens ?? []).find((s) => s.id === id);
-  if (!screen) return main.replaceChildren(h('div', { class: 'empty' }, 'There is no such screen here. ', h('a', { href: '#/workspace' }, 'Screens are in Settings.')));
-  const drawn = hooks.drawScreen(screen, () => screenPage(id));
-  // A screen that holds one of the kernel's own pages has that page's head; any other is named by its title.
-  const own = screen.pieces.some((p) => p.piece === 'page');
-  main.replaceChildren(...[!own && h('div', { class: 'page-head' }, h('h1', {}, screen.title)), drawn.column].filter(Boolean));
-  drawn.after();
-}
 
 /** Where a screen is: on Home, its place in the nav, or the kinds whose pages it is on. */
 const where = (s) =>
@@ -47,7 +20,7 @@ export function screenRows(screens, then) {
     try {
       await api('change', { ops, reason });
       await loadSchema();
-      drawNav();
+      hooks.drawNav?.();
       then();
     } catch (err) {
       tell('That was not changed', err.message);

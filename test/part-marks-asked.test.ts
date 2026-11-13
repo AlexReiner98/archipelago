@@ -208,3 +208,18 @@ test('shapes on a paint surface may be filled as a diagram is, say themselves an
   assert.equal(p.kids[1].at.href, 'https://x.test');
   refused(['paint', { width: 9, height: 9 }, ['path', { d: 'M0 0', look: 'cloud' }]], /look: "cloud"/);
 });
+
+test("a field may keep keys for its part: at most eight, each a key's name", () => {
+  const f = checkMarks(['input', { key: 'q', kind: 'search', focus: true, keys: ['ArrowUp', 'ArrowDown', 'Escape', 'Backspace'] }]);
+  assert.deepEqual(f.at.keys, ['ArrowUp', 'ArrowDown', 'Escape', 'Backspace']);
+  refused(['input', { key: 'q', keys: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] }], /at most 8 key names/);
+  refused(['input', { key: 'q', keys: ['Ctrl+A'] }], /not a key name/);
+});
+
+test('a slot mark names a slot the part opens, and no other', () => {
+  const s = checkMarks(['box', {}, ['slot', { name: 'sheet.bands' }], ['slot', { key: 'sec', name: 'sheet.sections' }]], { opens: ['sheet.bands', 'sheet.sections'] });
+  assert.equal(s.kids[0].at.name, 'sheet.bands');
+  assert.throws(() => checkMarks(['slot', { name: 'bar.find' }], { opens: ['sheet.bands'] }), /the slot "bar.find", which the part does not open/);
+  refused(['slot', {}], /a slot with no name/);
+  refused(['slot', { name: 'a' }, ['text', 'x']], /a slot holding something/);
+});

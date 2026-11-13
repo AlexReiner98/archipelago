@@ -33,8 +33,8 @@ test('in a browser, a view is read and drawn before what the drawing does not ne
     await page.send('Page.addScriptToEvaluateOnNewDocument', { source: RECORD });
     await page.go(`${base}/#/v?find=id+${made.a}&over=depends_on&steps=1`);
     assert.ok(await page.until(`[...document.querySelectorAll('#canvas svg a')].some((a) => a.textContent.includes('Second step'))`), `the view is drawn: ${page.logs().join('\n')}`);
-    // The bar fills in after: the saved views, the layouts and who is at work are read.
-    const later = (r: any) => (r.path === '/api/view' && ['sessions', 'saved_views'].includes(r.name)) || (r.path === '/api/search' && ['lens', 'layout'].includes(r.type)) || (r.name === 'flat' && r.walk === 'all');
+    // The bar fills in after: the saved views, the layouts (the styles pack's layout switch, its view layouts) and who is at work are read.
+    const later = (r: any) => (r.path === '/api/view' && ['sessions', 'saved_views', 'layouts'].includes(r.name)) || (r.path === '/api/search' && r.type === 'lens') || (r.name === 'flat' && r.walk === 'all');
     assert.ok(await page.until(`window.reads.filter(${later.toString()}).length >= 5`), `what waits is read once the view is drawn: ${JSON.stringify(await page.evaluate('window.reads'))}`);
     const reads = await page.evaluate<any[]>('window.reads');
     const view = reads.find((r) => r.name === 'flat' && r.walk !== 'all');

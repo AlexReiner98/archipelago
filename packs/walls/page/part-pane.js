@@ -141,6 +141,8 @@ export function layPanes(el) {
   if (box) {
     const at = { left: box.left, right: innerWidth - box.right, top: box.top, bottom: innerHeight - box.bottom };
     for (const side of Object.keys(at)) document.body.style.setProperty(`--active-${side}`, `${Math.max(0, at[side])}px`);
+    // A pane alone fills the page, bars and all: the bar and find still sit under the band, as with several.
+    if (panes.length === 1) document.body.style.setProperty('--active-top', `max(var(--band, 0%), ${Math.max(0, at.top)}px)`);
   }
 }
 

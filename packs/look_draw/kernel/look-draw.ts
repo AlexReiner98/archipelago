@@ -41,7 +41,7 @@ export interface Drawn {
   /** Whether two pictures a moment apart were the same: false for a drawing that moves. */
   settled: boolean;
   ms: number;
-  /** The drawing as marks, where they were asked for and it has them (ui/look-marks.js). */
+  /** The drawing as marks, where they were asked for and it has them (packs/walls/page/look-marks.js). */
   marks?: Marks;
   /** Each face the page asked for and Chrome drew another in: the first named in its family, and what drew instead. */
   fell_back?: { asked: string; drawn: string }[];

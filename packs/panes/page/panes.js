@@ -9,7 +9,7 @@
 
 import { api, h, hooks, state } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
-import { presetSettings, savedCanvases, viewParts } from './canvases.js';
+import { presetSettings, savedCanvases, viewParts } from './views-kept.js';
 import { addressOf, opening, readAddress } from './query.js';
 import { numberOf } from './query-base.js';
 import { dragPane, sashes } from './pane-drag.js';
@@ -201,13 +201,13 @@ const touched = (target) => {
 addEventListener('pointerdown', (ev) => touched(ev.target), true);
 addEventListener('blur', () => setTimeout(() => document.activeElement?.tagName === 'IFRAME' && touched(document.activeElement), 0));
 
-/** A side of a frame as CSS: across, a share of the page; down, a share of what the band above leaves (ui/shell.css). */
+/** A side of a frame as CSS: across, a share of the page; down, a share of what the band above leaves (packs/surface/page/shell.css). */
 const edge = (side, v) => {
   const share = (v * 100).toFixed(3);
   if (side === 'left' || side === 'right') return `${share}%`;
   return side === 'top' ? `calc(var(--band, 0%) + (100% - var(--band, 0%)) * ${share} / 100)` : `calc((100% - var(--band, 0%)) * ${share} / 100)`;
 };
-/** The frame of the pane the bar acts on, for the bar and find to sit in (ui/shell.css: --active-*). */
+/** The frame of the pane the bar acts on, for the bar and find to sit in (packs/surface/page/shell.css: --active-*). */
 let frames = [];
 function frameActive() {
   for (const [g, e] of drawn) e.el.classList.toggle('pane-active', g === active);
@@ -388,7 +388,7 @@ hooks.besidePane = (from, view) => {
  */
 hooks.paneFrame = (at, el, said) => {
   let live = true;
-  // Laid out as a pane here lays out its own (ui/shell.css: #canvas .pane-canvas).
+  // Laid out as a pane here lays out its own (packs/surface/page/shell.css: #canvas .pane-canvas).
   el.classList.add('pane-canvas');
   const canvas = canvasIn(el, {
     go: (lens) => said('open', { at: lens ? `v?${addressOf(lens, canvas.asked)}` : 'v' }),

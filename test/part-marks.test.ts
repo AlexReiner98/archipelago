@@ -164,3 +164,12 @@ test('a picture names an item and holds nothing: the host draws it', () => {
   assert.throws(() => checkMarks(['picture', { item: 'e_aaaaaaaa' }, ['text', 'x']]), /holding something/);
   assert.throws(() => checkMarks(['picture', { item: 'https://x' }]), /not an item's id/);
 });
+
+test('a slot mark names a slot, which the host fills with the parts that fill it', () => {
+  const node = checkMarks(['box', {}, ['slot', { name: 'sheet.bands' }]], { kinds: ['box', 'slot'] }).kids[0];
+  assert.equal(node.mark, 'slot');
+  assert.equal(node.at.name, 'sheet.bands');
+  refused(['slot', {}], /name/);
+  refused(['slot', { name: 'Sheet Bands' }], /not a slot's name/);
+  refused(['slot', { name: 'sheet.bands' }, ['text', 'inside']], /slot/);
+});

@@ -1,8 +1,6 @@
 import { api, h, hooks, main, route, state, whoami } from './base.js';
-import { changeSet } from './changes.js';
 import { project } from './project.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
-import { trace } from './traces.js';
 import { still } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { numberOf } from './query-base.js';
@@ -295,7 +293,7 @@ export async function checkTail() {
   let more = false;
   try {
     // From the furthest back of the page and its store, on everything it holds and the islands its views touch.
-    // A store being played from where its reader last looked is left alone until it ends (ui/catch-up.js).
+    // A store being played from where its reader last looked is left alone until it ends (the replay mark: ./replay.js).
     const following = store.views.size > 0 && !store.playing;
     const at = [state.pos, ...(following ? [store.pos] : [])].filter((pos) => pos !== undefined);
     const from = at.length ? Math.min(...at) : undefined;
@@ -306,14 +304,12 @@ export async function checkTail() {
     if (beat.entries && following) {
       try {
         // What the facts changed of what the store held, worked out before they are folded in, once: told to the trace
-        // overlay as rows (catch_up.changes); where no part hears it yet, traced as before (ui/traces.js).
+        // overlay as rows, which catch_up.changes traces until seen.
         const fresh = store.fresh(beat.entries);
         const from = store.pos;
         const { rows } = rowsOf(store, kinds, fresh, beat.gone);
-        const set = changeSet(store, kinds, fresh, { after: from, gone: beat.gone });
         store.apply(beat);
-        const told = rows.length ? hooks.tellSlot?.('traces', { name: 'beat', from, to: beat.pos, rows }) ?? 0 : 0;
-        if (!told) trace(set).catch(() => {});
+        if (rows.length) hooks.tellSlot?.('traces', { name: 'beat', from, to: beat.pos, rows });
       } catch (err) {
         console.error(err);
       }

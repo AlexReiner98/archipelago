@@ -85,6 +85,7 @@ test('the host offers these slots, each handing the part what it is named with',
     'workspace.card': ['workspace', 'section'],
     'tabs.land': ['step', 'tabs', 'drawable'],
     'tabs.life': ['open', 'tabs'],
+    ghosts: ['held', 'drawn', 'loose'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
   assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'button', 'count']);
@@ -107,6 +108,8 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ id: 'row' }), /part "row" must be named "shelf.<name>"/);
   assert.throws(refused({ reads: { task: ['colour'] } }), /reads "colour" of "task", which has no such field/);
   assert.throws(refused({ reads: { nothing: ['title'] } }), /reads unknown type "nothing"/);
+  assert.throws(refused({ reads: '*' }), /reads items whole \("\*"\), which only a root pack's part may/);
+  assert.doesNotThrow(refused({ reads: '*' }, { kernel: { trust: 'root', internal: true } }), "a root pack's part reads items whole");
   assert.throws(refused({ reads: { 'bin.box': ['size'] } }, {}, bin), /reads "size" of "bin.box", bin's: ask for it, as type:bin.box or field:size@bin.box/);
   assert.throws(refused({ sends: ['shelf.take'] }), /sends "shelf.take", which is not an action of shelf/);
   assert.throws(refused({ sends: ['capture'] }), /not an action of shelf/);

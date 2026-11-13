@@ -10,7 +10,7 @@
 
 /**
  * The pieces the host draws, each with what it must be told. A document read whole is the publish pack's part
- * (piece.document); a pack's view of an item, its roadmap or gate say, is a lens preset `on` its type (ui/canvases.js); a figure is the picture it keeps; a diagram is the diagrams pack's part (piece.diagram); rows and a form are the pack's own view and action.
+ * (piece.document); a pack's view of an item, its roadmap or gate say, is a lens preset `on` its type (packs/surface/page/views-kept.js); a figure is the picture it keeps; a diagram is the diagrams pack's part (piece.diagram); rows and a form are the pack's own view and action.
  * A button stands in the page's head, not its column: it opens the pack's action's form, or draws the canvas up as it says.
  * A count stands under the note while it is written: how long it is, against the limit its field's value picks.
  */
@@ -32,6 +32,7 @@ export const PAGES: string[] = ['doc', 'public'];
  *                     (Home's when no query is up) with `said`, the answer in brief and the `names` of the items it names
  * - `tabs.land`       a decision, not marks: where a show lands among the tabs and panes (packs/surface/page/part-decide.js)
  * - `tabs.life`       a decision: which kept tabs' sessions have ended or rested
+ * - `ghosts`          a decision: what the changes held would look like on the canvas, read back into its answer
  * - `canvas`, `traces` the canvas itself, and the overlay of traces over it
  * - `sheet`           the sheet over the canvas, an item's one page, handed where the documents beside it are read
  *                     (`reading`), so a part decides which page is shown; `item.menu` what is done rarely to that item
@@ -60,13 +61,14 @@ export const FRAME_SLOTS = {
   'workspace.card': ['workspace', 'section'],
   'tabs.land': ['step', 'tabs', 'drawable'],
   'tabs.life': ['open', 'tabs'],
+  ghosts: ['held', 'drawn', 'loose'],
 } as const satisfies Record<string, readonly string[]>;
 
 /**
  * The slots whose part answers a decision rather than marks (`decide(input)` in the part, `askSlot` in the page): the
  * part decides and the root that asked applies it, so the runtime keeps one way in (a mounted part) and two ways out.
  */
-export const DECISION_SLOTS: readonly string[] = ['tabs.land', 'tabs.life'];
+export const DECISION_SLOTS: readonly string[] = ['tabs.land', 'tabs.life', 'ghosts'];
 
 /** Slots drawn only while a page state another part publishes is set: the rows above find while find is open. */
 export const SHOWN_WHILE: Readonly<Record<string, string>> = { 'bar.find.rows': 'find_open' };

@@ -24,11 +24,14 @@
 //   panes   panes side by side (dir row) or one over another (column), each given room by its share; the host draws
 //           the lines between them and tells the part when one is dragged
 //   swatch  a style preset's colours, painted by the host from the preset the part names: a part paints no colour
+//   slot    a slot the part opens, drawn in its place by the parts that fill it (`name`, one of its manifest's opens)
 //   ghost   nothing where it stands: a change held for the owner, as data the canvas reads back into its answer and draws
 //           where it would land (of an item, a link, or a mark on one)
 //   replay  nothing where it stands: the canvas under it shows what the person missed, up to step `at` of its steps
 //   trace   nothing where it stands: its item's marks on the canvas painted with its line (`tip`), in a session's hue,
 //           until the person has seen them; then the part is told `seen`
+//   slot    the parts that fill a slot the part opens (`name`, one of its `opens`), drawn here by the host: the part
+//           never sees them, nor they it (decision e_hp9xmrbq)
 // Any mark may also carry `lights`: the items it stands for, lit on the canvas while the person points at it, the rest
 // faded. A box may be `fits`: it shows as many of its marks as fit on one line and says how many are left (`more`: the
 // key a press on the count goes back by). A box, a button or a pane may carry `drag`: the host follows it when it is
@@ -47,6 +50,9 @@ export const partLimits = { marks: 5000, depth: 32, words: 200000, path: 100000,
 const KEY = /^[A-Za-z0-9_:.-]+$/;
 const ITEM = /^e_[a-z0-9]{8}$/;
 /** A view: one kept on the map (its id), one a pack ships (its id, `<pack>.<name>`), or home. */
+/** A slot's name, as packs/loader/kernel/slots.ts names one. */
+const SLOT_NAME = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_-]*)*$/;
+const slotName = (v, why) => (typeof v === 'string' && v.length <= partLimits.key && SLOT_NAME.test(v) ? v : why("not a slot's name"));
 const VIEW = /^(?:e_[a-z0-9]{8}|home|[a-z][a-z0-9_]*(?:.[a-z][a-z0-9_-]*)+)$/;
 /** A path says only where it goes: its commands and numbers, nothing that could name or fetch anything. */
 const PATH = /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s+-]*$/;
@@ -90,6 +96,8 @@ const address = (v, why) => (typeof v === 'string' && v.length <= 2000 && ADDRES
 const share = (v, why) => (typeof v === 'number' && v > 0 && v <= 1 ? v : why('not a share above 0 and at most 1'));
 /** What a box or a button may be when it stands for something the person moves or picks between (a tab). */
 const handled = { drag: key, selected: flag, ring: flag, hue: words(partLimits.key), aux: flag };
+/** The keys a field gives its part (a KeyboardEvent's key names: ArrowUp, Escape), at most eight. */
+const keyNames = (v, why) => (Array.isArray(v) && v.length <= 8 ? v.map((k) => (typeof k === 'string' && /^[A-Za-z]{1,20}$/.test(k) ? k : why('not a key name, such as ArrowUp or Escape'))) : why('not a list of at most 8 key names'));
 /** A style preset tried on this screen alone, or null ('' too) for the workspace's own again. */
 const tryOn = (v, why) => (v === null || v === '' ? '' : key(v, why));
 /** A ghost's own id: its proposal and what in it (p_x:ref, p_x:#n, p_x:n). */
@@ -121,7 +129,7 @@ export const MARKS = {
   box: { attrs: { ...anyMark, ...handled, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag, fits: flag, more: key, dock: flag }, holds: 'marks' },
   text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end'), href, hue: words(partLimits.key) }, holds: 'words' },
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
-  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag }, holds: 'nothing', keyed: true },
+  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag, keys: keyNames }, holds: 'nothing', keyed: true },
   button: { attrs: { ...anyMark, ...handled, look: oneOf('main', 'quiet', 'tab'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(2000), try: tryOn }, holds: 'words', keyed: true },
   paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag, controls: flag }, holds: 'drawn' },
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash', 'area', 'box', 'strong'), tone, weight: step(1, 4), tip: words(partLimits.label), href }, holds: 'nothing', plane: true, needs: ['d'] },
@@ -132,9 +140,11 @@ export const MARKS = {
   web: { attrs: { key, tip: anyMark.tip, url: href, reload: words(partLimits.key) }, holds: 'nothing', needs: ['url'] },
   pane: { attrs: { key, tip: anyMark.tip, at: address, share, ring: flag, drag: key, selected: flag }, holds: 'marks', keyed: true, needs: ['at'] },
   panes: { attrs: { key, dir: oneOf('row', 'column') }, holds: 'marks', only: ['pane'], keyed: true },
+  slot: { attrs: { key, name: key }, holds: 'nothing', needs: ['name'] },
   ghost: { attrs: { key, of: oneOf('item', 'link', 'mark'), id: ghostId, type: key, title: words(partLimits.label), status: key, body: words(4000), proposal, by: words(partLimits.label), reason: words(partLimits.label), op: oneOf('create', 'link', 'update', 'archive', 'unlink'), from: rowId, to: rowId, on: rowId }, holds: 'nothing', needs: ['of', 'proposal', 'op'] },
   replay: { attrs: { key, at: step(0, 1000000), steps: replaySteps }, holds: 'nothing', needs: ['at', 'steps'] },
   trace: { attrs: { key, item, tip: words(500), hue: words(partLimits.key) }, holds: 'nothing', needs: ['item'] },
+  slot: { attrs: { key, name: slotName }, holds: 'nothing', needs: ['name'] },
   swatch: { attrs: { key, tip: anyMark.tip, preset: key, label: words(partLimits.label), on: oneOf('kept', 'trying') }, holds: 'nothing', needs: ['preset'] },
 };
 
@@ -153,8 +163,8 @@ const plain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) &&
  * says what and where (`box 0 > text 2`), and nothing of it is drawn. `kinds`, the marks the part's manifest names
  * (packs/loader/kernel/ui-parts.ts), holds it to them: a mark it did not name is refused too.
  */
-export function checkMarks(mark, { kinds } = {}) {
-  const seen = { n: 0, words: 0, keys: new Set(), kinds };
+export function checkMarks(mark, { kinds, opens } = {}) {
+  const seen = { n: 0, words: 0, keys: new Set(), kinds, opens };
   return node(mark, seen, [], false);
 }
 
@@ -198,6 +208,7 @@ function node(mark, seen, where, onPlane) {
   if (at.more !== undefined && !at.fits) why('more on a box that does not fit: the count it names is drawn only by one that fits');
   if ((at.drag !== undefined || at.aux) && at.key === undefined) why(`${a(kind)} that is dragged or closed with no key: what is done to it goes back by its key`);
   for (const name of shape.needs ?? []) if (at[name] === undefined) why(`${a(kind)} with no ${name}`);
+  if (kind === 'slot' && seen.opens && !seen.opens.includes(at.name)) why(`the slot "${at.name}", which the part does not open`);
   if (kind === 'paint' && (at.width === undefined || at.height === undefined)) why('a paint surface with no width and height');
   if (shape.keyed && at.key === undefined) why(`${a(kind)} with no key: what the person does to it goes back by its key`);
   for (const k of [at.key, at.more]) if (k !== undefined) seen.keys.has(k) ? why(`the key "${k}" twice`) : seen.keys.add(k);

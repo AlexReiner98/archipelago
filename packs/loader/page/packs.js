@@ -8,7 +8,7 @@
 // one plate with one switch: each pack a band in it, its name on a line and what it touches under it.
 
 import { api, ask, h, may, state, tell } from './base.js';
-import { screenRows } from './nav.js';
+import { screenRows } from './screen-rows.js';
 import { checkRow } from './agents-card.js';
 import { line, secretBox } from './workspace-cards.js';
 import { plate } from './plates.js';
