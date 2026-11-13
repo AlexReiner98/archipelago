@@ -74,7 +74,15 @@ export const save = (key, value, to = localStorage) => {
 export const landed = new Map();
 /** The tabs of this page, in order, and the one in sight. */
 export const tabs = { list: [], front: null };
-export const front = () => tabs.list.find((t) => t.id === tabs.front) ?? tabs.list[0];
+/**
+ * Whether the panes pack's part draws the tabs (packs/panes/parts/index.js): then this page keeps none, and what the host
+ * reads of the tab in sight is the state the part publishes on the root (`data-front`, `data-front_chat`, ...).
+ */
+export const byPart = { on: false };
+const published = () => document.documentElement.dataset;
+/** The tab in sight as the part says it, for what the host reads of it. */
+const partFront = () => ({ id: published().front ?? 'part', follows: published().front_follows ?? 'none', ...(published().front_chat && { chat: published().front_chat }), groups: [], panes: {}, sizes: [] });
+export const front = () => (byPart.on ? partFront() : (tabs.list.find((t) => t.id === tabs.front) ?? tabs.list[0]));
 export const tabOf = (id) => tabs.list.find((t) => t.id === id);
 
 /** The tabs in windows of their own, as each window keeps it; one docked back is taken into this page's tabs. */
@@ -137,6 +145,7 @@ export const named = (at) => {
  * the owner sees it land (packs/presence/kernel/seeing.ts).
  */
 export function landsIn(t) {
+  if (byPart.on) return (published().lands_in ?? '').split(' ').filter(Boolean);
   if (!t) return [];
   const runs = new Set([t.follows, t.chat].filter((r) => r && r !== 'none'));
   for (const g of t.groups) for (const r of [t.panes[g]?.held, t.panes[g]?.by]) if (r && !tabs.list.some((o) => o !== t && o.follows === r)) runs.add(r);

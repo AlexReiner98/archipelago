@@ -5,16 +5,19 @@
 // was last worked in, for the main page to read; and the main page keeps the windows it popped out, so an agent's next
 // step can go to one.
 
-import { state } from './base.js';
+import { hooks, state } from './base.js';
+import { byPart } from './tabs.js';
 
 const quietAfter = 20_000;
 const popped = window.name.startsWith('pelago-tab:') ? window.name.slice('pelago-tab:'.length) : null;
 const keyOf = (id) => `pelago-pane-busy:${id}`;
 
 /** The pane in focus: the sheet opens over it. */
-const inFocus = () => document.querySelector('#canvas > .pane.pane-active')?.dataset.pane ?? null;
+const inFocus = () => (byPart.on ? paneKey(document.querySelector('#canvas .pm-pane[aria-selected="true"]')) : document.querySelector('#canvas > .pane.pane-active')?.dataset.pane) ?? null;
+/** A pane the panes part draws, by its id (its mark's key is `pane:<id>`). */
+const paneKey = (el) => /^pane:(.+)$/.exec(el?.dataset?.key ?? '')?.[1] ?? null;
 /** The pane an element is in, by its id: the sheet is the pane in focus's. */
-export const paneOf = (el) => el?.closest?.('#canvas > .pane')?.dataset.pane ?? (el?.closest?.('#sheet') ? inFocus() : null);
+export const paneOf = (el) => (byPart.on ? paneKey(el?.closest?.('#canvas .pm-pane')) : el?.closest?.('#canvas > .pane')?.dataset.pane) ?? (el?.closest?.('#sheet') ? inFocus() : null);
 
 const lastAt = new Map();
 let keptAt = 0;
@@ -22,6 +25,8 @@ function stir(target) {
   const id = popped ?? paneOf(target);
   if (!id) return;
   const now = Date.now();
+  // The panes part decides where a show lands: it is told, once a second at most for a pane.
+  if (byPart.on && !popped && now - (lastAt.get(id) ?? 0) > 1000) hooks.tellSlot?.('tabs', { name: 'busy', pane: id });
   lastAt.set(id, now);
   if (!popped || now - keptAt < 1000) return;
   keptAt = now;
