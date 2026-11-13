@@ -181,3 +181,6 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 /* A paint surface's −, Fit and + in its corner. */
 .pm-zooms { position: absolute; right: var(--space-3); bottom: var(--space-3); display: flex; gap: var(--space-2); z-index: 2; }
 .pm-zoom { padding: var(--space-2) var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); color: var(--text); cursor: pointer; }
+
+/* A slot a part opens: the parts that fill it, one under another, drawn by the runtime. */
+.pm-slot { display: flex; flex-direction: column; min-width: 0; }

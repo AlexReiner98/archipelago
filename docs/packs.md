@@ -177,7 +177,7 @@ A part is handed the item it stands on cut to the fields it `reads`, its
 query's items, its named reads, and, where it declares `go`, the page's
 address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
 `text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`,
-`picture`, `web`, `pane`, `panes`, `swatch`, `trace`, `replay` and `ghost`, each named in its `marks`.
+`picture`, `web`, `pane`, `panes`, `swatch`, `trace`, `replay`, `ghost` and `slot`, each named in its `marks`.
 
 **What any mark may carry**, beside `key`, `item`, `view` and `tip`:
 `lights`, up to 500 items it lights on the canvas in sight while the person
@@ -196,6 +196,7 @@ part is told nothing.
 | `button` `try` | A theme (a preset used once chosen) tried on this screen alone, nothing kept; `null` the workspace's own again (`packs/surface/page/swatch.js`). Every part is handed `trying`, the preset tried or null. | `press`. |
 | `swatch` | A style preset's paper, ink and sea for the screen's scheme, painted by the host from the preset the part names (`preset`): a part paints no colour. `label` under it, `on: kept` or `trying` outlines it; an unknown preset is blank. | `press`, with a key. |
 | `text` `hue` | A session, named by its words, marked in its hue as every session is. | nothing. |
+| `slot` | A slot the part opens (`name`, one of its `opens`), drawn in its place by the parts that fill it, four deep at most (`slot(name, el)` in part-host). | nothing. |
 | `ghost` | Nothing where it stands: a change held for the owner, as data (`of` item, link or mark; `id` such as `p_x:ref`, `proposal`, `op`, and the item's or link's fields), handed to whoever hosts the part (`ghosts(list)`, `hooks.ghosts`) for the canvas to read back into its answer and draw where it would land. | nothing. |
 | `paint` `controls` | −, Fit and + in the surface's corner, zoomed by the style's `zoom_step`. A `path` may be filled as a diagram's shapes are (`look: area`, `box`, `strong`), and a path or placed text may carry a `tip` and an `href` (opened apart). | nothing. |
 | `replay` | Nothing where it stands: the canvas under the part shows what the person missed (`store.missed`, set as the canvas mounts) up to step `at` of `steps` (`[{ pos, ids }]`, each the facts of entry `pos` about those ids), the store `playing` while it is said; a step back or other steps rewinds first. With no replay mark, what was not played is projected at once and the store is the map as it is now (`packs/surface/page/replay.js`). The part drives the timer. | nothing. |
