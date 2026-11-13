@@ -6,7 +6,7 @@ import { test } from 'node:test';
 // @ts-ignore: a module of the page, plain JavaScript
 import { checkMarks, MARKS } from '../packs/walls/page/part-check.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
-import page, { pageMarks } from '../packs/sheet/parts/page/index.js';
+import page, { along, pageMarks, pageTold } from '../packs/sheet/parts/page/index.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import { fieldEvent, fieldMarks, fieldsMarks } from '../packs/sheet/parts/page/fields.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
@@ -102,4 +102,24 @@ test('told the page scrolled, the follow names the page', () => {
   f.on({ name: 'scrolled', reading: { open: 'e_aaaaaaaa', item: 'e_bbbbbbbb' } });
   f.on({ name: 'press', key: 'x' });
   assert.deepEqual(went, [{ item: 'e_bbbbbbbb', replace: true }]);
+});
+
+test('the frame tells the page part the item, its links and history, and it draws them without being mounted again', async () => {
+  const p = page({ item: { id: task.id, type: 'task' }, words, views: {} }, { change: async () => ({ status: 'applied' }), keep: () => {}, state: () => {} });
+  const marks = await p.on({ name: 'page', item: task, views: { item: { outgoing: [{ type: 'depends_on', root: 'depends_on' }], source: { title: 'A talk', uri: 'https://example.com' } }, history: { events: [{ changeset: 'c_bbbb', actor: 'human:local', reason: 'Made it', ts: '2026-11-13T10:00:00Z' }], names: { 'human:local': 'You' } } } });
+  const text = JSON.stringify(marks);
+  for (const s of ['Try it', 'A talk', 'Made it', 'Walk from it']) assert.ok(text.includes(s), s);
+  assert.equal(pageTold({ item: { id: 'x' } }, { name: 'scrolled' }).item.id, 'x', 'a scroll is not the page');
+  assert.ok(!text.includes('field-row:status'), 'what the head says is not a field again');
+});
+
+test('what holds others walks part_of down only', () => {
+  assert.deepEqual(along({ outgoing: [{ type: 'serves' }], incoming: [{ type: 'part_of', root: 'part_of' }] }), ['serves', 'part_of<']);
+});
+
+test('a refresh by the runtime keeps what the frame told of the page', async () => {
+  const p = page({ item: { id: task.id, type: 'task', title: 'Old', status: 'todo' }, words, views: {} }, { change: async () => ({ status: 'applied' }), keep: () => {}, state: () => {} });
+  await p.on({ name: 'page', item: { ...task, status: 'doing' }, views: { item: { outgoing: [{ type: 'depends_on' }] } } });
+  const again = JSON.stringify(p.update({ item: { id: task.id, type: 'task', title: 'Old', status: 'todo' }, words, views: {}, told: { name: 'scrolled' } }));
+  assert.ok(again.includes('Try it') && again.includes('doing') && again.includes('Walk from it'));
 });

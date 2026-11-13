@@ -4,7 +4,7 @@
 // the page of each such item too. What a pack shows of one item (a roadmap, a gate) is a view of it: packs/surface/page/views-kept.js.
 
 import { api, h, hooks } from './base.js';
-import { section } from './item-sections.js';
+
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { flatView } from './query.js';
@@ -13,6 +13,9 @@ import { tokenAskPiece } from './token-ask.js';
 import { drawPart } from './part-host.js';
 import { pageIsA, pageSchema } from './page-schema.js';
 import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
+
+/** One section of an item's page: a heading, a count where it has one, and what it holds. */
+export const section = (key, title, n, ...content) => h('section', { class: 'page-section', 'data-section': key }, h('h2', {}, title, n ? h('span', { class: 'n' }, n) : ''), ...content);
 
 /** The screens shown on an item of this type, in the order the packs load. */
 export const screensFor = (typeId) => (pageSchema()?.screens ?? []).filter((s) => s.on?.some((t) => pageIsA(typeId, t)));

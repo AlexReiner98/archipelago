@@ -25,13 +25,16 @@ const none = () => ['text', { look: 'muted' }, '—'];
 /** Words on one line, the whole of them the tip. */
 const line = (s, at = {}) => ['text', { tip: String(s).slice(0, 200), ...at }, String(s)];
 
+/** The names of the items the fields name, by id, as the frame told them: an item is said by its name, never its id. */
+let titled = {};
+
 /** One value with no parts, by its shape: an item, a day, an address, a number, yes or no, words. */
 export function one(v, { fold = 80 } = {}) {
   if (v === null || v === undefined || v === '') return none();
   if (typeof v === 'boolean') return ['text', {}, v ? 'yes' : 'no'];
   if (typeof v === 'number') return ['text', {}, v.toLocaleString()];
   const s = String(v);
-  if (ID.test(s)) return ['text', { item: s, look: 'mark' }, s];
+  if (ID.test(s)) return ['text', { item: s, look: 'mark', tip: s }, titled[s] ?? 'an item'];
   if (DAY.test(s) && s.length <= 30) return ['text', { tip: s }, s.slice(0, 10)];
   if (WEB.test(s)) return ['text', { href: s, tip: s.slice(0, 200) }, s.replace(/^https?:\/\/(www\.)?/i, '').replace(/\/$/, '')];
   return s.length > fold ? line(`${s.slice(0, fold)}…`, { tip: s.slice(0, 200) }) : line(s);
@@ -115,7 +118,8 @@ export function fieldMarks(name, v, field, { writes = false, open = false, kept,
   if (!writes) return valueMarks(name, v, field, { open, fold });
   const pick = picker(name, v, field);
   if (pick) return pick;
-  if (typeof v === 'string' && ID.test(v)) return ['input', { key: `field:${name}`, kind: 'item', hint: 'Find an item', value: v }];
+  if (typeof v === 'string' && ID.test(v) && open) return ['input', { key: `field:${name}`, kind: 'item', hint: 'Find an item', focus: true }];
+  if (typeof v === 'string' && ID.test(v)) return ['box', { flow: 'row', gap: 1 }, one(v), ['button', { key: `field-open:${name}`, look: 'quiet', tip: 'Name another item' }, '✎']];
   if (open || kept !== undefined) return writer(name, kept === undefined ? v : kept, field, { fold });
   return ['box', { flow: 'row', gap: 1 }, valueMarks(name, v, field, { fold }), ['button', { key: `field-open:${name}`, look: 'quiet', tip: 'Change it' }, '✎']];
 }
@@ -124,7 +128,8 @@ export function fieldMarks(name, v, field, { writes = false, open = false, kept,
  * The fields section: each field its type declares, empty or not, and any it holds its type no longer declares. What
  * holds something first; what holds nothing after, in one fold. `skip`: a field shown elsewhere (the choices).
  */
-export function fieldsMarks(item, declared, { writes = false, open = new Set(), kept = {}, emptyOpen = false, skip = [], fold } = {}) {
+export function fieldsMarks(item, declared, { writes = false, open = new Set(), kept = {}, emptyOpen = false, skip = [], fold, titles = {} } = {}) {
+  titled = titles;
   const props = item?.props ?? {};
   const names = [...new Set([...Object.keys(declared), ...Object.keys(props)])].filter((k) => NAME.test(k) && !skip.includes(k));
   if (!names.length) return null;

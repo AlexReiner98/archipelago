@@ -42,8 +42,8 @@ export const kept = {
   },
 };
 
-/** Whether the sheet holds words not yet saved: the router asks before they are left behind. */
-export const unsaved = () => Boolean(document.querySelector('#sheet [data-draft="unsaved"]'));
+/** Whether the sheet holds words not yet saved, a new item's here or an item's in the page part (its page state draft): the router asks before they are left behind. */
+export const unsaved = () => Boolean(document.querySelector('#sheet [data-draft="unsaved"]')) || document.documentElement.dataset.draft === 'unsaved';
 
 /** Ask before leaving words unsaved; true when there are none, or the person lets them go. */
 export const mayLeave = async () => !unsaved() || Boolean(await ask({ title: 'Leave without saving?', message: 'What you wrote here is not on the map yet.', action: 'Leave', danger: true }));
@@ -102,7 +102,7 @@ export function draftOf({ base, style, editable = true, note = true, reading, wr
     if (sheet) sheet.style.scrollPaddingBottom = bar.offsetHeight ? `${bar.offsetHeight + parseFloat(getComputedStyle(bar).marginBottom)}px` : '';
   };
   new ResizeObserver(clear).observe(bar);
-  // Fields written in place wait here for the same Save (packs/sheet/page/field-edit.js): a name, what it held, what it holds now.
+  // Fields written in place wait here for the same Save (a new item's fields): a name, what it held, what it holds now.
   const fields = new Map();
   const same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
   const props = () => Object.fromEntries([...fields].filter(([, f]) => !same(f.now, f.was)).map(([k, f]) => [k, f.now ?? null]));
