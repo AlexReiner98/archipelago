@@ -2,6 +2,9 @@
 // owner's version of it. A preset is used as the pack ships it until the owner changes it; changing it keeps a style on
 // the map with the preset's id, which the owner edits like any item. Retired, the preset is not used. Themes are chosen
 // apart (ui/themes-card.js), not here.
+//
+// Stays here until the host can hold it as a map pack's part (decision e_85tk2x7d): the Packs page has no slot, and
+// the styles pack is internal, so a version kept through it would be the pack's change, not the person's.
 
 import { api, h, may, tell } from './base.js';
 import { loadSchema, typeTitle } from './words.js';

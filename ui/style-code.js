@@ -1,4 +1,7 @@
 // A layout's code: the drawing a person or an agent wrote for their own project.
+//
+// The host's, not a part's (task e_md3v7bj4): the page side of a layout's wall. It moves with the canvas (query.js,
+// look.js, query-base.js), since moving it alone would import the app from the host.
 
 import { api, drawingsOpen, frameSandbox, h, may } from './base.js';
 import { STYLE_COLORS, litSwitch } from './query-base.js';
