@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
 import * as F from './find-dom.ts';
+import { PANE } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -28,13 +29,13 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/#/v?find=text+roof&only=in+${made.site}&over=part_of&steps=1`);
-  const step = (n: number, id: string) => `[...document.querySelectorAll('#canvas > .pane')][${n}]?.querySelector('svg a[href="#/e/${id}"]')`;
+  const step = (n: number, id: string) => `[...document.querySelectorAll('${PANE}')][${n}]?.querySelector('svg a[href="#/e/${id}"]')`;
   const drawn = (n: number, id: string) => `Boolean(${step(n, id)})`;
   const dim = (n: number, id: string) => `${step(n, id)}.classList.contains('dim')`;
   const parts = `[...document.querySelectorAll('#find-lens .pm-fits > .pm-bold')].map((l) => l.textContent)`;
   const lineSays = `document.getElementById('find-lens').textContent`;
   const press = async (n: number) => {
-    const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = [...document.querySelectorAll('#canvas > .pane')][${n}].querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })())`));
+    const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = [...document.querySelectorAll('${PANE}')][${n}].querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })())`));
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
   };
   // Typed in find as a person does (the find pack's part: test/find-dom.ts), then Enter.
@@ -60,19 +61,19 @@ test('in a browser, the query line says the lens in one line at both widths', { 
       // What the words found is lit; what the walk reached, dimmed.
       assert.ok(await page.until(`!${dim(0, made.roof)} && !${dim(0, made.tiles)} && ${dim(0, made.site)}`), `the words' hits lit, the rest dimmed at ${width} px`);
       // The tab's controls are on the strip, none in the bar.
-      assert.ok(await page.evaluate<boolean>(`Boolean(document.querySelector('#tabs .tab [aria-label^="This tab"]') && document.querySelector('#tabs .tab-new'))`), 'the tab’s menu and + are on the strip');
-      assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#query .tab-act, #query .tab-new, #find .tab-act, #find .tab-new'))`)), 'and not in the bar');
+      assert.ok(await page.evaluate<boolean>(`Boolean(document.querySelector('#tabs [data-key^="tab:"] details.pm-menu') && document.querySelector('#tabs [data-key="new"]'))`), 'the tab’s menu and + are on the strip');
+      assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#query [data-key^="menu:"], #query [data-key="new"], #find [data-key^="menu:"], #find [data-key="new"]'))`)), 'and not in the bar');
       if (shots) writeFileSync(`${shots}/query-line-${width}.png`, await page.screenshot());
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
     // Split, then find in the second: the bar is the second's. A press in the first gives the bar back to it.
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
-    assert.ok(await page.until(`document.querySelectorAll('#canvas > .pane').length === 2 && !${drawn(1, made.roof)}`), 'Split opens a blank pane, with no query');
+    assert.ok(await page.until(`document.querySelectorAll('${PANE}').length === 2 && !${drawn(1, made.roof)}`), 'Split opens a blank pane, with no query');
     await press(1);
-    assert.ok(await page.until(`[...document.querySelectorAll('#canvas > .pane')][1].classList.contains('pane-active')`), 'the second is the one touched');
+    assert.ok(await page.until(`[...document.querySelectorAll('${PANE}')][1].getAttribute('aria-selected') === 'true'`), 'the second is the one touched');
     await find('gutters');
     assert.ok(await page.until(`${lineSays}.includes('“gutters”') && ${drawn(1, made.gutter)} && !${dim(1, made.gutter)}`), `find set the second's words: ${await page.evaluate(lineSays)}`);
-    const inside = (n: number) => `(() => { const f = document.getElementById('find').getBoundingClientRect(); const p = [...document.querySelectorAll('#canvas > .pane')][${n}].getBoundingClientRect(); const mid = (f.left + f.right) / 2; return mid > p.left && mid < p.right; })()`;
+    const inside = (n: number) => `(() => { const f = document.getElementById('find').getBoundingClientRect(); const p = [...document.querySelectorAll('${PANE}')][${n}].getBoundingClientRect(); const mid = (f.left + f.right) / 2; return mid > p.left && mid < p.right; })()`;
     assert.ok(await page.evaluate(inside(1)), 'find stands under the pane it acts on');
     await press(0);
     assert.ok(await page.until(`${lineSays}.includes('“roof”') && !${lineSays}.includes('gutters')`), `the first's lens again: ${await page.evaluate(lineSays)}`);
@@ -122,7 +123,7 @@ test('in a browser, a lens of many long terms stays in the line, and each term c
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
-    assert.ok(await page.until(`document.querySelectorAll('#canvas > .pane').length === 2`), 'split');
+    assert.ok(await page.until(`document.querySelectorAll('${PANE}').length === 2`), 'split');
     assert.ok(await page.still(`[document.getElementById('find')?.getBoundingClientRect(), document.getElementById('canvas')?.getBoundingClientRect()]`), 'laid out split');
     await staysIn('in a split pane');
     // A click opens the rows; a row's count of what did not fit, pressed, shows every term with its ×.
