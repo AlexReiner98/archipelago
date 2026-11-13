@@ -51,7 +51,7 @@ export const FRAME_SLOTS = {
   find: ['query'],
   home: [],
   nav: [],
-  look: ['drawn'],
+  look: ['drawn', 'why'],
   'workspace.card': ['workspace', 'section'],
 } as const satisfies Record<string, readonly string[]>;
 
