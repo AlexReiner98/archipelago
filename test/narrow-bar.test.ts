@@ -97,7 +97,9 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
     await pick('Find', 'Type', 'Task');
     assert.ok(await page.until(`${has('Gutters')} && ${has('Which tiles?')}`), `a type more is found within it: ${page.logs().join('\n')}`);
     await pick('Only', 'Type', 'Task');
-    assert.ok(await page.until(`location.hash.includes('only=type+task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
+    // On failure, what the page held: the address, the terms the rows show, and the page's own log.
+    const state = async () => `${await page.evaluate(`JSON.stringify(${drawn})`)} at ${await page.evaluate('location.hash')}; Find ${await page.evaluate(`JSON.stringify(${terms('Find')}.map((c) => c.textContent))`)} Only ${await page.evaluate(`JSON.stringify(${chips})`)}\n${page.logs().join('\n')}`;
+    assert.ok(await page.until(`location.hash.includes('only=type+task') && ${has('Gutters')} && !${has('Which tiles?')}`), `only narrows what is found: ${await state()}`);
     assert.ok(await page.until(`${chips}.join('|') === 'Task|in Site works'`), `each narrowing a term of Only: ${await page.evaluate(`JSON.stringify(${chips})`)}`);
     // Its × takes it out, and what it held back is drawn again.
     await page.evaluate(`${terms('Only')}.find((c) => !c.textContent.includes('in Site')).querySelector('button').click()`);

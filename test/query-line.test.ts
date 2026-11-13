@@ -71,7 +71,7 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     await press(1);
     assert.ok(await page.until(`[...document.querySelectorAll('#canvas .pm-pane')][1].getAttribute('aria-selected') === 'true'`), 'the second is the one touched');
     await find('gutters');
-    assert.ok(await page.until(`${lineSays}.includes('“gutters”') && ${drawn(1, made.gutter)} && !${dim(1, made.gutter)}`), `find set the second's words: ${await page.evaluate(lineSays)}`);
+    assert.ok(await page.until(`${lineSays}.includes('“gutters”') && ${drawn(1, made.gutter)} && !${dim(1, made.gutter)}`), `find set the second's words: ${await page.evaluate(lineSays)} at ${await page.evaluate('location.hash')}; focus ${await page.evaluate(`JSON.stringify([...document.querySelectorAll('#canvas .pm-pane')].map((p) => p.getAttribute('aria-selected')))`)}\n${page.logs().join('\n')}`);
     const inside = (n: number) => `(() => { const f = document.getElementById('find').getBoundingClientRect(); const p = [...document.querySelectorAll('#canvas .pm-pane')][${n}].getBoundingClientRect(); const mid = (f.left + f.right) / 2; return mid > p.left && mid < p.right; })()`;
     assert.ok(await page.until(inside(1)), 'find stands under the pane it acts on');
     await press(0);
