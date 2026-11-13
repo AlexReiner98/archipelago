@@ -82,7 +82,8 @@ export function startTabs() {
   if (still) return lonePane(atOf(location.hash) ?? 'v');
   void startPart().then((drawn) => drawn || canvasFailed());
   if (poppedTab) return;
-  firstDrawn.then(readOpen);
+  // What is open is read once the first view has drawn, by the count and by the part, never before it.
+  firstDrawn.then(() => (readOpen(), hooks.tellSlot?.('tabs', { name: 'sessions' })));
   // Coming back to the page, what ended or began while it was out of sight is counted again.
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && readOpen());
 }

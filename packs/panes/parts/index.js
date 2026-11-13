@@ -271,8 +271,10 @@ export default function panes(input, tools) {
     driver = mount;
     keptMoved(input?.kept);
     if (input?.page?.hash) moved(input.page.hash);
+    // The open sessions are read once the page has drawn its first view (the host says so: `sessions`), never before.
     queueMicrotask(changed);
-    void readOpen();
+    // Told before it was mounted, it is handed the last word as `told`.
+    if (input?.told?.name === 'sessions') void readOpen();
   }
   return {
     marks: marksFor(mount.slot),
