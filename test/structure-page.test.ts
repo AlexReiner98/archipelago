@@ -54,6 +54,11 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/surface/page/app.js': 6,
   'packs/surface/page/live.js': 3,
   'packs/panes/page/tab-bar.js': 1,
+  'packs/surface/page/views-kept.js': 3,
+  'packs/surface/page/canvas.js': 1,
+  'packs/surface/page/query.js': 2,
+  'packs/panes/page/panes.js': 1,
+  'packs/panes/page/tabs.js': 1,
   // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
   // type's views (canvases) and a document's menus (item-doc), screens.js for a diagram and
   // the start page, each going as that module becomes a part.
@@ -89,8 +94,6 @@ test("the host's page imports one way along roots.json", () => {
 // the boundary itself moves, as it did here and on 12 Nov; otherwise it falls. It moved once more the same day:
 // doc-lens.js, the picture mark's drawing, went to surface (task e_atxefw2s), so doc.js and item-doc.js count it.
 const APP_ON_HOST: Record<string, number> = {
-  'ui/find-choices.js': 3,
-  'ui/find.js': 3,
   'ui/keep-in-view.js': 2,
 };
 

@@ -4,11 +4,10 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { SignInNeeded, api, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
+import { SignInNeeded, api, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { warmLayouts } from './layout.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
-import { drawFind } from './find.js';
 import { home } from './home.js';
 import { entity } from './item.js';
 import { heldPage } from './item-held.js';
@@ -38,6 +37,15 @@ const close = () => (location.hash === hrefNow() ? route() : (location.hash = hr
 document.getElementById('sheet-close').addEventListener('click', close);
 addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset.sheet && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') && close());
 
+/** Find at the canvas's foot, the find pack's part (slot `find`), drawn once: it follows the address itself. */
+let findDrawn = false;
+function drawFindSlot() {
+  const node = document.querySelector('#find .find-part');
+  if (findDrawn || !node) return;
+  findDrawn = true;
+  drawSlot(node, { slot: 'find' }).catch((err) => console.warn(err.message));
+}
+
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
 async function route(pulse = false) {
   // An address as a show answers it, without its slash (#v?…, #e/…), is the page it names (e_jk63uduv).
@@ -65,7 +73,7 @@ async function route(pulse = false) {
   }
   // In a workspace: the page is the app again, whatever signed-out page was up.
   ungate();
-  drawFind();
+  drawFindSlot();
   drawNav();
   startTabs();
   const params = new URLSearchParams(query);
