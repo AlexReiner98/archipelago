@@ -162,7 +162,11 @@ test('catch_up.replay plays chapters by who made them, island by island', () => 
 
 test('catch_up.replay offers what was missed in a band, plays it step by step and ends as the map is', async () => {
   const shown: unknown[] = [];
-  const part = replay({ me: 'e_owner001', style: { numbers: { catch_up_start: 1, catch_up_step: 1 } } }, { marks: (m: unknown) => shown.push(checkMarks('catch_up.replay', m)) });
+  // Played out when the part says the band is gone: waited for, not timed, so a busy machine does not cut it short.
+  let ended: () => void = () => {};
+  const playedOut = new Promise<void>((r) => (ended = r));
+  const marks = (m: any) => (shown.push(checkMarks('catch_up.replay', m)), m?.[1]?.key === 'catch-up-none' && ended());
+  const part = replay({ me: 'e_owner001', style: { numbers: { catch_up_start: 1, catch_up_step: 1 } } }, { marks });
   assert.deepEqual(part.marks, ['box', { key: 'catch-up-none' }], 'nothing missed, nothing offered');
   const by = { actor: 'e_agent001', run: 'e_run00001', word: 'Coll' };
   const missed = missedOf(held(), [entries[0], { ...entries[2], by: { ...by, run: 'e_run00009', word: 'Herm' } }]);
@@ -175,7 +179,7 @@ test('catch_up.replay offers what was missed in a band, plays it step by step an
   assert.deepEqual([mark[0], mark[1].at, mark[1].steps.map((s: any) => s.pos)], ['replay', 0, [5]], 'rewound: the canvas as the person left it');
   assert.deepEqual([...mark[1].steps[0].ids].sort(), ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_dddddddd', 'r_aaaaaaaa', 'r_bbbbbbbb'], 'each step names what of its entry it plays');
   assert.equal(part.on({ key: 'play', name: 'press' }), undefined, 'playing, Play is not pressed again');
-  await new Promise((r) => setTimeout(r, 50));
+  await playedOut;
   const said = shown.map((m) => JSON.stringify(m));
   assert.ok(said.some((s) => /"1 of 1"/.test(s) && /Session Coll/.test(s) && /"replay",\{"at":1/.test(s)), 'each step who made it, in their word');
   assert.deepEqual(shown.at(-1), ['box', { key: 'catch-up-none' }], 'played out: the band gone, the map as it is');
