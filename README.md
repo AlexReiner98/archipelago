@@ -7,18 +7,18 @@
   <img alt="Agent memory for human brains: islands drawn in stacked rows, the water opening round the title and its line, your agent's plans and decisions as a map you read, correct, share." src="brand/hero-light.svg">
 </picture>
 
-**If your work feels like a labyrinth, you need a map. Archipelago is the map you draw as you work, so you and your agents never get lost.**
+**If you're going somewhere uncharted, you should make a map. Archipelago is a map that draws itself while you work, so you and your agents never get lost.**
 
 Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.
 
 *Early: built and used daily by its author; expect rough edges.*
 
 - **Make a plan:** Your agents make plans you can see on the map.
-- **Work through it:** Watch agents work through the map, updating items in progress and once complete.
-- **Customize:** Make it fit the way you work, live as you work. Tell your agent the problem you want to solve, and watch it create custom types, rules, views, styles, and more.
-- **Never forget:** Agents query the knowledge graph and find everything you've done so far.
-- **Share:** Share a map live with your team, or frozen via link. Anyone with the link can add it to their own map with one click.
-- **Automate:** Turn your map into a machine that acts. Build automations that run on a schedule, or respond dynamically to something changing.
+- **Work through it:** Watch agents work through the map, keeping it up to date so you don't have to.
+- **Customize:** Tell your agent any problem you want to solve, and watch it create custom types, rules, views, styles, and more to model it clearly.
+- **Never forget:** Every change is saved. You and your agents can look back and see every step you've made so far.
+- **Share:** Collaborate live with your team, or publish for all. Anyone with the link can add it to their own map in a click.
+- **Automate:** Turn your map into a machine that acts. Automations reach into your programs or the web. Run them on a schedule, or respond to something changing on the map.
 - **Own your data:** Open source, MIT, and a database you can download any time.
 
 The site is [archipelago.tools](https://archipelago.tools/?ref=github).
