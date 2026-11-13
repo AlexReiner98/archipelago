@@ -52,6 +52,11 @@ test('what is not in the vocabulary is refused, with where it was', () => {
   refused(['input', { key: 'a' }, 'x'], /an input holding something/);
 });
 
+test('a part is held to the marks it names', () => {
+  assert.ok(isChecked(checkMarks(['box', {}, ['text', 'Hi']], { kinds: ['box', 'text'] })));
+  assert.throws(() => checkMarks(['box', {}, ['button', { key: 'go' }, 'Go']], { kinds: ['box', 'text'] }), /the mark "button", which the part does not name in its marks \(at box 0\)/);
+});
+
 test('what the person acts on has a key, and no key is used twice', () => {
   refused(['button', {}, 'Go'], /a button with no key/);
   refused(['input', {}], /an input with no key/);

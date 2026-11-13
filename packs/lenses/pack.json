@@ -13,6 +13,7 @@
       "id": "lenses.saved",
       "title": "Views",
       "slot": "piece.saved_views",
+      "marks": ["box", "text", "list", "button", "thumb"],
       "opens": ["piece.saved_views"],
       "views": [{ "name": "saved_views", "params": { "limit": 200, "pick": true } }],
       "modules": { "index.js": "parts/saved.js", "views.js": "parts/views.js" }
@@ -21,6 +22,7 @@
       "id": "lenses.switch",
       "title": "Find a view",
       "slot": "bar.views",
+      "marks": ["box", "text", "list", "input", "button", "thumb"],
       "views": [{ "name": "saved_views", "params": { "limit": 200, "pick": true } }],
       "modules": { "index.js": "parts/switch.js", "views.js": "parts/views.js" }
     }

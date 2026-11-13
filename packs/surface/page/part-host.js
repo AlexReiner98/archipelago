@@ -18,7 +18,7 @@ import { partBridge } from './part-bridge.js';
 import { shippedOn, wayBack } from './way-back.js';
 import { pageType } from './page-schema.js';
 import { endPart, partPort } from './layout.js';
-import { checkMarks } from './part-check.js';
+import { MARKS, checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
 import { pickOnCanvas } from './canvas-pick.js';
 import { itemOf, waysBetween } from './layout-asks.js';
@@ -46,7 +46,7 @@ window.lookDrew = () => [...drew.values()];
 /** The parts an island draws (or the map, with no island), or as they ship; each with its modules. */
 async function partsOn(island, shipped) {
   const loaded = await host;
-  const answer = await api('view', { name: 'parts', params: { ...(island && { island }), have: [...modules.keys(), ...wordsBy.keys()], ...(shipped && { shipped: true }), ...(loaded && { host: loaded }), ...(at && { at }) } });
+  const answer = await api('view', { name: 'parts', params: { ...(island && { island }), have: [...modules.keys(), ...wordsBy.keys()], marks: Object.keys(MARKS), ...(shipped && { shipped: true }), ...(loaded && { host: loaded }), ...(at && { at }) } });
   if (answer?.drew) drew.set(island ?? '', answer.drew);
   const parts = (answer?.parts ?? []).map((p) => (p.modules && modules.set(p.hash, p.modules), { ...p, modules: modules.get(p.hash), ...(loaded && { host: loaded }) }));
   if (answer?.words?.types) wordsBy.set(answer.words.hash, { types: answer.words.types, links: answer.words.links });
@@ -214,7 +214,7 @@ async function workerOf(version, parts, pack) {
     if (!m) return;
     if (said.type === 'marks') {
       try {
-        m.render.draw(checkMarks(said.marks));
+        m.render.draw(checkMarks(said.marks, { kinds: m.part.marks }));
       } catch (err) {
         m.failed(err.message);
       }
@@ -297,6 +297,8 @@ export async function drawPart(node, { slot, item, piece, redraw = () => {}, ope
   wayBackFor(island, shipped ? undefined : refined, async () => redraw());
   const part = parts.find((p) => p.slot === slot);
   if (!part) return false;
+  // A part naming a mark this host does not draw waits: said in one line, its code never sent or run.
+  if (part.waiting) return (node.replaceChildren(h('div', { class: 'muted', title: `${part.title} waits: ${part.waiting}` }, `${part.title} waits`)), true);
   if (!part.modules) throw new Error(`${part.title}: its code did not come`);
   await mount(node, part, parts, item, words, piece, { openView, picture });
   return true;

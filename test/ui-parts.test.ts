@@ -14,7 +14,9 @@ import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { setIslands, setPack } from '../packs/loader/kernel/packstate.ts';
 import { hostFor } from '../packs/loader/kernel/packtools.ts';
 import { HOST_SLOTS } from '../packs/loader/kernel/slots.ts';
-import { partsBy, partsFor } from '../packs/loader/kernel/ui-parts.ts';
+import { marksWaiting, partsBy, partsFor } from '../packs/loader/kernel/ui-parts.ts';
+// @ts-ignore: a module of the page, plain JavaScript
+import { MARKS } from '../packs/walls/page/part-check.js';
 import { parts } from '../packs/loader/kernel/parts-read.ts';
 import { freshWith, human, make, packsWith } from './map.ts';
 
@@ -30,7 +32,7 @@ const bin = {
 const shelf = (over: Record<string, unknown> = {}, part: Record<string, unknown> = {}) => ({
   id: 'shelf', version: '1.0.0', title: 'Shelf', description: 'A part of the page.', requires: ['core'],
   actions: [{ id: 'shelf.put', title: 'Put', description: 'Put it.', verb: 'capture', input: { type: 'object', properties: {}, additionalProperties: false } }],
-  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', reads: { task: ['title', 'status'] }, sends: ['shelf.put'], opens: ['shelf.end'], modules: { 'index.js': 'parts/row/index.js', 'look.js': 'parts/row/look.js' }, ...part }],
+  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', reads: { task: ['title', 'status'] }, sends: ['shelf.put'], opens: ['shelf.end'], marks: ['box', 'text'], modules: { 'index.js': 'parts/row/index.js', 'look.js': 'parts/row/look.js' }, ...part }],
   ...over,
 });
 
@@ -78,6 +80,9 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ slot: 'other.place' }), /fills "other.place", which is not open to it/);
   assert.throws(refused({ opens: ['piece.figure'] }), /opens "piece.figure", which the host draws: one name, one owner/);
   assert.throws(refused({ opens: ['other.end'] }), /a slot it opens is named "shelf.<name>"/);
+  assert.throws(refused({ marks: undefined }), /names the marks it answers with/);
+  assert.throws(refused({ marks: ['box', 'Box!'] }), /names the marks it answers with/);
+  assert.throws(refused({ marks: ['box', 'box'] }), /names a mark twice/);
   assert.throws(refused({ modules: { 'look.js': 'parts/row/look.js' } }), /needs its modules, entered at index.js/);
   assert.throws(refused({ modules: { 'index.js': 'parts/row/gone.js' } }), /the pack has no file of/);
   assert.throws(refused({ query: { find: 'island {here}' } }), /query is a filter's terms/);
@@ -118,6 +123,29 @@ test('a slot has one owner: a second pack opening it waits', () => {
     assert.match(reg.states.get('shelf')?.why ?? '', /slot:piece.shelf_end is ledge's: one pack owns a name/);
   } finally {
     hostFor(reg).stop();
+  }
+});
+
+test('a part naming a mark the host does not draw waits: its pack stays active, its code is never sent', async () => {
+  const host = Object.keys(MARKS);
+  assert.equal(marksWaiting(['box', 'text'], host), undefined);
+  assert.match(marksWaiting(['box', 'hologram'], host)!, /"hologram", which this host does not draw/);
+  const dir = folder(shelf({}, { marks: ['box', 'hologram'] }));
+  const l = await freshWith(new Registry(dir));
+  try {
+    assert.equal(l.registry.states.get('shelf')?.state, 'active', 'a host dropping a mark refuses no pack');
+    const [row] = shelfs(partsFor(l.registry, [], [], host));
+    assert.match(row.waiting!, /hologram/);
+    assert.equal(row.modules, undefined, 'a waiting part is never sent its code');
+    assert.deepEqual(row.marks, ['box', 'hologram']);
+    // The page hands in what its host draws when it asks; a host that draws the mark draws the part.
+    const asked = shelfs((await parts({ caller: 'query', map: l }, { marks: [...host, 'hologram', 'Not a mark'] })).parts)[0];
+    assert.equal(asked.waiting, undefined);
+    assert.ok(asked.modules);
+    assert.match(shelfs((await parts({ caller: 'query', map: l }, { marks: host, shipped: true })).parts)[0].waiting!, /hologram/, 'the way back waits on the host too');
+  } finally {
+    hostFor(l.registry).stop();
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

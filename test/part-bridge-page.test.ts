@@ -23,7 +23,7 @@ const shelf = {
     { id: 'shelf.put', title: 'Put', description: 'Put it.', verb: 'capture', input },
     { id: 'shelf.other', title: 'Other', description: 'Not the part’s.', verb: 'capture', input },
   ],
-  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', sends: ['shelf.put'], modules: { 'index.js': 'parts/row/index.js' } }],
+  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', marks: ['box', 'text', 'button'], sends: ['shelf.put'], modules: { 'index.js': 'parts/row/index.js' } }],
 };
 /** The part: it sends on its own once mounted, and again on each event, the action the event names. */
 const PART = `export default function row(input, tools) {

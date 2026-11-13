@@ -20,7 +20,7 @@ const input = { type: 'object', properties: { title: { type: 'string' } }, addit
 const SHELF = {
   id: 'shelf', version: '1.0.0', title: 'Shelf', description: 'A part of the page.', requires: ['core'],
   actions: [{ id: 'shelf.put', title: 'Put', description: 'Put it.', verb: 'capture', input }],
-  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', sends: ['shelf.put'], modules: { 'index.js': 'parts/row/index.js' } }],
+  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', marks: ['box', 'text', 'button'], sends: ['shelf.put'], modules: { 'index.js': 'parts/row/index.js' } }],
 };
 const HANDLER = "export default { 'shelf.put': (input) => ({ ops: [{ op: 'create', type: 'task', title: input.title ?? 'Put' }], reason: 'Put on the shelf' }) };\n";
 const row = (dir: string, word: string) => writeFileSync(join(dir, 'shelf', 'parts', 'row', 'index.js'), `export default () => ({ marks: ['text', {}, '${word}'] });\n`);

@@ -73,7 +73,8 @@
           "have?": "any",
           "shipped?": "boolean",
           "host?": "string",
-          "at?": "number"
+          "at?": "number",
+          "marks?": "any"
         },
         "out": "any",
         "run": "parts-read.ts#parts"
