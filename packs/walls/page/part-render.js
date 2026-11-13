@@ -15,6 +15,7 @@ import { paintSurface } from './part-paint.js';
 import { renderBody } from './body.js';
 // A menu opened is placed in sight (its listener is the page's).
 import './menu-place.js';
+import { fits } from './part-fits.js';
 
 /** What each element was drawn from, and the surface that runs a paint mark. */
 const drawnFrom = new WeakMap();
@@ -31,13 +32,14 @@ const partTold = 50;
  * Draw a part into `root`. `tell(event)` hears what the person does; `style` is the workspace's style (a paint surface
  * moves by its numbers); `canvas(key, el)` is handed a paint surface's pixel canvas (`pixels: true`) once, for whoever
  * hosts the part to give it to the part; `thumb(view)` answers with the element that shows a view small, or nothing;
- * `picture(item, el)` draws a picture mark's item into its element. `find(q, types, link)` answers the items an item
+ * `picture(item, el)` draws a picture mark's item into its element; `lights(ids)` lights those items on the canvas
+ * while the person points at a mark that names them, and fades the rest (nothing, or an empty list, takes it off). `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
  * `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null } = {}) {
-  const ctx = { tell, style, canvas, thumb, picture, find, pick };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {} } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights };
   let ended = false;
   return {
     draw(node) {
@@ -98,6 +100,8 @@ function build(node, ctx) {
     el.type = 'button';
     el.addEventListener('click', async () => {
       const { key, at } = drawnFrom.get(el);
+      // A button that copies: the words it carries go to the clipboard on the press, and the part hears the press too.
+      if (at.copy !== undefined) void navigator.clipboard?.writeText(at.copy).catch(() => {});
       if (!at.pick) return ctx.tell({ key, name: 'press' });
       // A pick waits for the item clicked on the canvas; told back either way, null when it was let go.
       el.setAttribute('aria-pressed', 'true');
@@ -204,6 +208,9 @@ function update(el, node, ctx, fresh = false) {
     return made;
   }
   looks(el, node);
+  lit(el, node, ctx, fresh);
+  // A box that fits shows as many of its marks as the page has room for; the host measures, never the part.
+  if (node.mark === 'box' && (fresh || Boolean(was.at.fits) !== Boolean(at.fits))) fits(el, Boolean(at.fits));
   if (node.item !== undefined && node.mark !== 'picture') el.dataset.item = node.item;
   else delete el.dataset.item;
   if (node.view !== undefined) el.dataset.view = node.view;
@@ -274,12 +281,27 @@ function looks(el, node) {
   if (at.grow) cls.push('pm-grow');
   if (at.wrap) cls.push('pm-wrap');
   if (at.bold) cls.push('pm-bold');
+  if (at.fits) cls.push('pm-fits');
   el.className = [...(kind === 'menu' ? ['menu'] : []), ...cls].join(' ');
   tipped(el, at.tip);
   for (const [name, scale, value] of [['--pm-gap', 'space', at.gap], ['--pm-pad', 'space', at.pad], ['--pm-size', 'text', at.size]]) {
     if (value === undefined) el.style.removeProperty(name);
     else el.style.setProperty(name, value ? `var(--${scale}-${value})` : '0');
   }
+}
+
+/**
+ * The items a mark lights while the person points at it (`lights`): the host lights them on the canvas and fades the
+ * rest, and takes it off as the pointer leaves or the mark goes. The part is told nothing: pointing is not a gesture.
+ */
+function lit(el, node, ctx, fresh) {
+  const ids = node.at.lights;
+  if (fresh) {
+    el.addEventListener('pointerenter', () => drawnFrom.get(el)?.at.lights?.length && ctx.lights(drawnFrom.get(el).at.lights));
+    el.addEventListener('pointerleave', () => ctx.lights([]));
+  }
+  if (!ids?.length) el.classList.remove('pm-lights');
+  else el.classList.add('pm-lights');
 }
 
 /** A mark on a paint surface: a path or placed text, in the surface's own units. */

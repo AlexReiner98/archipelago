@@ -3,9 +3,6 @@
   "version": "0.1.0",
   "title": "Sheet",
   "description": "The sheet over the canvas, an item's one page: its frame and the sections in it, its fields and how one is edited, the links picked on it, and the note being written. What keeps a person in control here stays protected (decisions e_gyzm7rj3, e_axz9au5f, e_dd7gdy8z); a root pack, so its parts change only through a root re-pin (task e_zhxd9bhb).",
-  "requires": [
-    "core"
-  ],
   "kernel": {
     "trust": "root",
     "internal": true

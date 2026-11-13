@@ -13,10 +13,13 @@
 //   paint   a surface in its own units that pans and zooms in the host, holding paths and placed text
 //   path    a line or a shape on a paint surface
 //   note    words in the map's note dialect, drawn as the item page draws a note (packs/walls/page/body.js)
-//   menu    buttons behind a few words, for what is done rarely, placed in sight by the host
+//   menu    what is done rarely, behind a few words, placed in sight by the host: buttons, and the text, boxes, lists
+//           and inputs that make steps of them (a head, a field that narrows what is under it, a way back)
 //   thumb   a kept view drawn small, as the host keeps it (its thumbnail): the part names the view, never draws it
 //   picture an item's picture, out of what the host handed the part (a view frozen as publishing keeps it, a figure):
 //           the part names the item, the host draws it, so a part never sends an answer or an address
+// Any mark may also carry `lights`: the items it stands for, lit on the canvas while the person points at it, the rest
+// faded. A box may be `fits`: it shows as many of its marks as fit on one line and says how many are left.
 // Any mark on the page may carry a `tip`: what it says of itself, shown by the page's one tooltip, and a `view`: pressed,
 // the host opens that view (a kept view's id, a pack's view by its own, or home), as an `item` opens an item's page.
 // Every look is a name the style gives its value (packs/walls/page/part-marks.css): a tone, a gap or a size is a word or a step on
@@ -60,8 +63,10 @@ export const PICKS = ['date', 'time', 'check', 'pick'];
 /** The tones a mark may take: each a colour the style names. */
 export const TONES = ['accent', 'muted', 'ok', 'warn', 'bad', 'closed'];
 const tone = oneOf(...TONES);
-/** What any mark may say: its key, the item or view it stands for and, on the page, its tip. */
-const anyMark = { key, item, view, tip: words(partLimits.label) };
+/** The items a mark lights on the canvas while the person points at it: the rest are faded (packs/walls/page/part-marks.css, hooks.lights). */
+const lights = (v, why) => (Array.isArray(v) && v.length <= 200 ? v.map((i) => item(i, why)) : why('not a list of at most 200 items'));
+/** What any mark may say: its key, the item or view it stands for, what it lights on the canvas and, on the page, its tip. */
+const anyMark = { key, item, view, lights, tip: words(partLimits.label) };
 
 /**
  * Each kind: the attributes it may have and how each is read, what it may hold (`marks`, `words`, `drawn`: paths and
@@ -69,15 +74,15 @@ const anyMark = { key, item, view, tip: words(partLimits.label) };
  * on a paint surface (`plane`) or on the page.
  */
 export const MARKS = {
-  box: { attrs: { ...anyMark, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag }, holds: 'marks' },
+  box: { attrs: { ...anyMark, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag, fits: flag }, holds: 'marks' },
   text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end'), href }, holds: 'words' },
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
   input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag }, holds: 'nothing', keyed: true },
-  button: { attrs: { ...anyMark, look: oneOf('main', 'quiet'), tone, label: words(partLimits.label), pick: oneOf('item', 'link') }, holds: 'words', keyed: true },
+  button: { attrs: { ...anyMark, look: oneOf('main', 'quiet'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(partLimits.words) }, holds: 'words', keyed: true },
   paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag }, holds: 'drawn' },
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
   note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
-  menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet') }, holds: 'marks', only: ['button'], needs: ['label'] },
+  menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet') }, holds: 'marks', only: ['button', 'box', 'text', 'list', 'input'], needs: ['label'] },
   thumb: { attrs: { key, view, tip: anyMark.tip }, holds: 'nothing', needs: ['view'] },
   picture: { attrs: anyMark, holds: 'nothing', needs: ['item'] },
 };

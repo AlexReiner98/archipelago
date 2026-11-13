@@ -78,6 +78,8 @@ hooks.address = () => {
     drawn: { count: answer?.items?.length ?? 0, ...(answer?.cut && { cut: true }) },
   };
 };
+/** The pages of the app a part may name in an address (`page`), each one the host draws over the canvas. */
+const PAGES_GO = ['you', 'workspace', 'screen'];
 /** A name a layout goes by in an address: a shape's or a kept style's. */
 const NAMED = /^[A-Za-z0-9_.-]{1,80}$/;
 /**
@@ -88,6 +90,13 @@ const NAMED = /^[A-Za-z0-9_.-]{1,80}$/;
 hooks.go = (address) => {
   if (!current || !address || typeof address !== 'object') return;
   if (typeof address.item === 'string' && /^e_[a-z0-9]{8}$/.test(address.item)) return void openOver(address.item);
+  // A page of the app the host draws, by name: what the menu leads to, so a part may go there without knowing an address.
+  if (typeof address.page === 'string') {
+    if (!PAGES_GO.includes(address.page)) return;
+    const of = typeof address.of === 'string' && /^e_[a-z0-9]{8}$/.test(address.of) ? address.of : undefined;
+    if (address.page === 'screen' && !of) return;
+    return void openHere(address.page === 'screen' ? `#/s/${of}` : `#/${address.page}`);
+  }
   let lens = null;
   try {
     if (address.query) lens = readAddress(addressOf(address.query)).lens;

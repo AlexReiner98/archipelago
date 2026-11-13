@@ -1,4 +1,4 @@
-// A style's own code (packs/walls/page/style-code.js, packs/walls/page/draw.js) runs in a frame walled in, unless the owner opens it for the
+// A style's own code (ui/style-code.js, packs/walls/page/draw.js) runs in a frame walled in, unless the owner opens it for the
 // workspace (drawings_open, e_eezrwza2): the frame's policy, and in a real browser (skipped where there is no Chrome)
 // the same code run both ways. Beside test/layouts.test.ts.
 

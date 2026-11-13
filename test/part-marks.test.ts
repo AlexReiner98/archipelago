@@ -90,7 +90,8 @@ test('a note holds words in the dialect, a menu holds buttons, and any mark on t
   assert.equal(root.kids[0].words, '## Why\n- [ ] check it');
   assert.equal(root.kids[0].at.tick, true);
   assert.equal(root.kids[1].kids[0].mark, 'button');
-  refused(['menu', { label: 'More' }, ['text', 'loose']], /a text in a menu: it holds buttons only/);
+  // A menu holds the steps of what is done rarely: buttons, and the text, boxes, lists and fields that make steps of them.
+  refused(['menu', { label: 'More' }, ['note', 'loose']], /a note in a menu: it holds/);
   refused(['menu', {}, ['button', { key: 'a' }, 'A']], /a menu with no label/);
   refused(['note', {}, ['text', 'x']], /a note holding a mark/);
   refused(['note', { tick: true }, '- [ ] a'], /a note that ticks with no key/);

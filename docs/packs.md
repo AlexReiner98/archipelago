@@ -140,6 +140,7 @@ answering with marks the host checks.
 | `opens` | The slots it draws for others to fill. | Named `<pack>.<name>`, or a piece or page the host no longer draws. |
 | `marks` | The marks it answers with (`box`, `text`, ...). | A list of mark kinds, checked by shape. One the host does not draw (`packs/walls/page/part-check.js`) makes the part wait, its pack still active; at draw, a mark it did not name is refused. |
 | `go` | Whether it may move the page: it is handed the page's `address` and, after a press or Enter, may name another (`tools.go`), which the canvas checks. | true or false. |
+| `state` | The page state it publishes (`tools.state`): names the runtime writes on the root as `data-<name>`, where anything watching the page from outside reads it (the picture taken once the canvas has drawn). | A list of names; one name, one owner, and the page refuses a name the part did not declare. |
 | `modules` | Its code, files of the pack entered at `index.js`, as a layout's. | The files are there. |
 
 **A slot has one owner** (`packs/loader/kernel/slots.ts`). The host owns its
@@ -164,17 +165,61 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `bar.layouts` | The layout a view is drawn in. | `current`, `layout` |
 | `canvas` | The canvas itself. | `query`, `layout` |
 | `traces` | The overlay of traces over it. | `query` |
-| `sheet` | The sheet over the canvas, an item's one page. | — |
+| `sheet` | The sheet over the canvas, an item's one page. | `reading` |
 | `item.menu` | What is done rarely to that item. | — |
 | `find` | Find at the canvas's foot. | `query` |
 | `home` | The page with no query up. | — |
-| `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace` |
+| `nav` | What the menu leads to. | — |
+| `look` | Drawn by nothing: the part is handed whether the canvas has drawn (`drawn`, and `why` when there is one) and publishes it as page state, so a picture is taken at the right moment. The host mounts it under `?look`. | `drawn`, `why` |
+| `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace`, `section` |
 
 A part is handed the item it stands on cut to the fields it `reads`, its
 query's items, its named reads, and, where it declares `go`, the page's
 address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
 `text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`
 and `picture`, each named in its `marks`.
+
+**What any mark may carry**, beside `key`, `item`, `view` and `tip`:
+`lights`, the items it lights on the canvas while the person points at it,
+the rest faded — pointing is not a gesture, so the part is told nothing. A
+box may be `fits`: the host shows as many of its marks as fit on one line
+and counts the rest (`packs/walls/page/part-fits.js`), so the same marks suit a
+wide screen and a narrow one without asking the part again. A button may
+carry `copy`: the words that go to the clipboard on the press. A `menu`
+holds the steps of what is done rarely — buttons, and the text, boxes,
+lists and fields that make steps of them.
+
+**A part decides, the runtime draws.** A part runs in a worker: it never
+holds a node, never reads the page, and answers when it is ready, which is
+what lets nearly everything become a part. The runtime hands it what it
+declared it reads and keeps only the drawing — so where a module used to
+work something out and paint it, the working out is the part and the
+painting is a mark the contract names. Three shapes to write against:
+
+- **Proposals in, ghosts out.** The part is handed the changes held and the
+  items drawn; it answers with the marks of what would land, and the runtime
+  draws them where it draws anything.
+- **A view in, a thumbnail out.** The part names the view (`thumb`); the
+  runtime keeps and draws the picture. A part never holds an image.
+- **A view named, a frame drawn.** The part answers with the view it wants
+  in sight; the runtime frames it and brings it into view.
+
+Where a part must say something about the page rather than draw it (that the
+canvas has finished drawing, say), it publishes page state it declared
+(`state`), and the runtime writes it on the root.
+
+**Where a part may go.** A part that declares `go` names an address after a
+gesture and the canvas checks it: an item (`item`), a query and the layout
+to draw it in (`query`, `layout`), or a page of the app the host draws
+(`page`: `you`, `workspace`, or `screen` with `of`, the screen's id).
+
+**Which version of a part runs** depends on what it stands on: the island of
+the item it stands on, as today. A part that stands on nothing — the tabs,
+the panes, Home, the menu, a bar over a canvas that spans islands — is the
+chrome, and is to be pinned per person (decision e_x6bqupud, task
+e_fpm9n7er); until that lands the chrome runs the map's version. The page
+resolves it in one function, `pinFor` in
+`packs/surface/page/part-host.js`.
 
 **Its code is the version's its island pins.** A part's modules are read
 from its pack's folder as the registry has it (`folderOf`): on an island
