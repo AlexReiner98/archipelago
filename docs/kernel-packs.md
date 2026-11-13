@@ -323,7 +323,8 @@ importing module.
 It is the server's entry point (`npm start`, `npm run dev`).
 
 1. Reads `packs/roots.json`: the root packs in order, each with its hash.
-2. Hashes each root pack's folder (`pack.json` and `kernel/**`, canonical
+2. Hashes each root pack's folder (`pack.json` and every other file of it but its README:
+   `kernel/**`, `page/**`, `parts/**`, canonical
    JSON and SHA-256, `src/jcs.ts`, `src/hashes.ts`) and refuses to start on
    a difference, naming the pack and both hashes.
 3. Starts the roots in order, handing each a context of the roots before it,
