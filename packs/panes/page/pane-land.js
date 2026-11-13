@@ -1,5 +1,5 @@
-// Where an agent's step lands on the owner's page (packs/surface/page/live.js): ui/pane-route.js works it out from whom each tab
-// follows, whose each pane is and where the reader is busy (ui/pane-busy.js), and this does it: a pane of the tab in
+// Where an agent's step lands on the owner's page (packs/surface/page/live.js): packs/panes/page/pane-route.js works it out from whom each tab
+// follows, whose each pane is and where the reader is busy (packs/panes/page/pane-busy.js), and this does it: a pane of the tab in
 // sight drawn again or split, a tab brought into sight, a tab in the background given the step and marked (decision
 // e_xjrpyysn), a tab of its own opened, or the window a tab was popped out into moved. A pane a session's step lands in
 // is held for it (`held`), kept with the tab, so its next step goes there again, however long it works.
@@ -45,7 +45,7 @@ hooks.land = (step) => {
     .map((t) => ({ id: t.id, follows: t.follows ?? 'none', popped: true, panes: [{ ...paneOf(t, focusOf(t), false), busy: busy(t.id) }] }));
   const to = route(step, [...docked, ...out], { drawable: drawable(at) });
   // The pane is held for the session from now on, unless it is the reader's in focus (lit only because it drew this) or
-  // named; its strip's mark says who sent it, and the mark's tooltip why (ui/panes.js).
+  // named; its strip's mark says who sent it, and the mark's tooltip why (packs/panes/page/panes.js).
   const lit = (t, pane) => {
     landed.set(`${t.id}:${pane}`, { session, at: now });
     const p = t.panes[pane];
@@ -75,7 +75,7 @@ hooks.land = (step) => {
     }
     // A blank pane taken for a name the show gave is that name's from now on.
     if (to.slot && t.panes[to.pane]) t.panes[to.pane].slot = to.slot;
-    // A pane split for the session is its own, and closes as its chat ends (ui/tab-life.js).
+    // A pane split for the session is its own, and closes as its chat ends (packs/panes/page/tab-life.js).
     const split = () => openPane(at, to.split.side, t.groups.at(-1), { ...(!to.split.shared && { by: session }), ...(to.split.slot && { slot: to.split.slot }), ...(!to.split.slot && t.follows !== session && { held: session }) }, t);
     // Not a canvas (a screen, the workspace): the page opens over the tab's pane in focus.
     if (!drawable(at)) {

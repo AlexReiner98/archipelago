@@ -1,4 +1,4 @@
-// The browser's back and forward on the page. The address is the pane in focus's (ui/panes.js), and each step a pane
+// The browser's back and forward on the page. The address is the pane in focus's (packs/panes/page/panes.js), and each step a pane
 // takes there is an entry of the browser's history, stamped with where it stands in it, so a step back or forth through
 // those entries is known as one. It is ‹ or › on the pane in focus, whichever pane took the step; an entry that only
 // opens or shuts a page over the canvas does just that.
@@ -13,7 +13,7 @@ export function atOf(hash) {
   const [, name = '', arg] = where.split('/');
   if (name === '') return 'v';
   if (name === 'v') return query ? `v?${query}` : 'v';
-  // A web page framed in a pane (ui/pane-web.js).
+  // A web page framed in a pane (packs/panes/page/pane-web.js).
   if (name === 'w') return query ? `w?${query}` : 'v';
   if (name === 'e' && arg && readAddress(query).lens) return `v?${query}`;
   return undefined;

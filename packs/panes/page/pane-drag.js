@@ -1,6 +1,6 @@
-// Moving panes by hand (ui/panes.js): a pane's name pressed and dragged shows where it would dock, as a code editor
+// Moving panes by hand (packs/panes/page/panes.js): a pane's name pressed and dragged shows where it would dock, as a code editor
 // does: over a pane's side, docked on that side of it; over its middle, swapped with it; over the tabs, into a tab of
-// its own, or over a tab, into that one (ui/tab-bar.js). The line between two panes is dragged to share the room between them.
+// its own, or over a tab, into that one (packs/panes/page/tab-bar.js). The line between two panes is dragged to share the room between them.
 
 import { h } from './base.js';
 

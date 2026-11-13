@@ -1,11 +1,11 @@
-// Panes: the canvases in sight at once in a tab (ui/tab-bar.js), docked side by side as a code editor's groups are;
+// Panes: the canvases in sight at once in a tab (packs/panes/page/tab-bar.js), docked side by side as a code editor's groups are;
 // they stay together in their tab (decision e_mzer5m4t). Every pane is the same: a canvas of its own (ui/canvas.js)
 // drawing the address it was given (a lens, a saved canvas, an item), held in its own store and kept current from the
 // log (packs/surface/page/live.js), with its own back and forward, a step for each lens it was given, not for a page opened over it
 // (e_ssnyd3ex), kept with its tab so a reload draws it as it was. The query bar and find act on the pane last touched
-// (decision e_h2pqjy2q), and the address is that pane's (ui/pane-address.js). Only the tab in sight is drawn; the
-// others keep where their panes stand (ui/tabs.js). An agent arranges them with report show and its `pane`; where a
-// step lands is ui/pane-route.js.
+// (decision e_h2pqjy2q), and the address is that pane's (packs/panes/page/pane-address.js). Only the tab in sight is drawn; the
+// others keep where their panes stand (packs/panes/page/tabs.js). An agent arranges them with report show and its `pane`; where a
+// step lands is packs/panes/page/pane-route.js.
 
 import { api, h, hooks, state } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
@@ -95,7 +95,7 @@ const NONE = 'v?shown=none';
 function load(id, at) {
   const entry = drawn.get(id);
   entry.at = at;
-  // A web page is framed in place of the canvas (ui/pane-web.js).
+  // A web page is framed in place of the canvas (packs/panes/page/pane-web.js).
   frameIn(entry, webOf(at));
   if (webOf(at)) return;
   if (at === NONE) return void ((entry.name.textContent = ''), entry.canvas.empty());
@@ -322,7 +322,7 @@ export function only(id, t = front()) {
   keep();
   if (t === front()) draw();
 }
-/** Let go of a pane dragged (ui/pane-drag.js): on a tab, into it; on the tabs, into a tab of its own; on a side of another, docked there; in the middle of one, the two swap places. */
+/** Let go of a pane dragged (packs/panes/page/pane-drag.js): on a tab, into it; on the tabs, into a tab of its own; on a side of another, docked there; in the middle of one, the two swap places. */
 function drop(id, target, zone) {
   if (zone === 'out') return;
   if (zone === 'tabs') return hooks.paneToTab?.(id, target);
@@ -380,7 +380,7 @@ hooks.besidePane = (from, view) => {
 };
 
 let started = false;
-/** Draw the panes of the tab in sight, once the page has read its tabs (ui/tab-bar.js). */
+/** Draw the panes of the tab in sight, once the page has read its tabs (packs/panes/page/tab-bar.js). */
 export function startPanes() {
   started = true;
   active = focusOf(front());
