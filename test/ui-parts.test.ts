@@ -53,7 +53,8 @@ test('parts is a key of the manifest, and a map pack’s alone', () => {
   const both = readManifest(JSON.stringify({ ...shelf(), types: bin.types }), 'test');
   const kernel = sharedOf([readManifest(JSON.stringify({ id: 'core', version: '1', title: 'core', shared: [] }), 'core')]);
   assert.match(islandProblems(both, kernel).join(), /a map pack \(actions, parts\): split it/);
-  assert.ok(HOST_SLOTS.includes('piece.figure') && HOST_SLOTS.includes('page.time') && HOST_SLOTS.includes('canvas'), 'the host owns its frame and the pieces and pages it draws');
+  // The host's last page (time) became views (e_7tgvuyrs): PAGES is empty, and the host keeps its frame and pieces.
+  assert.ok(HOST_SLOTS.includes('piece.figure') && HOST_SLOTS.includes('canvas') && !HOST_SLOTS.some((s) => s.startsWith('page.')), 'the host owns its frame and the pieces it draws, and no page');
 });
 
 test('a part loads when its shapes hold, and is refused with why when one does not', () => {
