@@ -176,6 +176,7 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace`, `section` |
 | `tabs.land` | A decision: where a show lands among the tabs and panes. | `step`, `tabs`, `drawable` |
 | `tabs.life` | A decision: which kept tabs' sessions have ended or rested. | `open`, `tabs` |
+| `ghosts` | A decision: what the changes held would look like, read back into the canvas's answer. | `held`, `drawn`, `loose` |
 
 **What the query slots are handed.** `bar.find`, `bar.find.rows`, `find`,
 `canvas` and `traces` are handed the lens the canvas in focus draws as
@@ -191,12 +192,29 @@ which `ui/query-bar.js` then leaves to the part.
 **The runtime tells a slot what it saw** (`tellSlot(slot, event)`, as
 `hooks.tellSlot`): every part mounted there hears it as an event in `on`,
 and one mounted later is handed the last as `told`. The sheet's reading
-position is told to `sheet` as `{ name: 'scrolled', reading: { open, sight,
-unsaved, holding } }` (`open` the item whose page is shown, `sight` the
-document in sight); a part there names the page to show with
+position is told to `sheet` as `{ name: 'scrolled', reading: { item, open,
+held, unsaved } }` (`item` the document in sight, `open` the item whose page
+is shown, `held` while the sheet waits for the frames above to settle); a
+part there names the page to show with
 `tools.go({ item, replace: true })`, which replaces the address and never
 leaves words not yet saved. With no part told, the page follows the reading
 itself.
+
+**What the traces are told.** A part on `traces` is handed `me` (the
+person's actor, as the log names one) and told each beat of the log as
+`{ name: 'beat', from, to, rows: [{ id, was, now, by?, at?, pos }] }`: the
+rows the beat touched as they were and are (null where not held, or gone),
+projected by the runtime, which keeps the store and the projector
+(`packs/surface/page/beat-rows.js`); the part compares them. On the first
+canvas of a page it is told `{ name: 'missed', from, to, entries: [{ pos, at,
+by?, moved?, facts, rows: [{ id, was, now }] }] }`, entry by entry from where
+the person last looked, then one beat for the whole span. Neither is worked
+out unless a part is mounted on `traces`.
+
+**A part may hold other parts** (`['slot', { name }]`, decision
+e_hp9xmrbq): only a slot in its own `opens`. The runtime draws whatever parts
+fill it in the mark's node; the holding part never sees them, nor they it,
+and nesting stops four deep.
 
 **What find's parts are told.** `find` is handed `shapes`, the layouts the
 packs ship (`{ shape, title }`). A part on `find`, `bar.find` or
@@ -235,7 +253,7 @@ by naming the change, never by working it out: `tools.go({ add: { find |
 only | not: term } })` adds a term, `tools.go({ take: { part, value } })`
 takes one out, and the runtime makes the lens and draws it.
 
-**A slot that asks a decision** (`tabs.land`, `tabs.life`) is filled by a
+**A slot that asks a decision** (`tabs.land`, `tabs.life`, `ghosts`) is filled by a
 part that answers a value, not marks: it exports `decide(input)` beside
 `marks` (none), may name no mark, and the root that asks
 (`askSlot(slot, input)` in `base.js`) checks the value and applies it. No
@@ -246,7 +264,7 @@ A part is handed the item it stands on cut to the fields it `reads`, its
 query's items, its named reads, and, where it declares `go`, the page's
 address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
 `text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`,
-`picture`, `web`, `pane`, `panes`, `swatch`, `trace` and `replay`, each named in its `marks`.
+`picture`, `web`, `pane`, `panes`, `swatch`, `trace`, `replay` and `ghost`, each named in its `marks`.
 
 **What any mark may carry**, beside `key`, `item`, `view` and `tip`:
 `lights`, up to 500 items it lights on the canvas in sight while the person
@@ -264,6 +282,8 @@ part is told nothing.
 | `button` `try` | A theme (a preset used once chosen) tried on this screen alone, nothing kept; `null` the workspace's own again (`packs/surface/page/swatch.js`). Every part is handed `trying`, the preset tried or null. | `press`. |
 | `swatch` | A style preset's paper, ink and sea for the screen's scheme, painted by the host from the preset the part names (`preset`): a part paints no colour. `label` under it, `on: kept` or `trying` outlines it; an unknown preset is blank. | `press`, with a key. |
 | `text` `hue` | A session, named by its words, marked in its hue as every session is. | nothing. |
+| `ghost` | Nothing where it stands: a change held for the owner, as data (`of` item, link or mark; `id` such as `p_x:ref`, `proposal`, `op`, and the item's or link's fields), handed to whoever hosts the part (`ghosts(list)`, `hooks.ghosts`) for the canvas to read back into its answer and draw where it would land. | nothing. |
+| `paint` `controls` | −, Fit and + in the surface's corner, zoomed by the style's `zoom_step`. A `path` may be filled as a diagram's shapes are (`look: area`, `box`, `strong`), and a path or placed text may carry a `tip` and an `href` (opened apart). | nothing. |
 | `replay` | Nothing where it stands: the canvas under the part shows what the person missed (`store.missed`, set as the canvas mounts) up to step `at` of `steps` (`[{ pos, ids }]`, each the facts of entry `pos` about those ids), the store `playing` while it is said; a step back or other steps rewinds first. With no replay mark, what was not played is projected at once and the store is the map as it is now (`packs/surface/page/replay.js`). The part drives the timer. | nothing. |
 | `trace` | Nothing where it stands: its `item`'s marks on the canvas painted with its line (`tip`, the page's tip over them) in a session's `hue`, until each was in sight for the style's `trace_seen_after` while the page painted; then it fades over `trace_fade` (`part-trace.js`). A trace no longer sent is taken off. | `seen`, with `item`. |
 | `menu` | What is done rarely, in steps (`part-menu.js`): a head (`text`), a field, buttons, and a `menu` in it as the next step (›, opened it is all its step shows, ‹ back). A `search` field narrows its step's choices in the page and Enter takes the first left; Backspace in it, empty, goes back. `open: true` opens it; it stays as the person leaves it while its key stays. | `press` from a choice, `edit` from a field; a `text` field still `submit`s, an `item` field `pick`s. |

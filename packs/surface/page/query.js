@@ -1,11 +1,14 @@
-import { api, h, withIds } from './base.js';
+import { api, askSlot, h, withIds } from './base.js';
 import { kinds, replicate } from './live.js';
-import { unfollow } from './replica.js';
+import { ghostAsker, unfollow } from './replica.js';
 import { drawWith, layouts, warmLayouts } from './layout.js';
 import { dress, layered } from './query-base.js';
 import { drawCode } from './style-code.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles } from './words.js';
+
+// Where a held change would land on a canvas is the decision of the part on `ghosts` (the write pack's).
+ghostAsker.ask = (input) => askSlot('ghosts', input);
 
 /** On a map with nothing on it yet, a person is pointed at what puts something there. */
 async function firstStep(body) {
@@ -223,7 +226,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   // The answer is held in a store kept current from the log (packs/surface/page/replica.js): facts redraw it without the lens being
   // read again; only a link made to something it does not hold reads the lens again, since the walk may now reach more.
   // What is drawn is the answer with what is held for the owner and the links drawn here not yet answered for drawn
-  // into it (`shown`, ui/ghosts.js); what the canvas holds (`host.answer`) is the answer alone.
+  // into it (`shown`, packs/surface/page/replica.js); what the canvas holds (`host.answer`) is the answer alone.
   const draw = (answer, shown, refreshing) => {
     if (only) [answer, shown] = [answer, shown].map(narrowed(only));
     if (extra) [answer, shown] = [answer, shown].map((a) => ({ ...a, ...extra, ...(extra.steps && { steps: phased(extra.steps, a.items) }) }));

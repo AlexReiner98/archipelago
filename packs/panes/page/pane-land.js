@@ -10,7 +10,7 @@ import { route, sessionOf, SHOWN, WATCH } from './pane-route.js';
 import { activeId, drawn, flash, goPane, markPanes, only, openPane, paneAt, place } from './panes.js';
 import { arrived, drawStrip, openTab, toFront } from './tab-bar.js';
 import { chatTab, revive, takeOver } from './tab-life.js';
-import { BLANK, drawable, focusOf, keep, landed, named, outTabs, poppedTab, tabOf, tabs } from './tabs.js';
+import { BLANK, byPart, drawable, focusOf, keep, landed, named, outTabs, poppedTab, tabOf, tabs } from './tabs.js';
 
 /** The page starts its tabs through here (ui/app.js), so that where a step lands is loaded with them. */
 export { startTabs } from './tab-bar.js';
@@ -20,6 +20,7 @@ const itemOf = (at) => /^e\/(e_[a-z0-9]{8})(?:\?|$)/.exec(at)?.[1];
 
 /** Land an agent's show where it goes: a pane, a tab in the background, a window of its own, or nowhere where no tab takes it. Answers 'later' when it is to be tried again. */
 hooks.land = (step) => {
+  if (byPart.on) return;
   if (poppedTab) return;
   const at = step.hash;
   // What the server says of a session, rather than what an agent asked to show, draws its canvas and opens no page.

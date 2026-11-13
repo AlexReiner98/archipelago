@@ -85,6 +85,7 @@ test('the host offers these slots, each handing the part what it is named with',
     'workspace.card': ['workspace', 'section'],
     'tabs.land': ['step', 'tabs', 'drawable'],
     'tabs.life': ['open', 'tabs'],
+    ghosts: ['held', 'drawn', 'loose'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
   assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'button', 'count']);
