@@ -41,7 +41,7 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     await page.evaluate(`(() => { const s = ${look}; s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   };
   try {
-    assert.ok(await page.until(`Boolean(document.querySelector('#find-lens .q-sum'))`), `the canvas is up: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`Boolean(document.querySelector('#find-lens .part-body .pm-text'))`), `the canvas is up: ${page.logs().join('\n')}`);
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
       // In Find a style is found as an item: its page opens over the lens, and nothing is applied.

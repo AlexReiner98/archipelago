@@ -62,7 +62,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       await enter();
       assert.ok(await page.until(`location.hash.includes('find=text+roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter finds the words, the walk kept: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       assert.ok(await page.evaluate(has('Elsewhere')), 'the rest of the lens stays');
-      assert.ok(await page.until(`document.querySelector('#find .q-sum')?.textContent.startsWith('Find“roof”or')`), 'the query bar says the words as a Find term, joined by or');
+      assert.ok(await page.until(`document.querySelector('#find-lens .pm-fits')?.textContent.startsWith('Find“roof”or')`), 'the query bar says the words as a Find term, joined by or');
       assert.ok(await page.until(`${list}.hidden && document.getElementById('find').classList.contains('open') && document.activeElement === document.querySelector('#find input[type=search]') && !document.querySelector('#find input[type=search]').value`), `find stays open and emptied, the cursor in it, to refine further: ${await page.evaluate(`JSON.stringify([${list}.hidden, document.getElementById('find').className, document.activeElement?.outerHTML.slice(0, 80)])`)}`);
       if (shots) writeFileSync(`${shots}/find-drawn-${width}.png`, await page.screenshot());
       // Enter again puts new words in place of those the bar set, and nothing else.
@@ -73,7 +73,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       await type('gutters');
       await enter(true);
       assert.ok(await page.until(`location.hash.includes('find=text+walls') && location.hash.includes('find=text+gutters') && ${has('Walls')} && ${has('Gutters')} && ${has('Elsewhere')}`), `Shift+Enter keeps both sets: ${await page.evaluate(`JSON.stringify(${drawn})`)}`);
-      assert.ok(await page.until(`document.querySelector('#find .q-sum')?.textContent.includes('“walls”or“gutters”')`), 'each set its own Find term');
+      assert.ok(await page.until(`document.querySelector('#find-lens .pm-fits')?.textContent.includes('“walls”or“gutters”')`), 'each set its own Find term');
       // The words' × in find's rows takes them out, and back brings them again.
       await out('walls');
       await page.until(`!location.hash.includes('find=text+walls')`);
@@ -105,7 +105,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
     assert.ok(await page.until(`location.hash.includes('only=in+${made.site}')`), `Enter takes it as within: ${await page.evaluate('location.hash')}`);
     // At rest find says, in its line, the lens an address carries.
     await page.go(`${base}/#/v?find=id+${made.other}&find=text+gutters`);
-    assert.ok(await page.until(`document.querySelector('#find .q-sum')?.textContent.includes('“gutters”')`), 'find says the lens up');
+    assert.ok(await page.until(`document.querySelector('#find-lens .pm-fits')?.textContent.includes('“gutters”')`), 'find says the lens up');
   } finally {
     await page.close();
   }

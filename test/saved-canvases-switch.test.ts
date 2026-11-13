@@ -28,7 +28,7 @@ test('in a browser, a saved canvas is opened and switched to from the bar; a vie
     assert.equal(await canvasUp(), other);
     assert.ok(await page.until(`${picked} === 'The other one'`), 'named in the bar');
     // As a chip, or in the folded line when the bar is narrow (560 px, as set above).
-    assert.ok(await page.until(`[...document.querySelectorAll('#find .q-id, #find .q-more')].some((c) => (c.textContent + c.title).includes('Another task'))`), 'its lens in the bar');
+    assert.ok(await page.until(`[...document.querySelectorAll('#find-lens .pm-text, #find-lens .pm-fits-rest')].some((c) => (c.textContent + c.title).includes('Another task'))`), 'its lens in the bar');
     // From the switcher's panel, its scope All.
     await page.evaluate(`document.querySelector('#query .q-pick').click()`);
     assert.ok(await page.until(`Boolean(document.querySelector('.view-panel:popover-open .pm-input'))`), 'the panel opens');

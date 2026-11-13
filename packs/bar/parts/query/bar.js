@@ -123,7 +123,7 @@ function termMark(s, said, part, t, i) {
   // Pointing at a term of Find lights what it brought on the canvas (was ui/query-light.js): the host does it.
   return ['box', { flow: 'row', gap: 1, tip: cut(tip), ...(lit?.length && { lights: lit.slice(0, LIT) }) },
     ['text', { ...(tone && { tone }) }, cut(said.termSaid(t))],
-    ['button', { key: `x:${part}:${i}`, look: 'quiet', tip: 'Take it out' }, '×']];
+    ['button', { key: `x:${part}:${i}`, look: 'quiet', tip: 'Take it out', label: cut(`Take out ${said.termSaid(t)}`) }, '×']];
 }
 
 /** What a row's + offers, as far as the person has gone: one step for each kind picked, then the last step's own. */
@@ -162,7 +162,8 @@ function plusMenu(s, part, word) {
     ...picks,
     ...(last.typed ? [['input', { key: `typed:${part}`, kind: 'text', label: cut(last.label), hint: cut(last.typed.hint), tip: cut(last.typed.tip), focus: true }]] : []),
     ...(last.search ? [['input', { key: `item:${part}`, kind: 'item', label: cut(last.label), hint: cut(last.search.hint), ...(last.search.types && { types: last.search.types }), focus: true }]] : []),
-    ...(!last.typed && !last.search && many ? [['input', { key: `narrow:${part}`, kind: 'search', label: 'Find a choice', hint: 'Find a choice', value: cut(adding.q), focus: true }]] : []),
+    // A plain field, not a search box: find's own box is the one search box in find (tests and the keyboard look for it so).
+    ...(!last.typed && !last.search && many ? [['input', { key: `narrow:${part}`, kind: 'text', label: 'Find a choice', hint: 'Find a choice', value: cut(adding.q), focus: true }]] : []),
     ...(s.wrong && s.adding?.part === part ? [['text', { tone: 'bad', size: 2 }, 'Not what this takes']] : []),
     ['list', { look: 'rows' }, ...finals.slice(0, CHOICES).map(([c, i]) => ['button', { key: `choice:${part}:${i}`, look: 'quiet', tip: cut(c.tip ?? c.label) }, cut(c.label)])],
   ];
@@ -193,13 +194,13 @@ function rowsOf(s, said) {
   const walked = over === 'all' ? [] : over;
   const walking = over === 'all' || walked.length > 0;
   const walkTerms = over === 'all'
-    ? [['box', { flow: 'row', gap: 1, tip: 'Every link, either way' }, ['text', {}, 'every link'], ['button', { key: 'wx:all', look: 'quiet', tip: 'Take it out' }, '×']]]
+    ? [['box', { flow: 'row', gap: 1, tip: 'Every link, either way' }, ['text', {}, 'every link'], ['button', { key: 'wx:all', look: 'quiet', tip: 'Take it out', label: 'Take out every link' }, '×']]]
     : walked.map((t, i) => {
       const w = wayOf(t);
       return ['box', { flow: 'row', gap: 1, tip: WAY_TIP[w.way] },
         ['button', { key: `way:${i}`, look: 'quiet', tip: `${WAY_TIP[w.way]}: turn it` }, ARROW[w.way]],
         ['text', {}, cut(said.linkTitle(w.link))],
-        ['button', { key: `wx:${i}`, look: 'quiet', tip: 'Take it out' }, '×']];
+        ['button', { key: `wx:${i}`, look: 'quiet', tip: 'Take it out', label: cut(`Take out ${said.linkTitle(w.link)}`) }, '×']];
     });
   const stepper = walking ? [['box', { flow: 'row', gap: 1, tip: 'How many steps the walk takes' },
     ['button', { key: 'steps:less', look: 'quiet', tip: 'One step fewer' }, '−'],
