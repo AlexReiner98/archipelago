@@ -221,6 +221,8 @@ function partInside() {
     marks: (said) => marks(id, said),
     // One of its pack's declared actions; the page checks it is, shows it as it goes out and answers what came of it.
     act: (action, params) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'act', id, asked: asks, action: String(action), params: params ?? {} }))),
+    // Another address for the page, from a part that declares `go`: the page checks it and moves, after a gesture only.
+    go: (address) => send({ type: 'go', id, address }),
   });
 
   // One part's words at a time, in the order they came: a part is never told of an event before it is mounted.

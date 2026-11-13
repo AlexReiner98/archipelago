@@ -138,6 +138,7 @@ answering with marks the host checks.
 | `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). |
 | `sends` | The actions it may send. | Each its own pack's. |
 | `opens` | The slots it draws for others to fill. | Named `<pack>.<name>`, or a piece or page the host no longer draws. |
+| `go` | Whether it may move the page: it is handed the page's `address` and, after a press or Enter, may name another (`tools.go`), which the canvas checks. | true or false. |
 | `modules` | Its code, files of the pack entered at `index.js`, as a layout's. | The files are there. |
 
 **A slot has one owner** (`packs/loader/kernel/slots.ts`). The host owns its

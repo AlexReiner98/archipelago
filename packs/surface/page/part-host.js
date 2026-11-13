@@ -10,7 +10,8 @@
 // query is asked as the person looking, so what they may not see it never gets. Beside them every part is handed, as
 // data (decision e_fx62gsjb), the schema's `words` of the island it draws for (root.parts) and the `style` values a
 // part may read: the style's numbers and page settings, never a colour or a length, and `up`, the saved view the
-// canvas draws now. A mark that names a view opens it, and a thumb shows it small, both as the app says
+// canvas draws now. A part that declares `go` is handed the page's `address` too, again each time it changes
+// (addressMoved), and may name another after a gesture (hooks.go checks it). A mark that names a view opens it, and a thumb shows it small, both as the app says
 // (hooks.openView, hooks.viewThumb, hooks.viewUp: ui/canvases.js), or as the one drawing the part says (`openView`).
 
 import { api, h, hooks, state } from './base.js';
@@ -115,7 +116,7 @@ async function viewsOf(part, item, piece) {
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  given = { ...given, up: hooks.viewUp?.() ?? null };
+  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: hooks.address?.() ?? null }) };
   if (!part.query) return { item: here, ...views, ...given };
   const fill = (terms) => terms?.map((t) => t.replaceAll('{here}', item?.id ?? ''));
   const filter = { find: fill(part.query.find), ...(part.query.only && { only: fill(part.query.only) }), ...(part.query.not && { not: fill(part.query.not) }) };
@@ -148,7 +149,8 @@ async function workerOf(version, parts, pack) {
       if (message?.type === 'acted' && !message.error) for (const m of one.mounted.values()) void m.refresh();
     },
   };
-  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part });
+  // A part that declares `go` names another address after a gesture; the app checks it and moves (hooks.go, ui/canvas.js).
+  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part, go: (address) => hooks.go?.(address) });
   one.port.onmessage = (ev) => {
     const said = ev.data ?? {};
     if (one.bridge.heard(said)) return;
@@ -163,6 +165,12 @@ async function workerOf(version, parts, pack) {
     } else if (said.type === 'error') m.failed(said.message);
   };
   return one;
+}
+
+/** The address the page draws has changed (ui/canvas.js): every part that declares `go` is handed it again. */
+export function addressMoved() {
+  const now = JSON.stringify(hooks.address?.() ?? null);
+  for (const one of versions.values()) for (const m of one.mounted.values()) if (m.part.go && m.address !== now) ((m.address = now), void m.refresh());
 }
 
 /** Take down every part whose place has left the page, and every worker none is drawn by. */
@@ -196,7 +204,7 @@ async function mount(node, part, parts, item, words, piece, openView) {
   const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }), thumb: (view) => hooks.viewThumb?.(view) ?? null });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await inputOf(part, item, given) });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
-  one.mounted.set(id, { part: { ...part, island: islandOf(item) }, node, render, failed, refresh });
+  one.mounted.set(id, { part: { ...part, island: islandOf(item) }, node, render, failed, refresh, address: JSON.stringify(hooks.address?.() ?? null) });
   one.bridge.send({ type: 'mount', id, part: part.id, input: await inputOf(part, item, given) });
 }
 

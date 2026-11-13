@@ -78,6 +78,7 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ slot: 'other.place' }), /fills "other.place", which is not open to it/);
   assert.throws(refused({ opens: ['piece.figure'] }), /opens "piece.figure", which the host draws: one name, one owner/);
   assert.throws(refused({ opens: ['other.end'] }), /a slot it opens is named "shelf.<name>"/);
+  assert.throws(refused({ go: 'yes' }), /go is true or false/);
   assert.throws(refused({ modules: { 'look.js': 'parts/row/look.js' } }), /needs its modules, entered at index.js/);
   assert.throws(refused({ modules: { 'index.js': 'parts/row/gone.js' } }), /the pack has no file of/);
   assert.throws(refused({ query: { find: 'island {here}' } }), /query is a filter's terms/);
@@ -94,6 +95,14 @@ test('a part loads when its shapes hold, and is refused with why when one does n
     assert.deepEqual(shelfs(partsFor(viewing))[0].views, [{ name: 'turns', params: { run: '{here}' } }], 'the page is sent what it reads');
   } finally {
     hostFor(viewing).stop();
+  }
+  // A part that moves the page says so, and the page is told.
+  const going = new Registry(folder(shelf({}, { go: true })));
+  try {
+    assert.equal(shelfs(partsFor(going))[0].go, true);
+    assert.equal(shelfs(partsFor(ok))[0].go, undefined, 'one that does not is sent no go');
+  } finally {
+    hostFor(going).stop();
   }
   // Asked for, another pack's type reads; a slot asked for fills.
   const asked = new Registry(folder(shelf({ requires: ['core', 'field:size@bin.box', 'slot:shelf.end'] }, { reads: { 'bin.box': ['size', 'title'] }, slot: 'shelf.end', opens: [] }), bin));

@@ -11,7 +11,8 @@ import { wiresOn } from './canvas-wires.js';
 import { catchUp } from './catch-up.js';
 import { canvasSwitch } from './canvases.js';
 import { numberOf } from './query-base.js';
-import { FOCUS, addressOf, flatView } from './query.js';
+import { addressMoved } from './part-host.js';
+import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
 
@@ -46,6 +47,7 @@ export function activate(c) {
 function barNow() {
   const c = current;
   if (c?.view) drawQuery(c.lens, c.view, c.pane.go, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
+  addressMoved();
 }
 /** The lens the canvas in focus draws now. */
 export const queryNow = () => current?.lens ?? null;
@@ -56,12 +58,48 @@ export const openHere = (href) => current?.pane.open(href);
 /** The style the canvas in focus was asked for (a shape, a style kept by id, the saved canvas up). */
 export const styleNow = () => current?.asked ?? {};
 /** Draw the lens up in a style, as the style switch does: a shape, a style kept by its id, or neither for the house's. */
-export const drawIn = (style) => {
+export const drawIn = (style, lens = queryNow()) => {
   const { shape: _s, style: _k, ...rest } = styleNow();
-  openHere(`#/v?${addressOf(queryNow() ?? home(), { ...rest, ...style })}`);
+  openHere(`#/v?${addressOf(lens ?? home(), { ...rest, ...style })}`);
 };
 /** Open an item's page over the canvas in focus, the lens as it is. */
 export const openOver = (id) => current?.pane.opened(id, queryNow() ?? home());
+/**
+ * The address a part that declares `go` is handed (packs/surface/page/part-host.js): the query the canvas in focus
+ * draws (null for Home), the layout it was asked for, the item whose page is open, and how much its answer drew.
+ */
+hooks.address = () => {
+  if (!current) return null;
+  const { shape, style, canvas } = styleNow();
+  const answer = current.view?.answer;
+  return {
+    query: current.home ? null : current.lens,
+    layout: { ...(shape && { shape }), ...(style && { style }), ...(canvas && { canvas }) },
+    ...(current.here && { item: current.here }),
+    drawn: { count: answer?.items?.length ?? 0, ...(answer?.cut && { cut: true }) },
+  };
+};
+/** A name a layout goes by in an address: a shape's or a kept style's. */
+const NAMED = /^[A-Za-z0-9_.-]{1,80}$/;
+/**
+ * Move the canvas in focus where a part says (its `go`, after a gesture): an item's page over it, or a query (null for
+ * Home) in the layout named, else the one up. The query is said as an address and read back, so only what an address
+ * can say is drawn.
+ */
+hooks.go = (address) => {
+  if (!current || !address || typeof address !== 'object') return;
+  if (typeof address.item === 'string' && /^e_[a-z0-9]{8}$/.test(address.item)) return void openOver(address.item);
+  let lens = null;
+  try {
+    if (address.query) lens = readAddress(addressOf(address.query)).lens;
+  } catch {
+    return;
+  }
+  if (!address.layout || typeof address.layout !== 'object') return void goQuery(lens);
+  const layout = Object.fromEntries(['shape', 'style'].map((k) => [k, address.layout[k]]).filter(([, v]) => typeof v === 'string' && NAMED.test(v)));
+  drawIn(layout, lens);
+};
+
 /** Whether the canvas in focus draws this item now. */
 export const canvasHas = (id) => Boolean(current?.has(id));
 /** Light this item in the canvas in focus (its page is open), or none. */
@@ -101,6 +139,10 @@ export function canvasIn(host, pane) {
     },
     get home() {
       return Boolean(at?.home);
+    },
+    /** The item lit in it, whose page is open. */
+    get here() {
+      return at?.here ?? null;
     },
     get view() {
       return at?.view ?? null;

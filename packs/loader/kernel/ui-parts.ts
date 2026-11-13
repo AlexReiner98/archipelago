@@ -34,6 +34,8 @@ export interface PartDef {
   sends?: string[];
   /** The slots it draws for other parts to fill, each named `<pack>.<name>`, or a piece or page the host no longer draws (piece.<name>, page.<name>). */
   opens?: string[];
+  /** Whether it may move the page: handed the address the page draws, it may name another after a gesture (`tools.go`). */
+  go?: boolean;
   /** Its modules by name, each a file in the pack's folder, entered at index.js. */
   modules: Record<string, string>;
 }
@@ -63,6 +65,7 @@ export interface Part {
   views?: PartView[];
   sends: string[];
   opens: string[];
+  go?: true;
   hash: string;
   /** Left out when the page says it has them (`have`). */
   modules?: Record<string, string>;
@@ -107,6 +110,7 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       if (opened.has(s)) problems.push(`${at} opens "${s}", which another of its pack's parts opens`);
       opened.add(s);
     }
+    if (part.go !== undefined && typeof part.go !== 'boolean') problems.push(`${at}: go is true or false`);
     if (part.opens !== undefined && !Array.isArray(part.opens)) problems.push(`${at}: opens is a list of slots`);
     if (part.reads !== undefined && (typeof part.reads !== 'object' || part.reads === null || Array.isArray(part.reads))) problems.push(`${at}: reads is the fields it reads, by type: { "<type>": ["<field>", ...] }`);
     else for (const [type, fields] of Object.entries(part.reads ?? {})) {
@@ -201,7 +205,7 @@ export function partsFor(packs: Packs, kept: Kept[] = [], have: string[] = []): 
     const mine = kept.find((v) => v.props.preset === d.id);
     if (mine && !mine.is_open) continue;
     const modules = modulesOf(packs, d, mine), hash = hashOf(modules);
-    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], opens: d.opens ?? [], hash, ...(!have.includes(hash) && { modules }) });
+    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], opens: d.opens ?? [], ...(d.go && { go: true as const }), hash, ...(!have.includes(hash) && { modules }) });
   }
   return out;
 }
