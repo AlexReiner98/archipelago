@@ -117,7 +117,6 @@ details.pm-menu details.pm-menu[open] > summary { color: var(--muted); backgroun
 .pm-button-tab[aria-selected="true"], .pm-box[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
 .pm-ring { animation: pm-ring 1.2s ease 2; }
 @keyframes pm-ring { 50% { background: var(--accent-soft); } }
-.pm-pane.pm-ring { animation: pm-ring-pane 1.2s ease; }
 @keyframes pm-ring-pane { from { box-shadow: inset 0 0 0 var(--border-2) var(--accent); } to { box-shadow: none; } }
 [data-drag] { touch-action: none; }
 body[data-dragging] { user-select: none; cursor: grabbing; }
@@ -129,15 +128,45 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 .pm-web-page { flex: 1 1 auto; width: 100%; min-height: var(--box-10); border: 0; background: var(--panel); }
 .pm-web-own { padding: var(--space-6); }
 .pm-web-out { position: absolute; top: var(--space-3); right: var(--space-3); color: var(--muted); text-decoration: none; padding: 0 var(--space-3); background: var(--panel); border-radius: var(--radius-2); }
-.pm-panes { position: relative; display: flex; min-width: 0; min-height: 0; flex: 1 1 auto; }
-.pm-dir-row { flex-direction: row; }
-.pm-dir-column { flex-direction: column; }
-.pm-pane { display: flex; flex-direction: column; flex: var(--pm-share, 1) 1 0; min-width: 0; min-height: 0; }
-.pm-pane + .pm-pane { border-left: var(--border-1) solid var(--line); }
-.pm-dir-column > .pm-pane + .pm-pane { border-left: 0; border-top: var(--border-1) solid var(--line); }
-.pm-pane-strip { display: flex; gap: var(--space-4); align-items: baseline; min-width: 0; overflow: hidden; padding: 0 var(--space-4); }
+.pm-panes { position: fixed; inset: 0; z-index: 1; display: flex; min-width: 0; min-height: 0; }
+.pm-panes:not([data-count="1"]) { top: var(--band, 0); }
+.pm-panes[data-dir="row"] { flex-direction: row; }
+.pm-panes[data-dir="column"] { flex-direction: column; }
+/* A frame slot holding panes fills its node, so nothing it holds collapses. */
+.part-body:has(> .pm-panes) { display: flex; flex: 1; min-height: 0; }
+.pm-pane { position: relative; display: flex; flex-direction: column; flex: var(--pm-grow, 1) 1 0; min-width: 0; min-height: 0; background: var(--ln-sea, var(--bg)); box-sizing: border-box; }
+.pm-pane.pm-ring { animation: pm-ring-pane 1.2s ease; }
+/* Each pane's strip, as the page's panes keep one: one height, in or out of focus, so nothing moves when focus does; the
+   pane in focus a line of the accent along its top and its name given to the bar over it; a pane alone has none. */
+.pm-pane-strip { flex: none; box-sizing: border-box; height: var(--strip); display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-5); min-width: 0; overflow: hidden; background: var(--panel); border-bottom: var(--border-1) solid var(--line); }
+.pm-pane-strip > .pm-text { flex: 1; min-width: 0; font-size: var(--text-3); font-weight: 600; }
+.pm-pane:not([aria-selected="true"]) > .pm-pane-strip > .pm-text { color: var(--muted); font-weight: 400; }
+.pm-pane[aria-selected="true"] > .pm-pane-strip { box-shadow: inset 0 var(--border-2) 0 var(--accent); }
+.pm-pane[aria-selected="true"] > .pm-pane-strip > .pm-text { visibility: hidden; }
+.pm-panes[data-count="1"] > .pm-pane > .pm-pane-strip { display: none; }
 .pm-pane[data-drag] > .pm-pane-strip { cursor: grab; }
-.pm-pane-body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; }
-.pm-sash { position: absolute; z-index: 4; }
+.pm-pane-body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; overflow: clip; }
+.pm-pane-body > * { flex: 1 1 auto; min-width: 0; min-height: 0; }
+/* The line between two panes: drawn by the sash itself, wider and in the accent while pointed at or dragged. */
+.pm-sash { position: absolute; z-index: 3; }
+.pm-sash::after { content: ''; position: absolute; background: var(--line); }
+.pm-sash-row::after { top: 0; bottom: 0; left: 50%; width: var(--border-1); transform: translateX(-50%); }
+.pm-sash-column::after { left: 0; right: 0; top: 50%; height: var(--border-1); transform: translateY(-50%); }
+.pm-sash:hover::after, body[data-dragging="sash"] .pm-sash::after { background: var(--accent); }
+.pm-sash-row:hover::after, body[data-dragging="sash"] .pm-sash-row::after { width: var(--border-3); }
+.pm-sash-column:hover::after, body[data-dragging="sash"] .pm-sash-column::after { height: var(--border-3); }
 .pm-sash-row { top: 0; bottom: 0; left: var(--pm-at); width: var(--space-4); margin-left: calc(var(--space-4) / -2); cursor: col-resize; }
 .pm-sash-column { left: 0; right: 0; top: var(--pm-at); height: var(--space-4); margin-top: calc(var(--space-4) / -2); cursor: row-resize; }
+
+/* A style preset's colours, painted by the host from the preset (packs/surface/page/swatch.js): Aa on its paper, its sea a line. */
+.pm-swatch { display: inline-flex; flex-direction: column; gap: var(--space-3); flex: none; min-width: 0; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
+.pm-swatch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2); color: var(--muted); }
+.pm-swatch-name:empty { display: none; }
+.pm-swatch:hover .pm-swatch-paint { border-color: var(--edge-strong); }
+.pm-swatch[data-on="kept"] .pm-swatch-paint { box-shadow: 0 0 0 var(--border-2) var(--accent); }
+.pm-swatch[data-on="trying"] .pm-swatch-paint { box-shadow: 0 0 0 var(--border-2) var(--accent-soft); border-style: dashed; }
+.pm-swatch-paint { position: relative; display: block; width: 100%; min-width: var(--box-9); height: var(--box-9); padding: var(--space-3) var(--space-4); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); background: var(--bg); color: var(--text); font-weight: 600; }
+.pm-swatch-sea { position: absolute; left: var(--space-4); right: var(--space-4); bottom: var(--space-4); height: var(--box-1); border-radius: var(--radius-1); background: var(--accent); }
+
+/* What a part says that is drawn nowhere itself: a trace (painted on its item's marks) and a replay (played on the canvas). */
+.pm-trace, .pm-replay { display: none; }

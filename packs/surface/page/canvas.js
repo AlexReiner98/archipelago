@@ -38,6 +38,8 @@ const canvasOf = (asked) => `${asked?.canvas ?? ''}@${asked?.shape && asked.shap
 /** Every canvas drawn now, and the one the bar and find act on: the pane in focus (decision e_h2pqjy2q). */
 const all = new Set();
 let current = null;
+/** The store of the canvas drawn round `node` (a part over it, a replay: ./replay.js), by name so nothing imports this file for it. */
+hooks.storeUnder = (node) => [...all].find((c) => c.host?.contains(node))?.view?.store ?? null;
 /** Make this canvas the one the bar acts on. */
 export function activate(c) {
   if (current && current !== c) hooks.partsAway?.();

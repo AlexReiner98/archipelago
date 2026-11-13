@@ -23,11 +23,17 @@
 //           a web page
 //   panes   panes side by side (dir row) or one over another (column), each given room by its share; the host draws
 //           the lines between them and tells the part when one is dragged
+//   swatch  a style preset's colours, painted by the host from the preset the part names: a part paints no colour
+//   replay  nothing where it stands: the canvas under it shows what the person missed, up to step `at` of its steps
+//   trace   nothing where it stands: its item's marks on the canvas painted with its line (`tip`), in a session's hue,
+//           until the person has seen them; then the part is told `seen`
 // Any mark may also carry `lights`: the items it stands for, lit on the canvas while the person points at it, the rest
 // faded. A box may be `fits`: it shows as many of its marks as fit on one line and says how many are left (`more`: the
 // key a press on the count goes back by). A box, a button or a pane may carry `drag`: the host follows it when it is
 // pressed and moved, shows where it would land, and tells the part `drop`; a box or a button may be `selected`, `ring`
-// once, take a session's `hue`, and (`aux`) go back as `close` when pressed with the middle button.
+// once, take a session's `hue`, and (`aux`) go back as `close` when pressed with the middle button. A button may carry
+// `copy` (its words go to the clipboard, said Copied) or `try` (a chosen style preset tried on this screen alone; null or
+// '' the workspace's own again).
 // Any mark on the page may carry a `tip`: what it says of itself, shown by the page's one tooltip, and a `view`: pressed,
 // the host opens that view (a kept view's id, a pack's view by its own, or home), as an `item` opens an item's page.
 // Every look is a name the style gives its value (packs/walls/page/part-marks.css): a tone, a gap or a size is a word or a step on
@@ -82,6 +88,20 @@ const address = (v, why) => (typeof v === 'string' && v.length <= 2000 && ADDRES
 const share = (v, why) => (typeof v === 'number' && v > 0 && v <= 1 ? v : why('not a share above 0 and at most 1'));
 /** What a box or a button may be when it stands for something the person moves or picks between (a tab). */
 const handled = { drag: key, selected: flag, ring: flag, hue: words(partLimits.key), aux: flag };
+/** A style preset tried on this screen alone, or null ('' too) for the workspace's own again. */
+const tryOn = (v, why) => (v === null || v === '' ? '' : key(v, why));
+/** An item's or a link's id, as a step of a replay names what it plays. */
+const ROW = /^[er]_[a-z0-9]{8}$/;
+/** The steps of a replay: each the position of an entry of the log and the ids whose facts it plays. */
+const replaySteps = (v, why) => {
+  if (!Array.isArray(v) || v.length > partLimits.marks) return why(`not a list of at most ${partLimits.marks} steps`);
+  let n = 0;
+  return v.map((s) => {
+    if (!plain(s) || !Number.isInteger(s.pos) || s.pos < 0 || !Array.isArray(s.ids)) return why('a step that is not { pos, ids }');
+    if ((n += s.ids.length) > partLimits.marks * 10) return why('more ids than a replay may play');
+    return { pos: s.pos, ids: s.ids.map((id) => (typeof id === 'string' && ROW.test(id) ? id : why("not an item's or a link's id"))) };
+  });
+};
 /** Where a dragged mark may be let go: a side of a pane or its middle, the strip of tabs, or out of the page. */
 export const DROP_ZONES = ['left', 'right', 'above', 'below', 'center', 'tabs', 'out'];
 
@@ -92,10 +112,10 @@ export const DROP_ZONES = ['left', 'right', 'above', 'below', 'center', 'tabs', 
  */
 export const MARKS = {
   box: { attrs: { ...anyMark, ...handled, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag, fits: flag, more: key, dock: flag }, holds: 'marks' },
-  text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end'), href }, holds: 'words' },
+  text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end'), href, hue: words(partLimits.key) }, holds: 'words' },
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
   input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag }, holds: 'nothing', keyed: true },
-  button: { attrs: { ...anyMark, ...handled, look: oneOf('main', 'quiet', 'tab'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(partLimits.words) }, holds: 'words', keyed: true },
+  button: { attrs: { ...anyMark, ...handled, look: oneOf('main', 'quiet', 'tab'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(2000), try: tryOn }, holds: 'words', keyed: true },
   paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag }, holds: 'drawn' },
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
   note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
@@ -103,8 +123,11 @@ export const MARKS = {
   thumb: { attrs: { key, view, tip: anyMark.tip }, holds: 'nothing', needs: ['view'] },
   picture: { attrs: anyMark, holds: 'nothing', needs: ['item'] },
   web: { attrs: { key, tip: anyMark.tip, url: href, reload: words(partLimits.key) }, holds: 'nothing', needs: ['url'] },
-  pane: { attrs: { key, tip: anyMark.tip, at: address, share, ring: flag, drag: key }, holds: 'marks', keyed: true, needs: ['at'] },
+  pane: { attrs: { key, tip: anyMark.tip, at: address, share, ring: flag, drag: key, selected: flag }, holds: 'marks', keyed: true, needs: ['at'] },
   panes: { attrs: { key, dir: oneOf('row', 'column') }, holds: 'marks', only: ['pane'], keyed: true },
+  replay: { attrs: { key, at: step(0, 1000000), steps: replaySteps }, holds: 'nothing', needs: ['at', 'steps'] },
+  trace: { attrs: { key, item, tip: words(500), hue: words(partLimits.key) }, holds: 'nothing', needs: ['item'] },
+  swatch: { attrs: { key, tip: anyMark.tip, preset: key, label: words(partLimits.label), on: oneOf('kept', 'trying') }, holds: 'nothing', needs: ['preset'] },
 };
 
 /** The nodes this module made: the renderer draws nothing else. */
@@ -154,6 +177,7 @@ function node(mark, seen, where, onPlane) {
   if (onPlane && at.tip !== undefined) why(`a tip on ${a(kind)} on a paint surface: what lies there keeps none`);
   if (kind === 'note' && at.tick && at.key === undefined) why('a note that ticks with no key: a tick goes back by its key');
   if (kind === 'text' && onPlane && at.href !== undefined) why('an href on text on a paint surface');
+  if (kind === 'text' && onPlane && at.hue !== undefined) why('a hue on text on a paint surface');
   if (kind === 'input' && (at.kind === 'pick') !== (at.values !== undefined)) why(at.values === undefined ? 'a pick with no values' : 'values on an input that is not a pick');
   if (kind === 'input' && at.names !== undefined && at.names.length !== (at.values ?? []).length) why('names that are not one for each value');
   if (kind === 'input' && at.kind !== 'item' && (at.types !== undefined || at.link !== undefined)) why('types or link on an input that finds no item');
