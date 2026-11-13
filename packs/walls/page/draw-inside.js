@@ -177,12 +177,13 @@ function inside(home, given) {
  * The parts of one pack version, in a worker of the frame's. The frame hands it each part's modules and one end of a
  * channel whose other end it gives the page (packs/walls/page/draw-marks.js): from then on the page and the parts talk on it alone.
  *
- * The page says: mount { id, part, input }, update { id, input }, event { id, event }, unmount { id }, and
- * acted { asked, ... } (what came of an action). The parts say: marks { id, marks }, act { id, asked, action, params },
- * keep { id, name, value } (unsaved words for the page to keep)
+ * The page says: mount { id, part, input }, update { id, input }, event { id, event }, decide { id, asked, input }
+ * (on a slot that asks a decision), unmount { id }, and acted { asked, ... } (what came of an action). The parts say:
+ * marks { id, marks }, decided { id, asked, value }, act { id, asked, action, params }, keep { id, name, value } (unsaved words for the page to keep)
  * and error { id?, message }. A part (`<pack>.<name>`, as its manifest declares it, with its modules entered at
  * index.js, packs/loader/kernel/ui-parts.ts) exports by default a function (input, tools), answering
- * { marks, update?(input), on?(event), end?() }, where update and on may answer new marks. The page checks every word.
+ * { marks, update?(input), on?(event), decide?(input), end?() }, where update and on may answer new marks and decide a
+ * value. The page checks every word.
  */
 function partInside() {
   const text = (err) => String(err?.message ?? err).slice(0, 300);
@@ -249,6 +250,8 @@ function partInside() {
           marks(id, made?.marks);
         } else if (said.type === 'update' && mounted.get(id)?.update) marks(id, await mounted.get(id).update(said.input));
         else if (said.type === 'event' && mounted.get(id)?.on) marks(id, await mounted.get(id).on(said.event));
+        // A slot that asks a decision (tabs.land, tabs.life): the part answers a value, the root that asked applies it.
+        else if (said.type === 'decide') send({ type: 'decided', id, asked: said.asked, value: mounted.get(id)?.decide ? ((await mounted.get(id).decide(said.input)) ?? null) : null });
         else if (said.type === 'unmount') (mounted.get(id)?.end?.(), mounted.delete(id));
       } catch (err) {
         send({ type: 'error', id, message: text(err) });

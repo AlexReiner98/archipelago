@@ -45,6 +45,8 @@ export { h };
  */
 export const drawSlot = (node, asked) => import('./part-host.js').then((m) => m.drawPart(node, asked));
 export const drawSlots = (node, asked) => import('./part-host.js').then((m) => m.drawParts(node, asked));
+/** Ask the part that fills a decision slot (`tabs.land`, `tabs.life`) to decide on `input`: its value, or undefined when none does. */
+export const askSlot = (slot, input) => import('./part-host.js').then((m) => m.askSlot(slot, input));
 
 /**
  * Look mode (`?look`): on the first word of a drawing, from the canvas or from a page that draws one, mount the part
