@@ -12,6 +12,7 @@ import type { ActionDef } from './declared.ts';
 import { islandRegistry } from './island-pin.ts';
 import type { Registry } from './packs.ts';
 import { partsFor } from './ui-parts.ts';
+import { viewCall } from './view-calls.ts';
 import type { Actor, Archipelago, PartRef } from '../../write/kernel/pelago.ts';
 
 const HASH = /^[0-9a-f]{64}$/;
@@ -33,6 +34,8 @@ async function versionsOf(l: Archipelago, reg: Registry, id: string) {
  */
 export async function partCall(l: Archipelago, actor: Actor, action: string, island: unknown, given: unknown): Promise<PartRef> {
   if (actor.kind !== 'human') throw no("a part's action is sent by the page, as the person looking at it.");
+  // A view's drawing names its view, not a part (packs/loader/kernel/view-calls.ts).
+  if (typeof (given as { view?: unknown } | undefined)?.view === 'string') return viewCall(l, actor, await islandRegistry(l, island), action, given as { view: string });
   const ref = (given ?? {}) as Partial<PartRef>;
   if (typeof ref.id !== 'string' || typeof ref.hash !== 'string' || !HASH.test(ref.hash)) throw no('part is { id, hash }: the part and the hash of its code.');
   const reg = await islandRegistry(l, island);

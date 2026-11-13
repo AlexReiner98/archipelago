@@ -6,6 +6,12 @@ The canvas pack (`packs/canvas`, moved out of core with its ids on 11 Nov 2026, 
 
 **Rails** (`core.rails`, shape `rails`; decision e_btxq2nzq) is the shipped map with a walk through it: its picture is core.map's, mark for mark (`layouts/rails/index.js` runs `layouts/flow/index.js` as `map.js`), so a page baked from a view looks as the product does. Every item drawn is a stop, read in the view's order (`walk.js`: an `order` field first, then what an item depends on before it, then the answer's order), and each item's mark says its `item`. Beside the marks its scene carries `stops` (each item's id, title, first paragraph, and the camera on it: `x`, `y`, the `span` of picture it frames, `zoom` against the whole, read off where the map put it, `places`) and `whole`. A page baked from it is walked by scrolling with `packs/reader/public/rails.js` and `rails.css` (the markup they read is in rails.js's head): wide, the map fills a screen held still and scroll only moves its camera: the stop at rest is lit, the rest dimmed, and its words stand in one callout beside its box, a dot row at the foot the walk (question e_m7tssx3y); at `rails_narrow_at` or less, a column of cards with a wire between; asked for less motion, or with no script, a plain page of titles and notes. The camera's lengths are `rails_stop_span` and `rails_stop_room`; the page's the other `rails_*` sizes.
 
+**Time** (`core.time`, shape `time`, back from the archive on 13 Nov 2026 for the time pack's week and day: task e_7tgvuyrs) draws what a view places on its time axis: a calendar (`calendar.js`: a column per day, hours running down, a lane per person and per session, each block in the colour of what it counts toward, today marked, each day's hours in its head) or bars (`bars.js`, style `layout: "bars"`). The days drawn are the reader's to choose over the picture (`range.js`, the style's `ranges`), within the view's window; a span of `time_week_from` days or more starts on a Monday and steps a week. A view a pack ships may say what its drawing sends (below): with `add`, each hour of the first person's lane is a mark that adds a block there; with `aside`, the bands the pack answers for the days in sight are drawn beside the calendar (`aside.js`), each row's acts pressed as the person.
+
+### What a view's drawing sends
+
+A view a pack ships names, in its style, what its drawing may ask that pack to do (`sends`: by gesture, each an action or view of the same pack; decision e_k9qu6s4g, the owner, 13 Nov 2026). The drawing calls one with `act(name, params, { asks })`; the page (`drawingActs` in `packs/walls/page/layout-asks.js`) asks the person what `asks` names, in its own dialogs, one at a time, then calls the action as them with `part: { view, hash }`, the view's id and the hash of the drawing's code. The server (`packs/loader/kernel/view-calls.ts`, beside a part's `part-calls.ts`) lets it through only from a person, for a drawing this map draws at that hash, from a view a pack ships (or one kept on the map whose preset it is) whose shipped style names the action, and never for one a person calls alone; the change names the view and the hash. What a view sends is read from the pack as it ships it, so no change on the map widens it.
+
 ## Retired layouts
 
 On 9 Nov 2026 the owner kept Map alone, to bring the others back one by one as they are refined (a single list first). Each is whole at git tag `archive/layouts-2026-11-09`, with its tests, its scripts and its sizes on the house style:
@@ -18,7 +24,6 @@ On 9 Nov 2026 the owner kept Map alone, to bring the others back one by one as t
 | Rows | `rows` | `packs/canvas/layouts/rows/` |
 | Cola | `cola` | `packs/canvas/layouts/cola/` |
 | Grid | `grid` | `packs/canvas/layouts/grid/` |
-| Time | `time` | `packs/canvas/layouts/time/` |
 | Architecture | `architecture` | `packs/canvas/layouts/architecture/` (Map keeps its `marks.js`, `play.js`, `story-look.js`) |
 | Pages | `pages` | `packs/canvas/layouts/pages/`: a document written beside its live draft went with it (`test/docs-beside.test.ts`) |
 

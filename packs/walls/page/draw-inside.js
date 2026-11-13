@@ -70,8 +70,12 @@ function inside(home, given) {
     const asked = new Map();
     let asks = 0;
     const change = (ops, reason) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'change', asked: asks, ops, reason: String(reason ?? '') })));
+    // An action or view its view sends (`sends` on the view a pack ships), called by the page as the person: its answer, or why not.
+    // What the person must say first is asked by the page (`asks`, packs/walls/page/layout-asks.js drawingActs).
+    const act = (name, params, said = {}) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'act', asked: asks, name: String(name), params: params ?? {}, asks: said.asks ?? [] })));
     const tools = {
       change,
+      act,
       gestures: (spec) => gesturesOf(may)(spec),
       measure,
       patch: (list) => send({ type: 'patch', list }),
