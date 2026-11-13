@@ -2,12 +2,19 @@
 // alike. A mark says the item it stands for (packs/walls/page/marks.js); what a term found is in the lens's answer (each item's
 // `terms`, and the step of the walk that reached it). What is not lit fades by the style's `dim`. The rule is one
 // stylesheet, so a mark drawn while the pointer is there (what comes into sight) fades with the rest.
+//
+// A part's mark that carries `lights` is lit here too (the host calls hooks.lights, packs/surface/page/part-host.js), on
+// the view the bar is over: the renderer of a mark the contract names, to go to the runtime with the canvas's view.
 
-import { api, state } from './base.js';
+import { api, hooks, state } from './base.js';
 import { numberOf } from './query-base.js';
 import { litBy } from './lit-by.js';
+import { viewUp } from './query-bar.js';
 
 let sheet = null;
+
+/** Light what a part's mark names on the canvas the bar is over, or, with none, take the lighting off. */
+hooks.lights = (ids) => lightItems(viewUp(), ids?.length ? ids : null);
 
 /** Keep these items lit in the view and fade the rest; with none, take the lighting off. */
 export function lightItems(view, ids) {
@@ -21,6 +28,7 @@ export function lightItems(view, ids) {
     view?.lightSurface?.(null);
     return;
   }
+  if (!view?.dataset) return;
   view.dataset.lighting = '';
   const kept = [...ids].map((id) => `[data-item="${id}"]`).join(',');
   sheet.replaceSync(`[data-lighting] [data-item]${kept ? `:not(${kept})` : ''} { opacity: ${numberOf(state.style, 'dim')}; }`);

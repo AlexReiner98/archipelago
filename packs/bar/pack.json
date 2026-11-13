@@ -14,7 +14,8 @@
         "text",
         "list",
         "input",
-        "button"
+        "button",
+        "menu"
       ],
       "modules": {
         "index.js": "parts/query/index.js",

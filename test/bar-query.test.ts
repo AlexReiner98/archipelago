@@ -8,7 +8,7 @@ import { test } from 'node:test';
 // @ts-ignore: a module of the page, plain JavaScript
 import { checkMarks } from '../packs/walls/page/part-check.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
-import query, { heard } from '../packs/bar/parts/query/index.js';
+import query, { heard, stepsOf } from '../packs/bar/parts/query/index.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import { added, filterSaid, namer, without } from '../packs/bar/parts/query/terms.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
@@ -56,7 +56,7 @@ test('pressed, the line opens a row for each part, every term with its ×', () =
   const open = part.on({ key: 'line', name: 'press' });
   check(open);
   const said = text(open);
-  for (const w of ['"Find"', '"Only"', '"Not"', '"Walk"', '"Limit"', '"x:find:0"', '"x:only:0"', '"way:0"', '"wx:0"', '"add:find"']) assert.ok(said.includes(w), w);
+  for (const w of ['"Find"', '"Only"', '"Not"', '"Walk"', '"Limit"', '"x:find:0"', '"x:only:0"', '"way:0"', '"wx:0"', '"add:find"', '"fits":true']) assert.ok(said.includes(w), w);
 });
 
 test('a term’s × names the lens without it', () => {
@@ -68,25 +68,25 @@ test('a term’s × names the lens without it', () => {
 
 test('adding is a kind, then the thing of that kind: never words taken for a term', () => {
   const { part, went } = mount();
-  part.on({ key: 'line', name: 'press' });
-  const kindsShown = part.on({ key: 'add:find', name: 'press' });
+  const kindsShown = part.on({ key: 'line', name: 'press' });
   check(kindsShown);
   assert.match(text(kindsShown), /"Find…","Words","Type","Link"/);
-  const typesShown = part.on({ key: 'pick:1', name: 'pick', value: 'type' });
+  // A kind is a pick, so the menu stays open and its things are drawn under it, each a button that adds its term.
+  const typesShown = part.on({ key: 'kind:find:0', name: 'pick', value: 'type' });
   check(typesShown);
-  assert.match(text(typesShown), /"Task"/);
+  assert.match(text(typesShown), /\["button",\{"key":"choice:find:0","look":"quiet","tip":"Task"\},"Task"\]/);
   assert.doesNotMatch(text(typesShown), /"Run"/, 'the system’s types are not offered');
-  part.on({ key: 'pick:2', name: 'pick', value: 'decision' });
+  part.on({ key: 'choice:find:1', name: 'press' });
   assert.deepEqual((went[0] as { query: { filter: { find: string[] } } }).query.filter.find, ['type task', 'part_of e_abcdefgh', 'type decision']);
 });
 
 test('an item picked by name is added by its id and named by its title from then on', () => {
   const { part, went, kept } = mount();
   part.on({ key: 'line', name: 'press' });
-  part.on({ key: 'add:find', name: 'press' });
-  part.on({ key: 'pick:1', name: 'pick', value: 'link' });
-  part.on({ key: 'pick:2', name: 'pick', value: 'part_of' });
-  const drawn = part.on({ key: 'search:3', name: 'pick', value: { id: 'e_zzzzzzzz', title: 'Server', type: 'task' } });
+  part.on({ key: 'kind:find:0', name: 'pick', value: 'link' });
+  const ends = part.on({ key: 'kind:find:1', name: 'pick', value: 'part_of' });
+  assert.match(text(ends), /"key":"item:find"/);
+  const drawn = part.on({ key: 'item:find', name: 'pick', value: { id: 'e_zzzzzzzz', title: 'Server', type: 'task' } });
   assert.deepEqual((went[0] as { query: { filter: { find: string[] } } }).query.filter.find.at(-1), 'part_of e_zzzzzzzz');
   assert.deepEqual(kept, [['names', { e_zzzzzzzz: 'Server' }]]);
   const after = part.update(input({ ...lens, filter: { find: ['part_of e_zzzzzzzz'] } }));
@@ -97,22 +97,21 @@ test('an item picked by name is added by its id and named by its title from then
 test('what is written is taken only where the kind takes writing, and refused when it is not', () => {
   const { part, went } = mount();
   part.on({ key: 'line', name: 'press' });
-  part.on({ key: 'add:only', name: 'press' });
-  part.on({ key: 'pick:1', name: 'pick', value: 'changed-since' });
-  const wrong = part.on({ key: 'typed:2', name: 'submit', value: 'last week' });
+  part.on({ key: 'kind:only:0', name: 'pick', value: 'changed-since' });
+  const wrong = part.on({ key: 'typed:only', name: 'submit', value: 'last week' });
   assert.match(text(wrong), /Not what this takes/);
   assert.equal(went.length, 0);
-  part.on({ key: 'typed:2', name: 'submit', value: '2026-10-01' });
+  part.on({ key: 'typed:only', name: 'submit', value: '2026-10-01' });
   assert.deepEqual((went[0] as { query: { filter: { only: string[] } } }).query.filter.only, ['blocked', 'changed since 2026-10-01']);
 });
 
 test('Only offers its plain words, those already there left out, and the statuses of the types Find names', () => {
   const s = { input: input(), open: true, adding: null, wrong: false, names: new Map() };
-  const next = heard(s, { key: 'add:only', name: 'press' });
-  const ids = next.adding.steps[0].choices.map((c: { id: string }) => c.id);
+  const ids = stepsOf(s, 'only')[0].choices.map((c: { id: string }) => c.id);
   assert.ok(ids.includes('w:done') && !ids.includes('w:blocked'));
-  const statuses = heard(next, { key: 'pick:1', name: 'pick', value: 'status' });
-  assert.deepEqual(statuses.adding.steps[1].choices.map((c: { id: string }) => c.id), ['todo', 'doing', 'done']);
+  const statuses = heard(s, { key: 'kind:only:0', name: 'pick', value: 'status' });
+  assert.deepEqual(stepsOf(statuses, 'only')[1].choices.map((c: { id: string }) => c.id), ['todo', 'doing', 'done']);
+  assert.equal(heard(statuses, { key: 'choice:only:0', name: 'press' }).go.filter.only.at(-1), 'status todo');
 });
 
 test('the walk: an arrow turns a link’s way, steps go up and down, × takes a link out', () => {
@@ -121,9 +120,8 @@ test('the walk: an arrow turns a link’s way, steps go up and down, × takes a 
   assert.deepEqual(heard(s, { key: 'steps:more', name: 'press' }).go.walk, { over: ['depends_on>'], steps: 3 });
   assert.deepEqual(heard(s, { key: 'steps:less', name: 'press' }).go.walk, { over: ['depends_on>'], steps: 1 });
   assert.deepEqual(heard(s, { key: 'wx:0', name: 'press' }).go.walk, { over: [], steps: 0 });
-  const adding = heard(s, { key: 'add:walk', name: 'press' });
-  assert.deepEqual(adding.adding.steps[0].choices.map((c: { id: string }) => c.id), ['all', 'part_of']);
-  assert.deepEqual(heard(adding, { key: 'pick:1', name: 'pick', value: 'all' }).go.walk, { over: 'all', steps: 2 });
+  assert.deepEqual(stepsOf(s, 'walk')[0].choices.map((c: { id: string }) => c.id), ['all', 'part_of']);
+  assert.deepEqual(heard(s, { key: 'choice:walk:0', name: 'press' }).go.walk, { over: 'all', steps: 2 });
   assert.equal(heard(s, { key: 'limit', name: 'submit', value: '20' }).go.limit, 20);
   assert.equal(heard(s, { key: 'limit', name: 'submit', value: '0' }), s, 'a limit under one is no lens');
 });
@@ -131,10 +129,12 @@ test('the walk: an arrow turns a link’s way, steps go up and down, × takes a 
 test('with the answer handed, what is used here is offered first, and a term says what it brought', () => {
   const answer = { items: [{ id: 'e_00000001', type: 'decision', terms: ['type task'] }, { id: 'e_00000002', type: 'decision', step: 1 }], links: [{ id: 'l1', type: 'depends_on', from: 'e_00000002', to: 'e_00000001' }] };
   const s = { input: input(lens, { answer }), open: true, adding: null, wrong: false, names: new Map() };
-  const types = heard(heard(s, { key: 'add:find', name: 'press' }), { key: 'pick:1', name: 'pick', value: 'type' });
-  assert.equal(types.adding.steps[1].choices[0].id, 'decision');
+  const types = heard(s, { key: 'kind:find:0', name: 'pick', value: 'type' });
+  assert.equal(stepsOf(types, 'find')[1].choices[0].id, 'decision');
   const { part } = mount(input(lens, { answer }));
-  assert.match(text(part.on({ key: 'line', name: 'press' })), /Items of this type: 2 drawn/);
+  const open = part.on({ key: 'line', name: 'press' });
+  check(open);
+  assert.match(text(open), /"tip":"Items of this type: 2 drawn","lights":\["e_00000001","e_00000002"\]/);
 });
 
 test('the lens algebra and its words, as the bar kept them', () => {

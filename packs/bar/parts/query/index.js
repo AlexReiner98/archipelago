@@ -7,7 +7,8 @@
 // as its address (`go`), which the canvas checks and draws. No term or part is a box inside a box (rule e_vgs9vt5j).
 //
 // It is handed the page's address (the lens, how many it drew), the schema's words and the style's numbers; where the
-// host hands the answer too (`answer`: items and links), it ranks by what is used here and says what a term brought.
+// host hands the answer too (`answer`: items and links), it ranks by what is used here, and a term of Find lights what
+// it brought (`lights`). A row's terms are as many as fit (`fits`): the host measures and counts the rest.
 
 import { ranked, uses } from './rank.js';
 import { litBy } from './lit-by.js';
@@ -19,6 +20,9 @@ const BLANK = { filter: {}, walk: { over: [], steps: 0 } };
 const CHOICES = 199;
 /** How many names of items the part keeps between pages. */
 const NAMES = 200;
+/** How many items a term lights: the host takes 200. */
+const LIT = 200;
+const ITEM = /^e_[a-z0-9]{8}$/;
 const cut = (s, n = 200) => String(s ?? '').slice(0, n);
 const PARTS = { find: 'Find', only: 'Only', not: 'Not' };
 const WAY_TIP = { either: 'Either way along this link', out: 'Out along this link, from what it starts at', in: 'In along this link, to what it starts at' };
@@ -86,39 +90,64 @@ function lineMarks(s, said) {
 /** A term: its words, toned by its sort, and an × to take it away. */
 function termMark(s, said, part, t, i) {
   const { answer } = read(s.input);
-  const brought = part === 'find' && answer?.items ? litBy(answer, t).size : null;
-  const tip = `${MEANT[sortOf(t)] ?? ''}${brought === null ? '' : `: ${brought} drawn`}`;
+  const lit = part === 'find' && answer?.items ? [...litBy(answer, t)].filter((id) => ITEM.test(id)) : null;
+  const tip = `${MEANT[sortOf(t)] ?? ''}${lit === null ? '' : `: ${lit.length} drawn`}`;
   const sort = sortOf(t);
   const tone = part === 'not' ? 'muted' : part === 'only' ? 'warn' : TONE[sort];
-  return ['box', { flow: 'row', gap: 1, tip: cut(tip) },
+  // Pointing at a term of Find lights what it brought on the canvas (was ui/query-light.js): the host does it.
+  return ['box', { flow: 'row', gap: 1, tip: cut(tip), ...(lit?.length && { lights: lit.slice(0, LIT) }) },
     ['text', { ...(tone && { tone }) }, cut(said.termSaid(t))],
     ['button', { key: `x:${part}:${i}`, look: 'quiet', tip: 'Take it out' }, '×']];
 }
 
-/** What is being added to a row, drawn in it after its +: the step's choices, what may be written, an item found by name. */
-function addingMarks(s) {
-  const steps = s.adding.steps;
-  const step = steps.at(-1);
-  const depth = steps.length;
-  const choices = step.choices.slice(0, CHOICES);
-  return [
-    ...(depth > 1 ? [['button', { key: 'back', look: 'quiet', tip: 'Back' }, `‹ ${cut(step.label, 60)}`]] : []),
-    ...(choices.length ? [['input', { key: `pick:${depth}`, kind: 'pick', label: cut(step.label), tip: cut(step.label), values: ['', ...choices.map((c) => cut(c.id))], names: [`${cut(step.label, 60)}…`, ...choices.map((c) => cut(c.label))], focus: true }]] : []),
-    ...(step.typed ? [['input', { key: `typed:${depth}`, kind: 'text', label: cut(step.label), hint: cut(step.typed.hint), tip: cut(step.typed.tip), focus: !choices.length }]] : []),
-    ...(step.search ? [['input', { key: `search:${depth}`, kind: 'item', label: cut(step.label), hint: cut(step.search.hint), ...(step.search.types && { types: step.search.types }), focus: !choices.length && !step.typed }]] : []),
-    ...(s.wrong ? [['text', { tone: 'bad', size: 2 }, 'Not what this takes']] : []),
-    ['button', { key: 'cancel', look: 'quiet', tip: 'Leave it' }, '×'],
+/** What a row's + offers, as far as the person has gone: one step for each kind picked, then the last step's own. */
+export function stepsOf(s, part) {
+  const path = s.adding?.part === part ? s.adding.path : [];
+  const steps = [part === 'walk' ? walkKinds(s) : kindsFor(part, s)];
+  for (const id of path) {
+    const next = steps.at(-1).choices.find((c) => c.id === id)?.next;
+    if (!next) break;
+    steps.push(next());
+  }
+  return steps;
+}
+
+/** How many choices the menu lists before it offers a field to narrow them. */
+const NARROW_FROM = 8;
+
+/**
+ * A row's +: a menu (decision e_45sgrfqd; was ui/term-pick.js). Each step that leads on is a pick, so choosing a kind
+ * keeps the menu open and draws its things under it; the last step's things are buttons, each adding its term (and
+ * shutting the menu), narrowed by a field when there are many, or what may be written, or an item found by name.
+ */
+function plusMenu(s, part, word) {
+  const adding = s.adding?.part === part ? s.adding : { path: [], q: '' };
+  const steps = stepsOf(s, part);
+  const last = steps.at(-1);
+  const q = adding.q.toLowerCase();
+  const finals = last.choices.map((c, i) => [c, i]).filter(([c]) => !c.next && (!q || c.label.toLowerCase().includes(q)));
+  const many = last.choices.filter((c) => !c.next).length > NARROW_FROM;
+  const picks = steps.map((step, d) => {
+    const on = step.choices.filter((c) => c.next).slice(0, CHOICES);
+    return on.length ? [['input', { key: `kind:${part}:${d}`, kind: 'pick', label: cut(step.label), tip: cut(step.label), values: ['', ...on.map((c) => cut(c.id))], names: [`${cut(step.label, 60)}…`, ...on.map((c) => cut(c.label))], value: cut(adding.path[d] ?? '') }]] : [];
+  }).flat();
+  return ['menu', { key: `add:${part}`, label: '+', look: 'quiet', tip: cut(`${word}: add a term`) },
+    ['text', { look: 'muted', bold: true }, cut(last.label, 60)],
+    ...picks,
+    ...(last.typed ? [['input', { key: `typed:${part}`, kind: 'text', label: cut(last.label), hint: cut(last.typed.hint), tip: cut(last.typed.tip), focus: true }]] : []),
+    ...(last.search ? [['input', { key: `item:${part}`, kind: 'item', label: cut(last.label), hint: cut(last.search.hint), ...(last.search.types && { types: last.search.types }), focus: true }]] : []),
+    ...(!last.typed && !last.search && many ? [['input', { key: `narrow:${part}`, kind: 'search', label: 'Find a choice', hint: 'Find a choice', value: cut(adding.q), focus: true }]] : []),
+    ...(s.wrong && s.adding?.part === part ? [['text', { tone: 'bad', size: 2 }, 'Not what this takes']] : []),
+    ['list', { look: 'rows' }, ...finals.slice(0, CHOICES).map(([c, i]) => ['button', { key: `choice:${part}:${i}`, look: 'quiet', tip: cut(c.tip ?? c.label) }, cut(c.label)])],
   ];
 }
 
-/** A row of the editor: its word, its terms, its own + and, while something is added to it, that. */
+/** A row of the editor: its word, its terms as many as fit (the host counts the rest), and its own +. */
 function row(s, key, word, tip, terms, extra = []) {
   return ['box', { flow: 'row', gap: 3, tip: cut(tip) },
     ['text', { look: 'muted', bold: true, tip: cut(tip) }, word],
-    ['box', { flow: 'row', gap: 2, wrap: true, grow: true },
-      ...terms,
-      ['button', { key: `add:${key}`, look: 'quiet', tip: cut(`${word}: add a term`) }, '+'],
-      ...(s.adding?.part === key ? addingMarks(s) : [])],
+    ['box', { flow: 'row', gap: 2, fits: true, grow: true }, ...terms],
+    plusMenu(s, key, word),
     ...extra];
 }
 
@@ -180,9 +209,6 @@ export function heard(s, event) {
   const walked = over === 'all' ? [] : over;
   const walk = (change) => done({ ...l, walk: { over, steps, ...change } });
   if (head === 'line' && name === 'press') return { ...s, open: !s.open, adding: null, wrong: false };
-  if (head === 'add' && name === 'press') return s.adding?.part === a ? { ...s, adding: null } : { ...s, wrong: false, adding: { part: a, steps: [a === 'walk' ? walkKinds(s) : kindsFor(a, s)] } };
-  if (head === 'cancel' || (head === 'search' && name === 'leave')) return { ...s, adding: null, wrong: false };
-  if (head === 'back' && s.adding) return { ...s, wrong: false, adding: { ...s.adding, steps: s.adding.steps.slice(0, -1) } };
   if (head === 'x' && name === 'press') {
     const list = inOrder(a === 'not' ? notOf(f) : (f[a] ?? []));
     return list[Number(b)] === undefined ? s : done(without(l, a, list[Number(b)]));
@@ -203,24 +229,29 @@ export function heard(s, event) {
     const n = Number(event.value);
     return n >= 1 ? done({ ...l, limit: Math.round(n) }) : s;
   }
-  if (!s.adding) return s;
-  const step = s.adding.steps.at(-1);
-  const part = s.adding.part;
-  const add = (term) => done(added(l, { [part]: term }));
-  if (head === 'pick' && name === 'pick') {
-    const choice = step.choices.find((c) => c.id === event.value);
-    if (!choice) return s;
-    if (choice.next) return { ...s, wrong: false, adding: { ...s.adding, steps: [...s.adding.steps, choice.next()] } };
-    if (choice.walk) return walk(choice.walk);
-    return add(choice.term);
+  // What a row's + does: `a` is the row's part, `b` the step a pick is at.
+  if (!['find', 'only', 'not', 'walk'].includes(a)) return s;
+  const mine = s.adding?.part === a ? s.adding : { part: a, path: [], q: '' };
+  if (head === 'kind' && name === 'pick') {
+    const at = Number(b);
+    const path = [...mine.path.slice(0, at), ...(event.value ? [String(event.value)] : [])];
+    return { ...s, wrong: false, adding: { part: a, path, q: '' } };
   }
-  if (head === 'typed' && name === 'submit' && step.typed) {
-    const term = step.typed.term(String(event.value ?? '').trim());
-    return term ? add(term) : { ...s, wrong: true };
+  if (head === 'narrow' && name === 'edit') return { ...s, adding: { ...mine, q: cut(event.value, 80) } };
+  const last = stepsOf(s, a).at(-1);
+  const add = (term) => done(added(l, { [a]: term }));
+  if (head === 'choice' && name === 'press') {
+    const choice = last.choices[Number(b)];
+    if (!choice || choice.next) return s;
+    return choice.walk ? walk(choice.walk) : add(choice.term);
   }
-  if (head === 'search' && name === 'pick' && step.search && typeof event.value?.id === 'string') {
+  if (head === 'typed' && name === 'submit' && last.typed) {
+    const term = last.typed.term(String(event.value ?? '').trim());
+    return term ? add(term) : { ...s, wrong: true, adding: mine };
+  }
+  if (head === 'item' && name === 'pick' && last.search && typeof event.value?.id === 'string') {
     const names = new Map(s.names).set(event.value.id, cut(event.value.title, 120));
-    return { ...add(step.search.term(event.value.id)), names, keepNames: true };
+    return { ...add(last.search.term(event.value.id)), names, keepNames: true };
   }
   return s;
 }

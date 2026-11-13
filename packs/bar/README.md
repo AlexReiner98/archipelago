@@ -22,17 +22,20 @@ change is a new lens the part names as the page's address (`go`).
 
 It is handed the page's address (the lens, how many were drawn), the
 schema's words and the style's numbers. Where the host also hands the
-answer (`answer`: items and links) it ranks by what is used here and says
-what each term brought; where it hands `names` (titles of the ids the lens
-names) it names those items.
+answer (`answer`: items and links) it ranks by what is used here and a term
+of Find lights what it brought (`lights`); where it hands `names` (titles
+of the ids the lens names) it names those items. A row's terms are as many
+as fit (`fits`). A row's + is a menu: each step that leads on is a pick, so
+the menu stays open, and the last step's choices are buttons.
 
 ## Waiting on the runtime
 
-The old modules stay in `ui/` until the runtime carries what they did that a
-part cannot: the lens algebra other modules import (`added`, `filterSaid`),
-the slot drawn in place of `drawQuery`, the answer handed to `bar.find`,
-lighting what a term brought on the canvas, a row that fits, and a stepped
-picker. Until then the picker is drawn inline in its row.
+The old modules stay in `ui/` until the runtime takes the lens algebra
+other modules import (`added`, `filterSaid`, task e_926g89jb), splits the
+band from `drawQuery` and fills `bar.find` with this part, hands the
+answer, the names and the rows' slot (e_gaa2ubge), and takes the lighting
+`lights` asks for (`hooks.lights`, set in `ui/query-light.js` for now) with
+the canvas's view.
 
 Find's choices are the find pack's, and the layout a view is drawn in is the
 slot `bar.layouts`. What each slot hands a part is in `docs/packs.md`.
