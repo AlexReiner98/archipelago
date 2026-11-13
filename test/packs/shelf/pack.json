@@ -1,0 +1,9 @@
+{
+  "id": "shelf",
+  "version": "1.0.0",
+  "title": "Shelf",
+  "description": "A map pack with one part, for the tests of a part's version tried on one island (test/part-trial.test.ts, test/approvals.ts).",
+  "requires": ["core"],
+  "actions": [{ "id": "shelf.put", "title": "Put", "description": "Put it.", "verb": "capture", "input": { "type": "object", "properties": {}, "additionalProperties": false } }],
+  "parts": [{ "id": "shelf.row", "title": "Row", "slot": "sheet", "reads": { "task": ["title"] }, "sends": ["shelf.put"], "modules": { "index.js": "parts/row/index.js", "look.js": "parts/row/look.js" } }]
+}

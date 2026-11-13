@@ -892,6 +892,19 @@
       "say": "Code a version of a pack runs on its island is code that runs on the server: the owner allows it."
     },
     {
+      "id": "part_trial",
+      "when": { "actor": "agent", "op": ["create", "update"], "type": "pack", "part_trial": true },
+      "then": "spare",
+      "spares": ["pack_code", "code_runs", "agent_packs"],
+      "say": "A version whose code is its parts' modules alone, pinned on one island at most, is tried there before review: walled in the browser, the way back one press away (the owner, 12 Nov 2026, e_6f2kje39)."
+    },
+    {
+      "id": "version_spread",
+      "when": { "actor": "agent", "op": ["create", "update"], "type": "island", "spreads": true },
+      "then": "hold",
+      "say": "\"{title}\" would run a version's code another island already tries: spreading it is the owner's to allow."
+    },
+    {
       "id": "code_runs",
       "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code", "modules", "page_css", "writes"] },
       "then": "hold",

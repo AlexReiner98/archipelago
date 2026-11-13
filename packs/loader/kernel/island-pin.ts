@@ -42,7 +42,7 @@ export function versionRegistry(reg: Registry, item: string): Registry | Error |
 }
 
 /** Whether a pack here is a map pack: it owns no type that lives on an island, so a version of it may be tried on any island. */
-function mapPack(reg: Registry, id: string): boolean {
+export function mapPack(reg: Registry, id: string): boolean {
   const m = reg.found.find((p) => p.id === id);
   if (!m) return false;
   const kernel = sharedOf(reg.found.filter((p) => KERNEL_PACKS.includes(p.id)));
