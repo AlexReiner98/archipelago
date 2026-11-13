@@ -178,7 +178,8 @@ function inside(home, given) {
  * channel whose other end it gives the page (packs/walls/page/draw-marks.js): from then on the page and the parts talk on it alone.
  *
  * The page says: mount { id, part, input }, update { id, input }, event { id, event }, unmount { id }, and
- * acted { asked, ... } (what came of an action). The parts say: marks { id, marks }, act { id, asked, action, params }
+ * acted { asked, ... } (what came of an action). The parts say: marks { id, marks }, act { id, asked, action, params },
+ * keep { id, name, value } (unsaved words for the page to keep)
  * and error { id?, message }. A part (`<pack>.<name>`, as its manifest declares it, with its modules entered at
  * index.js, packs/loader/kernel/ui-parts.ts) exports by default a function (input, tools), answering
  * { marks, update?(input), on?(event), end?() }, where update and on may answer new marks. The page checks every word.
@@ -221,6 +222,9 @@ function partInside() {
     marks: (said) => marks(id, said),
     // One of its pack's declared actions; the page checks it is, shows it as it goes out and answers what came of it.
     act: (action, params) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'act', id, asked: asks, action: String(action), params: params ?? {} }))),
+    // Words the person has not saved yet, kept by the page in its browser for this part on this item (and `name`), and
+    // handed back as `kept` when it is mounted again; nothing (null) lets them go.
+    keep: (value, name = '') => send({ type: 'keep', id, name: String(name), value: value ?? null }),
   });
 
   // One part's words at a time, in the order they came: a part is never told of an event before it is mounted.

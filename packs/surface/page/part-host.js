@@ -18,6 +18,8 @@ import { pageType } from './page-schema.js';
 import { endPart, partPort } from './layout.js';
 import { checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
+import { pickOnCanvas } from './canvas-pick.js';
+import { itemOf, waysBetween } from './layout-asks.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -109,10 +111,66 @@ async function viewsOf(part, item, piece) {
   return Object.fromEntries(part.views.map((v, i) => [v.name, asked[i] ?? null]));
 }
 
+/**
+ * Words a part has not saved yet, kept in this browser by part, item and name until it lets them go (tools.keep): a
+ * walled worker has no storage of its own. Storage may be blocked or full: then nothing is kept, and the words last as
+ * long as the page.
+ */
+const keptMost = 100000;
+const keptKey = (part, item, name = '') => `pelago-part:${part.id}:${item?.id ?? '-'}:${name}`;
+function keepFor(part, item, name, value) {
+  try {
+    const said = value === null || value === undefined ? null : JSON.stringify(value);
+    if (said === null || said.length > keptMost) localStorage.removeItem(keptKey(part, item, name));
+    else localStorage.setItem(keptKey(part, item, name), said);
+  } catch {
+    // Not kept: the words are still on the page.
+  }
+}
+function keptFor(part, item) {
+  const out = {};
+  try {
+    const prefix = keptKey(part, item);
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith(prefix)) out[k.slice(prefix.length)] = JSON.parse(localStorage.getItem(k));
+    }
+  } catch {
+    // Nothing could be kept, so nothing is handed back.
+  }
+  return out;
+}
+
+/** An item as a part is told of it when the person picks it, with the ways it may be linked to `from` when asked. */
+const pickedItem = (from, x, link) => {
+  const said = { id: x.id, title: x.title, type: x.type };
+  if (!link || !from) return said;
+  return { ...said, ways: waysBetween(from, x).map((w) => ({ type: w.type, from: w.from, to: w.to, verb: w.verb })) };
+};
+
+/** The items an item input offers as the person types: found as they may see them, of the types it names, and, for a link, only those it may be linked to. */
+async function findFor(from, q, types, link) {
+  const hits = (await Promise.all((types?.length ? types : [undefined]).map((type) => api('search', { q, ...(type && { type }), limit: 8 }).catch(() => [])))).flat();
+  return hits
+    .filter((x) => x.id !== from?.id && !String(x.type).startsWith('sys.'))
+    .map((x) => pickedItem(from, x, link))
+    .filter((x) => !link || x.ways.length)
+    .slice(0, 8);
+}
+
+/** The item clicked on the canvas for a pick button, as the person may read it; null when let go or unread. */
+async function pickFor(from, kind) {
+  const id = await pickOnCanvas(from?.id);
+  const other = id && (await itemOf(id));
+  return other ? pickedItem(from, other, kind === 'link') : null;
+}
+
 /** What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read them, and its piece's settings. */
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
+  const kept = keptFor(part, item);
+  if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
   const fill = (terms) => terms?.map((t) => t.replaceAll('{here}', item?.id ?? ''));
   const filter = { find: fill(part.query.find), ...(part.query.only && { only: fill(part.query.only) }), ...(part.query.not && { not: fill(part.query.not) }) };
@@ -157,7 +215,8 @@ async function workerOf(version, parts, pack) {
       } catch (err) {
         m.failed(err.message);
       }
-    } else if (said.type === 'error') m.failed(said.message);
+    } else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
+    else if (said.type === 'error') m.failed(said.message);
   };
   return one;
 }
@@ -183,10 +242,10 @@ async function mount(node, part, parts, item, words, piece) {
   // What every part is handed beside its items: the island's words, the style's values (none of its looks), and what
   // its piece says of it on its screen (a title, a limit).
   const given = { words, style: styleValues(style), piece: settingsOf(piece) };
-  const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }) });
+  const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }), find: (q, types, link) => findFor(item, q, types, link), pick: (kind) => pickFor(item, kind) });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await inputOf(part, item, given) });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
-  one.mounted.set(id, { part: { ...part, island: islandOf(item) }, node, render, failed, refresh });
+  one.mounted.set(id, { part: { ...part, island: islandOf(item) }, item, node, render, failed, refresh });
   one.bridge.send({ type: 'mount', id, part: part.id, input: await inputOf(part, item, given) });
 }
 

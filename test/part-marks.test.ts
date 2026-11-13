@@ -125,3 +125,29 @@ test('every look a mark may name has its rule in the stylesheet, reading the sty
     for (const w of words.filter((w) => !['plain', 'body', 'line'].includes(w))) assert.match(css, new RegExp(`\\.pm-${kind}-${w}\\b`), `${kind} ${w}`);
   }
 });
+
+test('an input may be a pick, a day, a time, yes or no, a title; text may open an address on the web', () => {
+  const pick = checkMarks(['input', { key: 'status', kind: 'pick', values: ['todo', 'done'], names: ['To do', 'Done'], value: 'todo' }]);
+  assert.deepEqual(pick.at.values, ['todo', 'done']);
+  assert.equal(checkMarks(['input', { key: 'd', kind: 'date', value: '2026-11-13' }]).at.kind, 'date');
+  assert.equal(checkMarks(['input', { key: 't', look: 'title', focus: true, value: 'A name' }]).at.look, 'title');
+  assert.equal(checkMarks(['input', { key: 'n', lines: 4, fits: true }]).at.fits, true);
+  assert.equal(checkMarks(['text', { href: 'https://example.test/a' }, 'there']).at.href, 'https://example.test/a');
+  refused(['input', { key: 's', kind: 'pick' }], /a pick with no values/);
+  refused(['input', { key: 's', values: ['a'] }], /values on an input that is not a pick/);
+  refused(['input', { key: 's', kind: 'pick', values: ['a', 'b'], names: ['A'] }], /names that are not one for each value/);
+  refused(['input', { key: 's', kind: 'check', lines: 3 }], /lines on a check/);
+  refused(['input', { key: 's', kind: 'colour' }], /kind: "colour", not one of/);
+  refused(['text', { href: 'javascript:alert(1)' }, 'x'], /not an address on the web/);
+  refused(['text', { href: 'https://x.test/"onmouseover' }, 'x'], /not an address on the web/);
+  refused(['paint', { width: 9, height: 9 }, ['text', { x: 1, y: 1, href: 'https://x.test' }, 'x']], /an href on text on a paint surface/);
+});
+
+test('an item is found by name or picked on the canvas, the host doing the finding', () => {
+  assert.deepEqual(checkMarks(['input', { key: 'owner', kind: 'item', types: ['person'], hint: 'Find a person' }]).at.types, ['person']);
+  assert.equal(checkMarks(['input', { key: 'to', kind: 'item', link: true }]).at.link, true);
+  assert.equal(checkMarks(['button', { key: 'link', pick: 'link' }, 'Link']).at.pick, 'link');
+  refused(['input', { key: 'x', types: ['task'] }], /types or link on an input that finds no item/);
+  refused(['input', { key: 'x', kind: 'item', lines: 2 }], /lines on an item/);
+  refused(['button', { key: 'x', pick: 'anything' }, 'Go'], /pick: "anything", not one of item, link/);
+});

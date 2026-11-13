@@ -5,10 +5,11 @@
 // A mark is [kind, attributes, ...what is in it], as a drawing's is (packs/walls/page/marks.js); the attributes may be left out
 // (['text', 'Hello']). Nine kinds, nothing richer:
 //   box     a group of marks, in a row or a column
-//   text    words
+//   text    words; with an href, an address on the web the host opens apart
 //   list    marks one under another, a row each
-//   input   a field the person types in; its edits go back to the part
-//   button  words the person presses; the press goes back to the part
+//   input   a field the person types in or picks from (its kind: words, a number, an address, a day, a time, yes or
+//           no, one of its values); its edits and picks go back to the part
+//   button  words the person presses; the press goes back to the part, or (pick) the item then clicked on the canvas
 //   paint   a surface in its own units that pans and zooms in the host, holding paths and placed text
 //   path    a line or a shape on a paint surface
 //   note    words in the map's note dialect, drawn as the item page draws a note (packs/walls/page/body.js)
@@ -34,7 +35,20 @@ const side = (v, why) => (typeof v === 'number' && Number.isFinite(v) && v > 0 &
 const point = (v, why) => (Array.isArray(v) && v.length === 2 ? v.map((n) => number(n, why)) : why('not [x, y]'));
 const key = (v, why) => (typeof v === 'string' && v.length <= partLimits.key && KEY.test(v) ? v : why('a key of letters, digits and _ : . - only'));
 const item = (v, why) => (typeof v === 'string' && ITEM.test(v) ? v : why("not an item's id"));
+/** An address on the web a text opens apart: http or https, nothing that could run. */
+const WEB = /^https?:\/\/[^\s"'<>\\]+$/i;
+const href = (v, why) => (typeof v === 'string' && v.length <= 2000 && WEB.test(v) ? v : why('not an address on the web (http or https)'));
+/** A list of words, each a value a pick offers or the name it is shown by. */
+const wordList = (v, why) => (Array.isArray(v) && v.length <= 200 ? v.map((w) => words(partLimits.label)(w, why)) : why('not a list of at most 200 words'));
 const path = (v, why) => (typeof v !== 'string' ? why('not a path') : v.length > partLimits.path ? why(`a path over ${partLimits.path} characters`) : PATH.test(v) ? v : why('a path with what is not a path command or a number'));
+
+/**
+ * What an input may be: words typed (text, number, url, search), a pick sent at once (date, time, check, pick), or an
+ * item found by name (item): the host finds as the person types and tells the part only the one picked.
+ */
+export const INPUT_KINDS = ['text', 'number', 'url', 'search', 'date', 'time', 'check', 'pick', 'item'];
+/** The kinds of input whose change is a pick, sent as one gesture, not words being typed. */
+export const PICKS = ['date', 'time', 'check', 'pick'];
 
 /** The tones a mark may take: each a colour the style names. */
 export const TONES = ['accent', 'muted', 'ok', 'warn', 'bad', 'closed'];
@@ -49,10 +63,10 @@ const anyMark = { key, item, tip: words(partLimits.label) };
  */
 export const MARKS = {
   box: { attrs: { ...anyMark, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag }, holds: 'marks' },
-  text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end') }, holds: 'words' },
+  text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end'), href }, holds: 'words' },
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
-  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag }, holds: 'nothing', keyed: true },
-  button: { attrs: { ...anyMark, look: oneOf('main', 'quiet'), tone, label: words(partLimits.label) }, holds: 'words', keyed: true },
+  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag }, holds: 'nothing', keyed: true },
+  button: { attrs: { ...anyMark, look: oneOf('main', 'quiet'), tone, label: words(partLimits.label), pick: oneOf('item', 'link') }, holds: 'words', keyed: true },
   paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag }, holds: 'drawn' },
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
   note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
@@ -103,6 +117,11 @@ function node(mark, seen, where, onPlane) {
   if (kind === 'text' && onPlane && (at.x === undefined || at.y === undefined)) why('text on a paint surface with no x and y');
   if (onPlane && at.tip !== undefined) why(`a tip on ${a(kind)} on a paint surface: what lies there keeps none`);
   if (kind === 'note' && at.tick && at.key === undefined) why('a note that ticks with no key: a tick goes back by its key');
+  if (kind === 'text' && onPlane && at.href !== undefined) why('an href on text on a paint surface');
+  if (kind === 'input' && (at.kind === 'pick') !== (at.values !== undefined)) why(at.values === undefined ? 'a pick with no values' : 'values on an input that is not a pick');
+  if (kind === 'input' && at.names !== undefined && at.names.length !== (at.values ?? []).length) why('names that are not one for each value');
+  if (kind === 'input' && at.kind !== 'item' && (at.types !== undefined || at.link !== undefined)) why('types or link on an input that finds no item');
+  if (kind === 'input' && (PICKS.includes(at.kind) || at.kind === 'item') && (at.lines ?? 1) > 1) why(`lines on ${a(at.kind)}`);
   if (kind === 'text' && !onPlane && placed) why('x, y or anchor on text off a paint surface');
   for (const name of shape.needs ?? []) if (at[name] === undefined) why(`${a(kind)} with no ${name}`);
   if (kind === 'paint' && (at.width === undefined || at.height === undefined)) why('a paint surface with no width and height');
