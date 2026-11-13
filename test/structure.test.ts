@@ -266,7 +266,7 @@ const KERNEL_SHAPES: Record<string, number> = {};
 const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 
 test('the kernel draws no shape of its own: each is a drawing a pack ships', () => {
-  const counted = Object.fromEntries(['packs/surface/page/query.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
+  const counted = Object.fromEntries(['packs/surface/page/query.js', 'packs/surface/page/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
   assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/canvas/layouts/architecture is.");
 });
 

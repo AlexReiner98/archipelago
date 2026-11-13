@@ -217,7 +217,7 @@ function draw(d) {
   onSite = Boolean(d.site?.host);
   // The section the style names for a page's picture (page.share) is shown where its address is posted, not on the page.
   const sections = d.parts.filter((p) => p.section && p.section.id !== d.share);
-  // A page is one column (ui/doc-lens.css). Only a front page whose first section is a figure leaves it: that figure runs from edge to edge, with no title over it (its title is its words).
+  // A page is one column (packs/surface/page/doc-lens.css). Only a front page whose first section is a figure leaves it: that figure runs from edge to edge, with no title over it (its title is its words).
   const hero = d.parts.find((p) => p.section)?.section;
   const lead = d.path === FRONT && hero?.picture && !d.lenses?.[hero.id] ? hero.id : null;
   // A page that is one item alone (a view or an item given as a link) has its title once, over the page.

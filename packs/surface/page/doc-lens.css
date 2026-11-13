@@ -1,4 +1,4 @@
-/* A picture in a published document (ui/doc-lens.js): the lens's colours read from the page's, as in the app
+/* A picture in a published document (packs/surface/page/doc-lens.js): the lens's colours read from the page's, as in the app
    (ui/style.css, .lens-view), and the few controls its shapes put over it. Every value is the style's. */
 .doc-lens .lens-view {
   --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
