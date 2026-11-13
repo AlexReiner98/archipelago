@@ -1,4 +1,4 @@
-// Tabs at the top of the owner's page (packs/panes/page/tab-bar.js, packs/panes/page/tab-life.js; decisions e_mzer5m4t, e_q3amet26, e_ezb7s3a7,
+// Tabs at the top of the owner's page (the panes part, packs/panes/parts/index.js and life.js; decisions e_mzer5m4t, e_q3amet26, e_ezb7s3a7,
 // e_xjrpyysn, and the tab lifecycle e_p6fr4uye): in a real browser (skipped where there is no Chrome), every chat that
 // has shown something has a tab named by its title, kept live as it is renamed and closed as it ends; its shows land there in the background
 // and marked, a press brings a tab into sight, and a tab pops out into a window of its own and docks back whole. A show
@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
-import { agent, heard, press, ready, wait } from './tab-page.ts';
+import { TAB, agent, heard, menuOf, press, ready, wait } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -24,14 +24,16 @@ test('in a browser, every chat that shows something has a tab named by its title
   for (const n of [0, 1, 2]) sessions.push((await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: `tabs-${n}`, title: `Chat ${n}`, surface: 'codex' } })).result);
   const page = await open(`${base}/`);
   /** The strip as the reader sees it: each tab's name, whether it is in sight, marked, or out in a window. */
-  const strip = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('#tabs .tab')].map((t) => [t.querySelector('.tab-name').textContent, t.getAttribute('aria-selected') === 'true', Boolean(t.dataset.unseen), t.classList.contains('tab-out')]))`).then(JSON.parse) as Promise<[string, boolean, boolean, boolean][]>;
+  const strip = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('${TAB}')].map((t) => [t.querySelector('[data-key^="front:"]').textContent, t.getAttribute('aria-selected') === 'true', t.classList.contains('pm-ring'), !t.querySelector('details.pm-menu')]))`).then(JSON.parse) as Promise<[string, boolean, boolean, boolean][]>;
   const names = async () => (await strip()).map((t) => t[0]);
   const until = async (what: string, ok: () => Promise<boolean>) => {
     if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${JSON.stringify(await strip())} ${page.logs().join('\n')}`);
   };
   const show = (n: number, item: string) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[item], run: sessions[n].run, focus: false } });
-  /** The tab named `name`, as a selector. */
-  const tabNamed = async (name: string) => `#tabs .tab:nth-child(${(await names()).indexOf(name) + 1})`;
+  /** The tab named `name`, as an expression of the page. */
+  const tabNamed = (name: string) => `[...document.querySelectorAll('${TAB}')].find((t) => t.querySelector('[data-key^="front:"]').textContent === ${JSON.stringify(name)})`;
+  /** Its name, as a selector to press. */
+  const nameOf = async (name: string) => `[data-key="front:${(await page.evaluate<string>(`${tabNamed(name)}.dataset.key`)).slice(4)}"]`;
   try {
     // The page follows steps from its first look at the map on. A chat open that has shown nothing has no tab.
     await ready(page);
@@ -50,7 +52,7 @@ test('in a browser, every chat that shows something has a tab named by its title
     assert.equal((await strip()).length, 4);
     assert.equal(await page.evaluate(`location.hash`), reader);
     // A press brings it into sight, where its chat last showed.
-    await press(page, `${await tabNamed('Chat 1')} .tab-name`);
+    await press(page, await nameOf('Chat 1'));
     await until('the chat’s tab is in sight', async () => (await page.evaluate<string>(`location.hash`)).startsWith(`#/e/${made.i1}`));
     // A rename reaches the tab at once.
     await call('/agent/report', undefined, { actor: agent, action: 'session_update', params: { run: sessions[2].run, title: 'Chat two, renamed' } });
@@ -60,9 +62,8 @@ test('in a browser, every chat that shows something has a tab named by its title
     await until('its tab is gone', async () => !(await names()).includes('Chat 0'));
     // The tab in sight pops out into a window of its own, and docks back whole.
     await page.send('Target.setDiscoverTargets', { discover: true });
-    await press(page, `${await tabNamed('Chat 1')} [aria-label="This tab: whom it follows, pop it out"]`);
-    assert.ok(await page.until(`[...document.querySelectorAll('.tab-menu [role="menuitem"]')].some((b) => b.textContent === 'Pop out')`), 'the menu offers Pop out');
-    await page.evaluate(`[...document.querySelectorAll('.tab-menu [role="menuitem"]')].find((b) => b.textContent === 'Pop out').click()`);
+    assert.ok(await page.until(`${menuOf(tabNamed('Chat 1'))}.some((b) => b.textContent === 'Pop out')`), 'the menu offers Pop out');
+    await page.evaluate(`${menuOf(tabNamed('Chat 1'))}.find((b) => b.textContent === 'Pop out').click()`);
     await until('the tab is out', async () => (await strip()).some((t) => t[3]));
     const targets = (await page.send('Target.getTargets')).result.targetInfos as { targetId: string; type: string; url: string }[];
     const popped = targets.find((t) => t.type === 'page' && t.url.includes(`/e/${made.i1}`));

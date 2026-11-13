@@ -24,7 +24,8 @@
         "front",
         "lands_in",
         "front_chat",
-        "front_follows"
+        "front_follows",
+        "pane_at"
       ],
       "modules": {
         "index.js": "parts/index.js",

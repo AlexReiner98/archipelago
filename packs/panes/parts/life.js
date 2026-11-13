@@ -204,6 +204,8 @@ export function mirror(m, newId, open) {
     for (const g of t.groups) for (const run of [t.panes[g]?.by, t.panes[g]?.held]) if (isRun(run)) kept.add(run);
   }
   for (const run of kept) if (!live.has(run)) ended(m, newId, run, true);
+  // A session no longer open has ended, tab or none: no tab offers to follow it.
+  for (const [run, s] of Object.entries(m.heard)) if (isRun(run) && !live.has(run)) s.ended = true;
   for (const s of open) {
     const was = m.heard[s.id];
     m.heard[s.id] = { name: s.name ?? was?.name ?? s.title, called: s.title ?? was?.called, at: Date.parse(s.last_seen) || was?.at || 0, run: s.id, ended: false };

@@ -1,4 +1,4 @@
-// More than one canvas at once (packs/panes/page/panes.js), every pane alike: an agent's show can name a pane of the owner's page, the
+// More than one canvas at once (the panes part, packs/panes/parts/index.js; each canvas packs/panes/page/panes.js), every pane alike: an agent's show can name a pane of the owner's page, the
 // step carrying it; in a real browser (skipped where there is no Chrome) a session's show opens a tab of its own, apart from
 // the reader's, a change reaches every pane, the bar, find, back and the address follow the pane last touched, a reload
 // draws every pane again, a click in any pane opens the item's page over it, and a pane's name dragged docks it.
@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import { ready } from './tab-page.ts';
+import { PANE, TAB, paneMark, paneName, ready, tabAt } from './tab-page.ts';
 import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
 
@@ -37,10 +37,10 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
   /** The panes as the reader sees them, in order: each one's name, its left edge, whose it is, and whether it is in focus. */
   const panes = () =>
     page
-      .evaluate<string>(`JSON.stringify([...document.querySelectorAll('#canvas > .pane')].map((p) => [p.querySelector('.pane-name').textContent, Math.round(p.getBoundingClientRect().left), p.querySelector('.pane-follows').textContent, p.classList.contains('pane-active')]))`)
+      .evaluate<string>(`JSON.stringify([...document.querySelectorAll('${PANE}')].map((p) => [${paneName('p')}.textContent, Math.round(p.getBoundingClientRect().left), ${paneMark('p')}?.textContent ?? '', p.getAttribute('aria-selected') === 'true']))`)
       .then(JSON.parse) as Promise<[string, number, string, boolean][]>;
   /** Pane `n`'s element, in order. */
-  const nth = (n: number) => `[...document.querySelectorAll('#canvas > .pane')][${n}]`;
+  const nth = (n: number) => `[...document.querySelectorAll('${PANE}')][${n}]`;
   const draws = (n: number, words: string) => page.evaluate<boolean>(`${nth(n)}?.querySelector('svg')?.textContent.includes(${JSON.stringify(words)}) ?? false`);
   const press = async (n: number) => {
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(n)}.querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
@@ -51,11 +51,11 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await ready(page);
     // A session's show opens a tab of its own, out of sight: the reader's pane, the bar and the address stay theirs.
     await show({ entity: views.f });
-    await until('a tab of its own', () => page.evaluate<boolean>(`document.querySelectorAll('#tabs .tab').length === 2`));
+    await until('a tab of its own', () => page.evaluate<boolean>(`document.querySelectorAll('${TAB}').length === 2`));
     assert.deepEqual((await panes()).map((p) => [p[0], p[3]]), [['Home', true]], 'the reader keeps their pane and the bar');
     assert.ok(['', '#/'].includes(await page.evaluate<string>('location.hash')), 'the address stays the reader’s');
     // Brought into sight, its tab draws what it showed.
-    await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2)').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))`);
+    await page.evaluate(`${tabAt(2)}.querySelector('[data-key^="front:"]').click()`);
     await until('its tab draws the first', async () => (await panes()).length === 1 && (await draws(0, 'First step')));
     // A pane by a name of the session's own, beside it.
     await show({ entity: views.g, pane: 'second' });
@@ -111,20 +111,20 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     // Shut, and slid away: until then it covers the second pane's strip.
     await until('the sheet shut', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && getComputedStyle(document.getElementById('sheet')).visibility === 'hidden'`));
 
-    // A pane's name dragged to the left of the other docks it there, and × closes it; the strip has only ⠿ and ×.
-    const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(1)}.querySelector('.pane-name').getBoundingClientRect(); return [r.left + 10, r.top + r.height / 2]; })())`));
+    // A pane's name dragged to the left of the other docks it there, and × closes it; the strip has only ⧉ and ×.
+    const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${paneName(nth(1))}.getBoundingClientRect(); return [r.left + 10, r.top + r.height / 2]; })())`));
     const mouse = (type: string, at: number[]) => page.send('Input.dispatchMouseEvent', { type, x: at[0], y: at[1], button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
     await mouse('mousePressed', [x, y]);
     for (let n = 1; n <= 8; n++) await mouse('mouseMoved', [x + ((30 - x) * n) / 8, y + ((450 - y) * n) / 8]);
     await mouse('mouseReleased', [30, 450]);
     await until('the second docked on the left', async () => (await draws(0, 'Second step, renamed')) && (await panes())[0][1] === 0 && (await panes())[1][1] > 500);
-    await page.evaluate(`${nth(0)}.querySelector('[aria-label="Close this pane"]').click()`);
+    await page.evaluate(`${nth(0)}.querySelector('[title="Close this pane"]').click()`);
     await until('closed by hand', async () => (await panes()).length === 1 && (await draws(0, 'First step, renamed')));
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
     await until('a pane once more', async () => (await panes()).length === 2);
-    assert.deepEqual(await page.evaluate(`[...${nth(1)}.querySelectorAll('.pane-bar [aria-label]')].map((b) => b.getAttribute('aria-label'))`), ['Move this pane', 'Move this pane to a new tab', 'Close this pane'], 'every pane has the same controls');
+    assert.deepEqual(await page.evaluate(`[...${nth(1)}.querySelectorAll('.pm-pane-strip button')].map((b) => b.title)`), ['Move this pane to a new tab', 'Close this pane'], 'every pane has the same controls');
     // A pane of the reader's own splits too: Split opens a second of it, not the pane it finds drawing the same.
-    await page.evaluate(`${nth(0)}.querySelector('[aria-label="Close this pane"]').click()`);
+    await page.evaluate(`${nth(0)}.querySelector('[title="Close this pane"]').click()`);
     await until('the reader’s pane alone', async () => (await panes()).length === 1);
     await press(0);
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);

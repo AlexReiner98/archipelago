@@ -45,8 +45,7 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/surface/page/live.js': 6,
   'packs/surface/page/query.js': 2,
   'packs/panes/page/panes.js': 2,
-  'packs/panes/page/tab-bar.js': 3,
-  'packs/panes/page/tabs.js': 1,
+  'packs/panes/page/tab-bar.js': 2,
   // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
   // type's views (canvases), a document's menus (item-doc) and find's terms (query-bar), screens.js for a diagram and
   // the start page, each going as that module becomes a part.

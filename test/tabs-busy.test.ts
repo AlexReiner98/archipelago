@@ -1,4 +1,4 @@
-// A show while the reader is at work in its chat's tab waits for them (packs/panes/page/pane-busy.js, packs/panes/page/pane-route.js), and lands
+// A show while the reader is at work in its chat's tab waits for them (packs/panes/page/pane-busy.js tells the panes part, packs/panes/parts/route.js), and lands
 // once they are quiet: a chat has one tab. Beside test/tabs.test.ts, in a file of its own as it waits out the while a
 // press counts as work.
 
@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
-import { agent, heard, press, ready, wait } from './tab-page.ts';
+import { TAB, agent, heard, press, ready, tabName, wait } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -18,7 +18,7 @@ test('in a browser, a chat’s show waits while the reader is at work in its tab
   })).result.created as Record<string, string>;
   const { run } = (await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: 'tabs-busy', title: 'Chat 1', surface: 'codex' } })).result;
   const page = await open(`${base}/`);
-  const tabs = () => page.evaluate<number>(`document.querySelectorAll('#tabs .tab').length`);
+  const tabs = () => page.evaluate<number>(`document.querySelectorAll('${TAB}').length`);
   const hash = () => page.evaluate<string>(`location.hash`);
   const show = (item: string) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[item], run } });
   try {
@@ -27,7 +27,7 @@ test('in a browser, a chat’s show waits while the reader is at work in its tab
     for (let n = 0; n < 60 && (await tabs()) < 2; n++) await wait(250);
     assert.equal(await tabs(), 2, 'its tab');
     // A press brings it into sight, where its chat last showed.
-    await press(page, '#tabs .tab:nth-child(2) .tab-name');
+    await press(page, await tabName(page, 2));
     for (let n = 0; n < 60 && !(await hash()).startsWith(`#/e/${made.i1}`); n++) await wait(250);
     assert.ok((await hash()).startsWith(`#/e/${made.i1}`), `the chat’s tab is in sight: ${await hash()} ${page.logs().join('\n')}`);
     // While the reader is at work in it, its chat's next show waits: a chat has one tab.

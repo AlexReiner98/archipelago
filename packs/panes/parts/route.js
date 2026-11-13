@@ -1,6 +1,10 @@
 // Where an agent's show lands among the tabs and their panes, worked out with no page (the panes pack's part, task
-// e_d5ewsvgf): the same rule packs/panes/page/pane-route.js keeps for the host, copied here because a part shares no code
-// with the page. Kept alike by test/panes-route-part.test.ts.
+// e_d5ewsvgf): the rule the page's own tabs kept until the part drew them (tested by test/pane-route.test.ts).
+// - Only a show lands. A change or a beat of a session's story moves nothing (the owner, 29 Oct 2026, e_e7yfp2yg).
+// - A session working inside what a tab watches goes to the one pane beside it the plan's sessions share (`shown`).
+// - A show goes to a tab that follows its session, else to a tab holding a pane of its own, else to a tab of its own,
+//   opened out of sight and marked. No tab is brought into sight but by a show with `focus` (e_uh7qu8ts).
+// - A pane the reader is busy in is never taken.
 
 /** Whom a tab follows when it watches what it draws (a plan the owner approved): every session working inside it. */
 export const WATCH = 'watch';

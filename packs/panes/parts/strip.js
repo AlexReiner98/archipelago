@@ -40,6 +40,7 @@ export function tabMenu(m, t, sessions = {}) {
     pick('watch', 'Sessions in what it draws', 'Every session working on what this tab draws'),
     ...Object.entries(sessions).filter(([, s]) => !s.ended).map(([run, s]) => pick(run, s.name ?? run, run)),
     ...(t.chat ? [['button', { key: `keep:${t.id}`, tip: 'Make this tab yours: it stays when its chat ends' }, 'Keep']] : []),
+    ...(m.list.length > 1 ? [['button', { key: `pop:${t.id}`, tip: 'Into a window of its own' }, 'Pop out']] : []),
     ...m.list.filter((o) => o !== t).map((o) => ['button', { key: `merge:${t.id}:${o.id}`, tip: 'Put this tab’s panes beside those of another' }, cut(`Merge into ${nameOfTab(o, sessions).name}`, 80)]),
   ];
 }
