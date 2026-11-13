@@ -48,8 +48,11 @@ function paneAt(href) {
  */
 export function drawPane(at, el, said) {
   let live = true;
-  // Laid out as a pane's canvas (ui/shell.css: #canvas .pane-canvas); a view a drawing names finds its pane by it (packs/walls/page/view-frame.js).
-  el.classList.add('pane-canvas');
+  // A canvas of its own in a node of its own, laid out as a pane's (ui/shell.css: #canvas .pane-canvas): the runtime keeps
+  // `el` as the pane's address changes, and what listened on the canvas before must go with it.
+  const host = h('div', { class: 'pane-canvas' });
+  el.replaceChildren(host);
+  // A view a drawing names finds its pane by it (packs/walls/page/view-frame.js).
   const pane = /^pane:(.+)$/.exec(el.closest('[data-key]')?.dataset.key ?? '')?.[1];
   if (pane) el.dataset.pane = pane;
   // What it draws now; in focus, with no page over it, the page's address is this pane's (decision e_h2pqjy2q).
@@ -57,16 +60,18 @@ export function drawPane(at, el, said) {
   const hrefOf = (to) => (!to || to === 'v' ? '#/' : `#/${to}`);
   const inFocus = () => el.closest('[aria-selected]')?.getAttribute('aria-selected') === 'true' && document.body.dataset.sheet !== 'open';
   const moved = (to) => {
+    if (!live) return;
     now = to;
     said('open', { at: to });
     if (inFocus() && location.hash !== hrefOf(to)) location.hash = hrefOf(to);
   };
-  const canvas = canvasIn(el, {
+  const canvas = canvasIn(host, {
     go: (lens) => moved(lens ? `v?${addressOf(lens, canvas.asked)}` : 'v'),
     open: (href) => moved(paneAt(href)),
     opened: (item, lens) => {
+      if (!live) return;
       // This pane is the one touched before its item's page opens over it (a click with no press before it too).
-      el.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+      host.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
       said('opened', { item, at: `v?${addressOf(lens, canvas.asked)}` });
       location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
     },
@@ -77,8 +82,8 @@ export function drawPane(at, el, said) {
     activate(canvas);
     if (document.body.dataset.sheet !== 'open' && location.hash !== hrefOf(now)) history.replaceState(history.state, '', hrefOf(now));
   };
-  el.addEventListener('pointerdown', touched, true);
-  el.addEventListener('focusin', touched);
+  host.addEventListener('pointerdown', touched, true);
+  host.addEventListener('focusin', touched);
   if (at === NONE) canvas.empty();
   else
     lensOf(at).then(({ lens, style, here }) => {
@@ -87,7 +92,7 @@ export function drawPane(at, el, said) {
       naming();
       canvas.show(lens, here, style);
       activate(canvas);
-    }, (err) => live && el.replaceChildren(h('div', { class: 'error' }, err.message)));
+    }, (err) => live && host.replaceChildren(h('div', { class: 'error' }, err.message)));
   // What it draws, told again as it is drawn anew (the map changed, another lens): a tab that watches what it draws reads it.
   let told = '';
   const tell = () => {
@@ -96,7 +101,7 @@ export function drawPane(at, el, said) {
   };
   let soon;
   const watching = new MutationObserver(() => (clearTimeout(soon), (soon = setTimeout(tell, 300))));
-  watching.observe(el, { childList: true, subtree: true });
+  watching.observe(host, { childList: true, subtree: true });
   return () => ((live = false), watching.disconnect(), clearTimeout(soon), canvas.close());
 }
 hooks.paneFrame = drawPane;
@@ -120,8 +125,8 @@ export function toAddress(at) {
 /** Start the lone pane of a page with no tabs, in #canvas. */
 export function lonePane(at) {
   const canvas = document.getElementById('canvas');
-  const body = h('div', { class: 'pane-canvas' });
-  canvas?.replaceChildren(h('section', { class: 'pane' }, body));
+  const body = h('section', { class: 'pane' });
+  canvas?.replaceChildren(body);
   lone = { at: null, body, stop: null };
   toAddress(at);
 }
