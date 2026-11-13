@@ -93,7 +93,7 @@ test('the styles pack’s actions answer with the ops each action makes, and tou
   assert.deepEqual(use(style, false).ops, [{ op: 'update', id: 'e_sea00001', status: 'retired' }]);
   assert.throws(() => use(undefined, true), /not a style/);
   const chosen = chooseTheme({ preset: 'core.dusk', title: 'Dusk', props: {}, others: ['e_sea00001', 'e_task0001'] }, new Set(['e_sea00001']));
-  assert.deepEqual(chosen.ops.map((o: { op: string; id?: string }) => [o.op, o.id]), [['update', 'e_sea00001'], ['create', undefined]], 'only styles are retired');
+  assert.deepEqual(chosen.ops.map((o) => [o.op, o.id]), [['update', 'e_sea00001'], ['create', undefined]], 'only styles are retired');
   assert.deepEqual(deleteLayout({ id: 'e_lay00001', type: 'layout', title: 'Mine' }).ops, [{ op: 'archive', id: 'e_lay00001' }]);
   assert.throws(() => deleteLayout(undefined), /not a layout/);
   const ctx = { reads: async () => [{ id: 'e_task0001', type: 'task', title: 'A task' }], registry: { isA: (t: string, of: string) => t === of } };
