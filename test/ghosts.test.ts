@@ -42,3 +42,18 @@ test('the part answers with a ghost for each, as the runtime reads them back', (
   assert.deepEqual(part.update({ held: [], drawn }), ['list', {}], 'nothing held, nothing drawn');
   assert.deepEqual(ghosts({}).marks, ['list', {}]);
 });
+
+test('the runtime draws the ghosts into an answer, with the links drawn here and not yet answered for', async () => {
+  // @ts-expect-error a page module, plain JavaScript: what the runtime keeps until it reads the part's ghost marks
+  const { HELD, withGhosts } = await import('../ui/ghosts.js');
+  const g = ghostsOf(held, holds);
+  const answer = { items: [{ id: 'e_aaaaaaaa' }, { id: 'e_bbbbbbbb' }], links: [] };
+  const shown = withGhosts(answer, g, [{ id: 'mine:1', type: 'depends_on', from: 'e_bbbbbbbb', to: 'e_aaaaaaaa' }, { id: 'mine:2', type: 'depends_on', from: 'e_bbbbbbbb', to: 'e_cccccccc' }]);
+  assert.equal(shown.items.length, 4);
+  assert.deepEqual(shown.items[1].pending, { proposal: 'p_edit', op: 'update' });
+  assert.deepEqual(shown.links.at(-1).pending, { mine: true, op: 'link' }, 'a link drawn here, pending');
+  assert.equal(shown.links.length, 4, 'one drawn here to what is not drawn is left out');
+  assert.equal(answer.items.length, 2, 'the answer itself is left as it was');
+  assert.equal(HELD.exec('held:p_abc123:4')?.[1], 'p_abc123');
+  assert.equal(HELD.exec('s:held:p_abc'), null);
+});
