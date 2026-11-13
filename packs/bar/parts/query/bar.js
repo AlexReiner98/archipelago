@@ -294,10 +294,18 @@ export function heard(s, event) {
 export function barPart(draw) {
   return function part(input, tools) {
     let s = fresh(input);
+    // A lens gone to that the page has not handed back yet, and those left on the way: until the page hands the new one,
+    // a hand of an old one (an answer for it arriving late) does not undo the gesture; any other lens is the page's own.
+    let pending = null;
+    const said = (i) => JSON.stringify(i?.query ?? i?.address?.query ?? null);
     return {
       marks: draw(s),
       update(next) {
-        s = { ...s, input: next, names: new Map([...s.names, ...Object.entries(next?.names ?? {}).filter(([, v]) => typeof v === 'string')]) };
+        const q = said(next);
+        if (pending && q === pending.to) pending = null;
+        else if (pending && !pending.left.has(q)) pending = null;
+        const given = pending ? { ...next, query: pending.query } : next;
+        s = { ...s, input: given, names: new Map([...s.names, ...Object.entries(next?.names ?? {}).filter(([, v]) => typeof v === 'string')]) };
         return draw(s);
       },
       on(event) {
@@ -309,6 +317,7 @@ export function barPart(draw) {
         // The lens gone to is the one the next gesture builds on, before the page hands it back: two quick presses
         // (an × and another) each take their own term out, rather than the second undoing the first.
         if (go) {
+          pending = { left: new Set([...(pending?.left ?? []), said(s.input)]), to: JSON.stringify(go), query: go };
           s = { ...s, input: { ...s.input, query: go } };
           tools?.go?.({ query: go });
         }

@@ -73,10 +73,10 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     await find('gutters');
     assert.ok(await page.until(`${lineSays}.includes('“gutters”') && ${drawn(1, made.gutter)} && !${dim(1, made.gutter)}`), `find set the second's words: ${await page.evaluate(lineSays)}`);
     const inside = (n: number) => `(() => { const f = document.getElementById('find').getBoundingClientRect(); const p = [...document.querySelectorAll('#canvas .pm-pane')][${n}].getBoundingClientRect(); const mid = (f.left + f.right) / 2; return mid > p.left && mid < p.right; })()`;
-    assert.ok(await page.evaluate(inside(1)), 'find stands under the pane it acts on');
+    assert.ok(await page.until(inside(1)), 'find stands under the pane it acts on');
     await press(0);
     assert.ok(await page.until(`${lineSays}.includes('“roof”') && !${lineSays}.includes('gutters')`), `the first's lens again: ${await page.evaluate(lineSays)}`);
-    assert.ok(await page.evaluate(inside(0)), 'and find under it');
+    assert.ok(await page.until(inside(0)), 'and find under it');
   } finally {
     await page.close();
   }

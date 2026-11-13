@@ -82,6 +82,22 @@ test('two ×s pressed before the page answers each take their own term out', () 
   assert.deepEqual(last.query.filter.only, lens.filter.only, 'the rest of the lens stays');
 });
 
+test('a late hand of the old lens does not undo a gesture; the page’s own move is taken', () => {
+  const { part, went } = mount();
+  part.on({ key: 'x:find:0', name: 'press' });
+  // An answer for the old lens lands before the page has moved: the bar keeps the lens it went to.
+  part.update(input());
+  part.on({ key: 'x:find:0', name: 'press' });
+  const last = went.at(-1) as { query: typeof lens };
+  assert.deepEqual(last.query.filter.find ?? [], [], 'the second × builds on the first');
+  // Something else moves the lens (a click on the canvas, back): that is what the next gesture builds on.
+  const elsewhere = { filter: { find: ['type decision'] }, walk: { over: [], steps: 0 } };
+  part.update(input(elsewhere));
+  part.on({ key: 'x:find:0', name: 'press' });
+  assert.deepEqual((went.at(-1) as { query: { filter: { find?: string[] } } }).query.filter.find ?? [], [], 'the page’s lens, its one term out');
+  assert.equal(went.length, 3);
+});
+
 test('adding is a kind, then the thing of that kind: never words taken for a term', () => {
   const { part, went } = mount();
   const kindsShown = part.marks;
