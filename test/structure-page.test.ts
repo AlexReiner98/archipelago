@@ -42,8 +42,8 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/write/page/item-held.js': 1,
   // ui/nav.js's switches for a pack's screens (task e_pe3fjd75), with its import of the page's base.
   'packs/loader/page/screen-rows.js': 1,
-  // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar, item-doc and thumbs.
-  'packs/surface/page/views-kept.js': 3,
+  // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar and thumbs.
+  'packs/surface/page/views-kept.js': 2,
   'packs/surface/page/app.js': 7,
   'packs/surface/page/canvas.js': 1,
   'packs/surface/page/live.js': 4,
@@ -52,9 +52,9 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/panes/page/tab-bar.js': 3,
   'packs/panes/page/tabs.js': 1,
   // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
-  // type's views (canvases), a document's menus (item-doc) and find's terms (query-bar), screens.js for a diagram and
+  // type's views (canvases) and find's terms (query-bar), screens.js for a diagram and
   // the start page, each going as that module becomes a part.
-  'packs/sheet/page/item.js': 2,
+  'packs/sheet/page/item.js': 1,
   'packs/sheet/page/screens.js': 1,
 };
 
@@ -87,7 +87,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/find-choices.js': 3,
   'ui/find.js': 3,
   'ui/home.js': 1,
-  'ui/item-doc.js': 5,
   'ui/keep-in-view.js': 2,
   'ui/look-marks.js': 1,
   'ui/query-bar.js': 3,

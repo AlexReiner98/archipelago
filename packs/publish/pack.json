@@ -38,6 +38,13 @@
         },
         "out": "any",
         "run": "share-tools.ts#reading"
+      },
+      "answer.shared": {
+        "in": {
+          "id": "id"
+        },
+        "out": "any",
+        "run": "share-read.ts#sharedOf"
       }
     },
     "hooks": {
@@ -71,6 +78,13 @@
       "lens": {},
       "answer": "reading",
       "description": "A document read whole as its reader meets it, with the drawing of each view it brings in as publishing would keep it: what its sheet reads. Params: id (required)."
+    },
+    {
+      "id": "publish.shared",
+      "shape": "data",
+      "lens": {},
+      "answer": "shared",
+      "description": "An item's public view, when a person shared it (its address and when), and whether it is a document anyone may read whole: what the item's menu offers to open, copy and print. Params: id (required)."
     }
   ],
   "parts": [
@@ -116,6 +130,24 @@
       "reads": {},
       "modules": {
         "index.js": "parts/public/index.js"
+      }
+    },
+    {
+      "id": "publish.share",
+      "title": "Its public view",
+      "slot": "item.menu",
+      "marks": ["box", "text", "button"],
+      "reads": {},
+      "views": [
+        {
+          "name": "shared",
+          "params": {
+            "id": "{here}"
+          }
+        }
+      ],
+      "modules": {
+        "index.js": "parts/share/index.js"
       }
     }
   ]
