@@ -10,7 +10,7 @@
 
 /**
  * The pieces the host draws, each with what it must be told. A document read whole is the publish pack's part
- * (piece.document); a pack's view of an item, its roadmap or gate say, is a lens preset `on` its type (ui/canvases.js); a figure is the picture it keeps; a diagram is the diagrams pack's part (piece.diagram); rows and a form are the pack's own view and action.
+ * (piece.document); a pack's view of an item, its roadmap or gate say, is a lens preset `on` its type (packs/surface/page/views-kept.js); a figure is the picture it keeps; a diagram is the diagrams pack's part (piece.diagram); rows and a form are the pack's own view and action.
  * A button stands in the page's head, not its column: it opens the pack's action's form, or draws the canvas up as it says.
  * A count stands under the note while it is written: how long it is, against the limit its field's value picks.
  */

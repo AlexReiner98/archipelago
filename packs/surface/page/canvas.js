@@ -9,7 +9,7 @@
 import { api, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { catchUp } from './catch-up.js';
-import { canvasSwitch } from './canvases.js';
+import { canvasSwitch } from './views-kept.js';
 import { moved, numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { drawQuery } from './query-bar.js';
@@ -48,7 +48,7 @@ export const home = () => ({
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
 export const focusOn = (id) => ({ filter: { find: [`id ${id}`] }, walk: { over: FOCUS, steps: 1 } });
 /**
- * What a picture is kept under in this browser: the saved view up (ui/canvases.js), and the form it is laid out in.
+ * What a picture is kept under in this browser: the saved view up (packs/surface/page/views-kept.js), and the form it is laid out in.
  * Nothing is put by hand on it: every view is drawn from its query's answer alone, the same each time it is asked, and
  * no step can be dragged (the owner, 3 Nov 2026: Home wore down under places put on other pictures). `flow` here names
  * no pack, only that the form asked for is the canvas's own.
@@ -129,11 +129,12 @@ hooks.go = (address) => {
   // A page of the app the host draws, by name: what the menu leads to, so a part may go there without knowing an address.
   if (typeof address.page === 'string') {
     if (!PAGES_GO.includes(address.page)) return;
-    const of = typeof address.of === 'string' && /^e_[a-z0-9]{8}$/.test(address.of) ? address.of : undefined;
+    // A screen by its id: one kept on the map (e_...) or one a pack offers (core.run_worked).
+    const of = typeof address.of === 'string' && /^(?:e_[a-z0-9]{8}|[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_-]*)*)$/.test(address.of) ? address.of : undefined;
     if (address.page === 'screen' && !of) return;
-    return void openHere(address.page === 'screen' ? `#/s/${of}` : `#/${address.page}`);
+    return void openHere(address.page === 'screen' ? `#/s/${encodeURIComponent(of)}` : `#/${address.page}`);
   }
-  // A saved view, by its id: opened as the bar's switcher opens one (hooks.openView, ui/canvases.js).
+  // A saved view, by its id: opened as the bar's switcher opens one (hooks.openView, packs/surface/page/views-kept.js).
   if (typeof address.view === 'string' && /^e_[a-z0-9]{8}$/.test(address.view)) return void hooks.openView?.(address.view);
   // A term added to the lens up or taken out of it (`add`, `take`): the runtime makes the lens, so no part keeps the algebra.
   if (address.add || address.take) {
@@ -148,7 +149,11 @@ hooks.go = (address) => {
   }
   if (!address.layout || typeof address.layout !== 'object') return void goQuery(lens);
   const layout = Object.fromEntries(['shape', 'style'].map((k) => [k, address.layout[k]]).filter(([, v]) => typeof v === 'string' && NAMED.test(v)));
-  drawIn(layout, lens);
+  // The kept view it is drawn as, when the address says (a view just saved), or none (`canvas: null`, one deleted).
+  if (!('canvas' in address.layout)) return void drawIn(layout, lens);
+  const { shape: _s, style: _k, canvas: _c, ...rest } = styleNow();
+  const canvas = typeof address.layout.canvas === 'string' && /^e_[a-z0-9]{8}$/.test(address.layout.canvas) ? address.layout.canvas : undefined;
+  openHere(`#/v?${addressOf(lens ?? home(), { ...rest, ...layout, ...(canvas && { canvas }) })}`);
 };
 
 /** Whether the canvas in focus draws this item now. */
