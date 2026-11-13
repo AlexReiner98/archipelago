@@ -40,15 +40,20 @@ export async function savedCanvasPage() {
     assert.ok(await page.until(drawn(made.a)), `drawn: ${page.logs().join('\n')}`);
     assert.ok(await page.until(`document.querySelector('#query .q-pick')?.title.startsWith('Not saved')`), 'the bar says what is up is not saved');
 
-    // Saved from the bar: a name asked in the page.
-    await page.evaluate(`document.querySelector('#query .q-save[aria-label="Save this view"]').click()`);
-    assert.ok(await page.until(`Boolean(document.querySelector('dialog.ask[open] textarea'))`), 'a name is asked');
-    await page.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = ${JSON.stringify(name)}; d.querySelector('button[value="ok"]').click(); })()`);
+    // Saved from the bar: the band's part (menu.band) asks a name in the band, its field and a Save of its own.
+    const bandButton = (tip: string) => `[...document.querySelectorAll('#query .pm-button')].find((b) => b.title === ${JSON.stringify(tip)})`;
+    // Once the band's part has drawn: it draws after the views are read.
+    assert.ok(await page.until(`Boolean(${bandButton('Save this view')})`), `the band offers Save: ${page.logs().join(' | ')}`);
+    await page.evaluate(`${bandButton('Save this view')}.click()`);
+    assert.ok(await page.until(`Boolean(document.querySelector('#query input[aria-label="The view’s name"]'))`), 'a name is asked');
+    await page.evaluate(`(() => { const i = document.querySelector('#query input[aria-label="The view’s name"]'); i.value = ${JSON.stringify(name)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await page.evaluate(`${bandButton('Keep what is up under this name')}.click()`);
     assert.ok(await page.until(`${picked} === ${JSON.stringify(name)}`), `the bar names it: ${await page.evaluate(picked)}`);
     const saved = (await canvases()).find((c) => c.title === name)!;
     assert.ok(saved, 'kept on the map');
     assert.deepEqual([saved.props.filter.find, saved.props.walk], [[`id ${made.p}`], { over: ['part_of'], steps: 1 }], 'its lens: the filter, the walk');
-    assert.equal(await canvasUp(), saved.id, 'its id in the address');
+    // The part goes to the view as kept once Save has answered: the address follows the bar naming it.
+    assert.ok(await page.until(`new URLSearchParams(location.hash.split('?')[1] ?? '').get('canvas') === ${JSON.stringify(saved.id)}`), `its id in the address: ${await canvasUp()} (${await page.evaluate('location.hash')})`);
 
     // The switcher: one line each, opening in one click.
     // Waited for by its name: a canvas saved before is listed already.
