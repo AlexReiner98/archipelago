@@ -68,3 +68,21 @@ test('the slow set and the checks are read off their files', () => {
   assert.deepEqual(checksOf("// 1. One.\nconst A: Owed = {};\ntest('one', () => {});\n").map((c) => [c.check, c.breaks, c.heading]), [['one', 0, '1. One.']]);
   assert.equal(kindOf({ m: { id: 'billing', reach: { server: { gates: {} } } } }), 'server');
 });
+
+test('a page part is part of its pack, reads its slot and fields, is kept in its modules, and a slot names who opens it', () => {
+  const files = [
+    file('packs/roots.json', { roots: [{ id: 'core' }], calls: {} }),
+    file('packs/core/pack.json', { id: 'core', title: 'Core', types: [{ id: 'finding', title: 'Finding' }] }),
+    file('packs/findings/pack.json', { id: 'findings', title: 'Findings', requires: ['slot:piece.legend'], parts: [{ id: 'findings.island', title: 'Findings', slot: 'piece.findings', opens: ['piece.findings'], reads: { finding: ['title'] }, modules: { 'index.js': 'parts/findings/index.js' } }] }),
+    file('packs/findings/parts/findings/index.js', '// The findings part.\n'),
+  ];
+  const { items, links } = extract(files);
+  const has = (type: string, from: string, to: string) => links.some((l) => l.type === type && l.from === from && l.to === to);
+  const part = 'part:findings:page:findings.island:habits';
+  assert.equal(items.find((i) => i.key === part)!.props.part, 'page');
+  assert.ok(has('part_of', part, 'pack:findings') && has('anatomy.reads', part, 'name:slot:piece.findings') && has('anatomy.reads', part, 'name:field:title@finding'));
+  assert.ok(has('anatomy.kept_in', part, 'module:packs/findings/parts/findings/index.js'));
+  assert.equal(items.find((i) => i.key === 'module:packs/findings/parts/findings/index.js')!.props.layer, 'page', 'a part\'s code is page code');
+  assert.ok(has('anatomy.provides', 'pack:findings', 'name:slot:piece.findings'), 'the pack whose part opens a slot provides it');
+  assert.ok(has('anatomy.provides', 'pack:core', 'name:slot:piece.legend'), 'a slot no part opens is the host\'s');
+});
