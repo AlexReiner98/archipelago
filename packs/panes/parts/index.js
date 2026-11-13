@@ -72,7 +72,7 @@ function panesMarks(t) {
     return ['pane', { key: `pane:${id}`, at: p.at, share, drag: 'pane', selected: id === focus, ...(p.ring && Date.now() - p.ring < 2000 && { ring: true }), tip: 'Drag its name to dock it elsewhere' },
       ['text', {}, String(hostOf(p.at) ?? p.name ?? 'Canvas').slice(0, 120)],
       // Whose it is, and in its tip what that session last said of it.
-      ...(who ? [['text', { look: 'mark', ...(p.said && { tip: String(p.said).slice(0, 200) }) }, String(who).slice(0, 40)]] : []),
+      ...(who || p.said ? [['text', { look: 'mark', ...(p.said && { tip: String(p.said).slice(0, 200) }) }, String(who).slice(0, 40)]] : []),
       ['button', { key: `totab:${id}`, look: 'quiet', tip: 'Move this pane to a new tab' }, '⧉'],
       ...(t.groups.length > 1 ? [['button', { key: `close:${id}`, look: 'quiet', tip: 'Close this pane' }, '×']] : []),
     ];
@@ -134,7 +134,7 @@ export function act(event) {
   if (name === 'drawn' && what === 'pane') return void (t.panes[a] && (t.panes[a].ids = (Array.isArray(value) ? value : []).slice(0, 500))), false;
   if (name === 'named' && what === 'pane') return Boolean(t.panes[a]) && t.panes[a].name !== value && ((t.panes[a].name = String(value ?? '').slice(0, 120)), true);
   if ((name === 'open' || name === 'go') && what === 'pane') {
-    const at = M.asPane(String(value?.at ?? value ?? ''));
+    const at = M.paneAt(String(value?.at ?? value ?? ''));
     if (!M.drawable(at) || !M.goPane(t, a, at)) return false;
     if (a === M.focusOf(t)) say(true);
     return true;
@@ -255,7 +255,7 @@ function heard(event) {
   if (event?.name === 'split') return act({ key: 'split', name: 'press' });
   if (event?.name === 'beside') return beside(String(event.pane ?? ''), event.view ?? null);
   if (event?.name === 'step') return stepped(event.step === -1 ? -1 : 1);
-  if (event?.name === 'land' && event.step) return (landed(event.step), void readOpen(), true);
+  if (event?.name === 'land' && event.step) return landed(event.step);
   if (event?.name === 'ended') return (ended(m, newId, event.run, false), true);
   if (event?.name === 'rested') return (rested(m, newId, event.run), true);
   return false;

@@ -52,16 +52,29 @@ export function drawPane(at, el, said) {
   el.classList.add('pane-canvas');
   const pane = /^pane:(.+)$/.exec(el.closest('[data-key]')?.dataset.key ?? '')?.[1];
   if (pane) el.dataset.pane = pane;
+  // What it draws now; in focus, with no page over it, the page's address is this pane's (decision e_h2pqjy2q).
+  let now = at;
+  const hrefOf = (to) => (!to || to === 'v' ? '#/' : `#/${to}`);
+  const inFocus = () => el.closest('[aria-selected]')?.getAttribute('aria-selected') === 'true' && document.body.dataset.sheet !== 'open';
+  const moved = (to) => {
+    now = to;
+    said('open', { at: to });
+    if (inFocus() && location.hash !== hrefOf(to)) location.hash = hrefOf(to);
+  };
   const canvas = canvasIn(el, {
-    go: (lens) => said('open', { at: lens ? `v?${addressOf(lens, canvas.asked)}` : 'v' }),
-    open: (href) => said('open', { at: paneAt(href) }),
+    go: (lens) => moved(lens ? `v?${addressOf(lens, canvas.asked)}` : 'v'),
+    open: (href) => moved(paneAt(href)),
     opened: (item, lens) => {
       said('opened', { item, at: `v?${addressOf(lens, canvas.asked)}` });
       location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
     },
   });
   // Pressed, or the focus gone into a drawing's frame in it, it is the canvas the bar and find act on.
-  const touched = () => live && activate(canvas);
+  const touched = () => {
+    if (!live) return;
+    activate(canvas);
+    if (document.body.dataset.sheet !== 'open' && location.hash !== hrefOf(now)) history.replaceState(history.state, '', hrefOf(now));
+  };
   el.addEventListener('pointerdown', touched, true);
   el.addEventListener('focusin', touched);
   if (at === NONE) canvas.empty();

@@ -30,6 +30,14 @@ async function startPart() {
   canvas.replaceChildren(panes);
   await drawSlot(panes, { slot: 'tabs', piece: { slot: 'panes' } });
   document.body.dataset.panesBy = 'part';
+  // The pane in focus's frame moved (the runtime lays the panes out, packs/walls/page/part-pane.js): what fits itself to it
+  // (find's line, the canvas) is told, as the page's own panes told it.
+  let frame = '';
+  let soon;
+  new MutationObserver(() => {
+    const now = ['left', 'right', 'top', 'bottom'].map((s) => document.body.style.getPropertyValue(`--active-${s}`)).join(' ');
+    if (now !== frame) ((frame = now), clearTimeout(soon), (soon = setTimeout(() => dispatchEvent(new Event('resize')), 30)));
+  }).observe(document.body, { attributes: true, attributeFilter: ['style'] });
   const button = (label, title, mark, onclick) => h('button', { type: 'button', class: 'q-save', title, 'aria-label': label, onclick }, mark);
   hooks.paneButtons = () => [
     button('Back', 'Back to what this pane drew before', '‹', () => history.back()),

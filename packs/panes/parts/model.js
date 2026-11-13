@@ -33,6 +33,20 @@ export function atOf(hash, hasLens = (q) => /(^|&)(f|find|lens|canvas|view)=/.te
   return undefined;
 }
 
+/** What an item's own canvas draws: the item and what it is part of, depends on and waits on (packs/surface/page/query.js FOCUS). */
+const FOCUS = 'over=part_of%2Cdepends_on%2Cwaits_on&steps=1';
+/**
+ * A pane's address for an address of the page: an item's page draws the lens beside it, else the item's own canvas,
+ * so a pane never stands at an item's page.
+ */
+export function paneAt(href) {
+  const bare = asPane(href);
+  const [where, query = ''] = bare.split('?');
+  const item = /^e\/(e_[a-z0-9]{8})$/.exec(where)?.[1];
+  if (!item) return bare;
+  return /(^|&)(find|only|view|canvas)=/.test(query) ? `v?${query}` : `v?find=id+${item}&${FOCUS}`;
+}
+
 /** A pane: the address it draws, its back and forth, and whose it is (slot, held, by). */
 export const freshPane = (at, more = {}) => ({ at: asPane(at || '#/'), back: [], forth: [], ...more });
 /** A tab: its panes, each its share, whom it follows, and the pane last touched in it. */
