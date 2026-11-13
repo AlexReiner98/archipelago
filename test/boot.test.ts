@@ -46,6 +46,26 @@ test('a changed root pack stops the start, naming it and both hashes', async () 
   await assert.rejects(boot({ home: h, load: async () => ({ start: () => ({}) }) }), (err: Error) => err instanceof BootRefused && err.message.includes('db:') && err.message.includes(pinned) && err.message.includes(now));
 });
 
+test("a changed root part, or any file a root serves, stops the start; its README does not", async () => {
+  const h = home({ core: {}, sheet: { kernel: root, files: { 'index.ts': '' } } }, ['core', 'sheet']);
+  const dir = join(h, 'packs', 'sheet');
+  mkdirSync(join(dir, 'parts', 'page'), { recursive: true });
+  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: [] });\n");
+  writeFileSync(join(dir, 'README.md'), 'What the sheet is.\n');
+  pinRoots(h);
+  assert.deepEqual(checkRoots(h), [], 'pinned with its part');
+  writeFileSync(join(dir, 'README.md'), 'What the sheet is, said again.\n');
+  assert.deepEqual(checkRoots(h), [], 'a README only says what it is');
+  const pinned = hashPack(dir);
+  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: ['text', {}, 'changed'] });\n");
+  const now = hashPack(dir);
+  assert.notEqual(now, pinned);
+  await assert.rejects(boot({ home: h, load: async () => ({ start: () => ({}) }) }), (err: Error) => err instanceof BootRefused && err.message.includes('sheet:') && err.message.includes(pinned) && err.message.includes(now));
+  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: [] });\n");
+  writeFileSync(join(dir, 'served.css'), 'a {}\n');
+  assert.match(checkRoots(h).join('\n'), /sheet:/, 'a file beside its folders counts too');
+});
+
 test('a root pack the list leaves out, or a listed pack that is no root, stops the start', () => {
   const h = home({ core: {}, db: { kernel: root }, svc: { kernel: { trust: 'service', internal: true } } }, ['core', 'svc']);
   const wrong = checkRoots(h).join('\n');

@@ -2,7 +2,7 @@
 // "The boot stub"; decision e_3pxvwdn7). It holds no SQL, no route and no type name. It
 //
 //   1. reads packs/roots.json, the root packs in order, each with its hash;
-//   2. hashes each root pack's folder (pack.json as canonical JSON, and kernel/**) and refuses to start on a
+//   2. hashes each root pack's folder (pack.json as canonical JSON, and every other file but its README: kernel/**, page/**, parts/**) and refuses to start on a
 //      difference, naming the pack and both hashes, and refuses a list of root service callers (roots.json calls)
 //      that names a pack not here or a name no root provides (src/root-calls.ts);
 //   3. starts the roots in order, each handed the roots before it by id: a root that asks for one after it stops
@@ -113,14 +113,14 @@ function filesUnder(packDir: string, sub: string): string[] {
 
 /**
  * A root pack's hash: SHA-256 of the canonical JSON of each file's own hash by path. pack.json is hashed as
- * canonical JSON, so spacing and key order do not count; kernel/** and page/** (the host's page modules) as text
- * with LF line endings.
+ * canonical JSON, so spacing and key order do not count; every other file of its folder (kernel/**, page/**, its
+ * parts/**, whatever else it serves) as text with LF line endings, but its README.md, which only says what it is.
  */
 export function hashPack(packDir: string): string {
   const manifest = join(packDir, 'pack.json');
   if (!existsSync(manifest)) throw new BootRefused(`${packDir} has no pack.json.`);
   const files: Record<string, string> = { 'pack.json': sha256Hex(jcs(JSON.parse(text(manifest)))) };
-  for (const f of [...filesUnder(packDir, 'kernel'), ...filesUnder(packDir, 'page')]) files[f] = sha256Hex(text(join(packDir, f)));
+  for (const f of readdirSync(packDir).filter((n) => n !== 'pack.json' && n !== 'README.md').sort().flatMap((n) => (statSync(join(packDir, n)).isDirectory() ? filesUnder(packDir, n) : [n]))) files[f] = sha256Hex(text(join(packDir, f)));
   return sha256Hex(jcs(files));
 }
 
