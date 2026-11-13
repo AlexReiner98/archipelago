@@ -26,7 +26,7 @@ const shelf = (sends = ['shelf.put']) => ({
     { id: 'shelf.other', title: 'Other', description: 'Not the part’s.', verb: 'capture', input },
     { id: 'shelf.mine', title: 'Mine', description: 'A person’s alone.', verb: 'capture', input, humanOnly: true },
   ],
-  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', sends, modules: { 'index.js': 'parts/row/index.js' } }],
+  parts: [{ id: 'shelf.row', title: 'Row', slot: 'sheet', marks: ['box', 'text', 'button'], sends, modules: { 'index.js': 'parts/row/index.js' } }],
 });
 
 const HANDLER = `const put = (input) => ({ ops: [{ op: 'create', type: 'task', title: input.title ?? 'Put' }], reason: 'Put on the shelf' });

@@ -8,6 +8,11 @@ import { test } from 'node:test';
 import { checkMarks } from '../packs/walls/page/part-check.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import findings from '../packs/findings/parts/findings/index.js';
+import { readFileSync } from 'node:fs';
+
+/** What the part names in its manifest: the host refuses any other mark it answers with. */
+const kinds = JSON.parse(readFileSync(new URL('../packs/findings/pack.json', import.meta.url), 'utf8')).parts[0].marks;
+const check = (marks: unknown) => checkMarks(marks, { kinds });
 
 test('the part answers with marks the host checks, and sends its action on a press', async () => {
   const input = {
@@ -19,16 +24,16 @@ test('the part answers with marks the host checks, and sends its action on a pre
   };
   const sent: unknown[] = [];
   const part = findings(input, { marks: () => {}, act: async (action: string, params: unknown) => (sent.push([action, params]), { status: 'applied' }) });
-  checkMarks(part.marks);
+  check(part.marks);
   assert.doesNotMatch(JSON.stringify(part.marks), /Base load/, 'the working findings are folded');
   const opened = await part.on({ key: 'working', name: 'press' });
-  checkMarks(opened);
+  check(opened);
   assert.match(JSON.stringify(opened), /stand:e_bbbbbbbb/);
   assert.doesNotMatch(JSON.stringify(opened), /stand:e_aaaaaaaa/, 'a published finding has no press');
-  checkMarks(await part.on({ key: 'stand:e_bbbbbbbb', name: 'press' }));
+  check(await part.on({ key: 'stand:e_bbbbbbbb', name: 'press' }));
   assert.deepEqual(sent, [['findings.stand_by', { finding: 'e_bbbbbbbb' }]]);
   assert.equal(await part.on({ key: 'stand:nonsense', name: 'press' }), undefined);
-  checkMarks(part.update({ item: input.item, items: [] }));
+  check(part.update({ item: input.item, items: [] }));
 });
 
 test('it reads the schema’s words, tips each value, keeps Stand by in a menu and shows a finding’s note', async () => {

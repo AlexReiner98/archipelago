@@ -71,10 +71,11 @@ const plain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) &&
 /**
  * Check what a part answered with, whole, and answer with the nodes to draw: { kind, key?, item?, at: { attribute:
  * value }, kids: [node] } or, for a kind that holds words, { ..., words }. Anything else is refused with an Error that
- * says what and where (`box 0 > text 2`), and nothing of it is drawn.
+ * says what and where (`box 0 > text 2`), and nothing of it is drawn. `kinds`, the marks the part's manifest names
+ * (packs/loader/kernel/ui-parts.ts), holds it to them: a mark it did not name is refused too.
  */
-export function checkMarks(mark) {
-  const seen = { n: 0, words: 0, keys: new Set() };
+export function checkMarks(mark, { kinds } = {}) {
+  const seen = { n: 0, words: 0, keys: new Set(), kinds };
   return node(mark, seen, [], false);
 }
 
@@ -87,6 +88,7 @@ function node(mark, seen, where, onPlane) {
   if (where.length >= partLimits.depth) why(`marks deeper than ${partLimits.depth}`);
   const [kind] = mark;
   const shape = Object.hasOwn(MARKS, kind) ? MARKS[kind] : why(`the mark "${kind.slice(0, 40)}"`);
+  if (seen.kinds && !seen.kinds.includes(kind)) why(`the mark "${kind}", which the part does not name in its marks`);
   const given = plain(mark[1]) ? mark[1] : undefined;
   const rest = mark.slice(given ? 2 : 1);
   if (!given && mark.length > 1 && typeof mark[1] === 'object' && !Array.isArray(mark[1])) why(`${kind}'s attributes, not a plain object`);

@@ -35,10 +35,10 @@ export const shippedFolder = (folder: string) => !inside(folder, laidOut());
  * version), with none of the owner's versions over them. A pack whose code is not in a shipped folder has no shipped
  * parts, so it draws none here: the way back never runs code a refiner wrote.
  */
-export function shippedParts(map: { registry: Packs }, have: string[] = []): Part[] {
+export function shippedParts(map: { registry: Packs }, have: string[] = [], host?: string[]): Part[] {
   const reg = map.registry;
   const packs = reg.packs.filter((p) => !partsOf([p]).length || shippedFolder(reg.folderOf(p.id)));
-  return partsFor({ folderOf: (id) => reg.folderOf(id), packs }, [], have);
+  return partsFor({ folderOf: (id) => reg.folderOf(id), packs }, [], have, host);
 }
 
 /** What an island draws that is not what ships. */
