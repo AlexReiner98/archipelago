@@ -12,7 +12,7 @@
 // part may read: the style's numbers and page settings, never a colour or a length, and `up`, the saved view the
 // canvas draws now. A part that declares `go` is handed the page's `address` too, again each time it changes
 // (addressMoved), and may name another after a gesture (hooks.go checks it). A mark that names a view opens it, and a thumb shows it small, both as the app says
-// (hooks.openView, hooks.viewThumb, hooks.viewUp: ui/canvases.js), or as the one drawing the part says (`openView`).
+// (hooks.openView, hooks.viewThumb, hooks.viewUp: packs/surface/page/views-kept.js), or as the one drawing the part says (`openView`).
 
 import { api, h, hooks, state } from './base.js';
 import { partBridge } from './part-bridge.js';
@@ -97,9 +97,17 @@ async function inputOf(part, item, given) {
 
 /** A version's worker, started once: its port heard here, each message going to the part mounted under its id. */
 async function workerOf(version, parts, pack) {
-  if (versions.get(version)) return versions.get(version);
+  // One asked again while it starts (a slot drawn twice at once) waits for it to be ready, its port and bridge set.
+  const starting = versions.get(version);
+  if (starting) {
+    await starting.ready;
+    if (!starting.port) throw new Error('The pack did not start.');
+    return starting;
+  }
   const mine = parts.filter((p) => p.pack === pack);
   const one = { mounted: new Map() };
+  let ready;
+  one.ready = new Promise((done) => (ready = done));
   versions.set(version, one);
   const stopped = (said) => {
     for (const m of one.mounted.values()) m.failed(said?.message ?? 'The pack stopped.');
@@ -109,6 +117,7 @@ async function workerOf(version, parts, pack) {
     one.port = await partPort(version, Object.fromEntries(mine.map((p) => [p.id, p.modules])), stopped);
   } catch (err) {
     versions.delete(version);
+    ready();
     throw err;
   }
   // Once an action a part sent has gone out, its version's parts are handed their items again: what it changed is
@@ -118,6 +127,9 @@ async function workerOf(version, parts, pack) {
     postMessage(message) {
       port.postMessage(message);
       if (message?.type === 'acted' && !message.error) for (const m of one.mounted.values()) void m.refresh();
+      // An action whose answer says it changed how the page looks (`looks`, a theme kept) has the page read its look
+      // again, which also ends a theme tried on this screen: the page then shows what was kept.
+      if (message?.type === 'acted' && !message.error && message.answer?.looks === true) void import('./swatch.js').then((s) => s.tryTheme('')).catch(() => {});
     },
   };
   // A part that declares `go` names another address after a gesture; the app checks it and moves (hooks.go, ui/canvas.js).
@@ -140,6 +152,7 @@ async function workerOf(version, parts, pack) {
     else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
     else if (said.type === 'error') m.failed(said.message);
   };
+  ready();
   return one;
 }
 
@@ -238,8 +251,7 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
     // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
     ghosts: (list) => hooks.ghosts?.(node, list),
-    // A `slot` mark (decided 13 Nov 2026): a slot this part opens, filled by whatever parts fill it, drawn by the runtime
-    // in the mark's node. The part holding it never sees them, nor they it; nested a few deep at most.
+    // A `slot` mark: a slot this part opens, filled by its parts in the mark's node, unseen by the holder; a few deep at most.
     slot: (name, el) => ((part.opens ?? []).includes(name) && depthOf(node) < slotsDeep ? drawParts(el, { slot: name, item, piece, openView, picture }) : Promise.resolve(0)),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });

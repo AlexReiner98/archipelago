@@ -34,23 +34,27 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/walls/page/query-base.js': 2,
   'packs/walls/page/surface.js': 1,
   'packs/walls/page/view-frame.js': 1,
-  'packs/loader/page/packs.js': 2,
+  'packs/loader/page/packs.js': 1,
   'packs/loader/page/page-schema.js': 1,
   'packs/loader/page/words.js': 2,
   'packs/write/page/held-card.js': 1,
   'packs/write/page/held.js': 2,
   'packs/write/page/item-held.js': 1,
-  'packs/surface/page/app.js': 8,
-  'packs/surface/page/canvas.js': 3,
-  'packs/surface/page/live.js': 6,
+  // ui/nav.js's switches for a pack's screens (task e_pe3fjd75), with its import of the page's base.
+  'packs/loader/page/screen-rows.js': 1,
+  // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar, item-doc and thumbs.
+  'packs/surface/page/views-kept.js': 3,
+  'packs/surface/page/app.js': 7,
+  'packs/surface/page/canvas.js': 1,
+  'packs/surface/page/live.js': 4,
   'packs/surface/page/query.js': 2,
-  'packs/panes/page/panes.js': 2,
+  'packs/panes/page/panes.js': 1,
   'packs/panes/page/tab-bar.js': 3,
   'packs/panes/page/tabs.js': 1,
   // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
   // type's views (canvases), a document's menus (item-doc) and find's terms (query-bar), screens.js for a diagram and
   // the start page, each going as that module becomes a part.
-  'packs/sheet/page/item.js': 3,
+  'packs/sheet/page/item.js': 2,
   'packs/sheet/page/screens.js': 1,
 };
 
@@ -78,19 +82,14 @@ test("the host's page imports one way along roots.json", () => {
 // the boundary itself moves, as it did here and on 12 Nov; otherwise it falls. It moved once more the same day:
 // doc-lens.js, the picture mark's drawing, went to surface (task e_atxefw2s), so doc.js and item-doc.js count it.
 const APP_ON_HOST: Record<string, number> = {
-  'ui/canvas-menu.js': 2,
-  'ui/canvases.js': 5,
-  'ui/catch-up.js': 3,
   'ui/connect-agent.js': 2,
   'ui/connections-card.js': 2,
-  'ui/find-choices.js': 2,
+  'ui/find-choices.js': 3,
   'ui/find.js': 3,
   'ui/home.js': 1,
-  'ui/island-new.js': 2,
   'ui/item-doc.js': 5,
   'ui/keep-in-view.js': 2,
   'ui/look-marks.js': 1,
-  'ui/nav.js': 2,
   'ui/query-bar.js': 3,
   'ui/query-light.js': 2,
   'ui/start.js': 1,
@@ -98,7 +97,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/term-kinds.js': 2,
   'ui/term-pick.js': 2,
   'ui/thumbs.js': 5,
-  'ui/traces.js': 3,
 };
 
 /** Whether a served path is the host's: a root pack's page/ folder. */

@@ -171,8 +171,8 @@
       "marks": [
         "box",
         "text",
-        "list",
-        "button"
+        "button",
+        "swatch"
       ],
       "modules": {
         "index.js": "parts/themes/index.js",

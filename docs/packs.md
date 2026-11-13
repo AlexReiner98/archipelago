@@ -279,6 +279,7 @@ part is told nothing.
 | Mark | What it is | What the part hears |
 | --- | --- | --- |
 | `box` `fits` | As many of its marks as fit on one line, one at least; then `+N`, its tip the hidden marks' tips (`part-fits.js`). | With `more: <key>`, the `+N` is a button: `press`, value N. |
+| `input` `keys`, `focus` | `keys` (up to 8 key names, such as ArrowUp, Escape) are the part's: the page does nothing with them (Escape goes no further). `focus: true` puts the caret in it whenever it is drawn so. Shift held on Enter or on a button's press adds `shift: true`. | `key` with `value` (the key) and `empty`; `focus` when it is come into; `submit` and `press` with `shift`. |
 | `button` `copy` | The words (up to 2000) go to the clipboard on the press; the button says Copied for a moment, or Copy failed with the words in its tip. | `press`, with `copied` true or false. |
 | `button` `try` | A theme (a preset used once chosen) tried on this screen alone, nothing kept; `null` the workspace's own again (`packs/surface/page/swatch.js`). Every part is handed `trying`, the preset tried or null. | `press`. |
 | `swatch` | A style preset's paper, ink and sea for the screen's scheme, painted by the host from the preset the part names (`preset`): a part paints no colour. `label` under it, `on: kept` or `trying` outlines it; an unknown preset is blank. | `press`, with a key. |
@@ -320,6 +321,10 @@ painting is a mark the contract names. Three shapes to write against:
 Where a part must say something about the page rather than draw it (that the
 canvas has finished drawing, say), it publishes page state it declared
 (`state`), and the runtime writes it on the root.
+
+An action whose answer says `looks: true` changed how the page looks (a theme
+kept): once it has gone out, the page reads its look again, ending any theme
+tried on that screen.
 
 **Where a part may go.** A part that declares `go` names an address after a
 gesture and the canvas checks it: an item (`item`), a query and the layout

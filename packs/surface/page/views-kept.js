@@ -1,21 +1,22 @@
 // Saved canvases (task e_uq77ps44): a flat lens and a style kept on the map as an item of core's `lens` type, so a
 // person opens it anywhere and it draws the same. Its id travels in the address beside the lens (`canvas=`, ui/query.js),
 // so what is moved on it goes to its own places (the places stream, under its id, apart from the map's) and the bar
-// names it. The bar switches between them and keeps what is up as one. What its view button opens, and a screen's
-// list of views, are the lenses pack's parts (packs/lenses/parts/), drawn at the map's version: they name a view, and
-// this opens it and draws its thumbnail (hooks.openView, hooks.viewThumb). One a document brings in is a part of that
-// page, in neither list unless it is up.
+// names it. This is the host's side of them (task e_pe3fjd75, from ui/canvases.js): the views kept read once a page,
+// what a view draws and where it opens, the view button naming the one up, and the band's frame. What the view button
+// opens and a screen's list of views are the lenses pack's parts (packs/lenses/parts/), drawn at the map's version: they
+// name a view, and this opens it and draws its thumbnail (hooks.openView, hooks.viewThumb). Saving and deleting the view
+// up, and making an island, are parts that fill the band (`bar`: the menu pack's menu.band, the islands pack's
+// islands.new). One a document brings in is a part of that page, in neither list unless it is up.
 
-import { api, ask, firstDrawn, h, hooks, idsOf, may, state, tell, wordsOf, withIds } from './base.js';
+import { api, drawSlots, firstDrawn, h, hooks, idsOf, may, state, tell, wordsOf, withIds } from './base.js';
 import { drawPart } from './part-host.js';
 import { placeBy } from './menu-place.js';
 import { addressOf, flatView, stepsOf } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
-import { canvasMenu } from './canvas-menu.js';
 import { sharePublicly } from './item-doc.js';
-import { newIslandButton } from './island-new.js';
 import { thumbOf } from './thumbs.js';
 import { pageIsA, pageSchema, versionCanvases } from './page-schema.js';
+import { isA, typeChoice, types, workType } from './words.js';
 
 const TYPE = 'lens';
 /**
@@ -112,62 +113,17 @@ const edited = (item, lens, style) => {
   return addressOf(kept.lens, keptStyle(kept.style)) !== addressOf(lens, keptStyle(style));
 };
 
-/** A view's own settings: what it holds beyond the layout and style the bar switches, kept through a Save. */
-const settingsOf = (item) => {
-  const { shape: _s, lit: _l, style: _k, ...settings } = item?.props?.style ?? {};
-  return settings;
-};
-
-/** A view an agent made, which the owner has not kept: it retires with what it is about. */
-const working = (c) => c?.status === 'working' && !c.preset;
-
-/** Keep what is up: into the view up, at once; else, or with `fresh` (Save as new view), under a name asked in the page.
- *  A person's Save is their word: what it keeps is kept (task e_gkv58kqb). */
-async function save(lens, style, current, open, fresh = false) {
-  const all = await savedCanvases();
-  const title = current && !fresh ? current.title : await ask({ title: 'Save this view', message: 'Its name.', input: { placeholder: 'A name, a few words' }, action: 'Save' });
-  if (title === null) return;
-  if (!title) return tell('Not saved', 'A view needs a name.');
-  if (title.length > 60) return tell('Not saved', 'A name is a few words: 60 characters at most.');
-  const { filter, walk, limit, time, sessions } = lens;
-  // A pack's view saved under its own name is the owner's version of it, standing in its place.
-  const props = { filter, walk, limit: limit ?? null, time: time ?? null, sessions: sessions === false ? false : null, style: { ...settingsOf(current), ...keptStyle(style) }, ...(current?.preset && title === current.title && { preset: current.id }) };
-  const same = all.find((c) => !c.preset && c.title.toLowerCase() === title.toLowerCase());
-  const made = same
-    ? await api('change', { ops: [{ op: 'update', id: same.id, status: 'kept', props }], reason: 'Saved from the query bar' })
-    : await api('change', { ops: [{ op: 'create', ref: 'canvas', type: TYPE, title, status: 'kept', props }], reason: 'Saved from the query bar' });
-  const id = same?.id ?? made.created?.canvas;
-  savedCanvases(true);
-  if (id) open(`#/v?${addressOf(lens, { ...style, canvas: id })}`);
-  return id ? { id, title } : null;
-}
-
 /**
  * Share the view that is up (decision e_nwdn7ce6): as a public view anyone opens, frozen as it is now, with what goes
- * out said first (ui/item-doc.js). Saved first when it is not, since a share shows a view kept on the map.
+ * out said first (ui/item-doc.js). A share shows a view kept on the map: one not kept is saved first, in the band.
  */
-async function shareView(lens, style, current, open) {
-  const kept = current && !current.preset ? { id: current.id, title: current.title } : await save(lens, style, current, open, true);
-  if (!kept) return;
+async function shareView(current) {
+  if (!current || current.preset) return tell('Not shared', 'Save this view first: a share shows a view kept on the map.');
   try {
-    await sharePublicly(kept.id, kept.title);
+    await sharePublicly(current.id, current.title);
   } catch (err) {
     tell('Not shared', err.message);
   }
-}
-
-/** Delete a saved canvas, after asking: it is retired (a lens's closed status), so it leaves the bar and Home and can
- *  be used again from its page. What is up stays, no longer saved. */
-async function drop(lens, style, current, open) {
-  if (!(await ask({ title: `Delete “${current.title}”?`, message: 'It leaves the bar and Home. What is up stays, unsaved.', action: 'Delete', danger: true }))) return;
-  try {
-    await api('change', { ops: [{ op: 'update', id: current.id, status: 'retired' }], reason: 'Deleted from the query bar' });
-  } catch (err) {
-    return tell('Not deleted', err.message);
-  }
-  savedCanvases(true);
-  const { canvas: _c, ...rest } = style;
-  open(`#/v?${addressOf(lens, rest)}`);
 }
 
 /** A mark drawn in the colour of what holds it, at the size of its text, from its strokes. */
@@ -179,46 +135,86 @@ function drawnMark(...strokes) {
   return svg;
 }
 const dot = (x, y, r = 2) => `M${x - r} ${y}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
-/** Save's mark: a disk. */
-const saveMark = () => drawnMark('M2.5 2.5h9l2 2v9h-11z', 'M5 2.5v3.5h5v-3.5', 'M5 13.5v-4h6v4');
-/** Delete's mark: a bin. */
-const binMark = () => drawnMark('M2.5 4h11', 'M6 4v-1.5h4v1.5', 'M4 4l.8 9.5h6.4l.8-9.5', 'M6.7 6.5v4.5', 'M9.3 6.5v4.5');
 /** The canvas picker's mark: three items and the links between them. */
 const canvasMark = () => drawnMark(dot(4, 12), dot(12, 4), dot(12, 12), 'M5.5 10.5l5-5', 'M6 12h4');
+
+/** The layout's menu: what is done rarely to how the view up is drawn, over everything, as a tab's menu is. */
+const layoutList = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: 'menu', 'aria-label': 'This view’s layout' });
+document.body.append(layoutList);
+function layoutMenu(rows) {
+  const button = h('button', { type: 'button', class: 'q-save q-band-menu', title: 'Layout, and sharing this view', 'aria-label': 'Layout, and sharing this view', 'aria-haspopup': 'menu' }, '⋯');
+  const item = (text, title, act, danger) => h('button', { type: 'button', role: 'menuitem', ...(danger && { class: 'danger' }), title, onclick: () => (layoutList.hidePopover(), act()) }, text);
+  button.addEventListener('click', () => {
+    if (layoutList.matches(':popover-open')) return layoutList.hidePopover();
+    layoutList.replaceChildren(...rows.filter(Boolean).map((m) => m.element ?? item(m.text, m.title, m.act, m.danger)));
+    layoutList.showPopover();
+    placeBy(layoutList, button, { end: true });
+  });
+  return button;
+}
+
+/** A part's menu opened in the band hangs over the page, placed by what opened it: the band clips what hangs below it. */
+function floatMenus(parts) {
+  parts.addEventListener('click', (ev) => {
+    const box = ev.target.closest?.('summary')?.parentElement;
+    const list = box?.matches('details') ? box.querySelector(':scope > .menu-items') : null;
+    if (!list || box.open) return;
+    // Placed once it is open (the click opens it after this), fixed where it is in sight.
+    requestAnimationFrame(() => box.open && ((list.style.position = 'fixed'), placeBy(list, box.querySelector(':scope > summary') ?? box, { end: true })));
+  });
+  return parts;
+}
+
+/** What the islands pack's part may offer for a new island, as its piece: the island packs and the types a first item may be (none where this session only reads). */
+function islandPiece() {
+  if (!may('write')) return {};
+  const all = state.schema?.packs ?? [];
+  const island = all.filter((p) => p.kind === 'island');
+  const packs = (island.length ? island : all.filter((p) => p.id === 'core')).slice(0, 50);
+  const usable = [...types.values()].filter((t) => !t.system && !t.dormant && !t.retired && !t.id.startsWith('sys.') && !isA(t.id, 'system') && !isA(t.id, 'actor'));
+  const offered = [...usable.filter((t) => t.pack !== 'core' && packs.some((p) => p.id === t.pack)), ...usable.filter((t) => t.pack === 'core').sort((a, b) => Number(b.id === workType()) - Number(a.id === workType()))].slice(0, 50);
+  return { packs: packs.map((p) => p.id), names: packs.map((p) => p.title), types: offered.map((t) => `${t.pack} ${t.id}`), type_names: offered.map((t) => typeChoice(t)) };
+}
+/** Whether the map holds its packs to the island rules (workspace_info islands), read once a page. */
+let islandsOn;
+const islandsHere = () => (islandsOn ??= api('workspace_info').then((info) => info?.islands === true, () => false));
 
 /** The saved canvas the canvas draws now, if one is: Home marks it. */
 let up = null;
 /** The views the bar has read the list again for, not finding them in it. */
 const reread = new Set();
 
-/** The canvas up, in the bar: a switch to every saved one (the current named, marked when changed since), and Save. `open` goes to an address (a pane's own, ui/panes.js). */
+/**
+ * The canvas up, in the bar: back and forward, the button naming the view up (opening every view), the parts that
+ * fill the band (Save, a new island), the pane's own buttons and the layout's menu. `open` goes to an address (a
+ * pane's own, ui/panes.js).
+ */
 export function canvasSwitch(lens, style, isHome, open = (href) => (location.hash = href)) {
   up = style.canvas ?? null;
   const part = h('span', { class: 'q-part q-canvas', title: 'The view up: switch to another, or save this one' });
   // A view the address names that the list lacks was kept since it was read (an agent's, another tab's): read it again.
   // Once for each: one retired is never in it.
   const listed = savedCanvases().then((all) => (style.canvas && !all.some((c) => c.id === style.canvas) && !reread.has(style.canvas) ? (reread.add(style.canvas), savedCanvases(true)) : all));
-  listed.then((all) => {
+  listed.then(async (all) => {
     const current = upOf(all, lens, style);
     const changed = current && edited(current, lens, style);
     // Not saved, it is named as its tab and its pane are: by what its filter finds.
     const label = current ? current.title : isHome ? 'Home' : filterSaid(lens.filter, () => {}) || 'View';
     const pick = viewPicker({ current, label, changed, isHome, open, title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it' });
-    // In a browser's order: back and forward, then the canvas up, as its address, and its style, with Save beside them, Split, and the canvas's menu at the end.
     const own = hooks.paneButtons?.() ?? [];
     const travel = own.filter((b) => b.classList.contains('q-travel'));
     // Each picker marked before it, its tooltip saying what it is.
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
-    // Saving, deleting and sharing a view write to the map: drawn only where this session may.
-    const writes = may('write');
-    // The menu's rows, read as it opens.
-    // The layout up and its switch are the styles pack's part (slot bar.layouts): it moves the page itself.
+    // The parts that fill the band, side by side: what the person keeps of the view up, and an island made.
+    const parts = floatMenus(h('span', { class: 'q-parts' }));
+    // The layout up and its switch are the styles pack's part (slot bar.layouts): drawn once the view is, so its reads wait.
     const layout = h('div', { class: 'q-look-row' });
-    void drawPart(layout, { slot: 'bar.layouts', piece: {} });
-    const rows = [{ element: layout }, writes && current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, writes && { text: 'Share it', title: 'Public for anyone, frozen as it is now (saved first if it is not)', act: () => shareView(lens, style, current, open) }];
-    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, ...[writes && h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : working(current) ? `Keep “${current.title}”: an agent’s view, retired with what it is about until you keep it` : `“${current.title}” is kept`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && !working(current) && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : working(current) ? 'Keep' : 'Save'))].filter(Boolean), ...(writes && current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu(rows));
-    // Making an island is a button of the band, once the map says it has islands: beside Save, before the menu.
-    newIslandButton().then((button) => button && !part.querySelector('.q-island') && (part.insertBefore(button, part.lastElementChild), fitBar()));
+    void firstDrawn.then(() => drawPart(layout, { slot: 'bar.layouts', piece: {} }));
+    const rows = [{ element: layout }, may('write') && current && !current.preset && { text: 'Share it', title: 'Public for anyone, frozen as it is now', act: () => shareView(current) }];
+    part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, parts, ...own.filter((b) => !travel.includes(b)), layoutMenu(rows));
+    fitBar();
+    const piece = { ...(current && !current.preset && { current: current.id }), home: Boolean(isHome), ...((await islandsHere()) ? islandPiece() : {}) };
+    await drawSlots(parts, { slot: 'bar', piece }).catch((err) => parts.append(h('span', { class: 'error', title: String(err?.message ?? err) }, 'The band’s parts did not draw')));
     fitBar();
   });
   return part;

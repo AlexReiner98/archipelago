@@ -208,3 +208,10 @@ test('shapes on a paint surface may be filled as a diagram is, say themselves an
   assert.equal(p.kids[1].at.href, 'https://x.test');
   refused(['paint', { width: 9, height: 9 }, ['path', { d: 'M0 0', look: 'cloud' }]], /look: "cloud"/);
 });
+
+test("a field may keep keys for its part: at most eight, each a key's name", () => {
+  const f = checkMarks(['input', { key: 'q', kind: 'search', focus: true, keys: ['ArrowUp', 'ArrowDown', 'Escape', 'Backspace'] }]);
+  assert.deepEqual(f.at.keys, ['ArrowUp', 'ArrowDown', 'Escape', 'Backspace']);
+  refused(['input', { key: 'q', keys: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] }], /at most 8 key names/);
+  refused(['input', { key: 'q', keys: ['Ctrl+A'] }], /not a key name/);
+});

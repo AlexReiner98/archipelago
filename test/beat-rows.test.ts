@@ -1,6 +1,6 @@
 // What the runtime hands the parts on `traces` (packs/surface/page/beat-rows.js, task e_p3tygg6p): the rows a beat
-// touched as they were and are. Its half and the part's half (packs/catch_up/parts/changes.js) together must say what
-// the page's change set (ui/changes.js) says, on the same facts.
+// touched as they were and are. With the part's half (packs/catch_up/parts/changes.js) they must say what came, left and
+// changed, and who did it, on the same facts.
 
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -16,9 +16,9 @@ import { changeSet as partSet } from '../packs/catch_up/parts/changes.js';
 async function served() {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-beat-'));
   writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
-  for (const f of ['project.js', 'changes.js', 'beat-rows.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
+  for (const f of ['project.js', 'beat-rows.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
   const at = (f: string) => import(pathToFileURL(join(dir, f)).href);
-  return { ...(await at('changes.js')), ...(await at('beat-rows.js')) };
+  return at('beat-rows.js');
 }
 
 const kinds = { isOpen: (_t: string, s: string) => s !== 'done', starterOf: (t: string) => t, relationFamily: (...r: string[]) => r };
@@ -35,15 +35,23 @@ const entries = [
   { pos: 7, at: '2026-11-05T10:03:00.000Z', by, facts: [['+', 'e_aaaaaaaa', 'title', 'Tailed']] },
 ];
 
-test("the runtime's rows and the part's comparison say what the page's change set says", async () => {
-  const { changeSet, beatRows } = await served();
+test("the runtime's rows and the part's comparison say what came, left and changed", async () => {
+  const { beatRows } = await served();
   const h = held();
   const before = JSON.stringify([...h.items, ...h.links]);
   const beat = beatRows(h, kinds, entries, { after: 4, gone: ['e_cccccccc'] });
   assert.equal(JSON.stringify([...h.items, ...h.links]), before, 'what it was handed is unchanged');
   assert.deepEqual([beat.from, beat.to], [4, 7]);
   assert.ok(beat.rows.every((r: any) => 'was' in r && 'now' in r && r.pos), 'each row as it was and is, with where');
-  assert.deepEqual(JSON.parse(JSON.stringify(partSet(beat))), JSON.parse(JSON.stringify(changeSet(held(), kinds, entries, { after: 4, gone: ['e_cccccccc'] }))));
+  const set = partSet(beat);
+  const items = Object.fromEntries(set.items.map((c: any) => [c.id, c]));
+  assert.deepEqual(Object.keys(items).sort(), ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_cccccccc', 'e_dddddddd']);
+  assert.deepEqual([items.e_aaaaaaaa.did, items.e_bbbbbbbb.did, items.e_cccccccc.did, items.e_dddddddd.did], ['changed', 'left', 'left', 'came'], 'what the reader may no longer see left');
+  assert.deepEqual(items.e_aaaaaaaa.fields, [{ field: 'title', was: 'Tail the log', now: 'Tailed' }, { field: 'status', was: 'todo', now: 'doing' }]);
+  assert.deepEqual([items.e_aaaaaaaa.by, items.e_aaaaaaaa.pos], [by, 7], 'its latest maker, and where');
+  const links = Object.fromEntries(set.links.map((c: any) => [c.id, c]));
+  assert.deepEqual([links.r_bbbbbbbb.did, links.r_bbbbbbbb.type, links.r_bbbbbbbb.from, links.r_bbbbbbbb.to], ['linked', 'depends_on', 'e_dddddddd', 'e_aaaaaaaa']);
+  assert.equal(links.r_aaaaaaaa.did, 'unlinked');
   assert.deepEqual(beatRows(held(), kinds, [], { after: 8 }), { from: 8, to: 8, rows: [] });
 });
 

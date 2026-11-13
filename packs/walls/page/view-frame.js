@@ -2,7 +2,7 @@
 // milestone a step reaches (packs/canvas/layouts/architecture/play.js, used by the map). A drawing names only the view; the page draws it.
 // On a canvas, it is drawn in a pane of its own beside the drawing's (hooks.besidePane, ui/panes.js), so the reader
 // slides the sash between them (the owner, 2 Nov 2026, e_dnewbxxh); the frame itself stays empty. Elsewhere (a
-// document), it is drawn in the frame as it is kept (keptView, ui/canvases.js), in the sandbox as every picture is:
+// document), it is drawn in the frame as it is kept (keptView, packs/surface/page/views-kept.js), in the sandbox as every picture is:
 // named again (a patch with the mark whole), the new view is drawn under the old, out of sight, and takes its place
 // once it has drawn, so nothing jumps; named with no id, the frame is empty.
 
