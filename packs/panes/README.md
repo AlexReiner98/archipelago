@@ -24,15 +24,13 @@ windows, none of which a part's marks can say yet. So the pack declares no
 | `pane-web.js` | A web page framed in a pane |
 | `tab-life.js` | A chat's tab over its life |
 
-## Later: parts
+## Later: one part
 Once the slot contract has a mark that holds a canvas, drag gestures and the
-address in the runtime, these become the parts below, and presence's
-decisions (landing, a tab's life) its parts.
-
-| Part | Slot |
-|---|---|
-| `panes.panes` | `panes` |
-| `panes.tabs` | `tabs` |
+address in the runtime, these become one part, `panes.panes`. It fills `tabs`
+and opens `panes`, so one model holds the tabs and their panes
+(`parts/model.js`, the strip's marks in `parts/strip.js`). It publishes
+`lands_in`, `popped`, `front` and `address` as page state for the host to
+read. Each piece waiting on a mark is a task under e_5fndpcsp.
 
 A mark on one tab is the slot `tab.mark`, filled by sessions' count. What
 each slot hands a part is in `docs/packs.md`.
