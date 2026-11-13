@@ -206,7 +206,7 @@ person's actor, as the log names one) and told each beat of the log as
 `{ name: 'beat', from, to, rows: [{ id, was, now, by?, at?, pos }] }`: the
 rows the beat touched as they were and are (null where not held, or gone),
 projected by the runtime, which keeps the store and the projector
-(`packs/surface/page/live.js`); the part compares them. On the first
+(`packs/surface/page/beat-rows.js`); the part compares them. On the first
 canvas of a page it is told `{ name: 'missed', from, to, entries: [{ pos, at,
 by?, moved?, facts, rows: [{ id, was, now }] }] }`, entry by entry from where
 the person last looked, then one beat for the whole span. Neither is worked
