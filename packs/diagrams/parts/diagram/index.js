@@ -1,9 +1,9 @@
 // A diagram made from the code, as the diagrams pack's part (piece.diagram): the boxes an item keeps in props.diagram,
 // where they sit on the page, the areas they sit in and the wires between them, answered as a paint surface the host
-// pans and zooms. The part only says what each line and word is; how it looks is the workspace's style.
+// pans and zooms, with its zoom buttons. The part only says what each line and word is; how it looks is the workspace's style.
 
-/** How each kind of box's outline is drawn on the plane. */
-const LOOK = { area: 'line', box: 'line', strong: 'fill' };
+/** How each kind of box is drawn on the plane: an area and a box filled from the style (a box over the wires), a strong one solid. */
+const LOOK = { area: 'area', box: 'box', strong: 'strong' };
 /** A box's words, a step on the style's scale: an area's heading a step over a box's, a wire's label a step under. */
 const SIZE = { area: 4, box: 3, text: 3, wire: 2 };
 /** How far below its middle a line of words sits, in the plane's units, so the words stand centred on it. */
@@ -50,8 +50,9 @@ function words(b) {
 function shape(b) {
   if (b.kind === 'text') return words(b);
   const look = strong(b) ? LOOK.strong : b.dashed ? 'dash' : LOOK[b.kind] ?? LOOK.box;
-  const tone = b.tone === 'warn' ? 'warn' : b.kind === 'area' ? 'muted' : undefined;
-  return [['path', { d: outline(b), look, ...(tone && { tone }) }], ...words(b)];
+  const tone = b.tone === 'warn' ? 'warn' : undefined;
+  const link = web(b.link);
+  return [['path', { d: outline(b), look, ...(tone && { tone }), ...(typeof b.tooltip === 'string' && b.tooltip && { tip: b.tooltip.slice(0, 200) }), ...(link && { href: link }) }], ...words(b)];
 }
 
 /** A wire between two boxes: a line from edge to edge, an arrowhead at its end, and its label at its middle. */
@@ -66,7 +67,7 @@ function wire(w, byId) {
   const [px, py] = [(-uy * ARROW) / 2, (ux * ARROW) / 2];
   const tone = w.faint ? 'closed' : 'muted';
   return [
-    ['path', { d: `M${n(x1)} ${n(y1)}L${n(bx)} ${n(by)}`, tone, ...(w.dashed && { look: 'dash' }) }],
+    ['path', { d: `M${n(x1)} ${n(y1)}L${n(bx)} ${n(by)}`, tone, ...(w.dashed && { look: 'dash' }), tip: `${a.lines?.[0] ?? a.id} → ${b.lines?.[0] ?? b.id}${w.label ? `: ${w.label}` : ''}`.slice(0, 200) }],
     ['path', { d: `M${n(x2)} ${n(y2)}L${n(bx + px)} ${n(by + py)}L${n(bx - px)} ${n(by - py)}Z`, look: 'fill', tone }],
     ...(w.label ? [['text', { x: n((x1 + x2) / 2), y: n((y1 + y2) / 2 + BASELINE), anchor: 'middle', size: SIZE.wire, tone: 'muted' }, String(w.label)]] : []),
   ];
@@ -90,7 +91,7 @@ export function diagramMarks(data) {
     ...(file ? [['text', { look: 'mark', href: file, tip: 'The draw.io file it was drawn from, at its commit' }, '.drawio']] : []),
   ];
   // Areas first, then the wires, then the boxes over them.
-  const plane = ['paint', { width: data.width, height: data.height, tip: 'Scroll to zoom, drag to move' }, ...areas.flatMap(shape), ...wires.flatMap((w) => wire(w, byId)), ...boxes.flatMap(shape)];
+  const plane = ['paint', { width: data.width, height: data.height, controls: true, tip: 'Scroll to zoom, drag to move' }, ...areas.flatMap(shape), ...wires.flatMap((w) => wire(w, byId)), ...boxes.flatMap(shape)];
   return ['box', { gap: 3 }, head, plane];
 }
 
