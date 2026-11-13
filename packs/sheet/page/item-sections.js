@@ -42,7 +42,7 @@ export function headSection(e, owner, setStatus, setVisibility) {
 
 /**
  * Each field its type declares, named, empty or not, and any it holds that its type no longer declares: each changed
- * where it stands by its kind (ui/field-edit.js), unless the system keeps it or its type no longer declares it. `edit`
+ * where it stands by its kind (packs/sheet/page/field-edit.js), unless the system keeps it or its type no longer declares it. `edit`
  * is the page's, when it may be changed: pick(name, value) changes one at once, keep(name, was) holds words for Save.
  * The choices it settles by have their own section.
  */

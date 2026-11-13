@@ -1,5 +1,5 @@
 // The page every item lands on, in the sheet that opens from the side of the canvas: a bare page of what the item
-// holds, a section for each (ui/item-sections.js), under its title. What it is tied to is not on it: the canvas
+// holds, a section for each (packs/sheet/page/item-sections.js), under its title. What it is tied to is not on it: the canvas
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
 import { api, ask, h, may, part, state, tell } from './base.js';
@@ -145,7 +145,7 @@ export async function entity(id, here) {
   const press = (b) => (b.at ? openHere(b.at) : b.draw ? drawIn(drawnBy(b.draw, id)) : act(toolOf(b.action)));
 
   redraw.inPlace = inPlace;
-  // Its title and note, written in place and saved as one change (ui/draft.js).
+  // Its title and note, written in place and saved as one change (packs/sheet/page/draft.js).
   // A document reads in its note's place as it will publish: the publish pack's part (ui/item-doc.js).
   const reading = doc && readingOf(e, doc, looks, again);
   // Read beside its draft (the pages), a document opens as words to write: it reads on the left already.
@@ -236,11 +236,11 @@ export async function entity(id, here) {
     acting,
     headSection(e, owner, writes && ((st) => change([{ op: 'update', id, status: st }], `Status set to ${st} in the UI`)), writes && ((v) => change([{ op: 'update', id, visibility: v }], `Visibility set to ${v} in the UI`))),
     note,
-    // What its kind's screens add to the page: a run's turns, for one.
-    ...sectionsOn(data),
     choicesSection(e, writes && pick, fieldEdit),
     fieldsSection(e, looks, fieldEdit),
     sourceSection(data.source),
+    // What its kind's screens add to the page, a run's turns for one: below the fields, above history (decision e_axz9au5f).
+    ...sectionsOn(data),
     // One Save for the note and every field written in place, kept in sight at the foot of the page.
     draft.bar,
     history,
