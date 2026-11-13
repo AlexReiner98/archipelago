@@ -1,5 +1,6 @@
 // A guest map from one click, and the link its agent writes to (packs/surface/kernel/guest-route.ts, e_4bsagguk).
 import assert from 'node:assert/strict';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import { setControlValue } from '../packs/identity/kernel/control.ts';
 import { GUEST_ITEMS, guestKey, guestOf, guestsDue, keepGuest, type Guest } from '../packs/identity/kernel/guests.ts';
@@ -123,4 +124,77 @@ test('Make it yours: a guest map starts as a copy of what a shared map shows, an
   const titles = (await call('/api/search', copy.result.page_token, { q: '' })).result.map((i: { title: string }) => i.title);
   assert.ok(titles.includes('Funding'), titles.join(', '));
   assert.ok(!titles.includes('Kept to myself'));
+});
+
+test('Make it yours brings the shared map’s own type, its view and its style, so the copy looks as it was shared', async () => {
+  const { workspaces, call } = await serve('tokens');
+  const main = await workspaces.get('default');
+  const owner = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'owner', admin: true })).token;
+  const ok = async (path: string, body: unknown) => {
+    const done = await call(path, owner, body);
+    assert.ok(!done.error, done.error);
+    return done.result;
+  };
+  await ok('/api/workspace_set', { islands: true });
+  const RECIPES = { types: [{ id: 'recipes.dish', title: 'Dish', description: 'A dish.', extends: 'record', fields: { serves: { type: 'number' } } }] };
+  await ok('/api/change', { reason: 'test', ops: [{ op: 'create', type: 'pack', title: 'Recipes', body: 'What we cook.', props: { name: 'recipes', manifest: RECIPES } }] });
+  await ok('/api/pack_set', { pack: 'recipes', on: true });
+  const { i: island } = (await ok('/api/change', { reason: 'test', ops: [{ op: 'create', ref: 'i', type: 'island', title: 'Kitchen', props: { pack: 'recipes' } }] })).created;
+  const { s: style } = (await ok('/api/change', { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'style', title: 'Warm', status: 'current', props: { shape: 'flow', link_colours: { part_of: '#aa5500' } } }] })).created;
+  const made = (await ok('/api/change', { reason: 'test', ops: [
+    { op: 'create', ref: 'a', type: 'recipes.dish', title: 'Soup', props: { serves: 4, island }, visibility: 'shared' },
+    { op: 'create', ref: 'b', type: 'recipes.dish', title: 'Bread', props: { island }, visibility: 'shared' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'a' },
+    { op: 'create', ref: 'l', type: 'lens', title: 'The dishes', props: { filter: { find: ['type recipes.dish'] }, style: { style } }, visibility: 'shared' },
+  ] })).created;
+  const shared = await ok('/api/share_create', { id: made.l });
+
+  const copy = await call('/guest', undefined, { from: shared.address });
+  assert.equal(copy.status, 200, copy.error);
+  const guest = (await workspaces.get(copy.result.workspace.id)).pelago;
+  // The type is itself, from a pack kept on the guest's map and on there, and its items live on an island that speaks it.
+  assert.equal(guest.registry.type('recipes.dish')?.title, 'Dish');
+  assert.equal(guest.registry.states.get('recipes')?.state, 'active');
+  const dishes = (await guest.db.query<{ id: string; title: string; props: Record<string, unknown> }>(`select id, title, props from entity where type = 'recipes.dish' limit 5`)).rows;
+  assert.deepEqual(dishes.map((d) => d.title).sort(), ['Bread', 'Soup']);
+  const there = await guest.entity(String(dishes[0].props.island));
+  assert.equal(there?.props.pack, 'recipes');
+  // The view, its query as it was, drawn by its style, which came too.
+  const views = (await guest.db.query<{ id: string; props: Record<string, unknown> }>(`select id, props from entity where type = 'lens' and title = 'The dishes' limit 1`)).rows;
+  assert.deepEqual((views[0]?.props.filter as { find: string[] }).find, ['type recipes.dish']);
+  const drawnBy = (views[0].props.style as { style: string }).style;
+  assert.notEqual(drawnBy, style, 'the copy names its own style');
+  const warm = await guest.entity(drawnBy);
+  assert.equal(warm?.title, 'Warm');
+  assert.deepEqual(warm?.props.link_colours, { part_of: '#aa5500' });
+});
+
+test('a type whose pack reaches outside comes as data, and the pack itself waits for sign-in', async () => {
+  const { workspaces, call } = await serve('tokens', undefined, undefined, [join(import.meta.dirname, 'fixtures', 'outward')]);
+  const main = await workspaces.get('default');
+  const owner = (await createToken(main.pelago.db, 'default', { kind: 'human', name: 'owner', admin: true })).token;
+  const ok = async (path: string, body: unknown) => {
+    const done = await call(path, owner, body);
+    assert.ok(!done.error, done.error);
+    return done.result;
+  };
+  // On a map with islands on, a pack that declares types and reaches outside is turned off: such a map has islands off.
+  await ok('/api/pack_set', { pack: 'tides', on: true });
+  const made = (await ok('/api/change', { reason: 'test', ops: [
+    { op: 'create', ref: 'r', type: 'tides.reading', title: 'High water', visibility: 'shared' },
+    { op: 'create', ref: 'l', type: 'lens', title: 'Readings', props: { filter: { find: ['type tides.reading'] } }, visibility: 'shared' },
+  ] })).created;
+  const shared = await ok('/api/share_create', { id: made.l });
+
+  const copy = await call('/guest', undefined, { from: shared.address });
+  assert.equal(copy.status, 200, copy.error);
+  const guest = (await workspaces.get(copy.result.workspace.id)).pelago;
+  assert.notEqual(guest.registry.states.get('tides')?.state, 'active', 'the pack that reaches outside is not turned on');
+  assert.equal(guest.registry.type('tides_data.reading')?.title, 'Reading', 'its type came as data');
+  const read = (await guest.db.query<{ title: string }>(`select title from entity where type = 'tides_data.reading' limit 1`)).rows;
+  assert.equal(read[0]?.title, 'High water');
+  const view = (await guest.db.query<{ props: { filter: { find: string[] } } }>(`select props from entity where type = 'lens' and title = 'Readings' limit 1`)).rows[0];
+  assert.deepEqual(view?.props.filter.find, ['type tides_data.reading'], 'the view finds the type as it is here');
+  const key = copy.result.link.split('/g/')[1];
+  assert.match((await call('/agent/pack_set', key, { pack: 'tides', on: true })).error, /reaches outside the map: sign in/);
 });
