@@ -109,3 +109,79 @@ test('a drag lands on a side of a pane, its middle, the tabs or out', () => {
   assert.deepEqual(zoneBox(box, 'right'), { left: 150, top: 0, width: 150, height: 300 });
   assert.deepEqual(zoneBox(box, 'center'), box);
 });
+
+test('a swatch names a style preset and the host paints it; a button may try one, or copy words', () => {
+  const s = checkMarks(['box', { flow: 'row' },
+    ['swatch', { key: 'sw-ocean', preset: 'styles.ocean', tip: 'Ocean', label: 'Ocean', on: 'trying' }],
+    ['button', { key: 'try-ocean', try: 'styles.ocean' }, 'Ocean'],
+    ['button', { key: 'try-house', try: null }, 'House'],
+    ['button', { key: 'copy', copy: 'https://x.test/mcp' }, 'Copy'],
+  ]);
+  assert.equal(s.kids[0].at.preset, 'styles.ocean');
+  assert.equal(s.kids[2].at.try, '');
+  assert.equal(s.kids[0].at.on, 'trying');
+  refused(['swatch', { preset: 'a', on: 'chosen' }], /on: "chosen", not one of kept, trying/);
+  refused(['button', { key: 'c', copy: 'x'.repeat(2001) }, 'Copy'], /copy: more than 2000 characters/);
+  refused(['swatch', {}], /a swatch with no preset/);
+  refused(['swatch', { preset: '#ff0000' }], /preset: a key of letters/);
+  refused(['swatch', { preset: 'a', color: 'red' }], /the attribute "color" on a swatch/);
+  refused(['button', { key: 'b', try: 'a b' }, 'x'], /try: a key of letters/);
+});
+
+test('text may stand for a session, in its hue, on the page only', () => {
+  assert.equal(checkMarks(['text', { hue: 'Sark' }, 'Session Sark']).at.hue, 'Sark');
+  refused(['paint', { width: 10, height: 10 }, ['text', { x: 1, y: 1, hue: 'Sark' }, 'x']], /a hue on text on a paint surface/);
+});
+
+test('panes stand one over another on a tall page, and give an open sheet its room', async () => {
+  // @ts-ignore
+  const { dirOn, sheetRoom } = await import('../packs/walls/page/part-pane.js');
+  assert.equal(dirOn('row', 1200, 800), 'row');
+  assert.equal(dirOn('row', 600, 900), 'column');
+  assert.equal(dirOn('column', 1200, 800), 'column');
+  assert.equal(sheetRoom(true, 400, 1600), 0.25);
+  assert.equal(sheetRoom(true, 1500, 1600), 0, 'a sheet over most of the page takes no room beside the panes');
+  assert.equal(sheetRoom(false, 400, 1600), 0);
+});
+
+test('a trace names an item and its line, and is drawn nowhere itself', () => {
+  const t = checkMarks(['list', {}, ['trace', { key: 'tr1', item: 'e_abcdefgh', tip: 'Session Sark, set status done: shipped', hue: 'Sark' }]]);
+  assert.equal(t.kids[0].at.item, 'e_abcdefgh');
+  refused(['trace', { tip: 'x' }], /a trace with no item/);
+  refused(['trace', { item: 'e_abcdefgh' }, ['text', 'x']], /a trace holding something/);
+  refused(['trace', { item: 'e_abcdefgh', tip: 'x'.repeat(501) }], /tip: more than 500 characters/);
+});
+
+test('a replay names its step and the entries it plays, and the host plays them through the store', async () => {
+  const r = checkMarks(['replay', { key: 'rp', at: 1, steps: [{ pos: 7, ids: ['e_abcdefgh', 'r_abcdefgh'] }, { pos: 9, ids: ['e_abcdefgh'] }] }]);
+  assert.equal(r.at.steps[1].pos, 9);
+  refused(['replay', { at: 0 }], /a replay with no steps/);
+  refused(['replay', { at: 0, steps: [{ pos: -1, ids: [] }] }], /a step that is not \{ pos, ids \}/);
+  refused(['replay', { at: 0, steps: [{ pos: 1, ids: ['x'] }] }], /not an item's or a link's id/);
+  // @ts-ignore
+  const { stepsFrom } = await import('../packs/surface/page/replay.js');
+  const entries = [{ pos: 7, at: 't', facts: [['+', 'e_abcdefgh', 'title', 'A'], ['+', 'e_zzzzzzzz', 'title', 'B']] }];
+  assert.deepEqual(stepsFrom(entries, [{ pos: 7, ids: ['e_abcdefgh'] }, { pos: 8, ids: [] }]).map((s: any) => s.facts), [[['+', 'e_abcdefgh', 'title', 'A']]]);
+});
+
+test('the host rewinds the store, plays each step once, and ends where the map is', async () => {
+  // @ts-ignore
+  const { replayIn } = await import('../packs/surface/page/replay.js');
+  const applied: number[] = [], projected: number[] = [];
+  const store: any = { items: new Map([['e_new00000', { title: 'made since' }], ['e_abcdefgh', { title: 'now' }]]), links: new Map(), at: new Map(), kinds: {}, apply: (x: any) => applied.push(x.pos) };
+  const view = { store, ids: ['e_new00000', 'e_abcdefgh'], links: new Map(), tell: () => {} };
+  const entries = [{ pos: 7, at: 'a', facts: [['+', 'e_abcdefgh', 'title', 'B']] }, { pos: 9, at: 'b', facts: [['+', 'e_new00000', 'type', 'task']] }];
+  store.missed = { view, then: { items: new Map([['e_abcdefgh', { title: 'then' }]]), links: new Map() }, entries, from: 5, to: 9 };
+  const steps = [{ pos: 7, ids: ['e_abcdefgh'] }, { pos: 9, ids: ['e_new00000'] }];
+  replayIn(store, { at: 0, steps }, () => {});
+  assert.equal(store.playing, true);
+  assert.equal(store.items.get('e_abcdefgh').title, 'then');
+  assert.equal(store.items.has('e_new00000'), false, 'what was made since leaves while it plays');
+  replayIn(store, { at: 1, steps }, () => {});
+  replayIn(store, { at: 1, steps }, () => {});
+  assert.deepEqual(applied, [7], 'a step is played once');
+  replayIn(store, null, (_s: any, _k: any, at: string) => projected.push(at === 'b' ? 9 : 0));
+  assert.deepEqual(projected, [9], 'what was not played is projected at once');
+  assert.equal(store.playing, false);
+  assert.equal(store.at.get('e_abcdefgh'), 9);
+});

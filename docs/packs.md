@@ -245,7 +245,7 @@ A part is handed the item it stands on cut to the fields it `reads`, its
 query's items, its named reads, and, where it declares `go`, the page's
 address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
 `text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`,
-`picture`, `web`, `pane` and `panes`, each named in its `marks`.
+`picture`, `web`, `pane`, `panes`, `swatch`, `trace` and `replay`, each named in its `marks`.
 
 **What any mark may carry**, beside `key`, `item`, `view` and `tip`:
 `lights`, up to 500 items it lights on the canvas in sight while the person
@@ -259,11 +259,16 @@ part is told nothing.
 | Mark | What it is | What the part hears |
 | --- | --- | --- |
 | `box` `fits` | As many of its marks as fit on one line, one at least; then `+N`, its tip the hidden marks' tips (`part-fits.js`). | With `more: <key>`, the `+N` is a button: `press`, value N. |
-| `button` `copy` | The words go to the clipboard on the press. | `press`. |
+| `button` `copy` | The words (up to 2000) go to the clipboard on the press; the button says Copied for a moment, or Copy failed with the words in its tip. | `press`, with `copied` true or false. |
+| `button` `try` | A theme (a preset used once chosen) tried on this screen alone, nothing kept; `null` the workspace's own again (`packs/surface/page/swatch.js`). Every part is handed `trying`, the preset tried or null. | `press`. |
+| `swatch` | A style preset's paper, ink and sea for the screen's scheme, painted by the host from the preset the part names (`preset`): a part paints no colour. `label` under it, `on: kept` or `trying` outlines it; an unknown preset is blank. | `press`, with a key. |
+| `text` `hue` | A session, named by its words, marked in its hue as every session is. | nothing. |
+| `replay` | Nothing where it stands: the canvas under the part shows what the person missed (`store.missed`, set as the canvas mounts) up to step `at` of `steps` (`[{ pos, ids }]`, each the facts of entry `pos` about those ids), the store `playing` while it is said; a step back or other steps rewinds first. With no replay mark, what was not played is projected at once and the store is the map as it is now (`packs/surface/page/replay.js`). The part drives the timer. | nothing. |
+| `trace` | Nothing where it stands: its `item`'s marks on the canvas painted with its line (`tip`, the page's tip over them) in a session's `hue`, until each was in sight for the style's `trace_seen_after` while the page painted; then it fades over `trace_fade` (`part-trace.js`). A trace no longer sent is taken off. | `seen`, with `item`. |
 | `menu` | What is done rarely, in steps (`part-menu.js`): a head (`text`), a field, buttons, and a `menu` in it as the next step (›, opened it is all its step shows, ‹ back). A `search` field narrows its step's choices in the page and Enter takes the first left; Backspace in it, empty, goes back. `open: true` opens it; it stays as the person leaves it while its key stays. | `press` from a choice, `edit` from a field; a `text` field still `submit`s, an `item` field `pick`s. |
 | `web` | A page on the web framed in place (`url`, http or https), sandboxed (`allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox`), no referrer, with ↗ to open it apart; this server's own pages are refused, drawn as what they are. A new `reload` loads it again. | nothing. |
 | `pane` | A canvas at an address (`at`) the page draws in its body (`hooks.paneFrame(at, el, said)`, whoever keeps the panes), the part's marks in its strip; `at` of `w?url=` frames that page as `web` does. `share` is its room; `ring` rings it once. | `focus` when pressed or focused in; whatever the frame says (`open`, `opened`, `named`). |
-| `panes` | Panes side by side (`dir: row`) or one over another (`column`), each by its share; the host draws the lines between them (`part-pane.js`). | `share { index, at }` as a line is dragged, `at` a share of the room. |
+| `panes` | Panes side by side (`dir: row`) or one over another (`column`, and a row on a page taller than wide), each by its share of the room; the host draws the lines between them (`part-pane.js`). It stands as the page's panes do: the whole page for one (its strip not drawn), under the band for several, the open sheet's room kept beside it; the pane marked `selected` gives its frame to the bar and find (`--active-left`, `right`, `top`, `bottom`). | `share { index, at }` as a line is dragged, `at` a share of the room. |
 
 A box, a button or a pane may carry `drag: <kind>`: the host follows it once
 it moves a few pixels, shows where it would land, and answers `drop { onto,

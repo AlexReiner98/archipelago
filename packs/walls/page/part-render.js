@@ -20,8 +20,9 @@ import { renderBody } from './body.js';
 import './menu-place.js';
 import { fits, fitOnce } from './part-fits.js';
 import { menuSteps } from './part-menu.js';
-import { buildPane, frameWeb, paneBody, paneGone, sashes } from './part-pane.js';
+import { buildPane, frameWeb, layPanes, paneBody, paneGone, sashes } from './part-pane.js';
 import { draggable } from './part-drag.js';
+import { traceGone, traceMark } from './part-trace.js';
 
 /** What each element was drawn from, and the surface that runs a paint mark. */
 const drawnFrom = new WeakMap();
@@ -41,13 +42,15 @@ const partTold = 50;
  * `picture(item, el)` draws a picture mark's item into its element; `lights(ids)` lights those items on the canvas
  * while the person points at a mark that names them, and fades the rest (nothing, or an empty list, takes it off). `frame(at, el,
  * said)` draws a canvas at a pane's address in `el` (said(name, value) tells the part what is done in it), answering
- * with a way to stop it; `hue(words)` is a session's hue named by words. `find(q, types, link)` answers the items an item
+ * with a way to stop it; `hue(words)` is a session's hue named by words; `swatch(preset, el)` paints a style preset's
+ * colours into `el`, and `tryTheme(preset)` paints this screen alone in one ('' the workspace's own again);
+ * `replay({ at, steps } | null)` shows the canvas under the part the missed steps up to `at`, or the map as it is now. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
  * `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined } = {}) {
-  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {} } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay };
   let ended = false;
   return {
     draw(node) {
@@ -101,6 +104,15 @@ function build(node, ctx) {
   else if (node.mark === 'web') el = make('div', 'pm-web');
   else if (node.mark === 'pane') el = buildPane(ctx.tell);
   else if (node.mark === 'panes') el = make('div', 'pm-panes');
+  else if (node.mark === 'trace') (el = make('span', 'pm-trace')), (el.hidden = true);
+  else if (node.mark === 'replay') (el = make('span', 'pm-replay')), (el.hidden = true), (el.pmReplay = ctx.replay);
+  else if (node.mark === 'swatch') {
+    // A swatch is pressed as a button is: the part hears it by its key.
+    el = make('button', 'pm-swatch');
+    el.type = 'button';
+    el.append(make('span', 'pm-swatch-tile'), make('span', 'pm-swatch-name'));
+    el.addEventListener('click', () => drawnFrom.get(el)?.key !== undefined && ctx.tell({ key: drawnFrom.get(el).key, name: 'press' }));
+  }
   else if (node.mark === 'text' && node.at.href) {
     // An address on the web, opened apart: the page never follows it in place, and tells it nothing of where it came from.
     el = make('a', 'pm-text');
@@ -112,8 +124,10 @@ function build(node, ctx) {
     el.type = 'button';
     el.addEventListener('click', async () => {
       const { key, at } = drawnFrom.get(el);
-      // A button that copies: the words it carries go to the clipboard on the press, and the part hears the press too.
-      if (at.copy !== undefined) void navigator.clipboard?.writeText(at.copy).catch(() => {});
+      // A button that tries a theme paints this screen in it alone, keeping nothing; the part hears the press too.
+      if (at.try !== undefined) void Promise.resolve(ctx.tryTheme(at.try)).catch(() => {});
+      // A button that copies: its words go to the clipboard, the button says whether they went, and the part hears it.
+      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', copied: await copied(el, at.copy) });
       if (!at.pick) return ctx.tell({ key, name: 'press' });
       // A pick waits for the item clicked on the canvas; told back either way, null when it was let go.
       el.setAttribute('aria-pressed', 'true');
@@ -224,9 +238,17 @@ function update(el, node, ctx, fresh = false) {
   looks(el, node);
   lit(el, node, ctx, fresh);
   if (['box', 'button', 'pane'].includes(node.mark)) handled(el, node, was, fresh, ctx);
+  // Text in a session's hue is that session, marked as every session is (its dot, ui/style.css .who-session).
+  if (node.mark === 'text') hued(el, at.hue !== undefined ? ctx.hue(at.hue) : undefined, at.hue !== undefined);
   if (node.mark === 'web') frameWeb(el, at.url, at.reload ?? '');
+  if (node.mark === 'trace') return (traceMark(el, node, ctx), el);
+  // A replay: the canvas under the part shows the missed steps up to `at`; the host holds the store, the part the timer.
+  if (node.mark === 'replay') return (ctx.replay({ at: at.at, steps: at.steps }), el);
+  // A swatch is painted by the host from the preset it names, again only for another preset.
+  if (node.mark === 'swatch' && (fresh || was.at.preset !== at.preset)) ctx.swatch(at.preset, el.firstElementChild);
+  if (node.mark === 'swatch') (el.lastElementChild.textContent = at.label ?? '', at.on ? (el.dataset.on = at.on) : delete el.dataset.on);
   if (node.mark === 'pane') (paneBody(el, node, ctx.frame, ctx.tell), place(el.firstElementChild, node.kids, ctx));
-  if (node.mark === 'panes') (el.dataset.key = node.key, place(el, node.kids, ctx), sashes(el, node, ctx.tell));
+  if (node.mark === 'panes') (el.dataset.key = node.key, (el.pmNode = node), place(el, node.kids, ctx), layPanes(el), sashes(el, node, ctx.tell));
   // A box that fits shows as many of its marks as the page has room for; the host measures, never the part.
   if (node.mark === 'box' && (fresh || Boolean(was.at.fits) !== Boolean(at.fits))) fits(el, Boolean(at.fits));
   if (node.item !== undefined && node.mark !== 'picture') el.dataset.item = node.item;
@@ -285,9 +307,23 @@ function update(el, node, ctx, fresh = false) {
   return el;
 }
 
+/** Put `words` on the clipboard, the button saying Copied for a moment, or Copy failed with the words in its tip to take by hand. */
+async function copied(el, words) {
+  let done = false;
+  try {
+    await navigator.clipboard.writeText(words);
+    done = true;
+  } catch {}
+  const said = el.textContent;
+  el.textContent = done ? 'Copied' : 'Copy failed';
+  if (!done) el.title = words;
+  setTimeout(() => el.isConnected && el.textContent !== said && ((el.textContent = drawnFrom.get(el)?.words ?? said), tipped(el, drawnFrom.get(el)?.at.tip, true)), 2000);
+  return done;
+}
+
 /** A tip is the element's own title; set only when it changes, as the page's tooltip takes a title off while it shows it. */
-function tipped(el, tip) {
-  if (tip === drawnTip.get(el)) return;
+function tipped(el, tip, again = false) {
+  if (tip === drawnTip.get(el) && !again) return;
   if (tip === undefined) el.removeAttribute('title');
   else el.setAttribute('title', tip);
   drawnTip.set(el, tip);
@@ -300,7 +336,7 @@ function looks(el, node) {
   if (at.look) cls.push(`pm-${kind}-${at.look}`);
   if (at.tone) cls.push(`pm-tone-${at.tone}`);
   if (at.flow) cls.push(`pm-flow-${at.flow}`);
-  if (kind === 'panes') cls.push(`pm-dir-${at.dir ?? 'row'}`);
+  if (kind === 'panes') cls.push(`pm-dir-${el.dataset.dir ?? at.dir ?? 'row'}`);
   if (at.align) cls.push(`pm-align-${at.align}`);
   if (at.grow) cls.push('pm-grow');
   if (at.wrap) cls.push('pm-wrap');
@@ -357,6 +393,9 @@ function drawOnPlane(node) {
 function gone(el) {
   for (const s of [el, ...el.querySelectorAll('.pm-paint')]) surfaces.get(s)?.stop();
   for (const p of [el, ...el.querySelectorAll('.pm-pane')]) if (p.classList?.contains('pm-pane')) paneGone(p);
+  for (const t of [el, ...el.querySelectorAll('.pm-trace')]) traceGone(t);
+  // A replay no longer said: the canvas is the map as it is now.
+  for (const r of [el, ...el.querySelectorAll('.pm-replay')]) r.pmReplay?.(null);
 }
 
 /** What a box, a button or a pane may be when it stands for something moved or picked between: listened for once, when made. */
@@ -374,14 +413,19 @@ function handle(el, ctx) {
   el.addEventListener('animationend', (ev) => ev.animationName.startsWith('pm-ring') && el.classList.remove('pm-ring'));
 }
 
+/** A session's hue on an element, or none. */
+function hued(el, hue, who = false) {
+  if (hue) el.style.setProperty('--session-hue', hue);
+  else el.style.removeProperty('--session-hue');
+  el.classList.toggle('who-session', who);
+}
+
 /** Whether it is selected, the session hue it takes, whether it is dragged or docks, and a ring once as it is asked for. */
 function handled(el, node, was, fresh, ctx) {
   const { at } = node;
   if (at.selected !== undefined) el.setAttribute('aria-selected', String(at.selected));
   else el.removeAttribute('aria-selected');
-  const hue = at.hue !== undefined ? ctx.hue(at.hue) : undefined;
-  if (hue) el.style.setProperty('--session-hue', hue);
-  else el.style.removeProperty('--session-hue');
+  hued(el, at.hue !== undefined ? ctx.hue(at.hue) : undefined);
   if (at.drag !== undefined) el.dataset.drag = at.drag;
   else delete el.dataset.drag;
   if (at.dock) el.dataset.dock = '';

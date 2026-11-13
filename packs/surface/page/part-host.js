@@ -30,6 +30,9 @@ import { readFor } from './part-read.js';
 import { hearAway, tellAway } from './part-away.js';
 import { focusWindow, goHash, hearPage, openWindow, pageOf } from './part-page.js';
 import { AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
+import { paintSwatch, tryTheme } from './swatch.js';
+import { replayIn } from './replay.js';
+import { project } from './project.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -181,7 +184,8 @@ async function pickFor(from, kind) {
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
+  // The theme this screen alone is painted in, if one is being tried (a button's `try`), so a part can say Keep or Stop.
+  given = { ...given, up: hooks.viewUp?.() ?? null, trying: state.trying ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
@@ -319,6 +323,11 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     frame: (at, el, said) => hooks.paneFrame?.(at, el, said) ?? null,
     // A session's hue, named by its words, as every session is marked.
     hue: (words) => sessionHue(words),
+    // A style preset's colours, and a theme tried on this screen alone: the page's, as a part paints no colour.
+    swatch: (preset, el) => paintSwatch(preset, el),
+    tryTheme: (preset) => tryTheme(preset),
+    // What the person missed, played on the canvas the part stands over (its store, hooks.storeUnder: ./canvas.js).
+    replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
