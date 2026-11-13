@@ -8,7 +8,7 @@ design, the canvas's look and the rest) is the hosted service's, kept in
 `archipelago-hosted` and read from a folder `PELAGO_PACKS` names (decision
 e_8jd82drh, 9 Nov 2026). A pack's tests live beside it and reach the kernel
 only through `#pelago/test`. The manifest says what the pack declares, in
-nineteen keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
+twenty keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
 reads it, `test/structure.test.ts` refuses any other key).
 
 ## The keys
@@ -29,6 +29,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`; an internal pack also `items`, the addresses the map's own items keep (a type and its field: connect's check of each connection). |
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
 | `kernel` | A kernel pack's code in the server process alone (the root packs and the service packs): its `trust`, where its `modules` are, the `service:` names it `provides` (each with the shapes it takes and gives, and the module and function that run it) and `calls`, its `hooks`, `timers`, `tables` and `memory`. Allowed only on the server's own packs; `docs/kernel-packs.md` says it whole. |
+| `app` | One of the app's own screens (decision e_y9dcs4nv): `true` and it is on in every map, existing and new, until that map's owner takes it out; taken out, it stays out. Only a pack of the server's own folder. |
 | `moved_from` | The packs it took declarations from, keeping their ids (below, In time): it may name a rule, view, style, action or layout `<pack>.<name>` for each, as well as its own. The kernel's packs it never needs to name. |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
