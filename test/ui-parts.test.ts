@@ -110,8 +110,9 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ reads: { nothing: ['title'] } }), /reads unknown type "nothing"/);
   assert.throws(refused({ reads: '*' }), /reads items whole \("\*"\), which only a root pack's part may/);
   assert.doesNotThrow(refused({ reads: '*' }, { kernel: { trust: 'root', internal: true } }), "a root pack's part reads items whole");
-  assert.throws(refused({ opens: ['tab.mark'] }), /opens "tab.mark", which the host draws/, "a map pack's part may not open the host's slot");
-  assert.doesNotThrow(refused({ opens: ['tab.mark'] }, { kernel: { trust: 'root', internal: true } }), "a root pack is the host: its part opens a frame slot");
+  // A frame slot no pack opens (tab.mark is the panes root's part's now: one name, one owner).
+  assert.throws(refused({ opens: ['item.menu'] }), /opens "item.menu", which the host draws/, "a map pack's part may not open the host's slot");
+  assert.doesNotThrow(refused({ opens: ['item.menu'] }, { kernel: { trust: 'root', internal: true } }), "a root pack is the host: its part opens a frame slot");
   assert.throws(refused({ reads: { 'bin.box': ['size'] } }, {}, bin), /reads "size" of "bin.box", bin's: ask for it, as type:bin.box or field:size@bin.box/);
   assert.throws(refused({ sends: ['shelf.take'] }), /sends "shelf.take", which is not an action of shelf/);
   assert.throws(refused({ sends: ['capture'] }), /not an action of shelf/);
