@@ -10,9 +10,9 @@ import { createHash } from 'node:crypto';
 /** Where the page is read, as the part is told: published (anyone, at /p/ or a site), a preview, or one's own read. */
 export type ReadAt = { published?: boolean; preview?: boolean; own?: boolean };
 
-/** The marks made lately, by what they were made from: a page read again as it was is not run again. */
+/** The marks made lately, by what they were made from: a page read again as it was is not run again. Enough for every page of a site. */
 const made = new Map<string, Promise<Record<string, unknown>>>();
-const MADE_MOST = 100;
+const MADE_MOST = 1000;
 
 /** What a page keeps of its part: its marks, title and sheets, or why it has none. */
 export function pageMarks(ctx: Pick<KernelContext, 'call'> & { workspace?: string }, slot: 'page.doc' | 'page.public', page: Record<string, unknown>, at: ReadAt) {
@@ -27,3 +27,10 @@ export function pageMarks(ctx: Pick<KernelContext, 'call'> & { workspace?: strin
   if (made.size > MADE_MOST) made.delete(made.keys().next().value!);
   return making;
 }
+
+/**
+ * surface.page_marks: the marks for a page published before pages kept them, made the first time it is served and
+ * kept here after (pageMarks), so it is drawn as one published now is. Its words are as they were frozen: only the
+ * marks are made now, by the part as it ships.
+ */
+export const servedMarks = (ctx: Pick<KernelContext, 'call'> & { workspace?: string }, page: Record<string, unknown>) => pageMarks(ctx, 'page.doc', page, { published: true });
