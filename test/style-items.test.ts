@@ -93,7 +93,7 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     })).result.created as Record<string, string>;
     await page.evaluate(`location.reload()`);
     const options = `((s) => (s ? [...s.options].map((o) => o.textContent) : []))(${look})`;
-    assert.ok(await page.until(`${options}.includes('Board layout')`), 'the switch offers a layout kept on the map');
+    assert.ok(await page.until(`${options}.includes('Board layout')`), `the switch offers a layout kept on the map: ${await page.evaluate(`JSON.stringify(${options})`)}\n${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate(`${options}.includes('Slab section look')`)), 'and no style');
     assert.equal(await page.evaluate(`${look}.selectedOptions[0].textContent`), 'Map', 'and a layout draws only where it is chosen: the map, the first shipped, is the choice of none');
     await type('style slab');

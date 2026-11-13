@@ -102,7 +102,7 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     await page.evaluate('location.reload()');
     await until('both panes again', async () => (await panes()).length === 2 && (await draws(0, 'First step, renamed')) && (await draws(1, 'Second step, renamed')) && (await panes())[0][3]);
     await press(1);
-    await until('the second keeps its history', () => page.evaluate<boolean>(`!document.querySelector('#query [aria-label="Back"]').disabled`));
+    await until('the second keeps its history', () => page.evaluate<boolean>(`document.querySelector('#query [aria-label="Back"]')?.disabled === false`));
     // A click on a node in either pane opens its page over it, that pane's lens as it was (e_jedng69e): the second
     // finds by its words, and the item clicked is not added to its ids.
     await page.evaluate(`${nth(1)}.querySelector('svg a[href="#/e/${made.b}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
