@@ -23,6 +23,10 @@ import { MARKS, checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
 import { pickOnCanvas } from './canvas-pick.js';
 import { itemOf, waysBetween } from './layout-asks.js';
+import { lightItems } from './light-items.js';
+import { sessionHue } from './words.js';
+import { addressSaid, queryGiven } from './part-lens.js';
+import { DECISION_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -172,7 +176,7 @@ async function pickFor(from, kind) {
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: hooks.address?.() ?? null }) };
+  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
@@ -221,7 +225,8 @@ async function workerOf(version, parts, pack) {
       } catch (err) {
         m.failed(err.message);
       }
-    } else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
+    } else if (said.type === 'decided') m.decided?.(said.asked, said.value);
+    else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
     else if (said.type === 'error') m.failed(said.message);
   };
   return one;
@@ -241,12 +246,25 @@ function publishState(name, value, part) {
   publishing.set(name, part.id);
   if (value === null) delete document.documentElement.dataset[name];
   else document.documentElement.dataset[name] = value;
+  shownWhile();
+}
+
+/** A part on a slot drawn only while a page state is set (`bar.find.rows` while find is open) is shown while it is. */
+function shownWhile() {
+  for (const one of versions.values()) for (const m of one.mounted.values()) if (SHOWN_WHILE[m.part.slot]) m.node.hidden = !(SHOWN_WHILE[m.part.slot] in document.documentElement.dataset);
 }
 
 /** The address the page draws has changed: the app says so by name (`hooks.addressMoved`, set below), never by importing this file. */
 export function addressMoved() {
   const now = JSON.stringify(hooks.address?.() ?? null);
-  for (const one of versions.values()) for (const m of one.mounted.values()) if (m.part.go && m.address !== now) ((m.address = now), void m.refresh());
+  const answer = hooks.answer?.()?.answer;
+  for (const one of versions.values()) {
+    for (const m of one.mounted.values()) {
+      // A part on a slot drawn from the canvas's query hears each new answer too, as the canvas draws it: a live read.
+      const moved = (m.part.go && m.address !== now) || (QUERY_SLOTS.includes(m.part.slot) && (m.address !== now || m.answer !== answer));
+      if (moved) ((m.address = now), (m.answer = answer), void m.refresh());
+    }
+  }
 }
 hooks.addressMoved = addressMoved;
 
@@ -288,13 +306,18 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),
     pick: (kind) => pickFor(item, kind),
-    // What a mark lights while the person points at it: the app lights those items on the canvas and fades the rest.
-    lights: (ids) => hooks.lights?.(ids),
+    // What a mark lights while the person points at it: those items lit on the canvas in sight, the rest faded.
+    lights: (ids) => lightItems(hooks.viewUp?.() ?? null, ids?.length ? ids : null),
+    // A pane's canvas, drawn at its address by whoever keeps the panes (hooks.paneFrame), told back what is done in it.
+    frame: (at, el, said) => hooks.paneFrame?.(at, el, said) ?? null,
+    // A session's hue, named by its words, as every session is marked.
+    hue: (words) => sessionHue(words),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
-  one.mounted.set(id, { part: { ...part, island: pinFor(item) }, item, node, render, failed, refresh, address: JSON.stringify(hooks.address?.() ?? null) });
+  one.mounted.set(id, { part: { ...part, island: pinFor(item) }, item, node, render, failed, refresh, address: JSON.stringify(hooks.address?.() ?? null), answer: hooks.answer?.()?.answer });
   one.bridge.send({ type: 'mount', id, part: part.id, input: await hand() });
+  shownWhile();
 }
 
 /** The island an item is on: its own id when it is one (its type has the field an island pins a version by), else its island. */
@@ -321,6 +344,72 @@ function wayBackFor(island, refined, redraw) {
   if (back) return back.press.update(refined);
   back = { island, press: wayBack({ island, refined, redraw }) };
 }
+
+/** The last event each slot was told, handed to a part mounted there later (`told`), so it starts where the others are. */
+const told = new Map();
+
+/**
+ * Tell every part mounted on `slot` of something the runtime saw: a beat of the log for `traces`, the reading position
+ * for `sheet` (`{ name: 'scrolled', reading }`). Data only, as an event the part hears in `on`; answers how many parts
+ * were told, so a root with none decides as it did before.
+ */
+export function tellSlot(slot, event) {
+  const said = JSON.parse(JSON.stringify(event ?? null));
+  told.set(slot, said);
+  let n = 0;
+  for (const one of versions.values()) for (const [id, m] of one.mounted) if (m.part.slot === slot && m.node.isConnected) (one.bridge.send({ type: 'event', id, event: said }), n++);
+  return n;
+}
+hooks.tellSlot = tellSlot;
+
+/** The part mounted to answer each decision slot, by slot and version: mounted once, asked as often as the root asks. */
+const deciders = new Map();
+/** How long a decision is waited for, in milliseconds, and how many characters of input it may be handed. */
+const decideWithin = 2000;
+const decideMost = 200000;
+
+/**
+ * Ask the part that fills a decision slot (`tabs.land`, `tabs.life`) to decide: it is handed `input` as data and
+ * answers a value, which comes back as data for the root that asked to check and apply. Undefined when no part fills
+ * the slot, or the part fails or takes too long: the root then decides as it did before. A part never applies anything.
+ */
+export async function askSlot(slot, input) {
+  if (!DECISION_SLOTS.includes(slot)) throw new Error(`${slot} is not a slot that asks a decision`);
+  const said = JSON.stringify(input ?? null);
+  if (said.length > decideMost) return undefined;
+  const { parts, words } = await partsOn(undefined, false);
+  const part = parts.find((p) => p.slot === slot);
+  if (!part || part.waiting || !part.modules) return undefined;
+  const version = versionOf(parts, part.pack);
+  const one = await workerOf(version, parts, part.pack);
+  const key = `${slot}@${version}`;
+  let m = deciders.get(key);
+  if (!m || !one.mounted.has(m.id)) {
+    // Never drawn: a hidden node kept on the page, so the sweep keeps the part mounted.
+    const node = Object.assign(document.createElement('div'), { hidden: true });
+    document.body.append(node);
+    const waiting = new Map();
+    m = {
+      id: `m${++mounts}`, part, item: null, node, waiting, asks: 0,
+      render: { draw() {}, stop() {} },
+      failed: () => [...waiting.values()].forEach((done) => done(undefined)),
+      refresh: async () => {},
+      decided: (asked, value) => waiting.get(asked)?.(value),
+    };
+    one.mounted.set(m.id, m);
+    deciders.set(key, m);
+    one.bridge.send({ type: 'mount', id: m.id, part: part.id, input: { item: null, words, style: styleValues(await styleOn(undefined)) } });
+  }
+  const asked = ++m.asks;
+  return new Promise((resolve) => {
+    const late = setTimeout(() => done(undefined), decideWithin);
+    const done = (value) => (clearTimeout(late), m.waiting.delete(asked), resolve(value));
+    m.waiting.set(asked, done);
+    one.bridge.send({ type: 'decide', id: m.id, asked, input: JSON.parse(said) });
+  });
+}
+/** Here by name, so the root that asks (the panes root) reaches it without importing this file. */
+hooks.askSlot = askSlot;
 
 /**
  * Draw the part that fills `slot` in `node`, standing on `item`: true when a part fills it, false when none does (the

@@ -48,7 +48,8 @@ export function followSheet(host, picture, bring) {
   document.getElementById('sheet').dispatchEvent(new Event('beside'));
   const follow = () => {
     const open = HERE.exec(location.hash);
-    if (!open || holding || !host.isConnected || document.querySelector('#sheet [data-draft="unsaved"]')) return;
+    if (!open || !host.isConnected) return;
+    const unsaved = Boolean(document.querySelector('#sheet [data-draft="unsaved"]'));
     const { top, height } = host.getBoundingClientRect();
     // What is in sight is what stands this share of the way down the pane.
     const line = top + height * numberOf(state.style, 'sheet_follow_line');
@@ -57,6 +58,10 @@ export function followSheet(host, picture, bring) {
       return at.height > 0 && at.top <= line && at.bottom >= line;
     });
     const id = row?.dataset.item;
+    // The reading position, handed to a part on the sheet (sheet.follow), which decides which page is shown and names
+    // it (`go` with `replace`); with none, the page follows it here.
+    if (hooks.tellSlot?.('sheet', { name: 'scrolled', reading: { open: open[1], sight: id ?? null, unsaved, holding } })) return;
+    if (unsaved || holding) return;
     if (id && id !== open[1]) location.replace(location.hash.replace(open[1], id));
   };
   let wait;

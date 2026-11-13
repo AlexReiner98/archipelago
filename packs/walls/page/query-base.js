@@ -54,6 +54,8 @@ export const sizeOf = (style, name) => {
 };
 /** A number a drawing's code is drawn by: the style's, named by the house style (the host's, packs/walls/page/style-number.js). */
 export { numberOf } from './style-number.js';
+/** The lens algebra, the runtime's service to every drawing and part (./lens-terms.js, task e_926g89jb). */
+export { added, without, moved, filterSaid, namer, sortOf, inOrder, idsNamed } from './lens-terms.js';
 
 /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it: the same numbers at every depth. */
 export function queryTree(answer) {

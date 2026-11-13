@@ -10,7 +10,7 @@ import { api, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { catchUp } from './catch-up.js';
 import { canvasSwitch } from './canvases.js';
-import { numberOf } from './query-base.js';
+import { moved, numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { drawQuery } from './query-bar.js';
 import { unfollow } from './replica.js';
@@ -48,6 +48,10 @@ function barNow() {
   if (c?.view) drawQuery(c.lens, c.view, c.pane.go, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
   hooks.addressMoved?.();
 }
+/** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */
+hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: current.view.failed } : null);
+/** The lens Home draws, handed where no query is up. */
+hooks.homeLens = () => home();
 /** The lens the canvas in focus draws now. */
 export const queryNow = () => current?.lens ?? null;
 /** Draw this lens in the canvas in focus. */
@@ -89,13 +93,25 @@ const NAMED = /^[A-Za-z0-9_.-]{1,80}$/;
  */
 hooks.go = (address) => {
   if (!current || !address || typeof address !== 'object') return;
-  if (typeof address.item === 'string' && /^e_[a-z0-9]{8}$/.test(address.item)) return void openOver(address.item);
+  if (typeof address.item === 'string' && /^e_[a-z0-9]{8}$/.test(address.item)) {
+    // Following the reading (`replace`, the sheet's part after the person scrolled): the page in sight in place of the one
+    // open, a step of no one's history, and never over words not yet saved.
+    if (!address.replace) return void openOver(address.item);
+    const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(location.hash);
+    if (!open || document.querySelector('#sheet [data-draft="unsaved"]')) return;
+    return void location.replace(location.hash.replace(open[1], address.item));
+  }
   // A page of the app the host draws, by name: what the menu leads to, so a part may go there without knowing an address.
   if (typeof address.page === 'string') {
     if (!PAGES_GO.includes(address.page)) return;
     const of = typeof address.of === 'string' && /^e_[a-z0-9]{8}$/.test(address.of) ? address.of : undefined;
     if (address.page === 'screen' && !of) return;
     return void openHere(address.page === 'screen' ? `#/s/${of}` : `#/${address.page}`);
+  }
+  // A term added to the lens up or taken out of it (`add`, `take`): the runtime makes the lens, so no part keeps the algebra.
+  if (address.add || address.take) {
+    const next = moved(current.home ? home() : current.lens, address);
+    return void (next && goQuery(next));
   }
   let lens = null;
   try {

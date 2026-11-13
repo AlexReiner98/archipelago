@@ -125,3 +125,30 @@ test('in a browser, a part sends an action and hears what came of it, over its o
     await page.close();
   }
 });
+
+test('in a browser, a part on a slot that asks a decision answers a value, never marks', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base } = await serve('off');
+  const page = await open(`${base}/`);
+  try {
+    const said: any = await page.evaluate(`(async () => {
+      const { partPort } = await import('/layout.js');
+      const code = ${JSON.stringify(version(`return { decide: (i) => (i.tabs.length ? { tab: i.tabs[0].id, front: true } : { later: true }) };`))};
+      const port = await partPort('decides', code);
+      const said = [];
+      port.onmessage = (ev) => said.push(ev.data);
+      port.postMessage({ type: 'mount', id: 'd', part: 'probe', input: {} });
+      port.postMessage({ type: 'decide', id: 'd', asked: 1, input: { tabs: [{ id: 't1' }] } });
+      port.postMessage({ type: 'decide', id: 'd', asked: 2, input: { tabs: [] } });
+      port.postMessage({ type: 'decide', id: 'none', asked: 3, input: {} });
+      for (let n = 0; n < 200 && said.length < 3; n++) await new Promise((r) => setTimeout(r, 25));
+      return said;
+    })()`);
+    assert.deepEqual(said, [
+      { type: 'decided', id: 'd', asked: 1, value: { tab: 't1', front: true } },
+      { type: 'decided', id: 'd', asked: 2, value: { later: true } },
+      { type: 'decided', id: 'none', asked: 3, value: null },
+    ]);
+  } finally {
+    await page.close();
+  }
+});
