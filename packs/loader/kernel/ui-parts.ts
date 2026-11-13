@@ -28,7 +28,7 @@ export interface PartDef {
   reads?: Record<string, string[]>;
   /** The items it is handed beside the one it stands on: a filter's terms, `{here}` standing for that item's id, each item cut to what it `reads` of its type. */
   query?: PartQuery;
-  /** The named reads it is handed, by name: views its pack answers (answer.<name>) or asks for, `{here}` in a param for that item's id. What is no item (a run's turns) comes so. */
+  /** The named reads it is handed, by name: views its pack answers (answer.<name>) or asks for, `{here}` in a param for that item's id, a param of only `{piece.<name>}` for that setting of its piece on the screen (left out, as a lone `{here}` is, when there is none). What is no item (a run's turns) comes so. */
   views?: PartView[];
   /** The actions it may send, each its pack's own. */
   sends?: string[];

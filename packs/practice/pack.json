@@ -21,6 +21,7 @@
     { "id": "core.authority", "type": "instruction", "title": "Say on whose authority", "body": "Every change takes authority: of \"human\" with what the owner said and where, when they told you to or decided it; of \"agent\" for your own reading of the work. Never claim the owner’s word for your own judgment.", "props": { "for": ["working_rules"], "order": 50 } },
     { "id": "core.held", "type": "lens", "title": "Held for you", "props": { "filter": { "find": ["held"], "not": ["type run"] }, "walk": { "over": "all", "steps": 1 } } }
   ],
+  "uses": ["slot:piece.attention"],
   "moved_from": ["core"],
   "views": [
     {

@@ -291,7 +291,7 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .card { margin: 0 0 var(--space-10); background: none; border: 0; border-radius: 0; overflow: visible; }
 #sheet .card > header, #sheet details.fold > summary { padding: 0 0 var(--space-4); border: 0; background: none; }
 #sheet .card > header h2, #sheet details.fold > summary h2 { font-size: var(--text-3); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); color: var(--muted); }
-#sheet .card .rows > li, #sheet .card .empty, #sheet .card .error, #sheet .card .kind-head, #sheet .card .overflow { padding-left: 0; padding-right: 0; }
+#sheet .card .rows > li, #sheet .card .empty, #sheet .card .error { padding-left: 0; padding-right: 0; }
 #sheet .part > :first-child .card:first-child > header, #sheet .part > .card:first-child > header { padding-right: calc(var(--box-8) + var(--space-5)); }
 /* A row that never wraps: its name cut with an ellipsis, its marks and one action at the end, rare ones in a menu. */
 .rows > li.one { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--space-5); white-space: nowrap; min-width: 0; }

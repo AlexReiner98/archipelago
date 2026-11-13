@@ -81,19 +81,38 @@ function cut(item, reads) {
   return { id: item.id, type: item.type, ...Object.fromEntries(fields.filter((f) => all[f] !== undefined).map((f) => [f, all[f]])) };
 }
 
+/** What of a piece's settings on its screen a part is handed: words, numbers, yes and no, and lists of words. */
+function settingsOf(piece) {
+  const fit = (v) => ['string', 'number', 'boolean'].includes(typeof v) || (Array.isArray(v) && v.length <= 50 && v.every((w) => typeof w === 'string'));
+  return Object.fromEntries(Object.entries(piece ?? {}).filter(([k, v]) => NAME.test(k) && k !== 'piece' && fit(v)));
+}
+
+/**
+ * A view's param filled for where the part stands: `{here}` is the item's id, and a param that is only `{piece.<name>}`
+ * is that setting of its piece, list or not. A param that is only one of these, with nothing to fill it, is left out.
+ */
+function paramsFor(params, item, piece) {
+  const out = {};
+  for (const [k, p] of Object.entries(params ?? {})) {
+    if (typeof p !== 'string') { out[k] = p; continue; }
+    const set = /^\{piece\.([a-z][a-z0-9_]*)\}$/.exec(p)?.[1];
+    if (set) { if (piece[set] !== undefined) out[k] = piece[set]; continue; }
+    if (p === '{here}' && !item) continue;
+    out[k] = p.replaceAll('{here}', item?.id ?? '');
+  }
+  return out;
+}
+
 /** The named reads a part declared, each asked as the person looking, by name: one that fails is handed as null. */
-async function viewsOf(part, item) {
-  const fill = (v) => (typeof v === 'string' ? v.replaceAll('{here}', item?.id ?? '') : v);
-  const asked = await Promise.all(
-    part.views.map((v) => api('view', { name: v.name, params: Object.fromEntries(Object.entries(v.params ?? {}).map(([k, p]) => [k, fill(p)])) }).catch(() => null)),
-  );
+async function viewsOf(part, item, piece) {
+  const asked = await Promise.all(part.views.map((v) => api('view', { name: v.name, params: paramsFor(v.params, item, piece) }).catch(() => null)));
   return Object.fromEntries(part.views.map((v, i) => [v.name, asked[i] ?? null]));
 }
 
-/** What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read them. */
+/** What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read them, and its piece's settings. */
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
-  const views = part.views?.length ? { views: await viewsOf(part, item) } : {};
+  const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
   if (!part.query) return { item: here, ...views, ...given };
   const fill = (terms) => terms?.map((t) => t.replaceAll('{here}', item?.id ?? ''));
   const filter = { find: fill(part.query.find), ...(part.query.only && { only: fill(part.query.only) }), ...(part.query.not && { not: fill(part.query.not) }) };
@@ -152,7 +171,7 @@ function sweep() {
 }
 
 /** Mount one part under `node` on its version's worker, with what it reads. */
-async function mount(node, part, parts, item, words) {
+async function mount(node, part, parts, item, words, piece) {
   const version = versionOf(parts, part.pack);
   const one = await workerOf(version, parts, part.pack);
   const id = `m${++mounts}`;
@@ -161,8 +180,9 @@ async function mount(node, part, parts, item, words) {
   node.replaceChildren(body);
   const failed = (message) => node.isConnected && node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
   const style = await styleOn(islandOf(item));
-  // What every part is handed beside its items: the island's words and the style's values (none of its looks).
-  const given = { words, style: styleValues(style) };
+  // What every part is handed beside its items: the island's words, the style's values (none of its looks), and what
+  // its piece says of it on its screen (a title, a limit).
+  const given = { words, style: styleValues(style), piece: settingsOf(piece) };
   const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }) });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await inputOf(part, item, given) });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
@@ -186,9 +206,9 @@ function wayBackFor(island, refined, redraw) {
 
 /**
  * Draw the part that fills `slot` in `node`, standing on `item`: true when a part fills it, false when none does (the
- * caller draws what it did before). `redraw` draws the page again when the way back is pressed.
+ * caller draws what it did before). `piece` is what its screen says of it; `redraw` draws the page again when the way back is pressed.
  */
-export async function drawPart(node, { slot, item, redraw = () => {} }) {
+export async function drawPart(node, { slot, item, piece, redraw = () => {} }) {
   sweep();
   const island = islandOf(item);
   const shipped = Boolean(island && shippedOn(island));
@@ -197,6 +217,6 @@ export async function drawPart(node, { slot, item, redraw = () => {} }) {
   const part = parts.find((p) => p.slot === slot);
   if (!part) return false;
   if (!part.modules) throw new Error(`${part.title}: its code did not come`);
-  await mount(node, part, parts, item, words);
+  await mount(node, part, parts, item, words, piece);
   return true;
 }

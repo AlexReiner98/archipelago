@@ -6,7 +6,6 @@
 import { api, h, hooks } from './base.js';
 import { renderBody } from './body.js';
 import { section } from './item-sections.js';
-import { attentionCard } from './attention.js';
 import { canvasesPiece } from './canvases.js';
 import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
@@ -144,12 +143,6 @@ const PIECES = {
     const tool = (pageSchema()?.pack_tools ?? []).find((t) => t.action === p.action);
     return tool && !ctx.e?.archived_at && { node: actionForm(tool, ctx.id, ctx.redraw) };
   },
-  // What needs attention: for you, and on an item's page only what is that item's.
-  attention: (ctx, p) => {
-    const node = h('div');
-    const params = { ...(p.person && { person: p.person }), ...(p.reasons && { reasons: p.reasons }), ...(ctx.id && { within: ctx.id }) };
-    return { node, later: () => attentionCard(node, params, p.title ?? p.screen.title, Boolean(ctx.id), p.limit) };
-  },
   note: (ctx, p) => ({ node: h('section', { class: 'card wide note' }, renderBody(p.text)) }),
   // A picture: a view kept on the map (by its id), or a flat lens where "{here}" is the item the page is of. A style
   // named by id is read by the server; one written into the screen is its fields only, never code.
@@ -240,7 +233,7 @@ const partPiece = (ctx, p) => {
   const body = h('div');
   const node = ctx.e ? section(p.piece, p.title ?? p.screen?.title ?? p.piece, 0, body) : h('div', {}, body);
   const later = async () => {
-    const drawn = await drawPart(body, { slot: `piece.${p.piece}`, item: ctx.e, redraw: () => ctx.redraw?.() ?? hooks.route?.() });
+    const drawn = await drawPart(body, { slot: `piece.${p.piece}`, item: ctx.e, piece: p, redraw: () => ctx.redraw?.() ?? hooks.route?.() });
     if (!drawn) {
       const stub = unknownPiece(p);
       node.replaceWith(stub.node);
