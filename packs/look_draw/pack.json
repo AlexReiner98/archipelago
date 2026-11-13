@@ -50,5 +50,20 @@
     "hooks": {
       "surface.looks": "served.ts#served"
     }
-  }
+  },
+  "parts": [
+    {
+      "id": "look_draw.page",
+      "title": "Look mode",
+      "slot": "look",
+      "state": [
+        "look",
+        "look_why"
+      ],
+      "marks": [],
+      "modules": {
+        "index.js": "parts/page/index.js"
+      }
+    }
+  ]
 }

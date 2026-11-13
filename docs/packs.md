@@ -217,6 +217,16 @@ address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
 `text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`
 and `picture`, each named in its `marks`.
 
+**What any mark may carry**, beside `key`, `item`, `view` and `tip`:
+`lights`, the items it lights on the canvas while the person points at it,
+the rest faded — pointing is not a gesture, so the part is told nothing. A
+box may be `fits`: the host shows as many of its marks as fit on one line
+and counts the rest (`packs/walls/page/part-fits.js`), so the same marks suit a
+wide screen and a narrow one without asking the part again. A button may
+carry `copy`: the words that go to the clipboard on the press. A `menu`
+holds the steps of what is done rarely — buttons, and the text, boxes,
+lists and fields that make steps of them.
+
 **A part decides, the runtime draws.** A part runs in a worker: it never
 holds a node, never reads the page, and answers when it is ready, which is
 what lets nearly everything become a part. The runtime hands it what it

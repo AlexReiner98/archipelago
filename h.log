@@ -1,0 +1,69 @@
+
+> archipelago@0.2.0 test
+> node scripts/test.ts test/ui-parts.test.ts test/part-marks.test.ts test/structure.test.ts test/structure-page.test.ts test/tab-count-part.test.ts
+
+Waiting for the tests running in C:\Users\imjyx\Documents\Github\archipelago\.claude\worktrees\vibrant-sanderson-3dee94 (npm test --no-cache test/looks.test.ts, pid 49680, for 24 s).
+✔ a screen of every kind is checked into nodes the renderer draws (3.6724ms)
+✔ attributes may be left out (0.4095ms)
+✔ what is not in the vocabulary is refused, with where it was (1.3595ms)
+✔ a part is held to the marks it names (0.4751ms)
+✔ what the person acts on has a key, and no key is used twice (1.2352ms)
+✔ paths and placed text lie on a paint surface, and only there (1.6177ms)
+✔ a note holds words in the dialect, a menu holds buttons, and any mark on the page may carry a tip (0.7178ms)
+✔ a part that says too much is refused whole (11.6982ms)
+✔ every look a mark may name has its rule in the stylesheet, reading the style (3.8562ms)
+✔ an input may be a pick, a day, a time, yes or no, a title; text may open an address on the web (1.0114ms)
+✔ an item is found by name or picked on the canvas, the host doing the finding (0.3803ms)
+✔ a picture names an item and holds nothing: the host draws it (0.3161ms)
+✔ the host's page imports one way along roots.json (109.5633ms)
+✔ the app asks the host by name, not by importing its files (65.1269ms)
+✔ a part imports only its own pack (110.1985ms)
+✔ no file is over 500 lines (2255.9625ms)
+✔ the kernel names no pack (816.7186ms)
+✔ the kernel names no pack's type by its bare name (596.3264ms)
+✔ the kernel names no surface (470.7047ms)
+✔ the kernel names no session's action (399.9441ms)
+✔ the kernel imports no pack's code (938.0025ms)
+✔ the kernel reads no kind (490.5295ms)
+✔ items and relations are written in one place (3806.0597ms)
+✔ every store is named, with its rule (46494.3458ms)
+✔ every approval is decided by a rule (2917.1429ms)
+✔ a pack's code imports nothing of the kernel (3462.8133ms)
+✔ a pack's code comes with its tests (325.1773ms)
+✔ kernel modules import one way (1802.1578ms)
+✔ the UI loads as modules (8.1292ms)
+✔ there are four dependencies (0.6108ms)
+✔ every UI module parses (235.0868ms)
+✔ how things look lives in style presets, not in the kernel (309.6785ms)
+✔ no term or control is wrapped in a capsule (1983.3615ms)
+✔ the kernel draws no shape of its own: each is a drawing a pack ships (7.1253ms)
+✔ the UI and the tools use one name for each idea (1965.6869ms)
+✔ every kernel view is a lens preset or named as operational (9316.6416ms)
+✔ every pack file is in the manifest shape, and every old key is mapped (647.3195ms)
+✔ no read of the whole map (4794.0274ms)
+✔ the page calls no more tools through /api than it did (373.192ms)
+✔ the canvas draws no depth, and nothing keeps places (732.6314ms)
+✔ a drawing's list holds every module it reaches (259.712ms)
+✔ a length in a drawing is named on the style (223.5294ms)
+✔ each module of a wired drawing names its layer (471.3338ms)
+✔ a layer of a wired drawing reads only those before it (1869.9966ms)
+✔ only Metrics sets a place or a wire's points (440.9663ms)
+✔ a wired drawing keeps its wires apart (3453.7046ms)
+✔ a root pack's code imports only plumbing and the roots before it (603.7096ms)
+✔ a released schema step is never edited (87.3841ms)
+✔ a service name is answered as the map that asks it (3218.2627ms)
+✔ the part marks a tab by its session’s state, handed in words as the slot’s piece (2.9819ms)
+✔ parts is a key of the manifest, and a map pack’s alone (5.15ms)
+✔ the host offers these slots, each handing the part what it is named with (0.4836ms)
+✔ a part loads when its shapes hold, and is refused with why when one does not (92506.3701ms)
+✔ a slot has one owner: a second pack opening it waits (2302.8224ms)
+✔ a part naming a mark the host does not draw waits: its pack stays active, its code is never sent (6382.8712ms)
+✔ a part goes to the page by its hash: the owner’s version over it, an island’s version there alone (9757.0529ms)
+ℹ tests 56
+ℹ suites 0
+ℹ pass 56
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 114192.77
