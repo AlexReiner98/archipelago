@@ -8,6 +8,7 @@ import { writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
+import * as F from './find-dom.ts';
 
 const browser = chrome();
 
@@ -36,8 +37,8 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = [...document.querySelectorAll('#canvas > .pane')][${n}].querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })())`));
     for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
   };
-  const find = (words: string) =>
-    page.evaluate(`(() => { if (!document.getElementById('find').classList.contains('open')) document.getElementById('find-lens').click(); const i = document.querySelector('#find input[name=q]'); i.value = ${JSON.stringify(words)}; i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); document.getElementById('find').requestSubmit(); })()`);
+  // Typed in find as a person does (the find pack's part: test/find-dom.ts), then Enter.
+  const find = async (words: string) => (await page.evaluate(F.type(words)), await page.evaluate(F.key('Enter')));
   const shots = process.env.PELAGO_SHOTS;
   try {
     assert.ok(await page.until(`${drawn(0, made.roof)} && ${drawn(0, made.tiles)} && ${drawn(0, made.site)}`), `the lens is drawn: ${page.logs().join('\n')}`);
@@ -126,7 +127,8 @@ test('in a browser, a lens of many long terms stays in the line, and each term c
     await staysIn('in a split pane');
     // A click opens the rows; a row's count of what did not fit, pressed, shows every term with its ×.
     await page.send('Emulation.setDeviceMetricsOverride', { width: 560, height: 900, deviceScaleFactor: 1, mobile: false });
-    await page.evaluate(`document.getElementById('find-lens').click()`);
+    await page.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }))`);
+    assert.ok(await page.until(F.isOpen), 'find opens');
     const findRow = `[...document.querySelectorAll('#find-rows .pm-box')].find((b) => b.firstElementChild?.textContent === 'Find')`;
     assert.ok(await page.until(`Boolean(${findRow}?.querySelector('.pm-fits-rest:not([hidden])'))`), 'the Find row holds more than fit');
     await page.evaluate(`${findRow}.querySelector('.pm-fits-rest').click()`);

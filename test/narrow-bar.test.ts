@@ -8,6 +8,7 @@ import { writeFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
+import * as F from './find-dom.ts';
 
 const browser = chrome();
 
@@ -67,7 +68,8 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
     await page.send('Emulation.clearDeviceMetricsOverride');
     // Pointing at a term of Find lights what it found: the rest of the picture fades, whatever drew it.
     const faded = (title: string) => `Number(getComputedStyle([...document.querySelectorAll('#canvas [data-item]')].find((a) => a.textContent.includes(${JSON.stringify(title)}))).opacity) < 1`;
-    await page.evaluate(`document.getElementById('find-lens')?.click()`);
+    await page.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }))`);
+    assert.ok(await page.until(F.isOpen), 'find opens');
     await pick('Find', 'Type', 'Task');
     assert.ok(await page.until(`${has('Gutters')} && ${has('Which tiles?')}`), 'two types found');
     assert.ok(await page.until(`${terms('Find')}.length === 2 && ${terms('Find')}[0].matches('.pm-lights')`), 'each term of Find says what it lights');
@@ -81,7 +83,8 @@ test('in a browser, the query bar shows what narrows in its Only row', { skip: !
     assert.ok(await page.until(`!${has('Gutters')}`), 'the second type taken out');
     // The page's tip alone speaks: on a term, and after a click on it, no title is left from there up for the browser to show.
     const titles = `(() => { const titled = []; for (let e = ${terms('Only')}[0]?.firstElementChild; e; e = e.parentElement) if (e.hasAttribute('title')) titled.push(e.className); return titled; })()`;
-    await page.evaluate(`document.getElementById('find-lens')?.click()`);
+    await page.evaluate(`document.body.dispatchEvent(new KeyboardEvent('keydown', { key: '/', bubbles: true }))`);
+    assert.ok(await page.until(F.isOpen), 'find opens');
     const spot = await page.evaluate<{ x: number; y: number }>(`(() => { const r = ${terms('Only')}[0].firstElementChild.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`);
     await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...spot });
     assert.ok(await page.until(`document.querySelector('.tip')?.matches(':popover-open')`), 'the page says it in its own tip');
