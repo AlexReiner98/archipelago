@@ -9,6 +9,7 @@
 // Like the push, it reads the map and never writes it: the chain ends in one change the kernel applies.
 
 import { reposOf } from './push.ts';
+import { statesNow } from './states.ts';
 
 type Ctx = { read: (q: Record<string, unknown>) => Promise<any> };
 const MAIN = 'main';
@@ -18,7 +19,9 @@ export async function catchUp(_input: unknown, ctx: Ctx) {
   const [sync] = await ctx.read({ items: { type: 'anatomy.sync' }, fields: ['commits'] });
   if (!sync) return { answer: { synced: false, reason: 'The island has no sync item: run scripts/anatomy.ts --full first.' } };
   const repos = reposOf(sync.props.commits);
-  return { requests: repos.map((r) => ({ host: 'github', path: `/repos/${r.name}/commits/${MAIN}`, then: 'anatomy_sync.head' })), answer: { synced: 'asked', repos: repos.map((r) => r.name) } };
+  // Where each pack stands here, as the server starts: a change missed while it was down shows now.
+  const states = await statesNow(ctx);
+  return { ...(states.ops && { ops: states.ops, reason: states.reason }), requests: repos.map((r) => ({ host: 'github', path: `/repos/${r.name}/commits/${MAIN}`, then: 'anatomy_sync.head' })), answer: { synced: 'asked', repos: repos.map((r) => r.name) } };
 }
 
 /** A repository's head is in: behind it, the island asks for the comparison and the push's chain takes over. */

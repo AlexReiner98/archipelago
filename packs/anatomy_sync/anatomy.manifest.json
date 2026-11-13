@@ -4,7 +4,7 @@
    "id": "anatomy.pack",
    "title": "Pack",
    "extends": "place",
-   "description": "One pack: a folder with a pack.json, or a pack kept as an item. What it declares is part_of it; what it needs and offers are names.",
+   "description": "One pack: a folder with a pack.json, or a pack kept as an item. What it declares is part_of it; what it needs and offers are names; its state is where it stands in this workspace.",
    "fields": {
     "pack_id": {
      "type": "string",
@@ -51,6 +51,20 @@
     "blob": {
      "type": "string",
      "description": "The git blob hash of its pack.json as last synced."
+    },
+    "state": {
+     "type": "enum",
+     "values": [
+      "active",
+      "waiting",
+      "off"
+     ],
+     "shown": true,
+     "description": "Where it stands in this workspace: in force, waiting for a name nothing provides, or turned off. Kept by the anatomy sync from the kernel's pack.changed."
+    },
+    "why": {
+     "type": "string",
+     "description": "Why it waits or is off, as the workspace says."
     }
    }
   },

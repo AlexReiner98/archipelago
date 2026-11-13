@@ -10,6 +10,7 @@ import type { Source } from '../packs/anatomy_sync/model.ts';
 import { plan } from '../packs/anatomy_sync/plan.ts';
 import { setIslands, setPack } from '../packs/loader/kernel/packstate.ts';
 import { hostFor } from '../packs/loader/kernel/packtools.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { fresh, human, make } from './map.ts';
 
 const MANIFEST = JSON.parse(readFileSync(new URL('../packs/anatomy_sync/anatomy.manifest.json', import.meta.url), 'utf8'));
@@ -54,4 +55,26 @@ test('a push brings the island to the pushed commit, run by the pack host as on 
   assert.equal(sync.props.commits, `${CORE}@${NEW}\n${HOSTED}@${HOSTED_AT}`, 'the island stands at the pushed commit');
   const { rows: imports } = await l.db.query(`select 1 from relation where type = 'anatomy.imports' and valid_to is null`);
   assert.equal(imports.length, 0, 'the import a.ts dropped is taken back');
+});
+
+test('a pack turned off shows off on the island, told by the kernel and heard by the sync in the pack host', async () => {
+  const l = await fresh();
+  await setIslands(l, human, true);
+  await callTool(l, { ...human, admin: true }, 'workspace_set', { holds_off: true }); // as on the islands map: agents' changes apply as made
+  await make(l, [{ op: 'create', type: 'pack', title: 'Pack anatomy', body: 'The pack architecture.', props: { name: 'anatomy', version: '0.4.0', manifest: MANIFEST } }]);
+  await setPack(l, human, { pack: 'anatomy', on: true });
+  await setPack(l, human, { pack: 'calendar', on: true });
+  const { isl } = await make(l, [{ op: 'create', ref: 'isl', type: 'island', title: 'Pack anatomy', props: { pack: 'anatomy' } }]);
+  await make(l, [
+    { op: 'create', type: 'anatomy.sync', title: 'Where the island stands', props: { island: isl, commits: `${CORE}@${OLD}\n${HOSTED}@${HOSTED_AT}` } },
+    { op: 'create', type: 'anatomy.pack', title: 'Calendar', props: { island: isl, pack_id: 'calendar', state: 'active' } },
+  ] as never);
+  await setPack(l, human, { pack: 'anatomy_sync', on: true });
+
+  await setPack(l, human, { pack: 'calendar', on: false });
+  const stateOf = async (id: string) => (await l.db.query<{ props: { state?: string; home?: string } }>(`select props from entity where type = 'anatomy.pack' and props->>'pack_id' = $1 and archived_at is null`, [id])).rows[0]?.props;
+  // The kernel tells pack.changed without waiting for its hearers: give the pack host a moment.
+  for (let i = 0; i < 50 && (await stateOf('calendar'))?.state !== 'off'; i++) await new Promise((r) => setTimeout(r, 100));
+  assert.equal((await stateOf('calendar'))?.state, 'off', 'the island shows calendar off');
+  assert.equal((await stateOf('anatomy'))?.home, 'item', 'the pack kept as an item joined the island, at home on the map');
 });

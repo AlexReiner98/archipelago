@@ -41,7 +41,8 @@ export function plan(want: Model, island: Island, scope: Scope): { ops: Op[]; co
   const refs = new Map(create.map((w, j) => [w.key, `r${j}`]));
   const end = (key: string) => id(key) ?? refs.get(key) ?? key;
   const update = want.items.filter((w) => id(w.key) && !same(w, byKey.get(w.key)!));
-  const gone = [...byKey].filter(([k]) => !wanted.has(k) && scope.mayArchive(k));
+  // A pack kept as an item is the map's, not a repository's: the code's sync never archives it (states.ts keeps it).
+  const gone = [...byKey].filter(([k, h]) => !wanted.has(k) && scope.mayArchive(k) && h.props?.home !== 'item');
   const wantedLinks = new Map(want.links.map((l) => [linkKey({ type: l.type, from: end(l.from), to: end(l.to) }), l] as const));
   const held = new Set(island.links.map(linkKey));
   const tie = [...wantedLinks].filter(([k]) => !held.has(k)).map(([, l]) => l);
