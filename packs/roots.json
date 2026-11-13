@@ -22,11 +22,7 @@
     },
     {
       "id": "walls",
-<<<<<<< HEAD
-      "hash": "b709d920cccea1b44ae630ee21ec97504ce727704ee810c5bc4bae02fa8d2339"
-=======
       "hash": "7f31c16fc95526c70c60d848fa815189fc49eca19dd4ba3a63d18d08b4e41403"
->>>>>>> claude/ui-port
     },
     {
       "id": "loader",
@@ -42,11 +38,7 @@
     },
     {
       "id": "surface",
-<<<<<<< HEAD
-      "hash": "6fc245fb3fe26ec0d2484cea1a4adf4886836f950dc38766b624d4c7b284d46b"
-=======
-      "hash": "239056cb2fcfafb8ecb0178f08d7a5bb24379099e91fa32e4504b0f7bd3c2926"
->>>>>>> claude/ui-port
+      "hash": "22d64efef37111c62b3e8ff8204fb1ddf8151403ddef1757b671926ba0373603"
     },
     {
       "id": "panes",
