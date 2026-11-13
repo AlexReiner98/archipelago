@@ -191,6 +191,7 @@ part is told nothing.
 | Mark | What it is | What the part hears |
 | --- | --- | --- |
 | `box` `fits` | As many of its marks as fit on one line, one at least; then `+N`, its tip the hidden marks' tips (`part-fits.js`). | With `more: <key>`, the `+N` is a button: `press`, value N. |
+| `input` `keys`, `focus` | `keys` (up to 8 key names, such as ArrowUp, Escape) are the part's: the page does nothing with them (Escape goes no further). `focus: true` puts the caret in it whenever it is drawn so. Shift held on Enter or on a button's press adds `shift: true`. | `key` with `value` (the key) and `empty`; `focus` when it is come into; `submit` and `press` with `shift`. |
 | `button` `copy` | The words (up to 2000) go to the clipboard on the press; the button says Copied for a moment, or Copy failed with the words in its tip. | `press`, with `copied` true or false. |
 | `button` `try` | A theme (a preset used once chosen) tried on this screen alone, nothing kept; `null` the workspace's own again (`packs/surface/page/swatch.js`). Every part is handed `trying`, the preset tried or null. | `press`. |
 | `swatch` | A style preset's paper, ink and sea for the screen's scheme, painted by the host from the preset the part names (`preset`): a part paints no colour. `label` under it, `on: kept` or `trying` outlines it; an unknown preset is blank. | `press`, with a key. |

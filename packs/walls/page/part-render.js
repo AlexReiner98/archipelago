@@ -129,13 +129,15 @@ function build(node, ctx) {
   else if (node.mark === 'button') {
     el = make('button', 'pm-button');
     el.type = 'button';
-    el.addEventListener('click', async () => {
+    el.addEventListener('click', async (ev) => {
       const { key, at } = drawnFrom.get(el);
+      // Shift held says the press means more (find: another set), and the part hears it.
+      const shift = ev.shiftKey ? { shift: true } : {};
       // A button that tries a theme paints this screen in it alone, keeping nothing; the part hears the press too.
       if (at.try !== undefined) void Promise.resolve(ctx.tryTheme(at.try)).catch(() => {});
       // A button that copies: its words go to the clipboard, the button says whether they went, and the part hears it.
-      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', copied: await copied(el, at.copy) });
-      if (!at.pick) return ctx.tell({ key, name: 'press' });
+      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', ...shift, copied: await copied(el, at.copy) });
+      if (!at.pick) return ctx.tell({ key, name: 'press', ...shift });
       // A pick waits for the item clicked on the canvas; told back either way, null when it was let go.
       el.setAttribute('aria-pressed', 'true');
       const value = await ctx.pick(at.pick).catch(() => null);
@@ -177,16 +179,30 @@ function field(node, ctx) {
   const el = kind === 'pick' ? make('select', 'pm-input') : make(many ? 'textarea' : 'input', 'pm-input');
   if (el.tagName === 'INPUT') el.type = FIELD_TYPES[kind];
   const value = () => (kind === 'check' ? String(el.checked) : el.value);
-  const said = (name) => (told(el).push(value()), told(el).splice(0, told(el).length - partTold), ctx.tell({ key: drawnFrom.get(el).key, name, value: value() }));
-  // A pick is made the moment it is changed, one gesture; words go back as they are typed, and Enter submits a line.
+  const said = (name, more = {}) => (told(el).push(value()), told(el).splice(0, told(el).length - partTold), ctx.tell({ key: drawnFrom.get(el).key, name, value: value(), ...more }));
+  // The keys the part asked for (`keys`) are its own: the page does nothing with them, and the part hears which, and
+  // whether the field was empty. Escape goes no further, so the page's own Escape does not act too.
+  el.addEventListener('keydown', (e) => {
+    const { key, at } = drawnFrom.get(el);
+    if (e.isComposing || !at.keys?.includes(e.key)) return;
+    e.preventDefault();
+    if (e.key === 'Escape') e.stopPropagation();
+    ctx.tell({ key, name: 'key', value: e.key, empty: el.value === '' });
+  });
+  // Coming into the field is told, so a part may open what goes with it.
+  el.addEventListener('focus', () => ctx.tell({ key: drawnFrom.get(el).key, name: 'focus' }));
+  // A pick is made the moment it is changed, one gesture; words go back as they are typed, and Enter submits a line
+  // (with Shift held, `shift`).
   if (PICKS.includes(kind)) el.addEventListener('change', () => said('pick'));
   else {
     el.addEventListener('input', () => (said('edit'), fit(el)));
-    el.addEventListener('keydown', (e) => !many && e.key === 'Enter' && !e.isComposing && (e.preventDefault(), said('submit')));
+    el.addEventListener('keydown', (e) => !many && e.key === 'Enter' && !e.isComposing && !drawnFrom.get(el).at.keys?.includes('Enter') && (e.preventDefault(), said('submit', e.shiftKey ? { shift: true } : {})));
   }
-  if (node.at.focus) requestAnimationFrame(() => el.isConnected && el.focus({ preventScroll: true }));
   return el;
 }
+
+/** Put the caret in a field the part asks to be in (`focus`), when it is drawn and whenever it is drawn again asking so. */
+const focusSoon = (el) => setTimeout(() => el.isConnected && document.activeElement !== el && el.focus({ preventScroll: true }), 0);
 
 /**
  * An item found by name, as the canvas's search finds one: what the person types is asked of the map here, as them,
@@ -304,6 +320,7 @@ function update(el, node, ctx, fresh = false) {
       heard.length = 0;
     }
     if (fresh) requestAnimationFrame(() => fit(el));
+    if (at.focus && el.tagName !== 'SPAN') focusSoon(el);
   }
   if (node.mark === 'text' && at.href && el.getAttribute('href') !== at.href) el.setAttribute('href', at.href);
   if (node.mark === 'box') place(el, node.kids, ctx);
