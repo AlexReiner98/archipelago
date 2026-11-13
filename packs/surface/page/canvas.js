@@ -171,7 +171,9 @@ hooks.go = (address) => {
 /** Whether the canvas in focus draws this item now. */
 export const canvasHas = (id) => Boolean(current?.has(id));
 /** Light this item in the canvas in focus (its page is open), or none. */
-export const mark = (here) => current?.mark(here);
+/** The item whose page is open over the canvas: lit in the canvas in focus now, and in a canvas drawn while it is open. */
+let pageHere;
+export const mark = (here) => ((pageHere = here), current?.mark(here));
 /**
  * Read every canvas's lens again, each drawn again only if its answer differs: after something made here, which a lens
  * may now reach. When the map only changed under the page (`tail`), a canvas held in a store is already kept current by
@@ -239,6 +241,8 @@ export function canvasIn(host, pane) {
     },
     /** Draw this lens (Home when it is null), the item `here` lit, unless it is up already: then only what is lit changes. */
     show(lens, here, asked = {}) {
+      // A pane drawn while an item's page is open over it lights that item: the address a pane is given names no item.
+      here ??= pageHere;
       const isHome = !lens;
       lens ??= home();
       const key = JSON.stringify([lens, asked]);

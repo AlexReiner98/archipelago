@@ -87,7 +87,8 @@ async function route(pulse = false) {
   if (pulse) refreshCanvas(true);
   else if (name === 'e' && arg) toAddress(atOf(location.hash) ?? (canvasHas(arg) ? undefined : `e/${arg}`), arg);
   else if (!SHEET[name]) toAddress(atOf(location.hash) ?? 'v', params.get('here') ?? undefined);
-  if (name !== 'e') mark(params.get('here') ?? undefined);
+  // The item whose page is open is lit on the canvas (an item's page), or what the address names to light, or nothing.
+  mark(name === 'e' ? arg : (params.get('here') ?? undefined));
   // The sheet: open over the canvas for what it holds, else shut.
   const page = SHEET[name];
   document.body.dataset.sheet = page ? 'open' : '';
