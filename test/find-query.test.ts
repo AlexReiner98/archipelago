@@ -41,7 +41,12 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
   const enter = (shift = false) => page.evaluate(F.key('Enter', shift));
   // A set of words taken out by its × in find's Find row.
   // In the bar's rows (its part, slot bar.find.rows): each term a box of its words and its ×.
-  const out = (w: string) => page.evaluate(`[...document.querySelectorAll('#find-rows .pm-box')].find((b) => b.querySelector(':scope > .pm-text')?.textContent === '“${w}”')?.querySelector(':scope > .pm-button')?.click()`);
+  // A term's × in find's rows, pressed once it is there: the rows may be mid-redraw when a step before has just moved.
+  const out = async (w: string) => {
+    const x = `[...document.querySelectorAll('#find-rows .pm-box')].find((b) => b.querySelector(':scope > .pm-text')?.textContent === '“${w}”')?.querySelector(':scope > .pm-button')`;
+    assert.ok(await page.until(`Boolean(${x})`), `the × of “${w}” is in find's rows: ${await page.evaluate('location.hash')}`);
+    await page.evaluate(`${x}.click()`);
+  };
   const list = F.list;
   // The lens in one line at rest: the bar's part (slot bar.find), in #find-lens.
   const line = `(document.getElementById('find-lens')?.textContent ?? '')`;
@@ -82,7 +87,7 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       await out('walls');
       await page.until(`!location.hash.includes('find=text+walls')`);
       await out('gutters');
-      assert.ok(await page.until(`!location.hash.includes('find=text+') && !${has('Walls')} && ${has('Elsewhere')}`), `cleared, the words are out and the rest is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
+      assert.ok(await page.until(`!location.hash.includes('find=text+') && !${has('Walls')} && ${has('Elsewhere')}`), `cleared, the words are out and the rest is drawn: ${await page.evaluate(`JSON.stringify(${drawn})`)} at ${await page.evaluate('location.hash')}; line ${await page.evaluate(line)}\n${page.logs().join('\n')}`);
       // Each × was a step of its own: back twice brings both.
       await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
       await page.until(`location.hash.includes('find=text+gutters')`);
