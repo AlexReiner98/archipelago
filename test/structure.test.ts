@@ -378,9 +378,10 @@ test('no read of the whole map', () => {
 // they stood on 25 Oct 2026, and may only go: a name the page stops calling comes off this list. A tool a pack's
 // screen names (ui/screens.js calls it by the name its pack declares) is the pack's, and is not counted. `undo`, one of
 // the agents' ten tools, came on 2 Nov 2026 at the owner's word: the page takes a change back as an agent does.
+// `pack_secret_set`, the owner's alone, came on 12 Nov 2026 (bug e_hvf78a2x): the Packs screen gives a pack its secrets.
 const PAGE_CALLS = [
   'backup_download', 'change', 'connections', 'decide', 'events', 'get', 'import_backup', 'init',
-  'launch', 'member_add', 'member_list', 'member_set', 'pack_set', 'packs', 'picture',
+  'launch', 'member_add', 'member_list', 'member_set', 'pack_secret_set', 'pack_set', 'packs', 'picture',
   'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
   'share_create', 'share_list', 'share_plan', 'share_revoke', 'tail',
   'time_invoice_draft', 'time_invoice_paid', 'time_log', 'time_timesheet', 'time_week', 'token_create', 'token_list',

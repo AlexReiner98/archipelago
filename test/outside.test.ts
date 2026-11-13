@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { after, test } from 'node:test';
 import { openDb } from '../packs/database/kernel/db.ts';
 import { runSchedule, serveHook } from '../packs/surface/kernel/hooks.ts';
-import { decideAct, setPackSecret, type Outcome } from '../packs/loader/kernel/outside.ts';
+import { decideAct, packSecrets, setPackSecret, type Outcome } from '../packs/loader/kernel/outside.ts';
 import { hostFor } from '../packs/loader/kernel/packtools.ts';
 import { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { Registry } from '../packs/loader/kernel/packs.ts';
@@ -108,4 +108,16 @@ test('a webhook is taken only with its signature, and a schedule runs as the pac
 
   const ran = (await runSchedule(l, 'demo', 'demo.tick')) as { requests: Outcome[] };
   assert.equal(ran.requests[0].status, 'made');
+});
+
+test('a pack says the secrets its hosts and webhooks need, and whether each is set, never a value', async () => {
+  const { base } = await shop();
+  const l = await map(base);
+  const demo = l.registry.found.find((p) => p.id === 'demo')!;
+  assert.deepEqual(await packSecrets(l, demo), [
+    { name: 'shop_key', for: 'host', id: 'shop', set: true },
+    { name: 'hook_key', for: 'webhook', id: 'demo.delivered', set: true },
+  ]);
+  await l.db.query(`delete from setting where key = 'pack_secret:demo:hook_key'`);
+  assert.deepEqual((await packSecrets(l, demo)).map((s) => [s.name, s.set]), [['shop_key', true], ['hook_key', false]]);
 });

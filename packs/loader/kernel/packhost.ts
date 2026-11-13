@@ -148,6 +148,9 @@ export class Sandbox {
     // A handler that never finishes loading is stopped all the same, at the most any call may take.
     const starting = setTimeout(() => (failed(new Error(`The pack's handler did not load in ${MAX_MS} ms.`)), child.kill()), MAX_MS);
     const proc: Proc = { child, waiting: new Map(), stderr: '', ready };
+    // A process stopped while a call still answers its reads (a pack turned off mid-call) closes its stdin under the
+    // write: the exit below settles every call waiting on it, so the pipe's own error (EPIPE) is let go, never thrown.
+    child.stdin!.on('error', () => undefined);
     child.stderr!.on('data', (chunk) => (proc.stderr = (proc.stderr + chunk).slice(-2000)));
     createInterface({ input: child.stdout! }).on('line', (text) => {
       let line: Record<string, unknown>;

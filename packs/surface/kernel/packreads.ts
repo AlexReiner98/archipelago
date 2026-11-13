@@ -7,6 +7,7 @@ import { livesIn, livesInFor, SCOPE } from './packreads-scope.ts';
 import type { Archipelago, Entity } from '../../write/kernel/pelago.ts';
 import { blockGraph } from './blocking.ts';
 import { packVersions } from '../../loader/kernel/pack-versions.ts';
+import { packStates } from '../../loader/kernel/packstate.ts';
 import { scanAround } from './region.ts';
 import { NAME, pageOf, paged, READ_LIMIT, shapes, type Page } from './packreads-rows.ts';
 import { confirmQuestions, factsByRun, heldChanges, lastSaid, runsOf } from './packreads-log.ts';
@@ -81,6 +82,8 @@ export type Read = KernelRead & ServiceRead & ViewsRead & ClocksRead & PublishRe
   fields?: string[];
   /** The packs in force here, each with its version and its manifest's hash (packs/loader/kernel/pack-versions.ts). */
   packs?: boolean;
+  /** Every pack this workspace may have, in force or not: its state here (active, waiting, off) and why, its version and manifest's hash, and the item it is kept as, when it is one. Names and states only. */
+  pack_states?: true;
 };
 
 // The loader's sandbox asks its packs' reads of this (the slot loader.reads, packs/loader/kernel/packhost.ts).
@@ -220,6 +223,7 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
   if (q.held) return heldChanges(l, { page: q.page });
   if (q.confirm !== undefined) return confirmQuestions(l, q.confirm ?? {});
   if (q.packs) return packVersions(l.registry);
+  if (q.pack_states) return packStates(l).map(({ id, title, version, manifest, state, why, made }) => ({ id, title, version, manifest: manifest ?? null, state, ...(why && { why }), ...(made && { item: made }) }));
   // A kernel view, a lens preset (attention, hubs) or a pack's view, each by its short name (repo_work), pinned or not.
   if (q.view !== undefined) return filled(l, 'view', q, pack);
   if (q.type_info !== undefined) {
@@ -236,5 +240,5 @@ export async function answerRead(l: Archipelago, q: Read, pack?: string): Promis
     const { rows } = await l.db.query(`select 1 from proposal where status = 'pending' and ops @> $1::jsonb limit 1`, [JSON.stringify([q.proposed])]);
     return rows.length > 0;
   }
-  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, view_lives, in_projects, mentioned, marked, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, entities, publishable, published_others, draft_paths, held_documents, published_doc, shared, picture, counts, corrections, run_of, runs_lately, runs_made, run_rows, run_works, run_links, run_tasks, run_signs, run_open, run_names, run_events, events_in, worked_on, part_around, run_items, hubs_among, places_of, search_map, steps_near, settling, flat, flat_ends, flat_pos, changed, open_runs, notifications, placed_rows, time_zone.');
+  throw new Error('A read is one of: get, items, related, trail, scope, parts_of, around, placed, events, pictures, blocked, writers, facts, said, runs, held, confirm, packs, pack_states, view, type_info, with_field, me, proposed, ids, links, history, tops, within, blocks, holds, region, kinds, instructions, view_lives, in_projects, mentioned, marked, owner, link, log_head, memory, islands_off, public_views, public_view_at, public_document, published_row, entities, publishable, published_others, draft_paths, held_documents, published_doc, shared, picture, counts, corrections, run_of, runs_lately, runs_made, run_rows, run_works, run_links, run_tasks, run_signs, run_open, run_names, run_events, events_in, worked_on, part_around, run_items, hubs_among, places_of, search_map, steps_near, settling, flat, flat_ends, flat_pos, changed, open_runs, notifications, placed_rows, time_zone.');
 }

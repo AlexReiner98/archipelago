@@ -51,8 +51,8 @@ export const ownsId = (pack: { id: string; moved_from?: string[] }, id: string):
   [pack.id, ...movedFrom(pack)].some((p) => id.startsWith(`${p}.`)) ||
   (!id.includes('.') && (pack.moved_from ?? []).some((p) => KERNEL_PACKS.includes(p)));
 
-/** The kernel's own kinds of event (packs/clocks/kernel/due.ts, packs/notifications/kernel/notify.ts): always provided, by core. */
-export const KERNEL_EVENTS = ['item.due', 'notification.made'];
+/** The kernel's own kinds of event (packs/clocks/kernel/due.ts, packs/notifications/kernel/notify.ts, packs/loader/kernel/packstate.ts): always provided, by core. */
+export const KERNEL_EVENTS = ['item.due', 'notification.made', 'pack.changed'];
 
 /** A name a pack requires or uses, read: what it asks for, and of what. A bare id is a pack: the old form. */
 export type Need = { by: 'has' | 'type' | 'event' | 'service' | 'slot' | 'field' | 'status' | 'phase' | 'pack'; name: string; of?: string };

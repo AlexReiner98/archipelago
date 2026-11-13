@@ -1,6 +1,7 @@
-// The code's extractors: each module of the packs, src/ and the page (ui/), with what it imports, and each test file
-// with the modules it imports. Read with the reader the structure test checks the architecture with (reader.ts), so the
-// map and the check read code alike. A module is part of its pack, read off its path; src/ and the page have none yet.
+// The code's extractors: each module of the packs, src/ and the page (ui/, and a root's page/ folder), with what it
+// imports, and each test file with the modules it imports. Read with the reader the structure test checks the
+// architecture with (reader.ts), so the map and the check read code alike. A module is part of its pack, read off its
+// path; src/ and ui/ have none yet, and a module meant to move into one says so in its moves_to on the map.
 
 import { headerOf, importsOf } from './reader.ts';
 import { gist, title, type Extractor, type Source, type Want, type WantLink } from './model.ts';

@@ -8,13 +8,13 @@ import { plate, plates } from './plates.js';
 // ---- Workspace -----------------------------------------------------------
 
 /** Show a new token's secret once, with a way to copy it, and for a token, the workspace it acts in. */
-export function secretBox(label, token, workspace) {
+export function secretBox(label, token, workspace, said = 'Shown once. It is not stored and cannot be shown again.') {
   return h(
     'div',
     { class: 'secret' },
     h('div', { class: 'gist', title: workspace ? `It acts in the workspace ${workspace.name} (${workspace.id}) alone` : label }, h('strong', {}, label)),
     h('code', {}, token),
-    h('div', { class: 'toolbar' }, h('button', { onclick: (e) => navigator.clipboard.writeText(token).then(() => (e.target.textContent = 'Copied')) }, 'Copy'), h('span', { class: 'muted small' }, 'Shown once. It is not stored and cannot be shown again.')),
+    h('div', { class: 'toolbar' }, h('button', { onclick: (e) => navigator.clipboard.writeText(token).then(() => (e.target.textContent = 'Copied')) }, 'Copy'), h('span', { class: 'muted small' }, said)),
   );
 }
 

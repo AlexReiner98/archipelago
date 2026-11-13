@@ -58,6 +58,14 @@ export async function hasPackSecret(l: Archipelago, pack: string, name: string):
   return Boolean(unseal(rows[0]?.value));
 }
 
+/** The secrets a pack's hosts and webhooks need, each by name with whether the owner has given it: never a value. */
+export async function packSecrets(l: Archipelago, pack: PackFile): Promise<{ name: string; for: 'host' | 'webhook'; id: string; set: boolean }[]> {
+  const { hosts, webhooks } = parts(pack);
+  const named = [...hosts.flatMap((h) => (h.secret ? [{ name: h.secret, for: 'host' as const, id: h.id }] : [])), ...webhooks.map((w) => ({ name: w.secret, for: 'webhook' as const, id: w.id }))];
+  const once = named.filter((s, i) => named.findIndex((t) => t.name === s.name) === i);
+  return Promise.all(once.map(async (s) => ({ ...s, set: await hasPackSecret(l, pack.id, s.name) })));
+}
+
 /** Make one request to a declared host, with its secret. */
 async function make(l: Archipelago, pack: string, host: HostDef, r: OutsideRequest): Promise<{ http: number; body: unknown }> {
   const base = new URL(host.base.endsWith('/') ? host.base : `${host.base}/`);

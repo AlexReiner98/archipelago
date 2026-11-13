@@ -14,7 +14,7 @@ import { z } from 'zod';
 import { newId } from '../../database/kernel/db.ts';
 import { env } from '../../../src/env.ts';
 import { append, type Fact } from '../../log/kernel/log.ts';
-import { decideAct, listActs, setPackSecret } from './outside.ts';
+import { decideAct, listActs, packSecrets, setPackSecret } from './outside.ts';
 import { canSeal } from '../../seal/kernel/secrets.ts';
 import { ISLANDS } from './islands.ts';
 import { dependentsOf, KERNEL_PACKS } from './packorder.ts';
@@ -308,6 +308,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   const woken = [...waitingBefore].filter((id) => now(id)?.state === 'active');
   await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} ${what}`, detail: { pack: input.pack, ...(bundle && { bundle: bundle.id, packs: named }), ...synced, ...(waiting.length && { waiting: waiting.map((w) => w.id) }), ...(woken.length && { woken }) } });
   toolsChanged(l.workspace);
+  tellPacksChanged(l, input.on ? 'pack.on' : 'pack.off', [...named, ...waiting.map((w) => w.id), ...woken]);
   return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated, waiting, woken };
 }
 
@@ -325,16 +326,33 @@ export async function followPacks(l: Archipelago): Promise<boolean> {
 
 /** After a pack kept as an item was made, changed or retired: the log says it as it is now, and the packs on follow. */
 export async function followMade(l: Archipelago): Promise<void> {
-  await syncPacks(l);
+  const said = await syncPacks(l);
   await followPacks(l);
+  if (said.length) tellPacksChanged(l, 'pack.sync', said.map((f) => String(f[1]).replace(/^pack:/, '')));
 }
+
+/**
+ * The kernel's pack.changed, told to the packs that hear it once the registry has the change: which packs moved and how
+ * (said: pack.on, pack.off, or pack.sync for a pack kept as an item made, changed or retired). What each is now, its
+ * hearer reads (the read pack_states, packs/surface/kernel/packreads.ts).
+ */
+export const PACK_CHANGED = 'pack.changed';
+const tellPacksChanged = (l: Archipelago, said: string, packs: string[]) =>
+  hostFor(l.registry).tell(l, 'kernel', { action: PACK_CHANGED, reason: `${said}: ${packs.join(', ')}`, detail: { said, packs } });
 
 /** The owner’s tools for packs: their states and switch, their secrets, and the acts they ask for. */
 export const PACK_STATE_TOOLS: Record<string, Tool> = {
   packs: {
-    description: 'The packs here and the state of each: active, waiting (with what it needs) or off. One kept as an item names it (made). To author a pack, make an item of type pack (query schema with type pack says its fields): the owner then adds it here.',
+    description: 'The packs here and the state of each: active, waiting (with what it needs) or off. One kept as an item names it (made). One whose hosts or webhooks need secrets names them (secrets: each name and whether it is set, never its value; pack_secret_set gives one). To author a pack, make an item of type pack (query schema with type pack says its fields): the owner then adds it here.',
     input: {},
-    run: async (l) => (await (await kernel()).callAs<{ states: unknown[] }>(l, 'answer.pack_use', { states: packStates(l) })).states,
+    run: async (l) => {
+      const states = (await (await kernel()).callAs<{ states: { id: string }[] }>(l, 'answer.pack_use', { states: packStates(l) })).states;
+      return Promise.all(states.map(async (s) => {
+        const p = l.registry.found.find((f) => f.id === s.id);
+        const secrets = p ? await packSecrets(l, p) : [];
+        return secrets.length ? { ...s, secrets } : s;
+      }));
+    },
   },
   pack_set: {
     description: 'Turn a pack off or on in this workspace. Its items stay; while it is off they are dormant and its tools are gone. The packs relying on it (dependents in packs) wait meanwhile, and wake when it is on again. A bundle (packs that go together) is turned by its id or any of its packs’ ids, all its packs at once.',
