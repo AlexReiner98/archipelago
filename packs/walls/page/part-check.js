@@ -30,6 +30,8 @@
 //   replay  nothing where it stands: the canvas under it shows what the person missed, up to step `at` of its steps
 //   trace   nothing where it stands: its item's marks on the canvas painted with its line (`tip`), in a session's hue,
 //           until the person has seen them; then the part is told `seen`
+//   slot    the parts that fill a slot the part opens (`name`, one of its `opens`), drawn here by the host: the part
+//           never sees them, nor they it (decision e_hp9xmrbq)
 // Any mark may also carry `lights`: the items it stands for, lit on the canvas while the person points at it, the rest
 // faded. A box may be `fits`: it shows as many of its marks as fit on one line and says how many are left (`more`: the
 // key a press on the count goes back by). A box, a button or a pane may carry `drag`: the host follows it when it is
@@ -48,6 +50,9 @@ export const partLimits = { marks: 5000, depth: 32, words: 200000, path: 100000,
 const KEY = /^[A-Za-z0-9_:.-]+$/;
 const ITEM = /^e_[a-z0-9]{8}$/;
 /** A view: one kept on the map (its id), one a pack ships (its id, `<pack>.<name>`), or home. */
+/** A slot's name, as packs/loader/kernel/slots.ts names one. */
+const SLOT_NAME = /^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_-]*)*$/;
+const slotName = (v, why) => (typeof v === 'string' && v.length <= partLimits.key && SLOT_NAME.test(v) ? v : why("not a slot's name"));
 const VIEW = /^(?:e_[a-z0-9]{8}|home|[a-z][a-z0-9_]*(?:.[a-z][a-z0-9_-]*)+)$/;
 /** A path says only where it goes: its commands and numbers, nothing that could name or fetch anything. */
 const PATH = /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s+-]*$/;
@@ -139,6 +144,7 @@ export const MARKS = {
   ghost: { attrs: { key, of: oneOf('item', 'link', 'mark'), id: ghostId, type: key, title: words(partLimits.label), status: key, body: words(4000), proposal, by: words(partLimits.label), reason: words(partLimits.label), op: oneOf('create', 'link', 'update', 'archive', 'unlink'), from: rowId, to: rowId, on: rowId }, holds: 'nothing', needs: ['of', 'proposal', 'op'] },
   replay: { attrs: { key, at: step(0, 1000000), steps: replaySteps }, holds: 'nothing', needs: ['at', 'steps'] },
   trace: { attrs: { key, item, tip: words(500), hue: words(partLimits.key) }, holds: 'nothing', needs: ['item'] },
+  slot: { attrs: { key, name: slotName }, holds: 'nothing', needs: ['name'] },
   swatch: { attrs: { key, tip: anyMark.tip, preset: key, label: words(partLimits.label), on: oneOf('kept', 'trying') }, holds: 'nothing', needs: ['preset'] },
 };
 

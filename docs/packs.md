@@ -136,7 +136,8 @@ answering with marks the host checks.
 |---|---|---|
 | `id`, `title` | The part, `<pack>.<name>`. | Its pack's name. |
 | `slot` | The slot it fills, or the slots: a part drawn in two places (the strip in `tabs` and the panes in `panes`) is one part, mounted once per slot and handed `slot` to say which (decision e_tq3fk4g8). | Each the host's, one its pack's parts open, or one it asks for as `slot:<name>`. |
-| `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). |
+| `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`; or `"*"`, items whole (head and every field) with each type's fields and capabilities beside the words. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). `"*"` only for a root pack's part. |
+| `writes` | The types it changes as the person looking, with `tools.change(ops, reason)` (and `tools.undo(changeset)` just after a press): applied through the one write path as that person's change, naming the part. | A root pack's part only; each type the map has. The server checks each op touches a type it writes, and allows no merge, type or forget. |
 | `sends` | The actions it may send. | Each its own pack's. |
 | `opens` | The slots it draws for others to fill. | Named `<pack>.<name>`, or a piece or page the host no longer draws. |
 | `marks` | The marks it answers with (`box`, `text`, ...). | A list of mark kinds, checked by shape. One the host does not draw (`packs/walls/page/part-check.js`) makes the part wait, its pack still active; at draw, a mark it did not name is refused. |
@@ -192,15 +193,15 @@ which `ui/query-bar.js` then leaves to the part.
 **The runtime tells a slot what it saw** (`tellSlot(slot, event)`, as
 `hooks.tellSlot`): every part mounted there hears it as an event in `on`,
 and one mounted later is handed the last as `told`. The sheet's reading
-position is told to `sheet` as `{ name: 'scrolled', reading: { item, open,
-held, unsaved } }` (`item` the document in sight, `open` the item whose page
-is shown, `held` while the sheet waits for the frames above to settle); a
+position is told to `sheet` as `{ name: 'scrolled', reading: { open, sight,
+unsaved, holding } }` (`open` the item whose page is shown, `sight` the
+document in sight, `holding` while the sheet waits for the frames above); a
 part there names the page to show with
 `tools.go({ item, replace: true })`, which replaces the address and never
 leaves words not yet saved. With no part told, the page follows the reading
 itself.
 
-**What the traces are told.** A part on `traces` is handed `me` (the
+**What the traces are told.** A part on `traces` is handed `me` in its piece (the
 person's actor, as the log names one) and told each beat of the log as
 `{ name: 'beat', from, to, rows: [{ id, was, now, by?, at?, pos }] }`: the
 rows the beat touched as they were and are (null where not held, or gone),

@@ -1,6 +1,5 @@
 import { api, h, hooks, main, route, state, whoami } from './base.js';
 import { project } from './project.js';
-import { beatRows, missedRows } from './beat-rows.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { still } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
@@ -284,16 +283,6 @@ function touchedBy(beat, pos) {
   for (const e of beat.entries ?? []) if (e.pos > pos) for (const f of e.facts) for (const id of f[2] === 'link' && f[0] === '+' ? f[3].slice(1) : [f[1]]) ids.add(id);
   return { ids: [...ids], made: beat.made ?? 0 };
 }
-
-/**
- * What was missed since the person last looked (ui/catch-up.js says when, by name), handed to the parts on `traces`:
- * entry by entry from the rows as they were (each row's island is on it), and one beat for the whole span.
- */
-hooks.tellMissed = (then, kinds, entries, { from, to, gone = [] }) => {
-  if (!hooks.slotFilled?.('traces')) return;
-  hooks.tellSlot('traces', { name: 'missed', from, to, entries: missedRows(then, kinds, entries) });
-  hooks.tellSlot('traces', { name: 'beat', ...beatRows(then, kinds, entries, { after: from, gone }) });
-};
 
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;

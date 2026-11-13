@@ -51,7 +51,7 @@ const partTold = 50;
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
  * `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {}, slot = () => {} } = {}) {
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {}, slot = async () => 0 } = {}) {
   const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts, slot };
   let ended = false;
   return {
@@ -149,6 +149,7 @@ function build(node, ctx) {
   } else if (node.mark === 'input') el = field(node, ctx);
   else if (node.mark === 'note') el = make('div', 'pm-note');
   else if (node.mark === 'thumb') el = make('span', 'pm-thumb');
+  else if (node.mark === 'slot') el = make('div', 'pm-slot');
   else if (node.mark === 'menu') {
     el = make('details', 'menu pm-menu');
     el.append(make('summary', ''), make('div', 'menu-items'));
@@ -287,6 +288,8 @@ function update(el, node, ctx, fresh = false) {
   if (node.view !== undefined && el.tagName !== 'BUTTON') (el.tabIndex = 0, el.setAttribute('role', 'link'));
   else if (el.tagName !== 'BUTTON' && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') (el.removeAttribute('tabindex'), el.removeAttribute('role'));
   // The view's picture is drawn again only when it names another view: the host keeps it current.
+  // The parts filling a slot are drawn by the host, once in the page, and again only for another slot.
+  if (node.mark === 'slot' && (fresh || was.at.name !== at.name)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.slot(at.name, el)));
   if (node.mark === 'thumb' && (fresh || was.at.view !== at.view)) el.replaceChildren(...[ctx.thumb(at.view)].filter(Boolean));
   // Drawn once it is in the page, where its width is known, and again only for another item.
   if (node.mark === 'picture' && (fresh || was.item !== node.item)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.picture(node.item, el)));
