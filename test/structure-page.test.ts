@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { pageImports, ratchet, rootOrder, uiFiles, VENDORED } from './structure-kit.ts';
+import { pageImports, ratchet, rootOrder, uiFiles, VENDORED, walk } from './structure-kit.ts';
 
 /** A served path's root, and so its place in the order; none for the app's own files. */
 const rootOf = (path: string) => /^packs\/([\w-]+)\/page\//.exec(path)?.[1];
@@ -47,4 +47,90 @@ test("the host's page imports one way along roots.json", () => {
     if (against) counted[f] = against;
   }
   assert.deepEqual(ratchet(counted, AGAINST_THE_ORDER), [], "Import from the host's page in a root at or before this one in packs/roots.json, or take what is needed in.");
+});
+
+// Between packs, names, never files (the owner, 13 Nov 2026, bug e_g6ban2ex): the app (ui/, every module of it meant
+// to become a part of a map pack, its moves_to on the Pack anatomy island) asks the host for what it needs by name, a
+// slot, a piece or a service the bridge offers, not by importing a host module. The count is frozen per file and only
+// falls, each import going as its module becomes a part or what it needs is offered by name.
+const APP_ON_HOST: Record<string, number> = {
+  'ui/app.js': 8,
+  'ui/canvas-menu.js': 2,
+  'ui/canvas.js': 3,
+  'ui/canvases.js': 4,
+  'ui/catch-up.js': 1,
+  'ui/connect-agent.js': 2,
+  'ui/connections-card.js': 1,
+  'ui/diagram.js': 2,
+  'ui/doc-lens.js': 2,
+  'ui/doc-sheet.js': 1,
+  'ui/doc.js': 6,
+  'ui/draft.js': 3,
+  'ui/field-edit.js': 1,
+  'ui/fields.js': 1,
+  'ui/find-choices.js': 1,
+  'ui/find.js': 1,
+  'ui/home.js': 1,
+  'ui/island-new.js': 2,
+  'ui/item-doc.js': 3,
+  'ui/item-links.js': 1,
+  'ui/item-sections.js': 2,
+  'ui/item.js': 3,
+  'ui/keep-in-view.js': 1,
+  'ui/layout-tip.js': 2,
+  'ui/limits-card.js': 1,
+  'ui/link-pick.js': 2,
+  'ui/look-marks.js': 1,
+  'ui/look-switch.js': 1,
+  'ui/marks-add.js': 1,
+  'ui/nav.js': 1,
+  'ui/pane-busy.js': 1,
+  'ui/pane-drag.js': 1,
+  'ui/pane-land.js': 1,
+  'ui/pane-web.js': 1,
+  'ui/panes.js': 1,
+  'ui/plates.js': 1,
+  'ui/public.js': 3,
+  'ui/query-bar.js': 1,
+  'ui/query-base.js': 3,
+  'ui/query-light.js': 1,
+  'ui/query.js': 4,
+  'ui/screens.js': 6,
+  'ui/sheet-follow.js': 1,
+  'ui/start.js': 1,
+  'ui/style-code.js': 1,
+  'ui/styles-card.js': 1,
+  'ui/tab-bar.js': 2,
+  'ui/tab-life.js': 1,
+  'ui/tabs.js': 1,
+  'ui/term-kinds.js': 1,
+  'ui/term-pick.js': 2,
+  'ui/themes-card.js': 1,
+  'ui/thumbs.js': 3,
+  'ui/traces.js': 1,
+  'ui/view-frame.js': 1,
+  'ui/words.js': 3,
+};
+
+/** Whether a served path is the host's: a root pack's page/ folder. */
+const isHost = (path: string) => rootOf(path) !== undefined;
+
+test('the app asks the host by name, not by importing its files', () => {
+  const counted: Record<string, number> = {};
+  for (const f of uiFiles.filter((f) => f.startsWith('ui/') && f.endsWith('.js') && !VENDORED.includes(f))) {
+    const onHost = pageImports(f).filter(isHost).length;
+    if (onHost) counted[f] = onHost;
+  }
+  assert.deepEqual(ratchet(counted, APP_ON_HOST), [], 'Ask the host by name (a slot, a piece, a service the bridge offers), or make the module a part that does.');
+});
+
+// A part (a map pack's parts/, run walled, its manifest's parts) imports only its own pack's files: everything else it
+// asks for by name. None reaches out today, and none may.
+test('a part imports only its own pack', () => {
+  const out: string[] = [];
+  for (const f of walk('packs').filter((f) => /^packs\/[\w-]+\/parts\/.+\.js$/.test(f) && !/\.test\./.test(f))) {
+    const pack = f.split('/')[1];
+    for (const to of pageImports(f)) if (!to.startsWith(`packs/${pack}/`)) out.push(`${f} imports ${to}`);
+  }
+  assert.deepEqual(out, [], "A part asks for what is not its pack's by name: a slot, the fields it reads, the actions it sends.");
 });
