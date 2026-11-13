@@ -321,6 +321,10 @@ Where a part must say something about the page rather than draw it (that the
 canvas has finished drawing, say), it publishes page state it declared
 (`state`), and the runtime writes it on the root.
 
+An action whose answer says `looks: true` changed how the page looks (a theme
+kept): once it has gone out, the page reads its look again, ending any theme
+tried on that screen.
+
 **Where a part may go.** A part that declares `go` names an address after a
 gesture and the canvas checks it: an item (`item`), a query and the layout
 to draw it in (`query`, `layout`), or a page of the app the host draws

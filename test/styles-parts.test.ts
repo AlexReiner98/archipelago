@@ -52,10 +52,14 @@ test('the theme card asks before it keeps a theme, retiring the one kept, and le
   const sent: unknown[] = [];
   const part = themes({ views: { style_presets: { styles: STYLES } }, piece: { section: 'map' } }, tools(sent));
   check(part.marks);
-  assert.match(JSON.stringify(part.marks), /Sea ✓/, 'the kept theme is marked');
+  assert.match(JSON.stringify(part.marks), /"swatch",\{"key":"pick:core.sea","preset":"core.sea","label":"Sea","tip":"[^"]*","on":"kept"\}/, 'a swatch the host paints, the kept one marked');
   const asking = await part.on({ name: 'press', key: 'pick:core.dusk' });
   check(asking);
-  assert.match(JSON.stringify(asking), /Dusk for the whole workspace\?/);
+  assert.match(JSON.stringify(asking), /"try":"core.dusk"/, 'Try here paints this screen alone, the host’s to do');
+  const tried = part.update({ views: { style_presets: { styles: STYLES } }, piece: { section: 'map' }, trying: 'core.dusk' });
+  check(tried);
+  assert.match(JSON.stringify(tried), /"preset":"core.dusk","label":"Dusk","tip":"[^"]*","on":"trying"/, 'the one tried is marked trying');
+  assert.match(JSON.stringify(tried), /Dusk on your screen only/);
   check(await part.on({ name: 'press', key: 'keep' }));
   check(await part.on({ name: 'press', key: 'pick:house' }));
   check(await part.on({ name: 'press', key: 'house' }));
@@ -98,6 +102,7 @@ test('the styles pack’s actions answer with the ops each action makes, and tou
   assert.deepEqual(use('flow.gone', true, presets, versions).ops, [{ op: 'update', id: 'e_gone0001', status: 'current' }]);
   assert.deepEqual(use('core.sea', false, presets, versions).ops, [{ op: 'update', id: 'e_sea00001', status: 'retired' }]);
   assert.deepEqual(use('flow.kept', true, presets, versions).ops, [], 'already used');
+  assert.equal(use('core.dusk', true, presets, versions).answer.looks, true, 'the page reads its look again, ending a try');
   assert.deepEqual(use('core.dusk', true, presets, versions).ops.map((o) => [o.op, o.id]), [['update', 'e_sea00001'], ['create', undefined]], 'a theme chosen retires the one kept');
   assert.throws(() => use('core.none', true, presets, versions), /not a style preset/);
   assert.deepEqual(deleteLayout({ id: 'e_lay00001', type: 'layout', title: 'Mine' }).ops, [{ op: 'archive', id: 'e_lay00001' }]);
