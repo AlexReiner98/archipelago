@@ -67,21 +67,24 @@ test('parts is a key of the manifest, and a map pack’s alone', () => {
 test('the host offers these slots, each handing the part what it is named with', () => {
   assert.deepEqual(FRAME_SLOTS, {
     panes: [],
-    tabs: ['tabs', 'current'],
+    tabs: ['tabs', 'current', 'page'],
     'tab.mark': ['tab', 'current'],
     bar: ['current', 'home'],
     'bar.views': ['current', 'home'],
-    'bar.find': ['query', 'home'],
+    'bar.find': ['query', 'home', 'answer', 'names'],
+    'bar.find.rows': ['query', 'home', 'answer', 'names'],
     'bar.layouts': ['current', 'layout'],
     canvas: ['query', 'layout'],
     traces: ['query'],
     sheet: ['reading'],
     'item.menu': [],
-    find: ['query'],
+    find: ['query', 'shapes'],
     home: [],
     nav: [],
     look: ['drawn', 'why'],
     'workspace.card': ['workspace', 'section'],
+    'tabs.land': ['step', 'tabs', 'drawable'],
+    'tabs.life': ['open', 'tabs'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
   assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'button', 'count']);
@@ -121,6 +124,10 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   // A part that only publishes state draws nothing, so it may name no mark; one that names none and publishes none is refused.
   assert.throws(refused({ marks: [] }), /names the marks it answers with/);
   assert.doesNotThrow(refused({ marks: [], state: ['look'] }), 'a part that only publishes state names no mark');
+  assert.doesNotThrow(refused({ slot: 'tabs.land', marks: [] }), 'a part that only answers a decision names no mark');
+  assert.doesNotThrow(refused({ views: [{ name: 'search', live: true }] }), 'search, live, is the kernel’s: no pack answers it');
+  assert.throws(refused({ views: [{ name: 'search' }] }), /does not answer/, 'search handed at mount is a view like any other');
+  assert.throws(refused({ views: [{ name: 'search', live: 'yes' }] }), /live is true or false/);
   assert.throws(refused({ modules: { 'look.js': 'parts/row/look.js' } }), /needs its modules, entered at index.js/);
   assert.throws(refused({ modules: { 'index.js': 'parts/row/gone.js' } }), /the pack has no file of/);
   assert.throws(refused({ query: { find: 'island {here}' } }), /query is a filter's terms/);
