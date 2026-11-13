@@ -14,7 +14,6 @@
     { "id": "bookkeeping", "when": { "bookkeeping": true }, "then": "spare", "say": "A session's own record of itself (it began, was named, waits, ended) is bookkeeping: it applies as it is made, as the agent it is for." }
   ],
   "views": [
-    { "form": "screen", "id": "core.run_turns", "title": "Turns", "on": ["run"], "pieces": [{ "piece": "turns" }] },
     { "form": "screen", "id": "core.run_worked", "title": "Worked on", "on": ["run"], "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["worked {here}"] }, "limit": 50 }, "style": { "shape": "map" } }] }
   ],
   "styles": [

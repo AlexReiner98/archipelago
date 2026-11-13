@@ -16,7 +16,6 @@ import { keptView } from './canvases.js';
 import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
-import { turnsPiece } from './turns.js';
 import { drawPart } from './part-host.js';
 import { pageIsA, pageSchema } from './page-schema.js';
 import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
@@ -203,11 +202,6 @@ const PIECES = {
   diagram: (ctx) => {
     const node = h('section', { class: 'card wide lens-card' });
     return { node, later: () => drawDiagram(node, ctx.e?.props?.diagram, { download: ctx.e?.props?.diagram?.drawio }) };
-  },
-  // A run's turns along time, its beats among them (ui/turns.js): a section of the bare page (sectionsOn).
-  turns: (ctx) => {
-    const node = h('div');
-    return ctx.e && { node, later: () => turnsPiece(node, ctx.e, section) };
   },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,

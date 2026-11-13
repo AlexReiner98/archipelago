@@ -78,6 +78,18 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ query: { find: 'island {here}' } }), /query is a filter's terms/);
   assert.throws(refused({ query: { find: ['island {here}'], limit: 900 } }), /query's limit is a whole number up to 200/);
   assert.throws(refused({ query: { find: ['island {here}'] }, reads: undefined }), /has a query but reads no type/);
+  // A named read is a view its pack answers, or one it asks for (runs answers turns; this pack does not).
+  assert.throws(refused({ views: [{ name: 'turns', params: { run: '{here}' } }] }), /reads the view "turns", which shelf does not answer: ask for it, as service:answer.turns/);
+  assert.throws(refused({ views: [] }), /views is a list of up to 4 named reads/);
+  assert.throws(refused({ views: [{ name: 'Turns!' }] }), /a view it reads is named/);
+  assert.throws(refused({ views: [{ name: 'turns', params: { run: { here: true } } }] }, { uses: ['service:answer.turns'] }), /params are words or numbers/);
+  const viewing = new Registry(folder(shelf({ uses: ['service:answer.turns'] }, { views: [{ name: 'turns', params: { run: '{here}' } }] })));
+  try {
+    assert.equal(viewing.states.get('shelf')?.state, 'active', viewing.states.get('shelf')?.why ?? '');
+    assert.deepEqual(shelfs(partsFor(viewing))[0].views, [{ name: 'turns', params: { run: '{here}' } }], 'the page is sent what it reads');
+  } finally {
+    hostFor(viewing).stop();
+  }
   // Asked for, another pack's type reads; a slot asked for fills.
   const asked = new Registry(folder(shelf({ requires: ['core', 'field:size@bin.box', 'slot:shelf.end'] }, { reads: { 'bin.box': ['size', 'title'] }, slot: 'shelf.end', opens: [] }), bin));
   try {

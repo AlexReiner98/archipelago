@@ -28,6 +28,8 @@ export interface PartDef {
   reads?: Record<string, string[]>;
   /** The items it is handed beside the one it stands on: a filter's terms, `{here}` standing for that item's id, each item cut to what it `reads` of its type. */
   query?: PartQuery;
+  /** The named reads it is handed, by name: views its pack answers (answer.<name>) or asks for, `{here}` in a param for that item's id. What is no item (a run's turns) comes so. */
+  views?: PartView[];
   /** The actions it may send, each its pack's own. */
   sends?: string[];
   /** The slots it draws for other parts to fill, each named `<pack>.<name>`, or a piece or page the host no longer draws (piece.<name>, page.<name>). */
@@ -44,6 +46,12 @@ export interface PartQuery {
   limit?: number;
 }
 
+/** A named read a part is handed: a view, asked as the person looking, its params' `{here}` the item it stands on. */
+export interface PartView {
+  name: string;
+  params?: Record<string, string | number>;
+}
+
 /** A part as the page is sent it. */
 export interface Part {
   id: string;
@@ -52,6 +60,7 @@ export interface Part {
   slot: string;
   reads: Record<string, string[]>;
   query?: PartQuery;
+  views?: PartView[];
   sends: string[];
   opens: string[];
   hash: string;
@@ -110,6 +119,7 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       }
     }
     problems.push(...queryProblems(at, part.query, part.reads));
+    problems.push(...viewProblems(at, part.views, pack));
     if (part.sends !== undefined && !Array.isArray(part.sends)) problems.push(`${at}: sends is a list of its pack's actions`);
     else for (const a of part.sends ?? []) {
       if (!actions.has(a)) problems.push(`${at} sends "${String(a)}", which is not an action of ${pack.id}: a part sends its own pack's actions alone`);
@@ -134,6 +144,30 @@ function queryProblems(at: string, query: unknown, reads: unknown): string[] {
   const problems: string[] = [];
   if (q.limit !== undefined && !(Number.isInteger(q.limit) && q.limit > 0 && q.limit <= 200)) problems.push(`${at}: query's limit is a whole number up to 200`);
   if (!reads || typeof reads !== 'object' || !Object.keys(reads).length) problems.push(`${at} has a query but reads no type: it is handed only the fields it reads`);
+  return problems;
+}
+
+/** How many named reads one part may be handed. */
+const VIEWS_MOST = 4;
+
+/** What is wrong with a part's named reads: each a view its pack answers or asks for (rule: ask for what you need), its params words or numbers. */
+function viewProblems(at: string, views: unknown, pack: Manifest): string[] {
+  if (views === undefined) return [];
+  if (!Array.isArray(views) || !views.length || views.length > VIEWS_MOST) return [`${at}: views is a list of up to ${VIEWS_MOST} named reads, { name, params? }`];
+  const provides = Object.keys((pack.kernel as { provides?: Record<string, unknown> } | undefined)?.provides ?? {});
+  const asked = [...(pack.requires ?? []), ...(pack.uses ?? [])];
+  const problems: string[] = [];
+  const names = new Set<string>();
+  for (const v of views as PartView[]) {
+    const name = typeof v?.name === 'string' && /^[a-z][a-z0-9_]*$/.test(v.name) ? v.name : undefined;
+    if (!name) { problems.push(`${at}: a view it reads is named, { name, params? }`); continue; }
+    if (names.has(name)) problems.push(`${at} reads the view "${name}" twice`);
+    names.add(name);
+    const service = `answer.${name}`;
+    if (!provides.includes(service) && !asked.includes(`service:${service}`)) problems.push(`${at} reads the view "${name}", which ${pack.id} does not answer: ask for it, as service:${service} in requires or uses`);
+    const params = v.params ?? {};
+    if (typeof params !== 'object' || params === null || Array.isArray(params) || !Object.values(params).every((p) => (typeof p === 'string' && p.length <= 200) || (typeof p === 'number' && Number.isFinite(p)))) problems.push(`${at}: the view "${name}"'s params are words or numbers, {here} for the item it stands on`);
+  }
   return problems;
 }
 
@@ -167,7 +201,7 @@ export function partsFor(packs: Packs, kept: Kept[] = [], have: string[] = []): 
     const mine = kept.find((v) => v.props.preset === d.id);
     if (mine && !mine.is_open) continue;
     const modules = modulesOf(packs, d, mine), hash = hashOf(modules);
-    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), sends: d.sends ?? [], opens: d.opens ?? [], hash, ...(!have.includes(hash) && { modules }) });
+    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], opens: d.opens ?? [], hash, ...(!have.includes(hash) && { modules }) });
   }
   return out;
 }

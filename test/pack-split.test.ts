@@ -22,7 +22,7 @@ after(() => registries.forEach((r) => hostFor(r).stop()));
 const types = [{ id: 'plant', title: 'Plant', description: 'Something grown.', extends: 'work', statuses: { open: ['sown', 'growing'], closed: ['picked'] } }];
 const links = [{ id: 'shades', title: 'shades', description: 'Keeps the sun off another.', from: ['plant'], to: ['plant'] }];
 const views = [
-  { form: 'screen', id: 'garden.plant_page', title: 'Beds', on: ['plant'], pieces: [{ piece: 'turns' }] },
+  { form: 'screen', id: 'garden.plant_page', title: 'Beds', on: ['plant'], pieces: [{ piece: 'held' }] },
   { id: 'garden.beds', shape: 'rows', title: 'Beds', description: 'The plants.', lens: { filter: { find: ['type plant'] } } },
 ];
 const styles = [
@@ -121,7 +121,7 @@ test('a pack may name only its own ids, the kernel’s, and those of the packs i
 });
 
 test('a bare name is the kernel’s: kept only by a pack whose moved_from names core outright', () => {
-  const screen = { form: 'screen', id: 'needs_here', title: 'Needs', on: ['plant'], pieces: [{ piece: 'turns' }] };
+  const screen = { form: 'screen', id: 'needs_here', title: 'Needs', on: ['plant'], pieces: [{ piece: 'held' }] };
   const taken = { ...practice, id: 'took_core', moved_from: ['garden', 'core'], views: [screen] } as unknown as PackFile;
   registries.push(new Registry(packsWith(vocabulary, taken)));
   const loose = { ...practice, id: 'bare', views: [screen] } as unknown as PackFile;
