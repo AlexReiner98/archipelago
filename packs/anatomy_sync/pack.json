@@ -1,8 +1,8 @@
 {
   "id": "anatomy_sync",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "title": "Anatomy sync",
-  "description": "Keeps the Pack anatomy island in step with the code. Its reader (reader.ts) reads each file's imports, pack and header comment the way the structure test checks the architecture; its extractors (extract.ts), one per kind of source, turn the manifests, the modules, the tests and the structure checks into the island's keyed items and links; and its plan (plan.ts) is what a run sends, from what changed since the island's last sync. GitHub's push webhook runs it (push.ts) with a read-only token the owner gives it, and a catch-up (catch-up.ts) as the server starts and every hour brings the island to main when a push was missed; scripts/anatomy.ts runs it from git, and --full is the whole check.",
+  "description": "Keeps the Pack anatomy island in step with the code. Its reader (reader.ts) reads each file's imports, pack and header comment the way the structure test checks the architecture; its extractors (extract.ts), one per kind of source, turn the manifests, the modules, the tests and the structure checks into the island's keyed items and links; and its plan (plan.ts) is what a run sends, from what changed since the island's last sync. GitHub's push webhook runs it (push.ts) with a read-only token the owner gives it, and a catch-up (catch-up.ts) as the server starts and every hour brings the island to main when a push was missed; and the kernel's pack.changed shows where each pack stands in this workspace, packs kept as items among them (states.ts); scripts/anatomy.ts runs it from git, and --full is the whole check.",
   "requires": [
     "type:anatomy.sync",
     "type:anatomy.module"
@@ -17,6 +17,10 @@
       "every_minutes": 60,
       "at_start": true,
       "limit_ms": 30000
+    },
+    {
+      "event": "pack.changed",
+      "limit_ms": 10000
     }
   ],
   "reach": {

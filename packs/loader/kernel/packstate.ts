@@ -308,6 +308,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   const woken = [...waitingBefore].filter((id) => now(id)?.state === 'active');
   await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} ${what}`, detail: { pack: input.pack, ...(bundle && { bundle: bundle.id, packs: named }), ...synced, ...(waiting.length && { waiting: waiting.map((w) => w.id) }), ...(woken.length && { woken }) } });
   toolsChanged(l.workspace);
+  tellPacksChanged(l, input.on ? 'pack.on' : 'pack.off', [...named, ...waiting.map((w) => w.id), ...woken]);
   return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated, waiting, woken };
 }
 
@@ -325,9 +326,19 @@ export async function followPacks(l: Archipelago): Promise<boolean> {
 
 /** After a pack kept as an item was made, changed or retired: the log says it as it is now, and the packs on follow. */
 export async function followMade(l: Archipelago): Promise<void> {
-  await syncPacks(l);
+  const said = await syncPacks(l);
   await followPacks(l);
+  if (said.length) tellPacksChanged(l, 'pack.sync', said.map((f) => String(f[1]).replace(/^pack:/, '')));
 }
+
+/**
+ * The kernel's pack.changed, told to the packs that hear it once the registry has the change: which packs moved and how
+ * (said: pack.on, pack.off, or pack.sync for a pack kept as an item made, changed or retired). What each is now, its
+ * hearer reads (the read pack_states, packs/surface/kernel/packreads.ts).
+ */
+export const PACK_CHANGED = 'pack.changed';
+const tellPacksChanged = (l: Archipelago, said: string, packs: string[]) =>
+  hostFor(l.registry).tell(l, 'kernel', { action: PACK_CHANGED, reason: `${said}: ${packs.join(', ')}`, detail: { said, packs } });
 
 /** The owner’s tools for packs: their states and switch, their secrets, and the acts they ask for. */
 export const PACK_STATE_TOOLS: Record<string, Tool> = {
