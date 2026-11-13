@@ -52,11 +52,11 @@ export function draggable(el, keyOf, tell) {
     const start = [ev.clientX, ev.clientY];
     const id = ev.pointerId;
     let moved = false, at = null;
-    el.setPointerCapture?.(id);
     const move = (e) => {
       if (e.pointerId !== id) return;
       if (!moved && Math.hypot(e.clientX - start[0], e.clientY - start[1]) < 4) return; // A few pixels of the screen: less was a press, as ui/pane-drag.js had it.
-      if (!moved) document.body.dataset.dragging = el.dataset.drag;
+      // Held only once it moves: a press that does not move is a press, on whatever button it landed.
+      if (!moved) (el.setPointerCapture?.(id), (document.body.dataset.dragging = el.dataset.drag));
       moved = true;
       at = landing(el, e.clientX, e.clientY);
       const z = overlay();
@@ -66,9 +66,9 @@ export function draggable(el, keyOf, tell) {
     };
     const up = (e) => {
       if (e.pointerId !== id) return;
-      el.removeEventListener('pointermove', move);
-      el.removeEventListener('pointerup', up);
-      el.removeEventListener('pointercancel', up);
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', up);
       if (!moved) return;
       delete document.body.dataset.dragging;
       overlay().hidden = true;
@@ -76,8 +76,8 @@ export function draggable(el, keyOf, tell) {
       setTimeout(() => (dragged = false), 0);
       if (e.type === 'pointerup' && at) tell({ key: keyOf(), name: 'drop', value: { onto: at.onto, zone: at.zone } });
     };
-    el.addEventListener('pointermove', move);
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', up);
   });
 }

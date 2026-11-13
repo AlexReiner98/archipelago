@@ -90,6 +90,8 @@ const address = (v, why) => (typeof v === 'string' && v.length <= 2000 && ADDRES
 const share = (v, why) => (typeof v === 'number' && v > 0 && v <= 1 ? v : why('not a share above 0 and at most 1'));
 /** What a box or a button may be when it stands for something the person moves or picks between (a tab). */
 const handled = { drag: key, selected: flag, ring: flag, hue: words(partLimits.key), aux: flag };
+/** The keys a field gives its part (a KeyboardEvent's key names: ArrowUp, Escape), at most eight. */
+const keyNames = (v, why) => (Array.isArray(v) && v.length <= 8 ? v.map((k) => (typeof k === 'string' && /^[A-Za-z]{1,20}$/.test(k) ? k : why('not a key name, such as ArrowUp or Escape'))) : why('not a list of at most 8 key names'));
 /** A style preset tried on this screen alone, or null ('' too) for the workspace's own again. */
 const tryOn = (v, why) => (v === null || v === '' ? '' : key(v, why));
 /** A ghost's own id: its proposal and what in it (p_x:ref, p_x:#n, p_x:n). */
@@ -121,7 +123,7 @@ export const MARKS = {
   box: { attrs: { ...anyMark, ...handled, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag, fits: flag, more: key, dock: flag }, holds: 'marks' },
   text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end'), href, hue: words(partLimits.key) }, holds: 'words' },
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
-  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag }, holds: 'nothing', keyed: true },
+  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag, keys: keyNames }, holds: 'nothing', keyed: true },
   button: { attrs: { ...anyMark, ...handled, look: oneOf('main', 'quiet', 'tab'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(2000), try: tryOn }, holds: 'words', keyed: true },
   paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag, controls: flag }, holds: 'drawn' },
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash', 'area', 'box', 'strong'), tone, weight: step(1, 4), tip: words(partLimits.label), href }, holds: 'nothing', plane: true, needs: ['d'] },
