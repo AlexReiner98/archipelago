@@ -102,7 +102,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/public.js': 3,
   'ui/query-bar.js': 3,
   'ui/query-light.js': 2,
-  'ui/sheet-follow.js': 2,
   'ui/start.js': 1,
   'ui/style-code.js': 2,
   'ui/styles-card.js': 2,
