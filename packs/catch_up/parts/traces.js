@@ -1,5 +1,5 @@
 // Traces: what was, until it is seen (task e_p3tygg6p). A change that reached the page from the log leaves a trace on
-// each mark it touched, in its maker's hue (a session's word, which the runtime turns into its hue), until the person
+// each mark it touched, in its maker's hue (`hue`: a session's word, which the runtime draws in its hue), until the person
 // has seen it. The runtime watches the marks and says when one was in sight long enough (`seen`); this keeps what
 // waits and what has been seen, and says the one line over a traced mark: who changed it, what it did, and why.
 // Changes the person made here are not traced: they saw them made. Pure: no page, no clock but the one handed in.
@@ -49,4 +49,4 @@ export function keptOf(book, now, days) {
 }
 
 /** The trace marks, one for each item that waits: the runtime paints it on that item's marks on the canvas. */
-export const traceMarks = (book) => [...book.waiting].map(([item, t]) => ['trace', { item, tip: t.line.slice(0, 200), ...(t.word && { word: t.word }) }]);
+export const traceMarks = (book) => [...book.waiting].map(([item, t]) => ['trace', { item, tip: t.line.slice(0, 200), ...(t.word && { hue: t.word }) }]);

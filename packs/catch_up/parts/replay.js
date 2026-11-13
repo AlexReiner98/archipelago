@@ -21,10 +21,12 @@ export default function replay(input, tools) {
   const number = (name, or) => now?.style?.numbers?.[name] ?? or;
 
   function offer(missed) {
-    const steps = stepsOf(missed?.entries, { islands: missed?.islands, me: now?.me ?? missed?.me });
+    const steps = stepsOf(missed?.entries, { islands: missed?.islands, me: now?.piece?.me ?? now?.me });
     offered = steps.length ? { steps, count: changedCount(steps) } : null;
   }
-  if (input?.missed) offer(input.missed);
+  // A part mounted after the runtime told the slot hears the last it told as `told` (hooks.tellSlot).
+  const missed = input?.missed ?? (input?.told?.name === 'missed' ? input.told : undefined);
+  if (missed) offer(missed);
 
   const band = (o) => {
     const playing = o.played !== undefined;
@@ -33,7 +35,7 @@ export default function replay(input, tools) {
       'box',
       { key: 'catch-up', look: 'band', flow: 'row', gap: 2, align: 'center', tip: 'What changed since you last looked' },
       ['text', { look: 'mark' }, playing ? `${o.played} of ${o.steps.length}` : `${o.count} changed`],
-      ...(step ? [['text', { look: 'muted', ...(step.by?.word && { word: step.by.word }) }, whoSaid(step.by)]] : []),
+      ...(step ? [['text', { look: 'muted', ...(step.by?.word && { hue: step.by.word }) }, whoSaid(step.by)]] : []),
       ...(playing ? [] : [['button', { key: 'play', look: 'main', tip: 'Play what changed since you last looked, a step at a time' }, 'Play']]),
       ['button', { key: 'skip', look: 'quiet', tip: 'The map as it is now' }, 'Skip'],
       ['button', { key: 'shut', look: 'quiet', tip: 'Leave it: what changed stays traced' }, '×'],
