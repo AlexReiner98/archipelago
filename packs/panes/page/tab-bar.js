@@ -401,7 +401,7 @@ async function startPart() {
   if (!strip || !canvas) return false;
   // The strip lets presses through but for its tabs (ui/shell.css): the part's strip takes them.
   const top = h('div', { class: 'tabs-part', style: 'pointer-events: auto' });
-  const filled = await drawSlot(top, { slot: 'tabs' }).catch(() => false);
+  const filled = await drawSlot(top, { slot: 'tabs' }).catch((err) => (console.warn('The panes part did not draw:', err), false));
   if (!filled) return false;
   strip.replaceChildren(top);
   const panes = h('div', { class: 'panes-part' });
