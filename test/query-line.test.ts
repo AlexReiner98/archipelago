@@ -104,7 +104,7 @@ test('in a browser, a lens of many long terms stays in the line, and each term c
     assert.ok(box.more >= 1, `a part says how many more it holds ${where}`);
   };
   try {
-    assert.ok(await page.until(`${lineSays}.includes('Term 0') && !${lineSays}.includes('…')`), `the terms are named: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`${lineSays}.includes('Term 0') && !${lineSays}.includes('…')`), `the terms are named: ${await page.evaluate(lineSays)} at ${await page.evaluate('location.hash')}\n${page.logs().join('\n')}`);
     // A walk of no steps reaches nothing: the line says nothing of it.
     assert.equal(await page.evaluate<string>(labels), 'Find|Only|Not', 'no Walk on the line');
     assert.ok(!(await page.evaluate<string>(lineSays)).includes('×0'), 'nor ×0');
