@@ -37,7 +37,7 @@ export const seeingLineAnswer = async (ctx: KernelContext, input: { whose: Whose
  */
 export async function sightAnswer(ctx: KernelContext, input: { whose: Whose; actor: string; run?: string; focus?: boolean }) {
   const pages = await watching(ctx, input.whose);
-  const run = input.run ?? runNamed(input.whose, input.actor);
+  const run = input.run ?? runNamed(ctx, input.whose, input.actor);
   let sight = await inSight(ctx, input.whose, run, pages.open);
   for (let tries = 0; input.focus && pages.open && !sight.looking && tries < FOCUS_TRIES; tries++) {
     await new Promise((done) => setTimeout(done, FOCUS_MS));
