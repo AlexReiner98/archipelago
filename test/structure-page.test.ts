@@ -44,7 +44,7 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/loader/page/screen-rows.js': 1,
   // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar, item-doc and thumbs.
   'packs/surface/page/views-kept.js': 3,
-  'packs/surface/page/app.js': 7,
+  'packs/surface/page/app.js': 6,
   'packs/surface/page/canvas.js': 1,
   'packs/surface/page/live.js': 4,
   'packs/surface/page/query.js': 2,

@@ -8,9 +8,9 @@ import { chrome, open } from './browser.ts';
 import * as F from './find-dom.ts';
 import { serve } from './serve.ts';
 
-/** The layout switch, in the view band's menu (task e_xvz8g89r): the menu opened afresh, so the switch is the bar's now. */
-// The bar's own menu, by its name: the tab bar's menu is a .tab-menu too, and which comes first in the page varies.
-const look = `(() => { const m = document.querySelector('.tab-menu[aria-label="This view"]'); if (m?.matches(':popover-open')) m.hidePopover(); document.querySelector('#query .q-band-menu')?.click(); return m?.querySelector('.q-look') ?? null; })()`;
+/** The layout switch, in the view band's menu (task e_xvz8g89r): the styles pack's part (slot bar.layouts), its pick a select. */
+// The menu that holds it, found by the switch's row: the tab bar's menu is a .tab-menu too.
+const look = `(() => { const m = document.querySelector('.q-look-row')?.closest('.tab-menu'); if (m?.matches(':popover-open')) m.hidePopover(); document.querySelector('#query .q-band-menu')?.click(); return document.querySelector('.q-look-row select'); })()`;
 
 const browser = chrome();
 

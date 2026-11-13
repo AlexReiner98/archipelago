@@ -95,7 +95,8 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
     await type('only ');
     assert.ok(await page.until(`${F.mode} === 'Only' && ${F.input}.value === ''`), 'find is in Only, its mark before the box');
     await type('done');
-    assert.ok(await page.until(`((s) => s.find((c) => c.lit)?.kind === 'Word' && s.find((c) => c.lit)?.name === 'done')(${F.saidAll})`), `Only's own choices, the first lit: ${await page.evaluate(`${list}?.textContent`)}`);
+    // Drawn for "done", not still for what was typed before: Status done is offered only for it.
+    assert.ok(await page.until(`((s) => s.some((c) => c.kind === 'Status' && c.name === 'done') && s.find((c) => c.lit)?.kind === 'Word' && s.find((c) => c.lit)?.name === 'done')(${F.saidAll})`), `Only's own choices, the first lit: ${await page.evaluate(`${list}?.textContent`)}`);
     await enter();
     assert.ok(await page.until(`location.hash.includes('only=done') && ${F.mode} === 'Find'`), `Enter takes it as an Only term: ${await page.evaluate('location.hash')}`);
     // A kind's word leading what is typed offers that kind alone, found by the rest: "in site" is In Site works.
