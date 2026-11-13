@@ -288,6 +288,8 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),
     pick: (kind) => pickFor(item, kind),
+    // What a mark lights while the person points at it: the app lights those items on the canvas and fades the rest.
+    lights: (ids) => hooks.lights?.(ids),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
