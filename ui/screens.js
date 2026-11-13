@@ -5,7 +5,6 @@
 
 import { api, h, hooks } from './base.js';
 import { section } from './item-sections.js';
-import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { flatView } from './query.js';
@@ -181,11 +180,6 @@ const PIECES = {
   held: (ctx, p) => {
     const node = h('div');
     return { node, later: () => heldPiece(node, p.title ?? p.screen.title) };
-  },
-  // A diagram made from the code: the boxes and wires the item keeps, with its draw.io file at the commit it came from.
-  diagram: (ctx) => {
-    const node = h('section', { class: 'card wide lens-card' });
-    return { node, later: () => drawDiagram(node, ctx.e?.props?.diagram, { download: ctx.e?.props?.diagram?.drawio }) };
   },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,

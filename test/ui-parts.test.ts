@@ -84,7 +84,7 @@ test('the host offers these slots, each handing the part what it is named with',
     'workspace.card': ['workspace', 'section'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
-  assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'diagram', 'button', 'count']);
+  assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'button', 'count']);
   // One name, one owner: no slot is named twice, and every one of them is open to any pack.
   assert.equal(new Set(HOST_SLOTS).size, HOST_SLOTS.length);
 });

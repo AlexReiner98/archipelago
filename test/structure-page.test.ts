@@ -74,7 +74,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/catch-up.js': 3,
   'ui/connect-agent.js': 2,
   'ui/connections-card.js': 2,
-  'ui/diagram.js': 3,
   'ui/doc-lens.js': 4,
   'ui/doc-sheet.js': 2,
   'ui/doc.js': 7,
