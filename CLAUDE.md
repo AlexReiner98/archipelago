@@ -131,7 +131,7 @@ reply ending) is `docs/agents.md`.
 - **Visibility is enforced by the database** (row level security in
   `packs/database/kernel/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
-- **Types live in pack files** under `packs/`, each a manifest of nineteen keys
+- **Types live in pack files** under `packs/`, each a manifest of twenty keys
   (`docs/packs.md`, read by `packs/loader/kernel/manifest.ts`). Fields the system maintains are
   marked `"system": true`.
 - **On an island map a pack is one of two kinds** (the owner, 10 Nov 2026,

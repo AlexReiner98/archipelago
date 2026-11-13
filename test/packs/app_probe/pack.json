@@ -1,0 +1,8 @@
+{
+  "id": "app_probe",
+  "version": "0.1.0",
+  "title": "App probe",
+  "app": true,
+  "description": "A map pack marked as one of the app's own screens, for testing that it is on in every map until its owner takes it out.",
+  "requires": ["core"]
+}
