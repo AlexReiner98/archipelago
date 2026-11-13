@@ -2,7 +2,7 @@
 // a person or a session (./published.ts). The picture is the lenses pack's (answer.kept_picture).
 
 import type { KernelContext } from '#pelago/kernel';
-import { isKept, itemsOf, stepsShown, type Step } from './map.ts';
+import { carriedOf, isKept, itemsOf, stepsShown, type Step } from './map.ts';
 import { framesFor } from './published-frames.ts';
 
 const IDS = /[ \t]*\(?\b(e_[a-z0-9]{8})\b\)?/g;
@@ -57,7 +57,9 @@ export async function picturesOf(ctx: KernelContext, sections: { id: string; typ
     const read = await itemsOf(ctx, answer.items.map((i) => i.id));
     const rows = shared ? read.filter((r) => r.visibility !== 'private' && r.private_to == null) : read;
     const shown = new Map(rows.map((r) => [r.id, r.body]));
-    const kept = { ...answer, items: answer.items.filter((i) => shown.has(i.id)), links: answer.links.filter((k) => shown.has(k.from) && shown.has(k.to)) };
+    // Each item with the fields a frozen view carries of it (carriedOf), when it holds any.
+    const fields = new Map(rows.map((r) => [r.id, carriedOf(ctx, r.type, r.props ?? {})]));
+    const kept = { ...answer, items: answer.items.filter((i) => shown.has(i.id)).map((i) => (Object.keys(fields.get(i.id) ?? {}).length ? { ...i, fields: { ...(i as { fields?: Record<string, unknown> }).fields, ...fields.get(i.id) } } : i)), links: answer.links.filter((k) => shown.has(k.from) && shown.has(k.to)) };
     // What a reader with no login is not shown is counted, so the page can say the view is not empty, only private.
     const hidden = answer.items.length - kept.items.length;
     lenses[section.id] = { ...freezeQuery(kept, shown, ctx.registry.relationFamily('part_of')), ...(shared && hidden && { hidden }) };

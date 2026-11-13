@@ -6,6 +6,7 @@ import { setControlValue } from '../packs/identity/kernel/control.ts';
 import { GUEST_ITEMS, guestKey, guestOf, guestsDue, keepGuest, type Guest } from '../packs/identity/kernel/guests.ts';
 import { standingChanged } from '../packs/identity/kernel/standing.ts';
 import { createToken } from '../packs/identity/kernel/auth.ts';
+import { publicView } from '../packs/surface/kernel/public-views.ts';
 import { serve } from './serve.ts';
 
 const DAY = 86_400_000;
@@ -136,22 +137,29 @@ test('Make it yours brings the shared map’s own type, its view and its style, 
     return done.result;
   };
   await ok('/api/workspace_set', { islands: true });
-  const RECIPES = { types: [{ id: 'recipes.dish', title: 'Dish', description: 'A dish.', extends: 'record', fields: { serves: { type: 'number' } } }] };
+  const RECIPES = { types: [{ id: 'recipes.dish', title: 'Dish', description: 'A dish.', extends: 'record', fields: { serves: { type: 'number' }, secret: { type: 'string', private: true } } }] };
   await ok('/api/change', { reason: 'test', ops: [{ op: 'create', type: 'pack', title: 'Recipes', body: 'What we cook.', props: { name: 'recipes', manifest: RECIPES } }] });
   await ok('/api/pack_set', { pack: 'recipes', on: true });
   const { i: island } = (await ok('/api/change', { reason: 'test', ops: [{ op: 'create', ref: 'i', type: 'island', title: 'Kitchen', props: { pack: 'recipes' } }] })).created;
   const { s: style } = (await ok('/api/change', { reason: 'test', ops: [{ op: 'create', ref: 's', type: 'style', title: 'Warm', status: 'current', props: { shape: 'flow', link_colours: { part_of: '#aa5500' } } }] })).created;
   const made = (await ok('/api/change', { reason: 'test', ops: [
-    { op: 'create', ref: 'a', type: 'recipes.dish', title: 'Soup', props: { serves: 4, island }, visibility: 'shared' },
+    { op: 'create', ref: 'a', type: 'recipes.dish', title: 'Soup', props: { serves: 4, secret: 'grandma’s stock', island }, visibility: 'shared' },
     { op: 'create', ref: 'b', type: 'recipes.dish', title: 'Bread', props: { island }, visibility: 'shared' },
     { op: 'link', type: 'part_of', from: 'b', to: 'a' },
     { op: 'create', ref: 'l', type: 'lens', title: 'The dishes', props: { filter: { find: ['type recipes.dish'] }, style: { style } }, visibility: 'shared' },
   ] })).created;
   const shared = await ok('/api/share_create', { id: made.l });
+  // The frozen view carries a dish's declared fields, never a private one nor where it lives.
+  const frozen = (await publicView(main.pelago, made.l)) as { lenses: Record<string, { items: { title: string; fields?: Record<string, unknown> }[] }> };
+  assert.deepEqual(frozen.lenses[made.l].items.find((i) => i.title === 'Soup')?.fields, { serves: 4 });
 
   const copy = await call('/guest', undefined, { from: shared.address });
   assert.equal(copy.status, 200, copy.error);
   const guest = (await workspaces.get(copy.result.workspace.id)).pelago;
+  // A dish keeps its fields in the copy, but for the private one.
+  const soup = (await guest.db.query<{ props: Record<string, unknown> }>(`select props from entity where type = 'recipes.dish' and title = 'Soup' limit 1`)).rows[0];
+  assert.equal(soup?.props.serves, 4);
+  assert.equal(soup?.props.secret, undefined);
   // The type is itself, from a pack kept on the guest's map and on there, and its items live on an island that speaks it.
   assert.equal(guest.registry.type('recipes.dish')?.title, 'Dish');
   assert.equal(guest.registry.states.get('recipes')?.state, 'active');

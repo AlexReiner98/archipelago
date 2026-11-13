@@ -1,7 +1,8 @@
 // Make it yours: a guest map that starts as a copy of a shared map, its look and its words included (the owner, 13
 // Nov 2026, e_8yd7wh5r: "Yes, copy them"). What comes is what the public view shows anyone, read through the function
 // a reader's page is (./public-views.ts), so nothing private comes with it: its items, each as its type, title,
-// status and the words shown of it, and the links between them. Beside them, what makes them look as they were shared:
+// status, the words shown of it and the fields the view was frozen with (packs/publish/kernel/map.ts, carriedOf: none
+// on a view frozen before that), and the links between them. Beside them, what makes them look as they were shared:
 // - each type they are of, as the map that shared them declares it: a type of its own (define_type), a pack kept on
 //   that map (its types and link types shown, as a pack kept on this one), or a server's pack (turned on here);
 // - an island for each pack, as there, so each item lives where its type does;
@@ -16,7 +17,7 @@ import { livesOnIsland } from '../../loader/kernel/island-items.ts';
 import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { publicView } from './public-views.ts';
 
-type Shown = { id: string; type: string; title: string; status?: string | null; body?: string; gist?: string; inside?: string | null; island?: string | null };
+type Shown = { id: string; type: string; title: string; status?: string | null; body?: string; gist?: string; inside?: string | null; island?: string | null; fields?: Record<string, unknown> };
 type Link = { from: string; to: string; type: string };
 type Frozen = { type?: string; title?: string; status?: string; types?: Record<string, string>; parts?: { section?: Shown }[]; lenses?: Record<string, { items?: Shown[]; links?: Link[] }> };
 type Def = { id: string; extends?: string; from?: string[]; to?: string[] } & Record<string, unknown>;
@@ -124,7 +125,10 @@ export async function copyShared(from: Archipelago, id: string, to: Archipelago,
     const type = rename(i.type), statuses = to.registry.type(type)?.statuses;
     const status = i.status && statuses && [...statuses.open, ...statuses.closed].includes(i.status) ? i.status : undefined;
     const body = (i.body ?? i.gist ?? '').trim(), island = await islandOf(i);
-    ops.push({ op: 'create', ref: i.id, type: to.registry.type(type) ? type : 'work', title: i.title.slice(0, 60), ...(body && { body }), ...(status && { status }), ...(island && { props: { island } }) });
+    // The fields the frozen view carried of it (packs/publish/kernel/map.ts, carriedOf), those its type here declares.
+    const as = to.registry.type(type) ? type : 'work', declared = to.registry.type(as)?.fields ?? {};
+    const props = { ...Object.fromEntries(Object.entries(i.fields ?? {}).filter(([k]) => declared[k] && !declared[k].system && !declared[k].private && k !== 'island')), ...(island && { island }) };
+    ops.push({ op: 'create', ref: i.id, type: as, title: i.title.slice(0, 60), ...(body && { body }), ...(status && { status }), ...(Object.keys(props).length && { props }) });
   }
   const seen = new Set<string>();
   for (const k of linked) {
