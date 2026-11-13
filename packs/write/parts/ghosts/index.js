@@ -1,4 +1,4 @@
-// The write pack's part for held changes (slot `ghosts`): handed the changes held (`held`), the ids of the items drawn
+// The write pack's part for held changes (slot `ghosts`, declared in its manifest once the frame offers it): handed the changes held (`held`), the ids of the items drawn
 // (`drawn`) and whether the canvas is one of what is held (`loose`), it answers with a ghost mark for each thing a held
 // change would add or change there. The part decides; the runtime draws each ghost where it draws anything.
 
