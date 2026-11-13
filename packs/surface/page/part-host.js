@@ -195,7 +195,7 @@ hooks.addressMoved = addressMoved;
 function sweep() {
   for (const [version, one] of versions) {
     for (const [id, m] of one.mounted) if (!m.node.isConnected) (m.render.stop(), one.bridge?.send({ type: 'unmount', id }), one.mounted.delete(id));
-    if (one.port && !one.mounted.size) (endPart(version), versions.delete(version));
+    if (one.port && !one.mounted.size && !opening.has(version)) (endPart(version), versions.delete(version));
   }
 }
 
@@ -204,8 +204,24 @@ const slotsDeep = 4;
 const depthOf = (node) => { let n = 0; for (let at = node.closest?.('.part-body'); at; at = at.parentElement?.closest('.part-body')) n++; return n; };
 
 /** Mount one part under `node` on its version's worker, with what it reads; `picture(item, el, input)` draws a picture mark out of what it was handed. */
-async function mount(node, part, parts, item, words, piece, { openView, picture } = {}) {
+async function mount(node, part, parts, item, words, piece, ways = {}) {
   const version = versionOf(parts, part.pack);
+  // Counted from before its worker is asked for until it is among the mounted, so no sweep in between (a slot drawn
+  // again while this one starts, as a cold first load does) ends the worker under it.
+  opening.set(version, (opening.get(version) ?? 0) + 1);
+  try {
+    return await mountOn(version, node, part, parts, item, words, piece, ways);
+  } finally {
+    const left = opening.get(version) - 1;
+    if (left) opening.set(version, left);
+    else opening.delete(version);
+  }
+}
+
+/** How many parts of each version are mounting now: a version with one is not taken down. */
+const opening = new Map();
+
+async function mountOn(version, node, part, parts, item, words, piece, { openView, picture } = {}) {
   const one = await workerOf(version, parts, part.pack);
   const id = `m${++mounts}`;
   // A mark that stands for an item opens that item's page when pressed: the host's, so a part names items, never addresses.
