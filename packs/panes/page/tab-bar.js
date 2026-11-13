@@ -10,7 +10,7 @@
 // A session's tab carries a mark for its state, and beside the strip a count of the sessions waiting on the owner goes
 // to the oldest one (ui/tab-count.js, e_82rggead).
 
-import { api, firstDrawn, h, hooks, state } from './base.js';
+import { api, drawSlot, firstDrawn, h, hooks, state } from './base.js';
 import { readAddress } from './query.js';
 import { still } from './look.js';
 import { placeBy } from './menu-place.js';
@@ -19,7 +19,7 @@ import { followable, heard, hearOpen, nameOf, WATCH } from './pane-route.js';
 import { activeIs, close, draw, paneAt, paneButtons, startPanes } from './panes.js';
 import { filterSaid } from './query-bar.js';
 import { countGoes, countTip, onYou, stateSaid } from './tab-count.js';
-import { BLANK, dismissed, focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
+import { BLANK, byPart, dismissed, focusOf, front, freshTab, isOutKey, keep, landed, listKey, named, outKey, outTabs, poppedTab, read, save, tabHref, tabOf, tabs } from './tabs.js';
 import { sessionHue, titles } from './words.js';
 
 read();
@@ -221,6 +221,8 @@ function tabEl(t, out) {
   return el;
 }
 export function drawStrip() {
+  // The part draws the strip; the count of sessions waiting on the owner beside it is still drawn here.
+  if (byPart.on) return void (poppedTab || drawCount([]));
   if (!strip || poppedTab) return;
   const out = outTabs().filter((t) => !tabOf(t.id));
   // The owner's tabs first, then the chats', each in the order they opened.
@@ -379,6 +381,60 @@ export function startTabs() {
     tabs.front = tabs.list[0].id;
     return startPanes();
   }
+  // The panes pack's part draws the tabs and the panes (packs/panes/parts/index.js), asked for with ?panes=part until a
+  // press inside a dragged mark reaches its button (task e_rq9d73mg); the page's own draw them otherwise, and where
+  // no part fills them.
+  if (partAsked()) {
+    byPart.on = true;
+    void startPart().then((drawn) => drawn || ((byPart.on = false), startHost(), dispatchEvent(new HashChangeEvent('hashchange'))));
+    return;
+  }
+  startHost();
+}
+
+/** Whether the panes part is asked for: ?panes=part, kept for this window's session and the windows it pops out. */
+function partAsked() {
+  try {
+    if (new URLSearchParams(location.search).get('panes') === 'part') sessionStorage.setItem('pelago-panes-part', '1');
+    return sessionStorage.getItem('pelago-panes-part') === '1';
+  } catch {
+    return new URLSearchParams(location.search).get('panes') === 'part';
+  }
+}
+
+/**
+ * Draw the tabs and the panes with the panes pack's part: the strip in the top bar, the panes in #canvas, one part mounted
+ * twice, so one model. The query bar's back, forth and split go to it: a step of the browser's, and `split` told. True
+ * when a part filled them.
+ */
+async function startPart() {
+  const canvas = document.getElementById('canvas');
+  if (!strip || !canvas) return false;
+  // The strip lets presses through but for its tabs (ui/shell.css): the part's strip takes them.
+  const top = h('div', { class: 'tabs-part', style: 'pointer-events: auto' });
+  const filled = await drawSlot(top, { slot: 'tabs' }).catch((err) => (console.warn('The panes part did not draw:', err), false));
+  if (!filled) return false;
+  strip.replaceChildren(top);
+  const panes = h('div', { class: 'panes-part' });
+  canvas.replaceChildren(panes);
+  await drawSlot(panes, { slot: 'tabs', piece: { slot: 'panes' } });
+  document.body.dataset.panesBy = 'part';
+  for (const hook of ['land', 'sessionEnded', 'sessionRested', 'sessionsOpen', 'settleTab', 'drawStrip', 'paneMoved', 'paneToTab', 'besidePane', 'watchTab']) delete hooks[hook];
+  const button = (label, title, mark, onclick) => h('button', { type: 'button', class: 'q-save', title, 'aria-label': label, onclick }, mark);
+  hooks.paneButtons = () => [
+    button('Back', 'Back to what this pane drew before', '‹', () => history.back()),
+    button('Forward', 'Forward again', '›', () => history.forward()),
+    button('Split', 'Split: a new pane beside this one', '◫', () => hooks.tellSlot?.('tabs', { name: 'split' })),
+    // In a popped window, its tab goes back into the main one as it closes.
+    poppedTab && button('Dock back', 'Dock this window back into the main one, as a tab', '⇲', () => (hooks.tellSlot?.('tabs', { name: 'dock' }), setTimeout(() => window.close(), 300))),
+  ].filter(Boolean);
+  // The count beside the strip reads the sessions open, as it did beside the page's own strip.
+  if (!poppedTab) (firstDrawn.then(readOpen), document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && readOpen()));
+  return true;
+}
+
+/** Draw the tabs kept here and the panes of the one in sight, as this page has drawn them. */
+function startHost() {
   // The page opened on an address: the page it names is open over the tab in sight (its lens goes to the pane in focus, ui/app.js).
   front().sheet = sheetOf(location.hash);
   keep();

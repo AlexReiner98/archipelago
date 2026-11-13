@@ -1,5 +1,5 @@
 // Automations as rows of marks, decided without the map: the automations, where each falls next and how each last
-// fired in, one row each out. The kernel draws a row's state, its name, then its marks (ui/screens.js); what each mark
+// fired in, one row each out. The kernel draws a row's state, its name, then its marks (packs/sheet/page/screens.js); what each mark
 // says is here. Next run is worked out by the kernel's clock from the automation's when, never stored.
 
 const DAY = 86_400_000;

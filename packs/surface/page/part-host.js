@@ -23,11 +23,16 @@ import { MARKS, checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
 import { pickOnCanvas } from './canvas-pick.js';
 import { itemOf, waysBetween } from './layout-asks.js';
+import { lightItems } from './light-items.js';
+import { sessionHue } from './words.js';
 import { addressSaid, queryGiven } from './part-lens.js';
 import { readFor } from './part-read.js';
 import { hearAway, tellAway } from './part-away.js';
 import { focusWindow, goHash, hearPage, openWindow, pageOf } from './part-page.js';
 import { AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
+import { paintSwatch, tryTheme } from './swatch.js';
+import { replayIn } from './replay.js';
+import { project } from './project.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -179,7 +184,8 @@ async function pickFor(from, kind) {
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
+  // The theme this screen alone is painted in, if one is being tried (a button's `try`), so a part can say Keep or Stop.
+  given = { ...given, up: hooks.viewUp?.() ?? null, trying: state.trying ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
@@ -281,6 +287,10 @@ function sweep() {
   }
 }
 
+/** How many parts deep a slot mark may hold others, and how deep a node stands among them. */
+const slotsDeep = 4;
+const depthOf = (node) => { let n = 0; for (let at = node.closest?.('.part-body'); at; at = at.parentElement?.closest('.part-body')) n++; return n; };
+
 /** Mount one part under `node` on its version's worker, with what it reads; `picture(item, el, input)` draws a picture mark out of what it was handed. */
 async function mount(node, part, parts, item, words, piece, { openView, picture } = {}) {
   const version = versionOf(parts, part.pack);
@@ -311,8 +321,22 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),
     pick: (kind) => pickFor(item, kind),
-    // What a mark lights while the person points at it: the app lights those items on the canvas and fades the rest.
-    lights: (ids) => hooks.lights?.(ids),
+    // What a mark lights while the person points at it: those items lit on the canvas in sight, the rest faded.
+    lights: (ids) => lightItems(hooks.viewUp?.() ?? null, ids?.length ? ids : null),
+    // A pane's canvas, drawn at its address by whoever keeps the panes (hooks.paneFrame), told back what is done in it.
+    frame: (at, el, said) => hooks.paneFrame?.(at, el, said) ?? null,
+    // A session's hue, named by its words, as every session is marked.
+    hue: (words) => sessionHue(words),
+    // A style preset's colours, and a theme tried on this screen alone: the page's, as a part paints no colour.
+    swatch: (preset, el) => paintSwatch(preset, el),
+    tryTheme: (preset) => tryTheme(preset),
+    // What the person missed, played on the canvas the part stands over (its store, hooks.storeUnder: ./canvas.js).
+    replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
+    // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
+    ghosts: (list) => hooks.ghosts?.(node, list),
+    // A `slot` mark (decided 13 Nov 2026): a slot this part opens, filled by whatever parts fill it, drawn by the runtime
+    // in the mark's node. The part holding it never sees them, nor they it; nested a few deep at most.
+    slot: (name, el) => ((part.opens ?? []).includes(name) && depthOf(node) < slotsDeep ? drawParts(el, { slot: name, item, piece, openView, picture }) : Promise.resolve(0)),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
@@ -328,6 +352,9 @@ addEventListener('storage', (ev) => {
   if (!ev.key?.startsWith('pelago-part:')) return;
   for (const { m } of mountedNow()) if (ev.key.startsWith(keptKey(m.part, m.item))) void m.refresh();
 });
+
+/** Whether a part is mounted on a slot now: what is worked out only for one (the beat's rows for `traces`) waits on it. */
+hooks.slotFilled = (slot) => [...mountedNow()].some(({ m }) => m.part.slot === slot && m.node.isConnected);
 
 /** Hand every part on these slots its input again. */
 const refreshOn = (slots) => { for (const { m } of mountedNow()) if (slots.includes(m.part.slot)) void m.refresh(); };

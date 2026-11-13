@@ -1,4 +1,3 @@
-import { ghostsOf, withGhosts } from './ghosts.js';
 import { mayMove, reads } from './membership.js';
 import { isLink, NOTE_START, project } from './project.js';
 
@@ -14,7 +13,8 @@ import { isLink, NOTE_START, project } from './project.js';
 // rows newer than the facts still to come, and those facts are not folded onto them twice. Beside the rows the store
 // keeps the changes held for the owner (`held`, the pending proposals, read again as the queue moves) and the links
 // the person drew here that the server has not yet answered for (`mine`): a view's `drawn()` is its answer with both
-// drawn into it (ui/ghosts.js), what the canvas hands its drawing.
+// drawn into it, what the canvas hands its drawing. Where a held change would land is the write pack's to decide (its
+// part on the slot `ghosts`, asked through `ghostAsker`); the replica checks what it answers and draws it in.
 
 /** An item of a lens answer as the row the projector folds facts into. */
 const itemRow = (i) => ({
@@ -29,6 +29,53 @@ const linkRow = (r) => ({ id: r.id, type: r.type, from_id: r.from, to_id: r.to, 
 const blank = () => ({ items: { added: [], changed: [], removed: [] }, links: { added: [], changed: [], removed: [] } });
 const anyIn = (changed) => ['items', 'links'].some((k) => Object.values(changed[k]).some((list) => list.length));
 const ISLAND_ID = /^e_[a-z0-9]{8}$/;
+
+// ---- what is held, drawn where it would land --------------------------------
+
+/** How the replica asks the part on the slot `ghosts` (askSlot, set by the page: packs/surface/page/query.js); unset, nothing held is drawn. */
+export const ghostAsker = { ask: null };
+
+const NONE = Object.freeze({ items: [], links: [], marks: new Map() });
+const PROPOSAL = /^p_[a-z0-9]+$/;
+/** What each kind of ghost may say it is of a held change. */
+const GHOST_OPS = { item: ['create'], link: ['link'], mark: ['update', 'archive', 'unlink'] };
+const word = (v, most) => typeof v === 'string' && v.length > 0 && v.length <= most;
+
+/**
+ * The ghosts a part answered, checked: `items` to draw faint, `links` to draw dashed and `marks` (by the id of an item
+ * or link drawn) the changes held on each. A ghost that is not of a held change, or names another's, is left out.
+ */
+export function ghostsFrom(list) {
+  if (!Array.isArray(list)) return NONE;
+  const items = [], links = [], marks = new Map();
+  for (const g of list.slice(0, 5000)) {
+    if (!g || typeof g !== 'object' || !GHOST_OPS[g.of]?.includes(g.op) || !word(g.proposal, 40) || !PROPOSAL.test(g.proposal)) continue;
+    const pending = { proposal: g.proposal, ...(word(g.by, 200) && { by: g.by }), ...(word(g.reason, 4000) && { reason: g.reason }), op: g.op };
+    const own = (id) => word(id, 120) && id.startsWith(`${g.proposal}:`);
+    if (g.of === 'item' && own(g.id) && word(g.type, 80) && typeof g.title === 'string') {
+      items.push({ id: g.id, type: g.type, title: g.title.slice(0, 4000), ...(typeof g.body === 'string' && g.body && { body: g.body }), status: word(g.status, 80) ? g.status : null, open: true, pending });
+    } else if (g.of === 'link' && own(g.id) && word(g.type, 80) && word(g.from, 120) && word(g.to, 120)) links.push({ id: g.id, type: g.type, from: g.from, to: g.to, pending });
+    else if (g.of === 'mark' && word(g.on, 120)) (marks.get(g.on) ?? marks.set(g.on, []).get(g.on)).push(pending);
+  }
+  return { items, links, marks };
+}
+
+/**
+ * A lens answer with what is held drawn into it: the ghosts added, each item or link a held change edits flagged with
+ * the first such change, and the links the person drew and the server has not answered for (`mine`, each
+ * { id, type, from, to }) flagged as theirs. A ghost link is drawn only between what is drawn.
+ */
+export function withGhosts(answer, ghosts, mine = []) {
+  const flag = (x) => (ghosts.marks.has(x.id) ? { ...x, pending: ghosts.marks.get(x.id)[0] } : x);
+  const ids = new Set(answer.items.map((i) => i.id));
+  const drawn = (l) => ids.has(l.from) && ids.has(l.to);
+  const shown = new Set([...ids, ...ghosts.items.map((i) => i.id)]);
+  return {
+    ...answer,
+    items: [...answer.items.map(flag), ...ghosts.items],
+    links: [...answer.links.map(flag), ...ghosts.links.filter((l) => shown.has(l.from) && shown.has(l.to)), ...mine.filter(drawn).map((l) => ({ ...l, pending: { mine: true, op: 'link' } }))],
+  };
+}
 
 /** The one store: every item and link an open view holds, by id. */
 export class Store {
@@ -275,8 +322,31 @@ export class View {
 
   /** The answer with what is held for the owner drawn where it would land, and the links drawn here and not yet answered for. */
   drawn() {
-    const holds = (id) => Boolean(this.item(id));
-    return withGhosts(this.answer(), ghostsOf(this.store.held, holds, Boolean(this.lens?.find?.includes('held'))), [...this.store.mine.values()]);
+    const answer = this.answer();
+    return withGhosts(answer, this.ghosts(answer), [...this.store.mine.values()]);
+  }
+
+  /**
+   * The ghosts of what is held over this answer, as the write pack's part last answered them: asked again when what is
+   * held or what is drawn moves, the view told once the answer lands, and the last answer drawn meanwhile.
+   */
+  ghosts(answer) {
+    const held = this.store.held ?? [];
+    if (!held.length || !ghostAsker.ask) return ((this.ghostAsked = undefined), (this.ghostsHad = undefined), NONE);
+    const input = { held, drawn: answer.items.map((i) => i.id), loose: Boolean(this.lens?.find?.includes('held')) };
+    const said = JSON.stringify(input);
+    if (said !== this.ghostAsked) {
+      this.ghostAsked = said;
+      Promise.resolve(ghostAsker.ask(input)).then(
+        (list) => {
+          if (this.ghostAsked !== said) return;
+          this.ghostsHad = ghostsFrom(list);
+          this.tell({ ...blank(), held: true });
+        },
+        () => {},
+      );
+    }
+    return this.ghostsHad ?? NONE;
   }
 
   /** What the store's facts changed of this view, and whether its answer may have moved: told when either is so. */

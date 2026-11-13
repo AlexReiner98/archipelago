@@ -3,7 +3,7 @@
 // brief; and `names`, the titles of the items the lens names. The canvas in focus says what it draws (hooks.address,
 // hooks.answer, hooks.homeLens: packs/surface/page/canvas.js); what needs no page is packs/walls/page/part-slots.js.
 
-import { hooks, state } from './base.js';
+import { hooks, state, whoami } from './base.js';
 import { idsNamed } from './lens-terms.js';
 import { itemOf } from './layout-asks.js';
 import { ANSWER_SLOTS, QUERY_SLOTS, SHAPE_SLOTS, answerBrief, withSaid } from './part-slots.js';
@@ -31,6 +31,8 @@ export async function addressSaid(words) {
 /** What a part filling `slot` is handed of the canvas's query, or nothing for a slot that is not handed it. */
 export async function queryGiven(slot, words) {
   if (!QUERY_SLOTS.includes(slot)) return {};
+  // Who is looking, as the log names an actor, for a part that tells their own changes from others' (the traces).
+  const me = slot === 'traces' ? await whoami().then((j) => (typeof j?.actor === 'string' ? j.actor : j?.actor?.kind ? `${j.actor.kind}:${j.actor.name}` : null), () => null) : undefined;
   const at = hooks.address?.() ?? null;
   const up = hooks.answer?.() ?? null;
   const lens = at?.query ?? hooks.homeLens?.() ?? null;
@@ -39,6 +41,7 @@ export async function queryGiven(slot, words) {
     query: withSaid(lens, words, names),
     home: !at?.query,
     names,
+    ...(me !== undefined && { me }),
     ...(ANSWER_SLOTS.includes(slot) && { answer: answerBrief(up?.answer, { failed: up?.failed, limit: lens?.limit }) }),
     ...(SHAPE_SLOTS.includes(slot) && { shapes: (state.schema?.shapes ?? []).filter((s) => typeof s?.shape === 'string').map((s) => ({ shape: s.shape, title: String(s.title ?? s.shape) })) }),
   };

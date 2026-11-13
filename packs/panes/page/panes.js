@@ -15,9 +15,8 @@ import { numberOf } from './query-base.js';
 import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf } from './pane-route.js';
 import { filterSaid } from './query-bar.js';
-import { sheetAside } from './sheet-follow.js';
 import { frameIn, reframe } from './pane-web.js';
-import { BLANK, asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
+import { BLANK, asPane, byPart, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
 import { titles } from './words.js';
 
 /** The sides a pane is docked on, beside the pane it is put by: along a row, or down a column. */
@@ -148,6 +147,8 @@ export function travel(by, from = '') {
 
 /** The address the pane in focus stands at, keeping the page open in `from`: an item's page over its lens, or another page. */
 export function hrefNow(from = '') {
+  // The part draws the panes: the page's own address, without the page over it, is the lens it stands at.
+  if (byPart.on) return (from || location.hash).split('?')[1] ? `#/v?${(from || location.hash).split('?')[1]}` : '#/';
   const at = front().panes[active]?.at;
   const base = hrefOf(at);
   const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(from)?.[1];
@@ -165,6 +166,7 @@ function say(push, from) {
 }
 /** The page's address given to the pane in focus (ui/app.js): a step there, unless it draws it already; `here` lit in it. */
 export function toAddress(at, here) {
+  if (byPart.on) return;
   const entry = drawn.get(active);
   if (entry) entry.here = here;
   // The browser took the step already: the address is only written over, to say the lens beside the page.
@@ -234,6 +236,7 @@ const host = document.getElementById('canvas');
 const groupEls = () => front().groups.map((g) => [g, drawn.get(g)?.el]).filter(([, el]) => el);
 
 export function draw() {
+  if (byPart.on) return;
   const layout = front();
   for (const [id, entry] of drawn) if (!layout.groups.includes(id)) (entry.canvas.close(), entry.el.remove(), drawn.delete(id));
   for (const [id, entry] of drawn) if (layout.panes[id]?.at !== entry.at) load(id, layout.panes[id].at);
@@ -241,7 +244,7 @@ export function draw() {
   host.dataset.dir = dir;
   // The panes share the room left of an open sheet, one alone too, so whatever a pane draws stands beside the sheet and
   // none of it behind: this is the one place a canvas gives way to it.
-  const aside = sheetAside();
+  const aside = hooks.sheetAside();
   const room = 1 - aside;
   let from = 0;
   frames = layout.groups.map((g, n) => {
@@ -377,6 +380,44 @@ hooks.besidePane = (from, view) => {
   const at = `v?canvas=${view}`;
   if (mine) goPane(mine, at, false);
   else openPane(at, 'right', from, { anew: true, shows: from });
+};
+
+/**
+ * A pane mark's canvas (packs/walls/page/part-pane.js): the panes part names an address, and this draws it in `el` as
+ * a pane here draws its own, telling the part what is done in it (`said`): another lens (`open`), an item opened over
+ * it (`opened`, its page opened here), and what it draws, by name (`named`). Answers how to stop it.
+ */
+hooks.paneFrame = (at, el, said) => {
+  let live = true;
+  // Laid out as a pane here lays out its own (ui/shell.css: #canvas .pane-canvas).
+  el.classList.add('pane-canvas');
+  const canvas = canvasIn(el, {
+    go: (lens) => said('open', { at: lens ? `v?${addressOf(lens, canvas.asked)}` : 'v' }),
+    open: (href) => said('open', { at: paneAt(href) }),
+    opened: (item, lens) => {
+      said('opened', { item, at: `v?${addressOf(lens, canvas.asked)}` });
+      location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
+    },
+  });
+  if (at === NONE) canvas.empty();
+  else
+    lensOf(at).then(({ lens, style, here }) => {
+      if (!live) return;
+      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? filterSaid(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
+      naming();
+      canvas.show(lens, here, style);
+      activate(canvas);
+    }, (err) => live && el.replaceChildren(h('div', { class: 'error' }, err.message)));
+  // What it draws, told again as it is drawn anew (the map changed, another lens): a tab that watches what it draws reads it.
+  let told = '';
+  const tell = () => {
+    const ids = canvas.ids?.() ?? [];
+    if (live && ids.join(' ') !== told) ((told = ids.join(' ')), said('drawn', ids.slice(0, 500)));
+  };
+  let soon;
+  const watching = new MutationObserver(() => (clearTimeout(soon), (soon = setTimeout(tell, 300))));
+  watching.observe(el, { childList: true, subtree: true });
+  return () => ((live = false), watching.disconnect(), clearTimeout(soon), canvas.close());
 };
 
 let started = false;

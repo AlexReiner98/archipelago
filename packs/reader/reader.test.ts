@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { describe, publishedPage } from './head.js';
 import { pageOf, siteOf } from './reader.js';
 
-const TEMPLATE = '<html><head><meta name="robots" content="noindex" />\n<title>Document</title></head><body><main id="main"><p>Loading…</p></main><script type="module" src="/doc.js"></script></body></html>';
+const TEMPLATE = '<html><head><meta name="robots" content="noindex" />\n<title>Document</title></head><body><main id="main"><p>Loading…</p></main><script type="module" src="/frozen-page.js"></script></body></html>';
 const HASH = 'a'.repeat(64);
 const D = 'e_doc00001', HOMEID = 'e_home0001', SEC = 'e_sec00001', VIEW = 'e_view0001';
 const view = { id: VIEW, title: 'The roadmap', path: null, parts: [{ section: { id: VIEW, title: 'The roadmap', body: '' } }], lenses: { [VIEW]: { items: [] } } };
@@ -50,7 +50,7 @@ test('a published document at /p/ is its page: its head for search engines, its 
   assert.doesNotMatch(page.html, /noindex|Loading/);
   const data = JSON.parse(/id="page-data">(.*)<\/script>/.exec(page.html)![1]);
   assert.deepEqual(data.site, { footer: 'Contact us.\n\nLegal.', name: 'Acme', home: `/p/acme/${HOMEID}`, pages: [{ title: 'About', href: `/p/acme/${D}` }] });
-  assert.ok(page.html.indexOf('src="/doc.js') < page.html.indexOf('id="page-data"'), 'its script is asked for before its data is read');
+  assert.ok(page.html.indexOf('src="/frozen-page.js') < page.html.indexOf('id="page-data"'), 'its script is asked for before its data is read');
   // On its site's domain, that is the address to keep.
   assert.match(((await pageOf({ workspace: 'acme', id: D, domain: 'acme.example' }, act, TEMPLATE)) as { html: string }).html, /canonical" href="https:\/\/acme.example\/about"/);
 });
@@ -104,7 +104,7 @@ test('a site: its front page at /, each page at its word, its figures, drawings,
   assert.equal(((await at(`/p/acme/${VIEW}/data`)) as { json: { title: string } }).json.title, 'The roadmap');
   assert.deepEqual(await at(`/p/other/${VIEW}`), { pass: true }, "another workspace's view is not this site's");
   // An address no published page has is not the site's.
-  for (const path of ['/nothing', '/doc.js', '/a/b/c/d', '/about/else/x', '/about/data/x']) assert.deepEqual(await at(path), { pass: true }, path);
+  for (const path of ['/nothing', '/frozen-page.js', '/a/b/c/d', '/about/else/x', '/about/data/x']) assert.deepEqual(await at(path), { pass: true }, path);
 });
 
 test('a page with no share of its own on a site shows its front page figure; with no front page, / says so', async () => {

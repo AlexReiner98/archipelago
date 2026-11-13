@@ -15,7 +15,7 @@ export type Drawn = { scene: Record<string, unknown> | null; css_ok: boolean };
 const plain = <T>(value: T): T => JSON.parse(JSON.stringify(value ?? null));
 
 /**
- * What the page gives a drawing on a published page (ui/doc-lens.js, packs/walls/page/layout.js): the answer without its style, and
+ * What the page gives a drawing on a published page (packs/surface/page/doc-lens.js, packs/walls/page/layout.js): the answer without its style, and
  * the style held still, without its code.
  */
 export function openingInput(frozen: Frozen, words: Words = {}) {

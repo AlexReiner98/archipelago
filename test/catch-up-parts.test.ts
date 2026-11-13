@@ -22,11 +22,11 @@ import replay from '../packs/catch_up/parts/replay.js';
 const manifest = JSON.parse(readFileSync(new URL('../packs/catch_up/pack.json', import.meta.url), 'utf8'));
 /**
  * The marks a part names, checked as the host checks them. The overlay's own marks (trace, replay) and a text's
- * `word` (a session's, drawn in its hue) are the runtime's to add, so only that the part names them is looked at here.
+ * `hue` (a session's word, drawn in its hue) are the runtime's to add, so only that the part names them is looked at here.
  */
 function checkMarks(id: string, marks: unknown) {
   const kinds = manifest.parts.find((p: any) => p.id === id).marks as string[];
-  const bare = (a: any) => (a && typeof a === 'object' && !Array.isArray(a) && 'word' in a && !('word' in MARKS.text.attrs) ? (({ word, ...rest }) => rest)(a) : a);
+  const bare = (a: any) => (a && typeof a === 'object' && !Array.isArray(a) && 'hue' in a && !('hue' in MARKS.text.attrs) ? (({ hue, ...rest }) => rest)(a) : a);
   const theirs = (m: any): any => (Array.isArray(m) && !(m[0] in MARKS) ? (assert.ok(kinds.includes(m[0]), `${id} names ${m[0]}`), null) : Array.isArray(m) ? [m[0], ...(m.slice(1).map((x: any) => (Array.isArray(x) ? theirs(x) : bare(x))).filter((x: any) => x !== null))] : m);
   checkAny(theirs(marks), { kinds });
   return marks as any;
@@ -124,7 +124,7 @@ test('catch_up.changes traces what another changed until it is seen, and keeps i
   const drawn = checkMarks('catch_up.changes', part.on({ name: 'beat', from: 4, to: 7, rows }));
   const lines = Object.fromEntries(drawn.slice(2).map((m: any) => [m[1].item, m[1]]));
   assert.deepEqual(Object.keys(lines).sort(), ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_cccccccc', 'e_dddddddd']);
-  assert.deepEqual(lines.e_aaaaaaaa, { item: 'e_aaaaaaaa', tip: 'Session Coll, doing, tokens_estimated: Finished the projector', word: 'Coll' }, 'who, what and why, in the session\'s word');
+  assert.deepEqual(lines.e_aaaaaaaa, { item: 'e_aaaaaaaa', tip: 'Session Coll, doing, tokens_estimated: Finished the projector', hue: 'Coll' }, 'who, what and why, in the session\'s word');
   // The person's own change is not traced: they saw it made.
   assert.equal(part.on({ name: 'beat', from: 7, to: 9, rows: rowsOf(held(), [{ pos: 9, at: 'x', by: { actor: 'e_owner001' }, facts: [['+', 'e_cccccccc', 'status', 'done']] }]).rows }), undefined);
   // Seen, it waits no more; a page opened later does not bring it back, and keeps what still waits.
@@ -162,7 +162,11 @@ test('catch_up.replay plays chapters by who made them, island by island', () => 
 
 test('catch_up.replay offers what was missed in a band, plays it step by step and ends as the map is', async () => {
   const shown: unknown[] = [];
-  const part = replay({ me: 'e_owner001', style: { numbers: { catch_up_start: 1, catch_up_step: 1 } } }, { marks: (m: unknown) => shown.push(checkMarks('catch_up.replay', m)) });
+  // Played out when the part says the band is gone: waited for, not timed, so a busy machine does not cut it short.
+  let ended: () => void = () => {};
+  const playedOut = new Promise<void>((r) => (ended = r));
+  const marks = (m: any) => (shown.push(checkMarks('catch_up.replay', m)), m?.[1]?.key === 'catch-up-none' && ended());
+  const part = replay({ me: 'e_owner001', style: { numbers: { catch_up_start: 1, catch_up_step: 1 } } }, { marks });
   assert.deepEqual(part.marks, ['box', { key: 'catch-up-none' }], 'nothing missed, nothing offered');
   const by = { actor: 'e_agent001', run: 'e_run00001', word: 'Coll' };
   const missed = missedOf(held(), [entries[0], { ...entries[2], by: { ...by, run: 'e_run00009', word: 'Herm' } }]);
@@ -175,7 +179,7 @@ test('catch_up.replay offers what was missed in a band, plays it step by step an
   assert.deepEqual([mark[0], mark[1].at, mark[1].steps.map((s: any) => s.pos)], ['replay', 0, [5]], 'rewound: the canvas as the person left it');
   assert.deepEqual([...mark[1].steps[0].ids].sort(), ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_dddddddd', 'r_aaaaaaaa', 'r_bbbbbbbb'], 'each step names what of its entry it plays');
   assert.equal(part.on({ key: 'play', name: 'press' }), undefined, 'playing, Play is not pressed again');
-  await new Promise((r) => setTimeout(r, 50));
+  await playedOut;
   const said = shown.map((m) => JSON.stringify(m));
   assert.ok(said.some((s) => /"1 of 1"/.test(s) && /Session Coll/.test(s) && /"replay",\{"at":1/.test(s)), 'each step who made it, in their word');
   assert.deepEqual(shown.at(-1), ['box', { key: 'catch-up-none' }], 'played out: the band gone, the map as it is');
