@@ -19,7 +19,7 @@ import { registryAt } from './registry-at.ts';
 import type { Registry } from './packs.ts';
 import { MARK, partsFor, type Part } from './ui-parts.ts';
 import { refinedOn, shippedParts, type Refined } from './way-back.ts';
-import { wordsOf, type Words } from './part-words.ts';
+import { schemaOf, wordsOf, type SchemaWords, type Words } from './part-words.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 const HASH = /^[0-9a-f]{64}$/;
@@ -45,6 +45,8 @@ export interface PartsAnswer {
   refined?: Refined;
   /** The schema's words the parts are drawn by: only the hash, when the page said it holds them. */
   words: Words | { hash: string };
+  /** The fields and capabilities of each type, only where a root pack's part reads items whole: its hash alone when the page holds it. */
+  schema?: SchemaWords | { hash: string };
   /** What the page draws with, as recorded (packs/loader/kernel/pack-versions.ts): the look keeps it beside its picture. */
   drew?: Drew;
   /**
@@ -85,6 +87,13 @@ const wordsFor = (reg: Registry, have: string[]) => {
   return have.includes(words.hash) ? { hash: words.hash } : words;
 };
 
+/** The schema's fields, for a root pack's part that reads items whole, when one is among the parts: by hash when the page holds them. */
+const schemaFor = (reg: Registry, have: string[], list: Part[]) => {
+  if (!list.some((p) => p.reads === '*')) return {};
+  const schema = schemaOf(reg);
+  return { schema: have.includes(schema.hash) ? { hash: schema.hash } : schema };
+};
+
 /** root.parts: the parts a page draws on an island (or the map), or as they ship. */
 export async function parts(call: RootCall, input: { island?: string; have?: string[]; shipped?: boolean; host?: string; at?: number; marks?: string[] }): Promise<PartsAnswer> {
   const l = call.map;
@@ -94,7 +103,10 @@ export async function parts(call: RootCall, input: { island?: string; have?: str
   const island = typeof input?.island === 'string' ? input.island : undefined;
   const head = await headPos(l.db);
   const at = Number.isInteger(input?.at) && input.at! >= 0 && input.at! < head ? input.at! : undefined;
-  if (input?.shipped) return drawn(l, { parts: shippedParts(l, have, drawable), shipped: true, words: wordsFor(l.registry, have) });
+  if (input?.shipped) {
+    const list = shippedParts(l, have, drawable);
+    return drawn(l, { parts: list, shipped: true, words: wordsFor(l.registry, have), ...schemaFor(l.registry, have, list) });
+  }
   // At a past position (a look redrawn as it was): the packs' code as the log kept it then (registryAt).
   let past: Awaited<ReturnType<typeof registryAt>>, stand_in: string | undefined;
   if (at !== undefined) past = await registryAt(l.db, l.registry, at).catch((err) => void (stand_in = String(err?.message ?? err).slice(0, 300)));
@@ -102,7 +114,8 @@ export async function parts(call: RootCall, input: { island?: string; have?: str
   const reg = await islandRegistry(then, island, then.registry);
   const kept = await keptParts(l, reg);
   const refined = island && !past ? await refinedOn(l, island, kept) : undefined;
-  const answer = { parts: partsFor(reg, kept, have, drawable), ...(refined && { refined }), ...(at !== undefined && { at: { pos: at, owners_parts: 'now' as const, ...(stand_in && { stand_in }) } }), words: wordsFor(reg, have) };
+  const list = partsFor(reg, kept, have, drawable);
+  const answer = { parts: list, ...schemaFor(reg, have, list), ...(refined && { refined }), ...(at !== undefined && { at: { pos: at, owners_parts: 'now' as const, ...(stand_in && { stand_in }) } }), words: wordsFor(reg, have) };
   return drawn(then, answer, past ? at : undefined);
 
   /** The answer with what it draws with: the packs of the registry it was read in, at the position whose code it is. Recorded only for today's. */

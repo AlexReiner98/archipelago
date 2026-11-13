@@ -56,7 +56,11 @@ async function partsOn(island, shipped) {
   if (answer?.drew) drew.set(island ?? '', answer.drew);
   const parts = (answer?.parts ?? []).map((p) => (p.modules && modules.set(p.hash, p.modules), { ...p, modules: modules.get(p.hash), ...(loaded && { host: loaded }) }));
   if (answer?.words?.types) wordsBy.set(answer.words.hash, { types: answer.words.types, links: answer.words.links });
-  return { parts, refined: answer?.refined, words: wordsBy.get(answer?.words?.hash) ?? { types: {}, links: {} } };
+  // The fields and capabilities by type, sent only where a root pack's part reads items whole: kept by hash as the words are.
+  if (answer?.schema?.types) wordsBy.set(answer.schema.hash, answer.schema.types);
+  const words = wordsBy.get(answer?.words?.hash) ?? { types: {}, links: {} };
+  const schema = answer?.schema && wordsBy.get(answer.schema.hash);
+  return { parts, refined: answer?.refined, words, ...(schema && { whole: wholeWords(words, schema) }) };
 }
 
 /** The style a part on `island` is drawn by: the island's own, as its page is; the map's where there is none. */
@@ -84,7 +88,13 @@ function typesOf(item) {
 }
 
 /** An item cut to what a part reads of its type: its id and type always, else nothing when it reads none of it. */
+/** An item as a part that reads items whole (`*`, a root pack's) is handed it: its head and every field. */
+const WHOLE = ['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'];
+/** The words with each type's fields and capabilities beside them, for a part that reads items whole. */
+const wholeWords = (words, schema) => ({ ...words, types: Object.fromEntries(Object.entries(words.types).map(([t, w]) => [t, { ...w, ...(schema[t] ?? {}) }])) });
+
 function cut(item, reads) {
+  if (reads === '*') return Object.fromEntries(WHOLE.filter((f) => item[f] !== undefined).map((f) => [f, item[f]]));
   const fields = typesOf(item).map((t) => reads[t]).find(Boolean);
   if (!fields) return null;
   const all = { ...(item.props ?? {}), ...(item.fields ?? {}), ...item };
@@ -300,7 +310,11 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
   };
   const body = h('div', { class: 'part-body', 'data-part-id': part.id, onclick: opens, onkeydown: (ev) => ev.key === 'Enter' && ev.target.dataset?.view && opens(ev) });
   node.replaceChildren(body);
-  const failed = (message) => node.isConnected && node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
+  const failed = (message) => {
+    // A part that publishes page state and fails says so in it, so whatever waits on that state is not left waiting.
+    for (const name of part.state ?? []) if (name === 'look') (publishState('look_why', String(message).slice(0, 300), part), publishState('look', 'error', part));
+    if (node.isConnected) node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
+  };
   const style = await styleOn(pinFor(item));
   // What every part is handed beside its items: the island's words, the style's values (none of its looks), and what
   // its piece says of it on its screen (a title, a limit).
@@ -449,14 +463,14 @@ export async function drawPart(node, { slot, item, piece, redraw = () => {}, ope
   sweep();
   const island = pinFor(item);
   const shipped = Boolean(island && shippedOn(island));
-  const { parts, refined, words } = await partsOn(island, shipped);
+  const { parts, refined, words, whole } = await partsOn(island, shipped);
   wayBackFor(island, shipped ? undefined : refined, async () => redraw());
   const part = parts.find((p) => p.slot === slot);
   if (!part) return false;
   // A part naming a mark this host does not draw waits: said in one line, its code never sent or run.
   if (part.waiting) return (node.replaceChildren(h('div', { class: 'muted', title: `${part.title} waits: ${part.waiting}` }, `${part.title} waits`)), true);
   if (!part.modules) throw new Error(`${part.title}: its code did not come`);
-  await mount(node, part, parts, item, words, piece, { openView, picture });
+  await mount(node, part, parts, item, part.reads === '*' && whole ? whole : words, piece, { openView, picture });
   return true;
 }
 
@@ -469,7 +483,7 @@ export async function drawParts(node, { slot, item, piece, redraw = () => {}, op
   sweep();
   const island = pinFor(item);
   const shipped = Boolean(island && shippedOn(island));
-  const { parts, refined, words } = await partsOn(island, shipped);
+  const { parts, refined, words, whole } = await partsOn(island, shipped);
   wayBackFor(island, shipped ? undefined : refined, async () => redraw());
   const filling = parts.filter((p) => p.slot === slot);
   for (const part of filling) {
@@ -478,7 +492,7 @@ export async function drawParts(node, { slot, item, piece, redraw = () => {}, op
     node.append(mine);
     if (part.waiting) mine.replaceChildren(h('div', { class: 'muted', title: `${part.title} waits: ${part.waiting}` }, `${part.title} waits`));
     else if (!part.modules) mine.replaceChildren(h('div', { class: 'muted' }, `${part.title}: its code did not come`));
-    else await mount(mine, part, parts, item, words, piece, { openView, picture });
+    else await mount(mine, part, parts, item, part.reads === '*' && whole ? whole : words, piece, { openView, picture });
   }
   return filling.length;
 }

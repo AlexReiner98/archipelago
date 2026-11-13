@@ -31,7 +31,7 @@ export interface PartDef {
   /** The slot it fills: the host's, one its own pack opens, or one it asks for as slot:<name>. */
   slot: string;
   /** The fields it reads, by type: what the host hands it of an item of that type, and no more. */
-  reads?: Record<string, string[]>;
+  reads?: Record<string, string[]> | '*';
   /** The items it is handed beside the one it stands on: a filter's terms, `{here}` standing for that item's id, each item cut to what it `reads` of its type. */
   query?: PartQuery;
   /** The named reads it is handed, by name: views its pack answers (answer.<name>) or asks for, `{here}` in a param for that item's id, a param of only `{piece.<name>}` for that setting of its piece on the screen (left out, as a lone `{here}` is, when there is none). What is no item (a run's turns) comes so. */
@@ -72,7 +72,7 @@ export interface Part {
   pack: string;
   title: string;
   slot: string;
-  reads: Record<string, string[]>;
+  reads: Record<string, string[]> | '*';
   query?: PartQuery;
   views?: PartView[];
   sends: string[];
@@ -144,7 +144,10 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       claimed.add(s);
     }
     if (part.opens !== undefined && !Array.isArray(part.opens)) problems.push(`${at}: opens is a list of slots`);
-    if (part.reads !== undefined && (typeof part.reads !== 'object' || part.reads === null || Array.isArray(part.reads))) problems.push(`${at}: reads is the fields it reads, by type: { "<type>": ["<field>", ...] }`);
+    // An item whole (`*`): a root pack's part alone, which keeps the human in control as the host's page did (the sheet).
+    if (part.reads === '*') {
+      if ((pack.kernel as { trust?: string } | undefined)?.trust !== 'root') problems.push(`${at} reads items whole ("*"), which only a root pack's part may: name the fields it reads, by type`);
+    } else if (part.reads !== undefined && (typeof part.reads !== 'object' || part.reads === null || Array.isArray(part.reads))) problems.push(`${at}: reads is the fields it reads, by type: { "<type>": ["<field>", ...] }`);
     else for (const [type, fields] of Object.entries(part.reads ?? {})) {
       const t = types.get(type);
       if (!t) { problems.push(`${at} reads unknown type "${type}"`); continue; }
