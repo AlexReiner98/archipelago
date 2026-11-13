@@ -215,3 +215,11 @@ test("a field may keep keys for its part: at most eight, each a key's name", () 
   refused(['input', { key: 'q', keys: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'] }], /at most 8 key names/);
   refused(['input', { key: 'q', keys: ['Ctrl+A'] }], /not a key name/);
 });
+
+test('a slot mark names a slot the part opens, and no other', () => {
+  const s = checkMarks(['box', {}, ['slot', { name: 'sheet.bands' }], ['slot', { key: 'sec', name: 'sheet.sections' }]], { opens: ['sheet.bands', 'sheet.sections'] });
+  assert.equal(s.kids[0].at.name, 'sheet.bands');
+  assert.throws(() => checkMarks(['slot', { name: 'bar.find' }], { opens: ['sheet.bands'] }), /the slot "bar.find", which the part does not open/);
+  refused(['slot', {}], /a slot with no name/);
+  refused(['slot', { name: 'a' }, ['text', 'x']], /a slot holding something/);
+});

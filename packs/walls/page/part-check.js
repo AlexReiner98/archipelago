@@ -24,6 +24,7 @@
 //   panes   panes side by side (dir row) or one over another (column), each given room by its share; the host draws
 //           the lines between them and tells the part when one is dragged
 //   swatch  a style preset's colours, painted by the host from the preset the part names: a part paints no colour
+//   slot    a slot the part opens, drawn in its place by the parts that fill it (`name`, one of its manifest's opens)
 //   ghost   nothing where it stands: a change held for the owner, as data the canvas reads back into its answer and draws
 //           where it would land (of an item, a link, or a mark on one)
 //   replay  nothing where it stands: the canvas under it shows what the person missed, up to step `at` of its steps
@@ -139,6 +140,7 @@ export const MARKS = {
   web: { attrs: { key, tip: anyMark.tip, url: href, reload: words(partLimits.key) }, holds: 'nothing', needs: ['url'] },
   pane: { attrs: { key, tip: anyMark.tip, at: address, share, ring: flag, drag: key, selected: flag }, holds: 'marks', keyed: true, needs: ['at'] },
   panes: { attrs: { key, dir: oneOf('row', 'column') }, holds: 'marks', only: ['pane'], keyed: true },
+  slot: { attrs: { key, name: key }, holds: 'nothing', needs: ['name'] },
   ghost: { attrs: { key, of: oneOf('item', 'link', 'mark'), id: ghostId, type: key, title: words(partLimits.label), status: key, body: words(4000), proposal, by: words(partLimits.label), reason: words(partLimits.label), op: oneOf('create', 'link', 'update', 'archive', 'unlink'), from: rowId, to: rowId, on: rowId }, holds: 'nothing', needs: ['of', 'proposal', 'op'] },
   replay: { attrs: { key, at: step(0, 1000000), steps: replaySteps }, holds: 'nothing', needs: ['at', 'steps'] },
   trace: { attrs: { key, item, tip: words(500), hue: words(partLimits.key) }, holds: 'nothing', needs: ['item'] },
@@ -161,8 +163,8 @@ const plain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v) &&
  * says what and where (`box 0 > text 2`), and nothing of it is drawn. `kinds`, the marks the part's manifest names
  * (packs/loader/kernel/ui-parts.ts), holds it to them: a mark it did not name is refused too.
  */
-export function checkMarks(mark, { kinds } = {}) {
-  const seen = { n: 0, words: 0, keys: new Set(), kinds };
+export function checkMarks(mark, { kinds, opens } = {}) {
+  const seen = { n: 0, words: 0, keys: new Set(), kinds, opens };
   return node(mark, seen, [], false);
 }
 
@@ -206,6 +208,7 @@ function node(mark, seen, where, onPlane) {
   if (at.more !== undefined && !at.fits) why('more on a box that does not fit: the count it names is drawn only by one that fits');
   if ((at.drag !== undefined || at.aux) && at.key === undefined) why(`${a(kind)} that is dragged or closed with no key: what is done to it goes back by its key`);
   for (const name of shape.needs ?? []) if (at[name] === undefined) why(`${a(kind)} with no ${name}`);
+  if (kind === 'slot' && seen.opens && !seen.opens.includes(at.name)) why(`the slot "${at.name}", which the part does not open`);
   if (kind === 'paint' && (at.width === undefined || at.height === undefined)) why('a paint surface with no width and height');
   if (shape.keyed && at.key === undefined) why(`${a(kind)} with no key: what the person does to it goes back by its key`);
   for (const k of [at.key, at.more]) if (k !== undefined) seen.keys.has(k) ? why(`the key "${k}" twice`) : seen.keys.add(k);

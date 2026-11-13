@@ -55,8 +55,9 @@ test('the tool list stays small, and what it leaves out is one call away', async
   const size = JSON.stringify(tools).length;
   // 12,000 until every tool said readOnlyHint, which the connectors directory's review asks for (2 Nov 2026); 12,200
   // until the first pack action an agent is offered, findings.stand_by (12 Nov 2026, task e_ndedf3vc: for the owner to keep or take back);
-  // 12,300 until the styles pack's two, styles.use and styles.delete_layout, which its parts send (13 Nov 2026, task e_u2phc9rq: the same).
-  assert.ok(size < 12_350, `the list is ${size} characters, and every request pays for it`);
+  // 12,300 until the styles pack's two, styles.use and styles.delete_layout, which its parts send (13 Nov 2026, task e_u2phc9rq: the same);
+  // 12,350 until the menu and islands packs' actions, the UI port's (the owner, 13 Nov 2026: raise to 12,500).
+  assert.ok(size < 12_500,`the list is ${size} characters, and every request pays for it`);
 
   const words = (answer: unknown) => (answer as { content: { text: string }[] }).content[0].text;
   const query = tools.find((t) => t.name === 'query')!.description!;

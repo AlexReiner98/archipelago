@@ -45,7 +45,8 @@ const partTold = 50;
  * with a way to stop it; `hue(words)` is a session's hue named by words; `swatch(preset, el)` paints a style preset's
  * colours into `el`, and `tryTheme(preset)` paints this screen alone in one ('' the workspace's own again);
  * `replay({ at, steps } | null)` shows the canvas under the part the missed steps up to `at`, or the map as it is now;
- * `ghosts(list)` is handed the ghosts each answer holds (each mark's attributes), for the canvas to draw where they land. `find(q, types, link)` answers the items an item
+ * `ghosts(list)` is handed the ghosts each answer holds (each mark's attributes), for the canvas to draw where they land;
+ * `slot(name, el)` draws the parts that fill a slot this part opens into `el`. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
  * `draw(node)` for each answer the part gives, and `stop()`.
@@ -111,6 +112,7 @@ function build(node, ctx) {
   else if (node.mark === 'pane') el = buildPane(ctx.tell);
   else if (node.mark === 'panes') el = make('div', 'pm-panes');
   else if (node.mark === 'trace') (el = make('span', 'pm-trace')), (el.hidden = true);
+  else if (node.mark === 'slot') el = make('div', 'pm-slot');
   else if (node.mark === 'ghost') (el = make('span', 'pm-ghost')), (el.hidden = true);
   else if (node.mark === 'replay') (el = make('span', 'pm-replay')), (el.hidden = true), (el.pmReplay = ctx.replay);
   else if (node.mark === 'swatch') {
@@ -266,6 +268,9 @@ function update(el, node, ctx, fresh = false) {
   if (node.mark === 'text') hued(el, at.hue !== undefined ? ctx.hue(at.hue) : undefined, at.hue !== undefined);
   if (node.mark === 'web') frameWeb(el, at.url, at.reload ?? '');
   if (node.mark === 'trace') return (traceMark(el, node, ctx), el);
+  // A slot the part opens: the parts that fill it are drawn in it by whoever hosts this one, again only for another slot.
+  if (node.mark === 'slot' && (fresh || was.at.name !== at.name)) (el.replaceChildren(), (el.dataset.slot = at.name), ctx.slot(at.name, el));
+  if (node.mark === 'slot') return el;
   // A replay: the canvas under the part shows the missed steps up to `at`; the host holds the store, the part the timer.
   if (node.mark === 'replay') return (ctx.replay({ at: at.at, steps: at.steps }), el);
   // A swatch is painted by the host from the preset it names, again only for another preset.
