@@ -81,8 +81,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/draft.js': 4,
   'ui/field-edit.js': 2,
   'ui/fields.js': 2,
-  'ui/find-choices.js': 2,
-  'ui/find.js': 3,
   'ui/home.js': 1,
   'ui/island-new.js': 2,
   'ui/item-doc.js': 4,
