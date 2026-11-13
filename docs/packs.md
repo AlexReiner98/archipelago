@@ -143,12 +143,38 @@ answering with marks the host checks.
 | `modules` | Its code, files of the pack entered at `index.js`, as a layout's. | The files are there. |
 
 **A slot has one owner** (`packs/loader/kernel/slots.ts`). The host owns its
-frame (`bar`, `canvas`, `sheet`, `find`, `home`) and each piece and page it
-still draws (`piece.<name>`, `page.<name>`, from `PIECES` and `PAGES`): the
-step that moves one into a pack's part takes it off the host's list and the
-part opens it. Any other slot is opened by one pack's part, and `slot:<name>`
-is provided by that pack (core for the host's); a second pack opening it
-waits, as one declaring a taken type does (`packs/loader/kernel/packorder.ts`).
+frame (`FRAME_SLOTS`) and each piece and page it still draws
+(`piece.<name>`, `page.<name>`, from `PIECES` and `PAGES`): the step that
+moves one into a pack's part takes it off the host's list and the part opens
+it. Any other slot is opened by one pack's part, and `slot:<name>` is
+provided by that pack (core for the host's); a second pack opening it waits,
+as one declaring a taken type does (`packs/loader/kernel/packorder.ts`).
+
+**The frame's slots**, and what each hands the part beside the item it
+stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
+
+| Slot | Where | Handed |
+|---|---|---|
+| `panes` | The panes of the page. | — |
+| `tabs` | The bar of tabs across them. | `tabs`, `current` |
+| `tab.mark` | A mark on one tab: whose it is, how much it holds. | `tab`, `current` |
+| `bar` | The bar over the canvas. | `current`, `home` |
+| `bar.views` | What its view button opens. | `current`, `home` |
+| `bar.find` | Find's input and its terms. | `query`, `home` |
+| `bar.layouts` | The layout a view is drawn in. | `current`, `layout` |
+| `canvas` | The canvas itself. | `query`, `layout` |
+| `traces` | The overlay of traces over it. | `query` |
+| `sheet` | The sheet over the canvas, an item's one page. | — |
+| `item.menu` | What is done rarely to that item. | — |
+| `find` | Find at the canvas's foot. | `query` |
+| `home` | The page with no query up. | — |
+| `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace` |
+
+A part is handed the item it stands on cut to the fields it `reads`, its
+query's items, its named reads, and, where it declares `go`, the page's
+address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
+`text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`
+and `picture`, each named in its `marks`.
 
 **Its code is the version's its island pins.** A part's modules are read
 from its pack's folder as the registry has it (`folderOf`): on an island

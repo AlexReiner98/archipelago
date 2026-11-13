@@ -13,7 +13,7 @@ import { islandProblems, sharedOf } from '../packs/loader/kernel/islands.ts';
 import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { setIslands, setPack } from '../packs/loader/kernel/packstate.ts';
 import { hostFor } from '../packs/loader/kernel/packtools.ts';
-import { HOST_SLOTS } from '../packs/loader/kernel/slots.ts';
+import { FRAME_SLOTS, HOST_SLOTS, PAGES, PIECES } from '../packs/loader/kernel/slots.ts';
 import { marksWaiting, partsBy, partsFor } from '../packs/loader/kernel/ui-parts.ts';
 // @ts-ignore: a module of the page, plain JavaScript
 import { MARKS } from '../packs/walls/page/part-check.js';
@@ -55,8 +55,36 @@ test('parts is a key of the manifest, and a map pack’s alone', () => {
   const both = readManifest(JSON.stringify({ ...shelf(), types: bin.types }), 'test');
   const kernel = sharedOf([readManifest(JSON.stringify({ id: 'core', version: '1', title: 'core', shared: [] }), 'core')]);
   assert.match(islandProblems(both, kernel).join(), /a map pack \(actions, parts\): split it/);
-  // The host's last page (time) became views (e_7tgvuyrs): PAGES is empty, and the host keeps its frame and pieces.
-  assert.ok(HOST_SLOTS.includes('piece.figure') && HOST_SLOTS.includes('canvas') && !HOST_SLOTS.some((s) => s.startsWith('page.')), 'the host owns its frame and the pieces it draws, and no page');
+  // The host owns its frame, the pieces it draws, and the two pages it still draws itself: a document read whole and a
+  // published page (ui/doc.js, ui/public.js), each a slot until the reader and publish packs draw it (task e_atxefw2s).
+  assert.ok(HOST_SLOTS.includes('piece.figure') && HOST_SLOTS.includes('canvas'), 'the host owns its frame and the pieces it draws');
+  assert.deepEqual(HOST_SLOTS.filter((s) => s.startsWith('page.')), ['page.doc', 'page.public'], 'the pages the host still draws');
+});
+
+// Every slot the host offers, and what it hands the part that fills it: the contract a pack's part is written
+// against (task e_6hhx2ub8). A slot is added here when the host draws it and leaves when a part opens it, so a name
+// never changes under a pack that fills it.
+test('the host offers these slots, each handing the part what it is named with', () => {
+  assert.deepEqual(FRAME_SLOTS, {
+    panes: [],
+    tabs: ['tabs', 'current'],
+    'tab.mark': ['tab', 'current'],
+    bar: ['current', 'home'],
+    'bar.views': ['current', 'home'],
+    'bar.find': ['query', 'home'],
+    'bar.layouts': ['current', 'layout'],
+    canvas: ['query', 'layout'],
+    traces: ['query'],
+    sheet: [],
+    'item.menu': [],
+    find: ['query'],
+    home: [],
+    'workspace.card': ['workspace'],
+  });
+  assert.deepEqual(PAGES, ['doc', 'public']);
+  assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'diagram', 'button', 'count']);
+  // One name, one owner: no slot is named twice, and every one of them is open to any pack.
+  assert.equal(new Set(HOST_SLOTS).size, HOST_SLOTS.length);
 });
 
 test('a part loads when its shapes hold, and is refused with why when one does not', () => {

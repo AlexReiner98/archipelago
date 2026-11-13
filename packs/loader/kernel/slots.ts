@@ -17,14 +17,41 @@
 export const PIECES = { figure: [], view: ['view'], action: ['action'], picture: ['lens'], fields: ['fields'], page: ['page'], token: [], token_ask: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [] } as const;
 
 /** The pages the host still draws itself, which a screen can hold as a piece until a pack draws them from pieces. Others are the family page.<name>. */
-export const PAGES: string[] = [];
+export const PAGES: string[] = ['doc', 'public'];
 
 /**
- * The frame the host draws, every page's: the bar of saved views, the canvas, the sheet over it, find at its foot, and
- * Home; and in the bar, what its view button opens (`bar.views`), which the host draws and a part fills. What is in the
- * bar spans islands, so it is drawn at the map's version (decision e_5b32vdsg).
+ * The frame the host draws, every page's, and what it hands the part that fills each one beside the item it stands on
+ * (its `piece`, as `drawPart` is given it: packs/surface/page/part-host.js). What is in the bar and in the panes spans
+ * islands, so it is drawn at the map's version (decision e_5b32vdsg).
+ *
+ * - `panes`, `tabs`   the panes of the page and the bar of tabs across them (the panes root pack)
+ * - `tab.mark`        a mark on one tab: whose it is, how much it holds
+ * - `bar`             the bar over the canvas; `bar.views` what its view button opens, `bar.find` find's input and its
+ *                     terms, `bar.layouts` the layout a view is drawn in
+ * - `canvas`, `traces` the canvas itself, and the overlay of traces over it
+ * - `sheet`           the sheet over the canvas, an item's one page; `item.menu` what is done rarely to that item
+ * - `find`            find at the canvas's foot; `home` the page with no query up
+ * - `workspace.card`  a card on the workspace page, one pack's say on this workspace
  */
-export const FRAME = ['bar', 'canvas', 'sheet', 'find', 'home', 'bar.views'];
+export const FRAME_SLOTS = {
+  panes: [],
+  tabs: ['tabs', 'current'],
+  'tab.mark': ['tab', 'current'],
+  bar: ['current', 'home'],
+  'bar.views': ['current', 'home'],
+  'bar.find': ['query', 'home'],
+  'bar.layouts': ['current', 'layout'],
+  canvas: ['query', 'layout'],
+  traces: ['query'],
+  sheet: [],
+  'item.menu': [],
+  find: ['query'],
+  home: [],
+  'workspace.card': ['workspace'],
+} as const satisfies Record<string, readonly string[]>;
+
+/** Every slot of the frame, in the order the page draws them. */
+export const FRAME: string[] = Object.keys(FRAME_SLOTS);
 
 /** Every slot the host owns: its frame's, and each piece and page it still draws. */
 export const HOST_SLOTS: readonly string[] = [...FRAME, ...Object.keys(PIECES).map((p) => `piece.${p}`), ...PAGES.map((p) => `page.${p}`)];
