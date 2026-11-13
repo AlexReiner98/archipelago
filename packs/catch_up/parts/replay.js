@@ -34,10 +34,12 @@ export default function replay(input, tools) {
     return [
       'box',
       { key: 'catch-up', look: 'band', flow: 'row', gap: 2, align: 'center', tip: 'What changed since you last looked' },
-      ['text', { look: 'mark' }, playing ? `${o.played} of ${o.steps.length}` : `${o.count} changed`],
+      ['text', { look: 'mark' }, o.played ? `${o.played} of ${o.steps.length}` : `${o.count} changed`],
       ...(step ? [['text', { look: 'muted', ...(step.by?.word && { hue: step.by.word }) }, whoSaid(step.by)]] : []),
-      ...(playing ? [] : [['button', { key: 'play', look: 'main', tip: 'Play what changed since you last looked, a step at a time' }, 'Play']]),
-      ['button', { key: 'skip', look: 'quiet', tip: 'The map as it is now' }, 'Skip'],
+      // Offered, Play; playing, Skip: one action in sight beside leave it.
+      playing
+        ? ['button', { key: 'skip', look: 'quiet', tip: 'The map as it is now' }, 'Skip']
+        : ['button', { key: 'play', look: 'main', tip: 'Play what changed since you last looked, a step at a time' }, 'Play'],
       ['button', { key: 'shut', look: 'quiet', tip: 'Leave it: what changed stays traced' }, '×'],
     ];
   };

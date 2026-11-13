@@ -1,6 +1,7 @@
 // Traces in a real browser (skipped where there is no Chrome): an agent's change reaches a page left open, and the
 // row it touched is traced in the session's hue, saying who and why through the page's tip; out of sight it stays,
-// in sight a moment it clears, and a reload does not bring it back (ui/traces.js).
+// in sight a moment it clears, and a reload does not bring it back (the catch_up pack's part catch_up.changes, and
+// the trace mark it answers with).
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -48,7 +49,8 @@ test("in a browser, an agent's change is traced in its session's hue and clears 
     await page.evaluate(`${row}.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }))`);
     assert.equal(await page.evaluate(`document.querySelector('.tip')?.textContent`), traced.line, 'the tip says who and why');
     assert.ok(await page.until(`!${row}.classList.contains('traced')`, 6000), 'in sight a moment, it clears');
-    const kept = await page.evaluate<string>(`localStorage.getItem('pelago-traces-default')`);
+    // What the traces part keeps, under its own name in this workspace (tools.keep: packs/surface/page/part-host.js).
+    const kept = await page.evaluate<string>(`localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith('pelago-part:catch_up.changes:') && k.endsWith(':traces')) ?? '')`);
     assert.ok(Object.keys(JSON.parse(kept).seen).some((k) => k.startsWith(made.a)), 'kept as seen in this browser');
     await page.evaluate(`location.reload()`);
     assert.ok(await page.until(`Boolean(${row})`), 'drawn again');

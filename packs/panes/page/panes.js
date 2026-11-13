@@ -7,7 +7,7 @@
 
 import { api, h, hooks } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
-import { presetSettings, savedCanvases, viewParts } from './canvases.js';
+import { presetSettings, savedCanvases, viewParts } from './views-kept.js';
 import { addressOf, opening, readAddress } from './query.js';
 import { filterSaid } from './query-bar.js';
 import { titles } from './words.js';

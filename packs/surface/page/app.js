@@ -14,7 +14,7 @@ import { entity } from './item.js';
 import { heldPage } from './item-held.js';
 import { linkFirst } from './item-link.js';
 import { stale } from './live.js';
-import { drawNav, screenPage } from './nav.js';
+import { drawNav, screenPage } from './screen-page.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
 import { atOf } from './pane-address.js';
 import { startTabs } from './pane-land.js';

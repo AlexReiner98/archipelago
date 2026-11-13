@@ -151,7 +151,7 @@ export function filterSaid(f, redraw) {
   ].filter(Boolean).join(' · ');
 }
 
-/** Draw the bar for this lens, over the view that draws it (its answer names what the lens names); `lead` goes first (the saved canvas up, ui/canvases.js). */
+/** Draw the bar for this lens, over the view that draws it (its answer names what the lens names); `lead` goes first (the saved canvas up, packs/surface/page/views-kept.js). */
 export function drawQuery(lens, view, go, lead) {
   if (!bar) return;
   const redraw = redrawLast;

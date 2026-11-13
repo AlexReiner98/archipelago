@@ -2,16 +2,14 @@
 // (packs/panes/parts/index.js): the strip in the top bar, the panes in #canvas, one part mounted twice so one model.
 // Every chat at work has a tab of its own, opened and closed as it begins and ends; tabs merge, pop out and dock back.
 // This starts the part, gives the query bar its back, forth and split for the pane in focus, and keeps beside the strip
-// the count of sessions waiting on the owner, which goes to the oldest (ui/tab-count.js, e_82rggead). A look's page,
+// the count of sessions waiting on the owner, which goes to the oldest (e_82rggead). A look's page,
 // and a frozen link's, draw their one view in a pane of their own, with no tabs.
 
 import { api, drawSlot, firstDrawn, h, hooks } from './base.js';
 import { still } from './look.js';
-import { windowOf } from './pane-busy.js';
 import { heard, hearOpen, nameOf } from './pane-route.js';
 import { lonePane } from './panes.js';
 import { atOf } from './pane-address.js';
-import { countGoes, countTip, onYou } from './tab-count.js';
 import { poppedTab } from './tabs.js';
 
 const strip = document.getElementById('tabs');
@@ -43,7 +41,18 @@ async function startPart() {
   return true;
 }
 
-// ---- The sessions waiting on the owner, counted beside the strip, so every tab sees them.
+// ---- The sessions waiting on the owner, counted beside the strip, so every tab sees them (docs/sessions.md).
+
+/** The states that wait on the owner, each its mark and what it is called. */
+const YOURS = { waiting: { mark: '?', said: 'waits on you' }, your_move: { mark: '↩', said: 'your move' } };
+/** The open sessions waiting on the owner, the one waiting longest first. */
+const onYou = (open = []) =>
+  open
+    .filter((s) => YOURS[s.session?.state])
+    .sort((a, b) => (Date.parse(a.session.since) || 0) - (Date.parse(b.session.since) || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+/** The count's tooltip: one line for each waiting on the owner, by its line, oldest first. */
+const countTip = (yours, nameOf) => yours.map((s) => `${YOURS[s.session.state].mark} ${nameOf(s)}: ${s.session.line ?? YOURS[s.session.state].said}`).join('
+');
 
 /** The sessions open now, as the `sessions` view last answered. */
 let open = [];
@@ -58,9 +67,8 @@ function drawCount() {
   countEl.setAttribute('aria-label', `${yours.length} waiting on you: ${tip}`);
   countEl.replaceChildren(h('span', { class: 'tab-state', 'aria-hidden': 'true' }, '↩'), String(yours.length));
   countEl.onclick = () => {
-    const to = countGoes(yours, []);
-    if (to?.tab) return void windowOf(to.tab)?.focus();
-    if (to?.page) location.hash = to.page;
+    // To the oldest one's page: the part keeps which tab is whose.
+    location.hash = `#/e/${yours[0].id}`;
   };
 }
 /** Ask which sessions are open, and count those waiting on the owner. */

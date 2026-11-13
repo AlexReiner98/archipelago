@@ -20,7 +20,7 @@ const data = {
   drawio: 'https://github.com/o/r/blob/abc/docs/modules.drawio',
   boxes: [
     { id: 'a', kind: 'area', x: 0, y: 0, w: 400, h: 300, head: 20, lines: ['Kernel', 'ignored'] },
-    { id: 'b', kind: 'box', x: 20, y: 40, w: 100, h: 40, lines: ['write', 'pelago.ts'], bold: true },
+    { id: 'b', kind: 'box', x: 20, y: 40, w: 100, h: 40, lines: ['write', 'pelago.ts'], bold: true, tooltip: 'The write path', link: 'https://github.com/o/r/blob/abc/packs/write/kernel/pelago.ts' },
     { id: 'c', kind: 'box', x: 220, y: 40, w: 100, h: 40, lines: ['log'], tone: 'warn', dashed: true },
     { id: 'd', kind: 'box', x: 220, y: 200, w: 100, h: 40, lines: ['seal'], tone: 'strong' },
     { id: 't', kind: 'text', x: 20, y: 200, w: 100, h: 20, lines: ['a note'] },
@@ -48,8 +48,13 @@ test('a diagram is answered as a surface of its areas, wires and boxes, which th
   assert.equal(paths[0].at.d, 'M0 0h400v300h-400Z');
   assert.equal(paths.at(-2).at.look, 'dash', 'a dashed box');
   assert.equal(paths.at(-2).at.tone, 'warn');
-  assert.equal(paths.at(-1).at.look, 'fill', 'a strong box is filled');
+  assert.equal(paths.at(-1).at.look, 'strong', 'a strong box is filled');
+  assert.equal(paths[0].at.look, 'area', 'an area is filled from the style');
+  assert.equal(paths.at(-3).at.look, 'box', 'a box is filled over the wires');
+  assert.equal(plane.at.controls, true, 'with its zoom buttons');
+  assert.equal(paths[1].at.tip, 'write → log: appends', 'a wire says what it joins');
   assert.equal(paths[3].at.look, 'dash', 'a dashed wire');
+  assert.deepEqual([paths.at(-3).at.tip, paths.at(-3).at.href], ['The write path', 'https://github.com/o/r/blob/abc/packs/write/kernel/pelago.ts'], 'a box keeps its tip and its link');
   assert.equal(paths[3].at.tone, 'closed', 'a faint wire');
 });
 

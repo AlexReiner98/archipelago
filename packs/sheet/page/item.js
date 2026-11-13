@@ -4,7 +4,7 @@
 
 import { api, ask, h, may, part, state, tell } from './base.js';
 import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
-import { viewsOn } from './canvases.js';
+import { viewsOn } from './views-kept.js';
 import { draftOf } from './draft.js';
 import { documentMenu, figureOf, publicMark, publicOf, readDocument, readingOf, shareMenu } from './item-doc.js';
 import { heldBand, heldOn } from './item-held.js';
@@ -140,7 +140,7 @@ export async function entity(id, here) {
   };
   const walkSaid = along.map((t) => t.replace(/[<>]$/, '')).map((t) => relations.get(t)?.title ?? t).join(', ');
   // What its type's screens give it to do: the first in sight, beside Walk from it, any more in the menu.
-  // And the views packs ship of an item of its type (ui/canvases.js), each drawn on the canvas up.
+  // And the views packs ship of an item of its type (packs/surface/page/views-kept.js), each drawn on the canvas up.
   const buttons = e.archived_at ? [] : [...buttonsOn(data).filter((b) => writes || !b.action), ...viewsOn(e.type, id).map((v) => ({ label: v.title, tip: `Draw its ${v.title.toLowerCase()} on the canvas`, at: v.at }))];
   const press = (b) => (b.at ? openHere(b.at) : b.draw ? drawIn(drawnBy(b.draw, id)) : act(toolOf(b.action)));
 

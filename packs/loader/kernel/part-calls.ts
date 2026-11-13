@@ -53,3 +53,40 @@ export async function partCall(l: Archipelago, actor: Actor, action: string, isl
   const host = commitOf(ref.host);
   return { id: part.id, hash: part.hash, ...(host && { host }) };
 }
+
+/** What a part's change may do: never a merge, a type, or a forget (as a drawing's: packs/rules/kernel/layout-changes.ts). */
+const PART_OPS = ['create', 'update', 'link', 'unlink', 'archive', 'restore'];
+
+/**
+ * A change a root pack's part sends as the person looking (`tools.change`, the sheet: decision e_gyzm7rj3 keeps editing
+ * the host's, so its parts write as its page did): checked here, then applied through the one write path as that
+ * person's, naming the part. The part is drawn here at that hash, declares `writes`, and every op touches an item of a
+ * type it writes (a link, one whose end is). Whether it applies or waits is the rules' to say, as for the person's own.
+ */
+export async function partChange(l: Archipelago, actor: Actor, island: unknown, given: unknown, ops: { op: string; ref?: string; type?: string; id?: string; from?: string; to?: string; relation?: string }[]): Promise<PartRef> {
+  if (actor.kind !== 'human') throw no("a part's change is sent by the page, as the person looking at it.");
+  const ref = (given ?? {}) as Partial<PartRef>;
+  if (typeof ref.id !== 'string' || typeof ref.hash !== 'string' || !HASH.test(ref.hash)) throw no('part is { id, hash }: the part and the hash of its code.');
+  const reg = await islandRegistry(l, island);
+  const part = partsFor(reg).find((p) => p.id === ref.id && p.hash === ref.hash);
+  if (!part) throw no(`no part "${ref.id.slice(0, 80)}" with that code is drawn here.`);
+  const writes = part.writes ?? [];
+  if (!writes.length) throw no(`${part.id} declares no types it writes.`);
+  const odd = ops.filter((o) => !PART_OPS.includes(o.op)).map((o) => o.op);
+  if (odd.length) throw no(`a part may ${PART_OPS.join(', ')}; not ${[...new Set(odd)].join(', ')}.`);
+  const writesType = (type: string | undefined) => Boolean(type && writes.some((w) => reg.isA(type, w)));
+  const made = new Map(ops.flatMap((o) => (o.op === 'create' && o.ref ? [[o.ref, o.type] as const] : [])));
+  const typeOf = async (id: string | undefined) => (id === undefined ? undefined : made.has(id) ? made.get(id) : (await l.entity(id))?.type);
+  for (const [i, o] of ops.entries()) {
+    const at = `op ${i + 1} (${o.op})`;
+    if (o.op === 'create' && !writesType(o.type)) throw no(`${at} makes a "${String(o.type).slice(0, 60)}", which ${part.id} does not write.`);
+    if (['update', 'archive', 'restore'].includes(o.op) && !writesType(await typeOf(o.id))) throw no(`${at} changes an item ${part.id} does not write.`);
+    if (o.op === 'link' && !(writesType(await typeOf(o.from)) || writesType(await typeOf(o.to)))) throw no(`${at} links items ${part.id} does not write.`);
+    if (o.op === 'unlink') {
+      const r = o.relation ? (await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where id = $1`, [o.relation])).rows[0] : undefined;
+      if (!r || !(writesType(await typeOf(r.from_id)) || writesType(await typeOf(r.to_id)))) throw no(`${at} unlinks items ${part.id} does not write.`);
+    }
+  }
+  const host = commitOf(ref.host);
+  return { id: part.id, hash: part.hash, ...(host && { host }) };
+}
