@@ -1,7 +1,6 @@
 // The two tools that write facts: change, the one write path, and undo, which takes a change set back. And where an
 // agent's change points the owner's screen.
 
-import { partChange } from '../../loader/kernel/part-calls.ts';
 import { z } from 'zod';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { bodyAfter } from '../../write/kernel/ops.ts';
@@ -81,7 +80,6 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         .describe('On whose authority. Left out, your own judgment; settling a decision or hypothesis needs it said.'),
       hold: z.boolean().optional().describe('true to wait for the human even where agents\u2019 changes apply as made.'),
       drawing: z.string().optional().describe('Sent by the page alone.'),
-      part: z.object({ id: z.string(), hash: z.string(), island: z.string().optional(), host: z.string().optional() }).optional().describe('Sent by the page alone.'),
       run: z.string().optional().describe('The run id from session_start, or the session id.'),
     },
     run: async (l, actor, { retry, fixes, ...given }) => {
@@ -153,8 +151,6 @@ export const WRITE_TOOLS: Record<string, Tool> = {
 - run: no open session "${input.run}". Send the run id session_start gave, or leave it out.`);
           input = { ...input, run: run.id };
         }
-        // A root pack's part asked (the sheet's, tools.change): checked as its own, then the person's change naming it.
-        if (input.part) input = { ...input, part: await partChange(l, actor, input.part.island, input.part, input.ops as never) };
         result = await l.change(actor, input);
       } catch (err) {
         const message = (err as Error).message;
