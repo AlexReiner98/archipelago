@@ -22,7 +22,7 @@ startTips();
 
 const main = document.getElementById('main');
 const here = location.pathname.replace(/\/+$/, '');
-/** A product's page (ui/public.html) or a document's. */
+/** A product's page (packs/surface/page/public.html) or a document's. */
 const product = main.dataset.page === 'public';
 // Opened from the app (/read/<id>), the page is read with the reader's own sign-in; made public, as anyone; a preview
 // (/preview/<id>) is drawn as the published page would be, read with the reader's sign-in.

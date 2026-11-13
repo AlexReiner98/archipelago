@@ -296,7 +296,7 @@ const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(
 
 /**
  * A page for whoever is not in a workspace yet, or is asked something before they are (sign in, agree, sign up,
- * Allow a client): one column in the middle, with no canvas, tabs or find behind it (ui/shell.css, [data-gate]).
+ * Allow a client): one column in the middle, with no canvas, tabs or find behind it (packs/surface/page/shell.css, [data-gate]).
  */
 export function gate(title, ...kids) {
   themeSignedOut();
