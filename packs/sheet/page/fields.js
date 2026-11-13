@@ -70,7 +70,7 @@ function codeBlock(text, name) {
   const block = h('div', { class: 'field-code' });
   const fold = h('button', { type: 'button', class: 'quiet-button field-code-fold', title: 'Open it' }, name ? `${name} · ${lines.toLocaleString()} lines` : `${lines.toLocaleString()} lines`);
   const set = (open) => (block.classList.toggle('open', open), (fold.title = open ? 'Fold it' : 'Open it'));
-  // A click opens it; only an open block is written in (ui/field-edit.js).
+  // A click opens it; only an open block is written in (packs/sheet/page/field-edit.js).
   fold.addEventListener('click', (ev) => (ev.stopPropagation(), set(!block.classList.contains('open'))));
   block.addEventListener('click', (ev) => block.classList.contains('open') || (ev.stopPropagation(), set(true)));
   block.append(h('pre', { class: 'field-code-text' }, text), fold);

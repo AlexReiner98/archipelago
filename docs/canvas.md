@@ -158,9 +158,9 @@ would land and decided there. A node is never moved by hand.
 ### 8. An item reads the same everywhere
 Rule 11 of the target model (decided 26 Oct 2026, e_bed3aj7d). An item's page
 is its head, its fields and its note. A field is drawn by the kind its type
-declares it as (`ui/fields.js`), and by its shape where the kind does not say,
+declares it as (`packs/sheet/page/fields.js`), and by its shape where the kind does not say,
 so a field a pack adds that no one foresaw is still read; never by its name.
-It is changed where it stands the same way (`ui/field-edit.js`): a pick (a
+It is changed where it stands the same way (`packs/sheet/page/field-edit.js`): a pick (a
 value from a menu, a day, yes or no, an item) is a change at once, and words
 (text, numbers, lists, rows, a set of names, JSON) wait with the note for the
 page's one Save (decided 26 Oct 2026, e_mvzugyga). System fields are only

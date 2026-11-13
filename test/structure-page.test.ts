@@ -79,8 +79,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/doc-sheet.js': 2,
   'ui/doc.js': 7,
   'ui/draft.js': 4,
-  'ui/field-edit.js': 2,
-  'ui/fields.js': 2,
   'ui/find-choices.js': 2,
   'ui/find.js': 3,
   'ui/home.js': 1,
