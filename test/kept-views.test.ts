@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
+import * as S from './sheet-page.ts';
 
 const browser = chrome();
 
@@ -57,7 +58,7 @@ test('in a browser, a kept view is drawn as a canvas, the owner’s screen draws
 
     // A company: its page is bare, with no pack's screen drawn on it.
     await page.go(`${base}/#/e/${made.co}`);
-    assert.ok(await page.until(`(document.querySelector('#sheet')?.textContent ?? '').includes('Client Co')`), `the company's page: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`${S.title} === 'Client Co'`), `the company's page: ${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate<boolean>(`Boolean(document.querySelector('#sheet .lens-card'))`)), 'no pack screen on a bare page');
   } finally {
     await page.close();

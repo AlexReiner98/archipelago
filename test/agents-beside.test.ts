@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { heard } from './tab-page.ts';
 import { serve } from './serve.ts';
+import * as S from './sheet-page.ts';
 
 const browser = chrome();
 
@@ -67,7 +68,7 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
     assert.ok(await page.evaluate(readers), 'the reader’s pane is still theirs');
     // An address as a show answers it, without its slash, opens what it names.
     await page.evaluate(`location.hash = '#e/${made.c}'`);
-    assert.ok(await page.until(`location.hash.startsWith('#/e/${made.c}') && document.body.dataset.sheet === 'open' && document.querySelector('#sheet h1, #sheet .page-head')?.textContent.includes('Other agent’s step')`), `the item's page: ${await page.evaluate('location.hash')}`);
+    assert.ok(await page.until(`location.hash.startsWith('#/e/${made.c}') && document.body.dataset.sheet === 'open' && ${S.title}.includes('Other agent’s step')`), `the item's page: ${await page.evaluate('location.hash')}`);
     await page.evaluate(`location.hash = '#v?find=id+${made.b}'`);
     assert.ok(await page.until(`location.hash === '#/v?find=id+${made.b}' && document.body.dataset.sheet !== 'open'`), `the lens it names: ${await page.evaluate('location.hash')}`);
   } finally {
