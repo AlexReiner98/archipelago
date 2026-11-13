@@ -66,36 +66,23 @@ test('the rows: a row for each part, every term with its ×', () => {
   for (const w of ['"Find"', '"Only"', '"Not"', '"Walk"', '"Limit"', '"x:find:0"', '"x:only:0"', '"way:0"', '"wx:0"', '"add:find"', '"fits":true']) assert.ok(said.includes(w), w);
 });
 
-test('a term’s × names the lens without it', () => {
+test('a term’s × says that term out, and the runtime takes it from the lens the canvas holds', () => {
   const { part, went } = mount();
   part.on({ key: 'x:find:0', name: 'press' });
-  assert.deepEqual(went, [{ query: { ...lens, filter: { ...lens.filter, find: ['part_of e_abcdefgh'] } } }]);
+  assert.deepEqual(went, [{ take: { part: 'find', value: 'type task' } }]);
+  // What it names is the lens without it, had the canvas this lens.
+  assert.deepEqual(heard({ input: input(), names: new Map(), expanded: null, adding: null, wrong: false }, { key: 'x:find:0', name: 'press' }).go, { ...lens, filter: { ...lens.filter, find: ['part_of e_abcdefgh'] } });
 });
 
-test('two ×s pressed before the page answers each take their own term out', () => {
+test('a term added says that term in, whatever lens this part was last handed', () => {
+  // The part is a hand behind (CI, 13 Nov 2026: an answer for the old lens landed after the new one), so what it says
+  // is the term alone: the runtime adds it to the lens the canvas holds, and nothing the part had left behind comes back.
   const { part, went } = mount();
-  part.on({ key: 'x:find:0', name: 'press' });
-  // The page has not handed the new lens back yet: the next × builds on the one just gone to, not on the old one.
-  part.on({ key: 'x:find:0', name: 'press' });
-  const last = went.at(-1) as { query: typeof lens };
-  assert.deepEqual(last.query.filter.find ?? [], [], 'neither Find term is left');
-  assert.deepEqual(last.query.filter.only, lens.filter.only, 'the rest of the lens stays');
-});
-
-test('a late hand of the old lens does not undo a gesture; the page’s own move is taken', () => {
-  const { part, went } = mount();
-  part.on({ key: 'x:find:0', name: 'press' });
-  // An answer for the old lens lands before the page has moved: the bar keeps the lens it went to.
-  part.update(input());
-  part.on({ key: 'x:find:0', name: 'press' });
-  const last = went.at(-1) as { query: typeof lens };
-  assert.deepEqual(last.query.filter.find ?? [], [], 'the second × builds on the first');
-  // Something else moves the lens (a click on the canvas, back): that is what the next gesture builds on.
-  const elsewhere = { filter: { find: ['type decision'] }, walk: { over: [], steps: 0 } };
-  part.update(input(elsewhere));
-  part.on({ key: 'x:find:0', name: 'press' });
-  assert.deepEqual((went.at(-1) as { query: { filter: { find?: string[] } } }).query.filter.find ?? [], [], 'the page’s lens, its one term out');
-  assert.equal(went.length, 3);
+  part.on({ key: 'kind:only:0', name: 'pick', value: 'status' });
+  part.on({ key: 'choice:only:0', name: 'press' });
+  assert.equal(went.length, 1);
+  assert.deepEqual(Object.keys(went[0] as object), ['add']);
+  assert.match(String((went[0] as { add: { only: string } }).add.only), /^status /);
 });
 
 test('adding is a kind, then the thing of that kind: never words taken for a term', () => {
@@ -109,7 +96,7 @@ test('adding is a kind, then the thing of that kind: never words taken for a ter
   assert.match(text(typesShown), /\["button",\{"key":"choice:find:0","look":"quiet","tip":"Task"\},"Task"\]/);
   assert.doesNotMatch(text(typesShown), /"Run"/, 'the system’s types are not offered');
   part.on({ key: 'choice:find:1', name: 'press' });
-  assert.deepEqual((went[0] as { query: { filter: { find: string[] } } }).query.filter.find, ['type task', 'part_of e_abcdefgh', 'type decision']);
+  assert.deepEqual(went[0], { add: { find: 'type decision' } });
 });
 
 test('an item picked by name is added by its id and named by its title from then on', () => {
@@ -118,7 +105,7 @@ test('an item picked by name is added by its id and named by its title from then
   const ends = part.on({ key: 'kind:find:1', name: 'pick', value: 'part_of' });
   assert.match(text(ends), /"key":"item:find"/);
   const drawn = part.on({ key: 'item:find', name: 'pick', value: { id: 'e_zzzzzzzz', title: 'Server', type: 'task' } });
-  assert.deepEqual((went[0] as { query: { filter: { find: string[] } } }).query.filter.find.at(-1), 'part_of e_zzzzzzzz');
+  assert.deepEqual(went[0], { add: { find: 'part_of e_zzzzzzzz' } });
   assert.deepEqual(kept, [['names', { e_zzzzzzzz: 'Server' }]]);
   const after = part.update(input({ ...lens, filter: { find: ['part_of e_zzzzzzzz'] } }));
   assert.match(text(after), /part of Server/);
@@ -132,7 +119,7 @@ test('what is written is taken only where the kind takes writing, and refused wh
   assert.match(text(wrong), /Not what this takes/);
   assert.equal(went.length, 0);
   part.on({ key: 'typed:only', name: 'submit', value: '2026-10-01' });
-  assert.deepEqual((went[0] as { query: { filter: { only: string[] } } }).query.filter.only, ['blocked', 'changed since 2026-10-01']);
+  assert.deepEqual(went[0], { add: { only: 'changed since 2026-10-01' } });
 });
 
 test('Only offers its plain words, those already there left out, and the statuses of the types Find names', () => {

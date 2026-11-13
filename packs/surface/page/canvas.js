@@ -149,8 +149,11 @@ hooks.go = (address) => {
   // A saved view, by its id: opened as the bar's switcher opens one (hooks.openView, packs/surface/page/views-kept.js).
   if (typeof address.view === 'string' && /^e_[a-z0-9]{8}$/.test(address.view)) return void hooks.openView?.(address.view);
   // A term added to the lens up or taken out of it (`add`, `take`): the runtime makes the lens, so no part keeps the algebra.
+  // Built on the lens this canvas last went to while it has not drawn another, so two quick moves each count.
   if (address.add || address.take) {
-    const next = moved(current.home ? home() : current.lens, address);
+    const up = current.home ? home() : current.lens;
+    const next = moved(current.wanted && current.wantedFrom === up ? current.wanted : up, address);
+    if (next) Object.assign(current, { wanted: next, wantedFrom: up });
     return void (next && goQuery(next));
   }
   let lens = null;
