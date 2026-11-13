@@ -1,0 +1,481 @@
+/* The two surfaces (ui/app.js): the canvas across the whole page, and the sheet that opens over it from the side. A
+   thin bar floats over the canvas's top and the find bar over its foot; nothing else is on screen. Every length is
+   the house style's (--*), every colour the theme's. */
+html, body { height: 100%; }
+body { overflow: hidden; }
+/* A select's open list in the theme, also where the select itself is drawn bare (the query bar, the sheet's marks). */
+option, optgroup { background: var(--panel); color: var(--text); }
+
+/* The canvas: the panes of the tab in sight (ui/panes.js), every one alike; one alone is drawn edge to edge, its frame
+   the whole page. */
+#canvas { position: fixed; inset: 0; background: var(--ln-sea, var(--bg)); }
+/* The safe zone of a pane alone: the bar and the view's band above, find (the lens) below. A drawing starts under the bars,
+   so they never cover it, and runs to the foot of the page, with find drawn over it: no room is kept for find. A drawing
+   on the plane is fitted above find; one that scrolls (a list, a grid) keeps room for it after its end only, so its
+   last row can be scrolled out from under it. Among several, each pane's strip holds the bar instead. */
+/* Under the band too, where a style's emblem makes it taller than the strip. */
+#canvas { --safe-top: calc(max(var(--strip), var(--band)) + var(--space-4)); --safe-bottom: calc(var(--box-10) + var(--space-9)); }
+body[data-panes="1"] #canvas .pane-canvas .lens-view { padding: var(--safe-top) 0 var(--safe-bottom); }
+body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.lf-stage), body[data-panes="1"] #canvas .pane-canvas .lens-view:has(.code-stage) { padding: var(--safe-top) 0 0; }
+/* A layout's code fills its pane, not the height a document gives its frame. */
+#canvas .code-stage { height: 100%; }
+#canvas .code-stage > .lens-frame { height: 100%; min-height: 0; }
+/* The key, always in sight on a pane alone: in the safe zone, under the query bar, as long as it is. */
+/* Among several, the pane the query bar is over keeps its drawing and key below the bar too (ui/query-bar.js keepClear). */
+#canvas > .pane.pane-active > .pane-canvas .lens-view { padding-top: var(--safe-top); }
+/* Where the bars stand over a pane, nothing drawn in it is ever seen under them, whatever a drawing's own styling says:
+   what scrolls is cut at the safe zone's top, and a drawing's fixed marks stay in its pane (contain). */
+body[data-panes="1"] #canvas .pane-canvas .lens-view, #canvas > .pane.pane-active > .pane-canvas .lens-view { clip-path: inset(var(--safe-top) 0 0 0); contain: paint; }
+/* A picture the page lays out (a grid, a time axis, meters) scrolls in the room between the bars alone: its scrollbar
+   and what scrolls never run under them. */
+body[data-panes="1"] #canvas .pane-canvas .lens-view.laid-out, #canvas > .pane.pane-active > .pane-canvas .lens-view.laid-out { position: absolute; inset: var(--safe-top) 0 var(--safe-bottom) 0; height: auto; padding: 0; clip-path: none; }
+/* A picture read beside the sheet: what is published gives way to the draft. */
+.lens-view.sheet-over .rd.published { display: none; }
+body[data-panes="1"] #canvas .lf-legend { bottom: auto; pointer-events: auto; }
+#canvas .lens-view > .lens-error { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
+
+/* The bar: where the canvas stands, what waits for you, and the menu. */
+#nav { position: fixed; z-index: 5; top: var(--space-4); left: var(--space-9); right: var(--space-9); height: calc(var(--band) - 2 * var(--space-4)); display: flex; align-items: center; gap: var(--space-5); min-width: 0; pointer-events: none; }
+#nav > * { pointer-events: auto; }
+/* The bar runs across the page over the sheet, one pane or several: the sheet opens under it (the owner, 27 Oct 2026). */
+/* One layout for one pane or several: the bar in a band across the top, over the sheet, and every pane under it with
+   its strip, so nothing moves or changes width when a tab is split. */
+body { --band: calc(max(var(--box-9), var(--emblem-size, var(--box-9))) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
+/* The lines of the frame are one system: a line under the tabs across the page, the tab in sight standing on it in the
+   panel's colour; a line under each band; one line between two panes, which is what is dragged and lights when it is
+   (ui/panes.js). Nothing draws a border of its own around a view. */
+body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) - var(--border-1)); left: 0; right: 0; height: var(--border-1); background: var(--line); pointer-events: none; }
+#nav > .grow { flex: 1; pointer-events: none; }
+/* Tabs (ui/tab-bar.js): one for each canvas kept, a session's named in its hue; many shrink to their mark and first letters.
+   They stand on one line across the bar, square below and rounded above; the one in sight is raised in the panel's
+   colour over that line, its top in the accent or its session's hue. No tab changes its size or controls when another
+   comes into sight. */
+#tabs { align-self: stretch; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: calc(-1 * var(--space-4)); padding: 0 var(--space-3); overflow-x: auto; scrollbar-width: none; }
+#tabs > .tab { pointer-events: auto; flex: 0 1 auto; max-width: 40%; min-width: calc(var(--box-8) + 2 * var(--box-7) + var(--space-6)); box-sizing: border-box; display: inline-flex; align-items: center; gap: 0; height: var(--box-8); padding: 0 var(--space-1) 0 var(--space-6); background: none; border: var(--border-1) solid transparent; border-bottom: 0; border-radius: var(--radius-3) var(--radius-3) 0 0; color: var(--muted); font-size: var(--text-5); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
+#tabs > .tab:hover { color: var(--text); background: var(--accent-soft); }
+#tabs > .tab[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
+#tabs > .tab.tab-out { border-color: var(--line); border-style: dashed; }
+#tabs > .tab[data-unseen] { color: var(--text); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
+#tabs > .tab.tab-drop { background: var(--accent-soft); }
+#tabs > .tab.tab-shown { animation: tab-shown 1.2s ease 2; }
+@keyframes tab-shown { 50% { background: var(--accent-soft); } }
+#tabs .tab-name { min-width: 0; margin-right: var(--space-5); overflow: hidden; text-overflow: ellipsis; }
+#tabs .tab-name.who-session::before { margin-right: var(--space-3); }
+#tabs > .tab[data-ended] .tab-name { text-decoration: line-through; }
+#tabs > .tab[data-quiet] .tab-name { opacity: var(--ln-dim); }
+#tabs > .tab.tab-chats { margin-left: var(--space-6); }
+/* A session's state, a mark before its name; one waiting on the owner stands out (ui/tab-count.js). */
+#tabs .tab-state { flex: none; margin-right: var(--space-3); }
+#tabs > .tab:is([data-state="waiting"], [data-state="your_move"]) { color: var(--text); }
+#tabs > .tab:is([data-state="waiting"], [data-state="your_move"]) .tab-state, #nav > .tab-count { color: var(--warn); }
+/* The sessions waiting on the owner, counted beside the strip so every tab sees them; a press goes to the oldest. */
+#nav > .tab-count { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: var(--box-7); padding: 0 var(--space-4); border: 0; border-radius: var(--radius-2); background: none; font: inherit; font-size: var(--text-5); cursor: pointer; }
+#nav > .tab-count[hidden] { display: none; }
+#nav > .tab-count .tab-state { margin: 0; }
+#nav > .tab-count:hover { background: var(--accent-soft); }
+/* Every control on the strip, in the bar and on a pane is a button a finger finds: a square of one size, its mark large enough to read. */
+#tabs .tab-act, #tabs > .tab-new, #query .q-save, .pane-bar .pane-act { flex: none; display: inline-grid; place-items: center; box-sizing: border-box; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); font-size: var(--text-8); line-height: 1; cursor: pointer; }
+#tabs .tab-act:hover, #tabs > .tab-new:hover, #query .q-save:hover:not(:disabled), .pane-bar .pane-act:hover { color: var(--text); background: var(--accent-soft); }
+#query .q-save:disabled { opacity: 0.35; cursor: default; }
+#query .q-mark { width: var(--text-5); height: var(--text-5); fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
+/* An action that is not read from its mark alone says its word beside it. */
+#query .q-save.q-word { width: auto; gap: var(--space-3); grid-auto-flow: column; padding: 0 var(--space-5); font-size: var(--text-4); color: var(--text); }
+/* New tab: on the line of the tabs' own buttons, as a browser's + is (its glyph sits a hairline lower than × and ⋯, so it is lifted by one), in the text's colour so it reads at a glance. */
+#tabs > .tab-new { pointer-events: auto; align-self: flex-end; margin: 0 0 calc((var(--box-8) - var(--box-7)) / 2 + var(--border-1)) var(--space-3); color: var(--text); }
+/* The tab in sight's menu: whom it follows, pop out. A popover, so the strip does not clip it. */
+/* Drawn as every open list is (ui/style.css, decision e_eqsuv24q). */
+.tab-menu, .term-pick { position: fixed; inset: auto; margin: var(--space-3) 0 0; }
+.tab-menu:not(:popover-open), .term-pick:not(:popover-open) { display: none; }
+.tab-menu > button[aria-checked="true"] { font-weight: 600; }
+.tab-menu > button[aria-checked="true"]::after { content: ' ✓'; color: var(--accent); }
+/* A part's menu (ui/term-pick.js): a field to narrow or write in, then the choices by group, and what the part holds. */
+.term-pick { width: var(--menu-least); max-height: var(--scroll-most); grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.term-pick-field { margin: 0 0 var(--space-3); padding: var(--space-4) var(--space-5); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--bg); color: var(--text); font: inherit; outline: none; }
+.term-pick-field:focus { border-color: var(--accent); }
+.term-pick-field.wrong { border-color: var(--bad); }
+.term-pick-list { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.term-pick-list > * { flex: none; }
+.term-pick-typed { color: var(--accent); }
+.term-pick.finding { width: var(--menu-find); }
+.term-pick-noted { display: flex; gap: var(--space-5); }
+.term-pick-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.term-pick-note { flex: none; color: var(--muted); }
+.term-pick-on::after { content: ' ›'; color: var(--muted); }
+.term-pick-back { text-align: left; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); font: inherit; cursor: pointer; }
+.term-pick-back:hover { color: var(--text); }
+.term-pick-held { display: flex; align-items: center; }
+.term-pick-held > .term-pick-item { flex: 1; min-width: 0; }
+.term-pick-x { flex: none; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); cursor: pointer; }
+.term-pick-x:hover { color: var(--text); }
+/* The emblem, the theme's own (its style's emblem, ui/theme.js), in place of the name: the name is still what it is called. */
+#nav .brand { flex: none; width: var(--emblem-size, var(--box-9)); height: var(--emblem-size, var(--box-9)); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
+#nav .brand > .error { font-size: var(--text-2); }
+#nav .brand .workspace-name { display: none; }
+/* Under the tabs, two bands, each the width of the pane: the view, in the panel's colour and joined to the tab in sight
+   (or the strip of the pane in focus), with the canvas up and what is done with it; then the query, in the page's
+   colour, in one line, with its editor under it when open. No box holds another (rule e_vgs9vt5j): the filter, the walk
+   and the limit are rows of the editor set apart by a line, and each term is its words and its ×, with no shape of its own. */
+#query { position: fixed; z-index: 2; top: var(--active-top, 0%); left: var(--active-left, 0%); right: var(--active-right, 0%); display: flex; flex-direction: column; white-space: nowrap; pointer-events: none; }
+#query[hidden] { display: none; }
+body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--sheet), 50%)); }
+#query .q-view { pointer-events: auto; display: flex; align-items: center; min-width: 0; overflow: hidden; box-sizing: border-box; height: var(--strip); padding: 0 var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); }
+#query .q-view > .q-canvas { display: inline-flex; align-items: center; gap: var(--space-6); padding: 0; background: none; border: 0; border-radius: 0; }
+/* At rest the find bar says the lens in one line, its words the query's (ui/query-bar.js); a click or / opens it to type (ui/find.js). */
+#find .q-lens { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; height: var(--box-9); padding: 0 var(--space-6); font-size: var(--text-4); cursor: text; }
+#find .q-sum > .q-hint { color: var(--muted); font-size: var(--text-6); }
+#find .q-sum { flex: 0 1 auto; min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+/* The parts share the line evenly, what one does not need going to the others, so a short part is whole beside a long one, and the longest is cut with its own ellipsis: no part leaves it. */
+#find .q-sum { display: flex; white-space: nowrap; }
+#find .q-sum-part { flex: 1 1 0; min-width: var(--line-part-least); max-width: max-content; overflow: hidden; display: flex; align-items: baseline; }
+#find .q-lens.tight .q-sum-part { min-width: 0; }
+#find .q-sum-part + .q-sum-part { margin-left: var(--space-8); }
+#find .q-sum-part > .q-label { margin-right: var(--space-4); }
+/* A part's terms, those that fit (ui/query-bar.js fitLine), then how many more, and the walk's steps, which are never cut. */
+#find .q-sum-terms { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#find .q-sum-more, #find .q-sum-tail { flex: none; margin-left: var(--space-4); }
+#find .q-sum-more { color: var(--muted); }
+/* Find: each term by name, joined by a muted "or" (any of them adds). */
+#find .q-sum-terms .q-or { margin: 0 var(--space-4); color: var(--muted); }
+#find .q-lens > .q-count { flex: none; }
+/* While find is open with nothing typed, a row for each part rises above it, the width of find, its word in a column of its own and its terms after it, as many as fit (ui/query-bar.js fitRows). */
+#find .q-edit { display: grid; grid-template-columns: max-content minmax(0, 1fr); box-sizing: border-box; margin: 0 0 var(--space-4); padding: 0 var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); font-size: var(--text-4); white-space: nowrap; }
+#find:not(.open) .q-edit, #find.typing .q-edit, #find.open .q-lens, #find:not(.open) input[type=search] { display: none; }
+#find .q-edit > .q-part { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; align-items: center; min-height: var(--box-8); }
+#find .q-edit > .q-part + .q-part { border-top: var(--border-1) solid var(--line); }
+#find .q-edit > .q-part > .q-label { padding-right: var(--space-8); cursor: pointer; }
+/* The part find is in, before its box: its word, as the rows say it. */
+#find .find-mode { padding-left: var(--space-6); color: var(--accent); }
+#find .q-terms { display: flex; align-items: center; gap: var(--space-6); min-width: 0; overflow: hidden; }
+#find .q-terms > [hidden] { display: none; }
+/* Open to edit, a term is said whole: a row shows those that fit and how many more, never a term cut short. */
+#find .q-edit .q-term .q-said { max-width: none; }
+#find .q-edit .q-term { flex: none; }
+#find .q-label { flex: none; color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
+/* Each part's own +, and how many more it holds than are in sight: a mark that opens its menu. */
+#find .q-add, #find .q-more { flex: none; border: 0; background: none; padding: var(--space-2) var(--space-4); border-radius: var(--radius-2); font: inherit; color: var(--accent); cursor: pointer; }
+#find .q-add { font-size: var(--text-6); line-height: 1; }
+#find .q-add:hover, #find .q-more:hover { background: var(--accent-soft); }
+#find .q-term { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--text); }
+#find .q-term.q-out { color: var(--muted); }
+#find .q-term.q-narrow { color: var(--accent); }
+#find .q-term button, #find .q-term .q-said { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; }
+#find .q-term .q-said { cursor: default; }
+#find .q-term[data-gone]::after { content: attr(data-gone); margin-inline-start: var(--space-3); }
+#find .q-term.q-walk .q-said { font-family: var(--type-water-family); font-weight: var(--type-water-weight); font-style: var(--type-water-style); text-transform: var(--type-water-case); letter-spacing: var(--type-water-track); }
+#find .q-term .q-x { color: var(--muted); }
+#find .q-term .q-x:hover { color: var(--text); }
+#find .q-steps { gap: var(--space-3); }
+#find .q-steps button, #find .q-steps button.on { border: 0; background: none; padding: 0 var(--space-2); margin: 0; font: inherit; color: var(--muted); }
+#find .q-steps button.on { color: var(--text); font-weight: 600; }
+#find .q-steps button:hover:not(:disabled):not(.on) { color: var(--text); }
+#find .q-limit { width: auto; min-width: 0; border: 0; background: none; padding: 0; font: inherit; color: inherit; }
+#find .q-count { color: var(--muted); }
+#find .q-count.cut { color: var(--accent); }
+/* The canvas's name never shrinks away. */
+#query .q-canvas { flex: 1 1 auto; min-width: 0; overflow: hidden; }
+#query .q-canvas > * { flex: none; }
+/* Back and forward sit together at the start, as a browser's do; Split goes to the far end. */
+#query .q-canvas > .q-travel + .q-travel { margin-left: calc(-1 * var(--space-5)); }
+#query .q-canvas > .q-split { margin-left: auto; }
+/* The parts that fill the band (slot bar: Save, a new island), side by side in its row, each drawn by its marks. */
+#query .q-canvas > .q-parts { display: inline-flex; align-items: center; gap: var(--space-5); }
+#query .q-parts > .part-in, #query .q-parts .part-body { display: contents; }
+#query .q-parts .menu-items { width: max-content; }
+/* Narrow (ui/query-bar.js fitBar): the buttons' words go, then the pickers shrink, and last back and forward, Split
+   and the pickers' marks; the query's line drops how many are drawn once its words have little room. */
+#query .tight .q-word-text, #query .tightest .q-travel, #find .q-lens.tight > .q-count { display: none; }
+#query .tight .q-save.q-word { width: var(--box-7); padding: 0; }
+#query .tighter .q-canvas > .q-pick { flex: 0 1 auto; min-width: var(--box-10); }
+/* A picker's mark sits close before it, and goes only with back and forward: its tooltip says what it is. */
+#query .q-pick-label { display: inline-flex; align-items: center; }
+#query .q-canvas > .q-pick-label + .q-pick { margin-left: calc(-1 * var(--space-5)); }
+#query .tightest .q-pick-label { display: none; }
+#query .tightest .q-split { display: none; }
+#query .q-pick { field-sizing: content; min-width: 0; border: 0; background: none; font-size: var(--text-3); font-weight: 600; max-width: var(--select-least); text-overflow: ellipsis; }
+/* The view picker (ui/canvases.js): its name shrinks first and is cut short, so it never runs under Save. */
+#query .q-view-pick { display: inline-flex; align-items: center; gap: var(--space-3); flex: 0 1 auto; overflow: hidden; white-space: nowrap; color: var(--text); cursor: pointer; }
+#query .q-view-pick > .q-pick-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#query .q-view-pick > :last-child { flex: none; }
+#more > summary:hover { color: var(--text); background: var(--accent-soft); }
+#listening { flex: none; color: var(--ok); font-size: var(--text-3); white-space: nowrap; }
+#listening::before { content: "● "; }
+#listening[hidden] { display: none; }
+/* The bar's own controls are marks on it, as a tab's are: no box of their own (rule e_vgs9vt5j). */
+#more > summary { display: inline-grid; place-items: center; width: var(--box-8); height: var(--box-8); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); }
+#more > .menu-items { min-width: var(--menu-least); width: max-content; max-width: var(--menu-item-most); }
+#menu-pages { display: grid; }
+#menu-pages > a { padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; }
+#menu-pages > a:hover { background: var(--accent-soft); }
+#menu-pages > a.active { color: var(--accent); font-weight: 600; }
+/* The menu pack's part draws the pages as buttons (slot nav): each a row of the menu, as the links were. */
+#menu-pages > .part-body, #menu-pages .part-body > .pm-box { display: contents; }
+#menu-pages .pm-button { justify-content: start; text-align: left; padding: var(--space-5) var(--space-6); border: 0; border-radius: var(--radius-2); background: none; color: var(--text); font-weight: 400; }
+#menu-pages .pm-button:hover { background: var(--accent-soft); }
+#menu-pages .pm-button.pm-tone-accent { color: var(--accent); font-weight: 600; }
+#canvas-settings { display: grid; padding: var(--space-3) 0; border-top: var(--border-1) solid var(--line); }
+#canvas-settings > label { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); color: var(--text); font-size: var(--text-4); cursor: pointer; }
+#canvas-settings > label:hover { background: var(--accent-soft); }
+#canvas-settings > button { margin: var(--space-3) var(--space-6); justify-self: start; }
+/* Who you are, under the pages: the workspaces this browser is in, a row each and this one marked, a way into another, and out. */
+#whoami { padding: var(--space-4) 0 0; margin-top: var(--space-4); border-top: var(--border-1) solid var(--line); display: grid; }
+#whoami:empty { display: none; }
+#whoami .ws-head { padding: var(--space-3) var(--space-6) var(--space-2); color: var(--muted); font-size: var(--text-2); }
+#whoami .ws-rows { display: grid; }
+#whoami .ws-row { display: flex; align-items: center; gap: var(--space-5); min-width: 0; padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; white-space: nowrap; }
+#whoami .ws-row > .gist { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#whoami a.ws-row:hover { background: var(--accent-soft); }
+#whoami .ws-row.here { font-weight: 600; }
+#whoami .ws-mark { color: var(--accent); }
+#whoami .ws-add { color: var(--muted); }
+#whoami .ws-foot { display: flex; align-items: center; gap: var(--space-6); min-width: 0; padding: var(--space-5) var(--space-6) var(--space-3); margin-top: var(--space-3); border-top: var(--border-1) solid var(--line); white-space: nowrap; }
+#whoami .ws-foot > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#whoami .ws-foot > span.gist { flex: 1; }
+
+/* Find: one bar at the canvas's foot that is the query's (decision e_2a4mddx8): at rest the lens in a line; open, its rows above it; typed, the choices of what the words could be. */
+#find { position: fixed; z-index: 3; left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - var(--active-right, 0%)) / 2); bottom: calc(var(--active-bottom, 0%) + var(--space-9)); transform: translateX(-50%); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - var(--active-right, 0%) - 2 * var(--space-9))); margin: 0; }
+body[data-sheet="open"] #find { left: calc(var(--active-left, 0%) + (100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%))) / 2); width: min(var(--find-most), calc(100% - var(--active-left, 0%) - max(var(--active-right, 0%), min(var(--sheet), 50%)) - 2 * var(--space-9))); }
+#find .find-row { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-3); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); box-shadow: 0 var(--space-3) var(--space-8) rgb(0 0 0 / 0.12); cursor: text; transition: border-color 0.12s; }
+/* At rest it reads as a field to type in: a magnifier before it, its edge lit under the pointer; open, lit as focused. */
+#find .find-row:hover, #find.open .find-row { border-color: var(--accent); }
+#find .find-icon { flex: none; width: var(--box-5); height: var(--box-5); margin-left: var(--space-5); fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linecap: round; }
+#find .find-row:hover .find-icon, #find.open .find-icon { stroke: var(--accent); }
+/* Open or at rest, the bar is the same height: the box is the line's height. */
+#find input[type=search] { flex: 1; min-width: 0; box-sizing: border-box; height: var(--box-9); border: 0; background: none; padding: 0 var(--space-6); font-size: var(--text-6); outline: none; }
+#find:not(.open) .find-mode { display: none; }
+/* Typed, the choices of what the words could be, each said by its kind, the lit one first (Words): what Enter takes. In the look of every dropdown (ui/menus.css). */
+#find .find-choices { display: grid; margin: 0 0 var(--space-4); padding: var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); white-space: nowrap; }
+#find .find-choices[hidden], #find:not(.typing) .find-choices { display: none; }
+#find .find-choice { display: flex; gap: var(--space-6); align-items: center; min-width: 0; max-width: none; }
+#find .find-choice.lit { background: var(--accent-soft); }
+#find .find-choice > .q-label { width: var(--box-10); }
+#find .find-choice > .find-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#find .find-choice > .find-note { flex: none; color: var(--muted); font-size: var(--text-2); }
+#find .find-choice > .find-count { flex: none; color: var(--muted); font-size: var(--text-2); font-variant-numeric: tabular-nums; }
+
+/* The sheet: one thing read as a document, over the canvas's right side, never more than half the screen. On a phone
+   (the phone-width block of ui/style.css) it is the whole screen; the bar and find keep a narrow screen's room there too. */
+#sheet { position: fixed; z-index: 4; top: var(--band); right: 0; bottom: 0; width: min(var(--sheet), 50%); overflow: auto; background: var(--bg); border-left: var(--border-1) solid var(--line); box-shadow: 0 0 var(--space-13) rgb(0 0 0 / 0.14); transform: translateX(100%); visibility: hidden; transition: transform 0.18s ease, visibility 0s 0.18s; }
+body[data-sheet="open"] #sheet { transform: none; visibility: visible; transition: transform 0.18s ease; }
+@media (prefers-reduced-motion: reduce) { #sheet, body[data-sheet="open"] #sheet { transition: none; } }
+#sheet-close { position: sticky; z-index: 1; top: var(--space-6); float: right; margin: var(--space-6) var(--space-6) 0 0; width: var(--box-8); height: var(--box-8); padding: 0; border: 0; background: none; font-size: var(--text-8); line-height: 1; }
+#main { padding: var(--space-11) var(--space-11) var(--space-14); }
+/* The sheet reads as a document: a title, one quiet line of marks, the note, and what a pack adds as plain sections
+   under small headings. No cards, no borders between parts: space and type set them apart. */
+#sheet .page-head { margin-bottom: var(--space-9); }
+#sheet .draft-title { font-size: var(--text-9); line-height: 1.2; margin: 0 0 var(--space-5); padding-right: var(--box-8); outline: none; overflow-wrap: anywhere; }
+#sheet .draft-title:empty::before { content: attr(data-placeholder); color: var(--muted); }
+/* Right-aligned on whichever line it lands, so the ⋯ menu, which opens leftward, stays inside the sheet under a long title. */
+#sheet .sheet-marks { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-4); }
+#sheet .sheet-marks > .grow { flex: 1; }
+#sheet .mark-type { color: var(--muted); }
+#sheet .sheet-marks select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
+#sheet .sheet-marks details.menu > summary { border: 0; padding: var(--space-2) var(--space-5); font-size: var(--text-7); line-height: 1; color: var(--muted); }
+/* An item a public view shows: a mark, and one behind it (changed since shared) offers to share it again. */
+#sheet .sheet-marks .public-mark { white-space: nowrap; }
+#sheet .sheet-marks .public-mark.behind, #sheet .sheet-marks details.public-mark > summary { color: var(--accent); font-size: inherit; }
+#sheet .note { margin-bottom: var(--space-10); }
+#sheet .note > .fields { padding: 0; margin: 0 0 var(--space-8); }
+#sheet .draft-read { cursor: text; }
+#sheet .draft-read .body-text, #sheet .note.doc .body-text { padding-left: 0; padding-right: 0; }
+#sheet .page-section > img.figure { margin-left: 0; margin-right: 0; }
+/* An image never runs wider than the sheet: a wide one scales down with its proportions, a small one keeps its size. */
+#sheet img { max-width: 100%; height: auto; }
+#sheet .draft-body { display: block; width: 100%; min-height: var(--box-10); padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-size: var(--text-6); line-height: 1.6; resize: none; outline: none; overflow: hidden; }
+#sheet .draft-body::placeholder { color: var(--muted); }
+#sheet .draft-body[hidden] { display: none; }
+#sheet .draft-bar { position: sticky; z-index: 1; bottom: 0; display: flex; align-items: center; gap: var(--space-5); margin: 0 calc(-1 * var(--space-11)) var(--space-10); padding: var(--space-6) var(--space-11); background: var(--bg); border-top: var(--border-1) solid var(--line); }
+#sheet .draft-bar[hidden] { display: none; }
+/* The bar's wrapper draws no box, so the bar sticks to the foot of the sheet and not of a wrapper its own size. */
+#sheet .draft { display: contents; }
+#sheet .draft-said { color: var(--muted); font-size: var(--text-4); }
+#sheet .draft-bar > .grow { flex: 1; }
+/* How long the note is while it is written: quiet, until it is in its best length, past it or over its limit. */
+#sheet .draft-count { color: var(--muted); font-size: var(--text-4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#sheet .draft-count[data-state='best'] { color: var(--ok); }
+#sheet .draft-count[data-state='near'] { color: var(--warn); }
+#sheet .draft-count[data-state='over'] { color: var(--bad); }
+/* Hidden until there is something to save, the buttons keep their room: the bar is one height, and the count stays put. */
+#sheet .draft-bar button[hidden] { display: inline-block; visibility: hidden; }
+#sheet .grid { display: block; }
+#sheet .card { margin: 0 0 var(--space-10); background: none; border: 0; border-radius: 0; overflow: visible; }
+#sheet .card > header, #sheet details.fold > summary { padding: 0 0 var(--space-4); border: 0; background: none; }
+#sheet .card > header h2, #sheet details.fold > summary h2 { font-size: var(--text-3); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); color: var(--muted); }
+#sheet .card .rows > li, #sheet .card .empty, #sheet .card .error { padding-left: 0; padding-right: 0; }
+#sheet .part > :first-child .card:first-child > header, #sheet .part > .card:first-child > header { padding-right: calc(var(--box-8) + var(--space-5)); }
+/* A row that never wraps: its name cut with an ellipsis, its marks and one action at the end, rare ones in a menu. */
+.rows > li.one { display: flex; flex-wrap: nowrap; align-items: center; gap: var(--space-5); white-space: nowrap; min-width: 0; }
+.rows > li.one > * { flex: none; }
+.rows > li.one > .grow, .rows > li.one > input[type='text'] { flex: 1 1 0; }
+.rows > li.one .menu-room { width: var(--box-7); }
+/* The Workspace page: its sections, one shown at a time; the theme as swatches, each painted in its own colours. */
+/* The sections as one row that never runs past the sheet: on a narrow one each tab gives up room, its name cut, whole in its tooltip. */
+#sheet .ws-sections { display: flex; max-width: 100%; margin: 0 0 var(--space-10); }
+#sheet .ws-sections > button { flex: 0 1 auto; min-width: 0; padding-left: var(--space-8); padding-right: var(--space-8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#sheet .ws-notice:not(:empty) { margin: 0 0 var(--space-8); }
+.card > .rows + .rows:not(:empty) { border-top: var(--border-1) solid var(--line); }
+/* Plates: a grid of small cards, each a thing with what it holds set in it, drawn like the theme swatches but larger.
+   A plate's head is its name, its marks and one action; its rows are the controls of what it holds; its foot is counts. */
+.plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--side-least), 1fr)); gap: var(--space-7); padding: var(--space-4) 0 var(--space-6); }
+.plate { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding: var(--space-7) var(--space-8); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); background: var(--panel); }
+.plate:hover { border-color: var(--edge); }
+.plate.off { background: none; border-style: dashed; }
+.plate.off .plate-name { color: var(--muted); }
+.plate-head { display: flex; align-items: center; gap: var(--space-5); min-width: 0; white-space: nowrap; }
+.plate-head > .grow { flex: 1 1 0; }
+.plate-name { font-size: var(--text-5); font-weight: 600; }
+.plate-says, .plate-foot { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: var(--text-2); }
+.plate-foot { margin-top: auto; padding-top: var(--space-4); border-top: var(--border-1) solid var(--line); }
+.plate > .rows > li { padding: var(--space-3) 0; gap: var(--space-4); }
+/* What a pack touches: a cell for each group of its manifest, its count over its name; a group changed here is pressed. */
+.plate > .rows > li.touches { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--count-col), 1fr)); gap: var(--space-3); padding: var(--space-2) 0 var(--space-4); }
+.touch { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); min-width: 0; padding: var(--space-3) var(--space-4); border: var(--border-1) solid transparent; border-radius: var(--radius-2); background: var(--bg); color: var(--muted); font: inherit; font-size: var(--text-1); text-align: left; }
+.touch > strong { color: var(--text); font-size: var(--text-4); }
+.touch > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate > .rows button.touch { padding: var(--space-3) var(--space-4); font-size: var(--text-1); cursor: pointer; border-color: var(--line); }
+.touch.can > strong { color: var(--accent); }
+.touch.can:hover { border-color: var(--accent); }
+.touch.on { border-color: var(--accent); background: var(--accent-soft); }
+/* A plate with a group open takes the grid's whole width; each thing in the group is a row that opens its definition. */
+.plate.wide { grid-column: 1 / -1; }
+.plate > .rows > li.decl { cursor: pointer; }
+/* A bundle's plate: each pack a band, its name on a line set apart above what it touches. */
+.plate > .rows > li.part { padding-top: var(--space-5); }
+.plate > .rows > li.decl:hover, .plate > .rows > li.decl.on { background: var(--accent-soft); }
+.plate > .rows > li.decl-def > pre { margin: 0; max-height: var(--scroll-most); overflow: auto; }
+/* A switch: a checkbox drawn as a sliding knob. */
+.switch-toggle { appearance: none; flex: none; position: relative; width: var(--box-7); height: var(--box-5); margin: 0; border-radius: var(--radius-pill); background: var(--line); cursor: pointer; transition: background 0.15s; }
+.switch-toggle::before { content: ""; position: absolute; top: var(--space-1); left: var(--space-1); width: calc(var(--box-5) - 2 * var(--space-1)); height: calc(var(--box-5) - 2 * var(--space-1)); border-radius: 50%; background: var(--panel); transition: transform 0.15s; }
+.switch-toggle:checked { background: var(--accent); }
+.switch-toggle:checked::before { transform: translateX(calc(var(--box-7) - var(--box-5))); }
+.plate > .rows button, .plate-head button, .plate details.menu > summary { padding: var(--space-2) var(--space-5); font-size: var(--text-2); }
+.plate > .rows > li:last-child { border-bottom: 0; }
+.themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--count-col), 1fr)); gap: var(--space-6); padding: var(--space-4) 0 var(--space-6); }
+.theme-tile { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
+.theme-tile .paint { position: relative; height: var(--box-9); padding: var(--space-3) var(--space-4); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); background: var(--bg); text-align: left; font-weight: 600; }
+.theme-tile .sea { position: absolute; left: var(--space-4); right: var(--space-4); bottom: var(--space-4); height: var(--box-1); border-radius: var(--radius-1); background: var(--accent); }
+.theme-tile .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2); color: var(--muted); }
+.theme-tile:hover .paint { border-color: var(--edge-strong); }
+.theme-tile.kept .paint { outline: var(--border-3) solid var(--accent); outline-offset: var(--border-2); }
+.theme-tile.trying .paint { outline: var(--border-3) dashed var(--accent); outline-offset: var(--border-2); }
+.theme-tile.kept .name, .theme-tile.trying .name { color: var(--text); }
+/* The item's page: what it holds, a section each, as headings over plain rows of a name and its value, one line each. */
+#sheet .page-section { margin: 0 0 var(--space-10); }
+#sheet .page-section > h2 { display: flex; align-items: baseline; gap: var(--space-5); margin: 0 0 var(--space-5); padding-bottom: var(--space-3); border-bottom: var(--border-1) solid var(--line); font-size: var(--text-2); color: var(--muted); font-family: var(--type-region-family); font-weight: var(--type-region-weight); font-style: var(--type-region-style); text-transform: var(--type-region-case); letter-spacing: var(--type-region-track); }
+#sheet .page-section > h2 .n { font-weight: normal; }
+#sheet .page-section .note { margin: 0; }
+#sheet .page-rows { display: grid; grid-template-columns: var(--label-col) minmax(0, 1fr); gap: var(--space-3) var(--space-8); margin: 0; }
+#sheet .page-rows dt { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd { margin: 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd > .gist { display: block; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd details > summary { cursor: pointer; list-style: none; overflow: hidden; text-overflow: ellipsis; }
+#sheet .page-rows dd details > summary::-webkit-details-marker { display: none; }
+#sheet .page-rows dd details[open] { white-space: normal; max-width: var(--measure); }
+#sheet .page-rows select { padding: 0; border: 0; background: none; color: var(--text); font: inherit; cursor: pointer; }
+#sheet .page-json { margin: var(--space-3) 0 0; font-size: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
+#sheet .page-lines .change.line { padding-left: 0; padding-right: 0; }
+
+/* A page for whoever is not in a workspace yet (gate, packs/surface/page/base.js): sign in, agree, Allow a client. One column
+   in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
+body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
+body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; }
+.gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: 0 auto; padding-top: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
+.gate-mark { width: var(--box-10); height: var(--box-10); border-radius: var(--radius-2); }
+.gate h1 { margin: 0 0 var(--space-4); }
+.gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
+.gate-row > input { flex: 1; min-width: 0; }
+.gate-row > button, .gate-row > a { flex: none; }
+.gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gate-others { display: flex; gap: var(--space-6); }
+.gate-error:empty { display: none; }
+.gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
+
+/* Panes (ui/panes.js): the canvases of a tab, each with its name, a way to keep only it and to close it. Their
+   frames are set by the layout as shares of the page; the line between two is dragged. */
+#canvas > .pane { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; background: var(--ln-sea, var(--bg)); box-sizing: border-box; }
+#canvas > .pane.pane-shown { animation: pane-shown 1.2s ease; }
+@keyframes pane-shown { from { box-shadow: inset 0 0 0 var(--border-2, var(--border-1)) var(--accent); } to { box-shadow: none; } }
+#canvas .pane-bar { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-5); background: var(--panel); border-bottom: var(--border-1) solid var(--line); min-width: 0; }
+.pane-bar .pane-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-3); font-weight: 600; cursor: grab; user-select: none; touch-action: none; padding: var(--space-2) var(--space-3); }
+.pane-bar .pane-follows { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2, var(--text-3)); color: var(--accent); background: var(--accent-soft); border-radius: var(--radius-2); padding: 0 var(--space-3); margin-left: var(--space-3); }
+.pane-bar .pane-follows[hidden] { display: none; }
+/* A pane is never scrolled itself, not even by code bringing a mark into sight: only what it holds scrolls. */
+#canvas .pane-canvas { position: relative; flex: 1; min-height: 0; overflow: clip; }
+#canvas .pane-canvas[hidden] { display: none; }
+#canvas .pane-web { flex: 1; min-height: 0; border: 0; background: var(--panel); }
+body[data-panes="1"] #canvas .pane-web { margin: var(--safe-top) 0 var(--safe-bottom); }#canvas .pane-web.error { padding: var(--space-5); }
+#canvas .pane-canvas > .lens-wrap, #canvas .pane-canvas .lens-view { height: 100%; }
+#canvas .pane-canvas .lens-view { position: relative; box-sizing: border-box; overflow: auto; }
+#canvas .pane-canvas .lens-view:has(.lf-stage) { overflow: hidden; }
+#canvas .pane-canvas .lf-stage { height: 100%; }
+/* A view that plays its steps: the chapters over the canvas, what was said beside the picture, both held in the pane. */
+#canvas .pane-canvas .lens-view:has(> .lf-beside) { display: flex; flex-direction: column; }
+#canvas .pane-canvas .lens-view > .sp-top { flex: none; margin: 0; padding: var(--space-4) var(--space-6) 0; }
+#canvas .pane-canvas .lens-view > .lf-beside { flex: 1 1 0; min-height: 0; padding: var(--space-6); }
+/* A view drawn inside another (a milestone beside a replay, ui/view-frame.js) is not under the bars: no room is kept for them. */
+body[data-panes] #canvas .pane-canvas .view-frame .lens-view:is(*, :has(.lf-stage), :has(.code-stage)) { padding: 0; }
+#canvas .pane-canvas .lf-beside > .sp-chat, #canvas .pane-canvas .lf-beside > .sp-side > .sp-shown { min-height: 0; margin-bottom: var(--safe-bottom); }
+/* Beside a milestone the conversation is narrow; where the row cannot hold all three it goes above them, a few lines tall. */
+#canvas .pane-canvas .lf-beside > .sp-side > .sp-chat { min-height: calc(var(--box-9) * 4); margin-bottom: var(--safe-bottom); }
+#canvas .pane-canvas .lens-view > .toolbar { display: none; }
+/* A finger needs more to land on than a pointer does. */
+@media (pointer: coarse) {
+  #query .q-save { min-width: var(--box-8); height: var(--box-9); }
+  #tabs .tab-act, #tabs > .tab-new { width: var(--box-8); height: var(--box-8); }
+}
+#canvas .pane-canvas > .empty, #canvas .pane-canvas > .error, #canvas .pane-canvas .lens-view > .empty { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
+/* The line between two panes: drawn by the sash itself, over the bands it crosses, wider and in the accent while it is
+   pointed at or dragged; what takes the pointer is wider than what is drawn. */
+#canvas > .pane-sash { position: fixed; z-index: 3; background: transparent; }
+#canvas > .pane-sash.row { top: 0; bottom: 0; width: var(--space-4); transform: translateX(-50%); cursor: col-resize; }
+#canvas > .pane-sash.column { left: 0; right: 0; height: var(--space-4); transform: translateY(-50%); cursor: row-resize; }
+#canvas > .pane-sash::after { content: ''; position: absolute; background: var(--line); }
+#canvas > .pane-sash.row::after { top: 0; bottom: 0; left: 50%; width: var(--border-1); transform: translateX(-50%); }
+#canvas > .pane-sash.column::after { left: 0; right: 0; top: 50%; height: var(--border-1); transform: translateY(-50%); }
+#canvas > .pane-sash:hover::after, body[data-dragging="sash"] #canvas > .pane-sash::after { background: var(--accent); }
+#canvas > .pane-sash.row:hover::after, body[data-dragging="sash"] #canvas > .pane-sash.row::after { width: var(--border-3); }
+#canvas > .pane-sash.column:hover::after, body[data-dragging="sash"] #canvas > .pane-sash.column::after { height: var(--border-3); }
+/* While a pane or a line is dragged, a style's frame does not take the pointer from the page. */
+body[data-dragging] { user-select: none; }
+body[data-dragging] iframe { pointer-events: none; }
+body[data-dragging="pane"] { cursor: grabbing; }
+.pane-zone { position: fixed; z-index: 7; pointer-events: none; background: var(--accent-soft); border: var(--border-1) solid var(--accent); box-sizing: border-box; transition: left 0.08s, top 0.08s, width 0.08s, height 0.08s; }
+.pane-zone[hidden] { display: none; }
+
+/* The pane the bar and find act on, among several: a line of the accent along its top; the names of the others quiet. */
+#canvas > .pane.pane-active > .pane-bar { box-shadow: inset 0 var(--border-2, var(--border-1)) 0 var(--accent); }
+body[data-panes="1"] .pane-bar .pane-act[aria-label="Move this pane to a new tab"] { display: none; }
+#canvas > .pane:not(.pane-active) .pane-name { color: var(--muted); font-weight: 400; }
+/* A pane not in focus takes the first press on a style's frame itself (a frame keeps its presses), and is then in focus. */
+#canvas > .pane:not(.pane-active) > .pane-canvas:has(iframe)::after { content: ''; position: absolute; inset: 0; z-index: 3; cursor: pointer; }
+/* Several panes: the top bar runs in a band across the page and over the sheet, the panes and the sheet under it.
+   Every pane keeps a strip of one height at its top, in or out of focus, so nothing moves when focus does: the query
+   bar fills the strip of the pane it acts on, and the others show their names there. A pane alone has no strip. */
+#canvas .pane-bar { box-sizing: border-box; height: var(--strip); padding-top: 0; padding-bottom: 0; }
+/* In focus, the bar takes the place of the pane's name, between its ⠿ and its ×, which stay where they are. */
+#canvas > .pane.pane-active > .pane-bar > .pane-name, #canvas > .pane.pane-active > .pane-bar > .pane-follows { visibility: hidden; }
+body[data-panes="1"] #canvas .pane-bar { display: none; }
+.pane-bar .pane-grip { cursor: grab; user-select: none; touch-action: none; }
+/* Room for the strip's ⠿ on its left and its ⧉ and × on its right. */
+body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + (var(--box-7) + var(--space-3)) * 2) 0 calc(var(--space-5) + var(--box-7) + var(--space-3)); padding: 0; background: none; border: 0; }
+#canvas > .pane-sash.row { top: var(--band, 0%); }
+
+/* A view's thumbnail (ui/thumbs.js): a small still of it at the head of its row, and the frame it is drawn in, off screen. */
+.thumb { display: block; flex: none; width: var(--thumb); height: var(--thumb-high); border-radius: var(--box-1); background: var(--bg); overflow: hidden; }
+.thumb > img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.thumb-stage { position: fixed; top: 0; left: 100%; width: var(--thumb-frame); height: var(--thumb-frame-high); overflow: hidden; visibility: hidden; pointer-events: none; contain: strict; }
+.thumb-stage .lens-wrap, .thumb-stage .lens-view { width: 100%; height: 100%; }
+
+/* A frozen link's page (packs/surface/page/base.js `link`, decision e_qpaqnmrc): the view it shows alone, without the tabs, menu, other
+   views or panes of whoever opens it; its query in sight and not to be changed, since the answer is frozen. */
+:root[data-reader] #tabs, :root[data-reader] #more, :root[data-reader] #listening, :root[data-reader] #query .q-travel, :root[data-reader] #query .q-split, :root[data-reader] #query .q-band-menu, :root[data-reader] #query .q-view-pick > :last-child { display: none; }
+:root[data-reader] #query .q-view-pick, :root[data-reader] #find { pointer-events: none; }
+/* A link's reader is shown, in the bar, a way to start a map of their own (ui/app.js, startOwn). */
+#nav .sign-in { margin-left: auto; color: var(--text); font-size: var(--text-4); }
+#nav .start-own { margin-left: var(--space-7); padding: var(--space-3) var(--space-7); background: var(--accent); color: var(--panel); border-radius: var(--radius-2); font-size: var(--text-4); font-weight: 600; white-space: nowrap; }
+/* A link's reader sees an item, not how the map keeps it: no menu of actions, no source, history or empty fields. */
+:root[data-reader] #sheet details.menu, :root[data-reader] #sheet [data-section="source"], :root[data-reader] #sheet [data-section="history"], :root[data-reader] #sheet .fields-empty, :root[data-reader] #sheet [data-section="fields"]:not(:has(> .page-rows)) { display: none; }
+/* A part's change going out (packs/surface/page/part-going.js): quiet lines over find, one each, never wrapping. */
+.part-going { position: fixed; left: var(--space-6); right: var(--space-6); bottom: calc(var(--active-bottom, 0%) + var(--box-9) + var(--space-7)); display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); pointer-events: none; font-size: var(--text-5); }
+.part-going:empty { display: none; }
+.part-going-row { display: flex; align-items: baseline; gap: var(--space-5); max-width: 100%; min-width: 0; white-space: nowrap; color: var(--muted); pointer-events: auto; }
+.part-going-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

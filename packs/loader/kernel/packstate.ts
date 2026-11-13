@@ -18,8 +18,8 @@ import { decideAct, listActs, packSecrets, setPackSecret } from './outside.ts';
 import { canSeal } from '../../seal/kernel/secrets.ts';
 import { ISLANDS } from './islands.ts';
 import { dependentsOf, KERNEL_PACKS } from './packorder.ts';
-import { manifestRead } from './pack-folders.ts';
-import { isRequired } from './manifest.ts';
+import { manifestRead, OWN_PACKS } from './pack-folders.ts';
+import { isApp, isRequired } from './manifest.ts';
 import { LOCAL_PACK, type PackFile } from './packs.ts';
 import { hostFor } from './packtools.ts';
 import { actorId, needHuman } from '../../identity/kernel/actor-checks.ts';
@@ -53,11 +53,13 @@ export const onToolsChanged = (fn: (workspace: string) => void) => (toolsChanged
 
 /**
  * The packs off in a workspace: those whose last fact retracts them, and those this server has that its log never
- * added (a pack is the owner's to add, decided 27 Oct 2026); before any pack fact, the old setting.
+ * added (a pack is the owner's to add, decided 27 Oct 2026); before any pack fact, the old setting. One of the app's
+ * own screens (`app`, of the server's own folder) is on until the owner takes it out (decision e_y9dcs4nv).
  */
 export async function packsOff(l: Archipelago): Promise<string[]> {
   const said = await packFacts(l);
-  if (said.size) return l.registry.found.map((p) => p.id).filter((id) => id !== LOCAL_PACK && !KERNEL_PACKS.includes(id) && said.get(id)?.op !== '+');
+  const app = (p: PackFile) => isApp(p) && !l.registry.made.has(p.id) && [l.registry.dir, OWN_PACKS].some((d) => l.registry.folderOf(p.id) === join(d, p.id));
+  if (said.size) return l.registry.found.filter((p) => p.id !== LOCAL_PACK && !KERNEL_PACKS.includes(p.id) && (app(p) ? said.get(p.id)?.op === '-' : said.get(p.id)?.op !== '+')).map((p) => p.id);
   const { rows } = await l.db.query<{ value: unknown }>(`select value from setting where key = $1`, [PACKS_OFF]);
   // a pack kept as an item is new here until the owner adds it, whatever the old setting said.
   return [...(Array.isArray(rows[0]?.value) ? (rows[0].value as string[]) : []), ...l.registry.made.keys()];

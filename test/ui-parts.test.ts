@@ -55,8 +55,8 @@ test('parts is a key of the manifest, and a map pack’s alone', () => {
   const both = readManifest(JSON.stringify({ ...shelf(), types: bin.types }), 'test');
   const kernel = sharedOf([readManifest(JSON.stringify({ id: 'core', version: '1', title: 'core', shared: [] }), 'core')]);
   assert.match(islandProblems(both, kernel).join(), /a map pack \(actions, parts\): split it/);
-  // The host owns its frame, the pieces it draws, and the two pages it still draws itself: a document read whole and a
-  // published page (ui/doc.js, ui/public.js), each a slot until the reader and publish packs draw it (task e_atxefw2s).
+  // The host owns its frame, the pieces it draws, and the two pages read with no login: a document's and a product's,
+  // whose parts (publish.doc, publish.public) run as the page is published and are drawn frozen (decision e_rhz4dvpk).
   assert.ok(HOST_SLOTS.includes('piece.figure') && HOST_SLOTS.includes('canvas'), 'the host owns its frame and the pieces it draws');
   assert.deepEqual(HOST_SLOTS.filter((s) => s.startsWith('page.')), ['page.doc', 'page.public'], 'the pages the host still draws');
 });
@@ -67,24 +67,28 @@ test('parts is a key of the manifest, and a map pack’s alone', () => {
 test('the host offers these slots, each handing the part what it is named with', () => {
   assert.deepEqual(FRAME_SLOTS, {
     panes: [],
-    tabs: ['tabs', 'current'],
+    tabs: ['tabs', 'current', 'page'],
     'tab.mark': ['tab', 'current'],
     bar: ['current', 'home'],
     'bar.views': ['current', 'home'],
-    'bar.find': ['query', 'home'],
+    'bar.find': ['query', 'home', 'answer', 'names'],
+    'bar.find.rows': ['query', 'home', 'answer', 'names'],
     'bar.layouts': ['current', 'layout'],
     canvas: ['query', 'layout'],
     traces: ['query'],
     sheet: ['reading'],
     'item.menu': [],
-    find: ['query'],
+    find: ['query', 'shapes'],
     home: [],
     nav: [],
     look: ['drawn', 'why'],
     'workspace.card': ['workspace', 'section'],
+    'tabs.land': ['step', 'tabs', 'drawable'],
+    'tabs.life': ['open', 'tabs'],
+    ghosts: ['held', 'drawn', 'loose'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
-  assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'diagram', 'button', 'count']);
+  assert.deepEqual(Object.keys(PIECES), ['figure', 'view', 'action', 'picture', 'fields', 'page', 'token', 'token_ask', 'held', 'start', 'button', 'count']);
   // One name, one owner: no slot is named twice, and every one of them is open to any pack.
   assert.equal(new Set(HOST_SLOTS).size, HOST_SLOTS.length);
 });
@@ -104,6 +108,8 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ id: 'row' }), /part "row" must be named "shelf.<name>"/);
   assert.throws(refused({ reads: { task: ['colour'] } }), /reads "colour" of "task", which has no such field/);
   assert.throws(refused({ reads: { nothing: ['title'] } }), /reads unknown type "nothing"/);
+  assert.throws(refused({ reads: '*' }), /reads items whole \("\*"\), which only a root pack's part may/);
+  assert.doesNotThrow(refused({ reads: '*' }, { kernel: { trust: 'root', internal: true } }), "a root pack's part reads items whole");
   assert.throws(refused({ reads: { 'bin.box': ['size'] } }, {}, bin), /reads "size" of "bin.box", bin's: ask for it, as type:bin.box or field:size@bin.box/);
   assert.throws(refused({ sends: ['shelf.take'] }), /sends "shelf.take", which is not an action of shelf/);
   assert.throws(refused({ sends: ['capture'] }), /not an action of shelf/);
@@ -121,6 +127,10 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   // A part that only publishes state draws nothing, so it may name no mark; one that names none and publishes none is refused.
   assert.throws(refused({ marks: [] }), /names the marks it answers with/);
   assert.doesNotThrow(refused({ marks: [], state: ['look'] }), 'a part that only publishes state names no mark');
+  assert.doesNotThrow(refused({ slot: 'tabs.land', marks: [] }), 'a part that only answers a decision names no mark');
+  assert.doesNotThrow(refused({ views: [{ name: 'search', live: true }] }), 'search, live, is the kernel’s: no pack answers it');
+  assert.throws(refused({ views: [{ name: 'search' }] }), /does not answer/, 'search handed at mount is a view like any other');
+  assert.throws(refused({ views: [{ name: 'search', live: 'yes' }] }), /live is true or false/);
   assert.throws(refused({ modules: { 'look.js': 'parts/row/look.js' } }), /needs its modules, entered at index.js/);
   assert.throws(refused({ modules: { 'index.js': 'parts/row/gone.js' } }), /the pack has no file of/);
   assert.throws(refused({ query: { find: 'island {here}' } }), /query is a filter's terms/);

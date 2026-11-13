@@ -16,8 +16,11 @@ import { goingOut } from './part-going.js';
 const pressLasts = 2000;
 /** What the person does that a part may answer with one action as theirs: a press, a tick in a note's checklist, and a pick (a day, yes or no, one of a field's values, an item found), and an item picked on the canvas. */
 const GESTURES = ['press', 'tick', 'pick', 'picked'];
-/** What the person does that a part may answer by moving the page: those, and Enter in its input. */
-const MOVES = [...GESTURES, 'submit'];
+/**
+ * What the person does that a part may answer by moving the page: those, Enter in its input, scrolling the reading (told
+ * to the sheet's part), a step back or forth in the browser, and a show landing (told to the part on `tabs`).
+ */
+const MOVES = [...GESTURES, 'submit', 'scrolled', 'step', 'land'];
 
 /**
  * Bridge one pack version's port. `partOf(id)` is the part mounted under that id ({ id, title, sends, hash, island?, host? }):
@@ -28,6 +31,41 @@ const MOVES = [...GESTURES, 'submit'];
 export function partBridge(port, { partOf, go, state } = {}) {
   const pressed = new Map(), moved = new Map(), busy = new Set();
   const answer = (asked, result) => port.postMessage({ type: 'acted', asked, ...result });
+
+  // A change a root pack's part makes as the person (its `writes`: the sheet, task e_zhxd9bhb), or an undo of one: as an
+  // action goes, one at a time, shown when it is the part's own accord; an undo only just after a press. The server checks
+  // the part, its code's hash and the types it writes (packs/loader/kernel/part-calls.ts partChange).
+  async function write(said) {
+    const id = String(said.id), asked = said.asked;
+    const part = partOf?.(id);
+    if (!part) return answer(asked, { error: 'No part is drawn under that id.' });
+    if (!part.writes?.length) return answer(asked, { error: `${part.title ?? part.id} writes nothing.` });
+    if (!may('write')) return answer(asked, { error: 'This session may only read the map.' });
+    if (busy.has(id)) return answer(asked, { error: 'A change of this part is still going out.' });
+    const press = pressed.get(id);
+    const ownAccord = !(press && performance.now() - press < pressLasts);
+    pressed.delete(id);
+    if (said.type === 'undo' && ownAccord) return answer(asked, { error: 'An undo is the person’s: only just after they press.' });
+    const ops = Array.isArray(said.ops) ? said.ops : [];
+    if (said.type === 'change' && !ops.length) return answer(asked, { error: 'A change needs ops.' });
+    const shown = ownAccord ? goingOut(part, 'change') : null;
+    busy.add(id);
+    try {
+      const ref = { id: part.id, hash: part.hash, ...(part.island && { island: part.island }), ...(part.host && { host: part.host }) };
+      const made = said.type === 'undo'
+        ? await api('undo', { changeset: String(said.changeset ?? '') })
+        : await api('change', { ops, reason: String(said.reason || `From ${part.title ?? part.id}`).slice(0, 500), part: ref });
+      const result = { status: made?.status, created: made?.created ?? {}, ...(made?.changeset && { changeset: made.changeset }), ...(made?.proposal && { proposal: made.proposal, held: made.held_by?.say ?? '' }) };
+      shown?.done(result);
+      answer(asked, result);
+    } catch (err) {
+      const error = String(err?.message ?? err).slice(0, 300);
+      shown?.done({ error });
+      answer(asked, { error });
+    } finally {
+      busy.delete(id);
+    }
+  }
 
   async function act(said) {
     const id = String(said.id), asked = said.asked;
@@ -66,7 +104,7 @@ export function partBridge(port, { partOf, go, state } = {}) {
     moved.delete(id);
     if (!part?.go || !(at && performance.now() - at < pressLasts)) return;
     pressed.delete(id);
-    go?.(said.address);
+    go?.(said.address, part);
   }
 
   // Page state a part publishes (`state` in its manifest): only a name it declared, and only its own, so one name has
@@ -90,6 +128,7 @@ export function partBridge(port, { partOf, go, state } = {}) {
     heard(said) {
       if (said?.type === 'go') return (moveTo(said), true);
       if (said?.type === 'state') return (publish(said), true);
+      if (said?.type === 'change' || said?.type === 'undo') return (void write(said), true);
       if (said?.type !== 'act') return false;
       void act(said);
       return true;

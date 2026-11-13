@@ -8,9 +8,7 @@
 // one plate with one switch: each pack a band in it, its name on a line and what it touches under it.
 
 import { api, ask, h, may, state, tell } from './base.js';
-import { screenRows } from './nav.js';
-import { styleRows } from './styles-card.js';
-import { isTheme } from './themes-card.js';
+import { screenRows } from './screen-rows.js';
 import { checkRow } from './agents-card.js';
 import { line, secretBox } from './workspace-cards.js';
 import { plate } from './plates.js';
@@ -62,10 +60,11 @@ export function packsCard({ info, then, goTo }) {
     const of = (things) => list(things).filter((t) => t.pack === p.id);
     if (key === 'styles') {
       const styles = of(schema.styles);
-      const themes = styles.filter(isTheme);
+      // A theme is a preset used only once chosen; changing a preset is the styles pack's card (packs/styles/parts/presets).
+      const themes = styles.filter((s) => s.over === 'chosen');
       // Its themes are each listed by name; one is chosen for the whole map, on the Map section.
       const choose = themes.length > 0 && line(h('span', { class: 'grow muted small' }, 'One theme is chosen for the whole map'), h('button', { onclick: () => goTo('map') }, 'Choose'));
-      return { covers: ['preset'], rows: styleRows(styles.filter((s) => !isTheme(s)), then), after: choose ? [choose] : [] };
+      return { covers: [], rows: [], after: choose ? [choose] : [] };
     }
     if (key === 'views') return { covers: ['screen'], rows: screenRows(of(schema.screens), then).filter(Boolean) };
     if (key === 'rules') return { covers: ['asks'], rows: (info.reply_rules ?? []).filter((r) => r.rule.startsWith(`${p.id}.`)).map(checkRow) };

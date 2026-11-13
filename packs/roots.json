@@ -2,7 +2,7 @@
   "roots": [
     {
       "id": "core",
-      "hash": "42ad63072073fbb28e4a90361fa14d92ae11658ff0dfe1a8275ed9793cae518e"
+      "hash": "d212eaef179cdad4c482058f4020bd68c693824b59ae9b16659973adf7135209"
     },
     {
       "id": "database",
@@ -14,19 +14,19 @@
     },
     {
       "id": "log",
-      "hash": "4c0a72d18a45c0574180f5d5baa9ec834e34bbb79ac27a134922e7027cde5900"
+      "hash": "0622e6606e8964461735c816c0bce3c126989b270843e96050ff854e1aa0b977"
     },
     {
       "id": "identity",
-      "hash": "9f4ed8aa986af14209e347bb38cfe028ada7c587918e77ae47f2bf8d8414ac15"
+      "hash": "d6fb0f14d027bebb26826411dbe88448da22a3cdb71434d0e13e83b2f3a3f77f"
     },
     {
       "id": "walls",
-      "hash": "237a99ca67377d85ac98e4ab1b49ca7e0dd635487a9efd5c7778033d13a5627f"
+      "hash": "b757406e873bb5c95e73ccdc86309f5d0821e5850ad2753027e5444d3e739521"
     },
     {
       "id": "loader",
-      "hash": "060f335e66efd6e6164ad71a4eb8f1bf2a1b0f76b72834c7706401d6a504e54b"
+      "hash": "1c861cc199d3d5c93cc03fab82010d5cb404ac9c314e1187f77dd75f445bf4ce"
     },
     {
       "id": "rules",
@@ -34,23 +34,23 @@
     },
     {
       "id": "write",
-      "hash": "adcf1846610736ef5d03f2983a6edf489e1aef541a4203db04b82fa6606e20d4"
+      "hash": "4cbd1142d83363066a36bc3ae57d6f8bb096c10c4ccd28437547e999056934af"
     },
     {
       "id": "surface",
-      "hash": "77dcf09be145e909503276e4dd95f8d1c82181b393ee59971e74347b8d7cf1e5"
+      "hash": "aee35f14aebff63e32f9049fa2ab9bdc13c5e32af9f60d289e29ffe524f142cb"
     },
     {
       "id": "panes",
-      "hash": "ace59170fbe15cc19fd809c143089eea296fe870f3115831cf2ae345d3c2f473"
+      "hash": "b951d9b0a6aba9f5c29e5b4720b1f73c6693617861e7263e7c01b6bf5a541c60"
     },
     {
       "id": "bar",
-      "hash": "7d7e229542e5123e5fc1969714cff618d858e728d1fce4e19de17d9fcdae19d6"
+      "hash": "6deeffcd831901a7fee37f24a7cc5d432f66f45182a49e208100ddd9c7dbef85"
     },
     {
       "id": "sheet",
-      "hash": "fab34b6295cb97225e071eedc07a37dfd2e020761e0e1acf9719e471dcae1a30"
+      "hash": "69f3dd0144a3513d67ace9097226bf37979548cde957a614ce56a372dd652b95"
     }
   ],
   "calls": {
@@ -90,6 +90,9 @@
       "publish"
     ],
     "root.scene": [
+      "publish"
+    ],
+    "root.part_marks": [
       "publish"
     ],
     "root.parts": [

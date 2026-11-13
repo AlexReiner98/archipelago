@@ -15,7 +15,8 @@ const rootOf = (path: string) => /^packs\/([\w-]+)\/page\//.exec(path)?.[1];
 // stay runtime (they boot or mount, render a mark the slot contract names, or are data the runtime hands parts) and
 // now sit in surface, walls and loader, so what the host used to reach into ui/ for it now has (layout.js 8 to 3,
 // live.js 5). The moved modules bring their own imports of the app with them (app.js, canvas.js, query-base.js and
-// the rest), each going as the module it reaches becomes a part.
+// the rest), each going as the module it reaches becomes a part. The panes and tabs moved to the panes root the same
+// day as host code (task e_d5ewsvgf): they bring their imports of the app with them, and their ui/ entries went.
 const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/identity/page/agents-card.js': 2,
   'packs/identity/page/authorize.js': 1,
@@ -24,26 +25,36 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/identity/page/token-ask.js': 2,
   'packs/identity/page/token-piece.js': 2,
   'packs/identity/page/workspace-cards.js': 3,
-  'packs/identity/page/workspace.js': 7,
+  'packs/identity/page/workspace.js': 5,
   'packs/identity/page/workspaces-card.js': 2,
   'packs/walls/page/layout-asks.js': 4,
   'packs/walls/page/layout-tip.js': 1,
-  'packs/walls/page/layout.js': 5,
+  'packs/walls/page/layout.js': 3,
   'packs/walls/page/plates.js': 1,
   'packs/walls/page/query-base.js': 2,
   'packs/walls/page/surface.js': 1,
   'packs/walls/page/view-frame.js': 1,
-  'packs/loader/page/packs.js': 4,
+  'packs/loader/page/packs.js': 1,
   'packs/loader/page/page-schema.js': 1,
   'packs/loader/page/words.js': 2,
   'packs/write/page/held-card.js': 1,
   'packs/write/page/held.js': 2,
   'packs/write/page/item-held.js': 1,
-  'packs/surface/page/app.js': 8,
-  'packs/surface/page/canvas.js': 3,
-  'packs/surface/page/live.js': 7,
-  'packs/surface/page/query.js': 2,
-  'packs/surface/page/replica.js': 1,
+  // ui/nav.js's switches for a pack's screens (task e_pe3fjd75), with its import of the page's base.
+  'packs/loader/page/screen-rows.js': 1,
+  // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar, item-doc and thumbs.
+  'packs/surface/page/views-kept.js': 2,
+  'packs/surface/page/app.js': 6,
+  'packs/surface/page/canvas.js': 1,
+  'packs/surface/page/live.js': 3,
+  'packs/surface/page/query.js': 1,
+  'packs/panes/page/panes.js': 1,
+  'packs/panes/page/tab-bar.js': 2,
+  // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
+  // type's views (canvases), a document's menus (item-doc) and find's terms (query-bar), screens.js for a diagram and
+  // the start page, each going as that module becomes a part.
+  'packs/sheet/page/item.js': 2,
+  'packs/sheet/page/screens.js': 1,
 };
 
 test("the host's page imports one way along roots.json", () => {
@@ -67,55 +78,21 @@ test("the host's page imports one way along roots.json", () => {
 // Frozen again 13 Nov 2026, as the runtime moved out of ui/ (task e_6hhx2ub8, decision e_6d2g62tg): eleven modules
 // left ui/ and their entries went with them; a module still in ui/ that imports one of them counts it from now on,
 // and that import goes when its own cluster makes it a part of a map pack. A number here may be re-frozen only when
-// the boundary itself moves, as it did here and on 12 Nov; otherwise it falls.
+// the boundary itself moves, as it did here and on 12 Nov; otherwise it falls. It moved once more the same day:
+// doc-lens.js, the picture mark's drawing, went to surface (task e_atxefw2s), so doc.js and item-doc.js count it.
 const APP_ON_HOST: Record<string, number> = {
-  'ui/canvas-menu.js': 2,
-  'ui/canvases.js': 5,
-  'ui/catch-up.js': 3,
   'ui/connect-agent.js': 2,
   'ui/connections-card.js': 2,
-  'ui/diagram.js': 3,
-  'ui/doc-lens.js': 4,
-  'ui/doc-sheet.js': 2,
-  'ui/doc.js': 7,
-  'ui/draft.js': 4,
-  'ui/field-edit.js': 2,
-  'ui/fields.js': 2,
-  'ui/find-choices.js': 2,
+  'ui/find-choices.js': 3,
   'ui/find.js': 3,
-  'ui/home.js': 1,
-  'ui/island-new.js': 2,
-  'ui/item-doc.js': 4,
-  'ui/item-links.js': 2,
-  'ui/item-sections.js': 3,
-  'ui/item.js': 6,
+  'ui/item-doc.js': 5,
   'ui/keep-in-view.js': 2,
-  'ui/limits-card.js': 1,
-  'ui/link-pick.js': 2,
-  'ui/look-marks.js': 1,
-  'ui/look-switch.js': 3,
-  'ui/nav.js': 2,
-  'ui/pane-address.js': 1,
-  'ui/pane-busy.js': 1,
-  'ui/pane-drag.js': 1,
-  'ui/pane-land.js': 1,
-  'ui/pane-web.js': 1,
-  'ui/panes.js': 5,
-  'ui/public.js': 3,
   'ui/query-bar.js': 3,
   'ui/query-light.js': 2,
-  'ui/screens.js': 8,
-  'ui/sheet-follow.js': 2,
   'ui/start.js': 1,
-  'ui/style-code.js': 2,
-  'ui/styles-card.js': 2,
-  'ui/tab-bar.js': 4,
-  'ui/tab-life.js': 1,
-  'ui/tabs.js': 1,
+  'ui/style-code.js': 3,
   'ui/term-kinds.js': 2,
   'ui/term-pick.js': 2,
-  'ui/themes-card.js': 2,
-  'ui/traces.js': 3,
 };
 
 /** Whether a served path is the host's: a root pack's page/ folder. */

@@ -261,7 +261,15 @@ export class PackHost {
    * in its answer is the id of what its change made. `part`: the part of the page that sent it, named on its change.
    */
   async act(l: Archipelago, actor: Actor, pack: string, name: string, input: unknown, ms?: number, call: 'action' | 'webhook' | 'schedule' | 'event' = 'action', check?: Check, part?: PartRef) {
-    const done = await this.call(l, actor, pack, call, name, input, ms);
+    return this.applied(l, actor, pack, name, await this.call(l, actor, pack, call, name, input, ms), input, call, check, part);
+  }
+
+  /**
+   * What a call answered, made so: checked, its events, launches and requests held to its pack's manifest, its ops one
+   * change set naming it on `actor`'s authority. A sandboxed handler's answer comes here, and an internal pack's action's
+   * (packs/loader/kernel/internal-act.ts), so both are judged alike.
+   */
+  async applied(l: Archipelago, actor: Actor, pack: string, name: string, done: Done, input: unknown, call: 'action' | 'webhook' | 'schedule' | 'event' = 'action', check?: Check, part?: PartRef) {
     await check?.(done);
     const file = l.registry.packs.find((p) => p.id === pack)!;
     // Refused whole, before anything is written: an event of a kind its pack does not declare.

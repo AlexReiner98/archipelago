@@ -30,3 +30,35 @@ export function wordsOf(reg: Pick<Registry, 'types' | 'relations'>): Words {
   const hash = createHash('sha256').update(JSON.stringify({ types, links })).digest('hex');
   return { hash, types, links };
 }
+
+/** A field as a root pack's part that reads items whole is told of it: its shape, never its value. */
+export interface FieldWords {
+  type: string;
+  values?: string[];
+  code?: true;
+  system?: true;
+  description?: string;
+}
+/** The schema's fields and capabilities, by type, with their hash: handed only to a root pack's part that reads items whole (`reads: "*"`). */
+export interface SchemaWords {
+  hash: string;
+  types: Record<string, { fields: Record<string, FieldWords>; capabilities: Record<string, unknown> }>;
+}
+
+/**
+ * The fields and capabilities of `reg`'s types, for the sheet's parts (a root pack's, which keep the human in control as
+ * its page did): what each field takes, so the page can be drawn and edited from data. Never sent to a map pack's part.
+ */
+export function schemaOf(reg: Pick<Registry, 'types'>): SchemaWords {
+  const types: SchemaWords['types'] = {};
+  for (const t of [...reg.types.values()].filter((t) => !t.dormant).sort((a, b) => a.id.localeCompare(b.id))) {
+    const fields: Record<string, FieldWords> = {};
+    for (const [name, f] of Object.entries({ ...t.columns, ...t.fields })) {
+      if (!f) continue;
+      fields[name] = { type: String(f.type), ...(f.values && { values: [...f.values] }), ...(f.code && { code: true as const }), ...(f.system && { system: true as const }), ...(f.description && { description: f.description }) };
+    }
+    types[t.id] = { fields, capabilities: JSON.parse(JSON.stringify(t.capabilities ?? {})) };
+  }
+  const hash = createHash('sha256').update(JSON.stringify(types)).digest('hex');
+  return { hash, types };
+}

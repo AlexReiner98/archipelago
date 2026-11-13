@@ -86,7 +86,8 @@ test('a line reads as spans: strong, said so, code, links, pages of the site and
 });
 
 test('the item page and the published reader read one dialect', () => {
-  for (const page of ['packs/walls/page/body.js', 'ui/doc.js']) {
+  // A published page's words are the note marks its part made (packs/publish/parts/doc), drawn in the page's own elements.
+  for (const page of ['packs/walls/page/body.js', 'packs/surface/page/frozen-doc.js']) {
     const code = readFileSync(page, 'utf8');
     assert.match(code, /from '\.\/text\.js'/, `${page} reads notes through the host's text.js`);
     assert.doesNotMatch(code, /TABLE_RULE|function readTable/, `${page} keeps no reader of its own`);

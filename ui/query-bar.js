@@ -10,7 +10,7 @@
 // and its neighbourhood use (ui/picker-rank.js). No term or part is a box inside a box (rule e_vgs9vt5j).
 
 import { api, firstDrawn, h, notOf, state, wordsOf } from './base.js';
-import { numberOf } from './query-base.js';
+import { added, numberOf, without } from './query-base.js';
 import { lightTerm, removedBy } from './query-light.js';
 import { ranked, around, uses } from './picker-rank.js';
 import { isWord } from './only-words.js';
@@ -93,25 +93,8 @@ function nameOf(id, redraw) {
   ask(true);
   return '…';
 }
-
-/** The lens with one term added to the part it is for: { find }, { only } or { not }. */
-export function added(lens, term) {
-  const f = { ...lens.filter };
-  for (const part of ['find', 'only', 'not']) if (term[part]) f[part] = [...new Set([...(part === 'not' ? notOf(f) : (f[part] ?? [])), term[part]])];
-  // Only what is done finds nothing while Not leaves the done out: it takes that away.
-  if (term.only === 'done' && f.not?.includes('done')) f.not = f.not.filter((x) => x !== 'done');
-  // A term added to a lens that names a view makes it a filter of the map again.
-  const { view: _view, ...rest } = lens;
-  return { ...rest, filter: f };
-}
-
-/** The lens with one of its filter's terms taken out. */
-function without(lens, part, value) {
-  const f = { ...lens.filter };
-  f[part] = (part === 'not' ? notOf(f) : (f[part] ?? [])).filter((v) => v !== value);
-  if (part !== 'not' && !f[part].length) delete f[part];
-  return { ...lens, filter: f };
-}
+/** The lens with one term added, the runtime's (packs/walls/page/lens-terms.js): here for the modules that still import it from the bar. */
+export { added };
 
 /** A link term in words: the link's title and its end's name. */
 function termWords(term, redraw) {
@@ -168,7 +151,7 @@ export function filterSaid(f, redraw) {
   ].filter(Boolean).join(' · ');
 }
 
-/** Draw the bar for this lens, over the view that draws it (its answer names what the lens names); `lead` goes first (the saved canvas up, ui/canvases.js). */
+/** Draw the bar for this lens, over the view that draws it (its answer names what the lens names); `lead` goes first (the saved canvas up, packs/surface/page/views-kept.js). */
 export function drawQuery(lens, view, go, lead) {
   if (!bar) return;
   const redraw = redrawLast;
@@ -295,12 +278,14 @@ export function drawQuery(lens, view, go, lead) {
   // The view's band at the top, joined to its tab or its pane's strip; the lens in one line in find, and a row for each
   // part of it above find while find is open.
   bar.replaceChildren(h('div', { class: 'q-view', role: 'group', 'aria-label': 'The view' }, lead ?? ''));
-  line?.replaceChildren(...[
+  // A node a part holds (`bar.find`, `bar.find.rows`: packs/surface/page/canvas.js) is the part's alone.
+  const free = (node) => node && !node.querySelector(':scope > .part-body');
+  if (free(line)) line.replaceChildren(...[
     h('button', { type: 'button', class: 'q-sum', title: filled ? `${said}: change it` : 'Find on the map' },
       filled ? parts.map(sumPart) : h('span', { class: 'q-hint' }, 'Find on the map')),
     drawn, failed,
   ].filter(Boolean));
-  rows?.replaceChildren(
+  if (free(rows)) rows.replaceChildren(
     part('q-filter', 'Find', 'What any of these finds is drawn', findTerms, (a) => addToFilter(a), 'Find more'),
     part('q-only', 'Only', 'What Find finds must all be so', onlyTerms, (a) => narrowTo(a), 'Only what is in this set, of what Find finds'),
     part('q-not', 'Not', 'Left out of everything, what the walk reaches included', notTerms, (a) => leaveOut(a), 'Leave something out'),

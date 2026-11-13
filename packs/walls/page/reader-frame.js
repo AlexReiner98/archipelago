@@ -1,7 +1,7 @@
 // A document as its reader meets it, in a frame on the canvas: the `reader` mark a drawing may make (./marks.js), as
 // the pages drawing does. Its draft is the preview, what publishing it would give now (/preview/<id>); its published
 // page is what visitors read (/p/<workspace>/<id>); one that cannot be published (a private one, or any item that is
-// not a document, read by its note) is read as the person looking sees it (/read/<id>). Each is drawn by the reader itself (ui/doc.js), so it reads and
+// not a document, read by its note) is read as the person looking sees it (/read/<id>). Each is drawn by the reader itself (packs/surface/page/frozen-page.js), so it reads and
 // looks as the site does, figures and drawings included. A drawing names only the item and which of the two; the page
 // makes the address, says whether the draft differs from what is published (the published read), and loads the frame
 // once it comes into sight. The frame is as tall as what it holds, so the canvas scrolls, not the frame. A document

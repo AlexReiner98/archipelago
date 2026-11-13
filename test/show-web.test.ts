@@ -1,4 +1,4 @@
-// A show of a web address (ui/pane-web.js): framed in its chat's pane, and its answer says whether the owner is looking
+// A show of a web address (packs/panes/page/pane-web.js): framed in its chat's pane, and its answer says whether the owner is looking
 // at that tab. Beside test/show-lands.test.ts.
 
 import assert from 'node:assert/strict';

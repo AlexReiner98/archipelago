@@ -45,6 +45,8 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 /* A note is the host's note (below); a menu is the page's menu (ui/menus.css), keeping its width in a row. */
 .pm-note { min-width: 0; }
 .pm-picture { min-width: 0; }
+/* A slot mark holds the parts that fill it, as wide as its place. */
+.pm-slot { min-width: 0; }
 .pm-menu { flex: none; }
 .pm-menu-main > summary { color: var(--accent); font-weight: 600; }
 .pm-menu-quiet > summary { color: var(--muted); }
@@ -93,6 +95,9 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 
 /* A box that fits shows one line of its marks and counts the rest (packs/walls/page/part-fits.js). */
 .pm-fits { flex-wrap: nowrap; overflow: hidden; }
+/* Its marks keep their width rather than shrinking to an ellipsis, so the box overflows and the host can count what
+   does not fit (packs/walls/page/part-fits.js); without this they shrink, nothing overflows and nothing is counted. */
+.pm-fits > * { flex-shrink: 0; }
 .pm-fits > .pm-fits-rest { flex: none; cursor: default; }
 .pm-fits > button.pm-fits-rest { cursor: pointer; }
 /* A mark that lights items on the canvas says so when it is pointed at. */

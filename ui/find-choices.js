@@ -10,7 +10,7 @@
 // draw the canvas at once. Each choice says the change it makes, kept by id.
 
 import { api, notOf, state } from './base.js';
-import { canvasAt } from './canvases.js';
+import { canvasAt } from './views-kept.js';
 import { offered } from './only-words.js';
 import { ARROW, isA, relations, titles, typeChoice, typeTitle, types, withWay } from './words.js';
 
@@ -54,7 +54,7 @@ const viewsFound = async (q, most) => {
 };
 /**
  * The styles and layouts kept, by name, each opening its own page, where Use here draws this view in it; and what draws
- * without being an item: the layouts the packs ship (ui/look-switch.js offers them too).
+ * without being an item: the layouts the packs ship (the styles pack's layout switch offers them too).
  */
 const stylesFound = async (q, most) => {
   const [layouts, styles] = await Promise.all(['layout', 'style'].map((type) => api('search', { ...(q && { q }), type, open: true, limit: most }).catch(() => [])));

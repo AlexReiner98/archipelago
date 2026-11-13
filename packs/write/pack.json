@@ -2,7 +2,10 @@
   "id": "write",
   "version": "0.1.0",
   "title": "Write",
-  "description": "The one write path and the shape of an item: change, apply and plan, proposals (decide, withdraw, undo), merge and forget, the ops, an item's head and fields, link ends, the owner's link and who may write within a scope. Opens the write path's hook points. Started after rules.",
+  "description": "The one write path and the shape of an item: change, apply and plan, proposals (decide, withdraw, undo), merge and forget, the ops, an item's head and fields, link ends, the owner's link and who may write within a scope. Opens the write path's hook points, and decides where a held change is drawn as a ghost. Started after rules.",
+  "parts": [
+    { "id": "write.ghosts", "title": "Held changes", "slot": "ghosts", "marks": [], "modules": { "index.js": "parts/ghosts/index.js", "ghosts.js": "parts/ghosts/ghosts.js" } }
+  ],
   "kernel": {
     "trust": "root",
     "internal": true,

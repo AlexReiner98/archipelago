@@ -14,7 +14,7 @@ import { entity } from './item.js';
 import { heldPage } from './item-held.js';
 import { linkFirst } from './item-link.js';
 import { stale } from './live.js';
-import { drawNav, screenPage } from './nav.js';
+import { drawNav, screenPage } from './screen-page.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
 import { atOf } from './pane-address.js';
 import { startTabs } from './pane-land.js';
@@ -23,7 +23,7 @@ import { startTips } from './tip.js';
 import { workspace } from './workspace.js';
 
 /** The pages the sheet holds, by the name in their address. */
-/** The address of an item a held change would make, as a drawing links it (ui/ghosts.js). */
+/** The address of an item a held change would make, as a drawing links it (packs/surface/page/replica.js). */
 const GHOST = /^p_[a-z0-9]+:/;
 const SHEET = { e: 'item', held: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
