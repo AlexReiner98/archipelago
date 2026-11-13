@@ -18,16 +18,10 @@ details.menu > .menu-items.start { right: auto; left: 0; }
 :is(:is(details.menu > .menu-items, .tab-menu) > :is(button, a, label), .term-pick-item):is(:hover, :focus-visible) { background: var(--accent-soft); outline: none; }
 .tab-menu-head, .term-pick-head { padding: var(--space-4) var(--space-6) var(--space-2); color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
 :is(details.menu > .menu-items, .tab-menu) > hr { width: 100%; margin: var(--space-3) 0; border: 0; border-top: var(--border-1) solid var(--line); }
-/* The view switcher's panel (ui/view-panel.js): a field, the scopes in a row set apart by a line, then a row per view, one line each. */
-.view-panel { width: var(--menu-item-most); max-height: var(--scroll-most); grid-template-rows: auto auto minmax(0, 1fr); overflow: hidden; }
-.view-find { margin: var(--space-2) var(--space-4) var(--space-4); padding: var(--space-3) var(--space-5); font: inherit; color: var(--text); background: none; border: var(--border-1) solid var(--line); border-radius: var(--radius-2); }
-.view-list { display: grid; align-content: start; overflow-y: auto; min-height: 0; }
-.view-row { display: flex; gap: var(--space-5); align-items: center; min-width: 0; text-align: left; border: 0; border-radius: var(--radius-2); background: none; padding: var(--space-3) var(--space-6); color: var(--text); font: inherit; text-decoration: none; cursor: pointer; white-space: nowrap; }
-.view-row > .gist { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.view-row > .muted { flex: none; }
-.view-row > .thumb { flex: none; }
-.view-row:is(:hover, :focus-visible) { background: var(--accent-soft); outline: none; }
-.view-row.up { color: var(--accent); }
-.view-working > summary { padding: var(--space-4) var(--space-6); cursor: pointer; }
+/* The view switcher's panel (ui/canvases.js): the lenses pack's part (a field, then a row per view, one line each), scrolled within. */
+.view-panel { width: var(--menu-item-most); max-height: var(--scroll-most); grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+.view-list { display: grid; align-content: start; overflow-y: auto; min-height: 0; padding: var(--space-2) var(--space-4); }
 .view-panel > .view-list > .empty { padding: var(--space-4) var(--space-6); }
+/* A thumbnail where a part names one (hooks.viewThumb): the thumbnail alone. */
+.thumb-at { display: contents; }
 .q-look-row > select { flex: 1 1 auto; min-width: 0; font: inherit; color: var(--text); background: none; border: 0; cursor: pointer; }

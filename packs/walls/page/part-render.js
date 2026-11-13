@@ -7,6 +7,8 @@
 // (./body.js), under the style; a tip is the element's title, which the page's one tooltip shows (./tip.js).
 // Looks are classes and steps the style gives values to (packs/walls/page/part-marks.css); the renderer writes no colour or length.
 // Pan and zoom of a paint surface stay here (packs/walls/page/part-paint.js): the part is never asked where the reader looks.
+// A thumb is what whoever hosts the part draws for the view it names (`thumb(view)`): a part never paints one.
+// A picture is drawn by whoever hosts the part (`picture(item, el)`), out of what it handed the part, once it is in the page.
 
 import { isChecked, PICKS } from './part-check.js';
 import { paintSurface } from './part-paint.js';
@@ -28,13 +30,14 @@ const partTold = 50;
 /**
  * Draw a part into `root`. `tell(event)` hears what the person does; `style` is the workspace's style (a paint surface
  * moves by its numbers); `canvas(key, el)` is handed a paint surface's pixel canvas (`pixels: true`) once, for whoever
- * hosts the part to give it to the part. `find(q, types, link)` answers the items an item input offers as the person
- * types, and `pick(kind)` the item a pick button waits for on the canvas: each { id, title, type, ways? }, the ways
- * it may be linked to the part's item where a link is asked for. Answers with `draw(node)` for each answer the part
- * gives, and `stop()`.
+ * hosts the part to give it to the part; `thumb(view)` answers with the element that shows a view small, or nothing;
+ * `picture(item, el)` draws a picture mark's item into its element. `find(q, types, link)` answers the items an item
+ * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
+ * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
+ * `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, find = async () => [], pick = async () => null } = {}) {
-  const ctx = { tell, style, canvas, find, pick };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick };
   let ended = false;
   return {
     draw(node) {
@@ -104,12 +107,14 @@ function build(node, ctx) {
     });
   } else if (node.mark === 'input') el = field(node, ctx);
   else if (node.mark === 'note') el = make('div', 'pm-note');
+  else if (node.mark === 'thumb') el = make('span', 'pm-thumb');
   else if (node.mark === 'menu') {
     el = make('details', 'menu pm-menu');
     el.append(make('summary', ''), make('div', 'menu-items'));
     // A choice made shuts the menu, as every menu on the page does.
     el.addEventListener('click', (ev) => ev.target.closest?.('.menu-items button') && (el.open = false));
   }
+  else if (node.mark === 'picture') el = make('div', 'pm-picture');
   else if (node.mark === 'paint') {
     const surface = paintSurface(node, { style: ctx.style, drawn: drawOnPlane });
     surfaces.set(surface.el, surface);
@@ -199,8 +204,17 @@ function update(el, node, ctx, fresh = false) {
     return made;
   }
   looks(el, node);
-  if (node.item !== undefined) el.dataset.item = node.item;
+  if (node.item !== undefined && node.mark !== 'picture') el.dataset.item = node.item;
   else delete el.dataset.item;
+  if (node.view !== undefined) el.dataset.view = node.view;
+  else delete el.dataset.view;
+  // What opens a view is reached by the keyboard too, as a link is.
+  if (node.view !== undefined && el.tagName !== 'BUTTON') (el.tabIndex = 0, el.setAttribute('role', 'link'));
+  else if (el.tagName !== 'BUTTON' && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') (el.removeAttribute('tabindex'), el.removeAttribute('role'));
+  // The view's picture is drawn again only when it names another view: the host keeps it current.
+  if (node.mark === 'thumb' && (fresh || was.at.view !== at.view)) el.replaceChildren(...[ctx.thumb(at.view)].filter(Boolean));
+  // Drawn once it is in the page, where its width is known, and again only for another item.
+  if (node.mark === 'picture' && (fresh || was.item !== node.item)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.picture(node.item, el)));
   if (node.mark === 'note') {
     // Drawn again only when its words, whether it ticks, or the style changed: a section the reader opened stays open.
     if (fresh || was.words !== node.words || was.at.tick !== at.tick || el.drawnUnder !== ctx.style) {

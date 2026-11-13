@@ -8,6 +8,23 @@
     "service:answer.flat_check",
     "service:answer.view_style"
   ],
+  "parts": [
+    {
+      "id": "lenses.saved",
+      "title": "Views",
+      "slot": "piece.saved_views",
+      "opens": ["piece.saved_views"],
+      "views": [{ "name": "saved_views", "params": { "limit": 200, "pick": true } }],
+      "modules": { "index.js": "parts/saved.js", "views.js": "parts/views.js" }
+    },
+    {
+      "id": "lenses.switch",
+      "title": "Find a view",
+      "slot": "bar.views",
+      "views": [{ "name": "saved_views", "params": { "limit": 200, "pick": true } }],
+      "modules": { "index.js": "parts/switch.js", "views.js": "parts/views.js" }
+    }
+  ],
   "kernel": {
     "trust": "service",
     "internal": true,
@@ -57,7 +74,8 @@
       },
       "answer.saved_views": {
         "in": {
-          "limit?": "number"
+          "limit?": "number",
+          "pick?": "boolean"
         },
         "out": {
           "pictures": [

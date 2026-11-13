@@ -6,6 +6,9 @@
   "requires": [
     "core"
   ],
+  "uses": [
+    "slot:piece.document"
+  ],
   "types": [
     {
       "id": "writing",

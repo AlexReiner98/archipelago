@@ -92,7 +92,7 @@ test('a note holds words in the dialect, a menu holds buttons, and any mark on t
   refused(['paint', { width: 10, height: 10 }, ['path', { d: 'M0 0', tip: 'x' }]], /the attribute "tip" on a path/);
   refused(['paint', { width: 10, height: 10 }, ['text', { x: 1, y: 1, tip: 'x' }, 'a']], /a tip on a text on a paint surface/);
   refused(['text', { tip: 'x'.repeat(partLimits.label + 1) }, 'a'], /tip: more than 200 characters/);
-  refused(['note', {}, 'x'.repeat(partLimits.words + 1)], /more than 20000 characters/);
+  refused(['note', {}, 'x'.repeat(partLimits.words + 1)], /more than 200000 characters/);
 });
 
 test('a part that says too much is refused whole', () => {
@@ -101,7 +101,7 @@ test('a part that says too much is refused whole', () => {
   let deep: unknown[] = ['text', 'bottom'];
   for (let i = 0; i < partLimits.depth + 1; i++) deep = ['box', {}, deep];
   refused(deep, /deeper than/);
-  refused(['text', 'x'.repeat(partLimits.words + 1)], /more than 20000 characters/);
+  refused(['text', 'x'.repeat(partLimits.words + 1)], /more than 200000 characters/);
   refused(['input', { key: 'a', hint: 'x'.repeat(partLimits.label + 1) }], /more than 200 characters/);
 });
 
@@ -150,4 +150,11 @@ test('an item is found by name or picked on the canvas, the host doing the findi
   refused(['input', { key: 'x', types: ['task'] }], /types or link on an input that finds no item/);
   refused(['input', { key: 'x', kind: 'item', lines: 2 }], /lines on an item/);
   refused(['button', { key: 'x', pick: 'anything' }, 'Go'], /pick: "anything", not one of item, link/);
+});
+
+test('a picture names an item and holds nothing: the host draws it', () => {
+  assert.equal(checkMarks(['picture', { item: 'e_aaaaaaaa' }]).item, 'e_aaaaaaaa');
+  assert.throws(() => checkMarks(['picture', {}]), /a picture with no item/);
+  assert.throws(() => checkMarks(['picture', { item: 'e_aaaaaaaa' }, ['text', 'x']]), /holding something/);
+  assert.throws(() => checkMarks(['picture', { item: 'https://x' }]), /not an item's id/);
 });

@@ -5,7 +5,6 @@
 
 import { api, h, hooks } from './base.js';
 import { section } from './item-sections.js';
-import { canvasesPiece } from './canvases.js';
 import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
@@ -183,11 +182,6 @@ const PIECES = {
     const node = h('div');
     return { node, later: () => heldPiece(node, p.title ?? p.screen.title) };
   },
-  // The saved canvases, one line each, opening in one click (ui/canvases.js).
-  saved_views: (ctx, p) => {
-    const node = h('div');
-    return { node, later: () => canvasesPiece(node, p.title ?? p.screen.title) };
-  },
   // A diagram made from the code: the boxes and wires the item keeps, with its draw.io file at the commit it came from.
   diagram: (ctx) => {
     const node = h('section', { class: 'card wide lens-card' });
@@ -195,7 +189,6 @@ const PIECES = {
   },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,
-  document: () => null,
 };
 
 /** The commit the server ran when this page's code was loaded: a piece this code does not know is newer than it. */

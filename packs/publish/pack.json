@@ -31,6 +31,13 @@
         },
         "out": "any",
         "run": "pictures.ts#getPicture"
+      },
+      "answer.reading": {
+        "in": {
+          "id": "id"
+        },
+        "out": "any",
+        "run": "share-tools.ts#reading"
       }
     },
     "hooks": {
@@ -54,5 +61,37 @@
     "service:page.look",
     "service:answer.kept_picture",
     "service:act.report.notify"
+  ],
+  "views": [
+    {
+      "id": "publish.reading",
+      "shape": "data",
+      "lens": {},
+      "answer": "reading",
+      "description": "A document read whole as its reader meets it, with the drawing of each view it brings in as publishing would keep it: what its sheet reads. Params: id (required)."
+    }
+  ],
+  "parts": [
+    {
+      "id": "publish.reading",
+      "title": "Reading",
+      "slot": "piece.document",
+      "opens": [
+        "piece.document"
+      ],
+      "reads": {},
+      "views": [
+        {
+          "name": "reading",
+          "params": {
+            "id": "{here}"
+          }
+        }
+      ],
+      "modules": {
+        "index.js": "parts/reading/index.js",
+        "sections.js": "parts/reading/sections.js"
+      }
+    }
   ]
 }

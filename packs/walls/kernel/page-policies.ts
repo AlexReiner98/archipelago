@@ -4,11 +4,11 @@
 /** What every answer the server writes is sent with: never sniffed for another type, never telling the next site where its reader came from (identity's reply, where OAuth answers first, holds it). */
 export { GUARD } from '../../identity/kernel/reply.ts';
 export const PAGE_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-src 'self' https: http://localhost:* http://127.0.0.1:*; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-/** A document's preview, which this server's own page may frame, to read drafts on the canvas (ui/reader-frame.js). */
+/** A document's preview, which this server's own page may frame, to read drafts on the canvas (packs/walls/page/reader-frame.js). */
 export const PREVIEW_POLICY = PAGE_POLICY.replace(" https: http://localhost:* http://127.0.0.1:*", '').replace("frame-ancestors 'none'", "frame-ancestors 'self'");
 /** A public page (/p/): loads its own scripts and styles, talks only to this server, frames only the sandbox its pictures are drawn in, and is never framed. */
 export const PUBLIC_POLICY = "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
-/** A published document's page, which this server's own page may also frame, to read it on the canvas (ui/reader-frame.js). */
+/** A published document's page, which this server's own page may also frame, to read it on the canvas (packs/walls/page/reader-frame.js). */
 export const READER_POLICY = PUBLIC_POLICY.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
 /** The same page read by someone signed in (/read/), to print or save: its pictures may also come as data. */
 export const SIGNED_IN_READER_POLICY = READER_POLICY.replace("img-src 'self'", "img-src 'self' data:");

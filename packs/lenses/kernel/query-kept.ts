@@ -11,6 +11,8 @@ export interface Kept {
   title: string;
   props: Record<string, unknown>;
   about: string[];
+  /** When it last changed, where asked. */
+  updated_at?: string;
 }
 
 type Looks = 'lens' | 'style' | 'layout';
@@ -30,8 +32,8 @@ export async function everyItem(ctx: KernelContext, type: string): Promise<Row[]
   return out;
 }
 
-/** Every lens, style or layout (of the types given) kept on the map, with what each is about; and one named outright, retired or not. */
-export async function keptOf(ctx: KernelContext, type: Looks | Looks[], named: unknown): Promise<Kept[]> {
+/** Every lens, style or layout (of the types given) kept on the map, with what each is about; and one named outright, retired or not. `times`: with when each last changed. */
+export async function keptOf(ctx: KernelContext, type: Looks | Looks[], named: unknown, times = false): Promise<Kept[]> {
   const asked = Array.isArray(type) ? type : [type];
   const types = new Set(asked.flatMap((t) => ctx.registry.family(t)));
   // Each type's items once (a family may hold another's), oldest change first, then by id.
@@ -40,7 +42,7 @@ export async function keptOf(ctx: KernelContext, type: Looks | Looks[], named: u
   const rows = all
     .filter((r) => r.is_open || (typeof named === 'string' && r.id === named))
     .sort((a, b) => time(a.updated_at) - time(b.updated_at) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map((r) => ({ id: r.id, type: r.type, title: r.title, props: r.props ?? {} }));
+    .map((r) => ({ id: r.id, type: r.type, title: r.title, props: r.props ?? {}, ...(times && { updated_at: new Date(r.updated_at).toISOString() }) }));
   // One archived is left out, and what named it falls back; only a name never kept is refused.
   if (typeof named === 'string' && !rows.some((r) => r.id === named) && !((await ctx.reads({ ids: [named] })) as unknown[]).length) throw new Error(`No ${asked.join(' or ')} "${named}"`);
   const links = rows.length ? ((await ctx.reads({ links: { from: rows.map((r) => r.id), types: ['about'] } })) as Link[]) : [];
