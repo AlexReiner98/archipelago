@@ -334,8 +334,7 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
     // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
     ghosts: (list) => hooks.ghosts?.(node, list),
-    // A `slot` mark (decided 13 Nov 2026): a slot this part opens, filled by whatever parts fill it, drawn by the runtime
-    // in the mark's node. The part holding it never sees them, nor they it; nested a few deep at most.
+    // A `slot` mark: a slot this part opens, filled by its parts in the mark's node, unseen by the holder; a few deep at most.
     slot: (name, el) => ((part.opens ?? []).includes(name) && depthOf(node) < slotsDeep ? drawParts(el, { slot: name, item, piece, openView, picture }) : Promise.resolve(0)),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
