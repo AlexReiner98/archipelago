@@ -37,15 +37,14 @@ export default function presets(input, tools) {
     },
     async on(event) {
       if (event?.name !== 'press') return undefined;
-      const [, what, id] = /^(change|again):(.+)$/.exec(event.key ?? '') ?? [];
+      const [, , id] = /^(change|again):(.+)$/.exec(event.key ?? '') ?? [];
       const s = id && (now?.views?.style_presets?.styles ?? []).find((p) => p.id === id);
       if (!s) return undefined;
       busy = s.id;
       failed = undefined;
       tools.marks(draw());
-      const said = what === 'change'
-        ? await tools.act('styles.keep', { preset: s.id, title: s.title, props: s.props ?? {}, ...(s.on?.length && { on: s.on }) })
-        : await tools.act('styles.use', { item: s.item, use: true });
+      // Change keeps the owner's version as the preset ships it; Use again brings it back: both are the preset used.
+      const said = await tools.act('styles.use', { preset: s.id });
       if (said?.error) (busy = undefined), (failed = said.error);
       return draw();
     },

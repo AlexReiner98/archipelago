@@ -13,7 +13,7 @@ import presets from '../packs/styles/parts/presets/index.js';
 import themes from '../packs/styles/parts/themes/index.js';
 // @ts-expect-error: as above
 import layoutSwitch from '../packs/styles/parts/layout-switch/index.js';
-import { chooseTheme, deleteLayout, deleteLayoutAct, keep, use } from '../packs/styles/kernel/part-acts.ts';
+import { deleteLayout, deleteLayoutAct, use } from '../packs/styles/kernel/part-acts.ts';
 // @ts-expect-error: as above
 import limits from '../packs/usage/parts/limits/index.js';
 
@@ -43,7 +43,7 @@ test('the presets card lists the presets by pack, and Change and Use again send 
   assert.match(said, /"item":"e_kept0001"/, 'the owner’s version opens with a press');
   check(await part.on({ name: 'press', key: 'change:core.tasks' }));
   check(await part.on({ name: 'press', key: 'again:flow.gone' }));
-  assert.deepEqual(sent, [['styles.keep', { preset: 'core.tasks', title: 'Tasks', props: { size: 2 }, on: ['task'] }], ['styles.use', { item: 'e_gone0001', use: true }]]);
+  assert.deepEqual(sent, [['styles.use', { preset: 'core.tasks' }], ['styles.use', { preset: 'flow.gone' }]]);
   assert.deepEqual(part.update({ views: { style_presets: { styles: STYLES } }, piece: { section: 'map' } }), ['box', {}], 'nothing in another section');
 });
 
@@ -60,8 +60,8 @@ test('the theme card asks before it keeps a theme, retiring the one kept, and le
   check(await part.on({ name: 'press', key: 'pick:house' }));
   check(await part.on({ name: 'press', key: 'house' }));
   assert.deepEqual(sent, [
-    ['styles.choose_theme', { preset: 'core.dusk', title: 'Dusk', props: { theme: {} }, others: ['e_sea00001'] }],
-    ['styles.use', { item: 'e_sea00001', use: false }],
+    ['styles.use', { preset: 'core.dusk' }],
+    ['styles.use', { preset: 'core.sea', use: false }],
   ]);
 });
 
@@ -88,12 +88,18 @@ test('the layout switch offers the packs’ layouts and the kept ones, moves the
 });
 
 test('the styles pack’s actions answer with the ops each action makes, and touches nothing but a style or layout', async () => {
-  assert.deepEqual(keep({ preset: 'core.tasks', title: 'Tasks', props: { size: 2, preset: 'x' }, on: ['task'] }).ops, [{ op: 'create', ref: 'mine', type: 'style', title: 'Tasks', status: 'current', props: { size: 2, on: ['task'], preset: 'core.tasks' } }]);
-  const style = { id: 'e_sea00001', type: 'style', title: 'Sea' };
-  assert.deepEqual(use(style, false).ops, [{ op: 'update', id: 'e_sea00001', status: 'retired' }]);
-  assert.throws(() => use(undefined, true), /not a style/);
-  const chosen = chooseTheme({ preset: 'core.dusk', title: 'Dusk', props: {}, others: ['e_sea00001', 'e_task0001'] }, new Set(['e_sea00001']));
-  assert.deepEqual(chosen.ops.map((o) => [o.op, o.id]), [['update', 'e_sea00001'], ['create', undefined]], 'only styles are retired');
+  const presets = STYLES.map(({ item: _i, retired: _r, ...p }) => p) as Parameters<typeof use>[2];
+  const versions = [
+    { id: 'e_kept0001', title: 'Kept', is_open: true, props: { preset: 'flow.kept' } },
+    { id: 'e_gone0001', title: 'Gone', is_open: false, props: { preset: 'flow.gone' } },
+    { id: 'e_sea00001', title: 'Sea', is_open: true, props: { preset: 'core.sea' } },
+  ];
+  assert.deepEqual(use('core.tasks', true, presets, versions).ops, [{ op: 'create', ref: 'mine', type: 'style', title: 'Tasks', status: 'current', props: { size: 2, on: ['task'], preset: 'core.tasks' } }], 'the preset as it ships, read on the server');
+  assert.deepEqual(use('flow.gone', true, presets, versions).ops, [{ op: 'update', id: 'e_gone0001', status: 'current' }]);
+  assert.deepEqual(use('core.sea', false, presets, versions).ops, [{ op: 'update', id: 'e_sea00001', status: 'retired' }]);
+  assert.deepEqual(use('flow.kept', true, presets, versions).ops, [], 'already used');
+  assert.deepEqual(use('core.dusk', true, presets, versions).ops.map((o) => [o.op, o.id]), [['update', 'e_sea00001'], ['create', undefined]], 'a theme chosen retires the one kept');
+  assert.throws(() => use('core.none', true, presets, versions), /not a style preset/);
   assert.deepEqual(deleteLayout({ id: 'e_lay00001', type: 'layout', title: 'Mine' }).ops, [{ op: 'archive', id: 'e_lay00001' }]);
   assert.throws(() => deleteLayout(undefined), /not a layout/);
   const ctx = { reads: async () => [{ id: 'e_task0001', type: 'task', title: 'A task' }], registry: { isA: (t: string, of: string) => t === of } };
