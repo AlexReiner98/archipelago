@@ -108,7 +108,7 @@ export async function workspace() {
     grid,
   );
   // What other packs say on this workspace, each a part of its own under the cards this screen draws (slot
-  // workspace.card). None fills it until its pack's cluster lands, and then nothing is added here.
+  // workspace.card).
   // Each is handed the section open, so it draws in its own section and nothing in the others, and the card a step of
   // Start here asked for (`at`).
   void drawSlots(grid, { slot: 'workspace.card', piece: { workspace: me.workspace.id, section: open, ...(step && { at: step }) }, redraw: workspace });
