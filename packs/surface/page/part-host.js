@@ -12,7 +12,7 @@
 // part may read: the style's numbers and page settings, never a colour or a length, and `up`, the saved view the
 // canvas draws now. A part that declares `go` is handed the page's `address` too, again each time it changes
 // (addressMoved), and may name another after a gesture (hooks.go checks it). A mark that names a view opens it, and a thumb shows it small, both as the app says
-// (hooks.openView, hooks.viewThumb, hooks.viewUp: ui/canvases.js), or as the one drawing the part says (`openView`).
+// (hooks.openView, hooks.viewThumb, hooks.viewUp: packs/surface/page/views-kept.js), or as the one drawing the part says (`openView`).
 
 import { api, h, hooks, state } from './base.js';
 import { partBridge } from './part-bridge.js';
@@ -184,9 +184,17 @@ async function inputOf(part, item, given) {
 
 /** A version's worker, started once: its port heard here, each message going to the part mounted under its id. */
 async function workerOf(version, parts, pack) {
-  if (versions.get(version)) return versions.get(version);
+  // One asked again while it starts (a slot drawn twice at once) waits for it to be ready, its port and bridge set.
+  const starting = versions.get(version);
+  if (starting) {
+    await starting.ready;
+    if (!starting.port) throw new Error('The pack did not start.');
+    return starting;
+  }
   const mine = parts.filter((p) => p.pack === pack);
   const one = { mounted: new Map() };
+  let ready;
+  one.ready = new Promise((done) => (ready = done));
   versions.set(version, one);
   const stopped = (said) => {
     for (const m of one.mounted.values()) m.failed(said?.message ?? 'The pack stopped.');
@@ -196,6 +204,7 @@ async function workerOf(version, parts, pack) {
     one.port = await partPort(version, Object.fromEntries(mine.map((p) => [p.id, p.modules])), stopped);
   } catch (err) {
     versions.delete(version);
+    ready();
     throw err;
   }
   // Once an action a part sent has gone out, its version's parts are handed their items again: what it changed is
@@ -223,6 +232,7 @@ async function workerOf(version, parts, pack) {
     } else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
     else if (said.type === 'error') m.failed(said.message);
   };
+  ready();
   return one;
 }
 

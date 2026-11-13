@@ -1,7 +1,7 @@
 // Screens: what a pack shows on the page of every item of a kind or type, as one column of pieces the kernel draws.
 // The packs declare them in pack.json (`screens`); the kernel knows only the pieces: a figure, a document read whole,
 // rows from a pack's view, a pack action's form, a short note. An action a pack offers on a kind or type is offered on
-// the page of each such item too. What a pack shows of one item (a roadmap, a gate) is a view of it: ui/canvases.js.
+// the page of each such item too. What a pack shows of one item (a roadmap, a gate) is a view of it: packs/surface/page/views-kept.js.
 
 import { api, h, hooks } from './base.js';
 import { section } from './item-sections.js';
@@ -9,7 +9,7 @@ import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
 import { flatView } from './query.js';
-import { keptView } from './canvases.js';
+import { keptView } from './views-kept.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { drawPart } from './part-host.js';

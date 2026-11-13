@@ -1,0 +1,43 @@
+{
+  "id": "islands",
+  "version": "0.1.0",
+  "title": "Islands",
+  "description": "Make an island from the band, as a part: its name, the island pack it speaks and its first item, as one change on the person's authority, the canvas up keeping it in sight.",
+  "actions": [
+    {
+      "id": "islands.make",
+      "title": "Make an island",
+      "description": "Make an island speaking an island pack, with its first item on it: a picture draws an island round what lives on it.",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "title": { "type": "string", "minLength": 1, "maxLength": 60, "description": "The island's name, a few words." },
+          "pack": { "type": "string", "description": "The island pack it speaks, by id: fixed once it is made." },
+          "first": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "description": "Its first item's type, one the pack offers." },
+              "title": { "type": "string", "minLength": 1, "maxLength": 60, "description": "Its first item's name." }
+            },
+            "required": ["type", "title"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["title", "pack", "first"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "parts": [
+    {
+      "id": "islands.new",
+      "title": "New island",
+      "slot": "bar",
+      "go": true,
+      "sends": ["islands.make"],
+      "marks": ["box", "text", "button", "input"],
+      "modules": { "index.js": "parts/new/index.js" }
+    }
+  ]
+}

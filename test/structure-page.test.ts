@@ -42,7 +42,9 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/write/page/held.js': 2,
   'packs/write/page/item-held.js': 1,
   'packs/surface/page/app.js': 8,
-  'packs/surface/page/canvas.js': 3,
+  'packs/surface/page/canvas.js': 2,
+  // ui/canvases.js's plumbing, moved in on 13 Nov 2026 (task e_pe3fjd75) with its imports of query-bar, item-doc and look-switch.
+  'packs/surface/page/views-kept.js': 3,
   'packs/surface/page/live.js': 5,
 };
 
@@ -67,10 +69,10 @@ test("the host's page imports one way along roots.json", () => {
 // Frozen again 13 Nov 2026, as the runtime moved out of ui/ (task e_6hhx2ub8): fifty-seven files counted here, now
 // forty-four. The twenty-one runtime modules left ui/ and their entries went with them; a module still in ui/ that
 // imports one of them counts it from now on, and that import goes when its own cluster makes it a part of a map pack.
+// Moved again 13 Nov 2026 (task e_pe3fjd75): ui/canvases.js's plumbing became the host's views-kept.js and it,
+// canvas-menu.js and island-new.js left ui/ (eleven gone), so the five modules that read the views kept count it (five).
 // A number here may be re-frozen only when the boundary itself moves, as it did here and on 12 Nov; otherwise it falls.
 const APP_ON_HOST: Record<string, number> = {
-  'ui/canvas-menu.js': 2,
-  'ui/canvases.js': 6,
   'ui/catch-up-steps.js': 1,
   'ui/catch-up.js': 4,
   'ui/connect-agent.js': 2,
@@ -82,15 +84,14 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/draft.js': 4,
   'ui/field-edit.js': 2,
   'ui/fields.js': 2,
-  'ui/find-choices.js': 2,
+  'ui/find-choices.js': 3,
   'ui/find.js': 3,
   'ui/home.js': 1,
-  'ui/island-new.js': 3,
   'ui/item-doc.js': 4,
   'ui/item-links.js': 2,
   'ui/item-sections.js': 3,
-  'ui/item.js': 6,
-  'ui/limits-card.js': 1,
+  'ui/item.js': 7,
+  'ui/limits-card.js': 2,
   'ui/link-pick.js': 2,
   'ui/look-switch.js': 3,
   'ui/nav.js': 2,
@@ -99,11 +100,11 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/pane-drag.js': 1,
   'ui/pane-land.js': 1,
   'ui/pane-web.js': 1,
-  'ui/panes.js': 6,
+  'ui/panes.js': 7,
   'ui/public.js': 3,
   'ui/query-bar.js': 3,
   'ui/query-light.js': 2,
-  'ui/screens.js': 8,
+  'ui/screens.js': 9,
   'ui/start.js': 1,
   'ui/styles-card.js': 2,
   'ui/tab-bar.js': 5,

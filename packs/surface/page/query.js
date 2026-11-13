@@ -99,7 +99,7 @@ const list = (value) => (value ?? '').split(',').filter(Boolean);
  * dates or days from today; not with nothing after it leaves nothing out). An
  * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null, unless the
  * address says so (`nothing`: every Find term taken out, drawn as an empty canvas). `canvas` names
- * the saved canvas it is drawn on (ui/canvases.js): its places, its name in the bar.
+ * the saved canvas it is drawn on (packs/surface/page/views-kept.js): its places, its name in the bar.
  */
 export function readAddress(query) {
   const p = new URLSearchParams(query);

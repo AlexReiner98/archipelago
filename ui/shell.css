@@ -177,6 +177,10 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 /* Back and forward sit together at the start, as a browser's do; Split goes to the far end. */
 #query .q-canvas > .q-travel + .q-travel { margin-left: calc(-1 * var(--space-5)); }
 #query .q-canvas > .q-split { margin-left: auto; }
+/* The parts that fill the band (slot bar: Save, a new island), side by side in its row, each drawn by its marks. */
+#query .q-canvas > .q-parts { display: inline-flex; align-items: center; gap: var(--space-5); }
+#query .q-parts > .part-in, #query .q-parts .part-body { display: contents; }
+#query .q-parts .menu-items { width: max-content; }
 /* Narrow (ui/query-bar.js fitBar): the buttons' words go, then the pickers shrink, and last back and forward, Split
    and the pickers' marks; the query's line drops how many are drawn once its words have little room. */
 #query .tight .q-word-text, #query .tightest .q-travel, #find .q-lens.tight > .q-count { display: none; }

@@ -9,7 +9,7 @@
 
 import { api, h, hooks, state } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
-import { presetSettings, savedCanvases, viewParts } from './canvases.js';
+import { presetSettings, savedCanvases, viewParts } from './views-kept.js';
 import { addressOf, opening, readAddress } from './query.js';
 import { numberOf } from './query-base.js';
 import { dragPane, sashes } from './pane-drag.js';

@@ -4,7 +4,7 @@
 // limit's use is a row here instead. How a limit is sold is the pack's, said in its note.
 
 import { h, state } from './base.js';
-import { canvasAt } from './canvases.js';
+import { canvasAt } from './views-kept.js';
 
 /** The canvas a pack ships that draws the usage view, if one does. */
 const usageCanvas = () => (state.schema?.canvases ?? []).find((c) => c.props?.view === 'usage');

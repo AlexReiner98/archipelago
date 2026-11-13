@@ -10,7 +10,7 @@
 // draw the canvas at once. Each choice says the change it makes, kept by id.
 
 import { api, notOf, state } from './base.js';
-import { canvasAt } from './canvases.js';
+import { canvasAt } from './views-kept.js';
 import { offered } from './only-words.js';
 import { ARROW, isA, relations, titles, typeChoice, typeTitle, types, withWay } from './words.js';
 
