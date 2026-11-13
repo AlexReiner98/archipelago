@@ -1,11 +1,14 @@
 // Saved canvases (task e_uq77ps44): a flat lens and a style kept on the map as an item of core's `lens` type, so a
 // person opens it anywhere and it draws the same. Its id travels in the address beside the lens (`canvas=`, ui/query.js),
 // so what is moved on it goes to its own places (the places stream, under its id, apart from the map's) and the bar
-// names it. The bar switches between them and keeps what is up as one; Home lists them, one line each, as one list
-// (the owner, 9 Nov 2026): the kept, newest first, then agents' working views folded; what a pack ships is found by
-// its name. One a document brings in is a part of that page, in neither list unless it is up.
+// names it. The bar switches between them and keeps what is up as one. What its view button opens, and a screen's
+// list of views, are the lenses pack's parts (packs/lenses/parts/), drawn at the map's version: they name a view, and
+// this opens it and draws its thumbnail (hooks.openView, hooks.viewThumb). One a document brings in is a part of that
+// page, in neither list unless it is up.
 
 import { api, ask, firstDrawn, h, hooks, idsOf, may, state, tell, wordsOf, withIds } from './base.js';
+import { drawPart } from './part-host.js';
+import { placeBy } from './menu-place.js';
 import { addressOf, flatView, stepsOf } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
@@ -13,8 +16,6 @@ import { sharePublicly } from './item-doc.js';
 import { lookSwitch, styleDelete } from './look-switch.js';
 import { newIslandButton } from './island-new.js';
 import { thumbOf } from './thumbs.js';
-import { viewPicker } from './view-panel.js';
-import { ARROW, typeTitle, wayOf } from './words.js';
 import { pageIsA, pageSchema, versionCanvases } from './page-schema.js';
 
 const TYPE = 'lens';
@@ -38,9 +39,6 @@ export function savedCanvases(fresh = false) {
     });
   return known;
 }
-
-/** The views a person picks from: not those a document brings in, unless up (`up`, an id). */
-const pickable = (all, up) => all.filter((c) => !c.inDocument || c.id === up);
 
 /** What a saved canvas draws: its filter, its walk and its limit; and its style, with its own id. */
 export function viewParts(item) {
@@ -206,7 +204,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const changed = current && edited(current, lens, style);
     // Not saved, it is named as its tab and its pane are: by what its filter finds.
     const label = current ? current.title : isHome ? 'Home' : filterSaid(lens.filter, () => {}) || 'View';
-    const pick = viewPicker({ all: pickable(all, current?.id), current, label, changed, isHome, at: canvasAt, parts: viewParts, open, title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it' });
+    const pick = viewPicker({ current, label, changed, isHome, open, title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it' });
     // In a browser's order: back and forward, then the canvas up, as its address, and its style, with Save beside them, Split, and the canvas's menu at the end.
     const own = hooks.paneButtons?.() ?? [];
     const travel = own.filter((b) => b.classList.contains('q-travel'));
@@ -224,48 +222,52 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
   return part;
 }
 
-// ---- Home: the saved canvases, one line each, opening in one click -------------------------------------------
+// ---- What a part names: a view to open, a thumbnail, the view up ----------------------------------------------
 
-/** What a lens finds, in a few words: its terms, then its walk. */
-function lensWords(lens) {
-  const f = lens.filter ?? {};
-  const said = [...(f.find ?? []), ...(f.only ?? []).map((t) => `only ${t}`)].map((t) => t.replace(/^text (.*)$/, '“$1”').replace(/^type (.*)$/, (_, x) => typeTitle(x)).replace(/^id .*$/, 'an item'));
-  const over = lens.walk?.over;
-  if (over === 'all' || over?.length) said.push(`${over === 'all' ? 'every link' : over.map((t) => ((w) => `${ARROW[w.way]} ${w.link}`)(wayOf(t))).join(', ').replaceAll('_', ' ')} × ${lens.walk.steps}`);
-  return said.join(' · ');
+/** Where a view a part names opens: home, one kept or one a pack ships, by its id. */
+async function viewAt(id) {
+  if (id === 'home') return '#/';
+  const c = (await savedCanvases()).find((v) => v.id === id);
+  return c ? canvasAt(c) : /^e_/.test(id) ? `#/v?canvas=${id}` : null;
 }
+hooks.openView = (id) => viewAt(id).then((href) => href && (location.hash = href));
+/** A view's thumbnail where a part names it: drawn once the list says what the view draws. */
+hooks.viewThumb = (id) => {
+  const box = h('span', { class: 'thumb-at' });
+  if (id !== 'home') savedCanvases().then((all) => ((c) => c && box.replaceChildren(thumbOf({ id: c.id, ...viewParts(c) })))(all.find((v) => v.id === id)));
+  return box;
+};
+hooks.viewUp = () => up;
 
-const row = (c, now) =>
-  h(
-    'li',
-    { class: 'row-top nowrap-row' },
-    thumbOf({ id: c.id, ...viewParts(c) }),
-    h('a', { class: 'gist', href: canvasAt(c), title: c.title }, c.title),
-    h('span', { class: 'muted small gist', title: lensWords(viewParts(c).lens) }, lensWords(viewParts(c).lens)),
-    c.cannot && h('span', { class: 'muted small', title: `It cannot draw here: ${c.cannot}` }, 'cannot draw'),
-    c.id === now && h('span', { class: 'mark ok', title: 'The view up now' }, 'up'),
-  );
+// ---- The view switcher: the bar's button, and the panel the lenses pack's part fills ----------------------------
 
-/** Newest first: a view changed or kept lately is the one most likely looked for. */
-const newest = (a, b) => String(b.updated_at ?? '').localeCompare(String(a.updated_at ?? ''));
+const panel = h('div', { class: 'tab-menu view-panel', popover: 'auto', role: 'dialog', 'aria-label': 'Views' });
+document.body.append(panel);
 
-/** Home's list: the views kept, newest first; agents' working views folded under them; what packs ship folded last. */
-export async function canvasesPiece(host, title) {
-  const all = await savedCanvases(true);
-  if (!host.isConnected) return;
-  const now = up;
-  const listed = pickable(all, now);
-  const kept = listed.filter((c) => !c.preset && c.status !== 'working').sort(newest);
-  const fold = (views, name, tip) =>
-    views.length > 0 && h('details', { class: 'old-views', ...(views.some((c) => c.id === now) && { open: true }) }, h('summary', { class: 'muted small', title: tip }, `${name} (${views.length})`), h('ul', { class: 'rows' }, views.map((c) => row(c, now))));
-  host.replaceChildren(
-    h(
-      'section',
-      { class: 'card wide canvases', style: 'margin-bottom: var(--space-8); min-width: 0' },
-      h('header', {}, h('h2', {}, title)),
-      kept.length ? h('ul', { class: 'rows' }, kept.map((c) => row(c, now))) : h('div', { class: 'empty', title: 'Save in the bar keeps what is up as a view' }, 'None saved yet.'),
-      fold(listed.filter(working).sort(newest), 'Agents’', 'Agents’ views: each retires with what it is about, or after two weeks untouched, unless you keep it'),
-      fold(listed.filter((c) => c.preset), 'From packs', 'Views the packs ship: Save one under its own name to keep your version'),
-    ),
-  );
+/** The button naming the view up, opening the panel over the page with the part that fills it (`bar.views`). */
+function viewPicker({ current, label, title, changed, isHome, open }) {
+  const button = h('button', { type: 'button', class: 'q-pick q-view-pick', title, 'aria-haspopup': 'dialog', 'data-title': current?.title ?? (isHome ? 'Home' : '') },
+    // The name is cut short where the bar is short of room; the whole of it is the tooltip.
+    h('span', { class: 'q-pick-text' }, `${label}${changed ? ' •' : ''}`), h('span', { 'aria-hidden': 'true' }, '▾'));
+  button.addEventListener('click', () => {
+    if (panel.matches(':popover-open')) return panel.hidePopover();
+    const body = h('div', { class: 'view-list' });
+    panel.replaceChildren(body);
+    panel.showPopover();
+    placeBy(panel, button);
+    // Placed again as the part draws into it; the field to find a view by takes the keys once it is drawn.
+    let focused = false;
+    const drawing = new MutationObserver(() => {
+      if (!panel.matches(':popover-open')) return drawing.disconnect();
+      placeBy(panel, button);
+      const field = body.querySelector('.pm-input');
+      if (field && !focused) (focused = true), field.focus();
+    });
+    drawing.observe(body, { childList: true, subtree: true });
+    const openView = (id) => viewAt(id).then((href) => href && (panel.hidePopover(), open(href)));
+    drawPart(body, { slot: 'bar.views', piece: { current: current?.id, home: Boolean(isHome) }, openView })
+      .then((drawn) => drawn || body.replaceChildren(h('div', { class: 'empty muted small' }, 'No pack draws the views.')))
+      .catch((err) => body.replaceChildren(h('div', { class: 'error' }, err.message)));
+  });
+  return button;
 }

@@ -31,8 +31,9 @@ test('in a browser, a saved canvas is opened and switched to from the bar; a vie
     assert.ok(await page.until(`[...document.querySelectorAll('#find .q-id, #find .q-more')].some((c) => (c.textContent + c.title).includes('Another task'))`), 'its lens in the bar');
     // From the switcher's panel, its scope All.
     await page.evaluate(`document.querySelector('#query .q-pick').click()`);
-    assert.ok(await page.until(`Boolean(document.querySelector('.view-panel:popover-open .view-find'))`), 'the panel opens');
-    await page.evaluate(`(() => { [...document.querySelectorAll('.view-panel .view-row')].find((r) => r.dataset.title === 'Saved at 1280').click(); })()`);
+    assert.ok(await page.until(`Boolean(document.querySelector('.view-panel:popover-open .pm-input'))`), 'the panel opens');
+    assert.ok(await page.until(`${panelRows}.some((r) => r.dataset.title === 'Saved at 1280')`), 'its part has drawn the rows');
+    await page.evaluate(`${panelRows}.find((r) => r.dataset.title === 'Saved at 1280').click()`);
     assert.ok(await page.until(drawn(made.a)), 'switched from the bar');
     assert.ok(await page.until(`${picked} === 'Saved at 1280'`));
 

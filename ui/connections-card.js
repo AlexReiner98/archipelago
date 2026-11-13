@@ -1,6 +1,9 @@
 // What this server offers to connect a workspace to: each a server pack (the GitHub App, say). One row each: whether
 // it is connected here, and to which account outside; the one action that comes next (set it up for the server,
 // connect, or choose again what it is given); disconnecting, rarely, in a menu.
+//
+// The host's, not a part's (task e_dqh5yz7t): connections is a tool only a person calls, its acts an admin's, and
+// Connect leaves for an address outside.
 
 import { api, ask, h } from './base.js';
 import { menu } from './words.js';

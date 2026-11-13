@@ -49,7 +49,7 @@ export interface PartQuery {
 /** A named read a part is handed: a view, asked as the person looking, its params' `{here}` the item it stands on. */
 export interface PartView {
   name: string;
-  params?: Record<string, string | number>;
+  params?: Record<string, string | number | boolean>;
 }
 
 /** A part as the page is sent it. */
@@ -150,7 +150,7 @@ function queryProblems(at: string, query: unknown, reads: unknown): string[] {
 /** How many named reads one part may be handed. */
 const VIEWS_MOST = 4;
 
-/** What is wrong with a part's named reads: each a view its pack answers or asks for (rule: ask for what you need), its params words or numbers. */
+/** What is wrong with a part's named reads: each a view its pack answers or asks for (rule: ask for what you need), its params words, numbers or yes and no. */
 function viewProblems(at: string, views: unknown, pack: Manifest): string[] {
   if (views === undefined) return [];
   if (!Array.isArray(views) || !views.length || views.length > VIEWS_MOST) return [`${at}: views is a list of up to ${VIEWS_MOST} named reads, { name, params? }`];
@@ -166,7 +166,7 @@ function viewProblems(at: string, views: unknown, pack: Manifest): string[] {
     const service = `answer.${name}`;
     if (!provides.includes(service) && !asked.includes(`service:${service}`)) problems.push(`${at} reads the view "${name}", which ${pack.id} does not answer: ask for it, as service:${service} in requires or uses`);
     const params = v.params ?? {};
-    if (typeof params !== 'object' || params === null || Array.isArray(params) || !Object.values(params).every((p) => (typeof p === 'string' && p.length <= 200) || (typeof p === 'number' && Number.isFinite(p)))) problems.push(`${at}: the view "${name}"'s params are words or numbers, {here} for the item it stands on`);
+    if (typeof params !== 'object' || params === null || Array.isArray(params) || !Object.values(params).every((p) => (typeof p === 'string' && p.length <= 200) || (typeof p === 'number' && Number.isFinite(p)) || typeof p === 'boolean')) problems.push(`${at}: the view "${name}"'s params are words, numbers or true and false, {here} for the item it stands on`);
   }
   return problems;
 }

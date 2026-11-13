@@ -38,6 +38,11 @@ textarea.pm-input { font: inherit; color: var(--text); background: var(--panel);
 .pm-menu-main > summary { color: var(--accent); font-weight: 600; }
 .pm-menu-quiet > summary { color: var(--muted); }
 
+/* A thumb holds the host's thumbnail of a view; a mark that names a view opens it when pressed. */
+.pm-thumb { display: inline-flex; flex: none; align-self: center; }
+[data-view] { cursor: pointer; }
+.pm-box[data-view]:is(:hover, :focus-visible) { background: var(--accent-soft); outline: none; }
+
 .pm-tone-accent { color: var(--accent); }
 .pm-tone-muted { color: var(--muted); }
 .pm-tone-ok { color: var(--ok); }

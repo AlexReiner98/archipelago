@@ -2,6 +2,9 @@
 // client they use and are shown that client's own steps, a row each, with the address to copy and the place to go. No
 // client takes a link that fills the address in except where a step says so. While the steps are open the page watches
 // for the connection and says when it lands, with a first thing to ask; shut, it watches for nothing.
+//
+// The host's, not a part's (task e_dqh5yz7t): it reads the person's tokens, copies to the clipboard and opens pages
+// outside, none of which a part may do.
 
 import { api, h } from './base.js';
 import { card, line } from './workspace-cards.js';

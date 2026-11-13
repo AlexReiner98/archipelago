@@ -6,7 +6,6 @@
 import { api, h, hooks } from './base.js';
 import { renderBody } from './body.js';
 import { section } from './item-sections.js';
-import { canvasesPiece } from './canvases.js';
 import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
 import { startPiece } from './start.js';
@@ -184,11 +183,6 @@ const PIECES = {
   held: (ctx, p) => {
     const node = h('div');
     return { node, later: () => heldPiece(node, p.title ?? p.screen.title) };
-  },
-  // The saved canvases, one line each, opening in one click (ui/canvases.js).
-  saved_views: (ctx, p) => {
-    const node = h('div');
-    return { node, later: () => canvasesPiece(node, p.title ?? p.screen.title) };
   },
   // A diagram made from the code: the boxes and wires the item keeps, with its draw.io file at the commit it came from.
   diagram: (ctx) => {

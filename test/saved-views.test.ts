@@ -75,3 +75,21 @@ test('a view that cannot draw here says why: a type the map lacks, a layout that
   assert.match(of(made.odd) ?? '', /unknown type "no_such_type"/);
   assert.match(of(made.lay) ?? '', /its layout e_nothere1 is not on this map/);
 });
+
+test('asked as a person picks (pick), each view says when it changed and what it finds, and the views packs ship follow, unless kept or of a type', async () => {
+  const shelf: PackFile = { id: 'shelf', version: '1', title: 'Shelf', requires: ['core'], styles: [
+    { id: 'shelf.all', type: 'lens', title: 'All work', description: 'Every task.\nMore.', props: { filter: { find: ['type task'] } } },
+    { id: 'shelf.kept', type: 'lens', title: 'Kept one', props: { filter: { find: ['type task'] } } },
+    { id: 'shelf.of', type: 'lens', title: 'Of a task', on: ['task'], props: { filter: { find: ['id {here}'] } } },
+  ] } as unknown as PackFile;
+  const l = await freshWith(new Registry(packsWith(shelf)));
+  const made = await make(l, [{ op: 'create', ref: 'mine', type: 'lens', title: 'My version', status: 'kept', props: { preset: 'shelf.kept', filter: { find: ['type task'] }, walk: { over: ['part_of<'], steps: 1 } } }]);
+  const plain = (await callTool(l, human, 'view', { name: 'saved_views', params: {} })) as { pictures: Record<string, unknown>[] };
+  assert.deepEqual(plain.pictures.map((p) => p.lens), [made.mine], 'without pick, as before');
+  const { pictures } = (await callTool(l, human, 'view', { name: 'saved_views', params: { pick: true } })) as { pictures: Record<string, unknown>[] };
+  const mine = pictures[0];
+  const all = pictures.find((p) => p.lens === 'shelf.all');
+  assert.deepEqual([mine.lens, mine.filter, mine.walk, typeof mine.updated_at], [made.mine, { find: ['type task'] }, { over: ['part_of<'], steps: 1 }, 'string']);
+  assert.deepEqual(all, { lens: 'shelf.all', title: 'All work', life: 'kept', preset: true, note: 'Every task.', filter: { find: ['type task'] }, walk: { over: [], steps: 0 } });
+  assert.ok(!pictures.some((p) => p.lens === 'shelf.kept' || p.lens === 'shelf.of'), 'the one kept and the one of a type are not offered');
+});
