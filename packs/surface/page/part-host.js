@@ -305,6 +305,8 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     tryTheme: (preset) => tryTheme(preset),
     // What the person missed, played on the canvas the part stands over (its store, hooks.storeUnder: ./canvas.js).
     replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
+    // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
+    ghosts: (list) => hooks.ghosts?.(node, list),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
