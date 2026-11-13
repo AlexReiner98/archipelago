@@ -287,6 +287,10 @@ function sweep() {
   }
 }
 
+/** How many parts deep a slot mark may hold others, and how deep a node stands among them. */
+const slotsDeep = 4;
+const depthOf = (node) => { let n = 0; for (let at = node.closest?.('.part-body'); at; at = at.parentElement?.closest('.part-body')) n++; return n; };
+
 /** Mount one part under `node` on its version's worker, with what it reads; `picture(item, el, input)` draws a picture mark out of what it was handed. */
 async function mount(node, part, parts, item, words, piece, { openView, picture } = {}) {
   const version = versionOf(parts, part.pack);
@@ -330,6 +334,9 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
     // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
     ghosts: (list) => hooks.ghosts?.(node, list),
+    // A `slot` mark (decided 13 Nov 2026): a slot this part opens, filled by whatever parts fill it, drawn by the runtime
+    // in the mark's node. The part holding it never sees them, nor they it; nested a few deep at most.
+    slot: (name, el) => ((part.opens ?? []).includes(name) && depthOf(node) < slotsDeep ? drawParts(el, { slot: name, item, piece, openView, picture }) : Promise.resolve(0)),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
@@ -345,6 +352,9 @@ addEventListener('storage', (ev) => {
   if (!ev.key?.startsWith('pelago-part:')) return;
   for (const { m } of mountedNow()) if (ev.key.startsWith(keptKey(m.part, m.item))) void m.refresh();
 });
+
+/** Whether a part is mounted on a slot now: what is worked out only for one (the beat's rows for `traces`) waits on it. */
+hooks.slotFilled = (slot) => [...mountedNow()].some(({ m }) => m.part.slot === slot && m.node.isConnected);
 
 /** Hand every part on these slots its input again. */
 const refreshOn = (slots) => { for (const { m } of mountedNow()) if (slots.includes(m.part.slot)) void m.refresh(); };
