@@ -82,7 +82,7 @@ details.fold > summary .n { color: var(--muted); font-size: var(--text-2); }
 .tq-money .gist { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 img.doc-figure { display: block; max-width: 100%; height: auto; margin: var(--space-3) 0 var(--space-6); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); background: var(--figure); }
 .card .empty, .card .error { padding: var(--space-8); color: var(--muted); }
-.card .error { color: var(--bad); } .card .kind-head { padding: var(--space-5) var(--space-8) 0; border-top: var(--border-1) solid var(--line); } .card .overflow { padding: 0 var(--space-8) var(--space-7); }
+.card .error { color: var(--bad); }
 .card.wide { grid-column: 1 / -1; }
 
 .rows { list-style: none; margin: 0; padding: 0; }
@@ -443,7 +443,7 @@ dialog.cal-ask .cal-when { display: flex; align-items: center; gap: var(--space-
 dialog.cal-ask .cal-days { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-6); }
 dialog.cal-ask [hidden] { display: none; }
 
-/* A held change on the sheet it touches: a thing to act on, set apart by its tone and room (Alex, 11 Nov 2026; ui/item-held.js). */
+/* A held change on the sheet it touches: a thing to act on, set apart by its tone and room (Alex, 11 Nov 2026; packs/write/page/item-held.js). */
 .held-band { margin: var(--space-6) 0 var(--space-9); padding: var(--space-7) var(--space-8); background: var(--warn-soft); border-left: var(--border-4) solid var(--warn); border-radius: var(--radius-2); }
 .held-band .held-head { color: var(--warn); font-weight: 600; font-size: var(--text-3); }
 .held-band .held-why { margin: var(--space-4) 0 var(--space-7); font-size: var(--text-6); }

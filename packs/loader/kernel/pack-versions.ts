@@ -39,3 +39,43 @@ export const packVersions = (registry: Registry): PackVersion[] => {
  *  on an island that tries a version of its pack records that version's manifest. No item, or one on no pinned island, is the map's. */
 export const packVersionsFor = async (map: Archipelago, item?: { props: Record<string, unknown> } | null): Promise<PackVersion[]> =>
   packVersions(await islandRegistry(map, item?.props.island));
+
+/** A part of the page as drawn: the part, its pack and the hash of its code (packs/loader/kernel/ui-parts.ts). */
+export interface PartVersion {
+  id: string;
+  pack: string;
+  hash: string;
+}
+
+/**
+ * What a page drew with (task e_qqp3cuk4): the same packs a run records, and what a run has no need of, the host the
+ * page loaded with and the hash of each part it was handed. `server` is the commit answering, where it is not the page's
+ * (a page loaded before the server restarted on new code); `at` the log's head, where the registry stood (registryAt).
+ */
+export interface Drew {
+  host: string | null;
+  server?: string;
+  at: number;
+  island?: string;
+  packs: PackVersion[];
+  parts: PartVersion[];
+  /** Asked at a past position whose packs this server cannot read: why today's drew in their place. */
+  stand_in?: string;
+}
+
+const COMMIT = /^[0-9a-f]{40}$/;
+/** A commit as the page names it: forty hex digits, else none. */
+export const commitOf = (given: unknown): string | null => (typeof given === 'string' && COMMIT.test(given) ? given : null);
+
+/** What a page on `island` (or the map) drew with: the run's record of its packs, the host it loaded with, its parts by hash. */
+export async function drewWith(map: Archipelago, input: { island?: string; host?: unknown; server?: string | null; at: number; parts: PartVersion[] }): Promise<Drew> {
+  const host = commitOf(input.host);
+  return {
+    host,
+    ...(input.server && input.server !== host && { server: input.server }),
+    at: input.at,
+    ...(input.island && { island: input.island }),
+    packs: await packVersionsFor(map, input.island ? { props: { island: input.island } } : undefined),
+    parts: input.parts.map((p) => ({ id: p.id, pack: p.pack, hash: p.hash })),
+  };
+}

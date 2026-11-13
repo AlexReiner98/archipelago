@@ -6,7 +6,7 @@ import { pageModule, type Page } from './browser.ts';
 export const agent = 'agent:claude-code/archipelago';
 export { wait } from './wait.ts';
 
-/** The page has asked the server once more and done what it answered (ui/live.js checkTail, which it asks itself
+/** The page has asked the server once more and done what it answered (packs/surface/page/live.js checkTail, which it asks itself
  * every two seconds): what agents did before this has reached it. A wait for that, not for two seconds and more. */
 export const heard = (page: Page) =>
   page.evaluate(`(async () => {

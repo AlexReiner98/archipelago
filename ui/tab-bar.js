@@ -269,7 +269,7 @@ const menuEl = h('div', { class: 'menu-items tab-menu', popover: 'auto', role: '
 document.body.append(menuEl);
 /** Ask which sessions are open: the menu is drawn at once from what is known, and again with the answer. */
 const readOpen = () => api('view', { name: 'sessions' }).then((got) => ((open = got.open ?? []), hearOpen(open), hooks.sessionsOpen?.(open), drawStrip()), () => {});
-/** A session was heard from (ui/live.js): its state may have moved, so the open ones are read again, once for a burst. */
+/** A session was heard from (packs/surface/page/live.js): its state may have moved, so the open ones are read again, once for a burst. */
 let rereading;
 hooks.sessionsMoved = () => {
   if (poppedTab || rereading) return;

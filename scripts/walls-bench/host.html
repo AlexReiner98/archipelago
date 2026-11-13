@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body { margin: 0; overflow: hidden; font: 12px sans-serif; }
+      #stage { position: absolute; left: 0; top: 0; width: 4000px; }
+      .slot, iframe.one { display: inline-block; vertical-align: top; width: 190px; height: 230px; border: 0; margin: 2px; overflow: hidden; }
+      iframe.all { width: 4000px; height: 4000px; border: 0; }
+      iframe.hidden { width: 0; height: 0; border: 0; position: absolute; }
+      .box { border: 1px solid #888; height: 220px; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script type="module" src="/host.js"></script>
+  </body>
+</html>

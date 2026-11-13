@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { headerOf, importsOf, kernelCodeOf, packOf, readModule, resolve, rootCodeOf, rootPacksOf, typeImports, valueImports } from './reader.ts';
+import { headerOf, importsOf, kernelCodeOf, packOf, readModule, resolve, resolveServed, rootCodeOf, rootPacksOf, servedNames, typeImports, valueImports } from './reader.ts';
 
 const MODULE = [
   '// The map and its single write path.',
@@ -78,4 +78,14 @@ test('the kernel is src/ and the root packs\' code', () => {
   const files = ['src/boot.ts', 'src/boot.test.ts', 'src/notes.md', 'packs/core/kernel/a.ts', 'packs/core/kernel/a.test.ts', 'packs/core/pack.json', 'packs/mentions/kernel/m.ts'];
   assert.deepEqual(rootCodeOf(files, roots), ['packs/core/kernel/a.ts']);
   assert.deepEqual(kernelCodeOf(files, roots), ['src/boot.ts', 'src/boot.test.ts', 'packs/core/kernel/a.ts']);
+});
+
+test('a served file names another by its served name, whatever folder holds it', () => {
+  const served = servedNames(['ui/app.js', 'ui/words.js', 'packs/surface/page/base.js', 'packs/surface/kernel/server.ts', 'ui/sub/x.js']);
+  assert.deepEqual(served, { 'app.js': 'ui/app.js', 'words.js': 'ui/words.js', 'base.js': 'packs/surface/page/base.js' });
+  assert.equal(resolveServed('packs/identity/page/password.js', './base.js', served), 'packs/surface/page/base.js');
+  assert.equal(resolveServed('packs/surface/page/base.js', './words.js', served), 'ui/words.js');
+  assert.equal(resolveServed('packs/surface/page/base.js', './gone.js', served), 'packs/surface/page/gone.js', 'a name nothing serves resolves as a path');
+  assert.equal(resolveServed('packs/surface/kernel/server.ts', './base.js', served), 'packs/surface/kernel/base.js', 'the kernel imports by path');
+  assert.equal(resolveServed('packs/surface/page/base.js', '../kernel/x.ts', served), 'packs/surface/kernel/x.ts');
 });

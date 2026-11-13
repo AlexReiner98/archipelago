@@ -61,6 +61,16 @@
       }
     }
   },
+  "parts": [
+    {
+      "id": "attention.needs",
+      "title": "Needs attention",
+      "slot": "piece.attention",
+      "opens": ["piece.attention"],
+      "views": [{ "name": "attention", "params": { "person": "{piece.person}", "reasons": "{piece.reasons}", "within": "{here}" } }],
+      "modules": { "index.js": "parts/attention/index.js", "rows.js": "parts/attention/rows.js" }
+    }
+  ],
   "views": [
     {
       "id": "core.attention",

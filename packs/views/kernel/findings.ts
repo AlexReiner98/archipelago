@@ -1,7 +1,7 @@
 // An island's findings, one row each, as an agent and a person read them alike (task e_p27ddjqt; question e_5xg2xd7q):
 // the claim (its title), its value with its unit, how sure (confidence), as of when, and how many read it. A finding is
 // an item of a type that promises fields to its readers (the `promised` capability); the kernel names no such type.
-// Read by `brief` of an island (packs/views/kernel/brief.ts) and drawn on the island's page from that same answer (ui/findings.js).
+// Read by `brief` of an island (packs/views/kernel/brief.ts); the island's page draws its findings with the findings pack's part (packs/findings/parts/findings).
 
 import type { KernelContext } from '#pelago/kernel';
 import type { Item, Link } from './rows.ts';

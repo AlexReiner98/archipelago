@@ -196,7 +196,7 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
 
   // What can be dimmed, by the item it is of; each step's key, for hovering; the badge of each step a held change is on.
   const dims = new Map(), keyed = new Map(), tipped = new Set(), stepBadges = new Map();
-  // The gesture of the drawing tools (ui/draw-marks.js), where the session may write: a button in an island's legend
+  // The gesture of the drawing tools (packs/walls/page/draw-marks.js), where the session may write: a button in an island's legend
   // that adds an item there (./islands.js), answered by the page. Not while a story plays.
   const gestures = !story && tools.gestures ? tools.gestures({ island: (key) => (/^i:e_/.test(key) ? key.slice(2) : null) }) : { on: () => [] };
   // Ties under everything, then wires, each broken where it passes under, then the steps over all, then what each choice is.

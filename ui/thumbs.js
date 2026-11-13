@@ -101,7 +101,7 @@ async function drawSmall({ id, lens, style: own }) {
     // Painted at the size the style keeps a still at: --thumb-still, a length of the house style.
     const width = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--thumb-still'));
     const image = still && width > 0 ? await smallOf(still, width) : still;
-    // What the view holds is its hold on the store (ui/replica.js): the ids of its answer, at the store's position.
+    // What the view holds is its hold on the store (packs/surface/page/replica.js): the ids of its answer, at the store's position.
     const held = typeof store?.ids === 'function' ? store.ids() : (store?.ids ?? []);
     return { pos: store?.pos ?? store?.store?.pos ?? null, ids: [...held, ...(/^e_/.test(id) ? [id] : [])], image };
   } finally {

@@ -1,5 +1,5 @@
 // Pointing at a term of the query lights what it brought: the page does it, not the drawing, so every style lights
-// alike. A mark says the item it stands for (ui/marks.js); what a term found is in the lens's answer (each item's
+// alike. A mark says the item it stands for (packs/walls/page/marks.js); what a term found is in the lens's answer (each item's
 // `terms`, and the step of the walk that reached it). What is not lit fades by the style's `dim`. The rule is one
 // stylesheet, so a mark drawn while the pointer is there (what comes into sight) fades with the rest.
 

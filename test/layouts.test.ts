@@ -1,4 +1,4 @@
-// The walls a drawing runs behind (ui/draw.js, ui/draw.html, ui/layout.js), in a real browser (skipped where there is
+// The walls a drawing runs behind (packs/walls/page/draw.js, ui/draw.html, packs/walls/page/layout.js), in a real browser (skipped where there is
 // no Chrome): a drawing that tries what a drawing may not is stopped, and reaches nothing; one that asks for a surface
 // paints pixels over its picture and reaches nothing more. A style's own code, walled in and opened, is
 // test/layouts-open.test.ts; the drawings drawing what the kernel drew, test/layouts-flow.test.ts and
@@ -12,7 +12,7 @@ import { serve } from './serve.ts';
 
 const browser = chrome();
 
-/** The house style's numbers, which the frame a picture moves in is moved by (ui/pan-zoom.js). */
+/** The house style's numbers, which the frame a picture moves in is moved by (packs/walls/page/pan-zoom.js). */
 const numbers = JSON.stringify(house('flow').numbers);
 /** A drawing's index.js that answers with this scene, after what `before` runs. */
 const hostile = (scene: string, before = '') => `export async function picture(input, tools) { ${before}; return { scene: ${scene} }; }`;

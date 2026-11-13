@@ -45,6 +45,8 @@ export interface Drawn {
   marks?: Marks;
   /** Each face the page asked for and Chrome drew another in: the first named in its family, and what drew instead. */
   fell_back?: { asked: string; drawn: string }[];
+  /** What the page's parts drew with, one for each island it drew parts on (packs/loader/kernel/pack-versions.ts, Drew). */
+  drew?: unknown[];
 }
 
 /** A drawing as marks: what an inline view mounts, with no code of the drawing's. */
@@ -175,8 +177,9 @@ async function drawNow(address: string, pass: string, width: number, height: num
     const jpeg = last.length > PNG_MOST;
     const made = marks && state === 'drawn' ? await tab.evaluate<Marks | null>('window.lookMarks()').catch(logged(`look ${address}: its marks could not be read`, null)) : null;
     const fell_back = await facesOf(tab).catch(logged(`look ${address}: its faces could not be read`));
+    const drew = await tab.evaluate<unknown[] | null>('window.lookDrew ? window.lookDrew() : null').catch(logged(`look ${address}: what it drew with could not be read`, null));
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
-    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }) };
+    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }) };
   } catch (err) {
     throw Date.now() - began >= LATE_MS ? new Error(`The view had not drawn within ${LATE_MS / 1000} s, and its page stopped answering: it was closed.`) : err;
   } finally {

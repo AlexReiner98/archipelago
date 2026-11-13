@@ -2,7 +2,7 @@
   "roots": [
     {
       "id": "core",
-      "hash": "3f21d6894ecaf3827fca27c51900e975d8174c28ba19b4a9c31679506c8f42f8"
+      "hash": "fb5e4e4e732c9adca693d900692e559326ba8702289e920198aa6b95573a3116"
     },
     {
       "id": "database",
@@ -14,31 +14,31 @@
     },
     {
       "id": "log",
-      "hash": "3fbc9dbf0ba3bd9bfe62cdf27af78fba85197122e3af51f53ff56f6c2b5f975a"
+      "hash": "4c0a72d18a45c0574180f5d5baa9ec834e34bbb79ac27a134922e7027cde5900"
     },
     {
       "id": "identity",
-      "hash": "a122f4358541d1b3f06f053b4d25d2c631c7b41ce131edbc33b3b467348117d2"
+      "hash": "86e55791bfbfd4001bb79151715c7e653ca9daa5ac23935de51bde23854a0115"
     },
     {
       "id": "walls",
-      "hash": "13f38e97b0b551b810f5b4c18ad822d713c03b261498061cf6c2d1f4b4a5619b"
+      "hash": "094dc7a90c825e93566758d97f32b049ae984793f04946197b4549b3850b2553"
     },
     {
       "id": "loader",
-      "hash": "853cbc8d866c15327ca03a2896c476ea8feed78a9a69e6e10e4838b379209beb"
+      "hash": "cc1b4b5fab21517116e3d9bd2498b04ebbc8d39a3f268227148eee8673a12022"
     },
     {
       "id": "rules",
-      "hash": "258dd6a822364d32985855b7bc20187b09a9f6fba16579b963da972073c44238"
+      "hash": "28c33d133295ac06ea53b36b0a1648ead5db478ae9bd97608038722cb8808724"
     },
     {
       "id": "write",
-      "hash": "d80313e07702e1db740d6e2ef1c4faa78b042d163fe66fc9f94eda0589f8a008"
+      "hash": "adcf1846610736ef5d03f2983a6edf489e1aef541a4203db04b82fa6606e20d4"
     },
     {
       "id": "surface",
-      "hash": "285422ea1580765c731127c2802a870e39db1d9b74cd4de444af039a4d57bbe0"
+      "hash": "066c5f68450ea4a8e007dc28984d677099cd88cbd14662672736bcebdac60dab"
     }
   ],
   "calls": {
@@ -79,6 +79,9 @@
     ],
     "root.scene": [
       "publish"
+    ],
+    "root.parts": [
+      "query"
     ],
     "root.drawing": [
       "publish"

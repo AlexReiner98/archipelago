@@ -6,6 +6,7 @@
 import { h, state } from './base.js';
 import { dress, numberOf } from './query-base.js';
 import { panZoom } from './pan-zoom.js';
+import { sheetAside } from './sheet-follow.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const svg = (tag, attrs = {}, ...kids) => {
@@ -66,7 +67,7 @@ export function drawDiagram(host, data, { download } = {}) {
   host.replaceChildren(stage);
   // The stage drawn before goes, and its observers with it.
   host.stopMoves?.();
-  const moves = panZoom(stage, picture, { width: data.width, height: data.height, style: state.style });
+  const moves = panZoom(stage, picture, { width: data.width, height: data.height, style: state.style, beside: sheetAside });
   host.stopMoves = moves.stop;
   const zoom = h(
     'span',

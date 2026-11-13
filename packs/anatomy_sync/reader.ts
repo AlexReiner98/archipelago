@@ -27,6 +27,23 @@ export const packOf = (path: string): string | undefined => /^packs\/([\w-]+)\//
 /** A relative import's target, as a path from the repository's root. */
 export const resolve = (from: string, spec: string): string => posix.normalize(posix.join(posix.dirname(from), spec));
 
+/** Whether a path is a file the page is served: in ui/, or in a root pack's page/ (the host's page modules). */
+export const isServed = (path: string): boolean => /^(?:ui|packs\/[\w-]+\/page)\/[^/]+$/.test(path);
+
+/** The files the page is served, by the name it asks for (`/<name>`): every served file of a list, keyed by its file name. */
+export const servedNames = (files: string[]): Record<string, string> =>
+  Object.fromEntries(files.filter(isServed).map((f) => [posix.basename(f), f]));
+
+/**
+ * A relative import's target as the page loads it. A served file names another by `./<name>`, which the browser asks
+ * for at `/<name>` whatever folder either is in (packs/surface/kernel/ui-files.ts), so it is the served file of that
+ * name; anything else resolves as a path.
+ */
+export const resolveServed = (from: string, spec: string, served: Record<string, string>): string => {
+  const name = /^\.\/([^/]+)$/.exec(spec)?.[1];
+  return isServed(from) && name !== undefined && served[name] !== undefined ? served[name] : resolve(from, spec);
+};
+
 /** Whether a spec names a file of this repository (relative), rather than a built-in, a dependency or an alias. */
 export const isRelative = (spec: string): boolean => spec.startsWith('./') || spec.startsWith('../');
 

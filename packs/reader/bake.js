@@ -8,7 +8,7 @@
 
 import { wordsHtml } from './head.js';
 
-/** The tags and attributes a mark may have, as the page holds a drawing to them (ui/marks.js); anything else is refused. */
+/** The tags and attributes a mark may have, as the page holds a drawing to them (packs/walls/page/marks.js); anything else is refused. */
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'a', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
 const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
 const ID = /^e_[a-z0-9]{8}$/;

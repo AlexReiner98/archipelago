@@ -1,0 +1,75 @@
+/* How a part's marks look (packs/walls/page/part-render.js): every value is the style's, read from its variables. A mark names a
+   look, a tone or a step of a scale; the step is set on the element as --pm-gap, --pm-pad, --pm-size or --pm-weight,
+   each a var() of the style's scale, and read here. */
+
+.pm-box { display: flex; flex-direction: column; gap: var(--pm-gap, 0); padding: var(--pm-pad, 0); min-width: 0; }
+.pm-flow-row { flex-direction: row; align-items: baseline; }
+.pm-wrap { flex-wrap: wrap; }
+.pm-grow { flex: 1 1 0; min-width: 0; }
+.pm-align-start { justify-content: flex-start; }
+.pm-align-center { justify-content: center; }
+.pm-align-end { justify-content: flex-end; }
+.pm-align-between { justify-content: space-between; }
+.pm-box-band { border-top: var(--border-1) solid var(--line); }
+.pm-box-sunk { background: var(--panel); }
+
+.pm-text { font-size: var(--pm-size, inherit); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.pm-text-title { font-size: var(--pm-size, var(--text-7)); font-weight: 600; }
+.pm-text-muted { color: var(--muted); }
+.pm-text-mark { font-size: var(--pm-size, var(--text-3)); }
+.pm-text-code { font-family: var(--face-mono); }
+.pm-bold { font-weight: 600; }
+
+.pm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--pm-gap, 0); min-width: 0; }
+.pm-list-rows > .pm-row + .pm-row { border-top: var(--border-1) solid var(--line); }
+.pm-row { min-width: 0; }
+
+textarea.pm-input { font: inherit; color: var(--text); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); padding: var(--space-4) var(--space-6); resize: vertical; }
+.pm-input { min-width: 0; }
+/* A press is a few words on one line: it keeps its width, and what is beside it gives way (a row never wraps). */
+.pm-button { white-space: nowrap; flex: none; }
+.pm-button-main { background: var(--accent); border-color: var(--accent); color: var(--panel); font-weight: 600; }
+.pm-button-quiet { border-color: transparent; background: none; color: var(--muted); }
+
+/* A note is the host's note (below); a menu is the page's menu (ui/menus.css), keeping its width in a row. */
+.pm-note { min-width: 0; }
+.pm-menu { flex: none; }
+.pm-menu-main > summary { color: var(--accent); font-weight: 600; }
+.pm-menu-quiet > summary { color: var(--muted); }
+
+.pm-tone-accent { color: var(--accent); }
+.pm-tone-muted { color: var(--muted); }
+.pm-tone-ok { color: var(--ok); }
+.pm-tone-warn { color: var(--warn); }
+.pm-tone-bad { color: var(--bad); }
+.pm-tone-closed { color: var(--closed); }
+
+/* A paint surface: the plane fills a frame of its own shape, and moves inside it (packs/walls/page/part-paint.js). */
+.pm-paint { position: relative; overflow: hidden; width: 100%; aspect-ratio: var(--pm-aspect, auto); touch-action: none; user-select: none; contain: paint; }
+.pm-plane, .pm-pixels { position: absolute; left: 0; top: 0; }
+.pm-plane { width: 100%; height: 100%; }
+.pm-pixels { transform-origin: 0 0; pointer-events: none; }
+.pm-path { fill: none; stroke: currentColor; stroke-width: var(--pm-weight, var(--border-2)); vector-effect: non-scaling-stroke; }
+.pm-path-fill { fill: currentColor; stroke: none; }
+.pm-path-dash { stroke-dasharray: var(--space-5) var(--space-3); }
+.pm-plane text { fill: currentColor; font-size: var(--pm-size, var(--text-3)); }
+
+/* A note, as the item page and a part's note mark read it (packs/walls/page/body.js). A callout's colour is the one the
+   style names for its tone (notes.callouts), set on it as --callout. */
+.body-text { max-width: var(--note-measure, var(--measure)); }
+.body-text em { font-style: italic; }
+.body-text code.note-code { font-family: ui-monospace, monospace; font-size: var(--text-3); padding: 0 var(--space-2); border-radius: var(--radius-1); background: var(--closed-soft); }
+.body-text pre.note-block { font-family: ui-monospace, monospace; font-size: var(--text-3); margin: 0 0 var(--space-6); padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); background: var(--closed-soft); overflow-x: auto; white-space: pre; }
+.body-text a.note-item { text-decoration: none; border-bottom: var(--border-1) solid var(--accent-soft); }
+.body-text a.note-item:hover { border-bottom-color: var(--accent); }
+.body-text h4.part-title { margin: var(--space-8) 0 var(--space-3); font-size: var(--text-5); }
+
+.body-text aside.callout { margin: 0 0 var(--space-6); padding: var(--space-4) var(--space-6); border-left: var(--border-4) solid var(--callout, var(--line)); border-radius: var(--radius-1); background: var(--callout-soft, var(--panel)); }
+.body-text aside.callout.quote { background: none; color: var(--muted); }
+.body-text aside.callout > :last-child { margin-bottom: 0; }
+
+.body-text ul.checklist { padding-left: 0; }
+.body-text ul.checklist li.check { display: flex; gap: var(--space-4); align-items: baseline; }
+.body-text ul.checklist li.check input { margin: 0; flex: none; cursor: pointer; }
+.body-text ul.checklist li.check input:disabled { cursor: default; }
+.body-text ul.checklist li.done > span { color: var(--muted); text-decoration: line-through; }

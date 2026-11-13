@@ -1,4 +1,4 @@
-// Pictures of one drawing are drawn by one worker, one after another (ui/draw-marks.js): a picture finished is the
+// Pictures of one drawing are drawn by one worker, one after another (packs/walls/page/draw-marks.js): a picture finished is the
 // worker answering, so pictures queued behind each other are each given the page's twelve seconds, and are not stopped
 // for what took long before them (bug: "How is Archipelago built, and why?" stopped, 7 Nov 2026). Code that never
 // answers is still stopped (test/layouts.test.ts). In a real browser, skipped where there is no Chrome.

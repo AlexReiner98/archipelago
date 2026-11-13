@@ -76,7 +76,7 @@ export function stepsOf(kinds, held, entries, mine) {
 }
 
 /**
- * Take a view's rows in the page's one store (ui/replica.js) back to `then`, as they were at `from`: what was made
+ * Take a view's rows in the page's one store (packs/surface/page/replica.js) back to `then`, as they were at `from`: what was made
  * since leaves while it plays, and every row the steps touch is current to `from` again, so each fact is projected
  * once as its step comes. Other views' rows are left as they are.
  */

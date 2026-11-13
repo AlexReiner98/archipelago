@@ -24,7 +24,9 @@ function before(): string {
   const dir = packsWith();
   const core = read('core'), findings = read('findings');
   const back = (id: unknown) => (typeof id === 'string' ? id.replace(/^findings\./, 'core.') : id);
-  for (const key of ['rules', 'views', 'styles'] as const) core[key] = [...core[key], ...(findings[key] ?? []).map((d) => ({ ...(d as object), id: back((d as { id: unknown }).id) }))];
+  // Its screen of an island's findings stays out: that piece is the findings pack's part now, which no core holds.
+  const ofPart = (d: unknown) => ((d as { pieces?: { piece: string }[] }).pieces ?? []).some((p) => p.piece === 'findings');
+  for (const key of ['rules', 'views', 'styles'] as const) core[key] = [...core[key], ...(findings[key] ?? []).filter((d) => !ofPart(d)).map((d) => ({ ...(d as object), id: back((d as { id: unknown }).id) }))];
   writeFileSync(join(dir, 'core', 'pack.json'), JSON.stringify(core));
   rmSync(join(dir, 'findings'), { recursive: true });
   return dir;

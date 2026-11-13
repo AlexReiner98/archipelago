@@ -54,7 +54,7 @@ async function route(pulse = false) {
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
   try {
     if (!state.schema) await loadSchema();
-    // What this session may do, before anything is drawn: each control is drawn only where it may (ui/base.js may).
+    // What this session may do, before anything is drawn: each control is drawn only where it may (packs/surface/page/base.js may).
     await loadMay();
     // One signed in who only reads has no map of their own to change either: shown the same way to one.
     if (!may('write')) startOwn();

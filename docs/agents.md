@@ -142,7 +142,7 @@ SessionStart's `source` and SessionEnd's `reason`.
 | `packs/sessions/kernel/sessions.ts` | session start and end; the session-start text |
 | `packs/sessions/kernel/reply-rules.ts`, `packs/sessions/kernel/replies.ts` | a reply rule checked as data and when it holds; asking once a turn, kept in the story; how often each asked |
 | `packs/sessions/kernel/touched.ts`, `packs/sessions/kernel/reconcile.ts` | the set a run touched; what a session has left unsaid when it ends |
-| `packs/surface/kernel/workspace-tools.ts`, `ui/workspace-cards.js` | `workspace_info.reply_rules`, and the Checks card that draws it with its switches |
+| `packs/surface/kernel/workspace-tools.ts`, `packs/identity/page/workspace-cards.js` | `workspace_info.reply_rules`, and the Checks card that draws it with its switches |
 
 ### In `packs/`
 | Pack | What it adds |

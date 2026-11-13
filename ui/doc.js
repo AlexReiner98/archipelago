@@ -85,7 +85,7 @@ const pathTo = (path) => {
   return id ? pageOf(id) : null;
 };
 
-/** A line's words, read in the one dialect (ui/text.js): addresses on the web as links, a section's or another published document's id or address as a way to it. */
+/** A line's words, read in the one dialect (packs/walls/page/text.js): addresses on the web as links, a section's or another published document's id or address as a way to it. */
 function inline(text, titles) {
   const draw = (spans) =>
     spans.map((s) => {
@@ -100,7 +100,7 @@ function inline(text, titles) {
   return draw(readSpans(text));
 }
 
-/** A table read by ui/text.js, each cell drawn by `cell`. */
+/** A table read by packs/walls/page/text.js, each cell drawn by `cell`. */
 function drawTable(t, cell) {
   // The page's policy allows no inline style: a column's side is a class.
   const td = (tag, text, i) => h(tag, { class: `align-${t.aligns[i] ?? 'left'}` }, cell(text));
@@ -112,7 +112,7 @@ function drawTable(t, cell) {
   );
 }
 
-/** Text as blocks, read in the one dialect (ui/text.js): a title is a heading at `depth`, deeper for each further #. */
+/** Text as blocks, read in the one dialect (packs/walls/page/text.js): a title is a heading at `depth`, deeper for each further #. */
 function blocks(text, titles, depth) {
   const draw = (list) =>
     list.map((b) => {
@@ -277,7 +277,7 @@ function draw(d) {
 }
 
 // A public page carries its data (src/published-page.ts); a signed-in reader's page fetches it, and
-// start the frame drawings run in while it is on its way (ui/layout.js).
+// start the frame drawings run in while it is on its way (packs/walls/page/layout.js).
 const given = document.getElementById('page-data');
 if (!given) warmLayouts();
 (given

@@ -14,7 +14,7 @@ import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../packs/log/kernel/operational.ts';
 import { valueImports } from '../packs/anatomy_sync/reader.ts';
 import { spacing } from './spacing.ts';
-import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, VENDORED, walk } from './structure-kit.ts';
+import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, uiFiles, VENDORED, walk } from './structure-kit.ts';
 import { history, RELEASED, RELEASED_KEY, releasedKey } from './structure-history.ts';
 import { rootImports } from './structure-roots.ts';
 import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
@@ -207,7 +207,7 @@ const CLASSIC_SCRIPTS: Record<string, number> = {
 
 test('the UI loads as modules', () => {
   const classic: Record<string, number> = {};
-  for (const page of walk('ui').filter((f) => f.endsWith('.html'))) {
+  for (const page of uiFiles.filter((f) => f.endsWith('.html'))) {
     for (const [tag] of read(page).matchAll(/<script\b[^>]*\bsrc=[^>]*>/g)) if (!/type="module"/.test(tag)) classic[`${page}: ${tag}`] = 1;
   }
   assert.deepEqual(ratchet(classic, CLASSIC_SCRIPTS), [], 'Load it with <script type="module"> and import what it needs.');
@@ -224,7 +224,7 @@ test('there are four dependencies', () => {
 const PARSE = `const { readFileSync } = await import('node:fs'); const { SourceTextModule } = await import('node:vm');
 for (const f of process.argv.slice(1)) try { new SourceTextModule(readFileSync(f, 'utf8'), { identifier: f }); } catch { console.log(f); }`;
 test('every UI module parses', () => {
-  const files = walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f));
+  const files = uiFiles.filter((f) => f.endsWith('.js') && !VENDORED.includes(f));
   const run = spawnSync(process.execPath, ['--experimental-vm-modules', '--no-warnings', '--input-type=module', '-e', PARSE, ...files.map((f) => join(ROOT, f))], { encoding: 'utf8' });
   assert.equal(run.status, 0, run.stderr);
   const bad = run.stdout.split(/\r?\n/).filter(Boolean).map((f) => files.find((g) => join(ROOT, g) === f) ?? f);
@@ -239,13 +239,13 @@ const LOOKS_IN_KERNEL: Record<string, number> = {
   'ui/draw.html': 6,
   'ui/public.css': 1,
   'ui/style.css': 8,
-  'ui/token-ask.js': 1,
+  'packs/identity/page/token-ask.js': 1,
   'ui/week.js': 1,
 };
 const LOOKS = /#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|rem|em|ch|vh|vw)\b|^(?:export )?const [A-Z][A-Z0-9_]* = -?[\d.]/gm;
 
 test('how things look lives in style presets, not in the kernel', () => {
-  const files = walk('ui').filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
+  const files = uiFiles.filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
   assert.deepEqual(ratchet(count(files, LOOKS), LOOKS_IN_KERNEL), [], "Make it a style field, give it its value in a pack's style preset (packs/*/pack.json, styles), and read it from the style.");
 });
 
@@ -260,7 +260,7 @@ test('no term or control is wrapped in a capsule', () => {
 });
 
 // 11. Every picture is drawn by a drawing: code a pack ships, which the owner changes on the map and which runs in
-// the sandbox (packs/loader/kernel/layouts.ts, ui/layout.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
+// the sandbox (packs/loader/kernel/layouts.ts, packs/walls/page/layout.js), never a shape the kernel draws itself (the owner, 22 Oct 2026). The
 // kernel keeps the frame every picture has. Counted here as the shapes the page still draws itself, as of 22 Oct
 // 2026; a shape moved into a pack's drawing comes off its list, with its modules in ui/.
 const KERNEL_SHAPES: Record<string, number> = {};
@@ -306,7 +306,7 @@ const isProse = (s: string) => (/[a-z] [a-z]/i.test(s) || /^[A-Z][a-z]/.test(s))
 
 test('the UI and the tools use one name for each idea', () => {
   const files = [
-    ...walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f)),
+    ...uiFiles.filter((f) => f.endsWith('.js') && !VENDORED.includes(f)),
     ...[...walk('src'), ...walk('packs')].filter((f) => /^(?:src|packs\/[\w-]+\/kernel)\/(?:tools|views|declared|[a-z-]+-tools)\.ts$/.test(f)),
   ];
   const counted = Object.fromEntries(
@@ -389,7 +389,7 @@ const PAGE_CALLS = [
 ];
 
 test('the page calls no more tools through /api than it did', () => {
-  const files = walk('ui').filter((f) => f.endsWith('.js') && !VENDORED.includes(f));
+  const files = uiFiles.filter((f) => f.endsWith('.js') && !VENDORED.includes(f));
   const called = new Set(files.flatMap((f) => [...read(f).matchAll(/\bapi\(\s*['"`]([a-z_]+)['"`]/g)].map((m) => m[1])));
   const counted = Object.fromEntries([...called].map((name) => [name, 1]));
   assert.deepEqual(ratchet(counted, Object.fromEntries(PAGE_CALLS.map((name) => [name, 1]))), [], 'Read through a lens (view), keep it current with tail, write through change: what an agent calls.');

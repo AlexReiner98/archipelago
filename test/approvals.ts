@@ -55,6 +55,8 @@ type Ids = Record<string, string>;
 interface Case {
   /** What a person makes first, for the case to act on. */
   given?: Op[];
+  /** What the person changes next, once it is made (an island pinning a version made in given). */
+  then?: (ids: Ids) => Op[];
   ops: (ids: Ids) => Op[];
   authority?: ChangeInput['authority'];
 }
@@ -71,6 +73,10 @@ const doc: Op = { op: 'create', ref: 'doc', type: 'page', title: 'Guide' };
 const automation: Op = { op: 'create', ref: 'a', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } };
 /** An automation lives with what it is about (packs/placement/kernel/subject.ts): given with a task, linked by ref. */
 const about: Op = { op: 'link', type: 'about', from: 'a', to: 't' };
+/** A part's new version, its code the part's modules alone (test/packs/shelf), and the islands that may try it (task e_g4jpb7ps). */
+const partCode = { 'parts/row/look.js': "export const look = 'bold';\n" };
+const partVersion: Op = { op: 'create', ref: 'v', type: 'pack', title: 'Shelf, bolder', props: { version_of: 'shelf', manifest: {}, code: partCode } };
+const island = (ref: string): Op => ({ op: 'create', ref, type: 'island', title: `Island ${ref}`, props: { pack: 'core' } });
 
 const CASES: Record<string, Case> = {
   'create task': { ops: () => [task()] },
@@ -111,6 +117,11 @@ const CASES: Record<string, Case> = {
   'merge styles': { given: [style(), style('z')], ops: (i) => [{ op: 'merge', keep: i.s, drop: i.z }] },
   'forget task': { given: [task()], ops: (i) => [{ op: 'forget', id: i.t }] },
   'define type': { ops: () => [{ op: 'define_type', type: { id: 'local.thing', title: 'Thing', description: 'A thing.', extends: 'work' } }] },
+  // A part's version tried on one island before review; the map's own version of the part, or a second island, waits.
+  'create part version': { ops: () => [partVersion] },
+  'pin part version on a trial island': { given: [partVersion, island('i')], ops: (i) => [{ op: 'update', id: i.i, props: { pack_version: i.v } }] },
+  'pin part version on a second island': { given: [partVersion, island('i'), island('j')], then: (i) => [{ op: 'update', id: i.i, props: { pack_version: i.v } }], ops: (i) => [{ op: 'update', id: i.j, props: { pack_version: i.v } }] },
+  'create part with code': { ops: () => [{ op: 'create', type: 'part', title: 'Row, bolder', props: { preset: 'shelf.row', pack: 'shelf', slot: 'sheet', code: { 'look.js': partCode['parts/row/look.js'] } } }] },
 };
 
 /** What becomes of one case: applied, held (proposed) or refused. */
@@ -122,6 +133,7 @@ async function outcome(l: Archipelago, who: (typeof ACTORS)[string], c: Case): P
     const linked = c.given.find((op) => op.op === 'link' && op.type === 'depends_on');
     if (linked) ids.link = (await l.db.query<{ id: string }>(`select id from relation where from_id = $1 and valid_to is null and type = 'depends_on'`, [ids.t])).rows[0].id;
     if (c.ops(ids).some((op) => op.op === 'restore')) await l.change(human, { ops: [{ op: 'archive', id: ids.t }], reason: 'given' });
+    if (c.then) await l.change(human, { ops: c.then(ids), reason: 'given' });
   }
   try {
     const input: ChangeInput = { ops: c.ops(ids), reason: 'the table', ...(c.authority && { authority: c.authority }), ...(who.hold && { hold: true }) };
@@ -140,7 +152,7 @@ export function checkPolicy(policyName: string, part: number) {
     const table: Record<string, string> = {};
     for (const settingName of settings) {
       const setting = SETTINGS[settingName];
-      const base = await freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs'), join(import.meta.dirname, 'fixtures', 'packs')], ['core', 'practice', 'claims', 'pages'])); // practice: settle_why moved there
+      const base = await freshWith(new Registry([PACKS, join(import.meta.dirname, 'packs'), join(import.meta.dirname, 'fixtures', 'packs')], ['core', 'practice', 'claims', 'pages', 'shelf'])); // practice: settle_why moved there; shelf: a map pack with a part
       const l = new Archipelago(base.db, base.registry, policy);
       for (const [key, value] of Object.entries(setting)) await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb)`, [key, JSON.stringify(value)]);
       for (const [actorName, who] of Object.entries(ACTORS))

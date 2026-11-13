@@ -183,7 +183,7 @@ test('in a browser, a step hovered while its story plays says what it is in a ti
       let part;
       await until(() => (part = document.querySelector('[data-lens] svg a.lf-step[href="#/e/${a}"]')));
       const tip = () => document.querySelector('[data-lens] .drawing-tip');
-      // As a pointer does: its title is taken off by the page's tip (ui/tip.js), so the browser shows none beside this one.
+      // As a pointer does: its title is taken off by the page's tip (packs/walls/page/tip.js), so the browser shows none beside this one.
       part.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
       part.dispatchEvent(new MouseEvent('mouseenter'));
       await until(() => tip() && !tip().hidden);

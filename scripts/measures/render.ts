@@ -1,4 +1,4 @@
-// A scene as a standalone page, for a picture of it (task e_tgmq6ffu): its marks as markup, as ui/marks.js builds them
+// A scene as a standalone page, for a picture of it (task e_tgmq6ffu): its marks as markup, as packs/walls/page/marks.js builds them
 // but without what only a page does (keys, events, items, pulses), on the page's dark theme as far as the scene reads
 // it, with the style's flow_* sizes as the variables its rules read. Pure.
 

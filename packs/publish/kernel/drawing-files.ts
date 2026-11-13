@@ -19,7 +19,7 @@ export const drawingPath = (path: string): { hash: string; name: string } | unde
 
 /**
  * The service worker of the drawing with this hash (GET /drawing/<hash>/sw.js), in its scope beside its modules: what
- * runs in a drawing's worker (ui/draw-inside.js) around its index.js, imported statically. Only for a drawing whose
+ * runs in a drawing's worker (packs/walls/page/draw-inside.js) around its index.js, imported statically. Only for a drawing whose
  * code is a pack's own: the frame cannot stop a service worker, so code kept on the map never runs in one
  * (./published-frames.ts keeps the same rule), and the frame draws such a drawing in a worker it can stop. Null else.
  */

@@ -9,6 +9,7 @@ import { isInternal, parts } from './manifest.ts';
 import { ownsId } from './packorder.ts';
 import type { PackFile, ResolvedType } from './packs.ts';
 import { checkServices, KERNEL_SETTINGS, KERNEL_TERMS, openedTo, type Family } from './services.ts';
+import { HOST_SLOTS, PAGES, PIECES, slotsOpenTo } from './slots.ts';
 
 /**
  * The reasons the attention pack gives (its REASONS, packs/attention/kernel/attention.ts): a pack's own reason joins one
@@ -255,17 +256,8 @@ export interface ScreenDef {
   pieces: PieceDef[];
 }
 
-/**
- * The pieces the kernel draws, each with what it must be told. A document draws the kernel's view of the item (a
- * pack's view of an item, its roadmap or gate say, is a lens preset `on` its type: ui/canvases.js); a figure is the picture it keeps; a diagram, the boxes and wires its props.diagram holds; rows and a form are the pack's own view and action.
- * A button stands in the page's head, not its column: it opens the pack's action's form, or draws the canvas up as it says.
- * A count stands under the note while it is written: how long it is, against the limit its field's value picks.
- * Turns are a run's, along time: each turn a row, its beats among them.
- */
-export const PIECES = { figure: [], document: [], view: ['view'], action: ['action'], note: ['text'], picture: ['lens'], fields: ['fields'], page: ['page'], attention: [], token: [], token_ask: [], saved_views: [], held: [], start: [], diagram: [], button: ['label', 'tip'], count: [], turns: [], findings: [] } as const;
-
-/** The pages the kernel still draws itself, which a screen can hold as a piece until a pack draws them from pieces. Others are the family page.<name>. */
-export const PAGES = ['time'];
+/** The pieces and pages the host draws: slot names it owns until a pack's part opens them (packs/loader/kernel/slots.ts). */
+export { PAGES, PIECES };
 
 /** Every screen the packs declare, in the order the packs load. */
 export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => parts(pack).screens.map((s) => ({ ...s, pack: pack.id })));
@@ -334,8 +326,10 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
   problems.push(...checkServices(pack, KERNEL_OWNS));
   // The answers the server's internal packs provide are always there (packs/views, packs/attention): any view names them.
   const answers = [...LENS_ANSWERS, ...always, ...openedTo(pack, 'answer')];
-  const pieces: Record<string, readonly string[]> = { ...PIECES, ...Object.fromEntries(openedTo(pack, 'piece').map((p) => [p, []])) };
-  const pages = [...PAGES, ...openedTo(pack, 'page')];
+  // A piece or page a pack's part draws is the slot piece.<name> or page.<name> it opens, or one its pack asks for (slot:).
+  const slotted = (family: string) => slotsOpenTo(pack).flatMap((s) => (s.startsWith(`${family}.`) && !HOST_SLOTS.includes(s) ? [s.slice(family.length + 1)] : []));
+  const pieces: Record<string, readonly string[]> = { ...PIECES, ...Object.fromEntries([...openedTo(pack, 'piece'), ...slotted('piece')].map((p) => [p, []])) };
+  const pages = [...PAGES, ...openedTo(pack, 'page'), ...slotted('page')];
   for (const [what, list] of [['action', parts(pack).actions], ['view', parts(pack).views]] as const) {
     for (const def of list) {
       const at = `${what} "${def.id}"`;

@@ -61,7 +61,7 @@ export type FlatRead = {
   };
   /** What some ends of terms name, as the viewer may see them: an id, or the items so titled of these types (any: none). */
   flat_ends?: { end: string; types: string[] | null }[];
-  /** Where the log stands, before a lens that keeps its answer current is read (ui/live.js). */
+  /** Where the log stands, before a lens that keeps its answer current is read (packs/surface/page/live.js). */
   flat_pos?: true;
 };
 

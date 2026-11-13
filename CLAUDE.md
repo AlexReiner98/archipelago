@@ -131,7 +131,7 @@ reply ending) is `docs/agents.md`.
 - **Visibility is enforced by the database** (row level security in
   `packs/database/kernel/db.ts`). Do not add application-side visibility filters; if something
   must cross the privacy line, add a narrow `security definer` function.
-- **Types live in pack files** under `packs/`, each a manifest of seventeen keys
+- **Types live in pack files** under `packs/`, each a manifest of nineteen keys
   (`docs/packs.md`, read by `packs/loader/kernel/manifest.ts`). Fields the system maintains are
   marked `"system": true`.
 - **On an island map a pack is one of two kinds** (the owner, 10 Nov 2026,
@@ -154,13 +154,15 @@ reply ending) is `docs/agents.md`.
   `"large": true`, which only a type with the kernel flag may have. What a pack adds to the page of an item of a
   type is a screen there too (a view of `form: "screen"`: pieces the kernel draws, listed in
   `packs/loader/kernel/declared.ts`); the item page (`ui/item.js`) names no pack's type.
-- **The UI has no build step and no framework.** Plain files in `ui/`.
+- **The UI has no build step and no framework.** Plain files: the app's in
+  `ui/`, the host's (what keeps humans in control) in the root packs'
+  `page/`, under their hash (`npm run roots` after a change there).
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
   Postgres server) unless the owner agrees to another. One library is kept as a file, not
-  a dependency: `ui/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
+  a dependency: `packs/walls/page/three.module.min.js` (three.js 0.160, MIT, since 13 Oct
   2026 at the owner's asking), offered to a layout's drawing code and to
-  a drawing that paints on a surface (`ui/surface.js`, since 23 Oct 2026, for
+  a drawing that paints on a surface (`packs/walls/page/surface.js`, since 23 Oct 2026, for
   the landing page's relief), loaded only when one asks for it, in the
   sandbox. The app's own pages do not use it. WebCola went with the cola
   layout on 9 Nov 2026 (git tag `archive/layouts-2026-11-09`).
@@ -170,7 +172,7 @@ reply ending) is `docs/agents.md`.
   frame `ui/draw.html`, never in the app's page; an agent that writes one
   proposes it, whatever the workspace lets agents do unreviewed. Do not give
   that code a page to touch, a way to the network, or anything typed. After
-  changing `ui/draw.js`, `ui/draw.html`, `ui/marks.js`, `ui/surface.js` or the frame's policy in
+  changing `packs/walls/page/draw.js`, `ui/draw.html`, `packs/walls/page/marks.js`, `packs/walls/page/surface.js` or the frame's policy in
   `packs/surface/kernel/server.ts` (and `packs/walls/kernel/page-policies.ts`), run a hostile layout against it in a real browser (the
   browser pane will not load a sandboxed frame; to see drawings there, start a dev server with `PELAGO_UNSANDBOXED=1`, which drops that wall and keeps the worker); `test/layouts.test.ts`
   does, in headless Chrome. The owner can take both walls down for a layout's
@@ -295,7 +297,9 @@ else a pack"). These rules keep it composable while that happens, and
 - **Kernel modules import one way.** No cycles; type-only imports do not
   count.
 - **The UI loads as modules,** with no build step: each part of the page its
-  own module under `ui/`, served by name from `packs/surface/kernel/ui-files.ts`.
+  own module under `ui/` or a root pack's `page/`, served by name from
+  `packs/surface/kernel/ui-files.ts`; the host's imports run one way along
+  `packs/roots.json` (`test/structure-page.test.ts`).
 - **Four dependencies,** as above.
 - **How anything looks is a style on the map, never kernel code,** the
   defaults included (the owner, 20 Oct 2026). A pack ships its defaults as
@@ -371,7 +375,7 @@ is, add a shard to both matrices in `.github/workflows/tests.yml`. When it
 says one file is over its own budget, split that file's tests into files of
 their own: no number of shards waits less than its longest file.
 
-The UI asks its questions in the page (`ask` and `tell` in `ui/base.js`), so
+The UI asks its questions in the page (`ask` and `tell` in `packs/surface/page/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
 
 ## Archipelago

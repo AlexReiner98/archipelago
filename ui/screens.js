@@ -3,10 +3,9 @@
 // rows from a pack's view, a pack action's form, a short note. An action a pack offers on a kind or type is offered on
 // the page of each such item too. What a pack shows of one item (a roadmap, a gate) is a view of it: ui/canvases.js.
 
-import { api, h } from './base.js';
+import { api, h, hooks } from './base.js';
 import { renderBody } from './body.js';
 import { section } from './item-sections.js';
-import { attentionCard } from './attention.js';
 import { canvasesPiece } from './canvases.js';
 import { drawDiagram } from './diagram.js';
 import { heldPiece } from './held.js';
@@ -16,8 +15,7 @@ import { keptView } from './canvases.js';
 import { time } from './time.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
-import { turnsPiece } from './turns.js';
-import { findingsPiece } from './findings.js';
+import { drawPart } from './part-host.js';
 import { pageIsA, pageSchema } from './page-schema.js';
 import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
 
@@ -145,12 +143,6 @@ const PIECES = {
     const tool = (pageSchema()?.pack_tools ?? []).find((t) => t.action === p.action);
     return tool && !ctx.e?.archived_at && { node: actionForm(tool, ctx.id, ctx.redraw) };
   },
-  // What needs attention: for you, and on an item's page only what is that item's.
-  attention: (ctx, p) => {
-    const node = h('div');
-    const params = { ...(p.person && { person: p.person }), ...(p.reasons && { reasons: p.reasons }), ...(ctx.id && { within: ctx.id }) };
-    return { node, later: () => attentionCard(node, params, p.title ?? p.screen.title, Boolean(ctx.id), p.limit) };
-  },
   note: (ctx, p) => ({ node: h('section', { class: 'card wide note' }, renderBody(p.text)) }),
   // A picture: a view kept on the map (by its id), or a flat lens where "{here}" is the item the page is of. A style
   // named by id is read by the server; one written into the screen is its fields only, never code.
@@ -204,16 +196,6 @@ const PIECES = {
     const node = h('section', { class: 'card wide lens-card' });
     return { node, later: () => drawDiagram(node, ctx.e?.props?.diagram, { download: ctx.e?.props?.diagram?.drawio }) };
   },
-  // A run's turns along time, its beats among them (ui/turns.js): a section of the bare page (sectionsOn).
-  turns: (ctx) => {
-    const node = h('div');
-    return ctx.e && { node, later: () => turnsPiece(node, ctx.e, section) };
-  },
-  // An island's findings, one line each (ui/findings.js): a section of the bare page, as the turns are.
-  findings: (ctx) => {
-    const node = h('div');
-    return ctx.e && { node, later: () => findingsPiece(node, ctx.e, section) };
-  },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,
   document: () => null,
@@ -243,8 +225,25 @@ const unknownPiece = (p) => {
   };
   return { node, later };
 };
-/** A piece drawn as the kernel draws it, or as a stub when this page does not know it. */
-const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, p) : unknownPiece(p));
+/**
+ * A piece a pack's part draws (packs/surface/page/part-host.js): the part that fills its slot, `piece.<name>`, on an
+ * item's page as a section of it. When no part fills it here, the stub that says so.
+ */
+const partPiece = (ctx, p) => {
+  const body = h('div');
+  const node = ctx.e ? section(p.piece, p.title ?? p.screen?.title ?? p.piece, 0, body) : h('div', {}, body);
+  const later = async () => {
+    const drawn = await drawPart(body, { slot: `piece.${p.piece}`, item: ctx.e, piece: p, redraw: () => ctx.redraw?.() ?? hooks.route?.() });
+    if (!drawn) {
+      const stub = unknownPiece(p);
+      node.replaceWith(stub.node);
+      await stub.later();
+    }
+  };
+  return { node, later };
+};
+/** A piece drawn as the kernel draws it, else by the part that fills it, else as a stub when this page does not know it. */
+const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, p) : partPiece(ctx, p));
 
 /** The pages the kernel still draws itself (packs/loader/kernel/declared.ts lists them). */
 const PAGES = { time };

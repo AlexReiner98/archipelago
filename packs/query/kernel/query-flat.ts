@@ -153,7 +153,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
   const allFields = input.fields === true;
   const whole = input.notes === 'whole' || allFields;
   // Asked by a page that keeps the answer current: where the log stood before anything was read, so the facts after it
-  // that the page plays reach what this answer holds, and nothing said while it was read is missed (ui/live.js).
+  // that the page plays reach what this answer holds, and nothing said while it was read is missed (packs/surface/page/live.js).
   if (input.follow !== undefined && input.follow !== true) throw new Error('follow must be true, or left out');
   const pos = input.follow ? ((await ctx.reads({ flat_pos: true } as never)) as number) : undefined;
   // On a time axis its ends said from today are worked out now, in the workspace's zone; a seed is open, or changed
@@ -243,7 +243,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(seeded.cut && { cut: true }),
     ...(seeded.matched !== undefined && { matched: seeded.matched }),
-    // The items whose notes are sent whole, so a page keeping the answer current keeps those whole too (ui/replica.js).
+    // The items whose notes are sent whole, so a page keeping the answer current keeps those whole too (packs/surface/page/replica.js).
     ...(whole && { whole: seeded.whole }),
     ...(pos !== undefined && { pos }),
   };

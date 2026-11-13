@@ -63,7 +63,7 @@ async function run(ctx: Pick<KernelContext, 'registry' | 'call'>, { section, len
   const drawn = await drawnOf(ctx, frozen, drawing);
   const scene = drawn?.scene as Baked['scene'] | undefined;
   if (!scene || !Array.isArray(scene.stops) || !scene.whole) return null;
-  // A stylesheet the drawing sent is held to what a drawing's may say, as the page holds it (ui/marks.js cssFor).
+  // A stylesheet the drawing sent is held to what a drawing's may say, as the page holds it (packs/walls/page/marks.js cssFor).
   const css = typeof scene.css === 'string' && drawn!.css_ok ? scene.css : '';
   return { section, scene: { svg: scene.svg, css, size: scene.size, stops: scene.stops, whole: scene.whole }, style: dressOf(lens.style ?? {}), key };
 }

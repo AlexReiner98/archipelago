@@ -1,4 +1,4 @@
-// The log read forward by a page that holds part of the map (ui/replica.js): the facts after a position, on the
+// The log read forward by a page that holds part of the map (packs/surface/page/replica.js): the facts after a position, on the
 // items and links it holds, on what lives on the islands its views touch, the links made touching them, and what such
 // a link brought that was made with it. What
 // the viewer may see is what today's tables show them (row-level security): facts on anything else are left out,

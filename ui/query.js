@@ -218,7 +218,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   let asking = lens;
   // Asked of a drawing that reads each note whole (the pages: `notes` on the drawing), the lens is read with them.
   const asked = JSON.stringify([of, style.style, style.canvas, style.shape]);
-  // The answer is held in a store kept current from the log (ui/replica.js): facts redraw it without the lens being
+  // The answer is held in a store kept current from the log (packs/surface/page/replica.js): facts redraw it without the lens being
   // read again; only a link made to something it does not hold reads the lens again, since the walk may now reach more.
   // What is drawn is the answer with what is held for the owner and the links drawn here not yet answered for drawn
   // into it (`shown`, ui/ghosts.js); what the canvas holds (`host.answer`) is the answer alone.
@@ -293,7 +293,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     store.on((changed) => {
       if (host.store !== store) return;
       if (!host.isConnected) return unfollow(store);
-      // What the query finds may have moved (ui/membership.js), or on a time axis an item changed may fall elsewhere:
+      // What the query finds may have moved (packs/surface/page/membership.js), or on a time axis an item changed may fall elsewhere:
       // both are the server's to work out, so the lens is read again. Not while the store is played from where its
       // reader last looked (ui/catch-up.js): it ends as the map is.
       if (!store.store?.playing && (changed.ask || (lens.time && changed.items.changed.length))) return load(true);

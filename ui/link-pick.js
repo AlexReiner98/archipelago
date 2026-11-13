@@ -1,6 +1,6 @@
 // Linking from an item's page (the owner, 10 Nov 2026: a link is started by a button, not dragged on the plane): Link on
 // its page starts it, and the next item clicked on the canvas is the other end. The person picks what the link says,
-// from the ways that fit (ui/layout-asks.js), and it is sent as theirs. Escape, or Link again, lets it go. While it
+// from the ways that fit (packs/walls/page/layout-asks.js), and it is sent as theirs. Escape, or Link again, lets it go. While it
 // waits the page says so on <body> (`data-linking`), for the stylesheet to mark the canvas and the button.
 
 import { api, tell } from './base.js';

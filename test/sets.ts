@@ -27,6 +27,9 @@ export const SLOW: Record<string, string> = {
   'test/layouts-open.test.ts': 'browser',
   'test/layouts-queued.test.ts': 'browser',
   'test/layouts-sw.test.ts': 'browser',
+  'test/part-workers.test.ts': 'browser',
+  'test/way-back-press.test.ts': 'browser',
+  'test/part-bridge-page.test.ts': 'browser',
   'test/find-query.test.ts': 'browser',
   'test/first-drawing.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
@@ -217,6 +220,8 @@ const lists = (test: string, folder: string) => new RegExp(`['"\`/]${folder}/|['
 export function reads(test: string, file: string, wide = false): boolean {
   if (reaches(test).has(file) || textOf(test).includes(file)) return true;
   const browser = SLOW[test] === 'browser';
+  // A root pack's page/ is the host's part of the page, served beside ui/: a browser test reads it as it reads ui/.
+  if (browser && /^packs\/[\w-]+\/page\//.test(file)) return true;
   const top = file.split('/')[0];
   if (LISTED.includes(top)) return (top === 'ui' && browser) || lists(test, top);
   const inPack = /^packs\/[^/]+\/(.+)$/.exec(file)?.[1];

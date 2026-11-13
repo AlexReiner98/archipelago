@@ -35,15 +35,15 @@ export function drawPolicy(open: boolean, unsandboxed: boolean, hashes: string[]
 
 // At the drawing host the frame keeps an origin of its own, that host's and never the page's, so it may register a service
 // worker and start workers from its own files. Only the pages it names may frame it: framed by its own origin it would be
-// the page's, which is why 'self' is never one of them (and the page refuses to frame its own origin so, ui/base.js).
+// the page's, which is why 'self' is never one of them (and the page refuses to frame its own origin so, packs/surface/page/base.js).
 const hosted = (policy: string, framedBy: string[]) =>
   `${policy.replace('sandbox allow-scripts;', 'sandbox allow-scripts allow-same-origin;').replace('worker-src blob: data:', "worker-src 'self' blob: data:")}; frame-ancestors ${framedBy.join(' ')}`;
 
 /** A page a secret opens (a link's) asks not to be indexed in its markup, as its header does: either may be all a crawler reads. */
 export const unlisted = (html: string) => (html.includes('name="robots"') ? html : html.replace('<head>', '<head>\n    <meta name="robots" content="noindex" />'));
-/** A page marked as it is served: with no sandbox for its drawing frames (ui/base.js frameSandbox), and draw.html as opened (ui/draw.js). */
+/** A page marked as it is served: with no sandbox for its drawing frames (packs/surface/page/base.js frameSandbox), and draw.html as opened (packs/walls/page/draw.js). */
 export const markPage = (html: string, { open = false, unsandboxed = false, drawOrigin }: { open?: boolean; unsandboxed?: boolean; drawOrigin?: string }) => {
   const marked = html.replace('<html', `<html${unsandboxed ? ' data-draw-sandbox="off"' : ''}${open ? ' data-draw-open="on"' : ''}${drawOrigin ? ` data-draw-origin="${drawOrigin}"` : ''}`);
-  // The frame the page starts with (ui/index.html), at the drawing host: the same frame ui/layout.js would make.
+  // The frame the page starts with (ui/index.html), at the drawing host: the same frame packs/walls/page/layout.js would make.
   return drawOrigin ? marked.replace(/sandbox="allow-scripts" src="\/draw\.html(\?v=\w+)?"/, (_, v = '') => `sandbox="allow-scripts allow-same-origin" src="${drawOrigin}/draw.html${v}"`) : marked;
 };

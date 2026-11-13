@@ -4,6 +4,7 @@ import { applyTheme } from './theme.js';
 import { api, apiFirst, h, state } from './base.js';
 // A menu (below) is placed in sight each time it opens.
 import './menu-place.js';
+import { noteContext } from './body.js';
 
 // ---- shared lookups ------------------------------------------------------
 
@@ -13,7 +14,7 @@ export const relations = new Map();
 export async function loadSchema() {
   // The schema, and the workspace's style: what a page that is not a picture is drawn by, until it asks for its own;
   // with the theme being tried on this screen over it (ui/themes-card.js), which nothing keeps.
-  // The first time, as the page started (ui/early.js).
+  // The first time, as the page started (packs/surface/page/early.js).
   const style = state.trying ? api('view', { name: 'style', params: { try: state.trying } }) : apiFirst('style', () => api('view', { name: 'style', params: {} }));
   [state.schema, state.style] = await Promise.all([apiFirst('schema', () => api('schema')), style.then((r) => r.style)]);
   applyTheme(state.style);
@@ -198,6 +199,8 @@ export const statusMark = (typeId, status) => h('span', { class: `mark ${isClose
 // The old names, for ui/item-links.js only, which another branch removes: drop these with it.
 /** Titles of the items the pages have shown, so a line that only holds an id can still say a name. */
 export const titles = new Map();
+// A note (packs/walls/page/body.js, the host's) is read by the page's style and names items by the titles known here.
+noteContext({ style: () => state.style, title: (id) => titles.get(id) });
 /** An item's name where the page knows it, else a word for it: never its id. */
 export const nameOr = (id, word = 'an item') => titles.get(id) ?? word;
 /** Text an agent wrote, with each item id in it as a link by the item's name: an id is something to follow, never something to read. */

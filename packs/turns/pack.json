@@ -1,0 +1,40 @@
+{
+  "id": "turns",
+  "version": "0.1.0",
+  "title": "Turns",
+  "description": "A session's turns on its page, as a part: one line a turn, the beats it told among them, and a turn followed up as a task. It reads the runs pack's turns and story; a session is core's run.",
+  "uses": ["service:answer.turns", "service:answer.story"],
+  "actions": [
+    {
+      "id": "turns.follow_up",
+      "title": "Follow up a turn",
+      "description": "Make a task of a session's turn: what it asked, or what it did, as work on the map about the session, on its island.",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "run": { "type": "string", "description": "The session, by its run's id." },
+          "said": { "type": "string", "minLength": 1, "maxLength": 4000, "description": "What the turn asked, or what it did: the task's title is its first clause, its note the whole." },
+          "at": { "type": "string", "description": "When the turn began (ISO), named in the task's note." }
+        },
+        "required": ["run", "said"],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "parts": [
+    {
+      "id": "turns.run",
+      "title": "Turns",
+      "slot": "piece.turns",
+      "opens": ["piece.turns"],
+      "reads": { "run": ["title"] },
+      "views": [{ "name": "turns", "params": { "run": "{here}" } }, { "name": "story", "params": { "run": "{here}" } }],
+      "sends": ["turns.follow_up"],
+      "modules": { "index.js": "parts/turns/index.js", "rows.js": "parts/turns/rows.js" }
+    }
+  ],
+  "views": [
+    { "form": "screen", "id": "turns.run", "title": "Turns", "on": ["run"], "pieces": [{ "piece": "turns" }] }
+  ]
+}

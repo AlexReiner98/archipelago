@@ -1,0 +1,1 @@
+export const look = 'plain';
