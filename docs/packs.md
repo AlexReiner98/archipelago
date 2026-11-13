@@ -170,7 +170,7 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `find` | Find at the canvas's foot. | `query` |
 | `home` | The page with no query up. | — |
 | `nav` | What the menu leads to. | — |
-| `look` | Drawn by nothing: the part is handed whether the canvas has drawn (`drawn`, and `why` when there is one) and publishes it as page state, so a picture is taken at the right moment. The host mounts it under `?look`. | `drawn`, `why` |
+| `look` | Drawn by nothing: the part is handed whether the canvas has drawn (`drawn`, and `why` when there is one) and publishes it as page state, so a picture is taken at the right moment. Nothing mounts it yet; the mount lands with the part that fills it. | `drawn`, `why` |
 | `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace`, `section` |
 
 A part is handed the item it stands on cut to the fields it `reads`, its
