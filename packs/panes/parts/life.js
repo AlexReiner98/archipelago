@@ -97,7 +97,7 @@ function landing(m, step, newId, now) {
   if (to.nowhere) return {};
   if (to.later) return { later: true };
   if (to.open) {
-    const id = M.openTab(m, newId, M.drawable(at) ? at : M.BLANK, { ...chatTab(m, to.open.follows), ...(to.open.slot && { slot: to.open.slot }) }, to.front);
+    const id = M.openTab(m, newId, M.drawable(at) ? M.paneAt(at) : M.BLANK, { ...chatTab(m, to.open.follows), ...(to.open.slot && { slot: to.open.slot }) }, to.front);
     const t = M.tabOf(m, id);
     if (page || !M.drawable(at)) t.sheet = page ? `e/${page}` : at.split('?')[0];
     lit(t, M.focusOf(t));
@@ -106,7 +106,7 @@ function landing(m, step, newId, now) {
   const t = M.tabOf(m, to.tab);
   if (!t) return {};
   if (to.slot && t.panes[to.pane]) t.panes[to.pane].slot = to.slot;
-  const split = () => M.openPane(t, newId, at, to.split.side, t.groups.at(-1), { anew: true, ...(!to.split.shared && { by: session }), ...(to.split.slot && { slot: to.split.slot }), ...(!to.split.slot && t.follows !== session && { held: session }) });
+  const split = () => M.openPane(t, newId, M.paneAt(at), to.split.side, t.groups.at(-1), { anew: true, ...(!to.split.shared && { by: session }), ...(to.split.slot && { slot: to.split.slot }), ...(!to.split.slot && t.follows !== session && { held: session }) });
   // Not a canvas (a screen, the workspace): the page opens over the tab's pane in focus.
   if (!M.drawable(at)) {
     if (to.front) M.toFront(m, t.id);
@@ -119,7 +119,7 @@ function landing(m, step, newId, now) {
   if (!pane) return {};
   if (to.side === 'alone') M.only(t, pane);
   else if (to.side && !to.split) M.place(t, pane, to.side, t.groups.find((g) => g !== pane) ?? pane);
-  M.goPane(t, pane, at);
+  M.goPane(t, pane, M.paneAt(at));
   lit(t, pane);
   if (!to.front && t.id !== m.front) {
     if (page && pane === M.focusOf(t)) t.sheet = `e/${page}`;
@@ -204,9 +204,11 @@ export function mirror(m, newId, open) {
     for (const g of t.groups) for (const run of [t.panes[g]?.by, t.panes[g]?.held]) if (isRun(run)) kept.add(run);
   }
   for (const run of kept) if (!live.has(run)) ended(m, newId, run, true);
+  // A session no longer open has ended, tab or none: no tab offers to follow it.
+  for (const [run, s] of Object.entries(m.heard)) if (isRun(run) && !live.has(run)) s.ended = true;
   for (const s of open) {
     const was = m.heard[s.id];
-    m.heard[s.id] = { name: s.name ?? was?.name ?? s.title, called: s.title ?? was?.called, at: Date.parse(s.last_seen) || was?.at || 0, run: s.id, ended: false };
+    m.heard[s.id] = { name: s.name ?? was?.name ?? s.title, called: s.title ?? was?.called, at: Date.parse(s.last_seen) || was?.at || 0, run: s.id, ended: false, ...(s.session?.state && { state: s.session.state }), ...(s.session?.for && { for: String(s.session.for).slice(0, 200) }) };
     if (kept.has(s.id) && (s.status === 'waiting' || (s.stale && !s.busy))) rested(m, newId, s.id);
   }
 }

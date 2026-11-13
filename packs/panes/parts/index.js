@@ -50,7 +50,17 @@ function modelOf(input) {
 }
 
 /** The sessions as the strip names and marks them: what each is called, the word its hue is made from, whether it ended. */
-const sessionsOf = () => Object.fromEntries(Object.entries(m.heard ?? {}).map(([k, s]) => [k, { name: s.called, word: s.name, ended: s.ended }]));
+const sessionsOf = () => Object.fromEntries(Object.entries(m.heard ?? {}).map(([k, s]) => [k, { name: s.called, word: s.name, ended: s.ended, state: s.state, for: s.for }]));
+
+/** A web page framed in a pane is named by its host. */
+function hostOf(at) {
+  try {
+    const url = M.webOf(at);
+    return url ? new URL(url).host : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /** The panes of the tab in sight, as marks: each its canvas at its address, its strip its name, its mark and its two buttons. */
 function panesMarks(t) {
@@ -59,9 +69,10 @@ function panesMarks(t) {
     const p = t.panes[id];
     const share = t.sizes[t.groups.indexOf(id)];
     const who = p.slot ?? (p.held ? m.heard?.[p.held]?.called ?? '' : '');
-    return ['pane', { key: `pane:${id}`, at: p.at, share, drag: 'pane', selected: id === focus, ...(p.ring && Date.now() - p.ring < 2000 && { ring: true }), tip: String(p.said ? `${who}: ${p.said}` : 'Drag its name to dock it elsewhere').slice(0, 200) },
-      ['text', {}, String(p.name ?? 'Canvas').slice(0, 120)],
-      ...(who ? [['text', { look: 'mark' }, String(who).slice(0, 40)]] : []),
+    return ['pane', { key: `pane:${id}`, at: p.at, share, drag: 'pane', selected: id === focus, ...(p.ring && Date.now() - p.ring < 2000 && { ring: true }), tip: 'Drag its name to dock it elsewhere' },
+      ['text', {}, String(hostOf(p.at) ?? p.name ?? 'Canvas').slice(0, 120)],
+      // Whose it is, and in its tip what that session last said of it.
+      ...(who || p.said ? [['text', { look: 'mark', ...(p.said && { tip: String(p.said).slice(0, 200) }) }, String(who).slice(0, 40)]] : []),
       ['button', { key: `totab:${id}`, look: 'quiet', tip: 'Move this pane to a new tab' }, '⧉'],
       ...(t.groups.length > 1 ? [['button', { key: `close:${id}`, look: 'quiet', tip: 'Close this pane' }, '×']] : []),
     ];
@@ -80,6 +91,7 @@ function changed() {
   driver?.tools.state?.('lands_in', M.landsIn(m, t).join(' ') || null);
   driver?.tools.state?.('front_chat', t.chat ?? null);
   driver?.tools.state?.('front_follows', t.follows ?? null);
+  driver?.tools.state?.('pane_at', M.hrefOf(t.panes[M.focusOf(t)]?.at));
   for (const mount of mounts) mount.tools.marks(marksFor(mount.slot));
 }
 
@@ -113,6 +125,7 @@ export function act(event) {
     if (what === 'follow') return (Object.assign(M.tabOf(m, a) ?? {}, { follows: b }), true);
     if (what === 'keep') return (M.keepTab(M.tabOf(m, a)), true);
     if (what === 'merge') return (M.joinTab(m, M.tabOf(m, a), M.tabOf(m, b)), say(false), true);
+    if (what === 'pop') return m.list.length > 1 && popOut(a);
     if (what === 'split') return Boolean(M.openPane(t, newId, M.BLANK, 'right', M.focusOf(t), { anew: true })) && (say(false), true);
     return false;
   }
@@ -121,7 +134,7 @@ export function act(event) {
   if (name === 'drawn' && what === 'pane') return void (t.panes[a] && (t.panes[a].ids = (Array.isArray(value) ? value : []).slice(0, 500))), false;
   if (name === 'named' && what === 'pane') return Boolean(t.panes[a]) && t.panes[a].name !== value && ((t.panes[a].name = String(value ?? '').slice(0, 120)), true);
   if ((name === 'open' || name === 'go') && what === 'pane') {
-    const at = M.asPane(String(value?.at ?? value ?? ''));
+    const at = M.paneAt(String(value?.at ?? value ?? ''));
     if (!M.drawable(at) || !M.goPane(t, a, at)) return false;
     if (a === M.focusOf(t)) say(true);
     return true;
@@ -195,6 +208,20 @@ function stepped(by) {
   return went;
 }
 
+/**
+ * A view a drawing in pane `from` names (a replay's milestone), drawn in a pane of its own on its right: opened once,
+ * then moved to each view named, with no step in its history; named with none (before the first milestone), it is empty.
+ */
+function beside(from, view) {
+  const t = M.frontOf(m);
+  if (!t.groups.includes(from)) return false;
+  const mine = t.groups.find((id) => t.panes[id]?.shows === from);
+  if (!view) return Boolean(mine) && M.goPane(t, mine, 'v?shown=none', false);
+  const at = `v?canvas=${view}`;
+  if (mine) return M.goPane(t, mine, at, false);
+  return Boolean(M.openPane(t, newId, at, 'right', from, { anew: true, shows: from }));
+}
+
 /** Land a show, or keep it to try again; then try those that wait. */
 function landed(step) {
   const did = land(m, step, newId);
@@ -222,11 +249,13 @@ async function readOpen() {
 
 /** What the strip's mount hears of the page and the sessions: true when the tabs changed. */
 function heard(event) {
+  if (event?.name === 'sessions') return (void readOpen(), false);
   if (event?.name === 'busy') return void (m.busy = { ...m.busy, [String(event.pane)]: Date.now() }), waiting.size > 0;
   if (event?.name === 'dock' && popped) return (driver?.tools.keep({ ...M.frontOf(m), docked: true }, keepName()), false);
   if (event?.name === 'split') return act({ key: 'split', name: 'press' });
+  if (event?.name === 'beside') return beside(String(event.pane ?? ''), event.view ?? null);
   if (event?.name === 'step') return stepped(event.step === -1 ? -1 : 1);
-  if (event?.name === 'land' && event.step) return (landed(event.step), void readOpen(), true);
+  if (event?.name === 'land' && event.step) return landed(event.step);
   if (event?.name === 'ended') return (ended(m, newId, event.run, false), true);
   if (event?.name === 'rested') return (rested(m, newId, event.run), true);
   return false;
@@ -242,8 +271,10 @@ export default function panes(input, tools) {
     driver = mount;
     keptMoved(input?.kept);
     if (input?.page?.hash) moved(input.page.hash);
+    // The open sessions are read once the page has drawn its first view (the host says so: `sessions`), never before.
     queueMicrotask(changed);
-    void readOpen();
+    // Told before it was mounted, it is handed the last word as `told`.
+    if (input?.told?.name === 'sessions') void readOpen();
   }
   return {
     marks: marksFor(mount.slot),

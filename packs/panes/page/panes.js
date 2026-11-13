@@ -1,35 +1,28 @@
-// Panes: the canvases in sight at once in a tab (packs/panes/page/tab-bar.js), docked side by side as a code editor's groups are;
-// they stay together in their tab (decision e_mzer5m4t). Every pane is the same: a canvas of its own (ui/canvas.js)
-// drawing the address it was given (a lens, a saved canvas, an item), held in its own store and kept current from the
-// log (packs/surface/page/live.js), with its own back and forward, a step for each lens it was given, not for a page opened over it
-// (e_ssnyd3ex), kept with its tab so a reload draws it as it was. The query bar and find act on the pane last touched
-// (decision e_h2pqjy2q), and the address is that pane's (packs/panes/page/pane-address.js). Only the tab in sight is drawn; the
-// others keep where their panes stand (packs/panes/page/tabs.js). An agent arranges them with report show and its `pane`; where a
-// step lands is packs/panes/page/pane-route.js.
+// A pane's canvas: the panes pack's part decides which panes stand where and what each draws (packs/panes/parts/index.js),
+// the runtime lays them out (the `pane` mark, packs/walls/page/part-pane.js), and this draws the canvas in each, at
+// the address the part names: a lens, a saved canvas, an item (`e/<id>`), or nothing (`v?shown=none`). It tells the
+// part what is done there (another lens, an item opened) and what it draws (its name, its items). The pane pressed
+// is the one the query bar and find act on (decision e_h2pqjy2q). A look's page, and a frozen link's, draw their one
+// view in a pane of their own, with no tabs.
 
-import { api, h, hooks, state } from './base.js';
+import { api, h, hooks } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
 import { presetSettings, savedCanvases, viewParts } from './views-kept.js';
 import { addressOf, opening, readAddress } from './query.js';
-import { numberOf } from './query-base.js';
-import { dragPane, sashes } from './pane-drag.js';
-import { heard, nameOf } from './pane-route.js';
-import { frameIn, reframe } from './pane-web.js';
-import { BLANK, asPane, byPart, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
 import { titles } from './words.js';
 
-/** The sides a pane is docked on, beside the pane it is put by: along a row, or down a column. */
-const SIDES = { left: ['row', 0], right: ['row', 1], above: ['column', 0], below: ['column', 1] };
-/** The most steps a pane keeps back and forth: the style's. */
-const kept = () => numberOf(state.style, 'pane_steps_kept');
+/**
+ * The item a canvas opened last, and the lens it opened it over: a drawing's own click on it opens it again by its bare
+ * address (packs/walls/page/layout.js), which then keeps that lens, as the address it was opened at said.
+ */
+let lastOpened = { item: null, query: '' };
+addEventListener('hashchange', () => {
+  const item = /^#\/e\/(e_[a-z0-9]{8})$/.exec(location.hash)?.[1];
+  if (item && item === lastOpened.item && lastOpened.query) history.replaceState(history.state, '', `#/e/${item}?${lastOpened.query}`);
+});
 
-// ---- The layout of the tab in sight: its panes in one row or one column, each its share.
-
-const even = (t = front()) => (t.sizes = t.groups.map(() => 1 / t.groups.length));
-/** Along a row on a page wider than tall; a row on a page taller than wide is drawn as a column. */
-const dirNow = () => (front().dir === 'row' && innerWidth < innerHeight ? 'column' : front().dir);
-
-// ---- What a pane draws: the address it was given (as an agent's show names a place: `v?…`, `e/<id>`).
+/** The address of a pane beside a replay that has reached no milestone yet: it draws nothing. */
+const NONE = 'v?shown=none';
 
 /** The lens and style a pane's address names (no lens for Home): a saved canvas named alone is read from the map. */
 async function lensOf(at) {
@@ -42,8 +35,7 @@ async function lensOf(at) {
     const got = await api('get', { id: asked.style.canvas });
     titles.set(got.entity.id, got.entity.title);
     opening.set(got.entity.id, got.entity);
-    // The saved views read again with it, so the bar weighs it as the map has it now: one an agent made or changed
-    // since the page loaded is up as saved, not as new or as changed since (bump e_4j6xvm82).
+    // The saved views read again with it, so the bar weighs it as the map has it now (bump e_4j6xvm82).
     savedCanvases(true);
     return viewParts(got.entity);
   }
@@ -51,353 +43,60 @@ async function lensOf(at) {
   return id ? { lens: focusOn(id), style: {}, here: id } : { lens: null, style: {} };
 }
 /** A pane's address for an address of the page: an item's page draws the lens beside it, else the item's own canvas. */
-export function paneAt(at) {
-  const bare = asPane(at);
+function paneAt(href) {
+  const bare = String(href ?? '').replace(/^#\//, '') || 'v';
   const [where, query = ''] = bare.split('?');
   const item = /^e\/(e_[a-z0-9]{8})$/.exec(where)?.[1];
   if (!item) return bare;
   return `v?${readAddress(query).lens ? query : addressOf(focusOn(item), {})}`;
 }
 
-/** The panes drawn now, by id: { el, body, name, mark, canvas, at, here }. */
-export const drawn = new Map();
-
-function paneEl(id) {
-  const name = h('span', { class: 'pane-name', title: 'Drag to dock it elsewhere' }, 'Canvas');
-  const mark = h('span', { class: 'pane-follows', hidden: true });
-  const body = h('div', { class: 'pane-canvas' });
-  const button = (title, mark, onclick) => h('button', { type: 'button', class: 'pane-act', title, 'aria-label': title, onclick }, mark);
-  // Its controls stand in its strip in focus or not: in focus, the query bar takes the name's place between them.
-  const grip = h('span', { class: 'pane-act pane-grip', title: 'Drag to dock it elsewhere', 'aria-label': 'Move this pane' }, '⠿');
-  const el = h('section', { class: 'pane', 'data-pane': id }, h('header', { class: 'pane-bar' }, grip, name, mark, button('Move this pane to a new tab', '⧉', () => hooks.paneToTab?.(id)), button('Close this pane', '×', () => close(id))), body);
-  for (const handle of [grip, name]) handle.addEventListener('pointerdown', (ev) => dragPane(ev, id, el, { groups: groupEls, drop }));
-  const canvas = canvasIn(body, {
-    go: (lens) => goPane(id, lens ? `v?${addressOf(lens, canvas.asked)}` : 'v'),
-    open: (href) => goPane(id, paneAt(href)),
-    // A click on an item: this pane is the one in focus, its lens as it was, the item's page open over it.
-    opened: (item, lens) => {
-      activeIs(id);
-      location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
-    },
-  });
-  const entry = { el, body, name, mark, canvas, at: null, here: undefined };
-  drawn.set(id, entry);
-  load(id, front().panes[id].at);
-  return el;
-}
-
-/** The address of a pane beside a replay that has reached no milestone yet: it draws nothing. */
-const NONE = 'v?shown=none';
-
-/** Draw this address in pane `id`, in place of what it drew: the pane, its name and its history stay. */
-function load(id, at) {
-  const entry = drawn.get(id);
-  entry.at = at;
-  // A web page is framed in place of the canvas (packs/panes/page/pane-web.js).
-  frameIn(entry, webOf(at));
-  if (webOf(at)) return;
-  if (at === NONE) return void ((entry.name.textContent = ''), entry.canvas.empty());
-  lensOf(at)
-    .then(({ lens, style, here }) => {
-      if (drawn.get(id) !== entry || entry.at !== at) return;
-      // Named as its tab would be: a saved canvas by its name, else by what its filter finds.
-      const naming = () => {
-        entry.name.textContent = (style.canvas && titles.get(style.canvas)) || (lens ? hooks.lensSaid?.(lens.filter, naming) : 'Home') || 'Canvas';
-        entry.name.title = `${entry.name.textContent}: drag to dock it elsewhere`;
-      };
-      naming();
-      entry.canvas.show(lens, entry.here ?? here, style);
-      if (active === id) activeIs(id);
-    })
-    .catch((err) => entry.body.replaceChildren(h('div', { class: 'error' }, err.message)));
-}
-
 /**
- * Give pane `id` of the tab in sight another address: a step in its history, unless it is one taken back or forth. In
- * focus, the address follows: a step of the browser's for a step (`push`), else written over (`replace`).
+ * Draw a canvas at address `at` in `el`, telling `said(name, value)` what is done in it: `open` another address, an
+ * item `opened` (its page opened over the pane), what it is `named` and the items it has `drawn`. Answers how to stop it.
  */
-export function goPane(id, at, step = true, push = step) {
-  const p = front().panes[id];
-  if (!p || at === p.at) return;
-  if (step) ((p.back = [...(p.back ?? []), p.at].slice(-kept())), (p.forth = []));
-  p.at = at;
-  keep();
-  draw();
-  hooks.paneMoved?.();
-  if (id === active) say(push, step ? location.hash : '');
-}
-/** Back (-1) or forth (1) in the history of the pane the bar acts on; whether it moved. The address follows, `from` the page it keeps open. */
-export function travel(by, from = '') {
-  const p = front().panes[active];
-  const [there, here] = by < 0 ? ['back', 'forth'] : ['forth', 'back'];
-  if (!p?.[there]?.length) return false;
-  const next = p[there].pop();
-  p[here] = [...(p[here] ?? []), p.at].slice(-kept());
-  p.at = next;
-  keep();
-  draw();
-  hooks.paneMoved?.();
-  say(false, from);
-  return true;
-}
-
-// ---- The address: the pane in focus's, under the page open over it. A step there is a step of the browser's; a move
-// of focus or a step back or forth only rewrites it.
-
-/** The address the pane in focus stands at, keeping the page open in `from`: an item's page over its lens, or another page. */
-export function hrefNow(from = '') {
-  // The part draws the panes: the page's own address, without the page over it, is the lens it stands at.
-  if (byPart.on) return (from || location.hash).split('?')[1] ? `#/v?${(from || location.hash).split('?')[1]}` : '#/';
-  const at = front().panes[active]?.at;
-  const base = hrefOf(at);
-  const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(from)?.[1];
-  const query = base.split('?')[1];
-  // An item's page over its own canvas is its bare address, as it is linked to.
-  if (open) return at === paneAt(`e/${open}`) || !query ? `#/e/${open}` : `#/e/${open}?${query}`;
-  return /^#\/(s|workspace|you|new)\b/.test(from) ? from : base;
-}
-function say(push, from) {
-  if (!started) return;
-  const href = hrefNow(from);
-  if (location.hash === href || (!location.hash && href === '#/')) return;
-  if (push) location.hash = href;
-  else history.replaceState(history.state, '', href);
-}
-/** The page's address given to the pane in focus (ui/app.js): a step there, unless it draws it already; `here` lit in it. */
-export function toAddress(at, here) {
-  if (byPart.on) return;
-  const entry = drawn.get(active);
-  if (entry) entry.here = here;
-  // The browser took the step already: the address is only written over, to say the lens beside the page.
-  if (at !== undefined) goPane(active, paneAt(at), true, false);
-  entry?.canvas.mark(here);
-}
-
-// ---- The pane the bar acts on: the one last touched. A press in a pane, or the focus going into a style's frame
-// there (a frame keeps its presses to itself), makes it the one.
-
-let active = null;
-/** The pane the bar acts on, in the tab in sight. */
-export const activeId = () => active;
-/** The tab and pane the bar last acted on: when it moves to another, the bar and find start afresh there. */
-let focused = '';
-export function activeIs(id) {
-  const t = front();
-  if (!t.groups.includes(id)) id = focusOf(t);
-  const moved = active !== id;
-  active = id;
-  // Each tab keeps the pane last touched in it, for when it is brought into sight again (decision e_x9b9yv5g, asked).
-  if (t.focus !== id) ((t.focus = id), keep());
-  if (focused !== `${t.id}:${id}`) ((focused = `${t.id}:${id}`), dispatchEvent(new Event('pane-focus')));
-  frameActive();
-  const e = drawn.get(id);
-  if (e) activate(e.canvas);
-  if (moved) say(false, location.hash);
-}
-const touched = (target) => {
-  const id = target?.closest?.('#canvas > .pane')?.dataset.pane;
-  if (id && id !== active) activeIs(id);
-};
-addEventListener('pointerdown', (ev) => touched(ev.target), true);
-addEventListener('blur', () => setTimeout(() => document.activeElement?.tagName === 'IFRAME' && touched(document.activeElement), 0));
-
-/** A side of a frame as CSS: across, a share of the page; down, a share of what the band above leaves (packs/surface/page/shell.css). */
-const edge = (side, v) => {
-  const share = (v * 100).toFixed(3);
-  if (side === 'left' || side === 'right') return `${share}%`;
-  return side === 'top' ? `calc(var(--band, 0%) + (100% - var(--band, 0%)) * ${share} / 100)` : `calc((100% - var(--band, 0%)) * ${share} / 100)`;
-};
-/** The frame of the pane the bar acts on, for the bar and find to sit in (packs/surface/page/shell.css: --active-*). */
-let frames = [];
-function frameActive() {
-  for (const [g, e] of drawn) e.el.classList.toggle('pane-active', g === active);
-  const box = frames.find(([g]) => g === active)?.[1] ?? frames[0]?.[1];
-  for (const side of ['left', 'right', 'top', 'bottom']) document.body.style.setProperty(`--active-${side}`, edge(side, box?.[side] ?? 0));
-  markPanes();
-}
-/** A pane named by a session, or held for one, says whose it is in its strip, and in the tooltip its session's name and what it last said of it. */
-export function markPanes() {
-  for (const [g, e] of drawn) {
-    const p = front().panes[g];
-    e.mark.textContent = p?.slot ?? (p?.held ? nameOf(p.held) : '');
-    e.mark.hidden = !e.mark.textContent;
-    const known = heard.get(p?.held);
-    e.mark.title = [known?.label && `Session ${known.name}`, p?.said].filter(Boolean).join(': ');
-  }
-}
-
-/** The history of the pane the bar acts on. */
-const historyNow = () => front().panes[active] ?? freshPane('#/');
-
-// ---- Layout the tab in sight: each pane put in its frame by its share.
-
-const host = document.getElementById('canvas');
-const groupEls = () => front().groups.map((g) => [g, drawn.get(g)?.el]).filter(([, el]) => el);
-
-export function draw() {
-  if (byPart.on) return;
-  const layout = front();
-  for (const [id, entry] of drawn) if (!layout.groups.includes(id)) (entry.canvas.close(), entry.el.remove(), drawn.delete(id));
-  for (const [id, entry] of drawn) if (layout.panes[id]?.at !== entry.at) load(id, layout.panes[id].at);
-  const dir = dirNow();
-  host.dataset.dir = dir;
-  // The panes share the room left of an open sheet, one alone too, so whatever a pane draws stands beside the sheet and
-  // none of it behind: this is the one place a canvas gives way to it.
-  const aside = hooks.sheetAside();
-  const room = 1 - aside;
-  let from = 0;
-  frames = layout.groups.map((g, n) => {
-    const share = layout.sizes[n];
-    const box = dir === 'row' ? { left: from * room, right: 1 - (from + share) * room, top: 0, bottom: 0 } : { top: from, bottom: 1 - from - share, left: 0, right: aside };
-    from += share;
-    return [g, box];
-  });
-  for (const [g, box] of frames) {
-    const el = drawn.get(g)?.el ?? paneEl(g);
-    // One alone fills the page under the bars, but for the sheet's room.
-    for (const side of ['left', 'right', 'top', 'bottom']) el.style[side] = layout.groups.length > 1 || (side === 'right' && aside) ? edge(side, box[side]) : '';
-    if (el.parentNode !== host) host.append(el);
-  }
-  // In the order they stand, so a reader's tab order and a test's first pane are the leftmost; moved only when out of
-  // order, since an element moved loses the pointer a drag of its name holds.
-  const order = layout.groups.map((g) => drawn.get(g).el);
-  const standing = [...host.children].filter((el) => el.classList.contains('pane'));
-  if (order.some((el, n) => standing[n] !== el)) for (const el of order) host.append(el);
-  document.body.dataset.panes = String(layout.groups.length);
-  if (!layout.groups.includes(active)) activeIs(focusOf(layout));
-  else frameActive();
-  sashes(host, dir, frames, (n, share) => {
-    const pair = layout.sizes[n] + layout.sizes[n + 1];
-    const least = pair * 0.15;
-    layout.sizes[n] = Math.min(pair - least, Math.max(least, share - layout.sizes.slice(0, n).reduce((a, b) => a + b, 0)));
-    layout.sizes[n + 1] = pair - layout.sizes[n];
-    keep();
-    draw();
-  });
-  dispatchEvent(new Event('resize'));
-}
-
-// ---- What can be done with a pane, any pane: open, move, close; an agent's alone keeps only its own.
-
-/**
- * Open this address in a pane on this side of the pane `by` (the one in focus, unless named) in tab `t` (the one in
- * sight unless named); one already on it is moved there. A pane opened for a session by the name it gave (`slot`), or
- * held for it (`held`), is its own, never one already open; so is one opened `anew` (Split: a second of what is up).
- * Answers the pane's id.
- */
-export function openPane(at, side = 'right', by = undefined, { anew = false, ...own } = {}, t = front()) {
-  if (!drawable(at)) return null;
-  at = paneAt(at);
-  const same = !anew && !own.slot && !own.held && !own.by && Object.entries(t.panes).find(([id, p]) => t.groups.includes(id) && !p.slot && !p.held && named(p.at) === named(at));
-  const id = same?.[0] ?? newId('p');
-  t.panes[id] = { ...freshPane(at), ...t.panes[id], at, ...own };
-  place(id, side, by ?? focusOf(t), t);
-  return id;
-}
-/** Put pane `id` on this side of pane `by` in tab `t`: a side across the tab's direction turns it. */
-export function place(id, side, by, t = front()) {
-  const [dir, after] = SIDES[side] ?? SIDES.right;
-  t.groups = t.groups.filter((g) => g !== id);
-  if (t.groups.length === 1 || dir !== t.dir) t.dir = dir;
-  const at = Math.max(0, t.groups.indexOf(by)) + after;
-  t.groups.splice(at, 0, id);
-  even(t);
-  keep();
-  if (t === front()) draw();
-}
-/** Close pane `id` of the tab in sight; the last one stays. */
-export function close(id) {
-  const t = front();
-  if (t.groups.length < 2 || !t.groups.includes(id)) return;
-  const n = t.groups.indexOf(id);
-  t.groups = t.groups.filter((g) => g !== id);
-  delete t.panes[id];
-  if (t.focus === id) t.focus = t.groups[Math.max(0, n - 1)];
-  even();
-  keep();
-  draw();
-}
-/** Only pane `id` in tab `t` (the one in sight unless named), the others closed. */
-export function only(id, t = front()) {
-  if (!t.groups.includes(id)) return;
-  Object.assign(t, { dir: 'row', groups: [id], sizes: [1], panes: { [id]: t.panes[id] }, focus: id });
-  keep();
-  if (t === front()) draw();
-}
-/** Let go of a pane dragged (packs/panes/page/pane-drag.js): on a tab, into it; on the tabs, into a tab of its own; on a side of another, docked there; in the middle of one, the two swap places. */
-function drop(id, target, zone) {
-  if (zone === 'out') return;
-  if (zone === 'tabs') return hooks.paneToTab?.(id, target);
-  if (zone !== 'center') return place(id, zone, target);
-  const t = front();
-  const [a, b] = [t.groups.indexOf(id), t.groups.indexOf(target)];
-  [t.groups[a], t.groups[b]] = [target, id];
-  keep();
-  draw();
-}
-
-addEventListener('resize', () => {
-  const dir = dirNow();
-  if (started && host.dataset.dir !== dir) ((host.dataset.dir = dir), draw());
-});
-// The sheet opening or shutting changes the room the panes share. Each pulse of the map says the sheet again as it was
-// (ui/app.js): that is no change, and laying the panes out for it would fit a canvas again under a pan.
-new MutationObserver((list) => started && list.some((m) => m.oldValue !== document.body.getAttribute('data-sheet')) && draw()).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'], attributeOldValue: true });
-
-/** The query bar's own for the pane it acts on, the same in every pane: back and forth (dimmed with nowhere to go) and split, which opens a pane with no query beside it. Each pane's move and close stay in its strip. */
-export function paneButtons() {
-  const { back = [], forth = [] } = historyNow();
-  const button = (label, title, mark, onclick, off, cls = 'q-save') => h('button', { type: 'button', class: cls, title, 'aria-label': label, disabled: off, onclick }, mark);
-  return [
-    button('Back', 'Back to what this pane drew before', '‹', () => travel(-1), !back.length, 'q-save q-travel'),
-    button('Forward', 'Forward again', '›', () => travel(1), !forth.length, 'q-save q-travel'),
-    button('Split', 'Split: a new pane beside this one (drag the pane’s name to dock it elsewhere)', ['◫', h('span', { class: 'q-word-text' }, 'Split')], () => openPane(BLANK, 'right', active, { anew: true }), false, 'q-save q-word q-split'),
-  ];
-}
-
-/** Light a pane an agent's step was just drawn in; a web page framed there is loaded again. */
-export function flash(id) {
-  const entry = drawn.get(id);
-  if (!entry) return;
-  reframe(entry);
-  entry.el.classList.remove('pane-shown');
-  void entry.el.offsetWidth;
-  entry.el.classList.add('pane-shown');
-}
-
-/**
- * A view a drawing in pane `from` names (a replay's milestone, ui/view-frame.js), drawn in a pane of its own on its
- * right: opened once, then moved to each view named, with no step in its history; the reader slides the sash between
- * them. Closed, it opens again with the next view named; named with none (a step before the first milestone), it is empty.
- */
-hooks.besidePane = (from, view) => {
-  const t = front();
-  if (!t.groups.includes(from)) return;
-  const mine = t.groups.find((id) => t.panes[id]?.shows === from);
-  // Before its first milestone, the pane beside a replay that has one stands empty: nothing is shown before it is real.
-  if (!view) return void (mine && goPane(mine, NONE, false));
-  const at = `v?canvas=${view}`;
-  if (mine) goPane(mine, at, false);
-  else openPane(at, 'right', from, { anew: true, shows: from });
-};
-
-/**
- * A pane mark's canvas (packs/walls/page/part-pane.js): the panes part names an address, and this draws it in `el` as
- * a pane here draws its own, telling the part what is done in it (`said`): another lens (`open`), an item opened over
- * it (`opened`, its page opened here), and what it draws, by name (`named`). Answers how to stop it.
- */
-hooks.paneFrame = (at, el, said) => {
+export function drawPane(at, el, said) {
   let live = true;
-  // Laid out as a pane here lays out its own (packs/surface/page/shell.css: #canvas .pane-canvas).
-  el.classList.add('pane-canvas');
-  const canvas = canvasIn(el, {
-    go: (lens) => said('open', { at: lens ? `v?${addressOf(lens, canvas.asked)}` : 'v' }),
-    open: (href) => said('open', { at: paneAt(href) }),
+  // A canvas of its own in a node of its own, laid out as a pane's (packs/surface/page/shell.css: #canvas .pane-canvas): the runtime keeps
+  // `el` as the pane's address changes, and what listened on the canvas before must go with it.
+  const host = h('div', { class: 'pane-canvas' });
+  el.replaceChildren(host);
+  // A view a drawing names finds its pane by it (packs/walls/page/view-frame.js).
+  const pane = /^pane:(.+)$/.exec(el.closest('[data-key]')?.dataset.key ?? '')?.[1];
+  // The pane it stands in (none for a page's lone pane, which is always the one in focus).
+  const paneEl = el.closest('.pm-pane');
+  const selected = () => !paneEl || paneEl.getAttribute('aria-selected') === 'true';
+  if (pane) el.dataset.pane = pane;
+  // What it draws now; in focus, with no page over it, the page's address is this pane's (decision e_h2pqjy2q).
+  let now = at;
+  const hrefOf = (to) => (!to || to === 'v' ? '#/' : `#/${to}`);
+  const inFocus = () => selected() && document.body.dataset.sheet !== 'open';
+  const moved = (to) => {
+    if (!live) return;
+    now = to;
+    said('open', { at: to });
+    if (inFocus() && location.hash !== hrefOf(to)) location.hash = hrefOf(to);
+  };
+  const canvas = canvasIn(host, {
+    go: (lens) => moved(lens ? `v?${addressOf(lens, canvas.asked)}` : 'v'),
+    open: (href) => moved(paneAt(href)),
     opened: (item, lens) => {
+      if (!live) return;
+      // This pane is the one touched before its item's page opens over it (a click with no press before it too).
+      host.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
       said('opened', { item, at: `v?${addressOf(lens, canvas.asked)}` });
-      location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
+      lastOpened = { item, query: addressOf(lens, canvas.asked) };
+      location.hash = `#/e/${item}?${lastOpened.query}`;
     },
   });
+  // Pressed, or the focus gone into a drawing's frame in it, it is the canvas the bar and find act on.
+  const touched = () => {
+    if (!live) return;
+    activate(canvas);
+    if (document.body.dataset.sheet !== 'open' && location.hash !== hrefOf(now)) history.replaceState(history.state, '', hrefOf(now));
+  };
+  host.addEventListener('pointerdown', touched, true);
+  host.addEventListener('focusin', touched);
   if (at === NONE) canvas.empty();
   else
     lensOf(at).then(({ lens, style, here }) => {
@@ -405,8 +104,9 @@ hooks.paneFrame = (at, el, said) => {
       const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? hooks.lensSaid?.(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
       naming();
       canvas.show(lens, here, style);
-      activate(canvas);
-    }, (err) => live && el.replaceChildren(h('div', { class: 'error' }, err.message)));
+      // The bar and find act on the pane in focus alone: a pane drawn beside it does not take them.
+      if (selected()) activate(canvas);
+    }, (err) => live && host.replaceChildren(h('div', { class: 'error' }, err.message)));
   // What it draws, told again as it is drawn anew (the map changed, another lens): a tab that watches what it draws reads it.
   let told = '';
   const tell = () => {
@@ -415,15 +115,42 @@ hooks.paneFrame = (at, el, said) => {
   };
   let soon;
   const watching = new MutationObserver(() => (clearTimeout(soon), (soon = setTimeout(tell, 300))));
-  watching.observe(el, { childList: true, subtree: true });
-  return () => ((live = false), watching.disconnect(), clearTimeout(soon), canvas.close());
-};
+  watching.observe(host, { childList: true, subtree: true });
+  // Its pane coming into focus (pressed, a tab brought into sight, the part's choice) gives it the bar and find.
+  const focus = new MutationObserver(() => live && selected() && activate(canvas));
+  if (paneEl) focus.observe(paneEl, { attributes: true, attributeFilter: ['aria-selected'] });
+  return () => ((live = false), watching.disconnect(), focus.disconnect(), clearTimeout(soon), canvas.close());
+}
+hooks.paneFrame = drawPane;
 
-let started = false;
-/** Draw the panes of the tab in sight, once the page has read its tabs (packs/panes/page/tab-bar.js). */
-export function startPanes() {
-  started = true;
-  active = focusOf(front());
-  draw();
-  activeIs(active);
+/**
+ * A view a drawing in pane `from` names (a replay's milestone, packs/walls/page/view-frame.js), drawn in a pane of its
+ * own on its right: the part opens it once and moves it to each view named.
+ */
+hooks.besidePane = (from, view) => hooks.tellSlot?.('tabs', { name: 'beside', pane: from, view: view ?? null });
+
+// ---- A page with no tabs (a look's, a frozen link's): its one view in a pane of its own, at the page's address.
+
+let lone = null;
+/** The page's address given to the lone pane of a page with no tabs (packs/surface/page/app.js): drawn again only for another. */
+export function toAddress(at) {
+  if (!lone || at === undefined || at === lone.at) return;
+  lone.stop?.();
+  lone.at = at;
+  lone.stop = drawPane(at, lone.body, () => {});
+}
+/** Start the lone pane of a page with no tabs, in #canvas. */
+export function lonePane(at) {
+  const canvas = document.getElementById('canvas');
+  const body = h('section', { class: 'pane' });
+  canvas?.replaceChildren(body);
+  lone = { at: null, body, stop: null };
+  toAddress(at);
+}
+/** Where closing the page over the canvas goes: the address the pane in focus stands at, as the panes part publishes it (`data-pane_at`), else the lens the page's address carries. */
+export function hrefNow(from = '') {
+  const at = document.documentElement.dataset.pane_at;
+  if (at) return at;
+  const query = (from || location.hash).split('?')[1];
+  return query ? `#/v?${query}` : '#/';
 }

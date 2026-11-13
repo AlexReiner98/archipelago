@@ -193,7 +193,7 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `pinch.js` | two fingers on it |
 | `canvas-wires.js` | a held change's badge clicked, opening where it is decided |
 | `live.js`, `replica.js`, `membership.js` | tailing the log; the one store, keyed by item, shared by views; when a view asks again; held changes drawn into it |
-| `panes.js`, `pane-drag.js`, `pane-address.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's |
+| the panes part (`packs/panes/parts/`), `panes.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's; `panes.js` draws each pane's canvas |
 | `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
 | `item.js`, `item-sections.js`, `field-edit.js`, `link-pick.js`, `settle.js` | the item's page, the host's by who owns what (the owner, 13 Nov 2026): its frame, fields, links, choices and settling for any type; a piece only one type or screen has is a part of the pack that owns it (a screen's note: `canvas.note`) |
 | `fields.js` | a field's value by its kind, else by its shape; the choices a question settles by |

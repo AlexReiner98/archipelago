@@ -16,15 +16,28 @@ export function nameOfTab(t, sessions = {}) {
   return { name: pane?.name ?? 'Home' };
 }
 
-/** The tab's mark for the state of the session it follows: whose it is, how much it holds. */
+/**
+ * A session's state as its tab says it: a mark for what waits on the owner or is stuck, and its words with what it waits
+ * for. Here until the sessions pack's part draws it in the slot tab.mark (task e_wmgpqayh), the same marks as
+ * packs/sessions/parts/tab_count draws.
+ */
+const STATES = { waiting: { mark: '?', said: 'waits on you' }, your_move: { mark: '↩', said: 'your move' }, blocked: { mark: '⊘', said: 'blocked' }, working: { said: 'working' }, quiet: { said: 'quiet' }, idle: { said: 'idle' } };
+export function stateSaid(s) {
+  const st = STATES[s?.state];
+  return st ? { mark: st.mark, said: [st.said, s.for].filter(Boolean).join(': ') } : null;
+}
+
+/** Whose a tab is, in its tooltip. */
 const whom = (t, session) => (t.chat ? 'this chat’s tab: it closes as the chat ends' : session ? 'yours, following this chat' : 'yours');
 
 function tabMark(m, t, sessions, out) {
   const { name, session } = nameOfTab(t, sessions);
   const inSight = t.id === m.front && !out;
   const ended = t.chat && t.ended?.includes(t.chat);
-  const tip = [name, whom(t, session), ended && 'its chat has ended or gone quiet: it goes when you leave it', out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · ');
+  const st = stateSaid(sessions[session]);
+  const tip = [name, st?.said, whom(t, session), ended && 'its chat has ended or gone quiet: it goes when you leave it', out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · ');
   return ['box', { key: `tab:${t.id}`, flow: 'row', gap: 2, drag: 'tab', selected: inSight, ...(t.unseen && !inSight && { ring: true }), ...(session && { hue: cut(sessions[session]?.word ?? t.word ?? t.named ?? session, 80) }), aux: !out && closable(m, t), ...(ended && { tone: 'closed' }), tip: cut(tip) },
+    ...(st?.mark ? [['text', { look: 'mark', tip: cut(st.said) }, st.mark]] : []),
     ['button', { key: `front:${t.id}`, look: 'tab', tip: cut(tip) }, cut(name, 80)],
     ...(out ? [] : [tabMenu(m, t, sessions)]),
     ...(!out && closable(m, t) ? [['button', { key: `close:${t.id}`, look: 'quiet', tip: 'Close this tab' }, '×']] : []),
@@ -40,6 +53,7 @@ export function tabMenu(m, t, sessions = {}) {
     pick('watch', 'Sessions in what it draws', 'Every session working on what this tab draws'),
     ...Object.entries(sessions).filter(([, s]) => !s.ended).map(([run, s]) => pick(run, s.name ?? run, run)),
     ...(t.chat ? [['button', { key: `keep:${t.id}`, tip: 'Make this tab yours: it stays when its chat ends' }, 'Keep']] : []),
+    ...(m.list.length > 1 ? [['button', { key: `pop:${t.id}`, tip: 'Into a window of its own' }, 'Pop out']] : []),
     ...m.list.filter((o) => o !== t).map((o) => ['button', { key: `merge:${t.id}:${o.id}`, tip: 'Put this tab’s panes beside those of another' }, cut(`Merge into ${nameOfTab(o, sessions).name}`, 80)]),
   ];
 }
