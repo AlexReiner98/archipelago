@@ -25,7 +25,12 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/identity/page/token-ask.js': 2,
   'packs/identity/page/token-piece.js': 2,
   'packs/identity/page/workspace-cards.js': 3,
-  'packs/identity/page/workspace.js': 5,
+  'packs/identity/page/workspace.js': 3,
+  // Connecting an agent, the server's connections and Start here left ui/ for the identity root as host code (task
+  // e_u2phc9rq, 13 Nov 2026): each reaches the page's base (and words, for a menu), going as each becomes a part.
+  'packs/identity/page/connect-agent.js': 1,
+  'packs/identity/page/connections-card.js': 2,
+  'packs/identity/page/start.js': 1,
   'packs/identity/page/workspaces-card.js': 2,
   'packs/walls/page/layout-asks.js': 4,
   'packs/walls/page/layout-tip.js': 1,
@@ -33,6 +38,8 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/walls/page/plates.js': 1,
   'packs/walls/page/query-base.js': 2,
   'packs/walls/page/surface.js': 1,
+  // A layout's code, runtime since 13 Nov 2026 (rule e_6d2g62tg: it mounts the walled frame), with its import of the base.
+  'packs/walls/page/style-code.js': 1,
   'packs/walls/page/view-frame.js': 1,
   'packs/loader/page/packs.js': 1,
   'packs/loader/page/page-schema.js': 1,
@@ -42,11 +49,9 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/write/page/item-held.js': 1,
   // ui/nav.js's switches for a pack's screens (task e_pe3fjd75), with its import of the page's base.
   'packs/loader/page/screen-rows.js': 1,
-<<<<<<< HEAD
   // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of query-bar, item-doc and thumbs.
-=======
+<<<<<<< HEAD
   // ui/canvases.js's plumbing (task e_pe3fjd75), with its imports of item-doc and thumbs.
->>>>>>> dd4bd57a
   'packs/surface/page/views-kept.js': 2,
   'packs/surface/page/app.js': 6,
   'packs/surface/page/live.js': 3,
@@ -57,6 +62,14 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   // the start page, each going as that module becomes a part.
   'packs/sheet/page/item.js': 1,
   'packs/sheet/page/screens.js': 1,
+=======
+  'packs/surface/page/canvas.js': 1,
+  'packs/panes/page/panes.js': 1,
+  'packs/panes/page/tabs.js': 1,
+  // The sheet's modules left ui/ for its root (task e_zhxd9bhb, 13 Nov 2026): item.js still reaches the app for a
+  // type's views (canvases), a document's menus (item-doc) and find's terms (query-bar), each going as that module
+  // becomes a part.
+>>>>>>> 3b9e3340
 };
 
 test("the host's page imports one way along roots.json", () => {
@@ -83,19 +96,12 @@ test("the host's page imports one way along roots.json", () => {
 // the boundary itself moves, as it did here and on 12 Nov; otherwise it falls. It moved once more the same day:
 // doc-lens.js, the picture mark's drawing, went to surface (task e_atxefw2s), so doc.js and item-doc.js count it.
 const APP_ON_HOST: Record<string, number> = {
-  'ui/connect-agent.js': 2,
-  'ui/connections-card.js': 2,
   'ui/find-choices.js': 3,
   'ui/find.js': 3,
   'ui/item-doc.js': 5,
   'ui/keep-in-view.js': 2,
-  'ui/start.js': 1,
-  'ui/style-code.js': 3,
 <<<<<<< HEAD
-  'ui/term-kinds.js': 2,
-  'ui/term-pick.js': 2,
 =======
-  'ui/thumbs.js': 5,
 >>>>>>> dd4bd57a
 };
 

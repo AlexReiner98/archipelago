@@ -4,7 +4,7 @@
 // drawn, empty (the lens found nothing) or error, with `data-look_why`. A view says so with a `view-drawn` event, raised
 // where its drawing is done: the lens found nothing or failed (packs/surface/page/query.js), a drawing mounted its scene
 // and a surface painted its first frame (packs/walls/page/layout.js), a layout's code returned and its worker painted
-// (ui/style-code.js). A document's preview (ui/doc.js) says so itself, once it has drawn the page.
+// (packs/walls/page/style-code.js). A document's preview (ui/doc.js) says so itself, once it has drawn the page.
 //
 // What the look reads of the first word is look_draw's part (packs/look_draw/parts/page): the runtime mounts it in the
 // slot `look` two frames on (packs/surface/page/base.js), and the part publishes it as page state on the root.

@@ -3,7 +3,8 @@
 // connect, or choose again what it is given); disconnecting, rarely, in a menu.
 //
 // The host's, not a part's (task e_dqh5yz7t): connections is a tool only a person calls, its acts an admin's, and
-// Connect leaves for an address outside.
+// Connect leaves for an address outside. Kept in the identity root as host code (task e_u2phc9rq, 13 Nov 2026): a part
+// sending an admin action is an open question for the owner.
 
 import { api, ask, h } from './base.js';
 import { menu } from './words.js';

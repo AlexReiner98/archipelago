@@ -4,7 +4,8 @@
 // for the connection and says when it lands, with a first thing to ask; shut, it watches for nothing.
 //
 // The host's, not a part's (task e_dqh5yz7t): it reads the person's tokens, copies to the clipboard and opens pages
-// outside, none of which a part may do.
+// outside. Kept in the identity root as host code (task e_u2phc9rq, 13 Nov 2026): what it watches for, the person's
+// agent tokens, no pack may read.
 
 import { api, h } from './base.js';
 import { card, line } from './workspace-cards.js';
