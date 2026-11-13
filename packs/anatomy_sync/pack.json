@@ -1,12 +1,41 @@
 {
   "id": "anatomy_sync",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "title": "Anatomy sync",
-  "description": "Keeps the Pack anatomy island in step with the code. Its reader (reader.ts) reads each file's imports, pack and header comment the way the structure test checks the architecture; its extractors (extract.ts), one per kind of source, turn the manifests, the modules, the tests and the structure checks into the island's keyed items and links; and its plan (plan.ts) is what a run sends, from what changed since the island's last sync. GitHub's push webhook runs it (push.ts) with a read-only token the owner gives it; scripts/anatomy.ts runs it from git, and --full is the whole check.",
-  "requires": ["type:anatomy.sync", "type:anatomy.module"],
-  "handlers": [{ "webhook": "anatomy_sync.push", "limit_ms": 30000 }],
+  "description": "Keeps the Pack anatomy island in step with the code. Its reader (reader.ts) reads each file's imports, pack and header comment the way the structure test checks the architecture; its extractors (extract.ts), one per kind of source, turn the manifests, the modules, the tests and the structure checks into the island's keyed items and links; and its plan (plan.ts) is what a run sends, from what changed since the island's last sync. GitHub's push webhook runs it (push.ts) with a read-only token the owner gives it, and a catch-up (catch-up.ts) as the server starts and every hour brings the island to main when a push was missed; scripts/anatomy.ts runs it from git, and --full is the whole check.",
+  "requires": [
+    "type:anatomy.sync",
+    "type:anatomy.module"
+  ],
+  "handlers": [
+    {
+      "webhook": "anatomy_sync.push",
+      "limit_ms": 30000
+    },
+    {
+      "schedule": "anatomy_sync.catch_up",
+      "every_minutes": 60,
+      "at_start": true,
+      "limit_ms": 30000
+    }
+  ],
   "reach": {
-    "hosts": [{ "id": "github", "base": "https://api.github.com", "secret": "github_token" }],
-    "webhooks": [{ "id": "anatomy_sync.push", "secret": "github_webhook", "header": "x-hub-signature-256", "headers": ["x-github-event"] }]
+    "hosts": [
+      {
+        "id": "github",
+        "base": "https://api.github.com",
+        "secret": "github_token"
+      }
+    ],
+    "webhooks": [
+      {
+        "id": "anatomy_sync.push",
+        "secret": "github_webhook",
+        "header": "x-hub-signature-256",
+        "headers": [
+          "x-github-event"
+        ]
+      }
+    ]
   }
 }
