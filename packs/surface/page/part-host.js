@@ -23,7 +23,6 @@ import { MARKS, checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
 import { pickOnCanvas } from './canvas-pick.js';
 import { itemOf, waysBetween } from './layout-asks.js';
-import { lightItems } from './light-items.js';
 import { sessionHue } from './words.js';
 import { addressSaid, queryGiven } from './part-lens.js';
 import { readFor } from './part-read.js';
@@ -196,11 +195,19 @@ async function inputOf(part, item, given) {
 }
 
 /** A version's worker, started once: its port heard here, each message going to the part mounted under its id. */
-async function workerOf(version, parts, pack) {
-  if (versions.get(version)) return versions.get(version);
-  const mine = parts.filter((p) => p.pack === pack);
+function workerOf(version, parts, pack) {
+  // Asked again while it starts (two parts of one pack mounted at once: the bar's line and its rows), the same start is
+  // waited on, so no part is handed a worker whose bridge is not there yet.
+  if (versions.get(version)) return versions.get(version).ready;
   const one = { mounted: new Map() };
   versions.set(version, one);
+  one.ready = startWorker(one, version, parts, pack);
+  return one.ready;
+}
+
+/** Start a version's worker for `one`: its port, its bridge, and what it hears. */
+async function startWorker(one, version, parts, pack) {
+  const mine = parts.filter((p) => p.pack === pack);
   const stopped = (said) => {
     for (const m of one.mounted.values()) m.failed(said?.message ?? 'The pack stopped.');
     versions.delete(version);
@@ -317,8 +324,9 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),
     pick: (kind) => pickFor(item, kind),
-    // What a mark lights while the person points at it: those items lit on the canvas in sight, the rest faded.
-    lights: (ids) => lightItems(hooks.viewUp?.() ?? null, ids?.length ? ids : null),
+    // What a mark lights while the person points at it: those items lit on the canvas in sight (the view the bar is
+    // over, ./bar-band.js), the rest faded. hooks.viewUp is the saved view up, an id: no view to light.
+    lights: (ids) => hooks.lights?.(ids),
     // A pane's canvas, drawn at its address by whoever keeps the panes (hooks.paneFrame), told back what is done in it.
     frame: (at, el, said) => hooks.paneFrame?.(at, el, said) ?? null,
     // A session's hue, named by its words, as every session is marked.

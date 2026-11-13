@@ -1,6 +1,7 @@
-// The bar pack's part bar.query (packs/bar/parts/query), run as its worker runs it: the page's address in, marks the
-// host's check takes out (packs/walls/page/part-check.js), and the lens each gesture names. Was ui/query-bar.js and the
-// modules beside it (task e_yxkdcdh6).
+// The bar pack's parts (packs/bar/parts/query), run as their worker runs them: bar.query, the line in find, and
+// bar.rows, the rows above it. What the query slots hand in (the lens, the answer in brief, the names), marks the host's
+// check takes out (packs/walls/page/part-check.js), and the lens each gesture names. Was ui/query-bar.js and the modules
+// beside it (task e_yxkdcdh6).
 
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -8,7 +9,11 @@ import { test } from 'node:test';
 // @ts-ignore: a module of the page, plain JavaScript
 import { checkMarks } from '../packs/walls/page/part-check.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
-import query, { heard, stepsOf } from '../packs/bar/parts/query/index.js';
+import { heard, stepsOf } from '../packs/bar/parts/query/bar.js';
+// @ts-expect-error: a plain module of the pack, with no types of its own.
+import line from '../packs/bar/parts/query/line.js';
+// @ts-expect-error: a plain module of the pack, with no types of its own.
+import rows from '../packs/bar/parts/query/rows.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import { added, filterSaid, namer, without } from '../packs/bar/parts/query/terms.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
@@ -17,8 +22,10 @@ import { around, ranked, uses } from '../packs/bar/parts/query/rank.js';
 import { changes, litBy } from '../packs/bar/parts/query/lit-by.js';
 
 const pack = JSON.parse(readFileSync(new URL('../packs/bar/pack.json', import.meta.url), 'utf8'));
-const kinds = pack.parts.find((p: { id: string }) => p.id === 'bar.query').marks;
-const check = (m: unknown) => checkMarks(m, { kinds });
+/** Each part is held to the marks its manifest names, as the host holds it. */
+const marksOf = (id: string) => pack.parts.find((p: { id: string }) => p.id === id).marks;
+const checkLine = (m: unknown) => checkMarks(m, { kinds: marksOf('bar.query') });
+const check = (m: unknown) => checkMarks(m, { kinds: marksOf('bar.rows') });
 const text = (m: unknown) => JSON.stringify(m);
 
 const words = {
@@ -26,34 +33,34 @@ const words = {
   links: { part_of: 'part of', depends_on: 'depends on', 'sys.ran': 'ran' },
 };
 const lens = { filter: { find: ['type task', 'part_of e_abcdefgh'], only: ['blocked'] }, walk: { over: ['depends_on>'], steps: 2 }, limit: 50 };
-const input = (q: unknown = lens, more = {}) => ({ address: { query: q, layout: {}, drawn: { count: 12, cut: false } }, words, style: { numbers: { only_since_short: 1, only_since_days: 7, only_since_long: 30 } }, piece: {}, ...more });
+/** What a query slot hands a part: the lens up (Home's when none is), whether it is Home's, the names it names, the address (go). */
+const input = (q: unknown = lens, more = {}) => ({ query: q, home: false, names: {}, address: { query: q, layout: {}, drawn: { count: 12 } }, words, style: { numbers: { only_since_short: 1, only_since_days: 7, only_since_long: 30 } }, piece: {}, ...more });
 
-/** Mount the part, with tools that record where it goes and what it keeps. */
-function mount(given = input()) {
+/** Mount a part (the rows unless told), with tools that record where it goes and what it keeps. */
+function mount(given = input(), make = rows) {
   const went: unknown[] = [], kept: unknown[] = [];
-  const part = query(given, { go: (a: unknown) => went.push(a), keep: (v: unknown, n: string) => kept.push([n, v]) });
+  const part = make(given, { go: (a: unknown) => went.push(a), keep: (v: unknown, n: string) => kept.push([n, v]) });
   return { part, went, kept };
 }
 
-test('the line says the lens in one line, each part by its word, and how many are drawn', () => {
-  const { part } = mount();
-  check(part.marks);
+test('the line says the lens, each part by its word and as many terms as fit, and how many are drawn', () => {
+  const { part } = mount(input(), line);
+  checkLine(part.marks);
   const said = text(part.marks);
-  assert.match(said, /Find Task or part of an item · Only blocked · Walk → depends on ×2/);
-  assert.match(said, /"12 of 50"/);
-  assert.doesNotMatch(said, /"Find","Only"/, 'the rows wait for a press');
+  assert.match(said, /"fits":true/);
+  for (const w of ['"Find"', '"Task"', '"or"', '"part of an item"', '"Only"', '"blocked"', '"Walk"', '"→ depends on"', '"×2"', '"12 of 50"']) assert.ok(said.includes(w), w);
+  assert.doesNotMatch(said, /"Limit"/, 'the rows are the other part’s');
 });
 
-test('Home says find on the map, and nothing drawn', () => {
-  const { part } = mount(input(null, {}));
-  check(part.marks);
+test('Home’s lens with no terms says find on the map', () => {
+  const { part } = mount(input({ filter: {} }, { home: true, address: { query: null, drawn: { count: 0 } } }), line);
+  checkLine(part.marks);
   assert.match(text(part.marks), /Find on the map/);
-  assert.doesNotMatch(text(part.marks), /of 50/);
 });
 
-test('pressed, the line opens a row for each part, every term with its ×', () => {
+test('the rows: a row for each part, every term with its ×', () => {
   const { part } = mount();
-  const open = part.on({ key: 'line', name: 'press' });
+  const open = part.marks;
   check(open);
   const said = text(open);
   for (const w of ['"Find"', '"Only"', '"Not"', '"Walk"', '"Limit"', '"x:find:0"', '"x:only:0"', '"way:0"', '"wx:0"', '"add:find"', '"fits":true']) assert.ok(said.includes(w), w);
@@ -61,14 +68,13 @@ test('pressed, the line opens a row for each part, every term with its ×', () =
 
 test('a term’s × names the lens without it', () => {
   const { part, went } = mount();
-  part.on({ key: 'line', name: 'press' });
   part.on({ key: 'x:find:0', name: 'press' });
   assert.deepEqual(went, [{ query: { ...lens, filter: { ...lens.filter, find: ['part_of e_abcdefgh'] } } }]);
 });
 
 test('adding is a kind, then the thing of that kind: never words taken for a term', () => {
   const { part, went } = mount();
-  const kindsShown = part.on({ key: 'line', name: 'press' });
+  const kindsShown = part.marks;
   check(kindsShown);
   assert.match(text(kindsShown), /"Find…","Words","Type","Link"/);
   // A kind is a pick, so the menu stays open and its things are drawn under it, each a button that adds its term.
@@ -82,7 +88,6 @@ test('adding is a kind, then the thing of that kind: never words taken for a ter
 
 test('an item picked by name is added by its id and named by its title from then on', () => {
   const { part, went, kept } = mount();
-  part.on({ key: 'line', name: 'press' });
   part.on({ key: 'kind:find:0', name: 'pick', value: 'link' });
   const ends = part.on({ key: 'kind:find:1', name: 'pick', value: 'part_of' });
   assert.match(text(ends), /"key":"item:find"/);
@@ -96,7 +101,6 @@ test('an item picked by name is added by its id and named by its title from then
 
 test('what is written is taken only where the kind takes writing, and refused when it is not', () => {
   const { part, went } = mount();
-  part.on({ key: 'line', name: 'press' });
   part.on({ key: 'kind:only:0', name: 'pick', value: 'changed-since' });
   const wrong = part.on({ key: 'typed:only', name: 'submit', value: 'last week' });
   assert.match(text(wrong), /Not what this takes/);
@@ -106,7 +110,7 @@ test('what is written is taken only where the kind takes writing, and refused wh
 });
 
 test('Only offers its plain words, those already there left out, and the statuses of the types Find names', () => {
-  const s = { input: input(), open: true, adding: null, wrong: false, names: new Map() };
+  const s = { input: input(), adding: null, wrong: false, names: new Map() };
   const ids = stepsOf(s, 'only')[0].choices.map((c: { id: string }) => c.id);
   assert.ok(ids.includes('w:done') && !ids.includes('w:blocked'));
   const statuses = heard(s, { key: 'kind:only:0', name: 'pick', value: 'status' });
@@ -115,7 +119,7 @@ test('Only offers its plain words, those already there left out, and the statuse
 });
 
 test('the walk: an arrow turns a link’s way, steps go up and down, × takes a link out', () => {
-  const s = { input: input(), open: true, adding: null, wrong: false, names: new Map() };
+  const s = { input: input(), adding: null, wrong: false, names: new Map() };
   assert.deepEqual(heard(s, { key: 'way:0', name: 'press' }).go.walk, { over: ['depends_on<'], steps: 2 });
   assert.deepEqual(heard(s, { key: 'steps:more', name: 'press' }).go.walk, { over: ['depends_on>'], steps: 3 });
   assert.deepEqual(heard(s, { key: 'steps:less', name: 'press' }).go.walk, { over: ['depends_on>'], steps: 1 });
@@ -128,13 +132,15 @@ test('the walk: an arrow turns a link’s way, steps go up and down, × takes a 
 
 test('with the answer handed, what is used here is offered first, and a term says what it brought', () => {
   const answer = { items: [{ id: 'e_00000001', type: 'decision', terms: ['type task'] }, { id: 'e_00000002', type: 'decision', step: 1 }], links: [{ id: 'l1', type: 'depends_on', from: 'e_00000002', to: 'e_00000001' }] };
-  const s = { input: input(lens, { answer }), open: true, adding: null, wrong: false, names: new Map() };
+  const s = { input: input(lens, { answer }), adding: null, wrong: false, names: new Map() };
   const types = heard(s, { key: 'kind:find:0', name: 'pick', value: 'type' });
   assert.equal(stepsOf(types, 'find')[1].choices[0].id, 'decision');
   const { part } = mount(input(lens, { answer }));
-  const open = part.on({ key: 'line', name: 'press' });
-  check(open);
-  assert.match(text(open), /"tip":"Items of this type: 2 drawn","lights":\["e_00000001","e_00000002"\]/);
+  check(part.marks);
+  assert.match(text(part.marks), /"tip":"Task: Items of this type, 2 drawn","lights":\["e_00000001","e_00000002"\]/);
+  const said = mount(input(lens, { answer }), line).part.marks;
+  checkLine(said);
+  assert.match(text(said), /\["text",\{"tip":"Task","lights":\["e_00000001","e_00000002"\]\},"Task"\]/);
 });
 
 test('the lens algebra and its words, as the bar kept them', () => {
@@ -147,4 +153,21 @@ test('the lens algebra and its words, as the bar kept them', () => {
   assert.deepEqual([...uses([{ type: 't' }], []).types], [['t', 1]]);
   assert.ok(changes(1, 3) && !changes(3, 3));
   assert.deepEqual([...litBy({ items: [{ id: 'a', terms: ['x'] }, { id: 'b', step: 1 }], links: [{ from: 'a', to: 'b' }] }, 'x')], ['a', 'b']);
+});
+
+test('a row’s count of what did not fit, pressed, shows all its terms, and pressed again, as many as fit', () => {
+  const { part } = mount();
+  assert.match(text(part.marks), /"fits":true,"more":"more:find"/);
+  const all = part.on({ key: 'more:find', name: 'press', value: 1 });
+  check(all);
+  assert.match(text(all), /"wrap":true,"grow":true\},\["box".*"key":"more:find"/);
+  assert.doesNotMatch(text(part.on({ key: 'more:find', name: 'press' })), /"wrap":true/);
+});
+
+test('the walk’s steps stand past what fits on the line, so they are never cut', () => {
+  const marks = mount(input(), line).part.marks;
+  checkLine(marks);
+  const fitting = JSON.stringify(marks[2]);
+  assert.ok(fitting.includes('"fits":true') && !fitting.includes('×2'), 'the steps are not among what fits');
+  assert.match(JSON.stringify(marks[3]), /×2/);
 });

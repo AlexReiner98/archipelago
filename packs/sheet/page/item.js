@@ -12,7 +12,7 @@ import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { linkAdder } from './item-links.js';
 import { startLink } from './link-pick.js';
-import { added } from './query-bar.js';
+import { added } from './query-base.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, keepsFigure, readWhole, sectionsOn, toolOf } from './screens.js';
 import { idsIn, isA, label, menu, relations, titles } from './words.js';

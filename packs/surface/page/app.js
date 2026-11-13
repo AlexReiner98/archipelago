@@ -69,7 +69,7 @@ async function route(pulse = false) {
   drawNav();
   startTabs();
   const params = new URLSearchParams(query);
-  // The canvas: the pane in focus draws the lens the address says (ui/query-bar.js shows it); an item's page with none
+  // The canvas: the pane in focus draws the lens the address says (the bar pack's parts show it); an item's page with none
   // keeps what is up when it draws the item, and else opens on the item.
   if (pulse) refreshCanvas(true);
   else if (name === 'e' && arg) toAddress(atOf(location.hash) ?? (canvasHas(arg) ? undefined : `e/${arg}`), arg);

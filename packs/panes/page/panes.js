@@ -14,7 +14,6 @@ import { addressOf, opening, readAddress } from './query.js';
 import { numberOf } from './query-base.js';
 import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf } from './pane-route.js';
-import { filterSaid } from './query-bar.js';
 import { frameIn, reframe } from './pane-web.js';
 import { BLANK, asPane, byPart, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
 import { titles } from './words.js';
@@ -103,7 +102,7 @@ function load(id, at) {
       if (drawn.get(id) !== entry || entry.at !== at) return;
       // Named as its tab would be: a saved canvas by its name, else by what its filter finds.
       const naming = () => {
-        entry.name.textContent = (style.canvas && titles.get(style.canvas)) || (lens ? filterSaid(lens.filter, naming) : 'Home') || 'Canvas';
+        entry.name.textContent = (style.canvas && titles.get(style.canvas)) || (lens ? hooks.lensSaid?.(lens.filter, naming) : 'Home') || 'Canvas';
         entry.name.title = `${entry.name.textContent}: drag to dock it elsewhere`;
       };
       naming();
@@ -403,7 +402,7 @@ hooks.paneFrame = (at, el, said) => {
   else
     lensOf(at).then(({ lens, style, here }) => {
       if (!live) return;
-      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? filterSaid(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
+      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? hooks.lensSaid?.(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
       naming();
       canvas.show(lens, here, style);
       activate(canvas);

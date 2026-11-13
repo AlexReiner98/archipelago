@@ -10,7 +10,6 @@ import { api, ask, firstDrawn, h, hooks, idsOf, may, state, tell, wordsOf, withI
 import { drawPart } from './part-host.js';
 import { placeBy } from './menu-place.js';
 import { addressOf, flatView, stepsOf } from './query.js';
-import { filterSaid, fitBar } from './query-bar.js';
 import { canvasMenu } from './canvas-menu.js';
 import { sharePublicly } from './item-doc.js';
 import { newIslandButton } from './island-new.js';
@@ -202,7 +201,7 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const current = upOf(all, lens, style);
     const changed = current && edited(current, lens, style);
     // Not saved, it is named as its tab and its pane are: by what its filter finds.
-    const label = current ? current.title : isHome ? 'Home' : filterSaid(lens.filter, () => {}) || 'View';
+    const label = current ? current.title : isHome ? 'Home' : hooks.lensSaid?.(lens.filter) || 'View';
     const pick = viewPicker({ current, label, changed, isHome, open, title: current ? (changed ? `${current.title}: changed since it was saved` : current.title) : 'Not saved: Save keeps it' });
     // In a browser's order: back and forward, then the canvas up, as its address, and its style, with Save beside them, Split, and the canvas's menu at the end.
     const own = hooks.paneButtons?.() ?? [];
@@ -218,8 +217,8 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const rows = [{ element: layout }, writes && current && { text: 'Save as new view', title: 'Keep what is up as a view of its own', act: () => save(lens, style, current, open, true) }, writes && { text: 'Share it', title: 'Public for anyone, frozen as it is now (saved first if it is not)', act: () => shareView(lens, style, current, open) }];
     part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, ...[writes && h('button', { type: 'button', class: 'q-save q-word', title: current ? (changed ? `Save the changes to “${current.title}”` : working(current) ? `Keep “${current.title}”: an agent’s view, retired with what it is about until you keep it` : `“${current.title}” is kept`) : 'Save this view', 'aria-label': 'Save this view', ...(current && !changed && !current.preset && !working(current) && { disabled: true }), onclick: () => save(lens, style, current, open) }, saveMark(), h('span', { class: 'q-word-text' }, changed ? 'Save •' : working(current) ? 'Keep' : 'Save'))].filter(Boolean), ...(writes && current && !current.preset ? [h('button', { type: 'button', class: 'q-save q-delete', title: `Delete “${current.title}”`, 'aria-label': 'Delete this saved view', onclick: () => drop(lens, style, current, open) }, binMark())] : []), ...own.filter((b) => !travel.includes(b)), canvasMenu(rows));
     // Making an island is a button of the band, once the map says it has islands: beside Save, before the menu.
-    newIslandButton().then((button) => button && !part.querySelector('.q-island') && (part.insertBefore(button, part.lastElementChild), fitBar()));
-    fitBar();
+    newIslandButton().then((button) => button && !part.querySelector('.q-island') && (part.insertBefore(button, part.lastElementChild), hooks.fitBar?.()));
+    hooks.fitBar?.();
   });
   return part;
 }

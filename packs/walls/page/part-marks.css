@@ -93,9 +93,14 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 
 /* A box that fits shows one line of its marks and counts the rest (packs/walls/page/part-fits.js). */
 .pm-fits { flex-wrap: nowrap; overflow: hidden; }
+/* A part never makes its place wider than it is given (a grid or flex item is as wide as its words by default): so a
+   box that fits in it is given the place's width, and counts what does not fit, rather than running past its edge. */
+.part-body, .part-body > .pm-box, .part-body > .pm-list, .pm-list > .pm-box { min-width: 0; }
 /* Its marks keep their width rather than shrinking to an ellipsis, so the box overflows and the host can count what
    does not fit (packs/walls/page/part-fits.js); without this they shrink, nothing overflows and nothing is counted. */
 .pm-fits > * { flex-shrink: 0; }
+/* What the host hides past what fits stays hidden, a box among them too (its display would otherwise win over hidden). */
+.pm-fits > [hidden] { display: none; }
 .pm-fits > .pm-fits-rest { flex: none; cursor: default; }
 .pm-fits > button.pm-fits-rest { cursor: pointer; }
 /* A mark that lights items on the canvas says so when it is pointed at. */
