@@ -25,7 +25,11 @@ h3,
 h4,
 nav,
 footer,
-.muted {
+.muted,
+.part-body .pm-text-title,
+.part-body .pm-text-muted,
+.part-body .pm-button,
+.part-body .part-title {
   font-family: var(--face-text);
 }
 h1 {
@@ -175,7 +179,7 @@ figure img {
   border-radius: var(--radius-3);
   background: var(--reader-figure);
 }
-/* A front page that opens on a figure (ui/doc.js) runs it from edge to edge of the window, with no card round it:
+/* A front page that opens on a figure (packs/surface/page/frozen-page.js) runs it from edge to edge of the window, with no card round it:
    its ground is the page's own. */
 html:has(section.lead) {
   overflow-x: clip;
@@ -398,7 +402,7 @@ button.copy.copied::before {
   margin: 0;
 }
 
-/* An item of a link's view, opened read only in a sheet over the page (ui/doc-sheet.js). */
+/* An item of a link's view, opened read only in a sheet over the page (packs/surface/page/frozen-chrome.js). */
 .doc-sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--reader-measure), 100%); overflow: auto; padding: var(--space-8) var(--reader-side); background: var(--reader-page, Canvas); color: var(--reader-ink, CanvasText); border-left: var(--border-1) solid var(--reader-line); }
 .doc-sheet-close { position: sticky; top: 0; float: right; border: 0; background: none; color: inherit; font: inherit; font-size: var(--reader-h1); line-height: 1; cursor: pointer; }
 .doc-sheet h2 { margin-top: 0; }

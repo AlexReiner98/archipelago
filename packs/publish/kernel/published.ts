@@ -12,6 +12,7 @@ import type { KernelContext } from '#pelago/kernel';
 import { actorId, authorityOf, itemOf, publishable, type Actor, type Said } from './map.ts';
 import { freezeDocument, pathOf, publishPlan } from './published-freeze.ts';
 import { republished } from './published-live.ts';
+import { pageMarks } from './page-marks.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 
@@ -38,7 +39,9 @@ export async function publish(ctx: KernelContext, actor: Actor, id: string, said
   if (doc.visibility !== 'public') await ctx.call('root.publish', { act: 'visibility', id, actor: actorId(actor), visibility: 'public', authority });
   // Drawn as the map's styles stand now (the styles pack's page.look), kept with it until it is published again.
   const frozen = await freezeDocument(ctx, id);
-  const given = { ...frozen, style_at: (await ctx.reads({ log_head: true })) as number, look: await ctx.call('page.look', { ...frozen, id }) };
+  const look = await ctx.call<unknown, Record<string, unknown>>('page.look', { ...frozen, id });
+  // And the marks its reader's part draws it with, so a reader with no login is sent marks, never the part's code.
+  const given = { ...frozen, style_at: (await ctx.reads({ log_head: true })) as number, look, ...(await pageMarks(ctx, 'page.doc', { ...frozen, ...look }, { published: true })) };
   const by = actor.person ?? actorId(actor);
   // What a reader is given is its public view: publishing a document shares it as it stands.
   await ctx.call('root.publish', { act: 'publish', id, actor: actorId(actor), by, given, detail: { sections: given.sections.length, lenses: Object.keys(given.lenses).length, authority } });

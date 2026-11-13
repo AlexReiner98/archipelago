@@ -27,7 +27,7 @@ body.baked { margin: 0; background: var(--ln-sea); color: var(--ln-text); font-f
 .baked .rails[data-rails="walk"] { padding: 0; }
 .site-foot { padding: var(--ln-rails-card-inset); color: var(--ln-muted); font-size: var(--ln-rails-count-text); max-width: var(--ln-rails-card-width); }
 
-/* The map's colours read from the page's, as a picture in a published document reads them (ui/doc-lens.css), on the
+/* The map's colours read from the page's, as a picture in a published document reads them (packs/surface/page/doc-lens.css), on the
    ground a published page stands on (--reader-page), which a hero's own ground is drawn to match (the ridges kit). */
 body.baked {
   --ln-sea: var(--reader-page, var(--bg)); --ln-land: var(--panel); --ln-inner: var(--reader-page, var(--bg)); --ln-line: var(--reader-line, var(--edge));

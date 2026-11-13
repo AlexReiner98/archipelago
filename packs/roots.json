@@ -18,15 +18,15 @@
     },
     {
       "id": "identity",
-      "hash": "9f4ed8aa986af14209e347bb38cfe028ada7c587918e77ae47f2bf8d8414ac15"
+      "hash": "43c1f8d948f2d32868b309abb98e5a38bf18d02d2f7f831596bc5a7a69f86e1f"
     },
     {
       "id": "walls",
-      "hash": "805622f3586f5595402bcc72519b5ba736f1e612f4b973481df434c4e4ee40ca"
+      "hash": "f7701643241f0faf10bf6da085cc5d39786a51f1d8a9f3f15d4f7d86327f5626"
     },
     {
       "id": "loader",
-      "hash": "e9ba8a9c31af693c1732fc4b5b08eaedd1204bb10ec6b38027ae1dd32835501f"
+      "hash": "c0c8736d05fedb42deb7120a5ca9914ec4d4b6fc2343f00920fd1010e330e54d"
     },
     {
       "id": "rules",
@@ -34,15 +34,15 @@
     },
     {
       "id": "write",
-      "hash": "adcf1846610736ef5d03f2983a6edf489e1aef541a4203db04b82fa6606e20d4"
+      "hash": "32b474b64d1928c5bf789538a8d5a12153511754770d2075b833fe3122ab140e"
     },
     {
       "id": "surface",
-      "hash": "8c670eda70d87f87965ce534331d2dbe7eec71a3aaeb4585101556320c5722cc"
+      "hash": "aad2ce0c423d6a12a767090af6e0b92797619efa60467a5447e79fb9b1927580"
     },
     {
       "id": "panes",
-      "hash": "ed42c101ebac3d69a61b22ad4e93bd9c8f960c48dc4c2273d419dca960198fd3"
+      "hash": "5f42e804a188fceb8faa94b2d45bb0a85caf09572e9d63d78485c89a6b0c4552"
     },
     {
       "id": "bar",
@@ -50,7 +50,7 @@
     },
     {
       "id": "sheet",
-      "hash": "fab34b6295cb97225e071eedc07a37dfd2e020761e0e1acf9719e471dcae1a30"
+      "hash": "cd3a8b49cc672e58d284b58cb6d6dece743d4fe8f51c23d7661300cc46ed13a0"
     }
   ],
   "calls": {
@@ -90,6 +90,9 @@
       "publish"
     ],
     "root.scene": [
+      "publish"
+    ],
+    "root.part_marks": [
       "publish"
     ],
     "root.parts": [

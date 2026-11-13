@@ -1,5 +1,5 @@
 // What a stylesheet from the map may say: a drawing's (packs/walls/page/marks.js, cssFor) and a published page's (a style's
-// page_css, read by ui/doc.js). The page checks a sheet before it reads one; the server checks page_css when it is
+// page_css, read by packs/surface/page/frozen-page.js). The page checks a sheet before it reads one; the server checks page_css when it is
 // written (packs/loader/kernel/fields.ts), by these same rules, so a sheet the page would refuse never reaches it. Served to the page
 // as /css-check.js, its types stripped (packs/surface/kernel/ui-files.ts). It imports nothing, so it runs in a browser as it is: keep it so.
 
