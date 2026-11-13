@@ -27,6 +27,7 @@ import { lightItems } from './light-items.js';
 import { sessionHue } from './words.js';
 import { paintSwatch, tryTheme } from './swatch.js';
 import { replayIn } from './replay.js';
+import { thumbOf } from './thumbs.js';
 import { project } from './project.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
@@ -255,6 +256,8 @@ export function addressMoved() {
   for (const one of versions.values()) for (const m of one.mounted.values()) if (m.part.go && m.address !== now) ((m.address = now), void m.refresh());
 }
 hooks.addressMoved = addressMoved;
+// A view drawn small, as a thumb mark and Home's rows show it: the app asks for it by name, never by importing the file.
+hooks.thumbOf = thumbOf;
 
 /** Take down every part whose place has left the page, and every worker none is drawn by. */
 function sweep() {

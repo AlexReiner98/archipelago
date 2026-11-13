@@ -1,4 +1,4 @@
-// A view drawn small (task e_qcydtzdj; the owner, 4 Nov 2026, decision e_nasagnyg): in this browser, in the
+// The runtime's drawing of a part's `thumb` mark (packs/walls/page/part-check.js), and of every view drawn small (task e_qcydtzdj; the owner, 4 Nov 2026, decision e_nasagnyg): in this browser, in the
 // background, never on the server. A thumbnail is the view drawn as the canvas draws it (flatView, the same sandboxed
 // drawing) in a frame kept off screen, one at a time and only when the page is idle and the thumbnail is in sight,
 // then made a still image (thumb-still.js) and kept in this browser's IndexedDB by the view and the log position its

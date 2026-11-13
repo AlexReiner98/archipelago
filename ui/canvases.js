@@ -15,7 +15,6 @@ import { canvasMenu } from './canvas-menu.js';
 import { sharePublicly } from './item-doc.js';
 import { lookSwitch, styleDelete } from './look-switch.js';
 import { newIslandButton } from './island-new.js';
-import { thumbOf } from './thumbs.js';
 import { pageIsA, pageSchema, versionCanvases } from './page-schema.js';
 
 const TYPE = 'lens';
@@ -234,7 +233,7 @@ hooks.openView = (id) => viewAt(id).then((href) => href && (location.hash = href
 /** A view's thumbnail where a part names it: drawn once the list says what the view draws. */
 hooks.viewThumb = (id) => {
   const box = h('span', { class: 'thumb-at' });
-  if (id !== 'home') savedCanvases().then((all) => ((c) => c && box.replaceChildren(thumbOf({ id: c.id, ...viewParts(c) })))(all.find((v) => v.id === id)));
+  if (id !== 'home') savedCanvases().then((all) => ((c) => c && box.replaceChildren(...[hooks.thumbOf?.({ id: c.id, ...viewParts(c) })].filter(Boolean)))(all.find((v) => v.id === id)));
   return box;
 };
 hooks.viewUp = () => up;
