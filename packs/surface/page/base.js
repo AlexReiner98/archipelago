@@ -46,6 +46,30 @@ export { h };
 export const drawSlot = (node, asked) => import('./part-host.js').then((m) => m.drawPart(node, asked));
 export const drawSlots = (node, asked) => import('./part-host.js').then((m) => m.drawParts(node, asked));
 
+/**
+ * Look mode (`?look`): on the first word of a drawing, from the canvas or from a page that draws one, mount the part
+ * that fills `look` on a hidden node, two frames on, so the page has painted before it says so. The part is handed
+ * what was drawn and publishes it as page state; with no part, or a part that fails, the state is said here instead,
+ * so whatever is waiting for the picture is never left waiting. Mounting a frame slot is the runtime's, not the app's.
+ */
+if (typeof location === 'object' && new URLSearchParams(location.search).has('look')) {
+  const root = document.documentElement;
+  const said = (why, state = 'error') => ((root.dataset.look_why = String(why).slice(0, 300)), (root.dataset.look = state));
+  const first = (ev) => {
+    if (ev.target !== root && !ev.target.closest?.('#canvas')) return;
+    document.removeEventListener('view-drawn', first);
+    const { state, why } = ev.detail ?? {};
+    // Words, not an object: what a piece says of a part is words, numbers and yes or no.
+    const piece = { drawn: typeof state === 'string' ? state : 'drawn', ...(why ? { why: String(why).slice(0, 300) } : {}) };
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const node = Object.assign(document.createElement('div'), { hidden: true });
+      document.body.append(node);
+      drawSlot(node, { slot: 'look', piece }).then((drawn) => drawn || said('No part fills the slot look.'), (err) => said(err?.message ?? err));
+    }));
+  };
+  document.addEventListener('view-drawn', first);
+}
+
 /** A lens's sets of words, each its own Find term: one or several (the find bar's Shift+Enter adds a set, e_e3k797d3). */
 export const wordsOf = (filter) => (filter?.find ?? []).filter((t) => t.startsWith('text ')).map((t) => t.slice(5));
 /** The filter with its words these sets, in the place words have among Find's terms. */
