@@ -65,8 +65,11 @@ test('in a browser, every chat that shows something has a tab named by its title
     assert.ok(await page.until(`${menuOf(tabNamed('Chat 1'))}.some((b) => b.textContent === 'Pop out')`), 'the menu offers Pop out');
     await page.evaluate(`${menuOf(tabNamed('Chat 1'))}.find((b) => b.textContent === 'Pop out').click()`);
     await until('the tab is out', async () => (await strip()).some((t) => t[3]));
-    const targets = (await page.send('Target.getTargets')).result.targetInfos as { targetId: string; type: string; url: string }[];
-    const popped = targets.find((t) => t.type === 'page' && t.url.includes(`/e/${made.i1}`));
+    // The window opens, and comes to its address, in its own time: waited for, not assumed (a busy machine is slow to it).
+    type Target = { targetId: string; type: string; url: string };
+    const poppedNow = async () => ((await page.send('Target.getTargets')).result.targetInfos as Target[]).find((t) => t.type === 'page' && t.url.includes(`/e/${made.i1}`));
+    let popped: Target | undefined;
+    await holds(async () => Boolean((popped = await poppedNow())), 20_000, 250);
     assert.ok(popped, 'a window was opened on the tab’s canvas');
     const { sessionId } = (await page.send('Target.attachToTarget', { targetId: popped.targetId, flatten: true })).result;
     const inPopped = async (expression: string) => (await page.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, sessionId)).result?.result?.value;
