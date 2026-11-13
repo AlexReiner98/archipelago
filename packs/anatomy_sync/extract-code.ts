@@ -12,14 +12,15 @@ const packOf = (path: string) => /^(?:packs|workspace-packs)\/([\w-]+)\//.exec(p
 
 /**
  * Where a module sits: a root pack's kernel, another pack's code, src/ or the page. The page is ui/ and a root's
- * page/ folder (the host's modules, part of that root: task e_qhrvu922), served by their names as ui/'s are.
+ * page/ folder (the host's modules, part of that root: task e_qhrvu922), served by their names as ui/'s are, and a
+ * pack's parts/ folder (the code of the page parts it draws, its manifest's parts).
  */
 export function layerOf(path: string, roots: Set<string>): string | undefined {
   if (path.startsWith('src/')) return 'src';
   if (path.startsWith('ui/')) return 'page';
   const pack = packOf(path);
   if (!pack) return undefined;
-  if (/^packs\/[\w-]+\/page\//.test(path)) return 'page';
+  if (/^packs\/[\w-]+\/(page|parts)\//.test(path)) return 'page';
   return roots.has(pack) && path.startsWith(`packs/${pack}/kernel/`) ? 'root' : 'pack';
 }
 

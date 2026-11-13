@@ -144,10 +144,11 @@
       "stream",
       "file",
       "count",
-      "hook"
+      "hook",
+      "page"
      ],
      "shown": true,
-     "description": "Which key of the manifest it is; hook is one of its kernel hooks (surface.views)."
+     "description": "Which key of the manifest it is; hook is one of its kernel hooks, page a part of the app's page it draws (parts)."
     },
     "part_id": {
      "type": "string",
@@ -185,10 +186,11 @@
       "status",
       "phase",
       "service",
+      "slot",
       "pack"
      ],
      "shown": true,
-     "description": "Its form; service is a service a pack provides in its kernel key (service:answer.flat, service:root.dump), pack the old form, a bare pack id."
+     "description": "Its form; service is a service a pack provides in its kernel key (service:answer.flat), slot a place on the page a part fills (slot:piece.attention), pack the old form, a bare pack id."
     },
     "takes": {
      "type": "string",

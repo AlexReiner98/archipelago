@@ -76,6 +76,10 @@ export function modelOf(packs: PackFile[], bundles: { b: Json }[], calls: Record
     for (const h of m.handlers ?? []) { if (h.event) names.add(`event:${h.event}`); for (const r of list(h.records)) names.add(`event:${r}`); }
     for (const [n, sig] of Object.entries<any>(k.provides ?? {})) { names.add(svc(n)); shapes.set(svc(n), { takes: sig?.in, gives: sig?.out }); }
     for (const n of Object.keys(k.calls ?? {})) names.add(svc(n));
+    for (const part of m.parts ?? []) {
+      for (const s of [part.slot, ...list(part.opens)].filter(Boolean)) names.add(`slot:${s}`);
+      for (const [type, fields] of Object.entries<any>(part.reads ?? {})) for (const f of list(fields)) names.add(`field:${f}@${type}`);
+    }
   }
   for (const act of Object.keys(calls)) names.add(svc(act));
 
@@ -111,6 +115,14 @@ export function modelOf(packs: PackFile[], bundles: { b: Json }[], calls: Record
       for (const r of x.runs ?? []) { const mod = moduleOf(p, r); if (mod) tie('anatomy.kept_in', key, mod); }
     }
     for (const [n, sig] of Object.entries<any>(k.provides ?? {})) { const mod = sig?.run && moduleOf(p, sig.run); if (mod) tie('anatomy.kept_in', `name:${svc(n)}`, mod); }
+    for (const part of m.parts ?? []) {
+      const key = `part:${m.id}:page:${part.id}:habits`;
+      want(key, 'anatomy.part', part.title || part.id, part.description, { part: 'page', part_id: part.id, side: 'habits' });
+      tie('part_of', key, me);
+      if (part.slot) tie('anatomy.reads', key, `name:slot:${part.slot}`);
+      for (const [type, fields] of Object.entries<any>(part.reads ?? {})) for (const f of list(fields)) tie('anatomy.reads', key, `name:field:${f}@${type}`);
+      for (const file of Object.values<string>(part.modules ?? {})) tie('anatomy.kept_in', key, `module:${p.path}/${file}`);
+    }
     const stores: [string, string][] = [...Object.keys(k.tables ?? {}).map((t) => [t, 'table'] as [string, string]), ...(k.memory ? [[String(k.memory), 'memory'] as [string, string]] : [])];
     for (const [id, store] of stores) { const key = `store:${m.id}:${id}`; want(key, 'anatomy.store', `${store} ${id}`, '', { store_id: id, store }); tie('part_of', key, me); }
   }
@@ -120,6 +132,7 @@ export function modelOf(packs: PackFile[], bundles: { b: Json }[], calls: Record
     if (f === 'pack') return packIds.has(n) ? [n] : [];
     if (f === 'type') return [typeOwner.get(rest) ?? linkOwner.get(rest)].filter((x): x is string => !!x);
     if (f === 'has') return [...(caps.get(rest) ?? [])];
+    if (f === 'slot') { const by = packs.filter((p) => (p.m.parts ?? []).some((part: Json) => list(part.opens).includes(rest))).map((p) => p.m.id); return by.length ? by : packIds.has('core') ? ['core'] : []; }
     if (f === 'service') return packs.filter((p) => Object.hasOwn(p.m.kernel?.provides ?? {}, rest)).map((p) => p.m.id);
     if (f === 'event') return ['item.due', 'notification.made'].includes(rest) ? ['core'] : packs.filter((p) => (p.m.handlers ?? []).some((h: Json) => list(h.records).includes(rest))).map((p) => p.m.id);
     return of && typeOwner.has(of) ? [typeOwner.get(of)!] : [];
