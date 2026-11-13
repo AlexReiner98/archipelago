@@ -1,14 +1,16 @@
 // A page drawn from frozen marks (decision e_rhz4dvpk): a document published or given as a link (/p/<workspace>/<id>,
 // a site's own domain), its preview (/preview/<id>), a document read with one's own sign-in (/read/<id>), and a
 // product's public page. The server ran the page's part (publish.doc, publish.public) and sends its marks with the page's
-// data (packs/publish/kernel/page-marks.ts); this draws them as the host draws any part's (./part-render.js), checked
-// first, with no session and none of the part's code. What only the page can do is the host's (./frozen-chrome.js):
-// its theme and page_css, its site's head and foot, pictures, where a link leads, sheets, copy and print.
+// data (packs/publish/kernel/page-marks.ts); this draws them, checked first, with no session and none of the part's
+// code: a document's in the page's own elements, which its page_css is written against (./frozen-doc.js), a product's
+// as the host draws any part's (./part-render.js). What only the page can do is the host's: its theme and page_css,
+// its site's head and foot, pictures, where a link leads, sheets, copy and print (./frozen-chrome.js).
 
 import { SignInNeeded, authHeaders, call, h } from './base.js';
 import { drawFrozen } from './doc-lens.js';
 import { carried } from './doc-ref.js';
-import { closeSheet, copyable, openSheet, pageFoot, plainMarks, readingStyle, siteHead, startAddress } from './frozen-chrome.js';
+import { closeSheet, openSheet, plainMarks, readingStyle, startAddress } from './frozen-chrome.js';
+import { blocks, pageParts, siteHead, waysOf } from './frozen-doc.js';
 import { warmLayouts } from './layout.js';
 import { checkedCss } from './marks.js';
 import { checkMarks } from './part-check.js';
@@ -66,60 +68,56 @@ addEventListener('auxclick', carry, true);
 
 /** The page drawn now, and what it was drawn from. */
 let d = null;
-let render = null;
 let start = null;
 let head = null;
 
-/** Where a page another one names is read: beside this one, at its address word on its site, or one's own read. */
-const pageOf = (id) => {
-  const paths = d?.paths ?? {};
-  if (own) return `/read/${id}`;
-  if (d?.site?.host && paths[id]) return paths[id] === 'home' ? '/' : `/${paths[id]}`;
-  return here.replace(/[^/]+$/, id);
-};
-
-/** An item named on the page, followed: its section on the page, another published page, or its sheet. */
+/** An item named on the page, followed: another published page it names, or its sheet when a picture froze it. */
 function follow(id) {
-  const at = main.querySelector(`[data-item="${id}"]`);
-  if (at) return void at.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  if (d?.links?.[id]) return void (location.href = pageOf(id));
+  if (d?.links?.[id]) return void (location.href = waysOf(d, { own, here }).pageOf(id));
   const sheet = d?.marks?.sheets?.[id];
   if (sheet && (published || d?.site)) openSheet(sheet);
 }
 
-main.addEventListener('click', (ev) => {
-  // A note names an item as the app does (#/e/<id>): here it leads where a page can take it.
-  const a = ev.target.closest?.('a[href]');
-  const id = a && main.contains(a) && /^#\/e\/(e_[a-z0-9]{8})$/.exec(a.hash)?.[1];
-  if (!id) return;
-  ev.preventDefault();
-  follow(id);
-});
-
-/** A picture the marks name, drawn out of the page's data: a view as publishing froze it, else a figure. */
-function picture(id, el) {
-  if (product) return void el.append(h('img', { src: `${here}/picture/${id}`, alt: '', loading: 'lazy' }));
-  const lens = d?.lenses?.[id];
+/** A section's picture: a view as publishing froze it, drawn once it is in place, else its figure. */
+function pictureOf(id) {
+  if (d?.lenses?.[id]) return h('div', { class: 'doc-lens', 'data-lens': id });
   const s = d?.parts?.find((p) => p.section?.id === id)?.section;
-  if (lens) {
-    const at = h('div', { class: 'doc-lens', 'data-lens': id });
-    el.append(at);
-    return void drawFrozen(at, lens, d.types, { onItem: published || d.site ? follow : null });
-  }
-  if (!s?.picture) return;
-  const img = h('img', { alt: s.title ?? '', 'data-figure': id });
-  el.append(img);
-  if (own || preview) api('picture', { result: id }).then((p) => (p ? (img.src = `data:${p.content_type};base64,${p.data}`) : img.remove()), () => img.remove());
-  else img.src = `${here}/picture/${id}`;
+  return s?.picture ? h('figure', {}, h('img', { src: own || preview ? '' : `${here}/picture/${id}`, alt: s.title ?? '', 'data-figure': id })) : null;
 }
 
-/** What the person did on the marks: the page's own gestures. */
-function told(ev) {
-  if (ev?.key === 'print' && ev.name === 'press') print();
-  if (product && ev?.key === 'build' && ev.name === 'picked') void load(String(ev.value ?? ''));
+/** A document's page, in its own elements (./frozen-doc.js), with what is around it as it is served. */
+function drawDoc() {
+  const ways = waysOf(d, { own, here });
+  const root = checkMarks(d.marks?.marks ?? plainMarks(d));
+  // One read with no login, not on its site's own domain, ends with a quiet way to start a map of one's own; one read with a sign-in may be printed.
+  const startsOwn = !own && !preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
+  const printable = !published && !d.site;
+  main.replaceChildren(
+    ...[
+      d.site && siteHead(d.site),
+      pageParts(root, d, ways, pictureOf),
+      d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, ways, 3)),
+      (printable || startsOwn) && h('footer', { class: 'muted' }, printable && h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF'), startsOwn && h('a', { class: 'start-own', href: start ?? '/' }, d.start)),
+    ].flat(Infinity).filter(Boolean),
+  );
+  // Its pictures, with the words: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
+  for (const el of main.querySelectorAll('[data-lens]')) drawFrozen(el, d.lenses[el.dataset.lens], d.types, { onItem: published || d.site ? follow : null });
+  if (own || preview) for (const img of main.querySelectorAll('img[data-figure]')) api('picture', { result: img.dataset.figure }).then((p) => (p ? (img.src = `data:${p.content_type};base64,${p.data}`) : img.remove()), () => img.remove());
 }
 
-async function draw(data) {
+/** A product's page, drawn as the host draws any part's; picking another build reads that build's page. */
+let render = null;
+function drawProduct() {
+  if (!render) render = mountPart(main.appendChild(h('div', { class: 'part-body' })), {
+    style: readingStyle,
+    tell: (ev) => ev?.key === 'build' && ev.name === 'picked' && void load(String(ev.value ?? '')),
+    picture: (id, el) => el.append(h('img', { src: `${here}/picture/${id}`, alt: '', loading: 'lazy' })),
+  });
+  render.draw(checkMarks(d.marks?.marks ?? ['text', { look: 'muted' }, 'This page cannot be drawn here.']));
+  main.querySelector(':scope > p')?.remove();
+}
+
+function draw(data) {
   d = data;
   closeSheet();
   if (d.carry) carryOn = d.carry;
@@ -131,21 +129,8 @@ async function draw(data) {
   head = /^[a-z]+$/.test(d.head ?? '') ? d.head : null;
   if (head) document.body.classList.add(head);
   if (d.marks_error) console.warn(`This page's marks were not kept: ${d.marks_error}`);
-  const body = d.marks?.marks ?? (product ? ['text', { look: 'muted' }, 'This page cannot be drawn here.'] : plainMarks(d));
-  // One read with no login, not on its site's own domain, ends with a quiet way to start a map of one's own.
-  const startsOwn = !product && !own && !preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
-  const page = ['box', { flow: 'column', gap: 8 }, ...(d.site ? [siteHead(d.site)] : []), body, ...(product ? [] : pageFoot(d, { start: startsOwn && start, print: !published && !d.site }))];
-  // Drawn the first time out of sight until its pictures are in (part-render draws each a moment after its marks), so
-  // a reader never sees the words without their pictures; drawn again, it changes in place.
-  const first = !render;
-  if (first) render = mountPart(main.appendChild(h('div', { class: 'part-body' })), { style: readingStyle, tell: told, picture });
-  const holder = main.querySelector('.part-body');
-  if (first) holder.style.visibility = 'hidden';
-  render.draw(checkMarks(page));
-  await Promise.resolve();
-  copyable(main);
-  main.querySelector(':scope > p')?.remove();
-  holder.style.visibility = '';
+  if (product) drawProduct();
+  else drawDoc();
 }
 
 /** The page's data with its marks, read where this page is. */
@@ -167,7 +152,7 @@ async function load(build) {
   try {
     const [data, address] = await Promise.all([read(build), product || own || preview ? null : startAddress()]);
     start = address;
-    await draw(data);
+    draw(data);
     sayLook('drawn');
   } catch (err) {
     render = null;

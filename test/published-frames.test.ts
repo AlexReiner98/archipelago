@@ -69,6 +69,22 @@ test('a published picture keeps its first frame, its page carries its data, and 
   assert.ok(!html.includes('noindex'), 'what the text says is not read as a replacement pattern');
 });
 
+test('a page keeps the marks its part drew it with, and one published before pages kept them is given them when served', async () => {
+  const { call, base, workspaces } = await serve('off');
+  const { d, l } = await published(call);
+  const kept = await (await fetch(`${base}/p/default/${d}/data`)).json();
+  assert.equal(kept.marks.part, 'publish.doc', 'its reader is sent marks, not the part');
+  assert.ok(JSON.stringify(kept.marks.marks).includes(`"item":"${l}"`), 'its picture is a mark');
+  assert.ok(Object.keys(kept.marks.sheets ?? {}).length > 0, 'with the sheet of each item its picture froze');
+  // As one published before this was: its row holds no marks.
+  await (await workspaces.get('default')).pelago.db.query(`update published set given = given - 'marks' where entity_id = $1`, [d]);
+  const served = await (await fetch(`${base}/p/default/${d}/data`)).json();
+  assert.equal(served.marks?.part, 'publish.doc', 'made the first time it is served');
+  assert.deepEqual(served.marks.marks, kept.marks.marks, 'as publishing would have made them');
+  const page = await (await fetch(`${base}/p/default/${d}`)).text();
+  assert.match(page, /"part":"publish.doc"/, 'and its page carries them');
+});
+
 test('a picture drawn by the owner’s version of a drawing is drawn only in the sandbox', async () => {
   const { call, base } = await serve('off');
   const look = 'export const css = `.lf-step { cursor: help; }`;\n';
@@ -87,8 +103,7 @@ test('in a browser, the text and the first frame are on the page together, and t
   try {
     // Whether the picture was there when the text first was.
     await page.send('Page.addScriptToEvaluateOnNewDocument', {
-      // The page is drawn from its frozen marks (packs/surface/page/frozen-page.js): its words are in sight once its body is.
-      source: `new MutationObserver((_, seen) => { const text = document.querySelector('main .pm-text-title'); if (!text || text.closest('.part-body').style.visibility === 'hidden') return; window.together = Boolean(document.querySelector('[data-lens="${l}"] svg')); seen.disconnect(); }).observe(document, { childList: true, subtree: true, attributes: true })`,
+      source: `new MutationObserver((_, seen) => { const text = document.querySelector('main h1'); if (!text) return; window.together = Boolean(document.querySelector('[data-lens="${l}"] svg')); seen.disconnect(); }).observe(document, { childList: true, subtree: true })`,
     });
     await page.go(`${base}/p/default/${d}`);
     assert.equal(await page.evaluate('window.together'), true);
@@ -137,10 +152,10 @@ test('in a browser, a page opened with ?live draws itself anew when published ag
   const { d, l } = await published(call);
   const page = await open(`${base}/p/default/${d}?live`);
   try {
-    await page.evaluate(`(async () => { for (let n = 0; n < 200 && !document.querySelector('main .pm-text-title'); n++) await new Promise((r) => setTimeout(r, 25)); window.stayed = true; })()`);
+    await page.evaluate(`(async () => { for (let n = 0; n < 200 && !document.querySelector('main h1'); n++) await new Promise((r) => setTimeout(r, 25)); window.stayed = true; })()`);
     await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: d, title: 'The system, renamed' }, { op: 'update', id: l, props: { style: { shape: 'map', lit: 'all' } } }] });
     await call('/api/publish', undefined, { id: d });
-    const title = await page.evaluate(`(async () => { for (let n = 0; n < 200 && document.querySelector('main .pm-text-title')?.textContent !== 'The system, renamed'; n++) await new Promise((r) => setTimeout(r, 25)); return document.querySelector('main .pm-text-title').textContent; })()`);
+    const title = await page.evaluate(`(async () => { for (let n = 0; n < 200 && document.querySelector('main h1')?.textContent !== 'The system, renamed'; n++) await new Promise((r) => setTimeout(r, 25)); return document.querySelector('main h1').textContent; })()`);
     assert.equal(title, 'The system, renamed');
     assert.equal(await page.evaluate('window.stayed'), true, 'the page was not loaded again');
   } finally {
@@ -150,23 +165,23 @@ test('in a browser, a page opened with ?live draws itself anew when published ag
 
 test('in a browser, the workspace style’s page_css is how a published page looks, checked as a drawing’s stylesheet is', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off');
-  const { d } = await published(call, [{ op: 'create', ref: 'look', type: 'style', title: 'The site', status: 'current', props: { page_css: '.pm-box:has(.doc-lens) > .pm-text-title { letter-spacing: 3px; }' } }]);
-  assert.equal((await (await fetch(`${base}/p/default/${d}/data`)).json()).page_css, '.pm-box:has(.doc-lens) > .pm-text-title { letter-spacing: 3px; }');
+  const { d } = await published(call, [{ op: 'create', ref: 'look', type: 'style', title: 'The site', status: 'current', props: { page_css: 'section:has(> .doc-lens) > h2 { letter-spacing: 3px; }' } }]);
+  assert.equal((await (await fetch(`${base}/p/default/${d}/data`)).json()).page_css, 'section:has(> .doc-lens) > h2 { letter-spacing: 3px; }');
   const page = await open(`${base}/p/default/${d}`);
-  const spacing = () => page.evaluate(`(async () => { const at = () => document.querySelector('main .pm-box:has(.doc-lens) > .pm-text-title'); for (let n = 0; n < 200 && !at(); n++) await new Promise((r) => setTimeout(r, 25)); return getComputedStyle(at()).letterSpacing; })()`);
+  const spacing = () => page.evaluate(`(async () => { for (let n = 0; n < 200 && !document.querySelector('section > h2'); n++) await new Promise((r) => setTimeout(r, 25)); return getComputedStyle(document.querySelector('section > h2')).letterSpacing; })()`);
   try {
     assert.equal(await spacing(), '3px');
     // One that would fetch something is refused when it is written (test/page-css.test.ts); another is read once published.
     const { rows } = { rows: (await call('/api/search', undefined, { q: 'The site', type: 'style' })).result };
-    assert.equal((await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: '.pm-text-title { letter-spacing: 3px; background: url(https://example.com/) }' } }] })).status, 400);
-    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: '.pm-text-title { letter-spacing: normal; }' } }] });
+    assert.equal((await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: 'h2 { letter-spacing: 3px; background: url(https://example.com/) }' } }] })).status, 400);
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: rows[0].id, props: { page_css: 'h2 { letter-spacing: normal; }' } }] });
     // What is published keeps the look it was published with until it is published again.
     await page.go(`${base}/p/default/${d}`);
     assert.equal(await spacing(), '3px');
     await call('/api/publish', undefined, { id: d });
     await page.go(`${base}/p/default/${d}`);
     assert.equal(await spacing(), 'normal');
-    assert.equal(await page.evaluate(`document.querySelector('main .pm-text-title').textContent`), 'The system');
+    assert.equal(await page.evaluate(`document.querySelector('main h1').textContent`), 'The system');
   } finally {
     await page.close();
   }

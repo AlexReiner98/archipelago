@@ -44,6 +44,7 @@
       "surface.published": "served.ts#served",
       "surface.public": "public-route.ts#servePublic",
       "surface.preview": "published-preview.ts#previewOf",
+      "surface.page_marks": "page-marks.ts#servedMarks",
       "surface.site_nav": "site.ts#siteNav",
       "surface.bake": "public-bake.ts#bake",
       "surface.counts_since": "pack-counts.ts#countsSince",
