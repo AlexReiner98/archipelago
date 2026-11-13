@@ -1,0 +1,24 @@
+{
+  "id": "catch_up",
+  "version": "0.1.0",
+  "title": "Catch-up",
+  "description": "What changed while you were away, traced and replayed over the canvas. Its parts stand on the trace overlay (the slot traces): catch_up.changes traces each mark a change touched, in its maker's hue, until it is seen, from the change set the runtime hands it as data (the rows a beat touched as they were and are); catch_up.replay offers what changed since the person last looked and plays it a step at a time, chapters by who made them, island by island. The runtime keeps the store, the projector, the painting and where the person last looked; the parts decide.",
+  "parts": [
+    {
+      "id": "catch_up.changes",
+      "title": "Traces",
+      "slot": "traces",
+      "reads": {},
+      "marks": ["box", "trace"],
+      "modules": { "index.js": "parts/traced.js", "changes.js": "parts/changes.js", "traces.js": "parts/traces.js" }
+    },
+    {
+      "id": "catch_up.replay",
+      "title": "Catch-up",
+      "slot": "traces",
+      "reads": {},
+      "marks": ["box", "text", "button", "replay"],
+      "modules": { "index.js": "parts/replay.js", "changes.js": "parts/changes.js", "steps.js": "parts/steps.js" }
+    }
+  ]
+}
