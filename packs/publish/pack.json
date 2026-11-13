@@ -56,6 +56,7 @@
     "service:root.picture",
     "service:root.layout",
     "service:root.scene",
+    "service:root.part_marks",
     "service:root.drawing",
     "service:root.public_product",
     "service:page.look",
@@ -92,6 +93,28 @@
       "modules": {
         "index.js": "parts/reading/index.js",
         "sections.js": "parts/reading/sections.js"
+      }
+    },
+    {
+      "id": "publish.doc",
+      "title": "A document's page",
+      "slot": "page.doc",
+      "marks": ["box", "text", "note", "list", "button", "picture"],
+      "reads": {},
+      "modules": {
+        "index.js": "parts/doc/index.js",
+        "page.js": "parts/doc/page.js",
+        "sheet.js": "parts/doc/sheet.js"
+      }
+    },
+    {
+      "id": "publish.public",
+      "title": "A product's public page",
+      "slot": "page.public",
+      "marks": ["box", "text", "list", "input", "button", "picture"],
+      "reads": {},
+      "modules": {
+        "index.js": "parts/public/index.js"
       }
     }
   ]

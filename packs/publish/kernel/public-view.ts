@@ -11,6 +11,7 @@ import type { KernelContext } from '#pelago/kernel';
 import { actorId, type Actor } from './map.ts';
 import { publicPath } from './published-data.ts';
 import { republished } from './published-live.ts';
+import { pageMarks } from './page-marks.ts';
 import { freeze, shownIn } from './public-view-freeze.ts';
 
 export { freeze, sharedState, sharedViews, sharePlan } from './public-view-freeze.ts';
@@ -22,7 +23,9 @@ export { freeze, sharedState, sharedViews, sharePlan } from './public-view-freez
 export async function share(ctx: KernelContext, actor: Actor, id: string) {
   if (actor.kind !== 'human') throw new Error('Only a person makes a view public: ask them (ask, action share_ask).');
   const frozen = await freeze(ctx, id);
-  const given = { ...frozen, style_at: (await ctx.reads({ log_head: true })) as number, look: await ctx.call('page.look', { ...frozen, id }) };
+  const look = await ctx.call<unknown, Record<string, unknown>>('page.look', { ...frozen, id });
+  // Kept with the marks its reader's part draws it with (./page-marks.ts).
+  const given = { ...frozen, style_at: (await ctx.reads({ log_head: true })) as number, look, ...(await pageMarks(ctx, 'page.doc', { ...frozen, ...look }, { published: true })) };
   const by = actor.person ?? actorId(actor);
   await ctx.call('root.publish', { act: 'share', id, actor: actorId(actor), by, given, detail: { shows: shownIn(frozen).length } });
   republished(ctx.workspace, id);

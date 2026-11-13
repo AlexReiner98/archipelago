@@ -87,9 +87,9 @@ test("a mounted entry answers JSON, a picture, text and a redirect, each with th
 test("a page a mounted entry makes names the UI's files at their version, and asks for what they import at once", async () => {
   const { base } = await server(true);
   const html = await (await fetch(`${base}/p/acme/ui`)).text();
-  assert.match(html, /<script type="module" src="\/doc\.js\?v=[0-9a-f]{12}"/);
+  assert.match(html, /<script type="module" src="\/frozen-page\.js\?v=[0-9a-f]{12}"/);
   assert.match(html, /<link rel="modulepreload" href="\/doc-lens\.js\?v=/);
-  assert.match(html, /<a href="\/doc\.js">/, 'only what a page loads is versioned');
+  assert.match(html, /<a href="\/frozen-page\.js">/, 'only what a page loads is versioned');
 });
 
 test("a stream is the kernel's own, of a published document alone; a pass is answered as with no pack", async () => {
@@ -100,7 +100,7 @@ test("a stream is the kernel's own, of a published document alone; a pass is ans
   assert.doesNotMatch(await passed.text(), /workspace=acme/);
   assert.doesNotMatch((await getAs(base, 'reader.example', '/pass')).body, /site workspace=/);
   // A site's domain serves the kernel's own files as every name does: they never reach the pack.
-  const script = await getAs(base, 'reader.example', '/doc.js');
+  const script = await getAs(base, 'reader.example', '/frozen-page.js');
   assert.equal(script.status, 200);
   assert.doesNotMatch(script.body, /site workspace=/);
 });

@@ -86,9 +86,7 @@ test('a line reads as spans: strong, said so, code, links, pages of the site and
 });
 
 test('the item page and the published reader read one dialect', () => {
-  for (const page of ['packs/walls/page/body.js', 'ui/doc.js']) {
-    const code = readFileSync(page, 'utf8');
-    assert.match(code, /from '\.\/text\.js'/, `${page} reads notes through the host's text.js`);
-    assert.doesNotMatch(code, /TABLE_RULE|function readTable/, `${page} keeps no reader of its own`);
-  }
+  // A published page's words are note marks (packs/publish/parts/doc), drawn by body.js as the item page's are.
+  assert.match(readFileSync('packs/walls/page/body.js', 'utf8'), /from '\.\/text\.js'/, "body.js reads notes through the host's text.js");
+  for (const page of ['packs/walls/page/body.js', 'packs/surface/page/frozen-page.js', 'packs/surface/page/frozen-chrome.js']) assert.doesNotMatch(readFileSync(page, 'utf8'), /TABLE_RULE|function readTable/, `${page} keeps no reader of its own`);
 });

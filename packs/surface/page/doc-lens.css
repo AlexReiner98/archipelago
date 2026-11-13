@@ -1,4 +1,4 @@
-/* A picture in a published document (ui/doc-lens.js): the lens's colours read from the page's, as in the app
+/* A picture in a published document (packs/surface/page/doc-lens.js): the lens's colours read from the page's, as in the app
    (ui/style.css, .lens-view), and the few controls its shapes put over it. Every value is the style's. */
 .doc-lens .lens-view {
   --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
@@ -19,7 +19,7 @@
 .doc-lens .group-actor .dot { fill: var(--g-actor); } .doc-lens .group-aim .dot { fill: var(--g-aim); } .doc-lens .group-work .dot { fill: var(--g-work); }
 .doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }
 .doc-lens .group-place .dot { fill: var(--g-place); } .doc-lens .group-system .dot { fill: var(--g-system); }
-/* A page is one column, and a picture is as wide as it. One that plays stands beside its words in a band (ui/doc.js):
+/* A page is one column, and a picture is as wide as it. One that plays stands beside its words in a band (packs/surface/page/frozen-page.js):
    the page is as wide as the style's reader_band, its other text centred at the column's width, and a band stacks
    by itself where the window cannot hold two sides at reader_band_least. */
 main:has(.doc-band) { max-width: var(--reader-band); }
