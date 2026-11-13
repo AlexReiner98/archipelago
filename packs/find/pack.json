@@ -1,6 +1,7 @@
 {
   "id": "find",
   "version": "0.1.0",
+  "app": true,
   "title": "Find",
   "description": "Find at the canvas's foot: what typed words could be, each choice said by its kind (decisions e_2a4mddx8, e_45sgrfqd), taken to move the canvas's query, open a view, an item's page or a layout. A map pack: one part, no type.",
   "uses": ["service:answer.flat", "service:answer.saved_views"],
