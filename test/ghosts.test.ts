@@ -1,13 +1,18 @@
 // What changes held for the owner add to a picture, the write pack's part (packs/write/parts/ghosts): a new item where
 // its links reach what is drawn, a link between what is drawn, an edit marked on its item, and nothing that would land
-// nowhere in sight. The part decides; the runtime draws each ghost.
+// nowhere in sight. The part decides; the runtime (packs/surface/page/replica.js) checks the ghosts and draws them in.
 
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
+import { uiFile } from '../packs/surface/kernel/ui-files.ts';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import { ghostsOf } from '../packs/write/parts/ghosts/ghosts.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
-import ghosts from '../packs/write/parts/ghosts/index.js';
+import ghosts, { ghostList } from '../packs/write/parts/ghosts/index.js';
 
 const drawn = ['e_aaaaaaaa', 'e_bbbbbbbb'];
 const holds = (id: string) => drawn.includes(id);
@@ -31,22 +36,39 @@ test('held changes are drawn where they would land, and only there', () => {
   assert.deepEqual(ghostsOf(held, holds, true).items.map((i: { id: string }) => i.id), ['p_make:x', 'p_make:y', 'p_away:z'], 'on a canvas of what is held, every new item');
 });
 
-test('the part answers with a ghost for each, as the runtime reads them back', () => {
-  const part = ghosts({ held, drawn });
-  const [list, at, ...marks] = part.marks;
-  assert.equal(list, 'list');
-  assert.deepEqual(at, {});
-  assert.deepEqual(marks.map(([kind, a]: [string, { of: string; id?: string; on?: string }]) => `${kind} ${a.of} ${a.id ?? a.on}`), ['ghost item p_make:x', 'ghost item p_make:y', 'ghost link p_link:0', 'ghost link p_make:2', 'ghost link p_make:3', 'ghost mark e_bbbbbbbb']);
-  assert.deepEqual(marks[2][1], { of: 'link', id: 'p_link:0', type: 'depends_on', from: 'e_aaaaaaaa', to: 'e_bbbbbbbb', proposal: 'p_link', by: 'robot', reason: 'a link', op: 'link' });
-  assert.deepEqual(marks.at(-1)[1], { of: 'mark', on: 'e_bbbbbbbb', proposal: 'p_edit', op: 'update' });
-  assert.deepEqual(part.update({ held: [], drawn }), ['list', {}], 'nothing held, nothing drawn');
-  assert.deepEqual(ghosts({}).marks, ['list', {}]);
+test('the part decides the ghosts as data, and draws nothing', async () => {
+  const part = ghosts();
+  assert.equal(part.marks, undefined, 'no marks: it is only asked');
+  const list = await part.decide({ held, drawn });
+  assert.deepEqual(list.map((g: { of: string; id?: string; on?: string }) => `${g.of} ${g.id ?? g.on}`),['item p_make:x', 'item p_make:y', 'link p_link:0', 'link p_make:2', 'link p_make:3', 'mark e_bbbbbbbb']);
+  assert.deepEqual(list[2], { of: 'link', id: 'p_link:0', type: 'depends_on', from: 'e_aaaaaaaa', to: 'e_bbbbbbbb', proposal: 'p_link', by: 'robot', reason: 'a link', op: 'link' });
+  assert.deepEqual(list.at(-1), { of: 'mark', on: 'e_bbbbbbbb', proposal: 'p_edit', op: 'update' });
+  assert.deepEqual(ghostList({}), [], 'nothing held, nothing drawn');
 });
 
-test('the runtime draws the ghosts into an answer, with the links drawn here and not yet answered for', async () => {
-  // @ts-expect-error a page module, plain JavaScript: what the runtime keeps until it reads the part's ghost marks
-  const { HELD, withGhosts } = await import('../ui/ghosts.js');
-  const g = ghostsOf(held, holds);
+/** The replica as the server serves it, loaded from a folder of its own as the browser would load it. */
+async function replica() {
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-ghosts-'));
+  writeFileSync(join(dir, 'package.json'), '{"type":"module"}');
+  for (const f of ['project.js', 'membership.js', 'replica.js']) writeFileSync(join(dir, f), (await uiFile(f, null)).body as string);
+  return import(pathToFileURL(join(dir, 'replica.js')).href);
+}
+
+test('the runtime checks what the part answered and draws it into the answer, with the links drawn here', async () => {
+  const { ghostsFrom, withGhosts } = await replica();
+  const g = ghostsFrom([
+    ...ghostList({ held, drawn }),
+    // Not of a held change, another's id, an op that is not its kind's: each left out.
+    { of: 'item', id: 'e_cccccccc', type: 'task', title: 'C', proposal: 'p_make', op: 'create' },
+    { of: 'link', id: 'p_other:1', type: 'part_of', from: 'e_aaaaaaaa', to: 'e_bbbbbbbb', proposal: 'p_make', op: 'link' },
+    { of: 'mark', on: 'e_aaaaaaaa', proposal: 'p_edit', op: 'create' },
+    { of: 'item', id: 'nope:1', type: 'task', title: 'N', proposal: 'nope', op: 'create' },
+  ]);
+  assert.deepEqual(g.items.map((i: { id: string }) => i.id), ['p_make:x', 'p_make:y']);
+  assert.deepEqual(g.items[0].pending, { proposal: 'p_make', op: 'create' });
+  assert.deepEqual(g.links.map((l: { id: string }) => l.id), ['p_link:0', 'p_make:2', 'p_make:3']);
+  assert.deepEqual([...g.marks.keys()], ['e_bbbbbbbb']);
+  assert.deepEqual(ghostsFrom('not a list'), { items: [], links: [], marks: new Map() });
   const answer = { items: [{ id: 'e_aaaaaaaa' }, { id: 'e_bbbbbbbb' }], links: [] };
   const shown = withGhosts(answer, g, [{ id: 'mine:1', type: 'depends_on', from: 'e_bbbbbbbb', to: 'e_aaaaaaaa' }, { id: 'mine:2', type: 'depends_on', from: 'e_bbbbbbbb', to: 'e_cccccccc' }]);
   assert.equal(shown.items.length, 4);
@@ -54,6 +76,6 @@ test('the runtime draws the ghosts into an answer, with the links drawn here and
   assert.deepEqual(shown.links.at(-1).pending, { mine: true, op: 'link' }, 'a link drawn here, pending');
   assert.equal(shown.links.length, 4, 'one drawn here to what is not drawn is left out');
   assert.equal(answer.items.length, 2, 'the answer itself is left as it was');
-  assert.equal(HELD.exec('held:p_abc123:4')?.[1], 'p_abc123');
-  assert.equal(HELD.exec('s:held:p_abc'), null);
+  // A ghost link to what is no longer drawn (an answer from before the canvas moved) is not drawn.
+  assert.deepEqual(withGhosts({ items: [{ id: 'e_aaaaaaaa' }], links: [] }, g).links.map((l: { id: string }) => l.id), ['p_make:2', 'p_make:3']);
 });
