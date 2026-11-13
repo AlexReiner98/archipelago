@@ -65,6 +65,8 @@ export function drawPane(at, el, said) {
     go: (lens) => moved(lens ? `v?${addressOf(lens, canvas.asked)}` : 'v'),
     open: (href) => moved(paneAt(href)),
     opened: (item, lens) => {
+      // This pane is the one touched before its item's page opens over it (a click with no press before it too).
+      el.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
       said('opened', { item, at: `v?${addressOf(lens, canvas.asked)}` });
       location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
     },

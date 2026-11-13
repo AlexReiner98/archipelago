@@ -36,7 +36,12 @@ async function startPart() {
   let soon;
   new MutationObserver(() => {
     const now = ['left', 'right', 'top', 'bottom'].map((s) => document.body.style.getPropertyValue(`--active-${s}`)).join(' ');
-    if (now !== frame) ((frame = now), clearTimeout(soon), (soon = setTimeout(() => dispatchEvent(new Event('resize')), 30)));
+    if (now === frame) return;
+    frame = now;
+    // How many panes stand: the page's own rules lay one alone out apart (ui/shell.css, body[data-panes]).
+    document.body.dataset.panes = String(document.querySelectorAll('#canvas .pm-pane').length);
+    clearTimeout(soon);
+    soon = setTimeout(() => dispatchEvent(new Event('resize')), 30);
   }).observe(document.body, { attributes: true, attributeFilter: ['style'] });
   const button = (label, title, mark, onclick) => h('button', { type: 'button', class: 'q-save', title, 'aria-label': label, onclick }, mark);
   hooks.paneButtons = () => [
