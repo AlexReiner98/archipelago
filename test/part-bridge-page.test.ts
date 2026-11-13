@@ -104,3 +104,36 @@ test('in a browser, a part that declares go moves the page after a press or Ente
     await page.close();
   }
 });
+
+test('in a browser, a press that sent an action may move the page once it answers, however long it took', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base } = await serve('off');
+  const page = await open(`${base}/`);
+  try {
+    const got: any = await page.evaluate(`(async () => {
+      const { partBridge } = await import('/part-bridge.js');
+      // The action answers late, as a save does on a loaded machine: past the moment a press lets a part move the page.
+      const fetched = window.fetch;
+      window.fetch = (url, init) => String(url).includes('/api/shelf_put') ? new Promise((done) => setTimeout(() => done(new Response(JSON.stringify({ status: 'applied', created: { view: 'e_aaaaaaaa' } }), { headers: { 'content-type': 'application/json' } })), 2300)) : fetched(url, init);
+      const went = [];
+      const parts = { a: { id: 'shelf.band', title: 'Band', go: true, sends: ['shelf.put'] } };
+      const answered = [];
+      const bridge = partBridge({ postMessage: (m) => answered.push(m) }, { partOf: (id) => parts[id], go: (address) => went.push(address) });
+      const to = (n) => bridge.heard({ type: 'go', id: 'a', address: { query: { filter: { find: ['type task'] } }, n } });
+      const acted = (n) => new Promise((done) => { const t = setInterval(() => answered.length >= n && (clearInterval(t), done()), 20); });
+      // Pressed: the action goes, answers late, and the part's move after its answer is the press's.
+      bridge.send({ type: 'event', id: 'a', event: { name: 'press' } });
+      bridge.heard({ type: 'act', id: 'a', asked: 1, action: 'shelf.put', params: {} });
+      await acted(1);
+      to('after the press');
+      // Of its own accord: the action goes and answers, and a move after it is still refused.
+      bridge.heard({ type: 'act', id: 'a', asked: 2, action: 'shelf.put', params: {} });
+      await acted(2);
+      to('own accord');
+      window.fetch = fetched;
+      return went.map((a) => a.n);
+    })()`);
+    assert.deepEqual(got, ['after the press'], 'the pressed action’s move goes, its own accord’s does not');
+  } finally {
+    await page.close();
+  }
+});

@@ -31,6 +31,10 @@ const MOVES = [...GESTURES, 'submit', 'scrolled', 'step', 'land'];
 export function partBridge(port, { partOf, go, state } = {}) {
   const pressed = new Map(), moved = new Map(), busy = new Set();
   const answer = (asked, result) => port.postMessage({ type: 'acted', asked, ...result });
+  // A press that sent an action may move the page once the action has answered (Save, then the view as kept), however
+  // long it took to go out: its move is counted from the answer, not from the press. Only a press's, never one of the
+  // part's own accord, and only where the press was one that may move.
+  const lastsTill = (id, ownAccord) => !ownAccord && moved.has(id) && moved.set(id, performance.now());
 
   // A change a root pack's part makes as the person (its `writes`: the sheet, task e_zhxd9bhb), or an undo of one: as an
   // action goes, one at a time, shown when it is the part's own accord; an undo only just after a press. The server checks
@@ -57,6 +61,7 @@ export function partBridge(port, { partOf, go, state } = {}) {
         : await api('change', { ops, reason: String(said.reason || `From ${part.title ?? part.id}`).slice(0, 500), part: ref });
       const result = { status: made?.status, created: made?.created ?? {}, ...(made?.changeset && { changeset: made.changeset }), ...(made?.proposal && { proposal: made.proposal, held: made.held_by?.say ?? '' }) };
       shown?.done(result);
+      lastsTill(id, ownAccord);
       answer(asked, result);
     } catch (err) {
       const error = String(err?.message ?? err).slice(0, 300);
@@ -87,6 +92,7 @@ export function partBridge(port, { partOf, go, state } = {}) {
       const made = await api(action.replaceAll('.', '_'), { ...params, part: { id: part.id, hash: part.hash, ...(part.island && { island: part.island }), ...(part.host && { host: part.host }) } });
       const result = { status: made?.status, created: made?.created ?? {}, ...(made?.proposal && { proposal: made.proposal, held: made.held_by?.say ?? '' }), ...(made?.answer !== undefined && { answer: made.answer }) };
       shown?.done(result);
+      lastsTill(id, ownAccord);
       answer(asked, result);
     } catch (err) {
       const error = String(err?.message ?? err).slice(0, 300);

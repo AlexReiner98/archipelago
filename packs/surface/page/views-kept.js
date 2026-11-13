@@ -179,6 +179,8 @@ function islandPiece() {
 }
 /** Whether the map holds its packs to the island rules (workspace_info islands), read once a page. */
 let islandsOn;
+/** The band's parts drawn last, and what they were handed. */
+let band = { key: '', node: null };
 const islandsHere = () => (islandsOn ??= api('workspace_info').then((info) => info?.islands === true, () => false));
 
 /** The saved canvas the canvas draws now, if one is: Home marks it. */
@@ -194,6 +196,8 @@ const reread = new Set();
 export function canvasSwitch(lens, style, isHome, open = (href) => (location.hash = href)) {
   up = style.canvas ?? null;
   const part = h('span', { class: 'q-part q-canvas', title: 'The view up: switch to another, or save this one' });
+  // The band's parts drawn last go with the bar at once, so they stay in the page (and mounted) while the list is read.
+  if (band.node) part.append(band.node);
   // A view the address names that the list lacks was kept since it was read (an agent's, another tab's): read it again.
   // Once for each: one retired is never in it.
   const listed = savedCanvases().then((all) => (style.canvas && !all.some((c) => c.id === style.canvas) && !reread.has(style.canvas) ? (reread.add(style.canvas), savedCanvases(true)) : all));
@@ -207,15 +211,21 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const travel = own.filter((b) => b.classList.contains('q-travel'));
     // Each picker marked before it, its tooltip saying what it is.
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
-    // The parts that fill the band, side by side: what the person keeps of the view up, and an island made.
-    const parts = floatMenus(h('span', { class: 'q-parts' }));
+    // The parts that fill the band, side by side: what the person keeps of the view up, and an island made. Kept across
+    // the bar's redraws (an answer come in, the address moved) while what they are handed is the same, so a name being
+    // typed or a delete being asked in the band is not lost, nor a press on it; they follow the address themselves.
+    const piece = { ...(current && !current.preset && { current: current.id }), home: Boolean(isHome), ...((await islandsHere()) ? islandPiece() : {}) };
+    const key = JSON.stringify(piece);
+    const kept = band.node?.isConnected && band.key === key;
+    const parts = kept ? band.node : floatMenus(h('span', { class: 'q-parts' }));
+    band = { key, node: parts };
     // The layout up and its switch are the styles pack's part (slot bar.layouts), drawn as the menu opens, so its reads
     // wait for the person and it is never mounted on a row the menu has not put in the page; once, as the row is kept.
     const layout = h('div', { class: 'q-look-row' });
     const rows = [{ element: layout, opened: () => void (layout.firstChild ?? drawPart(layout, { slot: 'bar.layouts', piece: {} })) }, may('write') && current && !current.preset && { text: 'Share it', title: 'Public for anyone, frozen as it is now', act: () => shareView(current) }];
     part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, parts, ...own.filter((b) => !travel.includes(b)), layoutMenu(rows));
     fitBar();
-    const piece = { ...(current && !current.preset && { current: current.id }), home: Boolean(isHome), ...((await islandsHere()) ? islandPiece() : {}) };
+    if (kept) return;
     await drawSlots(parts, { slot: 'bar', piece }).catch((err) => parts.append(h('span', { class: 'error', title: String(err?.message ?? err) }, 'The band’s parts did not draw')));
     fitBar();
   });
