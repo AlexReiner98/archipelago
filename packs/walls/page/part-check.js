@@ -18,8 +18,16 @@
 //   thumb   a kept view drawn small, as the host keeps it (its thumbnail): the part names the view, never draws it
 //   picture an item's picture, out of what the host handed the part (a view frozen as publishing keeps it, a figure):
 //           the part names the item, the host draws it, so a part never sends an answer or an address
+//   web     a page on the web framed in place, sandboxed and told nothing of where it is (its url)
+//   pane    a canvas the host draws at an address (`at`), with the part's own marks in its strip; `at` of w?url= frames
+//           a web page
+//   panes   panes side by side (dir row) or one over another (column), each given room by its share; the host draws
+//           the lines between them and tells the part when one is dragged
 // Any mark may also carry `lights`: the items it stands for, lit on the canvas while the person points at it, the rest
-// faded. A box may be `fits`: it shows as many of its marks as fit on one line and says how many are left.
+// faded. A box may be `fits`: it shows as many of its marks as fit on one line and says how many are left (`more`: the
+// key a press on the count goes back by). A box, a button or a pane may carry `drag`: the host follows it when it is
+// pressed and moved, shows where it would land, and tells the part `drop`; a box or a button may be `selected`, `ring`
+// once, take a session's `hue`, and (`aux`) go back as `close` when pressed with the middle button.
 // Any mark on the page may carry a `tip`: what it says of itself, shown by the page's one tooltip, and a `view`: pressed,
 // the host opens that view (a kept view's id, a pack's view by its own, or home), as an `item` opens an item's page.
 // Every look is a name the style gives its value (packs/walls/page/part-marks.css): a tone, a gap or a size is a word or a step on
@@ -64,9 +72,18 @@ export const PICKS = ['date', 'time', 'check', 'pick'];
 export const TONES = ['accent', 'muted', 'ok', 'warn', 'bad', 'closed'];
 const tone = oneOf(...TONES);
 /** The items a mark lights on the canvas while the person points at it: the rest are faded (packs/walls/page/part-marks.css, hooks.lights). */
-const lights = (v, why) => (Array.isArray(v) && v.length <= 200 ? v.map((i) => item(i, why)) : why('not a list of at most 200 items'));
+const lights = (v, why) => (Array.isArray(v) && v.length <= 500 ? v.map((i) => item(i, why)) : why('not a list of at most 500 items'));
 /** What any mark may say: its key, the item or view it stands for, what it lights on the canvas and, on the page, its tip. */
 const anyMark = { key, item, view, lights, tip: words(partLimits.label) };
+/** An address the host draws a canvas at, as the page's own addresses are written: nothing that could break out of one. */
+const ADDRESS = /^[A-Za-z0-9_~!*'().;:@&=+$,/?%#\[\]-]*$/;
+const address = (v, why) => (typeof v === 'string' && v.length <= 2000 && ADDRESS.test(v) ? v : why('not an address of this page'));
+/** A share of the room, above nothing and at most all of it. */
+const share = (v, why) => (typeof v === 'number' && v > 0 && v <= 1 ? v : why('not a share above 0 and at most 1'));
+/** What a box or a button may be when it stands for something the person moves or picks between (a tab). */
+const handled = { drag: key, selected: flag, ring: flag, hue: words(partLimits.key), aux: flag };
+/** Where a dragged mark may be let go: a side of a pane or its middle, the strip of tabs, or out of the page. */
+export const DROP_ZONES = ['left', 'right', 'above', 'below', 'center', 'tabs', 'out'];
 
 /**
  * Each kind: the attributes it may have and how each is read, what it may hold (`marks`, `words`, `drawn`: paths and
@@ -74,17 +91,20 @@ const anyMark = { key, item, view, lights, tip: words(partLimits.label) };
  * on a paint surface (`plane`) or on the page.
  */
 export const MARKS = {
-  box: { attrs: { ...anyMark, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag, fits: flag }, holds: 'marks' },
+  box: { attrs: { ...anyMark, ...handled, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag, fits: flag, more: key, dock: flag }, holds: 'marks' },
   text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end'), href }, holds: 'words' },
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
   input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag }, holds: 'nothing', keyed: true },
-  button: { attrs: { ...anyMark, look: oneOf('main', 'quiet'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(partLimits.words) }, holds: 'words', keyed: true },
+  button: { attrs: { ...anyMark, ...handled, look: oneOf('main', 'quiet', 'tab'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(partLimits.words) }, holds: 'words', keyed: true },
   paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag }, holds: 'drawn' },
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
   note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
-  menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet') }, holds: 'marks', only: ['button', 'box', 'text', 'list', 'input'], needs: ['label'] },
+  menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet'), open: flag }, holds: 'marks', only: ['button', 'box', 'text', 'list', 'input', 'menu'], needs: ['label'] },
   thumb: { attrs: { key, view, tip: anyMark.tip }, holds: 'nothing', needs: ['view'] },
   picture: { attrs: anyMark, holds: 'nothing', needs: ['item'] },
+  web: { attrs: { key, tip: anyMark.tip, url: href, reload: words(partLimits.key) }, holds: 'nothing', needs: ['url'] },
+  pane: { attrs: { key, tip: anyMark.tip, at: address, share, ring: flag, drag: key }, holds: 'marks', keyed: true, needs: ['at'] },
+  panes: { attrs: { key, dir: oneOf('row', 'column') }, holds: 'marks', only: ['pane'], keyed: true },
 };
 
 /** The nodes this module made: the renderer draws nothing else. */
@@ -139,10 +159,12 @@ function node(mark, seen, where, onPlane) {
   if (kind === 'input' && at.kind !== 'item' && (at.types !== undefined || at.link !== undefined)) why('types or link on an input that finds no item');
   if (kind === 'input' && (PICKS.includes(at.kind) || at.kind === 'item') && (at.lines ?? 1) > 1) why(`lines on ${a(at.kind)}`);
   if (kind === 'text' && !onPlane && placed) why('x, y or anchor on text off a paint surface');
+  if (at.more !== undefined && !at.fits) why('more on a box that does not fit: the count it names is drawn only by one that fits');
+  if ((at.drag !== undefined || at.aux) && at.key === undefined) why(`${a(kind)} that is dragged or closed with no key: what is done to it goes back by its key`);
   for (const name of shape.needs ?? []) if (at[name] === undefined) why(`${a(kind)} with no ${name}`);
   if (kind === 'paint' && (at.width === undefined || at.height === undefined)) why('a paint surface with no width and height');
   if (shape.keyed && at.key === undefined) why(`${a(kind)} with no key: what the person does to it goes back by its key`);
-  if (at.key !== undefined) seen.keys.has(at.key) ? why(`the key "${at.key}" twice`) : seen.keys.add(at.key);
+  for (const k of [at.key, at.more]) if (k !== undefined) seen.keys.has(k) ? why(`the key "${k}" twice`) : seen.keys.add(k);
   const out = { mark: kind, at, ...(at.key !== undefined && { key: at.key }), ...(at.item !== undefined && { item: at.item }), ...(at.view !== undefined && kind !== 'thumb' && { view: at.view }) };
   if (shape.holds === 'nothing' && rest.length) why(`${a(kind)} holding something: it holds nothing`);
   if (shape.holds === 'words') {
@@ -153,6 +175,9 @@ function node(mark, seen, where, onPlane) {
     const inner = shape.holds === 'drawn';
     out.kids = rest.map((kid, i) => (typeof kid === 'string' || typeof kid === 'number' ? why(`words in ${a(kind)}: put them in a text`) : node(kid, seen, [...where, `${kind} ${i}`], inner || onPlane)));
     for (const kid of shape.only ? out.kids : []) if (!shape.only.includes(kid.mark)) why(`${a(kid.mark)} in ${a(kind)}: it holds ${shape.only.join(' and ')}s only`);
+    // A pane is drawn by the panes that hold it, and holds in its strip only what names it.
+    if (kind !== 'panes' && out.kids.some((k) => k.mark === 'pane')) why(`a pane in ${a(kind)}: panes hold panes`);
+    if (kind === 'pane' && out.kids.some((k) => k.mark === 'panes')) why('panes in a pane: they stand side by side');
   }
   checked.add(out);
   return out;
