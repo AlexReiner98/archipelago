@@ -177,6 +177,13 @@ with `ctx.call`.
 | `piece.<name>`, `page.<name>` | what the page draws | `PIECES`, `PAGES`, `packs/loader/kernel/declared.ts` |
 | `act.<verb>.<action>` | an action whose code is in-process | `ACT_TOOLS`, `packs/surface/kernel/tool-acts.ts` |
 
+An internal pack's own declared action (`<pack>.<name>`, sent by an agent or
+by one of its parts) runs as the `act.<verb>.<name>` its pack provides, and
+answers as a sandboxed handler does (ops, reason, answer). That answer is made
+so by the same path a handler's is (`PackHost.applied`,
+`packs/loader/kernel/internal-act.ts`): one change set naming the action, its
+pack and the part, on the caller's authority, judged by the rules.
+
 The schema half of a closed list stays with the root pack that checks it
 (capabilities' check stays in loader); the behaviour moves to its provider.
 
