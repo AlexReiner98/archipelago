@@ -64,7 +64,11 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   } finally {
     hostFor(ok).stop();
   }
-  const refused = (part: Record<string, unknown>, over: Record<string, unknown> = {}, ...more: Record<string, unknown>[]) => () => new Registry(folder(shelf(over, part), ...more));
+  // A part whose shapes do not hold leaves its pack waiting with why (e_6g34wqdm): thrown here, so each line reads the why.
+  const refused = (part: Record<string, unknown>, over: Record<string, unknown> = {}, ...more: Record<string, unknown>[]) => () => {
+    const state = new Registry(folder(shelf(over, part), ...more)).states.get('shelf');
+    if (state?.state !== 'active') throw new Error(state?.why ?? 'shelf is not loaded');
+  };
   assert.throws(refused({ id: 'row' }), /part "row" must be named "shelf.<name>"/);
   assert.throws(refused({ reads: { task: ['colour'] } }), /reads "colour" of "task", which has no such field/);
   assert.throws(refused({ reads: { nothing: ['title'] } }), /reads unknown type "nothing"/);

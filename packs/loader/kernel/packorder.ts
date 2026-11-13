@@ -158,7 +158,8 @@ export function dependentsOf(active: PackFile[], gone: string[]): string[] {
  * pack ("local") requires nothing: it uses whichever packs are active, and a type of it that extends a type no
  * active pack has is left to the type table.
  */
-export function orderPacks(found: Map<string, PackFile>, off: Map<string, string>, local: string): { ordered: PackFile[]; states: Map<string, PackState> } {
+/** `held`: packs whose own declarations did not hold when last loaded (a screen on a piece nobody provides), each waiting with why, so what leans on them waits too and the rest loads. */
+export function orderPacks(found: Map<string, PackFile>, off: Map<string, string>, local: string, held: ReadonlyMap<string, string> = new Map()): { ordered: PackFile[]; states: Map<string, PackState> } {
   const states = new Map<string, PackState>();
   const ordered: PackFile[] = [];
   const owners = new Map<string, string>();
@@ -167,6 +168,7 @@ export function orderPacks(found: Map<string, PackFile>, off: Map<string, string
     const known = states.get(pack.id);
     if (known) return known;
     if (off.has(pack.id) && !KERNEL_PACKS.includes(pack.id)) return set(pack, { state: 'off', why: off.get(pack.id) });
+    if (held.has(pack.id)) return set(pack, { state: 'waiting', why: held.get(pack.id) });
     if (trail.includes(pack.id)) return set(pack, { state: 'waiting', why: `in a cycle: ${[...trail, pack.id].join(' -> ')}` });
     if (pack.id !== local) {
       for (const name of pack.requires ?? []) {
