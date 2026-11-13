@@ -10,6 +10,7 @@
 
 import type { ActionDef } from './declared.ts';
 import { islandRegistry } from './island-pin.ts';
+import { commitOf } from './pack-versions.ts';
 import type { Registry } from './packs.ts';
 import { partsFor } from './ui-parts.ts';
 import type { Actor, Archipelago, PartRef } from '../../write/kernel/pelago.ts';
@@ -45,5 +46,7 @@ export async function partCall(l: Archipelago, actor: Actor, action: string, isl
   if (!part) throw no(`no part "${ref.id.slice(0, 80)}" with that code is drawn here.`);
   if (!part.sends.includes(def.id) || found.pack !== part.pack) throw no(`${part.id} does not send "${def.id}": a part sends the actions its pack declares for it.`);
   if (def.humanOnly || def.admin) throw no(`"${def.id}" is one a person chooses to call themselves.`);
-  return { id: part.id, hash: part.hash };
+  // The host the page loaded with, where it names one: with the log position, all a refiner needs to know what drew it.
+  const host = commitOf(ref.host);
+  return { id: part.id, hash: part.hash, ...(host && { host }) };
 }

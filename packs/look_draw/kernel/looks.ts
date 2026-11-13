@@ -69,6 +69,10 @@ interface Kept {
   workspace: string;
   marks?: Marks;
   fell_back?: { asked: string; drawn: string }[];
+  /** What its parts drew with (packs/loader/kernel/pack-versions.ts, Drew): an old look redraws as it was from its `at`. */
+  drew?: unknown[];
+  /** The log position it was redrawn at, where it was asked as it was. */
+  as_at?: number;
 }
 
 /** What a look answers: what was drawn and how it stood, with the picture as an image (packs/surface/kernel/mcp.ts sends it as one), or the drawing's marks where they were asked for and it has them. */
@@ -82,6 +86,8 @@ const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
   settled: k.settled,
   ...(k.why && { why: k.why }),
   ...(k.fell_back && { fell_back: k.fell_back }),
+  ...(k.drew && { drew: k.drew }),
+  ...(k.as_at && { as_at: k.as_at }),
   width: k.width,
   height: k.height,
   bytes: data.length,
@@ -93,14 +99,16 @@ const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
  * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>; or preview/<id>, a document as it
  * would publish) for the asking agent and keep the picture. `fresh` draws it again whatever has changed or not.
  */
-export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean } = {}) {
+export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean; at?: number } = {}) {
   const width = Math.min(1920, Math.max(320, Math.round(size.width ?? 1200)));
   const height = Math.min(1600, Math.max(240, Math.round(size.height ?? 750)));
   const scheme = size.scheme ?? 'dark';
   // Marks are a canvas's: an item's page is a page, and is a picture.
   const marks = Boolean(size.marks) && hash.startsWith('v');
+  // As it was: the page asks its parts at that log position (packs/surface/page/part-host.js), so they run the code of then.
+  const asAt = Number.isInteger(size.at) && size.at! > 0 ? size.at : undefined;
   const pos = await ctx.reads({ log_head: true });
-  const same = `lookof:${whose(w)}:${sha256Hex(JSON.stringify([hash, width, height, scheme, pos, marks, (await ofRoots(ctx, { ui: true })).ui, BEGAN])).slice(0, 32)}`;
+  const same = `lookof:${whose(w)}:${sha256Hex(JSON.stringify([hash, width, height, scheme, pos, marks, asAt ?? null, (await ofRoots(ctx, { ui: true })).ui, BEGAN])).slice(0, 32)}`;
   if (!size.fresh) {
     const was = await kept<{ look: string }>(ctx, same);
     const had = was && (await keptWith<Kept>(ctx, `look:${whose(w)}:${was.look}`));
@@ -108,10 +116,10 @@ export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash
   }
   await countLook(ctx, w.viewer || actor);
   const { pass } = await ofRoots(ctx, { pass: { actor } });
-  const address = hash.startsWith('preview/') ? `${origin}/${hash}?look` : `${origin}/?look#/${hash}`;
+  const address = hash.startsWith('preview/') ? `${origin}/${hash}?look` : `${origin}/?look${asAt ? `&at=${asAt}` : ''}#/${hash}`;
   const got = await drawLook(address, pass, width, height, scheme, marks);
   const look = `l_${randomBytes(6).toString('hex')}`;
-  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }) };
+  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }), ...(got.drew && { drew: got.drew }), ...(asAt && { as_at: asAt }) };
   await keep(ctx, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
   await keep(ctx, same, { look }, LOOK_MS);
   return answer(look, k, got.data);

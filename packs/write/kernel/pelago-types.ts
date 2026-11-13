@@ -108,7 +108,8 @@ export interface Authority {
 }
 
 /** A part of the page, by its id and the hash of the code that ran: which version of it asked. */
-export interface PartRef { id: string; hash: string }
+/** A part that sent a change: the part, the hash of its code, and the commit of the host the page loaded with (task e_qqp3cuk4). */
+export interface PartRef { id: string; hash: string; host?: string }
 
 export interface ChangeInput {
   ops: Op[];

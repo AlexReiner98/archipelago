@@ -71,7 +71,9 @@
         "in": {
           "island?": "string",
           "have?": "any",
-          "shipped?": "boolean"
+          "shipped?": "boolean",
+          "host?": "string",
+          "at?": "number"
         },
         "out": "any",
         "run": "parts-read.ts#parts"

@@ -1118,6 +1118,20 @@
       "say": "When a token was last used and backups downloaded, a year of it."
     },
     {
+      "id": "drew",
+      "when": {
+        "fields": [
+          "drew"
+        ]
+      },
+      "stream": "observations",
+      "keep": {
+        "latest": true,
+        "history": "P90D"
+      },
+      "say": "What a page drew with (its host's commit, its packs, each part's hash), 90 days of it."
+    },
+    {
       "id": "pictures",
       "when": {
         "fields": [
