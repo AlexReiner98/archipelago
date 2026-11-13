@@ -1,8 +1,8 @@
 // The page in look mode (`?look`), as look_draw's part: the server's own browser opens the app for an agent's look
 // (packs/look_draw/kernel/look-draw.ts) and takes the picture once the page says it has drawn. The runtime
-// (packs/surface/page/look.js) marks the page `drawing` as it loads and hands this part the canvas's first word on it
-// (`drawn`: { state, why }), two frames after it was said, so what was mounted has been painted. The part decides what
-// the look reads: the first word only, as drawn, empty or error, and why, cut short. It publishes that as page state
+// (ui/look.js) marks the page `drawing` as it loads and mounts this part once the canvas has said its first word on
+// it, two frames on, so what was mounted has been painted, handing it that word as its piece's settings (`drawn`, the
+// state, and `why`). The part decides what the look reads: the first word only, as drawn, empty or error, and why, cut short. It publishes that as page state
 // (`look`, `look_why`), which the runtime writes on the root; it draws nothing.
 
 export const STATES = ['drawn', 'empty', 'error'];
@@ -21,7 +21,8 @@ export default function page(input, tools) {
   let said = false;
   // The canvas's first word is the one taken: why first, so the look that sees the state sees why with it.
   const hear = (next) => {
-    const look = said ? null : lookOf(next?.drawn);
+    const piece = next?.piece;
+    const look = said || !piece?.drawn ? null : lookOf({ state: piece.drawn, why: piece.why });
     if (!look) return undefined;
     said = true;
     if (look.why) tools.state('look_why', look.why);

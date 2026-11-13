@@ -1,5 +1,5 @@
 // look_draw's part of the page in look mode (packs/look_draw/parts/page), run as its worker runs it: the canvas's word
-// on its drawing in, the page state the runtime writes on the root out, and nothing drawn.
+// on its drawing in, as its piece's settings, the page state the runtime writes on the root out, and nothing drawn.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -17,23 +17,23 @@ function mounted(input: unknown) {
   return { made, said };
 }
 
-test('the part declares only the page state it publishes, and draws nothing', () => {
+test('the part fills the slot look, declares only the page state it publishes, and draws nothing', () => {
+  assert.equal(part.slot, 'look');
   assert.deepEqual(part.state, ['look', 'look_why']);
   assert.deepEqual(part.marks, []);
-  const { made, said } = mounted({ drawn: null });
+  const { made, said } = mounted({ piece: {} });
   assert.equal(made.marks, undefined);
   assert.deepEqual(said, []);
 });
 
-test('the canvas’s first word is the one taken, why before the state', () => {
-  const { made, said } = mounted({ drawn: null });
-  assert.equal(made.update({ drawn: { state: 'empty', why: 'The lens found nothing.' } }), undefined);
-  made.update({ drawn: { state: 'error', why: 'later' } });
+test('the word it is handed is said at once, why before the state, and only the first', () => {
+  const { made, said } = mounted({ piece: { drawn: 'empty', why: 'The lens found nothing.' } });
+  assert.equal(made.update({ piece: { drawn: 'error', why: 'later' } }), undefined);
   assert.deepEqual(said, [['look_why', 'The lens found nothing.'], ['look', 'empty']]);
+  assert.deepEqual(mounted({ piece: { drawn: 'drawn' } }).said, [['look', 'drawn']]);
 });
 
-test('a word handed at mount is said at once; a state it does not know is drawn, and why is cut short', () => {
-  assert.deepEqual(mounted({ drawn: { state: 'drawn' } }).said, [['look', 'drawn']]);
+test('a state it does not know is drawn, and why is cut short', () => {
   assert.deepEqual(lookOf({ state: 'painted' }), { state: 'drawn', why: null });
   assert.equal(lookOf({ state: 'error', why: 'x'.repeat(400) }).why.length, 300);
   assert.equal(lookOf(undefined), null);
