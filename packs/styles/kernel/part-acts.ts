@@ -4,7 +4,8 @@
 // owner's version from the map, and a layout is read first, so an action never touches what is not one.
 //
 // styles.use: a preset used (the owner's version kept as the preset ships it, or used again) or not (retired). A theme
-// used retires every other theme kept, so one is chosen. styles.delete_layout: a layout kept on the map archived.
+// used retires every other theme kept, so one is chosen; it answers looks: true, so the page reads its look again
+// (packs/surface/page/part-host.js), ending a theme tried on this screen. styles.delete_layout: a layout kept on the map archived.
 
 import type { KernelContext } from '#pelago/kernel';
 import type { Preset } from './styles.ts';
@@ -22,8 +23,8 @@ export function use(presetId: unknown, on: boolean, presets: Preset[], versions:
   if (!preset) throw new Error('That is not a style preset.');
   const mine = versions.find((v) => v.props.preset === preset.id);
   if (!on) {
-    if (!mine?.is_open) return { ops: [], reason: `${preset.title}: not used already`, answer: { preset: preset.id } };
-    return { ops: [{ op: 'update', id: mine.id, status: 'retired' }], reason: `${preset.title} retired`, answer: { preset: preset.id, item: mine.id } };
+    if (!mine?.is_open) return { ops: [], reason: `${preset.title}: not used already`, answer: { preset: preset.id, looks: true } };
+    return { ops: [{ op: 'update', id: mine.id, status: 'retired' }], reason: `${preset.title} retired`, answer: { preset: preset.id, item: mine.id, looks: true } };
   }
   // A theme is chosen alone: any other kept is retired in the same change.
   const theme = preset.over === 'chosen';
@@ -36,7 +37,7 @@ export function use(presetId: unknown, on: boolean, presets: Preset[], versions:
   return {
     ops: [...retire, ...(mineOp ? [mineOp] : [])],
     reason: theme ? `${preset.title} chosen as the workspace's theme` : mine ? `${preset.title} used again` : `${preset.title}: the owner's version of the preset`,
-    answer: { preset: preset.id, item: mine?.id ?? '{mine}' },
+    answer: { preset: preset.id, item: mine?.id ?? '{mine}', looks: true },
   };
 }
 

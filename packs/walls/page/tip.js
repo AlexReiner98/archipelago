@@ -29,7 +29,7 @@ const upFrom = function* (el) {
 function titled(el) {
   for (const e of upFrom(el)) {
     if (e === box || e.classList?.contains('drawing-tip')) return null;
-    // A trace (ui/traces.js) says who changed the mark and why: that, while it lasts, before what the mark says of itself.
+    // A trace (the trace mark, ./part-trace.js) says who changed the mark and why: that, while it lasts, before what the mark says of itself.
     if (e.dataset?.trace) return { el: e, said: e.dataset.trace, trace: true };
     if (e.hasAttribute('title')) return e.getAttribute('title') ? { el: e, said: e.getAttribute('title') } : null;
     const title = svgTitle(e);

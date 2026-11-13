@@ -117,7 +117,7 @@ test('a change set says what came, left and changed, and who did it, from the ro
 
 test('catch_up.changes traces what another changed until it is seen, and keeps it between pages', () => {
   const kept: Record<string, any> = {};
-  const tools = { keep: (name: string, value: unknown) => (kept[name] = JSON.parse(JSON.stringify(value))) };
+  const tools = { keep: (value: unknown, name: string) => (kept[name] = JSON.parse(JSON.stringify(value))) };
   const part = traced({ me: 'e_owner001', style: { numbers: { trace_kept_days: 30 } } }, tools);
   assert.deepEqual(checkMarks('catch_up.changes', part.marks), ['box', { key: 'traces' }]);
   const { rows } = rowsOf(held(), entries);

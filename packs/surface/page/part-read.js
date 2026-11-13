@@ -6,7 +6,7 @@ import { api } from './base.js';
 
 /** The kernel's reads a part may declare live without a pack answering them: search, by words, as anyone signed in may. */
 const KERNEL_READS = { search: (params) => api('search', params) };
-/** How many reads one mounted part may have out at once: one more is answered nothing, as an action is while one goes out. */
+/** How many reads one mounted part may have out at once: a newer one makes the oldest answer nothing, as typing moves on. */
 const outstandingMost = 4;
 /** How many characters a read's params may be. */
 const paramsMost = 20000;
@@ -16,15 +16,17 @@ export async function readFor(m, said, answer) {
   const name = String(said?.name ?? '');
   const done = (value) => answer({ type: 'readed', asked: said?.asked, value: value ?? null });
   if (!(m.part.views ?? []).some((v) => v.name === name && v.live)) return done(null);
-  if ((m.reading ?? 0) >= outstandingMost) return done(null);
   const params = said?.params;
   if (!params || typeof params !== 'object' || Array.isArray(params) || JSON.stringify(params).length > paramsMost) return done(null);
-  m.reading = (m.reading ?? 0) + 1;
+  // The reads out, oldest first, each with how to answer it: a newer one past the most lets the oldest go, answered null.
+  const out = (m.reading ??= []);
+  let answered = false;
+  const once = (value) => answered || ((answered = true), out.splice(out.indexOf(once), 1), done(value));
+  out.push(once);
+  if (out.length > outstandingMost) out[0](null);
   try {
-    done(await (KERNEL_READS[name] ? KERNEL_READS[name](params) : api('view', { name, params })));
+    once(await (KERNEL_READS[name] ? KERNEL_READS[name](params) : api('view', { name, params })));
   } catch {
-    done(null);
-  } finally {
-    m.reading--;
+    once(null);
   }
 }

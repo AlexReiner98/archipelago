@@ -178,6 +178,10 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 /* Back and forward sit together at the start, as a browser's do; Split goes to the far end. */
 #query .q-canvas > .q-travel + .q-travel { margin-left: calc(-1 * var(--space-5)); }
 #query .q-canvas > .q-split { margin-left: auto; }
+/* The parts that fill the band (slot bar: Save, a new island), side by side in its row, each drawn by its marks. */
+#query .q-canvas > .q-parts { display: inline-flex; align-items: center; gap: var(--space-5); }
+#query .q-parts > .part-in, #query .q-parts .part-body { display: contents; }
+#query .q-parts .menu-items { width: max-content; }
 /* Narrow (ui/query-bar.js fitBar): the buttons' words go, then the pickers shrink, and last back and forward, Split
    and the pickers' marks; the query's line drops how many are drawn once its words have little room. */
 #query .tight .q-word-text, #query .tightest .q-travel, #find .q-lens.tight > .q-count { display: none; }
@@ -204,6 +208,11 @@ body[data-sheet="open"] #query { right: max(var(--active-right, 0%), min(var(--s
 #menu-pages > a { padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); color: var(--text); text-decoration: none; }
 #menu-pages > a:hover { background: var(--accent-soft); }
 #menu-pages > a.active { color: var(--accent); font-weight: 600; }
+/* The menu pack's part draws the pages as buttons (slot nav): each a row of the menu, as the links were. */
+#menu-pages > .part-body, #menu-pages .part-body > .pm-box { display: contents; }
+#menu-pages .pm-button { justify-content: start; text-align: left; padding: var(--space-5) var(--space-6); border: 0; border-radius: var(--radius-2); background: none; color: var(--text); font-weight: 400; }
+#menu-pages .pm-button:hover { background: var(--accent-soft); }
+#menu-pages .pm-button.pm-tone-accent { color: var(--accent); font-weight: 600; }
 #canvas-settings { display: grid; padding: var(--space-3) 0; border-top: var(--border-1) solid var(--line); }
 #canvas-settings > label { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); color: var(--text); font-size: var(--text-4); cursor: pointer; }
 #canvas-settings > label:hover { background: var(--accent-soft); }

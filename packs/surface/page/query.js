@@ -102,7 +102,7 @@ const list = (value) => (value ?? '').split(',').filter(Boolean);
  * dates or days from today; not with nothing after it leaves nothing out). An
  * address from before the flat lens (?from=e_x) opens on that item. A lens that includes nothing is null, unless the
  * address says so (`nothing`: every Find term taken out, drawn as an empty canvas). `canvas` names
- * the saved canvas it is drawn on (ui/canvases.js): its places, its name in the bar.
+ * the saved canvas it is drawn on (packs/surface/page/views-kept.js): its places, its name in the bar.
  */
 export function readAddress(query) {
   const p = new URLSearchParams(query);
@@ -300,7 +300,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
       if (!host.isConnected) return unfollow(store);
       // What the query finds may have moved (packs/surface/page/membership.js), or on a time axis an item changed may fall elsewhere:
       // both are the server's to work out, so the lens is read again. Not while the store is played from where its
-      // reader last looked (ui/catch-up.js): it ends as the map is.
+      // reader last looked (the replay mark, ./replay.js): it ends as the map is.
       if (!store.store?.playing && (changed.ask || (lens.time && changed.items.changed.length))) return load(true);
       draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, true);
     });

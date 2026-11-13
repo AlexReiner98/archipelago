@@ -2,7 +2,7 @@
 // canvas of them (the owner, 31 Oct 2026: the canvas finds them, the item's sheet decides them, packs/write/page/item-held.js).
 
 import { api, ask, h, may, tell } from './base.js';
-import { canvasAt, savedCanvases } from './canvases.js';
+import { canvasAt, savedCanvases } from './views-kept.js';
 import { gist, loadSchema, relations, typeTitle } from './words.js';
 
 /** The kept view that draws what held changes touch: the one whose query finds what is held, and only that (a pack ships it). */

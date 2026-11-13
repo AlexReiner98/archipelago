@@ -223,6 +223,9 @@ function partInside() {
     marks: (said) => marks(id, said),
     // One of its pack's declared actions; the page checks it is, shows it as it goes out and answers what came of it.
     act: (action, params) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'act', id, asked: asks, action: String(action), params: params ?? {} }))),
+    // For a root pack's part that declares `writes`: a change as the person looking, and an undo of one just after a press.
+    change: (ops, reason) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'change', id, asked: asks, ops: ops ?? [], reason: String(reason ?? '') }))),
+    undo: (changeset) => new Promise((resolve) => (asked.set(++asks, resolve), send({ type: 'undo', id, asked: asks, changeset: String(changeset) }))),
     // A read it declared live (`views` with `live: true`), asked now as the person looking: its answer, or null.
     read: (name, params) => new Promise((resolve) => (asked.set(++asks, (said) => resolve(said.value ?? null)), send({ type: 'read', id, asked: asks, name: String(name), params: params ?? {} }))),
     // Words the person has not saved yet, kept by the page in its browser for this part on this item (and `name`), and
