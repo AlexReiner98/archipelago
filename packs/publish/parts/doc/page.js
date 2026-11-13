@@ -1,7 +1,9 @@
-// A document's page as its reader meets it, as marks (task e_atxefw2s): the site's head, the page's heading (an invoice's
-// when its style names that head), its text and the sections it brings in, in order, each with its picture, and the
-// page's foot. The page data is what the reader's route answers (packs/reader/reader.js, /p/<workspace>/<id>/data) or a
-// signed-in read of the same document; nothing is drawn that it did not say, and every word goes as words.
+// A document's page as its reader meets it, as marks (task e_atxefw2s): its heading (an invoice's when its style names
+// that head), its text and the sections it brings in, in order, each with its picture. The page data is what is
+// published (packs/publish/kernel/published.ts runs this part then, and keeps its marks), a preview or a signed-in read
+// of the same document; nothing is drawn that it did not say, and every word goes as words. What a page has around it
+// as it is served (its site's head and foot, a way to start a map of one's own) is the page's, drawn by the host
+// (packs/surface/page/frozen-page.js), since it changes with the site after the page is published.
 
 /** The address word of a site's front page (packs/publish/kernel/site.ts). */
 export const FRONT = 'home';
@@ -14,21 +16,6 @@ export const longDay = (ts) => {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-CA', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
 const money = (n, currency = 'CAD') => new Intl.NumberFormat('en-CA', { style: 'currency', currency }).format(Number(n) || 0);
-
-/** An address the page may open: one on the web as it is, one on this site made whole against `origin` when it is handed. */
-export function whole(href, origin) {
-  if (/^https?:\/\//i.test(String(href ?? ''))) return href;
-  if (typeof href !== 'string' || !href.startsWith('/') || !/^https?:\/\/[^/\s]+$/i.test(origin ?? '')) return undefined;
-  return `${origin}${href}`;
-}
-
-/** A line of words that leads somewhere when it can: a text with an address, else plain. */
-const link = (words, href, at = {}) => ['text', { ...at, ...(href && { href }) }, String(words ?? '')];
-
-/** The site's head: its name, the way home, and its main pages. */
-export function siteHead(site, origin) {
-  return ['box', { key: 'site-head', flow: 'row', gap: 6, align: 'between', wrap: true }, link(site.name, whole(site.home, origin), { bold: true }), ['box', { flow: 'row', gap: 5, wrap: true }, ...(site.pages ?? []).map((p, i) => link(p.title, whole(p.href, origin), { key: `site:${i}`, tip: tip(p.title) }))]];
-}
 
 /** An invoice's heading: its number, its dates and what is due, and a mark once it is paid or void. */
 export function invoiceHead(d) {
@@ -69,11 +56,8 @@ export function named(text, names) {
   return String(text ?? '').replace(/(\[[^\]]*\]\()?\b(e_[a-z0-9]{8})\b/g, (all, linked, id) => (linked || !names.has(id) ? all : `[${String(names.get(id)).replace(/[[\]]/g, '')}](${id})`));
 }
 
-/**
- * The page as marks. `d` is the page data; `at` says where it is read: `own` (with the reader's sign-in, so it may be
- * printed), `published` (at /p/), `preview`, and `origin`, the page's own, to make the site's addresses whole.
- */
-export function page(d, at = {}) {
+/** The page as marks. `d` is the page data. */
+export function page(d) {
   if (!d || !Array.isArray(d.parts)) return ['text', { look: 'muted' }, 'This page does not open anything.'];
   const names = new Map([...d.parts.filter((p) => p.section).map((p) => [p.section.id, p.section.title]), ...Object.entries(d.links ?? {})]);
   const head = headOf(d);
@@ -109,18 +93,7 @@ export function page(d, at = {}) {
     while (plays(list[k + 1])) pictures.push(part(list[++k], k));
     parts.push(['box', { key: `band:${k}`, flow: 'row', gap: 8, wrap: true }, ['box', { flow: 'column', grow: true }, words], ['box', { flow: 'column', gap: 6, grow: true }, ...pictures]]);
   }
-  // One read with no login, not on its site's own domain, ends with a quiet way to start a map of one's own.
-  // Printing is the host's: a part cannot reach the window, so the page's frame offers it where it reads with a sign-in.
-  const startsOwn = !at.own && !at.preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
-  return [
-    'box',
-    { key: 'page', flow: 'column', gap: 8 },
-    ...(d.site ? [siteHead(d.site, at.origin)] : []),
-    head ? head.draw(d) : plainHead(d),
-    ...parts,
-    ...(d.site?.footer ? [['box', { key: 'site-foot', look: 'band', pad: 4 }, ['note', {}, named(d.site.footer, names)]]] : []),
-    ...(startsOwn ? [['box', { key: 'foot', flow: 'row', gap: 6 }, link(d.start, whole(at.start ?? '/', at.origin), { look: 'muted' })]] : []),
-  ];
+  return ['box', { key: 'page', flow: 'column', gap: 8 }, head ? head.draw(d) : plainHead(d), ...parts];
 }
 
 /** The page's title, as the browser names its tab. */

@@ -39,10 +39,12 @@ test('publishing asks the rules first, then makes the document public as the one
   const reads = { entities: [doc], publishable: { types: ['document'], finished: [] }, published_others: [], public_document: { parts: [] }, log_head: 7 };
   const out = await publish(fake(reads, { 'page.look': { colors: {} } }, calls), person, doc.id);
   assert.deepEqual(out, { published: doc.id, sections: 0, lenses: 0 });
-  assert.deepEqual(calls.map((c) => c.name), ['root.may', 'root.publish', 'page.look', 'root.publish']);
+  assert.deepEqual(calls.map((c) => c.name), ['root.may', 'root.publish', 'page.look', 'root.part_marks', 'root.publish']);
   assert.deepEqual(calls[0].input, { act: 'publish', human: true });
   assert.deepEqual(calls[1].input, { act: 'visibility', id: doc.id, actor: 'human:alex', visibility: 'public', authority: { of: 'human', who: 'human:alex' } });
-  const rows = calls[3].input as { act: string; by: string; given: { style_at: number; look: unknown } };
+  // Its reader's part is run on what it will be handed, so the page keeps its marks (packs/publish/kernel/page-marks.ts).
+  assert.equal((calls[3].input as { slot: string }).slot, 'page.doc');
+  const rows = calls[4].input as { act: string; by: string; given: { style_at: number; look: unknown } };
   assert.equal(rows.act, 'publish');
   assert.equal(rows.by, 'p_alex');
   assert.equal(rows.given.style_at, 7);

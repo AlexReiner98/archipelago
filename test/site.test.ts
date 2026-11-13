@@ -68,7 +68,7 @@ test('a domain serves a workspace’s published pages at their address words, th
   assert.deepEqual(viaP.site.pages, [{ title: 'How it works', href: `/p/default/${a}` }]);
 
   // The page's own scripts are served on the domain as everywhere.
-  assert.equal((await visit(base, '/doc.js', 'site.test')).status, 200);
+  assert.equal((await visit(base, '/frozen-page.js', 'site.test')).status, 200);
   void d;
 });
 

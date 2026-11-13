@@ -1,4 +1,4 @@
-// The reader's page part (packs/reader/parts/doc) and a product's public page part (packs/publish/parts/public): page
+// The reader's page part (packs/publish/parts/doc) and a product's public page part (packs/publish/parts/public): page
 // data in, the marks they answer with out, each checked as the host checks them (packs/walls/page/part-check.js),
 // held to the marks their pack entries name.
 
@@ -6,14 +6,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
-import doc from '../packs/reader/parts/doc/index.js';
+import doc from '../packs/publish/parts/doc/index.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import publicPage from '../packs/publish/parts/public/index.js';
 // @ts-ignore: a module of the page, plain JavaScript
 import { checkMarks } from '../packs/walls/page/part-check.js';
 
 const kindsOf = (file: string, id: string) => JSON.parse(readFileSync(new URL(file, import.meta.url), 'utf8')).parts.find((p: { id: string }) => p.id === id).marks;
-const docKinds = kindsOf('../packs/reader/workspace.json', 'reader.doc');
+const docKinds = kindsOf('../packs/publish/pack.json', 'publish.doc');
 const publicKinds = kindsOf('../packs/publish/pack.json', 'publish.public');
 /** Every mark of a kind, through the tree. */
 const all = (m: any, kind: string): any[] => (Array.isArray(m) ? [...(m[0] === kind ? [m] : []), ...m.slice(1).flatMap((k: unknown) => all(k, kind))] : []);
@@ -34,7 +34,7 @@ const page = {
   links: { e_dddddddd: 'Another page' },
   start: 'Start a map of your own',
 };
-const at = { published: true, origin: 'https://example.org' };
+const at = { published: true, frozen: true };
 
 test("a document's page: its heading, its text, each section with its picture, and the style's share left out", () => {
   const part = doc({ page, at });
@@ -44,19 +44,15 @@ test("a document's page: its heading, its text, each section with its picture, a
   assert.ok(words(part.marks).some((w) => w.startsWith('Published ')));
   assert.equal(all(part.marks, 'note')[0][2], 'Start at [Where it stands](e_bbbbbbbb), then read [the other](e_dddddddd).', 'a bare id reads as its name, a named link as it is');
   assert.deepEqual(all(part.marks, 'picture').map((p) => p[1].item), ['e_bbbbbbbb', 'e_cccccccc'], 'a lens and a figure are pictures; the shared picture is not on the page');
-  const start = all(part.marks, 'text').find((t) => t[2] === 'Start a map of your own');
-  assert.equal(start[1].href, 'https://example.org/', 'read with no login, it ends with a way to start a map of one’s own');
-  assert.ok(!all(doc({ page, at: { own: true } }).marks, 'text').some((t) => t[2] === 'Start a map of your own'), 'read with a sign-in, it does not');
+  assert.ok(!words(part.marks).includes('Start a map of your own'), 'what is around the page as it is served is the host’s');
 });
 
-test('a site page has its head, its pages made whole against the origin, and its footer', () => {
-  const site = { name: 'Example', host: 'example.org', home: '/', pages: [{ title: 'Guide', href: '/guide' }], footer: 'Made with care.' };
-  const marks = doc({ page: { ...page, site }, at }).marks;
-  checkMarks(marks, { kinds: docKinds });
-  const head = all(marks, 'text').filter((t) => t[1]?.href);
-  assert.deepEqual(head.slice(0, 2).map((t) => t[1].href), ['https://example.org/', 'https://example.org/guide']);
-  assert.ok(all(marks, 'note').some((n) => n[2] === 'Made with care.'));
-  assert.ok(!words(marks).includes('Start a map of your own'), 'on its own domain, a site page sends no one away');
+test('run as the page is published, it keeps the sheet of every item its pictures froze', () => {
+  const part = doc({ page, at });
+  assert.deepEqual(Object.keys(part.sheets), ['e_ffffffff']);
+  checkMarks(part.sheets.e_ffffffff, { kinds: docKinds });
+  assert.ok(words(part.sheets.e_ffffffff).includes('A task'));
+  assert.equal(doc({ page, at: { own: true } }).sheets, undefined, 'drawn in a browser, it opens them as asked');
 });
 
 test('an invoice has its own head', () => {
@@ -102,6 +98,12 @@ const product = {
   ],
   changelog: [{ title: 'Shadows', status: 'shipped', at: '2026-11-01T10:00:00Z', release: { title: 'First', version: '1.0' } }],
 };
+
+test("a product's page kept for its reader has every question open", () => {
+  const marks = publicPage({ page: product, at: { frozen: true } }).marks;
+  checkMarks(marks, { kinds: publicKinds });
+  assert.deepEqual(all(marks, 'picture').map((p) => p[1].item), ['e_gggggggg']);
+});
 
 test("a product's page: how we know, folded, its tests open with their pictures and marks, and its changelog", () => {
   const part = publicPage({ page: product });

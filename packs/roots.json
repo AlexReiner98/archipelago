@@ -2,7 +2,7 @@
   "roots": [
     {
       "id": "core",
-      "hash": "1fed655d7bba11c47ad38508dd8e6ea1dfe4731a57ceca1f9ffc037819127630"
+      "hash": "42ad63072073fbb28e4a90361fa14d92ae11658ff0dfe1a8275ed9793cae518e"
     },
     {
       "id": "database",
@@ -22,11 +22,11 @@
     },
     {
       "id": "walls",
-      "hash": "099dae95c896407c18e3acc555facd00b832ff8727fa4862093fe4b3141891a5"
+      "hash": "4d1ee092b51cdbd7e30c40725c118289c8b7d8e78d927c1d956b1ce665947d2e"
     },
     {
       "id": "loader",
-      "hash": "060f335e66efd6e6164ad71a4eb8f1bf2a1b0f76b72834c7706401d6a504e54b"
+      "hash": "7197ef690279e4d9cfdfcc7c7ae88a42acfd2ea753fca1f95b89267c6747424a"
     },
     {
       "id": "rules",
@@ -38,7 +38,7 @@
     },
     {
       "id": "surface",
-      "hash": "8eb3c792ed4393ce7034f145b0163450961cd9dbf38d4e9945e688e932be5a6d"
+      "hash": "f1cd04518e50f0b28c796155118270df747e63ce38292396fce4441656f3f466"
     },
     {
       "id": "panes",
@@ -90,6 +90,9 @@
       "publish"
     ],
     "root.scene": [
+      "publish"
+    ],
+    "root.part_marks": [
       "publish"
     ],
     "root.parts": [

@@ -1,8 +1,9 @@
 // A product's public page, as the publish pack's part (task e_atxefw2s): how we know it is correct (the questions a
 // user would ask before trusting it, each with the tests that answer it) and what has been built. It fills the host's
 // page.public, is handed the page's data (`page`, packs/publish/kernel/public.ts's publicPage), and answers with marks
-// alone: a test's picture is the host's to draw, out of the data it handed. Picking another build asks the host for that
-// build's data (`event` back: the part names the build, the host reads it).
+// alone: a test's picture is the host's to draw, out of the data it handed. Picking another build is the page's: the
+// host reads that build's data, with its marks. Run on the server as the page is read (`at.frozen`,
+// packs/publish/kernel/page-marks.ts), every question is open, since marks kept for a reader do not fold.
 
 const day = (ts) => {
   const d = new Date(ts);
@@ -105,7 +106,7 @@ export function marks(d, open = new Set()) {
 
 export default function publicPage(input) {
   let d = input?.page ?? input?.views?.page ?? null;
-  const open = new Set();
+  const open = new Set(input?.at?.frozen ? (d?.questions ?? []).map((q) => q.id) : []);
   return {
     marks: marks(d, open),
     title: d?.title ? `${d.title}: how we know` : 'How we know',

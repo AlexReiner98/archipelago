@@ -19,7 +19,7 @@
 .doc-lens .group-actor .dot { fill: var(--g-actor); } .doc-lens .group-aim .dot { fill: var(--g-aim); } .doc-lens .group-work .dot { fill: var(--g-work); }
 .doc-lens .group-record .dot { fill: var(--g-record); } .doc-lens .group-question .dot { fill: var(--g-question); } .doc-lens .group-occurrence .dot { fill: var(--g-occurrence); }
 .doc-lens .group-place .dot { fill: var(--g-place); } .doc-lens .group-system .dot { fill: var(--g-system); }
-/* A page is one column, and a picture is as wide as it. One that plays stands beside its words in a band (ui/doc.js):
+/* A page is one column, and a picture is as wide as it. One that plays stands beside its words in a band (packs/surface/page/frozen-page.js):
    the page is as wide as the style's reader_band, its other text centred at the column's width, and a band stacks
    by itself where the window cannot hold two sides at reader_band_least. */
 main:has(.doc-band) { max-width: var(--reader-band); }
