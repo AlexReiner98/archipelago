@@ -287,7 +287,8 @@ export class View {
       out.items[k] = changed.items[k].filter((id) => this.ids.has(id));
       out.links[k] = changed.links[k].filter((id) => ours(this.store.links.get(id)) || ours(wasLinks.get(id)));
     }
-    out.ask = mayMove({ lens: this.lens, reads: this.reads, items: this.ids, islands: this.touched() }, touches, made);
+    const sessions = new Set([...this.ids].filter((id) => this.store.items.get(id)?.session));
+    out.ask = mayMove({ lens: this.lens, reads: this.reads, items: this.ids, islands: this.touched(), sessions }, touches, made);
     if (out.ask || anyIn(out)) this.tell(out);
     return out;
   }
