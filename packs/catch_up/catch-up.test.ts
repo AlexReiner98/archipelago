@@ -47,3 +47,14 @@ test('steps are chapters by maker, each island its own', () => {
   assert.deepEqual(steps.map((s: any) => [s.chapter, s.island, s.pos, s.ids]), [[0, 'e_islanda1', 2, ['e_aaaaaaaa']], [0, 'e_islandb1', 2, ['e_bbbbbbbb']], [1, 'e_islanda1', 3, ['e_aaaaaaaa']]]);
   assert.equal(changedCount(steps), 2);
 });
+
+test('a part mounted after the slot was told hears the last it was told', async () => {
+  // @ts-expect-error: plain modules of the pack, with no types of their own.
+  const replay = (await import('./parts/replay.js')).default;
+  // @ts-expect-error: plain modules of the pack, with no types of their own.
+  const traced = (await import('./parts/traced.js')).default;
+  const entries = [{ pos: 2, by, facts: [['+', 'e_aaaaaaaa', 'status', 'doing']], rows: [{ id: 'e_aaaaaaaa', was: task('A'), now: task('A', 'doing') }] }];
+  assert.match(JSON.stringify(replay({ told: { name: 'missed', entries } }, {}).marks), /"1 changed"/);
+  const rows = [{ id: 'e_aaaaaaaa', was: task('A'), now: task('A', 'doing'), by, pos: 2 }];
+  assert.equal(traced({ me: 'human:alex', told: { name: 'beat', from: 1, to: 2, rows } }, {}).marks.length, 3);
+});

@@ -15,6 +15,8 @@ export default function traced(input, tools) {
   const days = () => now?.style?.numbers?.trace_kept_days ?? KEPT_DAYS;
   const draw = () => ['box', { key: 'traces' }, ...traceMarks(book)];
   const keep = () => tools?.keep?.('traces', keptOf(book, Date.now(), days()));
+  // A part mounted after the runtime told the slot hears the last beat it told as `told` (hooks.tellSlot).
+  if (input?.told?.name === 'beat' && Array.isArray(input.told.rows) && trace(book, changeSet(input.told), input.me ?? input.told.me)) keep();
   return {
     marks: draw(),
     update(next) {

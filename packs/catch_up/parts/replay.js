@@ -24,7 +24,9 @@ export default function replay(input, tools) {
     const steps = stepsOf(missed?.entries, { islands: missed?.islands, me: now?.me ?? missed?.me });
     offered = steps.length ? { steps, count: changedCount(steps) } : null;
   }
-  if (input?.missed) offer(input.missed);
+  // A part mounted after the runtime told the slot hears the last it told as `told` (hooks.tellSlot).
+  const missed = input?.missed ?? (input?.told?.name === 'missed' ? input.told : undefined);
+  if (missed) offer(missed);
 
   const band = (o) => {
     const playing = o.played !== undefined;
