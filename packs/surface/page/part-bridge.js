@@ -25,7 +25,7 @@ const MOVES = [...GESTURES, 'submit'];
  * the parts everything through `send`, so a press is counted; hand each message from the port to `heard`, which
  * answers true when it was an action it took.
  */
-export function partBridge(port, { partOf, go } = {}) {
+export function partBridge(port, { partOf, go, state } = {}) {
   const pressed = new Map(), moved = new Map(), busy = new Set();
   const answer = (asked, result) => port.postMessage({ type: 'acted', asked, ...result });
 
@@ -69,6 +69,15 @@ export function partBridge(port, { partOf, go } = {}) {
     go?.(said.address);
   }
 
+  // Page state a part publishes (`state` in its manifest): only a name it declared, and only its own, so one name has
+  // one owner here as everywhere. The page (`state`) writes it on the root; no gesture is needed, since it says what
+  // the page is doing, never what the person did.
+  function publish(said) {
+    const part = partOf?.(String(said.id));
+    if (!part?.state?.includes(String(said.name))) return;
+    state?.(String(said.name), said.value === null ? null : String(said.value).slice(0, 300), part);
+  }
+
   return {
     /** Send the version's parts a message: a `press` (or a note's `tick`) lets that part send one action as its own. */
     send(message) {
@@ -80,6 +89,7 @@ export function partBridge(port, { partOf, go } = {}) {
     /** A message from the port: true when it was an action or a move, taken here. */
     heard(said) {
       if (said?.type === 'go') return (moveTo(said), true);
+      if (said?.type === 'state') return (publish(said), true);
       if (said?.type !== 'act') return false;
       void act(said);
       return true;

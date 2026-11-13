@@ -227,6 +227,9 @@ function partInside() {
     keep: (value, name = '') => send({ type: 'keep', id, name: String(name), value: value ?? null }),
     // Another address for the page, from a part that declares `go`: the page checks it and moves, after a gesture only.
     go: (address) => send({ type: 'go', id, address }),
+    // Page state this part publishes (`state` in its manifest): the runtime writes it on the root, where anything
+    // watching the page from outside reads it. A name the part did not declare is refused; nothing (null) takes it off.
+    state: (name, value) => send({ type: 'state', id, name: String(name), value: value ?? null }),
   });
 
   // One part's words at a time, in the order they came: a part is never told of an event before it is mounted.
