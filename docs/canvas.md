@@ -113,7 +113,7 @@ stack in one line: the packs', the workspace's, the view's, then a person's own
 colours. What moved from the styles made for one view is `packs/styles/kernel/style-move.ts`;
 how the styles with code became layouts is `packs/styles/kernel/layout-move.ts`.
 A layout is the pane's: editing the query keeps it, opening a saved view
-brings its own. The view band switches it (`ui/look-switch.js`), which lists
+brings its own. The view band switches it (the styles pack's part `styles.layout_switch`), which lists
 layouts and nothing else. A change in a pane is a draft: Save is marked and
 writes it to the view, and Save as new view makes another. The band's ⋯ holds
 Fit for the main canvas (decision e_yxp78scv). Find never
