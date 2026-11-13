@@ -45,13 +45,14 @@ const partTold = 50;
  * with a way to stop it; `hue(words)` is a session's hue named by words; `swatch(preset, el)` paints a style preset's
  * colours into `el`, and `tryTheme(preset)` paints this screen alone in one ('' the workspace's own again);
  * `replay({ at, steps } | null)` shows the canvas under the part the missed steps up to `at`, or the map as it is now;
- * `ghosts(list)` is handed the ghosts each answer holds (each mark's attributes), for the canvas to draw where they land. `find(q, types, link)` answers the items an item
+ * `ghosts(list)` is handed the ghosts each answer holds (each mark's attributes), for the canvas to draw where they land;
+ * `slot(name, el)` draws the parts that fill a slot this part opens into `el`. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
  * { id, title, type, ways? }, the ways it may be linked to the part's item where a link is asked for. Answers with
  * `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {} } = {}) {
-  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {}, slot = async () => 0 } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts, slot };
   let ended = false;
   return {
     draw(node) {
@@ -111,6 +112,7 @@ function build(node, ctx) {
   else if (node.mark === 'pane') el = buildPane(ctx.tell);
   else if (node.mark === 'panes') el = make('div', 'pm-panes');
   else if (node.mark === 'trace') (el = make('span', 'pm-trace')), (el.hidden = true);
+  else if (node.mark === 'slot') el = make('div', 'pm-slot');
   else if (node.mark === 'ghost') (el = make('span', 'pm-ghost')), (el.hidden = true);
   else if (node.mark === 'replay') (el = make('span', 'pm-replay')), (el.hidden = true), (el.pmReplay = ctx.replay);
   else if (node.mark === 'swatch') {
@@ -129,13 +131,15 @@ function build(node, ctx) {
   else if (node.mark === 'button') {
     el = make('button', 'pm-button');
     el.type = 'button';
-    el.addEventListener('click', async () => {
+    el.addEventListener('click', async (ev) => {
       const { key, at } = drawnFrom.get(el);
+      // Shift held says the press means more (find: another set), and the part hears it.
+      const shift = ev.shiftKey ? { shift: true } : {};
       // A button that tries a theme paints this screen in it alone, keeping nothing; the part hears the press too.
       if (at.try !== undefined) void Promise.resolve(ctx.tryTheme(at.try)).catch(() => {});
       // A button that copies: its words go to the clipboard, the button says whether they went, and the part hears it.
-      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', copied: await copied(el, at.copy) });
-      if (!at.pick) return ctx.tell({ key, name: 'press' });
+      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', ...shift, copied: await copied(el, at.copy) });
+      if (!at.pick) return ctx.tell({ key, name: 'press', ...shift });
       // A pick waits for the item clicked on the canvas; told back either way, null when it was let go.
       el.setAttribute('aria-pressed', 'true');
       const value = await ctx.pick(at.pick).catch(() => null);
@@ -145,6 +149,7 @@ function build(node, ctx) {
   } else if (node.mark === 'input') el = field(node, ctx);
   else if (node.mark === 'note') el = make('div', 'pm-note');
   else if (node.mark === 'thumb') el = make('span', 'pm-thumb');
+  else if (node.mark === 'slot') el = make('div', 'pm-slot');
   else if (node.mark === 'menu') {
     el = make('details', 'menu pm-menu');
     el.append(make('summary', ''), make('div', 'menu-items'));
@@ -177,16 +182,30 @@ function field(node, ctx) {
   const el = kind === 'pick' ? make('select', 'pm-input') : make(many ? 'textarea' : 'input', 'pm-input');
   if (el.tagName === 'INPUT') el.type = FIELD_TYPES[kind];
   const value = () => (kind === 'check' ? String(el.checked) : el.value);
-  const said = (name) => (told(el).push(value()), told(el).splice(0, told(el).length - partTold), ctx.tell({ key: drawnFrom.get(el).key, name, value: value() }));
-  // A pick is made the moment it is changed, one gesture; words go back as they are typed, and Enter submits a line.
+  const said = (name, more = {}) => (told(el).push(value()), told(el).splice(0, told(el).length - partTold), ctx.tell({ key: drawnFrom.get(el).key, name, value: value(), ...more }));
+  // The keys the part asked for (`keys`) are its own: the page does nothing with them, and the part hears which, and
+  // whether the field was empty. Escape goes no further, so the page's own Escape does not act too.
+  el.addEventListener('keydown', (e) => {
+    const { key, at } = drawnFrom.get(el);
+    if (e.isComposing || !at.keys?.includes(e.key)) return;
+    e.preventDefault();
+    if (e.key === 'Escape') e.stopPropagation();
+    ctx.tell({ key, name: 'key', value: e.key, empty: el.value === '' });
+  });
+  // Coming into the field is told, so a part may open what goes with it.
+  el.addEventListener('focus', () => ctx.tell({ key: drawnFrom.get(el).key, name: 'focus' }));
+  // A pick is made the moment it is changed, one gesture; words go back as they are typed, and Enter submits a line
+  // (with Shift held, `shift`).
   if (PICKS.includes(kind)) el.addEventListener('change', () => said('pick'));
   else {
     el.addEventListener('input', () => (said('edit'), fit(el)));
-    el.addEventListener('keydown', (e) => !many && e.key === 'Enter' && !e.isComposing && (e.preventDefault(), said('submit')));
+    el.addEventListener('keydown', (e) => !many && e.key === 'Enter' && !e.isComposing && !drawnFrom.get(el).at.keys?.includes('Enter') && (e.preventDefault(), said('submit', e.shiftKey ? { shift: true } : {})));
   }
-  if (node.at.focus) requestAnimationFrame(() => el.isConnected && el.focus({ preventScroll: true }));
   return el;
 }
+
+/** Put the caret in a field the part asks to be in (`focus`), when it is drawn and whenever it is drawn again asking so. */
+const focusSoon = (el) => setTimeout(() => el.isConnected && document.activeElement !== el && el.focus({ preventScroll: true }), 0);
 
 /**
  * An item found by name, as the canvas's search finds one: what the person types is asked of the map here, as them,
@@ -249,6 +268,9 @@ function update(el, node, ctx, fresh = false) {
   if (node.mark === 'text') hued(el, at.hue !== undefined ? ctx.hue(at.hue) : undefined, at.hue !== undefined);
   if (node.mark === 'web') frameWeb(el, at.url, at.reload ?? '');
   if (node.mark === 'trace') return (traceMark(el, node, ctx), el);
+  // A slot the part opens: the parts that fill it are drawn in it by whoever hosts this one, again only for another slot.
+  if (node.mark === 'slot' && (fresh || was.at.name !== at.name)) (el.replaceChildren(), (el.dataset.slot = at.name), ctx.slot(at.name, el));
+  if (node.mark === 'slot') return el;
   // A replay: the canvas under the part shows the missed steps up to `at`; the host holds the store, the part the timer.
   if (node.mark === 'replay') return (ctx.replay({ at: at.at, steps: at.steps }), el);
   // A swatch is painted by the host from the preset it names, again only for another preset.
@@ -266,6 +288,8 @@ function update(el, node, ctx, fresh = false) {
   if (node.view !== undefined && el.tagName !== 'BUTTON') (el.tabIndex = 0, el.setAttribute('role', 'link'));
   else if (el.tagName !== 'BUTTON' && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') (el.removeAttribute('tabindex'), el.removeAttribute('role'));
   // The view's picture is drawn again only when it names another view: the host keeps it current.
+  // The parts filling a slot are drawn by the host, once in the page, and again only for another slot.
+  if (node.mark === 'slot' && (fresh || was.at.name !== at.name)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.slot(at.name, el)));
   if (node.mark === 'thumb' && (fresh || was.at.view !== at.view)) el.replaceChildren(...[ctx.thumb(at.view)].filter(Boolean));
   // Drawn once it is in the page, where its width is known, and again only for another item.
   if (node.mark === 'picture' && (fresh || was.item !== node.item)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.picture(node.item, el)));
@@ -304,6 +328,7 @@ function update(el, node, ctx, fresh = false) {
       heard.length = 0;
     }
     if (fresh) requestAnimationFrame(() => fit(el));
+    if (at.focus && el.tagName !== 'SPAN') focusSoon(el);
   }
   if (node.mark === 'text' && at.href && el.getAttribute('href') !== at.href) el.setAttribute('href', at.href);
   if (node.mark === 'box') place(el, node.kids, ctx);

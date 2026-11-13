@@ -136,7 +136,8 @@ answering with marks the host checks.
 |---|---|---|
 | `id`, `title` | The part, `<pack>.<name>`. | Its pack's name. |
 | `slot` | The slot it fills, or the slots: a part drawn in two places (the strip in `tabs` and the panes in `panes`) is one part, mounted once per slot and handed `slot` to say which (decision e_tq3fk4g8). | Each the host's, one its pack's parts open, or one it asks for as `slot:<name>`. |
-| `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). |
+| `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`; or `"*"`, items whole (head and every field) with each type's fields and capabilities beside the words. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). `"*"` only for a root pack's part. |
+| `writes` | The types it changes as the person looking, with `tools.change(ops, reason)` (and `tools.undo(changeset)` just after a press): applied through the one write path as that person's change, naming the part. | A root pack's part only; each type the map has. The server checks each op touches a type it writes, and allows no merge, type or forget. |
 | `sends` | The actions it may send. | Each its own pack's. |
 | `opens` | The slots it draws for others to fill. | Named `<pack>.<name>`, or a piece or page the host no longer draws. |
 | `marks` | The marks it answers with (`box`, `text`, ...). | A list of mark kinds, checked by shape. One the host does not draw (`packs/walls/page/part-check.js`) makes the part wait, its pack still active; at draw, a mark it did not name is refused. |
@@ -192,15 +193,15 @@ which `ui/query-bar.js` then leaves to the part.
 **The runtime tells a slot what it saw** (`tellSlot(slot, event)`, as
 `hooks.tellSlot`): every part mounted there hears it as an event in `on`,
 and one mounted later is handed the last as `told`. The sheet's reading
-position is told to `sheet` as `{ name: 'scrolled', reading: { item, open,
-held, unsaved } }` (`item` the document in sight, `open` the item whose page
-is shown, `held` while the sheet waits for the frames above to settle); a
+position is told to `sheet` as `{ name: 'scrolled', reading: { open, sight,
+unsaved, holding } }` (`open` the item whose page is shown, `sight` the
+document in sight, `holding` while the sheet waits for the frames above); a
 part there names the page to show with
 `tools.go({ item, replace: true })`, which replaces the address and never
 leaves words not yet saved. With no part told, the page follows the reading
 itself.
 
-**What the traces are told.** A part on `traces` is handed `me` (the
+**What the traces are told.** A part on `traces` is handed `me` in its piece (the
 person's actor, as the log names one) and told each beat of the log as
 `{ name: 'beat', from, to, rows: [{ id, was, now, by?, at?, pos }] }`: the
 rows the beat touched as they were and are (null where not held, or gone),
@@ -264,7 +265,7 @@ A part is handed the item it stands on cut to the fields it `reads`, its
 query's items, its named reads, and, where it declares `go`, the page's
 address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
 `text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`,
-`picture`, `web`, `pane`, `panes`, `swatch`, `trace`, `replay` and `ghost`, each named in its `marks`.
+`picture`, `web`, `pane`, `panes`, `swatch`, `trace`, `replay`, `ghost` and `slot`, each named in its `marks`.
 
 **What any mark may carry**, beside `key`, `item`, `view` and `tip`:
 `lights`, up to 500 items it lights on the canvas in sight while the person
@@ -278,10 +279,12 @@ part is told nothing.
 | Mark | What it is | What the part hears |
 | --- | --- | --- |
 | `box` `fits` | As many of its marks as fit on one line, one at least; then `+N`, its tip the hidden marks' tips (`part-fits.js`). | With `more: <key>`, the `+N` is a button: `press`, value N. |
+| `input` `keys`, `focus` | `keys` (up to 8 key names, such as ArrowUp, Escape) are the part's: the page does nothing with them (Escape goes no further). `focus: true` puts the caret in it whenever it is drawn so. Shift held on Enter or on a button's press adds `shift: true`. | `key` with `value` (the key) and `empty`; `focus` when it is come into; `submit` and `press` with `shift`. |
 | `button` `copy` | The words (up to 2000) go to the clipboard on the press; the button says Copied for a moment, or Copy failed with the words in its tip. | `press`, with `copied` true or false. |
 | `button` `try` | A theme (a preset used once chosen) tried on this screen alone, nothing kept; `null` the workspace's own again (`packs/surface/page/swatch.js`). Every part is handed `trying`, the preset tried or null. | `press`. |
 | `swatch` | A style preset's paper, ink and sea for the screen's scheme, painted by the host from the preset the part names (`preset`): a part paints no colour. `label` under it, `on: kept` or `trying` outlines it; an unknown preset is blank. | `press`, with a key. |
 | `text` `hue` | A session, named by its words, marked in its hue as every session is. | nothing. |
+| `slot` | A slot the part opens (`name`, one of its `opens`), drawn in its place by the parts that fill it, four deep at most (`slot(name, el)` in part-host). | nothing. |
 | `ghost` | Nothing where it stands: a change held for the owner, as data (`of` item, link or mark; `id` such as `p_x:ref`, `proposal`, `op`, and the item's or link's fields), handed to whoever hosts the part (`ghosts(list)`, `hooks.ghosts`) for the canvas to read back into its answer and draw where it would land. | nothing. |
 | `paint` `controls` | −, Fit and + in the surface's corner, zoomed by the style's `zoom_step`. A `path` may be filled as a diagram's shapes are (`look: area`, `box`, `strong`), and a path or placed text may carry a `tip` and an `href` (opened apart). | nothing. |
 | `replay` | Nothing where it stands: the canvas under the part shows what the person missed (`store.missed`, set as the canvas mounts) up to step `at` of `steps` (`[{ pos, ids }]`, each the facts of entry `pos` about those ids), the store `playing` while it is said; a step back or other steps rewinds first. With no replay mark, what was not played is projected at once and the store is the map as it is now (`packs/surface/page/replay.js`). The part drives the timer. | nothing. |
@@ -319,6 +322,10 @@ painting is a mark the contract names. Three shapes to write against:
 Where a part must say something about the page rather than draw it (that the
 canvas has finished drawing, say), it publishes page state it declared
 (`state`), and the runtime writes it on the root.
+
+An action whose answer says `looks: true` changed how the page looks (a theme
+kept): once it has gone out, the page reads its look again, ending any theme
+tried on that screen.
 
 **Where a part may go.** A part that declares `go` names an address after a
 gesture and the canvas checks it: an item (`item`), a query and the layout

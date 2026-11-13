@@ -1,6 +1,5 @@
 import { api, h, hooks, main, route, state, whoami } from './base.js';
 import { project } from './project.js';
-import { beatRows, missedRows } from './beat-rows.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { still } from './look.js';
 import { hear, sessionOf } from './pane-route.js';

@@ -18,15 +18,19 @@
     },
     {
       "id": "identity",
-      "hash": "43c1f8d948f2d32868b309abb98e5a38bf18d02d2f7f831596bc5a7a69f86e1f"
+      "hash": "d6fb0f14d027bebb26826411dbe88448da22a3cdb71434d0e13e83b2f3a3f77f"
     },
     {
       "id": "walls",
+<<<<<<< HEAD
       "hash": "b709d920cccea1b44ae630ee21ec97504ce727704ee810c5bc4bae02fa8d2339"
+=======
+      "hash": "7f31c16fc95526c70c60d848fa815189fc49eca19dd4ba3a63d18d08b4e41403"
+>>>>>>> claude/ui-port
     },
     {
       "id": "loader",
-      "hash": "cd3ac02e7c83f534226663cb626138b575ccd5365a824d21e9d8b96d913afda0"
+      "hash": "1c861cc199d3d5c93cc03fab82010d5cb404ac9c314e1187f77dd75f445bf4ce"
     },
     {
       "id": "rules",
@@ -34,15 +38,19 @@
     },
     {
       "id": "write",
-      "hash": "0703ca96a636477621b20f42c5ba0fd4c8984cb08ab829fe3464dc25d76baa44"
+      "hash": "4cbd1142d83363066a36bc3ae57d6f8bb096c10c4ccd28437547e999056934af"
     },
     {
       "id": "surface",
+<<<<<<< HEAD
       "hash": "6fc245fb3fe26ec0d2484cea1a4adf4886836f950dc38766b624d4c7b284d46b"
+=======
+      "hash": "239056cb2fcfafb8ecb0178f08d7a5bb24379099e91fa32e4504b0f7bd3c2926"
+>>>>>>> claude/ui-port
     },
     {
       "id": "panes",
-      "hash": "23281fa866f7a74952369192305103845241dd6d9c3f6fc8c6dedaf9f23e902d"
+      "hash": "c1bd3fc1760a355e49259bb169cac80e47a0e2996452c9963d8c8aaafc09a4dd"
     },
     {
       "id": "bar",
@@ -50,7 +58,7 @@
     },
     {
       "id": "sheet",
-      "hash": "1fa991cd4b3d9e93a576e98dde277ff298302a826c830b51db7d10a8d3beaf27"
+      "hash": "69f3dd0144a3513d67ace9097226bf37979548cde957a614ce56a372dd652b95"
     }
   ],
   "calls": {
