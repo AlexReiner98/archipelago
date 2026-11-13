@@ -14,7 +14,7 @@ import { saveOps, unsaved } from '../packs/sheet/parts/page/draft.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import { linkEvent } from '../packs/sheet/parts/page/links.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
-import { followTo } from '../packs/sheet/parts/follow/index.js';
+import follow, { followTo } from '../packs/sheet/parts/follow/index.js';
 
 const words = {
   types: {
@@ -89,9 +89,17 @@ test('Save sends the note and the fields written as one change, and lets the kep
 });
 
 test('the follow goes to the item in sight, never while it is held or words are unsaved', () => {
-  assert.deepEqual(followTo({ item: 'e_aaaaaaaa' }, { item: 'e_bbbbbbbb' }), { item: 'e_bbbbbbbb', replace: true });
-  assert.equal(followTo({ item: 'e_aaaaaaaa' }, { item: 'e_aaaaaaaa' }), null);
-  assert.equal(followTo({ item: 'e_aaaaaaaa' }, { item: 'e_bbbbbbbb', unsaved: true }), null);
-  assert.equal(followTo({ item: 'e_aaaaaaaa' }, { item: 'e_bbbbbbbb', held: true }), null);
-  assert.equal(followTo(null, { item: 'e_bbbbbbbb' }), null);
+  assert.deepEqual(followTo({ open: 'e_aaaaaaaa', sight: 'e_bbbbbbbb' }), { item: 'e_bbbbbbbb', replace: true });
+  assert.equal(followTo({ open: 'e_aaaaaaaa', sight: 'e_aaaaaaaa' }), null);
+  assert.equal(followTo({ open: 'e_aaaaaaaa', sight: 'e_bbbbbbbb', unsaved: true }), null);
+  assert.equal(followTo({ open: 'e_aaaaaaaa', sight: 'e_bbbbbbbb', holding: true }), null);
+  assert.equal(followTo({ sight: 'e_bbbbbbbb' }), null);
+});
+
+test('told the page scrolled, the follow names the page', () => {
+  const went: unknown[] = [];
+  const f = follow({}, { go: (a: unknown) => went.push(a) });
+  f.on({ name: 'scrolled', reading: { open: 'e_aaaaaaaa', sight: 'e_bbbbbbbb' } });
+  f.on({ name: 'press', key: 'x' });
+  assert.deepEqual(went, [{ item: 'e_bbbbbbbb', replace: true }]);
 });
