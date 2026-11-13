@@ -4,7 +4,7 @@
 // server can connect it to (the GitHub App, say). Which is open is kept in the address (#/workspace?at=map); a step of Start here (ui/start.js)
 // names a card, and lands on its section with that card in view.
 
-import { api, ask, h, may, part, state, whoami } from './base.js';
+import { api, ask, drawSlots, h, may, part, state, whoami } from './base.js';
 import { screenRows } from './nav.js';
 import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
@@ -102,13 +102,17 @@ export async function workspace() {
   // What a person who is not an admin may change is only their own agent tokens.
   const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !tokensOn && !info.owner));
   if (!shown.some(([key]) => key === open)) open = shown[0]?.[0] ?? 'agents';
+  const grid = h('div', { class: 'grid' }, sections[open]());
   main.replaceChildren(
     h('div', { class: 'page-head' }, h('h1', {}, 'Settings'), h('p', { class: 'muted' }, me.workspace.name, ' ', admin && me.workspace.id !== 'default' && h('a', { href: '#/workspace', title: 'Give this workspace another name', onclick: rename }, 'Rename'))),
     // A member who is no admin has one section: no switch, and nothing in its place (replaceChildren would write "false").
     ...(shown.length > 1 ? [h('div', { class: 'switch ws-sections', role: 'tablist' }, shown.map(([key, label, tip]) => h('button', { class: key === open ? 'on' : '', role: 'tab', title: tip, onclick: () => go(key) }, label)))] : []),
     h('div', { class: 'ws-notice' }, notice),
-    h('div', { class: 'grid' }, sections[open]()),
+    grid,
   );
+  // What other packs say on this workspace, each a part of its own under the cards this screen draws (slot
+  // workspace.card). None fills it until its pack's cluster lands, and then nothing is added here.
+  void drawSlots(grid, { slot: 'workspace.card', piece: { workspace: me.workspace.id }, redraw: workspace });
   // Brought into view only as far as it must be, so the page's head and its sections stay in sight above it.
   if (step) setTimeout(() => main.querySelector(`[data-at="${CSS.escape(step)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 400);
 }

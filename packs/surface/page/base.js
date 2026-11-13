@@ -37,6 +37,15 @@ export const part = (name) => main.querySelector(`.part[data-part="${name}"]`) ?
 
 export { h };
 
+/**
+ * Ask for a slot by its name: the one part that fills it (`drawSlot`, true when one does, so the caller draws what it
+ * did before when none does) or every part that fills it, each in a node of its own (`drawSlots`, how many). Here, so
+ * a page of any root asks the host by name and reaches the runtime that draws parts without importing it
+ * (packs/surface/page/part-host.js, loaded the first time a slot is asked for).
+ */
+export const drawSlot = (node, asked) => import('./part-host.js').then((m) => m.drawPart(node, asked));
+export const drawSlots = (node, asked) => import('./part-host.js').then((m) => m.drawParts(node, asked));
+
 /** A lens's sets of words, each its own Find term: one or several (the find bar's Shift+Enter adds a set, e_e3k797d3). */
 export const wordsOf = (filter) => (filter?.find ?? []).filter((t) => t.startsWith('text ')).map((t) => t.slice(5));
 /** The filter with its words these sets, in the place words have among Find's terms. */

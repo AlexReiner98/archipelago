@@ -312,3 +312,25 @@ export async function drawPart(node, { slot, item, piece, redraw = () => {}, ope
   await mount(node, part, parts, item, words, piece, { openView, picture });
   return true;
 }
+
+/**
+ * Draw every part that fills `slot`, each in a node of its own under `node`, and answer how many: a slot a page holds
+ * several of (a card on the workspace page, a mark on a tab). The page draws what it has itself and asks for this
+ * beside it, so a slot no pack fills yet simply adds nothing. Takes what `drawPart` takes.
+ */
+export async function drawParts(node, { slot, item, piece, redraw = () => {}, openView, picture }) {
+  sweep();
+  const island = islandOf(item);
+  const shipped = Boolean(island && shippedOn(island));
+  const { parts, refined, words } = await partsOn(island, shipped);
+  wayBackFor(island, shipped ? undefined : refined, async () => redraw());
+  const filling = parts.filter((p) => p.slot === slot);
+  for (const part of filling) {
+    const mine = h('div', { class: 'part-in' });
+    node.append(mine);
+    if (part.waiting) mine.replaceChildren(h('div', { class: 'muted', title: `${part.title} waits: ${part.waiting}` }, `${part.title} waits`));
+    else if (!part.modules) mine.replaceChildren(h('div', { class: 'muted' }, `${part.title}: its code did not come`));
+    else await mount(mine, part, parts, item, words, piece, { openView, picture });
+  }
+  return filling.length;
+}

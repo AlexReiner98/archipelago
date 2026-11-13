@@ -1,6 +1,6 @@
 // A moved finding travels to its readers (task e_fqhbp4yq): the flow's island marks draw, for each finding read
 // across, a pulse from the finding's gate through the sea to the reader's, carrying what the finding promises, so the
-// page runs it when that moves (ui/transition.js). Pure: a composed model in, marks out.
+// page runs it when that moves (packs/walls/page/transition.js). Pure: a composed model in, marks out.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';

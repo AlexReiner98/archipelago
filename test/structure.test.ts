@@ -266,7 +266,7 @@ const KERNEL_SHAPES: Record<string, number> = {};
 const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 
 test('the kernel draws no shape of its own: each is a drawing a pack ships', () => {
-  const counted = Object.fromEntries(['ui/query.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
+  const counted = Object.fromEntries(['packs/surface/page/query.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
   assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/canvas/layouts/architecture is.");
 });
 
@@ -399,7 +399,7 @@ test('the page calls no more tools through /api than it did', () => {
 // a document or a screen). Places are never kept (the owner, 3 Nov 2026): a view is drawn from its query alone, so
 // nothing reads or appends to the places stream, which stays only so entries from before still read.
 test('the canvas draws no depth, and nothing keeps places', () => {
-  assert.doesNotMatch(read('ui/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
+  assert.doesNotMatch(read('packs/surface/page/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
   assert.doesNotMatch(read('packs/query/kernel/query-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
   const keepers = srcCode.filter((f) => /(?:readOps|record)\([^)]*'places'/.test(read(f)));
   assert.deepEqual(keepers, [], 'Nothing keeps where a person put a thing: a view is drawn from its query alone; grouping that matters is a link.');
