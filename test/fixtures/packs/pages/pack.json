@@ -4,6 +4,7 @@
   "title": "Pages",
   "description": "For the kernel's publishing tests: a document it can publish, and a part of one that shows a picture. Core keeps no such type of its own; the packs that do are not in the open repository.",
   "requires": ["core"],
+  "uses": ["slot:piece.document"],
   "types": [
     {
       "id": "page",

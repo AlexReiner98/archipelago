@@ -5,13 +5,13 @@
 // each drawing's code is sent once and kept by its hash. A drawing whose scene asks for a surface has the frames it
 // paints in its worker shown on a canvas laid over its picture (surface.js).
 
-import { drawFrame, h, state } from './base.js';
+import { api, drawFrame, h, state, whoami } from './base.js';
 import { drawingActs, drawingAsked } from './layout-asks.js';
 import { HELD } from './ghosts.js';
 import { tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
 import { build, cssFor, patch, step } from './marks.js';
-import { stillReading } from './reader-frame.js';
+import { readerAsks, stillReading } from './reader-frame.js';
 import { followSheet, sheetAside } from './sheet-follow.js';
 import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './query-base.js';
 import { surfaceOf } from './surface.js';
@@ -19,6 +19,9 @@ import { saidDrawn } from './look.js';
 import { relations, types as registry, typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
 import { transition } from './transition.js';
+
+// A reader frame on the canvas asks the page whether a document is published, and whose workspace it is.
+readerAsks({ api, whoami, style: () => state.style });
 
 /**
  * Each drawing's modules, by its hash: a lens answer leaves out those the page already has (`have`). The last few

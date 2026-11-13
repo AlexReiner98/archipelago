@@ -17,7 +17,7 @@ import { human, agent, freshWith, make, packsWith } from './map.ts';
 
 /** What a pack declares for the kernel to keep and show: a picture's type, public work, and writing for a reader. */
 const SHELF = {
-  id: 'shelf', version: '1', title: 'Shelf', requires: ['core'],
+  id: 'shelf', version: '1', title: 'Shelf', requires: ['core'], uses: ['slot:piece.document'],
   types: [
     { id: 'shot', title: 'Shot', description: 'What was seen, with its picture.', extends: 'record', public: true, fields: { value: { type: 'string' } } },
     { id: 'launch', title: 'Launch', description: 'Work anyone may follow.', extends: 'task', public: true },
