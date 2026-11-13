@@ -154,9 +154,9 @@ reply ending) is `docs/agents.md`.
   `"large": true`, which only a type with the kernel flag may have. What a pack adds to the page of an item of a
   type is a screen there too (a view of `form: "screen"`: pieces the kernel draws, listed in
   `packs/loader/kernel/declared.ts`); the item page (`packs/sheet/page/item.js`) names no pack's type.
-- **The UI has no build step and no framework.** Plain files: the app's in
-  `ui/`, the host's (what keeps humans in control) in the root packs'
-  `page/`, under their hash (`npm run roots` after a change there).
+- **The UI has no build step and no framework.** Plain files, all in packs (`ui/` is gone since 13 Nov 2026): parts in map packs'
+  `parts/`, the host's (what keeps humans in control) in the root packs'
+  `page/` and `parts/`, under their hash (`npm run roots` after a change there).
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
   Postgres server) unless the owner agrees to another. One library is kept as a file, not
@@ -280,7 +280,7 @@ else a pack"). These rules keep it composable while that happens, and
 
 - **No file over 500 lines.** Split it into modules, each one thing.
 - **The kernel names no pack.** No pack's type or link type by name in the
-  kernel (`src/`, the root packs' `kernel/`) or `ui/`: ask the registry for a kind or a capability.
+  kernel (`src/`, the root packs' `kernel/`) or a root's `page/`: ask the registry for a kind or a capability.
 - **One write path, checked.** Items and links are written only in
   `packs/write/kernel/pelago.ts`, its apply loop (`packs/write/kernel/change-apply.ts`) and the
   projector it runs (`packs/log/kernel/replay.ts`): through
@@ -297,7 +297,7 @@ else a pack"). These rules keep it composable while that happens, and
 - **Kernel modules import one way.** No cycles; type-only imports do not
   count.
 - **The UI loads as modules,** with no build step: each part of the page its
-  own module under `ui/` or a root pack's `page/`, served by name from
+  own module, a part in a pack's `parts/` or the host's in a root pack's `page/`, served by name from
   `packs/surface/kernel/ui-files.ts`; the host's imports run one way along
   `packs/roots.json` (`test/structure-page.test.ts`).
 - **Four dependencies,** as above.
@@ -306,7 +306,7 @@ else a pack"). These rules keep it composable while that happens, and
   style presets (`styles` in its pack file, resolved in `packs/styles/kernel/styles.ts`);
   the owner changes one by keeping their own version on the map. The UI
   keeps the mechanism (layouts, renderers, CSS rules reading variables) and
-  no values: a colour, a length or a number constant in `ui/` is counted,
+  no values: a colour, a length or a number constant in the page's code is counted,
   and the count only goes down.
 
 - **Every view is drawn by a layout a pack ships** (the owner, 22 Oct 2026):
@@ -377,7 +377,7 @@ is, add a shard to both matrices in `.github/workflows/tests.yml`. When it
 says one file is over its own budget, split that file's tests into files of
 their own: no number of shards waits less than its longest file.
 
-The UI asks its questions in the page (`ask` and `tell` in `packs/surface/page/base.js`), so
+The UI asks its questions in the page (`ask` and `tell` in `packs/kit/page/base.js`), so
 browser automation can answer them. Do not add `confirm`, `prompt` or `alert`.
 
 ## Archipelago
