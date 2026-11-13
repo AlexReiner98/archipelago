@@ -90,12 +90,66 @@ export function paneGone(el) {
   if (body) body.stop = null;
 }
 
+/** The way panes asked to stand side by side stand: one over another on a page taller than it is wide. */
+export const dirOn = (dir, wide, tall) => (dir === 'column' || wide < tall ? 'column' : 'row');
+
+/** How much of the page's width an open sheet takes beside the panes, as a share: none where it covers most of it. */
+export function sheetRoom(open, sheetWide, pageWide) {
+  return open && pageWide > 0 && sheetWide < pageWide * 0.8 ? sheetWide / pageWide : 0;
+}
+
+/** Every panes mark drawn, laid out again when the page or the sheet changes, or its own size does. */
+const laid = new Set();
+const sized = typeof ResizeObserver === 'function' ? new ResizeObserver((all) => all.forEach((e) => e.target.isConnected && layPanes(e.target))) : null;
+let watching = false;
+function watch() {
+  if (watching || typeof window === 'undefined') return;
+  watching = true;
+  const again = () => [...laid].forEach((el) => (el.isConnected ? layPanes(el) : laid.delete(el)));
+  addEventListener('resize', again);
+  new MutationObserver(again).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+}
+
+/**
+ * Lay out panes as the page's panes stand: under the band across the top where there are several, the whole page for
+ * one (its strip then not drawn), the open sheet's room kept at the side, side by side turned one over another on a
+ * tall page. The pane in focus (`selected`) gives its frame to the bar and find as --active-left, right, top, bottom.
+ */
+export function layPanes(el) {
+  if (!laid.has(el)) {
+    laid.add(el);
+    sized?.observe(el);
+    // Drawn before it is in the page: measured again once it is.
+    setTimeout(() => el.isConnected && layPanes(el), 0);
+  }
+  watch();
+  const node = el.pmNode;
+  if (!node) return;
+  const panes = [...el.children].filter((c) => c.classList.contains('pm-pane'));
+  el.dataset.count = String(panes.length);
+  // The shares are of the room the panes have, whatever they add up to: one alone fills it.
+  const shares = panes.map((p) => Number(p.style.getPropertyValue('--pm-share')) || 1);
+  const all = shares.reduce((a, b) => a + b, 0) || 1;
+  panes.forEach((p, i) => p.style.setProperty('--pm-grow', String(shares[i] / all)));
+  el.dataset.dir = dirOn(node.at.dir ?? 'row', innerWidth, innerHeight);
+  const sheet = document.getElementById('sheet');
+  const aside = sheetRoom(document.body.dataset.sheet === 'open', sheet?.offsetWidth ?? 0, innerWidth);
+  el.style.right = aside ? `${(aside * 100).toFixed(3)}%` : '';
+  document.body.dataset.panes = String(panes.length);
+  const front = panes.find((p) => p.getAttribute('aria-selected') === 'true') ?? panes[0];
+  const box = front?.getBoundingClientRect();
+  if (box) {
+    const at = { left: box.left, right: innerWidth - box.right, top: box.top, bottom: innerHeight - box.bottom };
+    for (const side of Object.keys(at)) document.body.style.setProperty(`--active-${side}`, `${Math.max(0, at[side])}px`);
+  }
+}
+
 /**
  * The lines between the panes in `el` (drawn from a panes mark), placed at each pane's edge; each, dragged, tells the
  * part `share { index, at }`, `at` the line's place as a share of the room the panes have.
  */
 export function sashes(el, node, tell) {
-  const dir = node.at.dir ?? 'row';
+  const dir = el.dataset.dir ?? node.at.dir ?? 'row';
   const panes = [...el.children].filter((c) => c.classList.contains('pm-pane'));
   const shares = panes.map((p) => Number(p.style.getPropertyValue('--pm-share')) || 1);
   const all = shares.reduce((a, b) => a + b, 0) || 1;
