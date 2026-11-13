@@ -1,7 +1,7 @@
 // The Workspace screen: setting the workspace up, in five sections shown one at a time. People: who is in it. Agents:
 // what is connected, how to connect another, and what they may do. Map: its theme, whether new things start private,
 // its backup. Packs: what it is made of, each pack's card holding everything that pack offers, and above them what this
-// server can connect it to (the GitHub App, say). Which is open is kept in the address (#/workspace?at=map); a step of Start here (ui/start.js)
+// server can connect it to (the GitHub App, say). Which is open is kept in the address (#/workspace?at=map); a step of Start here (./start.js)
 // names a card, and lands on its section with that card in view.
 
 import { api, ask, drawSlots, h, may, part, state, whoami } from './base.js';
