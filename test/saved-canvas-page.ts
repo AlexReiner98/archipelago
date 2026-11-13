@@ -26,7 +26,17 @@ export async function savedCanvasPage() {
   const picked = `document.querySelector('#query .q-pick')?.dataset.title`;
   const canvases = async () => (await call('/api/search', undefined, { type: 'lens', limit: 50 })).result as { id: string; title: string; props: Record<string, any> }[];
   const width = (w: number) => page.send('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 1, mobile: false });
-  /** A canvas of the task and its parts (${await page.evaluate('location.hash')})`);
+  /** A canvas of the task and its parts, kept as the bar keeps one saved at `at` px: what a pass before this one left. */
+  const keptBefore = (at: number) => call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: `Saved at ${at}`, props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }] });
+
+  /** The rows of the switcher's panel, opened from the bar if it is not open; none while the bar is still being drawn. */
+  const panelRows = `(() => { const p = document.querySelector('.view-panel'); const b = document.querySelector('#query .q-pick'); if (!p || (!p.matches(':popover-open') && !b)) return []; if (!p.matches(':popover-open')) b.click(); return [...p.querySelectorAll('[data-view]')].map((r) => ((r.dataset.title = (r.querySelector('.pm-grow') ?? r).textContent), r)); })()`;
+
+  /** At `w` px: a canvas saved from the bar and listed in its switcher, one line each. */
+  async function savePass(w: number) {
+    await width(w);
+    const name = `Saved at ${w}`;
+    await page.go(`${base}/#/v?find=id+${made.p}&over=part_of&steps=1`);
     assert.ok(await page.until(drawn(made.a)), `drawn: ${page.logs().join('\n')}`);
     assert.ok(await page.until(`document.querySelector('#query .q-pick')?.title.startsWith('Not saved')`), 'the bar says what is up is not saved');
 
