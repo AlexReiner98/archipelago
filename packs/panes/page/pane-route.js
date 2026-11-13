@@ -1,8 +1,8 @@
-// Where an agent's step lands among the owner's tabs and the panes in each (ui/tab-bar.js, ui/panes.js), worked out
+// Where an agent's step lands among the owner's tabs and the panes in each (packs/panes/page/tab-bar.js, packs/panes/page/panes.js), worked out
 // from whom each tab follows and whose each pane is, and nothing else, so it is tested without a page. A tab is a set of
 // panes, every one alike, and follows one session or nobody (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9; tabs:
 // e_mzer5m4t, e_q3amet26, e_ezb7s3a7, e_xjrpyysn). A chat has a tab of its own once it shows something, named by its
-// title and closed as it goes quiet or ends (ui/tab-life.js; the design e_p6fr4uye); the owner's own tabs follow nobody unless they
+// title and closed as it goes quiet or ends (packs/panes/page/tab-life.js; the design e_p6fr4uye); the owner's own tabs follow nobody unless they
 // set one to follow a chat (e_jk6bnuh9):
 // - Only a show lands (packs/surface/page/live.js sends no other). A change or a beat of a session's story moves nothing (the owner,
 //   29 Oct 2026, e_e7yfp2yg): with several sessions at work, the reader's canvas stays where they left it.
