@@ -1,11 +1,14 @@
 // A layout's code: the drawing a person or an agent wrote for their own project.
 //
-// The host's, not a part's (task e_md3v7bj4): the page side of a layout's wall. It moves with the canvas (query.js,
-// look.js, query-base.js), since moving it alone would import the app from the host.
+// Runtime, not a part (rule e_6d2g62tg, task e_u2phc9rq): the page side of a layout's wall, it mounts the walled frame
+// a layout's code runs in and hears it, which a worker never can. It says what came of a drawing as look mode hears
+// it (a view-drawn event, as ui/look.js says it), so it imports nothing of the app.
 
 import { api, drawingsOpen, frameSandbox, h, may } from './base.js';
 import { STYLE_COLORS, litSwitch } from './query-base.js';
-import { saidDrawn } from './look.js';
+
+/** Say on `el` how its drawing went, as look mode listens for it (ui/look.js, saidDrawn). */
+const saidDrawn = (el, state, why) => el.dispatchEvent(new CustomEvent('view-drawn', { bubbles: true, detail: { state, why } }));
 
 /** The frame's address (named with the UI's version as it is served), asked for opened. */
 const opened = (frame) => ((frame = new URL(frame, location.href)), frame.searchParams.set('open', '1'), frame.pathname + frame.search);

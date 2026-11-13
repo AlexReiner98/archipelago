@@ -33,7 +33,7 @@ const setupName = () => state.schema?.before?.actor ?? 'agent';
 
 /**
  * What is connected, first: a row each, or a line saying none is. Connect an agent opens the steps under it
- * (ui/connect-agent.js). The older way in, folded: a token, for Claude Code's hooks or a client that cannot sign in.
+ * (./connect-agent.js). The older way in, folded: a token, for Claude Code's hooks or a client that cannot sign in.
  */
 export function tokensCard({ tokens, row, then, fail, say, workspace, connect }) {
   const setup = setupName();

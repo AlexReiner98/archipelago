@@ -1,5 +1,5 @@
-// Pointing at what stands for items lights them on the canvas in sight and fades the rest by the style's `dim`: a term
-// of the query (ui/query-light.js), a mark of a part that carries `lights` (packs/walls/page/part-render.js). The page does
+// Pointing at what stands for items lights them on the canvas in sight and fades the rest by the style's `dim`: a choice
+// of find (ui/find.js), a mark of a part that carries `lights` (packs/walls/page/part-render.js). The page does
 // it, not the drawing, so every style lights alike: a mark says the item it stands for (packs/walls/page/marks.js), and
 // the rule is one stylesheet, so a mark drawn while the pointer is there (what comes into sight) fades with the rest.
 

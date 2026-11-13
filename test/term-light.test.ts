@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 // @ts-expect-error: a plain module of the page, with no types of its own.
-import { changes, litBy } from '../ui/lit-by.js';
+import { changes, litBy } from '../packs/bar/parts/query/lit-by.js';
 
 const [a, b, c, d] = ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_cccccccc', 'e_dddddddd'];
 const item = (id: string, extra: Record<string, unknown> = {}) => ({

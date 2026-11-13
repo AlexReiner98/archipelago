@@ -9,7 +9,6 @@ import { api, h, hooks } from './base.js';
 import { activate, canvasIn, focusOn } from './canvas.js';
 import { presetSettings, savedCanvases, viewParts } from './views-kept.js';
 import { addressOf, opening, readAddress } from './query.js';
-import { filterSaid } from './query-bar.js';
 import { titles } from './words.js';
 
 /**
@@ -58,7 +57,7 @@ function paneAt(href) {
  */
 export function drawPane(at, el, said) {
   let live = true;
-  // A canvas of its own in a node of its own, laid out as a pane's (ui/shell.css: #canvas .pane-canvas): the runtime keeps
+  // A canvas of its own in a node of its own, laid out as a pane's (packs/surface/page/shell.css: #canvas .pane-canvas): the runtime keeps
   // `el` as the pane's address changes, and what listened on the canvas before must go with it.
   const host = h('div', { class: 'pane-canvas' });
   el.replaceChildren(host);
@@ -99,7 +98,7 @@ export function drawPane(at, el, said) {
   else
     lensOf(at).then(({ lens, style, here }) => {
       if (!live) return;
-      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? filterSaid(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
+      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? hooks.lensSaid?.(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
       naming();
       canvas.show(lens, here, style);
       // The bar and find act on the pane in focus alone: a pane drawn beside it does not take them.

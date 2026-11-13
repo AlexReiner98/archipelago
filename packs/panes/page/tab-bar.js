@@ -21,7 +21,7 @@ const strip = document.getElementById('tabs');
 async function startPart() {
   const canvas = document.getElementById('canvas');
   if (!strip || !canvas) return false;
-  // The strip lets presses through but for its tabs (ui/shell.css): the part's strip takes them.
+  // The strip lets presses through but for its tabs (packs/surface/page/shell.css): the part's strip takes them.
   const top = h('div', { class: 'tabs-part', style: 'pointer-events: auto' });
   const filled = await drawSlot(top, { slot: 'tabs' }).catch((err) => (console.warn('The panes part did not draw:', err), false));
   if (!filled) return false;
@@ -38,7 +38,7 @@ async function startPart() {
     const now = ['left', 'right', 'top', 'bottom'].map((s) => document.body.style.getPropertyValue(`--active-${s}`)).join(' ');
     if (now === frame) return;
     frame = now;
-    // How many panes stand: the page's own rules lay one alone out apart (ui/shell.css, body[data-panes]).
+    // How many panes stand: the page's own rules lay one alone out apart (packs/surface/page/shell.css, body[data-panes]).
     document.body.dataset.panes = String(document.querySelectorAll('#canvas .pm-pane').length);
     clearTimeout(soon);
     soon = setTimeout(() => dispatchEvent(new Event('resize')), 30);

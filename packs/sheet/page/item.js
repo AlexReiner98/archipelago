@@ -2,17 +2,18 @@
 // holds, a section for each (packs/sheet/page/item-sections.js), under its title. What it is tied to is not on it: the canvas
 // behind draws that, with this item lit. Rare actions are in one menu; the page names no pack's type.
 
-import { api, ask, h, may, part, state, tell } from './base.js';
+import { api, ask, drawSlots, h, may, part, state, tell } from './base.js';
 import { drawIn, goQuery, openHere, queryNow } from './canvas.js';
 import { viewsOn } from './views-kept.js';
 import { draftOf } from './draft.js';
-import { documentMenu, figureOf, publicMark, publicOf, readDocument, readingOf, shareMenu } from './item-doc.js';
+import { figureOf, readDocument, readingOf } from './item-reading.js';
+import { publicMark, publicOf, shareMenu } from './item-share.js';
 import { heldBand, heldOn } from './item-held.js';
 import { choicesOf } from './fields.js';
 import { choicesSection, fieldsSection, headSection, historySection, section, sourceSection } from './item-sections.js';
 import { linkAdder } from './item-links.js';
 import { startLink } from './link-pick.js';
-import { added } from './query-bar.js';
+import { added } from './query-base.js';
 import { drawing as redraw, settleWhenFilled } from './settle.js';
 import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, keepsFigure, readWhole, sectionsOn, toolOf } from './screens.js';
 import { idsIn, isA, label, menu, relations, titles } from './words.js';
@@ -146,7 +147,7 @@ export async function entity(id, here) {
 
   redraw.inPlace = inPlace;
   // Its title and note, written in place and saved as one change (packs/sheet/page/draft.js).
-  // A document reads in its note's place as it will publish: the publish pack's part (ui/item-doc.js).
+  // A document reads in its note's place as it will publish: the publish pack's part (packs/surface/page/item-reading.js).
   const reading = doc && readingOf(e, doc, looks, again);
   // Read beside its draft (the pages), a document opens as words to write: it reads on the left already.
   const writing = Boolean(doc && document.querySelector('.lens-view.beside-sheet'));
@@ -172,6 +173,9 @@ export async function entity(id, here) {
     save: draft.save,
   };
   const history = historySection(id, past, writes && !e.archived_at && again);
+  // The parts on item.menu, each in a node of its own, drawn once the page is in place.
+  const rarely = h('span', { class: 'item-menu-parts' });
+  void drawSlots(rarely, { slot: 'item.menu', item: e, redraw: again }).catch((err) => console.warn(err.message));
   const kids = [
     h(
       'div',
@@ -182,8 +186,10 @@ export async function entity(id, here) {
         { class: 'sheet-marks' },
         h('span', { class: 'grow' }),
         version && h('span', { class: 'muted small gist version-mark', title: `Its island runs ${version.title}, a version of the ${version.of} pack: this page is drawn by it` }, version.title),
-        // The public views that show it, and a share again when one is behind it (ui/item-doc.js).
+        // The public views that show it, and a share again when one is behind it (packs/surface/page/item-share.js).
         publicMark(data.public_views, again, writes && !e.archived_at),
+        // What packs offer for it beside the menu, each a part on item.menu (its public view opened or copied, a document printed).
+        rarely,
         writes && session && h('button', { class: 'quiet-button', title: 'Close it and release what it holds', onclick: endSession }, 'End session'),
         buttons[0] && h('button', { class: 'quiet-button item-button', title: buttons[0].tip, onclick: () => press(buttons[0]) }, buttons[0].label),
         writes && !e.archived_at && ties.any && h('button', { class: 'quiet-button link-start', title: 'Link it to another: click that one on the canvas (Esc lets it go)', onclick: () => startLink(e, (made) => made && again()) }, 'Link'),
@@ -225,7 +231,7 @@ export async function entity(id, here) {
           ],
         publishable && !shown && e.visibility === 'public' && ['Stop being public', () => change([{ op: 'update', id, visibility: 'private' }], 'No longer public, set in the UI')],
         e.visibility === 'public' && type?.public && (Boolean(type?.capabilities?.plannable) || shown?.published) && ['Open its public page', () => window.open(`/p/${e.workspace}/${id}`, '_blank', 'noopener')],
-        ...(doc ? documentMenu(e, shared, again, writes) : shareMenu(e, shared, again, writes)),
+        ...shareMenu(e, shared, again, writes),
         ['Copy id', () => navigator.clipboard.writeText(e.id)],
         writes && !e.archived_at && ['Archive', async () => (await ask({ title: `Archive "${e.title}"?`, message: 'It leaves every view but stays in the history.', action: 'Archive', danger: true })) && change([{ op: 'archive', id }], 'Archived in the UI'), 'danger'],
       ]),

@@ -21,7 +21,6 @@ import { pageType } from './page-schema.js';
 import { endPart, partPort } from './layout.js';
 import { MARKS, checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
-import { lightItems } from './light-items.js';
 import { sessionHue } from './words.js';
 import { addressSaid, queryGiven } from './part-lens.js';
 import { cut, findFor, keepFor, keptFor, keptKey, pickFor, settingsOf, styleValues, viewsOf, wholeWords } from './part-input.js';
@@ -238,8 +237,9 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),
     pick: (kind) => pickFor(item, kind),
-    // What a mark lights while the person points at it: those items lit on the canvas in sight, the rest faded.
-    lights: (ids) => lightItems(hooks.viewUp?.() ?? null, ids?.length ? ids : null),
+    // What a mark lights while the person points at it: those items lit on the canvas in sight (the view the bar is
+    // over, ./bar-band.js), the rest faded. hooks.viewUp is the saved view up, an id: no view to light.
+    lights: (ids) => hooks.lights?.(ids),
     // A pane's canvas, drawn at its address by whoever keeps the panes (hooks.paneFrame), told back what is done in it.
     frame: (at, el, said) => hooks.paneFrame?.(at, el, said) ?? null,
     // A session's hue, named by its words, as every session is marked.

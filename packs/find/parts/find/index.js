@@ -17,9 +17,12 @@ import { added, schemaOf, walked, withWords, wordsOf } from './lens.js';
 const PLACEHOLDER = { Find: 'Find on the map', Only: 'Only what is so: done, a type, within…', Not: 'Leave out: closed, a type', Walk: 'Walk along a link', Limit: 'The most items drawn', View: 'A saved view, by its name', Style: 'A style, by its name' };
 const MODE_TIP = 'The part find is in: type another part’s word and a space to go there; Backspace goes back to Find';
 const FIELD_TIP = 'Choose what the words are: ↑↓, then Enter; Shift+Enter adds the words as another set';
-/** The keys find hears on its field, beyond typing and Enter: asked of the host when it draws them (the input's `keys`), until then none. */
-const KEYS = ['ArrowUp', 'ArrowDown', 'Escape', 'Backspace'];
-const HOST_KEYS = false;
+/**
+ * The keys find hears on its field, each held from the field while it means something to find: ↑↓ with choices to
+ * move through, Backspace only in an empty field in another part (else it deletes as ever), and Escape while find is open (else
+ * it is the page's).
+ */
+const keysNow = (open, choices, typed, mode) => !open ? [] : [...(choices.length ? ['ArrowUp', 'ArrowDown'] : []), 'Escape', ...(!typed && mode !== 'Find' ? ['Backspace'] : [])];
 /** How long typing rests before what it could be is read, in milliseconds. */
 const REST = 160;
 
@@ -30,7 +33,11 @@ export default function find(first, tools) {
   let input = first;
   let open = false, mode = 'Find', typed = '', choices = [], shownFor = '', lit = 0, asked = 0, wait, focus = false;
 
-  const lensUp = () => input?.address?.query ?? input?.piece?.query ?? { filter: {} };
+  // The lens up: the canvas's query as the slot is handed it (Home's when none), without the words the host says it in.
+  const lensUp = () => {
+    const { said: _said, ...lens } = input?.query ?? input?.address?.query ?? input?.address?.home ?? { filter: {} };
+    return { ...lens, filter: lens.filter ?? {} };
+  };
   const read = (name, params) => (tools.read ? tools.read(name, params).catch(() => null) : Promise.resolve(null));
   const publish = () => (tools.state?.('find_open', open ? '1' : null), tools.state?.('find_typing', open && (typed.trim() || mode !== 'Find') ? '1' : null));
 
@@ -43,7 +50,7 @@ export default function find(first, tools) {
   ];
 
   const marks = () => {
-    const field = ['input', { key: 'q', kind: 'search', value: typed, hint: PLACEHOLDER[mode], label: 'Find on the map', tip: FIELD_TIP, grow: true, ...(HOST_KEYS && { keys: KEYS }), ...(focus && { focus: true }) }];
+    const field = ['input', { key: 'q', kind: 'search', value: typed, hint: PLACEHOLDER[mode], label: 'Find on the map', tip: FIELD_TIP, grow: true, keys: keysNow(open, choices, typed, mode), ...(focus && { focus: true }) }];
     focus = false;
     return ['box', { flow: 'column', gap: 2 },
       ...(open && choices.length ? [['list', { look: 'rows' }, ...choices.map(row)]] : []),
@@ -95,7 +102,7 @@ export default function find(first, tools) {
     const lens = lensUp();
     const { only, not } = lens.filter ?? {};
     const most = num(input, 'find_choice_items', 3);
-    const c = { most, wide: num(input, 'term_find_most', 12), lens, schema: schemaOf(input?.words), read, views: viewsOf(input), shapes: input?.piece?.shapes ?? input?.shapes };
+    const c = { most, wide: num(input, 'term_find_most', 12), lens, schema: schemaOf(input?.words), read, views: viewsOf(input), shapes: input?.shapes };
     const [all, counted] = await Promise.all([
       choicesFor(mode, q, c).catch(() => []),
       finding && q ? read('flat', { filter: { find: [`text ${q}`], ...(only && { only }), ...(not && { not }) }, limit: most }) : null,

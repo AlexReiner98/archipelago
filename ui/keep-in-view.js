@@ -5,7 +5,6 @@
 
 import { api } from './base.js';
 import { goQuery, queryNow, refreshCanvas } from './canvas.js';
-import { added } from './query-bar.js';
 
 /** Bring what was just made into the canvas up: `made` is [{ id, term }], the term that finds each if its query does not. */
 export async function keepInView(made) {
@@ -15,5 +14,7 @@ export async function keepInView(made) {
   const found = new Set((answer?.items ?? []).map((i) => i.id));
   const missing = made.filter((m) => !found.has(m.id));
   if (!answer || !missing.length) return refreshCanvas();
-  goQuery(missing.reduce((l, m) => added(l, { find: m.term }), lens));
+  // Each missing item's term joins Find; a lens that named a view becomes a filter of the map again.
+  const { view: _view, ...rest } = lens;
+  goQuery({ ...rest, filter: { ...lens.filter, find: [...new Set([...(lens.filter.find ?? []), ...missing.map((m) => m.term)])] } });
 }
