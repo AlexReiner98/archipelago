@@ -6,7 +6,7 @@
 // which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
 // themselves (a page opened or shut then leaves it be).
 
-import { api, drawSlot, hooks, idsOf, state } from './base.js';
+import { api, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { catchUp } from './catch-up.js';
 import { canvasSwitch } from './canvases.js';
@@ -45,23 +45,8 @@ export function activate(c) {
 }
 function barNow() {
   const c = current;
-  mountBar();
   if (c?.view) drawQuery(c.lens, c.view, c.pane.go, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
   hooks.addressMoved?.();
-}
-/**
- * Find's line and the rows above it, where a part fills `bar.find` or `bar.find.rows`: mounted once, in the nodes the
- * bar drew them in, and handed the lens and its answer as they move (packs/surface/page/part-lens.js). The bar leaves a
- * node a part holds alone; with no part, it draws them as before.
- */
-let barMounted = false;
-function mountBar() {
-  if (barMounted) return;
-  barMounted = true;
-  for (const [slot, id] of [['bar.find', 'find-lens'], ['bar.find.rows', 'find-rows']]) {
-    const node = document.getElementById(id);
-    if (node) drawSlot(node, { slot }).catch((err) => console.warn(`${slot}: ${err?.message ?? err}`));
-  }
 }
 /** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */
 hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: current.view.failed } : null);
@@ -108,7 +93,14 @@ const NAMED = /^[A-Za-z0-9_.-]{1,80}$/;
  */
 hooks.go = (address) => {
   if (!current || !address || typeof address !== 'object') return;
-  if (typeof address.item === 'string' && /^e_[a-z0-9]{8}$/.test(address.item)) return void openOver(address.item);
+  if (typeof address.item === 'string' && /^e_[a-z0-9]{8}$/.test(address.item)) {
+    // Following the reading (`replace`, the sheet's part after the person scrolled): the page in sight in place of the one
+    // open, a step of no one's history, and never over words not yet saved.
+    if (!address.replace) return void openOver(address.item);
+    const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(location.hash);
+    if (!open || document.querySelector('#sheet [data-draft="unsaved"]')) return;
+    return void location.replace(location.hash.replace(open[1], address.item));
+  }
   // A page of the app the host draws, by name: what the menu leads to, so a part may go there without knowing an address.
   if (typeof address.page === 'string') {
     if (!PAGES_GO.includes(address.page)) return;

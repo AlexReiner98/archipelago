@@ -174,7 +174,7 @@ async function pickFor(from, kind) {
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)) };
+  given = { ...given, up: hooks.viewUp?.() ?? null, ...(part.go && { address: await addressSaid(given.words) }), ...(await queryGiven(part.slot, given.words)), ...(told.has(part.slot) && { told: told.get(part.slot) }) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
@@ -336,6 +336,23 @@ function wayBackFor(island, refined, redraw) {
   if (back) return back.press.update(refined);
   back = { island, press: wayBack({ island, refined, redraw }) };
 }
+
+/** The last event each slot was told, handed to a part mounted there later (`told`), so it starts where the others are. */
+const told = new Map();
+
+/**
+ * Tell every part mounted on `slot` of something the runtime saw: a beat of the log for `traces`, the reading position
+ * for `sheet` (`{ name: 'scrolled', reading }`). Data only, as an event the part hears in `on`; answers how many parts
+ * were told, so a root with none decides as it did before.
+ */
+export function tellSlot(slot, event) {
+  const said = JSON.parse(JSON.stringify(event ?? null));
+  told.set(slot, said);
+  let n = 0;
+  for (const one of versions.values()) for (const [id, m] of one.mounted) if (m.part.slot === slot && m.node.isConnected) (one.bridge.send({ type: 'event', id, event: said }), n++);
+  return n;
+}
+hooks.tellSlot = tellSlot;
 
 /** The part mounted to answer each decision slot, by slot and version: mounted once, asked as often as the root asks. */
 const deciders = new Map();

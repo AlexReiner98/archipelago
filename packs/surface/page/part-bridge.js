@@ -16,8 +16,8 @@ import { goingOut } from './part-going.js';
 const pressLasts = 2000;
 /** What the person does that a part may answer with one action as theirs: a press, a tick in a note's checklist, and a pick (a day, yes or no, one of a field's values, an item found), and an item picked on the canvas. */
 const GESTURES = ['press', 'tick', 'pick', 'picked'];
-/** What the person does that a part may answer by moving the page: those, and Enter in its input. */
-const MOVES = [...GESTURES, 'submit'];
+/** What the person does that a part may answer by moving the page: those, Enter in its input, and scrolling the reading (told to the sheet's part). */
+const MOVES = [...GESTURES, 'submit', 'scrolled'];
 
 /**
  * Bridge one pack version's port. `partOf(id)` is the part mounted under that id ({ id, title, sends, hash, island?, host? }):

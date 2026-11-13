@@ -57,7 +57,7 @@ export function namer(words, names = {}) {
     if (sort === 'owner') return `owner ${end(rest)}`;
     if (sort === 'word') return t;
     const [, link, to] = /^(\S+)\s+(.+)$/.exec(t) ?? [null, t, ''];
-    return `${linkTitle(link)} ${end(to)}`;
+    return `${linkTitle(link)} ${end(to)}`.trim();
   };
   const waySaid = (t) => ((w) => `${ARROW[w.way]} ${linkTitle(w.link)}`)(wayOf(t));
   return { typeTitle, linkTitle, nameOf, termSaid, waySaid };
