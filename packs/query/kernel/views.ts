@@ -120,7 +120,7 @@ export const VIEWS: Record<string, View> = {
     run: (ctx, input) => ctx.call('root.parts', { ...(typeof input.island === 'string' && { island: input.island }), ...(Array.isArray(input.have) && { have: input.have }), ...(input.shipped === true && { shipped: true }), ...(typeof input.host === 'string' && { host: input.host }), ...(Number.isInteger(input.at) && { at: input.at }) }),
   },
   saved_views: {
-    description: 'Every view kept on the map (a query, named by the style that draws it), with what it is a view of and its life (working, an agent’s; kept, on the owner’s word): the kept first, then the newest. A working view about items that have all closed is retired with them: left out, its id in ended. Params: limit (100).',
+    description: 'Every view kept on the map (a query, named by the style that draws it), with what it is a view of and its life (working, an agent’s; kept, on the owner’s word): the kept first, then the newest. A working view about items that have all closed is retired with them: left out, its id in ended. Params: limit (100), pick (true: as a person picks from them, each with when it changed and its filter and walk, and the views the packs ship after them, preset).',
     run: (ctx, input) => ctx.call('answer.saved_views', input),
   },
   style: {

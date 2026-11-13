@@ -87,7 +87,7 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ views: [{ name: 'turns', params: { run: '{here}' } }] }), /reads the view "turns", which shelf does not answer: ask for it, as service:answer.turns/);
   assert.throws(refused({ views: [] }), /views is a list of up to 4 named reads/);
   assert.throws(refused({ views: [{ name: 'Turns!' }] }), /a view it reads is named/);
-  assert.throws(refused({ views: [{ name: 'turns', params: { run: { here: true } } }] }, { uses: ['service:answer.turns'] }), /params are words or numbers/);
+  assert.throws(refused({ views: [{ name: 'turns', params: { run: { here: true } } }] }, { uses: ['service:answer.turns'] }), /params are words, numbers or true and false/);
   const viewing = new Registry(folder(shelf({ uses: ['service:answer.turns'] }, { views: [{ name: 'turns', params: { run: '{here}' } }] })));
   try {
     assert.equal(viewing.states.get('shelf')?.state, 'active', viewing.states.get('shelf')?.why ?? '');

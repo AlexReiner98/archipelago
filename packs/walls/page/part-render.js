@@ -6,6 +6,7 @@
 // (./body.js), under the style; a tip is the element's title, which the page's one tooltip shows (./tip.js).
 // Looks are classes and steps the style gives values to (packs/walls/page/part-marks.css); the renderer writes no colour or length.
 // Pan and zoom of a paint surface stay here (packs/walls/page/part-paint.js): the part is never asked where the reader looks.
+// A thumb is what whoever hosts the part draws for the view it names (`thumb(view)`): a part never paints one.
 
 import { isChecked } from './part-check.js';
 import { paintSurface } from './part-paint.js';
@@ -27,10 +28,11 @@ const partTold = 50;
 /**
  * Draw a part into `root`. `tell(event)` hears what the person does; `style` is the workspace's style (a paint surface
  * moves by its numbers); `canvas(key, el)` is handed a paint surface's pixel canvas (`pixels: true`) once, for whoever
- * hosts the part to give it to the part. Answers with `draw(node)` for each answer the part gives, and `stop()`.
+ * hosts the part to give it to the part; `thumb(view)` answers with the element that shows a view small, or nothing.
+ * Answers with `draw(node)` for each answer the part gives, and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {} } = {}) {
-  const ctx = { tell, style, canvas };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null } = {}) {
+  const ctx = { tell, style, canvas, thumb };
   let ended = false;
   return {
     draw(node) {
@@ -88,6 +90,7 @@ function build(node, ctx) {
     el.addEventListener('click', () => ctx.tell({ key: drawnFrom.get(el).key, name: 'press' }));
   } else if (node.mark === 'input') el = field(node, ctx);
   else if (node.mark === 'note') el = make('div', 'pm-note');
+  else if (node.mark === 'thumb') el = make('span', 'pm-thumb');
   else if (node.mark === 'menu') {
     el = make('details', 'menu pm-menu');
     el.append(make('summary', ''), make('div', 'menu-items'));
@@ -132,6 +135,13 @@ function update(el, node, ctx, fresh = false) {
   looks(el, node);
   if (node.item !== undefined) el.dataset.item = node.item;
   else delete el.dataset.item;
+  if (node.view !== undefined) el.dataset.view = node.view;
+  else delete el.dataset.view;
+  // What opens a view is reached by the keyboard too, as a link is.
+  if (node.view !== undefined && el.tagName !== 'BUTTON') (el.tabIndex = 0, el.setAttribute('role', 'link'));
+  else if (el.tagName !== 'BUTTON' && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') (el.removeAttribute('tabindex'), el.removeAttribute('role'));
+  // The view's picture is drawn again only when it names another view: the host keeps it current.
+  if (node.mark === 'thumb' && (fresh || was.at.view !== at.view)) el.replaceChildren(...[ctx.thumb(at.view)].filter(Boolean));
   if (node.mark === 'note') {
     // Drawn again only when its words, whether it ticks, or the style changed: a section the reader opened stays open.
     if (fresh || was.words !== node.words || was.at.tick !== at.tick || el.drawnUnder !== ctx.style) {

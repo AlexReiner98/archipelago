@@ -3,7 +3,7 @@
 // marks, and the host alone makes them into the page (packs/walls/page/part-render.js), under the workspace's style.
 //
 // A mark is [kind, attributes, ...what is in it], as a drawing's is (packs/walls/page/marks.js); the attributes may be left out
-// (['text', 'Hello']). Nine kinds, nothing richer:
+// (['text', 'Hello']). Ten kinds, nothing richer:
 //   box     a group of marks, in a row or a column
 //   text    words
 //   list    marks one under another, a row each
@@ -13,7 +13,9 @@
 //   path    a line or a shape on a paint surface
 //   note    words in the map's note dialect, drawn as the item page draws a note (packs/walls/page/body.js)
 //   menu    buttons behind a few words, for what is done rarely, placed in sight by the host
-// Any mark on the page may carry a `tip`: what it says of itself, shown by the page's one tooltip.
+//   thumb   a kept view drawn small, as the host keeps it (its thumbnail): the part names the view, never draws it
+// Any mark on the page may carry a `tip`: what it says of itself, shown by the page's one tooltip, and a `view`: pressed,
+// the host opens that view (a kept view's id, a pack's view by its own, or home), as an `item` opens an item's page.
 // Every look is a name the style gives its value (packs/walls/page/part-marks.css): a tone, a gap or a size is a word or a step on
 // the style's scale, never a colour or a length. This module reads no page: it is run without a browser in tests.
 
@@ -22,6 +24,8 @@ export const partLimits = { marks: 5000, depth: 32, words: 20000, path: 100000, 
 
 const KEY = /^[A-Za-z0-9_:.-]+$/;
 const ITEM = /^e_[a-z0-9]{8}$/;
+/** A view: one kept on the map (its id), one a pack ships (its id, `<pack>.<name>`), or home. */
+const VIEW = /^(?:e_[a-z0-9]{8}|home|[a-z][a-z0-9_]*(?:.[a-z][a-z0-9_-]*)+)$/;
 /** A path says only where it goes: its commands and numbers, nothing that could name or fetch anything. */
 const PATH = /^[MmLlHhVvCcSsQqTtAaZz0-9eE.,\s+-]*$/;
 
@@ -33,14 +37,15 @@ const number = (v, why) => (typeof v === 'number' && Number.isFinite(v) && Math.
 const side = (v, why) => (typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= partLimits.side ? v : why('not a size above nothing'));
 const point = (v, why) => (Array.isArray(v) && v.length === 2 ? v.map((n) => number(n, why)) : why('not [x, y]'));
 const key = (v, why) => (typeof v === 'string' && v.length <= partLimits.key && KEY.test(v) ? v : why('a key of letters, digits and _ : . - only'));
+const view = (v, why) => (typeof v === 'string' && v.length <= partLimits.key && VIEW.test(v) ? v : why("not a view's id"));
 const item = (v, why) => (typeof v === 'string' && ITEM.test(v) ? v : why("not an item's id"));
 const path = (v, why) => (typeof v !== 'string' ? why('not a path') : v.length > partLimits.path ? why(`a path over ${partLimits.path} characters`) : PATH.test(v) ? v : why('a path with what is not a path command or a number'));
 
 /** The tones a mark may take: each a colour the style names. */
 export const TONES = ['accent', 'muted', 'ok', 'warn', 'bad', 'closed'];
 const tone = oneOf(...TONES);
-/** What any mark may say: its key, the item it stands for and, on the page, its tip. */
-const anyMark = { key, item, tip: words(partLimits.label) };
+/** What any mark may say: its key, the item or view it stands for and, on the page, its tip. */
+const anyMark = { key, item, view, tip: words(partLimits.label) };
 
 /**
  * Each kind: the attributes it may have and how each is read, what it may hold (`marks`, `words`, `drawn`: paths and
@@ -57,6 +62,7 @@ export const MARKS = {
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash'), tone, weight: step(1, 4) }, holds: 'nothing', plane: true, needs: ['d'] },
   note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
   menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet') }, holds: 'marks', only: ['button'], needs: ['label'] },
+  thumb: { attrs: { key, view, tip: anyMark.tip }, holds: 'nothing', needs: ['view'] },
 };
 
 /** The nodes this module made: the renderer draws nothing else. */
@@ -108,7 +114,7 @@ function node(mark, seen, where, onPlane) {
   if (kind === 'paint' && (at.width === undefined || at.height === undefined)) why('a paint surface with no width and height');
   if (shape.keyed && at.key === undefined) why(`${a(kind)} with no key: what the person does to it goes back by its key`);
   if (at.key !== undefined) seen.keys.has(at.key) ? why(`the key "${at.key}" twice`) : seen.keys.add(at.key);
-  const out = { mark: kind, at, ...(at.key !== undefined && { key: at.key }), ...(at.item !== undefined && { item: at.item }) };
+  const out = { mark: kind, at, ...(at.key !== undefined && { key: at.key }), ...(at.item !== undefined && { item: at.item }), ...(at.view !== undefined && kind !== 'thumb' && { view: at.view }) };
   if (shape.holds === 'nothing' && rest.length) why(`${a(kind)} holding something: it holds nothing`);
   if (shape.holds === 'words') {
     const said = rest.map((w) => (typeof w === 'string' || typeof w === 'number' ? String(w) : why(`${a(kind)} holding a mark: it holds words`))).join('');
