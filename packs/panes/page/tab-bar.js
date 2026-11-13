@@ -49,9 +49,27 @@ async function startPart() {
     button('Forward', 'Forward again', '›', () => history.forward()),
     button('Split', 'Split: a new pane beside this one', '◫', () => hooks.tellSlot?.('tabs', { name: 'split' })),
     // In a popped window, its tab goes back into the main one as it closes.
-    poppedTab && button('Dock back', 'Dock this window back into the main one, as a tab', '⇲', () => (hooks.tellSlot?.('tabs', { name: 'dock' }), setTimeout(() => window.close(), 300))),
+    poppedTab && button('Dock back', 'Dock this window back into the main one, as a tab', '⇲', () => (hooks.tellSlot?.('tabs', { name: 'dock' }), closeDocked())),
   ].filter(Boolean);
   return true;
+}
+
+/**
+ * Close this popped window once the part has kept its tab as docked (under `out:<key>`, where the main page reads it):
+ * closed sooner, the main page would never hear it. Given up after a while, so the window still closes.
+ */
+function closeDocked(started = Date.now()) {
+  let docked = false;
+  try {
+    for (let n = 0; n < localStorage.length && !docked; n++) {
+      const key = localStorage.key(n);
+      docked = Boolean(key?.endsWith(`:out:${poppedTab}`) && /"docked":true/.test(localStorage.getItem(key) ?? ''));
+    }
+  } catch {
+    docked = true;
+  }
+  if (docked || Date.now() - started > 3000) return void window.close();
+  setTimeout(() => closeDocked(started), 50);
 }
 
 // ---- The sessions waiting on the owner, counted beside the strip, so every tab sees them (docs/sessions.md).
