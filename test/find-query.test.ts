@@ -63,13 +63,8 @@ test('in a browser, the find bar sets the text of the canvas lens', { skip: !bro
       await enter();
       assert.ok(await page.until(`location.hash.includes('find=text+roof') && ${has('Roof the shed')} && ${has('Site works')} && ${has('Gutters')}`), `Enter finds the words, the walk kept: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
       assert.ok(await page.evaluate(has('Elsewhere')), 'the rest of the lens stays');
-<<<<<<< HEAD
-      assert.ok(await page.until(`document.querySelector('#find .q-sum')?.textContent.startsWith('Find“roof”or')`), 'the query bar says the words as a Find term, joined by or');
-      assert.ok(await page.until(`!(${F.shown}) && ${F.isOpen} && document.activeElement === ${F.input} && !${F.input}.value`), `find stays open and emptied, the cursor in it, to refine further: ${await page.evaluate(`JSON.stringify([${F.shown}, ${F.isOpen}, document.activeElement?.outerHTML.slice(0, 80)])`)}`);
-=======
       assert.ok(await page.until(`document.querySelector('#find-lens .pm-fits')?.textContent.startsWith('Find“roof”or')`), 'the query bar says the words as a Find term, joined by or');
-      assert.ok(await page.until(`${list}.hidden && document.getElementById('find').classList.contains('open') && document.activeElement === document.querySelector('#find input[type=search]') && !document.querySelector('#find input[type=search]').value`), `find stays open and emptied, the cursor in it, to refine further: ${await page.evaluate(`JSON.stringify([${list}.hidden, document.getElementById('find').className, document.activeElement?.outerHTML.slice(0, 80)])`)}`);
->>>>>>> dfe03333
+      assert.ok(await page.until(`!(${F.shown}) && ${F.isOpen} && document.activeElement === ${F.input} && !${F.input}.value`), `find stays open and emptied, the cursor in it, to refine further: ${await page.evaluate(`JSON.stringify([${F.shown}, ${F.isOpen}, document.activeElement?.outerHTML.slice(0, 80)])`)}`);
       if (shots) writeFileSync(`${shots}/find-drawn-${width}.png`, await page.screenshot());
       // Enter again puts new words in place of those the bar set, and nothing else.
       await type('walls');
