@@ -38,6 +38,27 @@ test("a root pack's hash is its folder's, whatever the line endings and the mani
   assert.notEqual(hashPack(join(a, 'packs', 'x')), hashPack(join(b, 'packs', 'x')));
 });
 
+// A root pack's parts are the owner's too: what the refiner may not change is pinned, wherever in the pack it lives
+// (decision e_bn76z5fu, the sheet's parts). Its layouts likewise.
+test("a root pack's parts and layouts are pinned with its kernel and its page", () => {
+  const h = home({ x: { kernel: root, files: { 'index.ts': 'export {};
+' } } }, ['x']);
+  const at = join(h, 'packs', 'x');
+  const was = hashPack(at);
+  mkdirSync(join(at, 'parts', 'row'), { recursive: true });
+  writeFileSync(join(at, 'parts', 'row', 'index.js'), 'export default () => [];
+');
+  const withPart = hashPack(at);
+  assert.notEqual(withPart, was, 'a part added to a root pack changes its hash');
+  writeFileSync(join(at, 'parts', 'row', 'index.js'), 'export default () => [["text", "changed"]];
+');
+  assert.notEqual(hashPack(at), withPart, 'and so does changing one');
+  mkdirSync(join(at, 'layouts', 'flow'), { recursive: true });
+  writeFileSync(join(at, 'layouts', 'flow', 'index.js'), 'export default () => [];
+');
+  assert.notEqual(hashPack(at), withPart, 'a layout counts too');
+});
+
 test('a changed root pack stops the start, naming it and both hashes', async () => {
   const h = home({ core: {}, db: { kernel: root, files: { 'index.ts': '' } } }, ['core', 'db']);
   const pinned = JSON.parse(readFileSync(join(h, 'packs', 'roots.json'), 'utf8')).roots[1].hash;

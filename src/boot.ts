@@ -111,16 +111,22 @@ function filesUnder(packDir: string, sub: string): string[] {
     .sort();
 }
 
+/** The folders of a root pack whose files the pin covers: everything it runs, wherever it runs. */
+const PINNED = ['kernel', 'page', 'parts', 'layouts'];
+
 /**
  * A root pack's hash: SHA-256 of the canonical JSON of each file's own hash by path. pack.json is hashed as
- * canonical JSON, so spacing and key order do not count; kernel/** and page/** (the host's page modules) as text
- * with LF line endings.
+ * canonical JSON, so spacing and key order do not count; the folders in PINNED as text with LF line endings.
+ *
+ * A root pack's parts are pinned like its kernel and its page: a root part changes only through a re-pin the owner
+ * approves, which is the whole of what makes it a root pack's (decision e_bn76z5fu). Leaving parts/ out would let the
+ * refiner change code the owner is told is protected.
  */
 export function hashPack(packDir: string): string {
   const manifest = join(packDir, 'pack.json');
   if (!existsSync(manifest)) throw new BootRefused(`${packDir} has no pack.json.`);
   const files: Record<string, string> = { 'pack.json': sha256Hex(jcs(JSON.parse(text(manifest)))) };
-  for (const f of [...filesUnder(packDir, 'kernel'), ...filesUnder(packDir, 'page')]) files[f] = sha256Hex(text(join(packDir, f)));
+  for (const f of PINNED.flatMap((sub) => filesUnder(packDir, sub))) files[f] = sha256Hex(text(join(packDir, f)));
   return sha256Hex(jcs(files));
 }
 
