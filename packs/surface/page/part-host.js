@@ -9,9 +9,11 @@
 // A part is handed nothing it did not declare: of an item, its id and type and the fields it reads of that type; its
 // query is asked as the person looking, so what they may not see it never gets. Beside them every part is handed, as
 // data (decision e_fx62gsjb), the schema's `words` of the island it draws for (root.parts) and the `style` values a
-// part may read: the style's numbers and page settings, never a colour or a length.
+// part may read: the style's numbers and page settings, never a colour or a length, and `up`, the saved view the
+// canvas draws now. A mark that names a view opens it, and a thumb shows it small, both as the app says
+// (hooks.openView, hooks.viewThumb, hooks.viewUp: ui/canvases.js), or as the one drawing the part says (`openView`).
 
-import { api, h, state } from './base.js';
+import { api, h, hooks, state } from './base.js';
 import { partBridge } from './part-bridge.js';
 import { shippedOn, wayBack } from './way-back.js';
 import { pageType } from './page-schema.js';
@@ -113,6 +115,7 @@ async function viewsOf(part, item, piece) {
 async function inputOf(part, item, given) {
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
+  given = { ...given, up: hooks.viewUp?.() ?? null };
   if (!part.query) return { item: here, ...views, ...given };
   const fill = (terms) => terms?.map((t) => t.replaceAll('{here}', item?.id ?? ''));
   const filter = { find: fill(part.query.find), ...(part.query.only && { only: fill(part.query.only) }), ...(part.query.not && { not: fill(part.query.not) }) };
@@ -171,19 +174,26 @@ function sweep() {
 }
 
 /** Mount one part under `node` on its version's worker, with what it reads. */
-async function mount(node, part, parts, item, words, piece) {
+async function mount(node, part, parts, item, words, piece, openView) {
   const version = versionOf(parts, part.pack);
   const one = await workerOf(version, parts, part.pack);
   const id = `m${++mounts}`;
   // A mark that stands for an item opens that item's page when pressed: the host's, so a part names items, never addresses.
-  const body = h('div', { class: 'part-body', 'data-part-id': part.id, onclick: (ev) => { const el = ev.target.closest?.('[data-item]'); if (el && body.contains(el) && !el.closest('button, input, textarea')) location.hash = `#/e/${el.dataset.item}`; } });
+  // One that stands for a view opens it, as the app or the one drawing the part says where.
+  const opens = (ev) => {
+    const at = ev.target.closest?.('[data-view], [data-item]');
+    if (!at || !body.contains(at) || at.closest('input, textarea') || (at.closest('button') && !at.dataset.view)) return;
+    if (at.dataset.view) return void (openView ?? hooks.openView)?.(at.dataset.view);
+    location.hash = `#/e/${at.dataset.item}`;
+  };
+  const body = h('div', { class: 'part-body', 'data-part-id': part.id, onclick: opens, onkeydown: (ev) => ev.key === 'Enter' && ev.target.dataset?.view && opens(ev) });
   node.replaceChildren(body);
   const failed = (message) => node.isConnected && node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
   const style = await styleOn(islandOf(item));
   // What every part is handed beside its items: the island's words, the style's values (none of its looks), and what
   // its piece says of it on its screen (a title, a limit).
   const given = { words, style: styleValues(style), piece: settingsOf(piece) };
-  const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }) });
+  const render = mountPart(body, { style, tell: (event) => one.bridge.send({ type: 'event', id, event }), thumb: (view) => hooks.viewThumb?.(view) ?? null });
   const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await inputOf(part, item, given) });
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
   one.mounted.set(id, { part: { ...part, island: islandOf(item) }, node, render, failed, refresh });
@@ -206,9 +216,10 @@ function wayBackFor(island, refined, redraw) {
 
 /**
  * Draw the part that fills `slot` in `node`, standing on `item`: true when a part fills it, false when none does (the
- * caller draws what it did before). `piece` is what its screen says of it; `redraw` draws the page again when the way back is pressed.
+ * caller draws what it did before). `piece` is what its screen says of it; `redraw` draws the page again when the way back is pressed;
+ * `openView(view)` opens a view a mark names (else hooks.openView).
  */
-export async function drawPart(node, { slot, item, piece, redraw = () => {} }) {
+export async function drawPart(node, { slot, item, piece, redraw = () => {}, openView }) {
   sweep();
   const island = islandOf(item);
   const shipped = Boolean(island && shippedOn(island));
@@ -217,6 +228,6 @@ export async function drawPart(node, { slot, item, piece, redraw = () => {} }) {
   const part = parts.find((p) => p.slot === slot);
   if (!part) return false;
   if (!part.modules) throw new Error(`${part.title}: its code did not come`);
-  await mount(node, part, parts, item, words, piece);
+  await mount(node, part, parts, item, words, piece, openView);
   return true;
 }

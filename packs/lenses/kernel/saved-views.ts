@@ -31,12 +31,29 @@ export interface Picture {
   note?: string;
   /** Its life: working (an agent's, until the owner keeps it) or kept (on the owner's word). */
   life: 'working' | 'kept';
+  /** Asked for a person to pick from (`pick`): when it last changed, and what its query finds and walks, for its words. */
+  updated_at?: string;
+  filter?: unknown;
+  walk?: unknown;
+  /** One a pack ships (by its preset's id), not kept on the map: found by its name, opened by its query. */
+  preset?: true;
+}
+
+/** A view a pack ships, as its pack file keeps it (packs/loader/kernel/declared.ts presetsOf). */
+type Shipped = { id: string; title: string; type?: string; on?: unknown[]; description?: string; props?: Record<string, unknown> };
+
+/** The views the packs ship that a person picks from: not one of an item's type (`on`, offered on its page), nor one the owner keeps a version of. */
+function shipped(ctx: KernelContext, keptAs: Set<unknown>): Picture[] {
+  const packs = (ctx.registry as unknown as { packs?: readonly { styles?: Shipped[] }[] }).packs ?? [];
+  return packs
+    .flatMap((p) => (p.styles ?? []).filter((v) => v.type === 'lens' && !(Array.isArray(v.on) && v.on.length) && !keptAs.has(v.id)))
+    .map((v): Picture => ({ lens: v.id, title: v.title, life: 'kept', preset: true, ...(v.description && { note: v.description.split('\n')[0] }), filter: v.props?.filter ?? {}, walk: v.props?.walk ?? { over: [], steps: 0 } }));
 }
 
 type Row = { id: string; title: string; type: string; is_open: boolean; archived_at: unknown };
 
-export async function savedViews(ctx: KernelContext, input: { limit?: number } = {}): Promise<{ pictures: Picture[]; more: number; ended?: string[] }> {
-  const [all, styles] = await Promise.all([keptOf(ctx, 'lens', undefined), keptOf(ctx, ['style', 'layout'], undefined)]);
+export async function savedViews(ctx: KernelContext, input: { limit?: number; pick?: boolean } = {}): Promise<{ pictures: Picture[]; more: number; ended?: string[] }> {
+  const [all, styles] = await Promise.all([keptOf(ctx, 'lens', undefined, input.pick === true), keptOf(ctx, ['style', 'layout'], undefined)]);
   const ofIds = [...new Set(all.flatMap((x) => x.about))];
   const rows = ofIds.length ? ((await ctx.reads({ ids: ofIds })) as Row[]).filter((r) => r.archived_at == null) : [];
   const items = new Map(rows.map((r) => [r.id, r]));
@@ -75,9 +92,11 @@ export async function savedViews(ctx: KernelContext, input: { limit?: number } =
       const shape = named ? (typeof named.props.code === 'string' ? undefined : (named.props.shape ?? own.shape)) : (own.shape ?? style?.props.shape);
       const document = documents.get(x.id);
       const why = cannot.get(x.id);
-      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), ...(notes.has(x.id) && { note: notes.get(x.id) }), ...(why && { cannot: why }), life: kept.has(x.id) ? 'kept' : 'working' };
+      return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), ...(notes.has(x.id) && { note: notes.get(x.id) }), ...(why && { cannot: why }), life: kept.has(x.id) ? 'kept' : 'working', ...(input.pick === true && { updated_at: x.updated_at, filter: x.props.filter ?? {}, walk: x.props.walk ?? { over: [], steps: 0 } }) };
     })
     .sort((a, b) => Number(b.life === 'kept') - Number(a.life === 'kept'));
+  // A person picking also finds what the packs ship, by its name, after what is kept on the map.
+  if (input.pick === true) pictures.push(...shipped(ctx, new Set(lenses.map((x) => x.props.preset).filter(Boolean))));
   const limit = input.limit ?? 100;
   return { pictures: pictures.slice(0, limit), more: Math.max(0, pictures.length - limit), ...(ended.length && { ended }) };
 }

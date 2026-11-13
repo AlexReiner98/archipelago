@@ -30,7 +30,7 @@ export async function savedCanvasPage() {
   const keptBefore = (at: number) => call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: `Saved at ${at}`, props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }] });
 
   /** The rows of the switcher's panel, opened from the bar if it is not open; none while the bar is still being drawn. */
-  const panelRows = `(() => { const p = document.querySelector('.view-panel'); const b = document.querySelector('#query .q-pick'); if (!p || (!p.matches(':popover-open') && !b)) return []; if (!p.matches(':popover-open')) b.click(); return [...p.querySelectorAll('.view-row')]; })()`;
+  const panelRows = `(() => { const p = document.querySelector('.view-panel'); const b = document.querySelector('#query .q-pick'); if (!p || (!p.matches(':popover-open') && !b)) return []; if (!p.matches(':popover-open')) b.click(); return [...p.querySelectorAll('[data-view]')].map((r) => ((r.dataset.title = (r.querySelector('.pm-grow') ?? r).textContent), r)); })()`;
 
   /** At `w` px: a canvas saved from the bar and listed in its switcher, one line each. */
   async function savePass(w: number) {
