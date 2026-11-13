@@ -379,6 +379,35 @@ hooks.besidePane = (from, view) => {
   else openPane(at, 'right', from, { anew: true, shows: from });
 };
 
+/**
+ * A pane mark's canvas (packs/walls/page/part-pane.js): the panes part names an address, and this draws it in `el` as
+ * a pane here draws its own, telling the part what is done in it (`said`): another lens (`open`), an item opened over
+ * it (`opened`, its page opened here), and what it draws, by name (`named`). Answers how to stop it.
+ */
+hooks.paneFrame = (at, el, said) => {
+  let live = true;
+  // Laid out as a pane here lays out its own (ui/shell.css: #canvas .pane-canvas).
+  el.classList.add('pane-canvas');
+  const canvas = canvasIn(el, {
+    go: (lens) => said('open', { at: lens ? `v?${addressOf(lens, canvas.asked)}` : 'v' }),
+    open: (href) => said('open', { at: paneAt(href) }),
+    opened: (item, lens) => {
+      said('opened', { item, at: `v?${addressOf(lens, canvas.asked)}` });
+      location.hash = `#/e/${item}?${addressOf(lens, canvas.asked)}`;
+    },
+  });
+  if (at === NONE) canvas.empty();
+  else
+    lensOf(at).then(({ lens, style, here }) => {
+      if (!live) return;
+      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? filterSaid(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
+      naming();
+      canvas.show(lens, here, style);
+      activate(canvas);
+    }, (err) => live && el.replaceChildren(h('div', { class: 'error' }, err.message)));
+  return () => ((live = false), canvas.close());
+};
+
 let started = false;
 /** Draw the panes of the tab in sight, once the page has read its tabs (packs/panes/page/tab-bar.js). */
 export function startPanes() {

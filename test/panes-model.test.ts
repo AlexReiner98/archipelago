@@ -3,6 +3,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+// @ts-expect-error: a plain module of the pack, with no types of its own.
 import * as M from '../packs/panes/parts/model.js';
 
 const ids = () => {
