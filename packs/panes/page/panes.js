@@ -16,7 +16,7 @@ import { dragPane, sashes } from './pane-drag.js';
 import { heard, nameOf } from './pane-route.js';
 import { filterSaid } from './query-bar.js';
 import { frameIn, reframe } from './pane-web.js';
-import { BLANK, asPane, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
+import { BLANK, asPane, byPart, drawable, focusOf, freshPane, front, hrefOf, keep, named, newId, webOf } from './tabs.js';
 import { titles } from './words.js';
 
 /** The sides a pane is docked on, beside the pane it is put by: along a row, or down a column. */
@@ -147,6 +147,8 @@ export function travel(by, from = '') {
 
 /** The address the pane in focus stands at, keeping the page open in `from`: an item's page over its lens, or another page. */
 export function hrefNow(from = '') {
+  // The part draws the panes: the page's own address, without the page over it, is the lens it stands at.
+  if (byPart.on) return (from || location.hash).split('?')[1] ? `#/v?${(from || location.hash).split('?')[1]}` : '#/';
   const at = front().panes[active]?.at;
   const base = hrefOf(at);
   const open = /^#\/e\/(e_[a-z0-9]{8})/.exec(from)?.[1];
@@ -164,6 +166,7 @@ function say(push, from) {
 }
 /** The page's address given to the pane in focus (ui/app.js): a step there, unless it draws it already; `here` lit in it. */
 export function toAddress(at, here) {
+  if (byPart.on) return;
   const entry = drawn.get(active);
   if (entry) entry.here = here;
   // The browser took the step already: the address is only written over, to say the lens beside the page.
@@ -233,6 +236,7 @@ const host = document.getElementById('canvas');
 const groupEls = () => front().groups.map((g) => [g, drawn.get(g)?.el]).filter(([, el]) => el);
 
 export function draw() {
+  if (byPart.on) return;
   const layout = front();
   for (const [id, entry] of drawn) if (!layout.groups.includes(id)) (entry.canvas.close(), entry.el.remove(), drawn.delete(id));
   for (const [id, entry] of drawn) if (layout.panes[id]?.at !== entry.at) load(id, layout.panes[id].at);

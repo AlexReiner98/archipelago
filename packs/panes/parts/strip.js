@@ -24,7 +24,7 @@ function tabMark(m, t, sessions, out) {
   const inSight = t.id === m.front && !out;
   const ended = t.chat && t.ended?.includes(t.chat);
   const tip = [name, whom(t, session), ended && 'its chat has ended or gone quiet: it goes when you leave it', out && 'in a window of its own: press to go to it', !out && !inSight && 'drag it out of the page to pop it out'].filter(Boolean).join(' · ');
-  return ['box', { key: `tab:${t.id}`, flow: 'row', gap: 2, drag: 'tab', selected: inSight, ...(t.unseen && !inSight && { ring: true }), ...(session && { hue: cut(sessions[session]?.name ?? t.word ?? t.named ?? session, 80) }), aux: !out && closable(m, t), ...(ended && { tone: 'closed' }), tip: cut(tip) },
+  return ['box', { key: `tab:${t.id}`, flow: 'row', gap: 2, drag: 'tab', selected: inSight, ...(t.unseen && !inSight && { ring: true }), ...(session && { hue: cut(sessions[session]?.word ?? t.word ?? t.named ?? session, 80) }), aux: !out && closable(m, t), ...(ended && { tone: 'closed' }), tip: cut(tip) },
     ['button', { key: `front:${t.id}`, look: 'tab', tip: cut(tip) }, cut(name, 80)],
     ...(out ? [] : [tabMenu(m, t, sessions)]),
     ...(!out && closable(m, t) ? [['button', { key: `close:${t.id}`, look: 'quiet', tip: 'Close this tab' }, '×']] : []),
