@@ -40,6 +40,7 @@ const all = new Set();
 let current = null;
 /** Make this canvas the one the bar acts on. */
 export function activate(c) {
+  if (current && current !== c) hooks.partsAway?.();
   current = c;
   barNow();
 }
@@ -79,9 +80,11 @@ hooks.address = () => {
     query: current.home ? null : current.lens,
     layout: { ...(shape && { shape }), ...(style && { style }), ...(canvas && { canvas }) },
     ...(current.here && { item: current.here }),
-    drawn: { count: answer?.items?.length ?? 0, ...(answer?.cut && { cut: true }) },
+    drawn: { count: answer?.items?.length ?? 0, ids: (answer?.items ?? []).slice(0, idsHanded).map((i) => i.id), ...(answer?.cut && { cut: true }) },
   };
 };
+/** How many of the ids drawn a part is handed in the address, for what a term would add or take away. */
+const idsHanded = 500;
 /** The pages of the app a part may name in an address (`page`), each one the host draws over the canvas. */
 const PAGES_GO = ['you', 'workspace', 'screen'];
 /** A name a layout goes by in an address: a shape's or a kept style's. */
@@ -108,6 +111,8 @@ hooks.go = (address) => {
     if (address.page === 'screen' && !of) return;
     return void openHere(address.page === 'screen' ? `#/s/${of}` : `#/${address.page}`);
   }
+  // A saved view, by its id: opened as the bar's switcher opens one (hooks.openView, ui/canvases.js).
+  if (typeof address.view === 'string' && /^e_[a-z0-9]{8}$/.test(address.view)) return void hooks.openView?.(address.view);
   // A term added to the lens up or taken out of it (`add`, `take`): the runtime makes the lens, so no part keeps the algebra.
   if (address.add || address.take) {
     const next = moved(current.home ? home() : current.lens, address);

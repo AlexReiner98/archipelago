@@ -152,3 +152,30 @@ test('in a browser, a part on a slot that asks a decision answers a value, never
     await page.close();
   }
 });
+
+test('in a browser, a part asks a live read and hears its answer, over its own port', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base } = await serve('off');
+  const page = await open(`${base}/`);
+  try {
+    const said: any = await page.evaluate(`(async () => {
+      const { partPort } = await import('/layout.js');
+      const code = ${JSON.stringify(version(`setTimeout(async () => tools.marks('got ' + JSON.stringify(await tools.read('search', { q: 'roof' }))), 0); return { marks: 'asking' };`))};
+      const port = await partPort('reads', code);
+      const said = [];
+      port.onmessage = (ev) => {
+        said.push(ev.data);
+        if (ev.data.type === 'read') port.postMessage({ type: 'readed', asked: ev.data.asked, value: [{ id: 'e_aaaaaaaa' }] });
+      };
+      port.postMessage({ type: 'mount', id: 'r', part: 'probe', input: {} });
+      for (let n = 0; n < 200 && said.length < 3; n++) await new Promise((r) => setTimeout(r, 25));
+      return said;
+    })()`);
+    assert.deepEqual(said, [
+      { type: 'marks', id: 'r', marks: 'asking' },
+      { type: 'read', id: 'r', asked: 1, name: 'search', params: { q: 'roof' } },
+      { type: 'marks', id: 'r', marks: 'got [{"id":"e_aaaaaaaa"}]' },
+    ]);
+  } finally {
+    await page.close();
+  }
+});

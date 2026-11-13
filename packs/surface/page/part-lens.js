@@ -3,10 +3,10 @@
 // brief; and `names`, the titles of the items the lens names. The canvas in focus says what it draws (hooks.address,
 // hooks.answer, hooks.homeLens: packs/surface/page/canvas.js); what needs no page is packs/walls/page/part-slots.js.
 
-import { hooks } from './base.js';
+import { hooks, state } from './base.js';
 import { idsNamed } from './lens-terms.js';
 import { itemOf } from './layout-asks.js';
-import { ANSWER_SLOTS, QUERY_SLOTS, answerBrief, withSaid } from './part-slots.js';
+import { ANSWER_SLOTS, QUERY_SLOTS, SHAPE_SLOTS, answerBrief, withSaid } from './part-slots.js';
 
 /** How many names of items a part is handed. */
 const namesMost = 50;
@@ -22,6 +22,8 @@ export async function namesOf(lens, answer) {
 /** The page's address as a part that declares `go` is handed it: its lens with `said`, as every lens handed to a part. */
 export async function addressSaid(words) {
   const at = hooks.address?.() ?? null;
+  // Home draws a lens too: handed as `home`, so a term a part adds there adds to Home's.
+  if (at && !at.query) return { ...at, home: withSaid(hooks.homeLens?.() ?? null, words, {}) };
   if (!at?.query) return at;
   return { ...at, query: withSaid(at.query, words, await namesOf(at.query, hooks.answer?.()?.answer)) };
 }
@@ -38,5 +40,6 @@ export async function queryGiven(slot, words) {
     home: !at?.query,
     names,
     ...(ANSWER_SLOTS.includes(slot) && { answer: answerBrief(up?.answer, { failed: up?.failed, limit: lens?.limit }) }),
+    ...(SHAPE_SLOTS.includes(slot) && { shapes: (state.schema?.shapes ?? []).filter((s) => typeof s?.shape === 'string').map((s) => ({ shape: s.shape, title: String(s.title ?? s.shape) })) }),
   };
 }

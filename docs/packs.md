@@ -157,7 +157,7 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | Slot | Where | Handed |
 |---|---|---|
 | `panes` | The panes of the page. | — |
-| `tabs` | The bar of tabs across them. | `tabs`, `current` |
+| `tabs` | The bar of tabs across them. | `tabs`, `current`, `page` |
 | `tab.mark` | A mark on one tab: whose it is, how much it holds. | `tab`, `current` |
 | `bar` | The bar over the canvas. | `current`, `home` |
 | `bar.views` | What its view button opens. | `current`, `home` |
@@ -168,7 +168,7 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `traces` | The overlay of traces over it. | `query` |
 | `sheet` | The sheet over the canvas, an item's one page. | `reading` |
 | `item.menu` | What is done rarely to that item. | — |
-| `find` | Find at the canvas's foot. | `query` |
+| `find` | Find at the canvas's foot. | `query`, `shapes` |
 | `home` | The page with no query up. | — |
 | `nav` | What the menu leads to. | — |
 | `look` | Drawn by nothing: the part is handed whether the canvas has drawn (`drawn`, and `why` when there is one) and publishes it as page state, so a picture is taken at the right moment. The host mounts it under `?look`. | `drawn`, `why` |
@@ -196,6 +196,36 @@ document in sight); a part there names the page to show with
 `tools.go({ item, replace: true })`, which replaces the address and never
 leaves words not yet saved. With no part told, the page follows the reading
 itself.
+
+**What find's parts are told.** `find` is handed `shapes`, the layouts the
+packs ship (`{ shape, title }`). A part on `find`, `bar.find` or
+`bar.find.rows` is told `{ name: 'away' }` when a press lands outside all
+of them or another pane takes the focus, and the part on `find` is told
+`{ name: 'summon' }`, its input focused, when `/` is pressed outside a
+field. A go part is handed in its `address` the ids drawn (`drawn.ids`) and,
+on Home, Home's lens (`home`), and may go to a saved view (`{ view: id }`).
+
+**The page's address is the runtime's.** The part on `tabs` is handed
+`page`, `{ hash, popped? }` (`popped` the tab a popped-out window draws),
+again whenever the address moves, and is told `{ name: 'step', step, hash }`
+when the person goes back (-1) or forth (1). It writes the address with
+`tools.go({ hash, push })`: a step of history when `push`, written over the
+entry when not. A step, and a show landing, count as the person's move, so it
+may answer either by moving the page. It opens a tab in a window of its own
+with `tools.window(key, hash)` and brings one forward with `tools.focus(key)`.
+The runtime tells it, as events, `{ name: 'land', step }` for each show (it
+keeps what waits itself), `{ name: 'ended', run, why }` and
+`{ name: 'rested', run }`; it reads the open sessions live. All of this is
+heard only once a part fills `tabs`.
+
+**Kept words.** `tools.keep(value, name)` keeps by the item a part stands on,
+or, for a part on none, by the workspace; words kept in one window are
+handed again (`kept`) to the same part in every other.
+
+**Live reads.** A `views` entry with `live: true` is not handed at mount: the
+part asks it when it needs it, `tools.read(name, params)`, as the person
+looking, and is answered its result or null. Four may be out at once per
+part. `search` may be declared live with no pack answering it.
 
 **The lens algebra is the runtime's** (`packs/walls/page/lens-terms.js`).
 Every lens handed to a part carries `said`, the lens in a few words
