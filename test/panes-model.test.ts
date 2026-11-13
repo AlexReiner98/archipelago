@@ -51,7 +51,7 @@ test('a drag docks a pane on a side, swaps it in the middle, and a line shares t
   assert.deepEqual(t.groups, [a, c, b]);
   M.share(t, 0, 0.9);
   assert.ok(t.sizes[0] < 2 / 3 && t.sizes[1] > 0, 'a pane keeps at least its least');
-  assert.ok(Math.abs(t.sizes.reduce((x, y) => x + y, 0) - 1) < 1e-9);
+  assert.ok(Math.abs(t.sizes.reduce((x: number, y: number) => x + y, 0) - 1) < 1e-9);
 });
 
 test('tabs open, join, split off and close, the owner keeping one of theirs', () => {
