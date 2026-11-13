@@ -38,12 +38,49 @@ test("a root pack's hash is its folder's, whatever the line endings and the mani
   assert.notEqual(hashPack(join(a, 'packs', 'x')), hashPack(join(b, 'packs', 'x')));
 });
 
+// A root pack's parts are the owner's too: what the refiner may not change is pinned, wherever in the pack it lives
+// (decision e_bn76z5fu, the sheet's parts). Its layouts likewise.
+test("a root pack's parts and layouts are pinned with its kernel and its page", () => {
+  const h = home({ x: { kernel: root, files: { 'index.ts': 'export {};\n' } } }, ['x']);
+  const at = join(h, 'packs', 'x');
+  const was = hashPack(at);
+  mkdirSync(join(at, 'parts', 'row'), { recursive: true });
+  writeFileSync(join(at, 'parts', 'row', 'index.js'), 'export default () => [];\n');
+  const withPart = hashPack(at);
+  assert.notEqual(withPart, was, 'a part added to a root pack changes its hash');
+  writeFileSync(join(at, 'parts', 'row', 'index.js'), 'export default () => [["text", "changed"]];\n');
+  assert.notEqual(hashPack(at), withPart, 'and so does changing one');
+  mkdirSync(join(at, 'layouts', 'flow'), { recursive: true });
+  writeFileSync(join(at, 'layouts', 'flow', 'index.js'), 'export default () => [];\n');
+  assert.notEqual(hashPack(at), withPart, 'a layout counts too');
+});
+
 test('a changed root pack stops the start, naming it and both hashes', async () => {
   const h = home({ core: {}, db: { kernel: root, files: { 'index.ts': '' } } }, ['core', 'db']);
   const pinned = JSON.parse(readFileSync(join(h, 'packs', 'roots.json'), 'utf8')).roots[1].hash;
   writeFileSync(join(h, 'packs', 'db', 'kernel', 'more.ts'), 'export {};\n');
   const now = hashPack(join(h, 'packs', 'db'));
   await assert.rejects(boot({ home: h, load: async () => ({ start: () => ({}) }) }), (err: Error) => err instanceof BootRefused && err.message.includes('db:') && err.message.includes(pinned) && err.message.includes(now));
+});
+
+test("a changed root part, or any file a root serves, stops the start; its README does not", async () => {
+  const h = home({ core: {}, sheet: { kernel: root, files: { 'index.ts': '' } } }, ['core', 'sheet']);
+  const dir = join(h, 'packs', 'sheet');
+  mkdirSync(join(dir, 'parts', 'page'), { recursive: true });
+  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: [] });\n");
+  writeFileSync(join(dir, 'README.md'), 'What the sheet is.\n');
+  pinRoots(h);
+  assert.deepEqual(checkRoots(h), [], 'pinned with its part');
+  writeFileSync(join(dir, 'README.md'), 'What the sheet is, said again.\n');
+  assert.deepEqual(checkRoots(h), [], 'a README only says what it is');
+  const pinned = hashPack(dir);
+  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: ['text', {}, 'changed'] });\n");
+  const now = hashPack(dir);
+  assert.notEqual(now, pinned);
+  await assert.rejects(boot({ home: h, load: async () => ({ start: () => ({}) }) }), (err: Error) => err instanceof BootRefused && err.message.includes('sheet:') && err.message.includes(pinned) && err.message.includes(now));
+  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: [] });\n");
+  writeFileSync(join(dir, 'served.css'), 'a {}\n');
+  assert.match(checkRoots(h).join('\n'), /sheet:/, 'a file beside its folders counts too');
 });
 
 test('a root pack the list leaves out, or a listed pack that is no root, stops the start', () => {

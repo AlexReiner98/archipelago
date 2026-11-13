@@ -1,0 +1,10 @@
+{
+  "id": "diagrams",
+  "version": "0.1.0",
+  "title": "Diagrams",
+  "description": "A diagram made from the code, drawn on its item's page: the boxes, areas and wires its props.diagram keeps, on a surface that pans and zooms, with the draw.io file it was drawn from.",
+  "uses": ["type:diagram"],
+  "parts": [
+    { "id": "diagrams.piece", "title": "Diagram", "slot": "piece.diagram", "opens": ["piece.diagram"], "reads": { "diagram": ["diagram"] }, "marks": ["box", "text", "paint", "path"], "modules": { "index.js": "parts/diagram/index.js" } }
+  ]
+}

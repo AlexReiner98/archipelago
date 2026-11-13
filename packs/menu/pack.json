@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "title": "Menus",
   "description": "The page's menus as parts: the menu's pages (For you, the screens in the nav, Settings), and the view band's own buttons (Save what is up, into the view up or as a new one named in the band; in its menu Save as new view and Delete), each a person's change to a kept view (core's lens).",
+  "app": true,
   "uses": [
     "service:answer.saved_views"
   ],

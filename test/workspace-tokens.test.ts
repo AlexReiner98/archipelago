@@ -255,8 +255,8 @@ test('a product\u2019s public page is open to anyone, and says nothing until som
   const shell = await fetch(`${base}/p/default/${app}`);
   assert.equal(shell.status, 200);
   assert.match(shell.headers.get('content-security-policy') ?? '', /default-src 'none'/);
-  assert.match(await shell.text(), /public\.js/);
-  assert.equal((await fetch(`${base}/public.js`)).status, 200);
+  assert.match(await shell.text(), /frozen-page\.js/);
+  assert.equal((await fetch(`${base}/frozen-page.js`)).status, 200);
   // What is not there is not there: another product, another workspace, a picture that was never kept.
   assert.equal((await get(`/p/default/e_nothing1/data`)).status, 404);
   assert.equal((await get(`/p/elsewhere/${app}/data`)).status, 404);

@@ -1,4 +1,4 @@
-// A new session's tab opens on its canvas, with no page over it (ui/tab-life.js). Beside test/tabs.test.ts.
+// A new session's tab opens on its canvas, with no page over it (packs/panes/page/tab-life.js). Beside test/tabs.test.ts.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

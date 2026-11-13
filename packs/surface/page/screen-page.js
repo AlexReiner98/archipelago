@@ -3,7 +3,6 @@
 // places, which page is open and whether Settings is offered; a screen's page is composed here, from its pieces.
 
 import { drawSlot, h, hooks, may, part, state } from './base.js';
-import { drawScreen } from './screens.js';
 
 const byPlace = (a, b) => a.nav - b.nav;
 /** The screens in the nav, in their places. */
@@ -31,7 +30,7 @@ export async function screenPage(id) {
   const main = part('screen');
   const screen = (state.schema?.screens ?? []).find((s) => s.id === id);
   if (!screen) return main.replaceChildren(h('div', { class: 'empty' }, 'There is no such screen here. ', h('a', { href: '#/workspace' }, 'Screens are in Settings.')));
-  const drawn = drawScreen(screen, () => screenPage(id));
+  const drawn = hooks.drawScreen(screen, () => screenPage(id));
   // A screen that holds one of the kernel's own pages has that page's head; any other is named by its title.
   const own = screen.pieces.some((p) => p.piece === 'page');
   main.replaceChildren(...[!own && h('div', { class: 'page-head' }, h('h1', {}, screen.title)), drawn.column].filter(Boolean));

@@ -6,5 +6,50 @@
   "kernel": {
     "trust": "root",
     "internal": true
-  }
+  },
+  "parts": [
+    {
+      "id": "sheet.page",
+      "title": "Page",
+      "slot": "sheet",
+      "opens": [
+        "sheet.sections",
+        "sheet.bands"
+      ],
+      "go": true,
+      "state": [
+        "draft"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "list",
+        "input",
+        "button",
+        "note",
+        "menu"
+      ],
+      "modules": {
+        "index.js": "parts/page/index.js",
+        "words.js": "parts/page/words.js",
+        "fields.js": "parts/page/fields.js",
+        "sections.js": "parts/page/sections.js",
+        "draft.js": "parts/page/draft.js",
+        "links.js": "parts/page/links.js",
+        "note-count.js": "parts/page/note-count.js"
+      }
+    },
+    {
+      "id": "sheet.follow",
+      "title": "Follow the reading",
+      "slot": "sheet",
+      "go": true,
+      "marks": [
+        "box"
+      ],
+      "modules": {
+        "index.js": "parts/follow/index.js"
+      }
+    }
+  ]
 }

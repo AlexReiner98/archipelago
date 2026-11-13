@@ -14,7 +14,6 @@ import { placeBy } from './menu-place.js';
 import { addressOf, flatView, stepsOf } from './query.js';
 import { filterSaid, fitBar } from './query-bar.js';
 import { sharePublicly } from './item-doc.js';
-import { lookSwitch, styleDelete } from './look-switch.js';
 import { thumbOf } from './thumbs.js';
 import { pageIsA, pageSchema, versionCanvases } from './page-schema.js';
 import { isA, typeChoice, types, workType } from './words.js';
@@ -208,7 +207,10 @@ export function canvasSwitch(lens, style, isHome, open = (href) => (location.has
     const named = (mark, title) => h('span', { class: 'q-label q-pick-label', title, 'aria-hidden': 'true' }, mark);
     // The parts that fill the band, side by side: what the person keeps of the view up, and an island made.
     const parts = floatMenus(h('span', { class: 'q-parts' }));
-    const rows = [{ element: h('label', { class: 'q-look-row', title: 'Layout: how this view is arranged' }, h('span', { class: 'muted' }, 'Layout'), lookSwitch(lens, style, open)) }, may('write') && current && !current.preset && { text: 'Share it', title: 'Public for anyone, frozen as it is now', act: () => shareView(current) }, styleDelete(lens, style, open)];
+    // The layout up and its switch are the styles pack's part (slot bar.layouts): it moves the page itself.
+    const layout = h('div', { class: 'q-look-row' });
+    void drawPart(layout, { slot: 'bar.layouts', piece: {} });
+    const rows = [{ element: layout }, may('write') && current && !current.preset && { text: 'Share it', title: 'Public for anyone, frozen as it is now', act: () => shareView(current) }];
     part.replaceChildren(...travel, named(canvasMark(), 'View: the saved view up'), pick, parts, ...own.filter((b) => !travel.includes(b)), layoutMenu(rows));
     fitBar();
     const piece = { ...(current && !current.preset && { current: current.id }), home: Boolean(isHome), ...((await islandsHere()) ? islandPiece() : {}) };

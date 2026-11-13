@@ -6,10 +6,8 @@
 
 import { api, ask, drawSlots, h, may, part, state, whoami } from './base.js';
 import { screenRows } from './screen-rows.js';
-import { themesCard } from './themes-card.js';
 import { packsCard } from './packs.js';
 import { membersCard } from './members-card.js';
-import { limitsCard } from './limits-card.js';
 import { connectionsCard } from './connections-card.js';
 import { agentsMayCard, drawingsOpenRow, tokenRow, tokensCard } from './agents-card.js';
 import { connectCard, connecting, isConnecting } from './connect-agent.js';
@@ -86,7 +84,6 @@ export async function workspace() {
       // With sign-in, the owner is whoever the workspace was made for, by their address (marked under Members); with
       // none, the person at this machine says who they are here.
       !tokensOn && card('Owner', null, h('ul', { class: 'rows' }, ownerRow(info.owner, workspace))),
-      tokensOn && admin && limitsCard(info.member_limit, info.use, info.ended),
       // A workspace for one person (its limit is one, and it has no more) has no members to manage.
       tokensOn && admin && !(info.member_limit?.members === 1 && members.length <= 1) && at('team', membersCard({ me, owner: info.owner?.id, members, others: live.filter((t) => t.kind === 'human' && !members.some((m) => m.person_id === t.entity_id)), tokenRow: row, then: workspace, fail, say })),
     ],
@@ -96,7 +93,7 @@ export async function workspace() {
       tokensOn && isConnecting() && at('agent', connectCard({ tokens: agents, then: workspace, workspace: me.workspace.id })),
       admin && agentsMayCard(info, workspace, fail),
     ],
-    map: () => [themesCard(workspace), at('backup', backupCard(workspace, visibilityRow(info, workspace, fail), islandsRow(info, workspace, fail), admin && drawingsOpenRow(info)))],
+    map: () => [at('backup', backupCard(workspace, visibilityRow(info, workspace, fail), islandsRow(info, workspace, fail), admin && drawingsOpenRow(info)))],
     packs: () => [at('connections', connectionsCard()), packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard(), me.workspace.id === 'default' && tokensOn && admin && workspacesCard(me.workspace.id)],
   };
   // What a person who is not an admin may change is only their own agent tokens.
@@ -111,8 +108,10 @@ export async function workspace() {
     grid,
   );
   // What other packs say on this workspace, each a part of its own under the cards this screen draws (slot
-  // workspace.card), told which section is open so a card lands in one. None fills it until its pack's cluster lands.
-  void drawSlots(grid, { slot: 'workspace.card', piece: { workspace: me.workspace.id, section: open }, redraw: workspace });
+  // workspace.card).
+  // Each is handed the section open, so it draws in its own section and nothing in the others, and the card a step of
+  // Start here asked for (`at`).
+  void drawSlots(grid, { slot: 'workspace.card', piece: { workspace: me.workspace.id, section: open, ...(step && { at: step }) }, redraw: workspace });
   // Brought into view only as far as it must be, so the page's head and its sections stay in sight above it.
   if (step) setTimeout(() => main.querySelector(`[data-at="${CSS.escape(step)}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 400);
 }
