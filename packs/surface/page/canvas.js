@@ -8,7 +8,6 @@
 
 import { api, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
 import { wiresOn } from './canvas-wires.js';
-import { catchUp } from './catch-up.js';
 import { canvasSwitch } from './views-kept.js';
 import { moved, numberOf } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
@@ -20,12 +19,10 @@ let overlay;
 const actorOf = (a) => (typeof a === 'string' ? a : a?.kind ? `${a.kind}:${a.name}` : undefined);
 /**
  * Catch the first canvas up from where its reader last looked: the overlay (the slot `traces`, handed the person as
- * `me`) is mounted and told what was missed (hooks.tellMissed, packs/surface/page/live.js). Until the host draws the
- * overlay's marks (trace, replay), the catch-up of ui/catch-up.js does it as before.
+ * `me`) is mounted and told what was missed (hooks.tellMissed, packs/surface/page/live.js), which it traces and offers
+ * to play.
  */
 async function caughtUp(view) {
-  const { MARKS } = await import('./part-check.js');
-  if (!('trace' in MARKS && 'replay' in MARKS)) return catchUp(view);
   if (!overlay) {
     overlay = h('div', { id: 'traces' });
     document.body.append(overlay);
@@ -59,7 +56,8 @@ const canvasOf = (asked) => `${asked?.canvas ?? ''}@${asked?.shape && asked.shap
 const all = new Set();
 let current = null;
 /** The store of the canvas drawn round `node` (a part over it, a replay: ./replay.js), by name so nothing imports this file for it. */
-hooks.storeUnder = (node) => [...all].find((c) => c.host?.contains(node))?.view?.store ?? null;
+// The overlay of traces stands over no one canvas: it plays on the one whose store holds what was missed (live.js).
+hooks.storeUnder = (node) => ([...all].find((c) => c.host?.contains(node)) ?? [...all].find((c) => c.view?.store?.store?.missed))?.view?.store?.store ?? null;
 /** Make this canvas the one the bar acts on. */
 export function activate(c) {
   if (current && current !== c) hooks.partsAway?.();

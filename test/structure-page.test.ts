@@ -99,7 +99,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/term-kinds.js': 2,
   'ui/term-pick.js': 2,
   'ui/thumbs.js': 5,
-  'ui/traces.js': 3,
 };
 
 /** Whether a served path is the host's: a root pack's page/ folder. */
