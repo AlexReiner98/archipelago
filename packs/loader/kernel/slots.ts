@@ -29,7 +29,8 @@ export const PAGES: string[] = ['doc', 'public'];
  * - `bar`             the bar over the canvas; `bar.views` what its view button opens, `bar.find` find's input and its
  *                     terms, `bar.layouts` the layout a view is drawn in
  * - `canvas`, `traces` the canvas itself, and the overlay of traces over it
- * - `sheet`           the sheet over the canvas, an item's one page; `item.menu` what is done rarely to that item
+ * - `sheet`           the sheet over the canvas, an item's one page, handed where the documents beside it are read
+ *                     (`reading`), so a part decides which page is shown; `item.menu` what is done rarely to that item
  * - `find`            find at the canvas's foot; `home` the page with no query up
  * - `workspace.card`  a card on the workspace page, one pack's say on this workspace
  */
@@ -43,7 +44,7 @@ export const FRAME_SLOTS = {
   'bar.layouts': ['current', 'layout'],
   canvas: ['query', 'layout'],
   traces: ['query'],
-  sheet: [],
+  sheet: ['reading'],
   'item.menu': [],
   find: ['query'],
   home: [],

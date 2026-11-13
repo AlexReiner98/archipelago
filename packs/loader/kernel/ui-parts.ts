@@ -44,6 +44,8 @@ export interface PartDef {
   marks: string[];
   /** Whether it may move the page: handed the address the page draws, it may name another after a gesture (`tools.go`). */
   go?: boolean;
+  /** The page state it publishes (`tools.state`): names the runtime writes on the root for anything watching the page from outside (a picture taken once the canvas has drawn). One name, one owner. */
+  state?: string[];
   /** Its modules by name, each a file in the pack's folder, entered at index.js. */
   modules: Record<string, string>;
 }
@@ -75,6 +77,7 @@ export interface Part {
   opens: string[];
   marks: string[];
   go?: true;
+  state?: string[];
   hash: string;
   /** Why it is not drawn: it names a mark the host that asked does not draw. Its modules are then never sent. */
   waiting?: string;
@@ -87,6 +90,8 @@ const HEAD = ['id', 'type', 'title', 'body', 'visibility', 'created_at', 'update
 const MODULE = /^[a-z][a-z0-9_-]*\.js$/;
 /** A mark's kind, as a part names it and a host says it draws. */
 export const MARK = /^[a-z][a-z0-9_]*$/;
+/** A name of page state a part publishes: written on the root as `data-<name>`, so anything watching the page reads it. */
+export const STATE = /^[a-z][a-z0-9_]*$/;
 
 /** Why a part waits on a host: the marks it names that the host (the kinds it draws) does not draw, or nothing. */
 export function marksWaiting(marks: unknown, host: string[]): string | undefined {
@@ -110,7 +115,7 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
   if (given === undefined) return [];
   if (!Array.isArray(given)) return ['parts is a list of parts: { id, title, slot, reads?, sends?, opens?, modules }'];
   const problems: string[] = [];
-  const seen = new Set<string>(), opened = new Set<string>();
+  const seen = new Set<string>(), opened = new Set<string>(), claimed = new Set<string>();
   const actions = new Set(declared(pack).actions.map((a) => a.id));
   const personal = new Set(declared(pack).actions.filter((a) => a.humanOnly || a.admin).map((a) => a.id));
   const open = slotsOpenTo(pack);
@@ -130,6 +135,12 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       opened.add(s);
     }
     if (part.go !== undefined && typeof part.go !== 'boolean') problems.push(`${at}: go is true or false`);
+    if (part.state !== undefined && (!Array.isArray(part.state) || !part.state.length || part.state.some((s) => typeof s !== 'string' || !STATE.test(s)))) problems.push(`${at}: state is the page state it publishes, a list of names such as ["look", "look_why"]`);
+    else for (const s of part.state ?? []) {
+      // One name, one owner, within the pack here; across packs the page refuses the second to write it (part-host.js).
+      if (claimed.has(s)) problems.push(`${at} publishes the page state "${s}", which another of its pack's parts publishes: one name, one owner`);
+      claimed.add(s);
+    }
     if (part.opens !== undefined && !Array.isArray(part.opens)) problems.push(`${at}: opens is a list of slots`);
     if (part.reads !== undefined && (typeof part.reads !== 'object' || part.reads === null || Array.isArray(part.reads))) problems.push(`${at}: reads is the fields it reads, by type: { "<type>": ["<field>", ...] }`);
     else for (const [type, fields] of Object.entries(part.reads ?? {})) {
@@ -228,7 +239,7 @@ export function partsFor(packs: Packs, kept: Kept[] = [], have: string[] = [], h
     const mine = kept.find((v) => v.props.preset === d.id);
     if (mine && !mine.is_open) continue;
     const modules = modulesOf(packs, d, mine), hash = hashOf(modules), waiting = host && marksWaiting(d.marks, host);
-    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], opens: d.opens ?? [], marks: d.marks ?? [], ...(d.go && { go: true as const }), hash, ...(waiting ? { waiting } : !have.includes(hash) && { modules }) });
+    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], opens: d.opens ?? [], marks: d.marks ?? [], ...(d.go && { go: true as const }), ...(d.state?.length && { state: d.state }), hash, ...(waiting ? { waiting } : !have.includes(hash) && { modules }) });
   }
   return out;
 }
