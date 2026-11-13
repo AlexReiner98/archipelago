@@ -1,7 +1,7 @@
-// Tabs at the top of the page (decision e_mzer5m4t): each a set of panes side by side, every one alike (ui/panes.js),
-// kept by ui/tabs.js. Every chat at work has a tab of its own, named by its title and marked in its hue (ui/words.js),
-// opened and closed as the chat begins and ends (ui/tab-life.js), so its work mirrors into the page without squeezing a
-// pane or opening a window; where a step lands is ui/pane-route.js. The owner's own tabs stand at the left, the chats'
+// Tabs at the top of the page (decision e_mzer5m4t): each a set of panes side by side, every one alike (packs/panes/page/panes.js),
+// kept by packs/panes/page/tabs.js. Every chat at work has a tab of its own, named by its title and marked in its hue (ui/words.js),
+// opened and closed as the chat begins and ends (packs/panes/page/tab-life.js), so its work mirrors into the page without squeezing a
+// pane or opening a window; where a step lands is packs/panes/page/pane-route.js. The owner's own tabs stand at the left, the chats'
 // after them (e_pfpgendq). There is no most: many tabs shrink to their mark and first letters (e_q3amet26). A tab, not a
 // pane, pops out into a window of its own, from its strip or dragged out of the page, and docks back whole (e_ezb7s3a7).
 // Tabs merge: from ⋯, or a tab dragged onto another, and a pane dragged onto a tab joins it (e_c5stzz6z's way back).
@@ -27,7 +27,7 @@ const strip = document.getElementById('tabs');
 
 /** Bring tab `t` into sight: its panes drawn, the address its pane in focus's, the page it had open over it open again. */
 function show(t) {
-  // A tab struck because its chat ended while it was in sight goes once the reader leaves it (ui/tab-life.js).
+  // A tab struck because its chat ended while it was in sight goes once the reader leaves it (packs/panes/page/tab-life.js).
   const left = front();
   if (left && left !== t && left.ended) for (const run of left.ended) hooks.settleTab?.(left, run);
   tabs.front = t.id;

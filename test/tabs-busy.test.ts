@@ -1,4 +1,4 @@
-// A show while the reader is at work in its chat's tab waits for them (ui/pane-busy.js, ui/pane-route.js), and lands
+// A show while the reader is at work in its chat's tab waits for them (packs/panes/page/pane-busy.js, packs/panes/page/pane-route.js), and lands
 // once they are quiet: a chat has one tab. Beside test/tabs.test.ts, in a file of its own as it waits out the while a
 // press counts as work.
 

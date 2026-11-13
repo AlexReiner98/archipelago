@@ -15,7 +15,8 @@ const rootOf = (path: string) => /^packs\/([\w-]+)\/page\//.exec(path)?.[1];
 // stay runtime (they boot or mount, render a mark the slot contract names, or are data the runtime hands parts) and
 // now sit in surface, walls and loader, so what the host used to reach into ui/ for it now has (layout.js 8 to 3,
 // live.js 5). The moved modules bring their own imports of the app with them (app.js, canvas.js, query-base.js and
-// the rest), each going as the module it reaches becomes a part.
+// the rest), each going as the module it reaches becomes a part. The panes and tabs moved to the panes root the same
+// day as host code (task e_d5ewsvgf): they bring their imports of the app with them, and their ui/ entries went.
 const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/identity/page/agents-card.js': 2,
   'packs/identity/page/authorize.js': 1,
@@ -44,6 +45,9 @@ const AGAINST_THE_ORDER: Record<string, number> = {
   'packs/surface/page/live.js': 7,
   'packs/surface/page/query.js': 2,
   'packs/surface/page/replica.js': 1,
+  'packs/panes/page/panes.js': 3,
+  'packs/panes/page/tab-bar.js': 3,
+  'packs/panes/page/tabs.js': 1,
 };
 
 test("the host's page imports one way along roots.json", () => {
@@ -93,12 +97,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/look-marks.js': 1,
   'ui/look-switch.js': 3,
   'ui/nav.js': 2,
-  'ui/pane-address.js': 1,
-  'ui/pane-busy.js': 1,
-  'ui/pane-drag.js': 1,
-  'ui/pane-land.js': 1,
-  'ui/pane-web.js': 1,
-  'ui/panes.js': 5,
   'ui/public.js': 3,
   'ui/query-bar.js': 3,
   'ui/query-light.js': 2,
@@ -107,9 +105,6 @@ const APP_ON_HOST: Record<string, number> = {
   'ui/start.js': 1,
   'ui/style-code.js': 2,
   'ui/styles-card.js': 2,
-  'ui/tab-bar.js': 4,
-  'ui/tab-life.js': 1,
-  'ui/tabs.js': 1,
   'ui/term-kinds.js': 2,
   'ui/term-pick.js': 2,
   'ui/themes-card.js': 2,

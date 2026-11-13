@@ -1,4 +1,4 @@
-// Tabs at the top of the owner's page (ui/tab-bar.js, ui/tab-life.js; decisions e_mzer5m4t, e_q3amet26, e_ezb7s3a7,
+// Tabs at the top of the owner's page (packs/panes/page/tab-bar.js, packs/panes/page/tab-life.js; decisions e_mzer5m4t, e_q3amet26, e_ezb7s3a7,
 // e_xjrpyysn, and the tab lifecycle e_p6fr4uye): in a real browser (skipped where there is no Chrome), every chat that
 // has shown something has a tab named by its title, kept live as it is renamed and closed as it ends; its shows land there in the background
 // and marked, a press brings a tab into sight, and a tab pops out into a window of its own and docks back whole. A show

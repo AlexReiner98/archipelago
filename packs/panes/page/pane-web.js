@@ -8,7 +8,7 @@ import { h } from './base.js';
 /** What a framed page may do: run, keep its own origin (a dev server's reload needs it), take a form, open a window. */
 const SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox';
 
-/** Frame `url` in pane `entry` (ui/panes.js) in place of its canvas, named by its host; no url puts the canvas back. */
+/** Frame `url` in pane `entry` (packs/panes/page/panes.js) in place of its canvas, named by its host; no url puts the canvas back. */
 export function frameIn(entry, url) {
   const was = entry.web?.dataset.url;
   if (was === url) return;

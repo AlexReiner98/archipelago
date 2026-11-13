@@ -1,4 +1,4 @@
-// More than one canvas at once (ui/panes.js), every pane alike: an agent's show can name a pane of the owner's page, the
+// More than one canvas at once (packs/panes/page/panes.js), every pane alike: an agent's show can name a pane of the owner's page, the
 // step carrying it; in a real browser (skipped where there is no Chrome) a session's show opens a tab of its own, apart from
 // the reader's, a change reaches every pane, the bar, find, back and the address follow the pane last touched, a reload
 // draws every pane again, a click in any pane opens the item's page over it, and a pane's name dragged docks it.

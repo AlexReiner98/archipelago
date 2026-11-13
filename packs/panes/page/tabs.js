@@ -1,8 +1,8 @@
-// The reader's tabs (ui/tab-bar.js): each a set of panes side by side (ui/panes.js), all of one kind, which stay
+// The reader's tabs (packs/panes/page/tab-bar.js): each a set of panes side by side (packs/panes/page/panes.js), all of one kind, which stay
 // together in it (decision e_mzer5m4t). Each pane keeps its own address and its own back and forth, here, so a reload
 // draws every pane as it was. Where they stand is the reader's, kept in this browser for each workspace, as
 // the canvas's settings are: never on the map, and meaning nothing. A tab follows everyone, nobody or one session
-// (ui/pane-route.js). One popped out into a window of its own (e_ezb7s3a7) is kept apart, under its own key, by that
+// (packs/panes/page/pane-route.js). One popped out into a window of its own (e_ezb7s3a7) is kept apart, under its own key, by that
 // window, so the two pages never write over each other; the main page reads it there, and takes it back when docked.
 
 import { known, store } from './base.js';
@@ -27,7 +27,7 @@ export const BLANK = 'v?nothing=';
 export const freshPane = (at, more = {}) => ({ at: asPane(at || '#/'), back: [], forth: [], ...more });
 /**
  * A tab: its panes, each its share, whom it follows (a session, or nobody), and the pane last touched in it; `sheet`, the
- * page open over it when it was last in sight; `chat`, the session it is the tab of (ui/tab-life.js), none for the owner's.
+ * page open over it when it was last in sight; `chat`, the session it is the tab of (packs/panes/page/tab-life.js), none for the owner's.
  */
 export function freshTab(at = BLANK, { slot, held, by, ...more } = {}) {
   const p = newId('p');
@@ -124,7 +124,7 @@ export function keep() {
 
 /** Whether an address can be drawn in a pane: a canvas, an item's or a web page (`w?url=…`), not the workspace's sheet. */
 export const drawable = (at) => /^(v\b|e\/e_|w\?)/.test(at ?? '');
-/** The web address a pane's address frames (ui/pane-web.js), or nothing when it draws the map. */
+/** The web address a pane's address frames (packs/panes/page/pane-web.js), or nothing when it draws the map. */
 export const webOf = (at) => (/^(#\/)?w\?/.test(at ?? '') ? (new URLSearchParams(at.split('?')[1]).get('url') ?? undefined) : undefined);
 /** The saved canvas or item an address names first: two panes on it draw the same. */
 export const named = (at) => {
@@ -132,7 +132,7 @@ export const named = (at) => {
   return /canvas=(e_[a-z0-9]{8})/.exec(bare)?.[1] ?? /^e\/(e_[a-z0-9]{8})/.exec(bare)?.[1] ?? bare;
 };
 /**
- * The sessions whose next show lands in tab `t`, by the rules of ui/pane-route.js: the one it follows or is the tab of,
+ * The sessions whose next show lands in tab `t`, by the rules of packs/panes/page/pane-route.js: the one it follows or is the tab of,
  * and one holding a pane in it that no other tab follows. The page says them with its beat, so a show can say whether
  * the owner sees it land (packs/presence/kernel/seeing.ts).
  */
