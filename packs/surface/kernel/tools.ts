@@ -16,7 +16,7 @@ import { callAs, ownContext, type KernelContext } from '../../loader/kernel/kern
 import { LOOK_READS } from '../../walls/kernel/look-pass.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import { packActionByShort, packTool, packTools } from '../../loader/kernel/packtools.ts';
-import { partCall } from '../../loader/kernel/part-calls.ts';
+import { partCall, partChange } from '../../loader/kernel/part-calls.ts';
 import { withinScope } from './scope.ts';
 import { viewsSaid } from './view-words.ts';
 import { actionsOf, listedChange, movedTo, route, surfaceNames, surfaceTools, type Action } from './surface.ts';
@@ -159,8 +159,16 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   if (tool.humanOnly && actor.kind !== 'human') throw new Error(`"${name}" is for humans only.`);
   if (actor.may === 'read' && !MEMBER_READS.has(name)) throw new Error(`This sign-in only reads the map: it cannot call ${name}.`);
   if (actor.may === 'report' && !tool.report) throw new Error(`This token may only report: it cannot call ${name}. Send what was measured with report.`);
-  const parsed = z.strictObject(tool.input).safeParse(routed ? routed.input : named ? unnamed : (input ?? {}));
+  // A root pack's part's change (the sheet's tools.change) names the part too: sent by the page alone, so it is not in
+  // the tool's input an agent reads; taken off here, checked (packs/loader/kernel/part-calls.ts partChange) and named on the change.
+  const writer = name === 'change' && input && typeof input === 'object' && 'part' in input ? (input as Record<string, unknown>) : undefined;
+  const { part: writerAsked, ...written } = writer ?? {};
+  const parsed = z.strictObject(tool.input).safeParse(routed ? routed.input : named ? unnamed : writer ? written : (input ?? {}));
   if (!parsed.success) throw new Error(`Invalid input for ${name}:\n${z.prettifyError(parsed.error)}`);
+  if (writer) {
+    const ops = Array.isArray((parsed.data as { ops?: unknown }).ops) ? (parsed.data as { ops: never[] }).ops : [];
+    (parsed.data as Record<string, unknown>).part = await partChange(l, actor, (writerAsked as { island?: unknown } | null)?.island, writerAsked, ops);
+  }
   // An agent whose token is within some items is held to them here, whatever the tool; what it writes, where every change is checked.
   const limited = actor.kind === 'agent' && Boolean(actor.within?.length);
   if (limited && !surface) await withinScope(l, actor, name, parsed.data as Record<string, unknown>, tool.within);

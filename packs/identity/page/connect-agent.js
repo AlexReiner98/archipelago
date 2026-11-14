@@ -1,0 +1,166 @@
+// Connecting an agent, step by step, once the person asks to (Connect an agent, on the Agents card): they say which
+// client they use and are shown that client's own steps, a row each, with the address to copy and the place to go. No
+// client takes a link that fills the address in except where a step says so. While the steps are open the page watches
+// for the connection and says when it lands, with a first thing to ask; shut, it watches for nothing.
+//
+// The host's, not a part's (task e_dqh5yz7t): it reads the person's tokens, copies to the clipboard and opens pages
+// outside. Kept in the identity root as host code (task e_u2phc9rq, 13 Nov 2026): what it watches for, the person's
+// agent tokens, no pack may read.
+
+import { api, h } from './base.js';
+import { card, line } from './workspace-cards.js';
+
+// A workspace's own address, so that one Claude account can hold two maps: a connector is kept by its address.
+let workspace = 'default';
+const address = () => `${location.origin}/mcp${workspace === 'default' ? '' : `/${workspace}`}`;
+/** A client run by its maker, not on this machine, cannot reach a server on this machine. */
+const onThisMachine = () => /^(localhost|127\.|\[::1\])/.test(location.hostname);
+const FIRST_ASK = 'Put this project in Archipelago, with the three things I am working on as tasks, and tell me what you would do first.';
+
+// One name for the map's server in every client that asks for one, as the plugin and the setup name it.
+const SERVER = 'pelago';
+// The plugin (scripts/plugin.ts) connects to the hosted server unless PELAGO_URL names another.
+const HOSTED = 'https://app.archipelago.tools';
+const cursorInstall = () => `cursor://anysphere.cursor-deeplink/mcp/install?name=${SERVER}&config=${encodeURIComponent(btoa(JSON.stringify({ type: 'http', url: address() })))}`;
+
+// Each client's steps: its words, then what the row offers (copy, or open a place) and the rest of it in a tooltip.
+const CLIENTS = [
+  {
+    name: 'Claude Code',
+    label: 'Claude Code',
+    steps: () => [
+      location.origin !== HOSTED && ['Point Claude Code at this server', { copy: `PELAGO_URL=${location.origin}`, show: true }, 'Set it in your environment before opening Claude Code: setx on Windows, export in your shell profile elsewhere.'],
+      ['In Claude Code, add the marketplace', { copy: '/plugin marketplace add AlexReiner98/archipelago', show: true }],
+      ['Then install the plugin', { copy: '/plugin install archipelago@archipelago', show: true }, 'It brings the map’s tools, the hooks that put each session on the map, and the working rules.'],
+      ['Open a new session, then Allow here', null, 'The plugin opens this page in your browser to connect the computer.'],
+      ['Type /mcp, choose pelago, then Allow here', null, 'Connects the map’s tools as well.'],
+    ].filter(Boolean),
+  },
+  {
+    name: 'Claude',
+    label: 'Claude (web or desktop app)',
+    hosted: true,
+    steps: () => [
+      ['Copy this address', { copy: address() }],
+      ['Open Claude’s connectors', { open: 'https://claude.ai/customize/connectors', label: 'Open' }, 'Customize → Connectors, the same for the web and the desktop app'],
+      ['Choose Add, then Custom, then Web'],
+      ['Name it Archipelago and paste the address', null, 'Then Continue. Leave the rest as Claude sets it, and choose Add.'],
+      ['Sign in here when asked, then Allow'],
+    ],
+  },
+  {
+    name: 'Claude',
+    label: 'Claude for a Team or Enterprise plan',
+    hosted: true,
+    steps: () => [
+      ['Copy this address', { copy: address() }],
+      ['An Owner opens the organization’s connectors', { open: 'https://claude.ai/admin-settings/connectors', label: 'Open' }, 'Organization settings → Connectors. Only an Owner can add one.'],
+      ['Choose Add, then Custom, paste it, and Add', null, 'Choose Web if it asks for the type.'],
+      ['Each person opens their connectors', { open: 'https://claude.ai/customize/connectors', label: 'Open' }],
+      ['Choose Connect, sign in here, then Allow'],
+    ],
+  },
+  {
+    name: 'Cursor',
+    label: 'Cursor',
+    steps: () => [
+      ['Add it to Cursor', { open: cursorInstall(), label: 'Add', same: true }, 'Opens Cursor, which asks you to confirm. If nothing happens, update Cursor.'],
+      ['In Cursor’s MCP list, choose Connect'],
+      ['Sign in here when asked, then Allow'],
+    ],
+  },
+  {
+    name: 'VS Code',
+    label: 'VS Code',
+    steps: () => [
+      ['Copy this address', { copy: address() }],
+      ['In the Command Palette, run MCP: Add Server', { copy: 'MCP: Add Server', label: 'Copy name' }, 'Ctrl+Shift+P, or Cmd+Shift+P on a Mac'],
+      ['Choose HTTP and paste the address', null, `Name it ${SERVER}, and choose Global to have it in every project.`],
+      ['Sign in here when asked, then Allow'],
+    ],
+  },
+  {
+    name: 'ChatGPT',
+    label: 'ChatGPT',
+    hosted: true,
+    steps: () => [
+      ['Copy this address', { copy: address() }],
+      ['Add a custom MCP server in ChatGPT', { open: 'https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt', label: 'Steps' }, 'ChatGPT adds these under Plugins, and what each plan may do is set by OpenAI: its page has the current steps.'],
+      ['Sign in here when asked, then Allow'],
+    ],
+  },
+  {
+    name: 'Your agent',
+    label: 'Another client',
+    steps: () => [
+      ['Copy this address', { copy: address() }],
+      ['Add it as a remote MCP server', null, 'Look for MCP or connectors in its settings. Choose HTTP, or streamable HTTP, if it asks.'],
+      ['Sign in here when asked, then Allow', null, 'A client that cannot sign in takes a token instead: With a token, on the Agents card.'],
+    ],
+  },
+];
+
+/** What the card remembers while the page is drawn again: whether it is open, the client chosen (by its label; none is the first), and the name of one that has just landed. */
+const chosen = { open: false, client: null, landed: null };
+/** Open or shut the steps. */
+export const connecting = (open) => ((chosen.open = open), (chosen.landed = null));
+export const isConnecting = () => chosen.open;
+
+const copyButton = (text, label = 'Copy') => h('button', { class: 'primary', onclick: (e) => navigator.clipboard.writeText(text).then(() => (e.target.textContent = 'Copied')) }, label);
+const openButton = ({ open, label, same }) => h('a', { class: 'button', href: open, ...(!same && { target: '_blank', rel: 'noopener' }) }, label);
+
+function stepRow(n, [words, action, tip]) {
+  const text = h('span', { class: 'grow gist cut', title: tip ?? words }, h('span', { class: 'muted' }, `${n}  `), words);
+  const row = line(text, action?.copy && copyButton(action.copy, action.label), action?.open && openButton(action));
+  return action?.copy && (action.show || action.copy === address()) ? [row, line(h('code', { class: 'muted small gist cut', title: action.copy }, action.copy))] : [row];
+}
+
+/** Ask every few seconds whether a new connection has landed, for as long as this card is on the page. */
+function watchFor(status, client, known, landed) {
+  let asked = 0;
+  const tick = async () => {
+    if (!status.isConnected || !chosen.open) return;
+    const tokens = await api('token_list').catch(() => null);
+    const fresh = tokens?.find((t) => t.client && !t.revoked_at && !known.has(t.id));
+    if (fresh) return landed(fresh);
+    if (++asked === 60) status.replaceChildren(h('span', { class: 'muted gist', title: `If ${client.name} says it cannot connect, check the address is the one above, remove the connector and add it again.` }, `Nothing from ${client.name} yet. Check the address ends in /mcp.`));
+    setTimeout(tick, 3000);
+  };
+  setTimeout(tick, 3000);
+}
+
+function connectedRows(name) {
+  return [
+    line(h('strong', { class: 'grow gist' }, `${name} is connected`)),
+    line(h('span', { class: 'grow gist', title: FIRST_ASK }, 'Ask it something to try it'), copyButton(FIRST_ASK, 'Copy a first ask')),
+  ];
+}
+
+/** The card: which client, its steps, and whether it has landed yet. */
+export function connectCard({ tokens, then, workspace: id }) {
+  workspace = id ?? workspace;
+  const known = new Set(tokens.map((t) => t.id));
+  const client = CLIENTS.find((c) => c.label === chosen.client) ?? CLIENTS[0];
+  const status = h('span', { class: 'grow' }, h('span', { class: 'muted gist' }, `Waiting for ${client.name}…`));
+  const pick = h('select', { title: 'The app your agent runs in', onchange: (e) => ((chosen.client = e.target.value), (chosen.landed = null), then()) }, CLIENTS.map((c) => h('option', { value: c.label, selected: c === client }, c.label)));
+  if (!chosen.landed)
+    watchFor(status, client, known, (fresh) => {
+      chosen.landed = fresh.name;
+      then();
+    });
+  const shut = h('button', { title: 'Put the steps away', onclick: () => (connecting(false), then()) }, chosen.landed ? 'Done' : 'Close');
+  const box = card(
+    'Connect an agent',
+    null,
+    h(
+      'ul',
+      { class: 'rows' },
+      line(h('span', { class: 'grow' }, 'Your agent'), pick),
+      client.hosted && onThisMachine() && line(h('span', { class: 'error grow gist', style: 'padding: 0', title: `${client.name} runs on its maker’s servers, which cannot reach a server on this machine.` }, `${client.name} cannot reach this machine`)),
+      client.steps().flatMap((step, i) => stepRow(i + 1, step)),
+      chosen.landed ? connectedRows(chosen.landed) : line(status),
+    ),
+  );
+  box.querySelector('header').append(h('span', { class: 'grow' }), shut);
+  return box;
+}

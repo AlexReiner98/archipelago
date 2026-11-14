@@ -7,7 +7,7 @@
 // a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click), or `add`, a button the
 // page answers itself (ui/marks-add.js); a third, `pulse`, is kept on
 // the mark as words, for the page to run it along its line when they change (ui/transition.js). A mark says the item it
-// stands for with `item` (an id), which a link to the item says too: the page lights marks by it (ui/query-light.js),
+// stands for with `item` (an id), which a link to the item says too: the page lights marks by it (packs/surface/page/light-items.js),
 // whatever drew them. Two tags are the page's own, made from an item's id alone: `reader`, a document as its reader
 // meets it (./reader-frame.js), and `view`, a kept view drawn as it is kept (ui/view-frame.js).
 

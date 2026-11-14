@@ -71,6 +71,8 @@ export interface Manifest {
   shared?: string[];
   /** The packs it took declarations from, keeping their ids (packs/loader/kernel/pack-moved.ts): it may name a view, a style, a rule, an action or a layout `<pack>.<name>` for each, and is turned on, once, wherever one of them was. The kernel's packs are always among them. */
   moved_from?: string[];
+  /** One of the app's own screens (decision e_y9dcs4nv): on in every map, existing and new, until its owner takes it out. Only a pack of the server's own folder (packs/loader/kernel/packstate.ts, packsOff). */
+  app?: true;
   /** Its tier, and the code it runs in the server's process (docs/kernel-packs.md): only a pack of the server's own folder. */
   kernel?: KernelSpec;
 }
@@ -166,6 +168,8 @@ export const isInternal = (m: Pick<Manifest, 'kernel'>): boolean => m.kernel?.in
 export const isOptional = (m: Pick<Manifest, 'kernel'>): boolean => isInternal(m) && m.kernel?.optional === true;
 /** Whether an internal pack is required: always on, never taken out. */
 export const isRequired = (m: Pick<Manifest, 'kernel'>): boolean => isInternal(m) && !isOptional(m);
+/** Whether a pack is one of the app's own screens, on until a map's owner takes it out (`app`). */
+export const isApp = (m: Pick<Manifest, 'app'>): boolean => m.app === true;
 /** The settings prefix a pack's memory is kept under: its declared one (kernel.memory), else its own `pack:<id>:`. */
 export const memoryPrefix = (m: Pick<Manifest, 'id' | 'kernel'>): string => m.kernel?.memory ?? `pack:${m.id}:`;
 
@@ -177,7 +181,7 @@ export const kernelRefused = (packs: Iterable<Manifest>, own: (id: string) => bo
   [...packs].filter((p) => p.kernel !== undefined && !own(p.id)).map((p) => [p.id, "carries kernel code, which only the server's own packs may"]);
 
 /** The keys of a manifest, and of its reach. */
-export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'parts', 'styles', 'reach', 'shared', 'moved_from', 'kernel'] as const;
+export const MANIFEST_KEYS = ['id', 'version', 'title', 'description', 'requires', 'uses', 'types', 'links', 'rules', 'views', 'actions', 'handlers', 'layouts', 'parts', 'styles', 'reach', 'shared', 'moved_from', 'app', 'kernel'] as const;
 export const REACH_KEYS = ['hosts', 'items', 'secrets', 'webhooks', 'via', 'server', 'launch'] as const;
 export const SERVER_KEYS = ['acts', 'entries', 'pages', 'connect', 'aliases', 'gates', 'mounts', 'streams', 'files', 'launchers', 'adapter', 'counts'] as const;
 
@@ -227,6 +231,7 @@ function keyProblems(m: Raw): string[] {
   for (const v of arr<Raw>(m.views)) if (v.form !== undefined && v.form !== 'tree' && v.form !== 'screen' && v.form !== 'attention') problems.push(`view "${String(v.id)}": form is tree, screen or attention, or left out for a read`);
   if (m.shared !== undefined && (!KERNEL_PACKS.includes(String(m.id)) || !Array.isArray(m.shared) || m.shared.some((t) => typeof t !== 'string'))) problems.push('shared is a list of type ids, and only the kernel\'s pack declares it');
   else if (Array.isArray(m.shared)) { const own = new Set(arr<Raw>(m.types).map((t) => t.id)); const not = m.shared.filter((t) => !own.has(t)); if (not.length) problems.push(`shared names ${not.join(', ')}: the shared set is of the types this pack declares`); }
+  if (m.app !== undefined && m.app !== true) problems.push('app is true, or absent for a pack a map adds itself');
   if (m.moved_from !== undefined && (!Array.isArray(m.moved_from) || m.moved_from.some((p) => typeof p !== 'string' || !/^[a-z][\w-]*$/.test(p) || p === m.id))) problems.push('moved_from is a list of the ids of the packs it took declarations from, not its own');
   for (const [key, names] of Object.entries({ requires: m.requires, uses: m.uses })) for (const n of arr<unknown>(names)) if (!isName(n)) problems.push(`${key} names ${JSON.stringify(n)}: ${NAME_FORMS}`);
   for (const t of arr<Raw>(m.types)) if (t.of !== undefined && (t.id !== undefined || typeof t.fields !== 'object')) problems.push(`type entry of "${String(t.of)}" adds fields to another pack's type: of and fields only`);

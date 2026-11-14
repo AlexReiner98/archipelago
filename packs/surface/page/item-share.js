@@ -1,0 +1,74 @@
+// An item's public view, the person's own act: shared, shared again or taken down from the sheet's menu, and the mark
+// of the public views that show an item (packs/publish/kernel/public-view.ts). Only a person shares, so none of this
+// is a part's to send (decision e_3mdf9gn8); what a part may do with a public view (open it, copy its address, print
+// the document) is the publish pack's part on item.menu (packs/publish/parts/share).
+
+import { api, ask, h, may, tell } from './base.js';
+import { menu, when } from './words.js';
+
+/** The item's public view, when it has one: its address, who shared it and when. */
+export const publicOf = async (id) => (await api('share_list', { id }).catch(() => []))[0] ?? null;
+
+const names = (list) => `${list.slice(0, 3).map((i) => i.title).join(', ')}${list.length > 3 ? ` and ${list.length - 3} more` : ''}`;
+
+/**
+ * Share an item: its public view, frozen now. What goes out with it and what stays out as private are said first, so
+ * nothing leaves without the person seeing it. The address is copied once it is public.
+ */
+export async function sharePublicly(id, title) {
+  let plan;
+  try {
+    plan = await api('share_plan', { id });
+  } catch (err) {
+    return void tell('Not shared', err.message);
+  }
+  const goes = plan.goes.filter((i) => i.id !== id);
+  const message = [
+    goes.length ? `Goes out with it: ${names(goes)}.` : 'It goes out alone.',
+    plan.private.length && `Left out as private: ${names(plan.private)}.`,
+    'Anyone may open it and search engines list it, as it is now.',
+  ].filter(Boolean).join('\n');
+  const again = plan.shared;
+  if (!(await ask({ title: `${again ? 'Share again' : 'Share'} “${title}”?`, message, action: again ? 'Share again' : 'Share' }))) return null;
+  try {
+    const made = await api('share_create', { id });
+    const url = `${location.origin}${made.address}`;
+    const copied = await navigator.clipboard?.writeText(url).then(() => true, () => false);
+    tell(copied ? 'Shared, address copied' : 'Shared', url);
+    return made;
+  } catch (err) {
+    tell('Not shared', err.message);
+    return null;
+  }
+}
+
+/** What the sheet's menu offers for an item's public view, a person's acts alone: share it (again), stop sharing it. */
+export function shareMenu(e, shared, redraw, writes = may('write')) {
+  const stop = async () => {
+    if (!(await ask({ title: `Stop sharing “${e.title}”?`, message: 'Its public address stops answering at once.', action: 'Stop sharing', danger: true }))) return;
+    await api('share_revoke', { id: e.id }).catch((err) => tell('Still shared', err.message));
+    redraw();
+  };
+  return [
+    writes && !e.archived_at && [shared ? 'Share again' : 'Share', async () => (await sharePublicly(e.id, e.title)) && redraw()],
+    writes && shared && ['Stop sharing', stop, 'danger'],
+  ];
+}
+
+/**
+ * The mark of an item a public view shows (task e_r9e87vgz): which views, in its tooltip. One frozen before the item
+ * last changed is behind, and the mark offers to share it again, the person's act through the same share as ever.
+ */
+export function publicMark(views, redraw, writes = may('write')) {
+  if (!views?.length) return null;
+  const behind = views.filter((v) => v.behind);
+  // A line for each view: its title, when it was shared, and whether this has changed since.
+  const tip = ['Public in', ...views.map((v) => `${v.title}, shared ${when(v.shared_at)}${v.behind ? ': changed since' : ''}`)].join('\n');
+  if (!behind.length || !writes) return h('span', { class: 'public-mark', title: tip }, behind.length ? '◉ Public, behind' : '◉ Public');
+  const again = async (v) => (await sharePublicly(v.id, v.title)) && redraw();
+  if (behind.length === 1) return h('button', { class: 'quiet-button public-mark behind', title: `${tip}\nShare it again with this version`, onclick: () => again(behind[0]) }, '◉ Share again');
+  const box = menu('◉ Share again', behind.map((v) => [v.title, () => again(v)]));
+  box.title = tip;
+  box.classList.add('public-mark', 'behind');
+  return box;
+}

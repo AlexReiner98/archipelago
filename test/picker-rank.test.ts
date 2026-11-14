@@ -1,10 +1,10 @@
-// What a picker offers first (ui/picker-rank.js, task e_css8swr9): what the canvas uses, then what is used around it,
+// What a picker offers first (packs/bar/parts/query/rank.js, task e_css8swr9): what the canvas uses, then what is used around it,
 // then the rest; never what is retired or dormant.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { around, ranked, uses } from '../ui/picker-rank.js';
+import { around, ranked, uses } from '../packs/bar/parts/query/rank.js';
 
 const defs = [{ id: 'link' }, { id: 'part_of' }, { id: 'depends_on' }, { id: 'blocks', retired: true }, { id: 'old', dormant: true }, { id: 'waits_on' }, { id: 'about' }];
 

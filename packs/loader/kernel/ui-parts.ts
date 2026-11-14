@@ -22,7 +22,7 @@ import { join } from 'node:path';
 import { parts as declared, type Manifest } from './manifest.ts';
 import { KERNEL_PACKS, needOf, ownsId } from './packorder.ts';
 import type { ResolvedType } from './packs.ts';
-import { HOST_SLOTS, SLOT, slotsOpenTo } from './slots.ts';
+import { DECISION_SLOTS, FRAME, HOST_SLOTS, SLOT, slotsOpenTo } from './slots.ts';
 
 /** A part a pack declares: what it fills, reads, sends and opens, and its code. */
 export interface PartDef {
@@ -31,7 +31,9 @@ export interface PartDef {
   /** The slot it fills: the host's, one its own pack opens, or one it asks for as slot:<name>. */
   slot: string;
   /** The fields it reads, by type: what the host hands it of an item of that type, and no more. */
-  reads?: Record<string, string[]>;
+  reads?: Record<string, string[]> | '*';
+  /** The types it changes as the person looking (`tools.change`): a root pack's part alone, as its page did (packs/loader/kernel/part-calls.ts partChange). */
+  writes?: string[];
   /** The items it is handed beside the one it stands on: a filter's terms, `{here}` standing for that item's id, each item cut to what it `reads` of its type. */
   query?: PartQuery;
   /** The named reads it is handed, by name: views its pack answers (answer.<name>) or asks for, `{here}` in a param for that item's id, a param of only `{piece.<name>}` for that setting of its piece on the screen (left out, as a lone `{here}` is, when there is none). What is no item (a run's turns) comes so. */
@@ -42,6 +44,10 @@ export interface PartDef {
   opens?: string[];
   /** The marks it answers with, each a kind the host draws (box, text, ...): the host refuses any other, and a part naming one the host lacks waits. */
   marks: string[];
+  /** Whether it may move the page: handed the address the page draws, it may name another after a gesture (`tools.go`). */
+  go?: boolean;
+  /** The page state it publishes (`tools.state`): names the runtime writes on the root for anything watching the page from outside (a picture taken once the canvas has drawn). One name, one owner. */
+  state?: string[];
   /** Its modules by name, each a file in the pack's folder, entered at index.js. */
   modules: Record<string, string>;
 }
@@ -58,6 +64,8 @@ export interface PartQuery {
 export interface PartView {
   name: string;
   params?: Record<string, string | number | boolean>;
+  /** Asked when the part asks (`tools.read`), not handed at mount: a read it needs as the person types. */
+  live?: boolean;
 }
 
 /** A part as the page is sent it. */
@@ -66,12 +74,15 @@ export interface Part {
   pack: string;
   title: string;
   slot: string;
-  reads: Record<string, string[]>;
+  reads: Record<string, string[]> | '*';
+  writes?: string[];
   query?: PartQuery;
   views?: PartView[];
   sends: string[];
   opens: string[];
   marks: string[];
+  go?: true;
+  state?: string[];
   hash: string;
   /** Why it is not drawn: it names a mark the host that asked does not draw. Its modules are then never sent. */
   waiting?: string;
@@ -84,6 +95,8 @@ const HEAD = ['id', 'type', 'title', 'body', 'visibility', 'created_at', 'update
 const MODULE = /^[a-z][a-z0-9_-]*\.js$/;
 /** A mark's kind, as a part names it and a host says it draws. */
 export const MARK = /^[a-z][a-z0-9_]*$/;
+/** A name of page state a part publishes: written on the root as `data-<name>`, so anything watching the page reads it. */
+export const STATE = /^[a-z][a-z0-9_]*$/;
 
 /** Why a part waits on a host: the marks it names that the host (the kinds it draws) does not draw, or nothing. */
 export function marksWaiting(marks: unknown, host: string[]): string | undefined {
@@ -107,7 +120,7 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
   if (given === undefined) return [];
   if (!Array.isArray(given)) return ['parts is a list of parts: { id, title, slot, reads?, sends?, opens?, modules }'];
   const problems: string[] = [];
-  const seen = new Set<string>(), opened = new Set<string>();
+  const seen = new Set<string>(), opened = new Set<string>(), claimed = new Set<string>();
   const actions = new Set(declared(pack).actions.map((a) => a.id));
   const personal = new Set(declared(pack).actions.filter((a) => a.humanOnly || a.admin).map((a) => a.id));
   const open = slotsOpenTo(pack);
@@ -121,13 +134,29 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
     else if (!open.includes(part.slot)) problems.push(`${at} fills "${part.slot}", which is not open to it: a slot of the host (${HOST_SLOTS.filter((s) => !s.includes('.')).join(', ')}, piece.<name>, page.<name>), one its pack's parts open, or one it asks for as slot:${part.slot}`);
     for (const s of part.opens ?? []) {
       if (typeof s !== 'string' || !SLOT.test(s)) { problems.push(`${at}: opens names slots`); continue; }
-      if (HOST_SLOTS.includes(s)) problems.push(`${at} opens "${s}", which the host draws: one name, one owner (the step that moves it takes it off the host's list)`);
+      // A root pack is the host: its part may open a slot of the host's frame (panes holds each tab's `tab.mark`).
+      const rootFrame = (pack.kernel as { trust?: string } | undefined)?.trust === 'root' && FRAME.includes(s);
+      if (HOST_SLOTS.includes(s)) rootFrame || problems.push(`${at} opens "${s}", which the host draws: one name, one owner (the step that moves it takes it off the host's list)`);
       else if (!ownsId(pack, s) && !/^(?:piece|page)\.[a-z][a-z0-9_-]*$/.test(s)) problems.push(`${at} opens "${s}": a slot it opens is named "${pack.id}.<name>", or is a piece or page (piece.<name>, page.<name>)`);
       if (opened.has(s)) problems.push(`${at} opens "${s}", which another of its pack's parts opens`);
       opened.add(s);
     }
+    if (part.go !== undefined && typeof part.go !== 'boolean') problems.push(`${at}: go is true or false`);
+    if (part.state !== undefined && (!Array.isArray(part.state) || !part.state.length || part.state.some((s) => typeof s !== 'string' || !STATE.test(s)))) problems.push(`${at}: state is the page state it publishes, a list of names such as ["look", "look_why"]`);
+    else for (const s of part.state ?? []) {
+      // One name, one owner, within the pack here; across packs the page refuses the second to write it (part-host.js).
+      if (claimed.has(s)) problems.push(`${at} publishes the page state "${s}", which another of its pack's parts publishes: one name, one owner`);
+      claimed.add(s);
+    }
+    if (part.writes !== undefined) {
+      if ((pack.kernel as { trust?: string } | undefined)?.trust !== 'root') problems.push(`${at} writes items, which only a root pack's part may: a map pack's part sends its pack's actions`);
+      else if (!Array.isArray(part.writes) || part.writes.some((w) => typeof w !== 'string' || !types.get(w))) problems.push(`${at}: writes is a list of the types it changes, each a type the map has`);
+    }
     if (part.opens !== undefined && !Array.isArray(part.opens)) problems.push(`${at}: opens is a list of slots`);
-    if (part.reads !== undefined && (typeof part.reads !== 'object' || part.reads === null || Array.isArray(part.reads))) problems.push(`${at}: reads is the fields it reads, by type: { "<type>": ["<field>", ...] }`);
+    // An item whole (`*`): a root pack's part alone, which keeps the human in control as the host's page did (the sheet).
+    if (part.reads === '*') {
+      if ((pack.kernel as { trust?: string } | undefined)?.trust !== 'root') problems.push(`${at} reads items whole ("*"), which only a root pack's part may: name the fields it reads, by type`);
+    } else if (part.reads !== undefined && (typeof part.reads !== 'object' || part.reads === null || Array.isArray(part.reads))) problems.push(`${at}: reads is the fields it reads, by type: { "<type>": ["<field>", ...] }`);
     else for (const [type, fields] of Object.entries(part.reads ?? {})) {
       const t = types.get(type);
       if (!t) { problems.push(`${at} reads unknown type "${type}"`); continue; }
@@ -146,7 +175,11 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       else if (personal.has(a)) problems.push(`${at} sends "${a}", which only a person or an admin may call: a part never sends it`);
     }
     // By shape alone: whether the host draws them is asked where the part is drawn, so a host's change never refuses the pack.
-    if (!Array.isArray(part.marks) || !part.marks.length || part.marks.some((m) => typeof m !== 'string' || !MARK.test(m))) problems.push(`${at} names the marks it answers with: marks is a list of mark kinds, such as ["box", "text"] (packs/walls/page/part-check.js)`);
+    // A part that only publishes page state, or only answers a decision (a slot that asks one: tabs.land), draws
+    // nothing, so it may name no mark; every other part names at least one.
+    const decides = typeof part.slot === 'string' && DECISION_SLOTS.includes(part.slot);
+    const draws = !decides && !(Array.isArray(part.state) && part.state.length && Array.isArray(part.marks) && !part.marks.length);
+    if (!Array.isArray(part.marks) || (draws && !part.marks.length) || part.marks.some((m) => typeof m !== 'string' || !MARK.test(m))) problems.push(`${at} names the marks it answers with: marks is a list of mark kinds, such as ["box", "text"] (packs/walls/page/part-check.js); a part that only publishes state names none`);
     else if (new Set(part.marks).size !== part.marks.length) problems.push(`${at} names a mark twice`);
     if (typeof part.modules?.['index.js'] !== 'string') problems.push(`${at} needs its modules, entered at index.js`);
     for (const [name, file] of Object.entries(part.modules ?? {})) {
@@ -173,6 +206,9 @@ function queryProblems(at: string, query: unknown, reads: unknown): string[] {
 const VIEWS_MOST = 4;
 
 /** What is wrong with a part's named reads: each a view its pack answers or asks for (rule: ask for what you need), its params words, numbers or yes and no. */
+/** The kernel's reads a part may declare live with no pack answering them (packs/surface/page/part-read.js). */
+export const LIVE_KERNEL_READS = ['search'];
+
 function viewProblems(at: string, views: unknown, pack: Manifest): string[] {
   if (views === undefined) return [];
   if (!Array.isArray(views) || !views.length || views.length > VIEWS_MOST) return [`${at}: views is a list of up to ${VIEWS_MOST} named reads, { name, params? }`];
@@ -186,6 +222,9 @@ function viewProblems(at: string, views: unknown, pack: Manifest): string[] {
     if (names.has(name)) problems.push(`${at} reads the view "${name}" twice`);
     names.add(name);
     const service = `answer.${name}`;
+    if (v.live !== undefined && typeof v.live !== 'boolean') problems.push(`${at}: the view "${name}"'s live is true or false`);
+    // A kernel read declared live (search) is anyone's who may read the map: no pack answers it.
+    if (v.live && LIVE_KERNEL_READS.includes(name)) continue;
     if (!provides.includes(service) && !asked.includes(`service:${service}`)) problems.push(`${at} reads the view "${name}", which ${pack.id} does not answer: ask for it, as service:${service} in requires or uses`);
     const params = v.params ?? {};
     if (typeof params !== 'object' || params === null || Array.isArray(params) || !Object.values(params).every((p) => (typeof p === 'string' && p.length <= 200) || (typeof p === 'number' && Number.isFinite(p)) || typeof p === 'boolean')) problems.push(`${at}: the view "${name}"'s params are words, numbers or true and false, {here} for the item it stands on`);
@@ -224,7 +263,7 @@ export function partsFor(packs: Packs, kept: Kept[] = [], have: string[] = [], h
     const mine = kept.find((v) => v.props.preset === d.id);
     if (mine && !mine.is_open) continue;
     const modules = modulesOf(packs, d, mine), hash = hashOf(modules), waiting = host && marksWaiting(d.marks, host);
-    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], opens: d.opens ?? [], marks: d.marks ?? [], hash, ...(waiting ? { waiting } : !have.includes(hash) && { modules }) });
+    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], ...(d.writes?.length && { writes: d.writes }), opens: d.opens ?? [], marks: d.marks ?? [], ...(d.go && { go: true as const }), ...(d.state?.length && { state: d.state }), hash, ...(waiting ? { waiting } : !have.includes(hash) && { modules }) });
   }
   return out;
 }

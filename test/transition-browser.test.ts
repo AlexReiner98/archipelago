@@ -1,5 +1,5 @@
 // The transition engine in a real browser (skipped where there is no Chrome): a canvas drawn again as the map changes
-// under it plays what changed (ui/transition.js). A step added fades in and its wire is drawn in, a step taken away
+// under it plays what changed (packs/walls/page/transition.js). A step added fades in and its wire is drawn in, a step taken away
 // fades where it stood, a step that stays moves from where it was by a transform; with less motion asked for it cuts.
 // Only transform, opacity and a wire's dash are animated.
 

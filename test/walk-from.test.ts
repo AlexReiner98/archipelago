@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
+import * as S from './sheet-page.ts';
 
 const browser = chrome();
 
@@ -31,10 +32,10 @@ test('in a browser, an item page walks from the item, in place of the lens or ad
     assert.ok(!(await page.evaluate(drawn(made.b))), 'what it links to is not drawn yet');
     // A click opens its page and leaves the lens alone.
     await click(made.a);
-    assert.ok(await page.until(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.a}?') && Boolean(document.querySelector('#sheet .walk-from'))`), `its page is open, with Walk from it: ${await page.evaluate('location.hash')}`);
+    assert.ok(await page.until(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.a}?') && ${S.has('walk')}`), `its page is open, with Walk from it: ${await page.evaluate('location.hash')}`);
     assert.ok(!(await page.evaluate(drawn(made.b))), 'opening it draws nothing more');
     // Walk from it: the item and a step along its links, in place of the lens; its page stays open.
-    await page.evaluate(`document.querySelector('#sheet .walk-from').click()`);
+    await page.evaluate(S.press('walk'));
     assert.ok(await page.until(`${drawn(made.a)} && ${drawn(made.b)} && !${drawn(made.c)}`), `the item and what it links to, in place of the lens: ${await page.evaluate('location.hash')}`);
     assert.ok(await page.evaluate(`location.hash.startsWith('#/e/${made.a}?') && ${lens}.get('over') === 'depends_on' && ${lens}.get('find') === 'id ${made.a}'`), `the walk named by the link it has: ${await page.evaluate('location.hash')}`);
     assert.ok(await page.until(`document.querySelector('#find-lens').textContent.includes('Walk')`), 'the query line says the walk');
@@ -42,8 +43,8 @@ test('in a browser, an item page walks from the item, in place of the lens or ad
     await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
     assert.ok(await page.until(`${drawn(made.c)} && !${drawn(made.b)}`), 'back to the lens as it was');
     await click(made.c);
-    assert.ok(await page.until(`location.hash.startsWith('#/e/${made.c}?') && Boolean(document.querySelector('#sheet .walk-from'))`), 'the other’s page is open');
-    await page.evaluate(`[...document.querySelectorAll('#sheet .menu-items button')].find((b) => b.textContent === 'Walk from it, added to the lens').click()`);
+    assert.ok(await page.until(`location.hash.startsWith('#/e/${made.c}?') && ${S.has('walk')}`), 'the other’s page is open');
+    await page.evaluate(S.pressMenu('Walk from it, added to the lens'));
     assert.ok(await page.until(`${drawn(made.a)} && ${drawn(made.c)} && ${drawn(made.d)} && ${drawn(made.b)}`), `added to the lens, the walk taken from every seed: ${await page.evaluate('location.hash')}`);
   } finally {
     await page.close();

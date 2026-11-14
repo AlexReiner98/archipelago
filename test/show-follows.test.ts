@@ -1,10 +1,10 @@
-// The Follows menu of a tab (ui/tab-bar.js): the chats open now, by title. Beside test/show-lands.test.ts.
+// The Follows menu of a tab (the panes part's strip, packs/panes/parts/strip.js): the chats open now, by title. Beside test/show-lands.test.ts.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
-import { agent, called, ready, wait } from './tab-page.ts';
+import { agent, called, menuOf, ready, tabAt, wait } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -14,13 +14,10 @@ test('in a browser, the Follows menu lists the chats open now, by title', { skip
   const ending = await start('will-end', 'Will end');
   await start('stays-quiet', 'Stays quiet');
   const page = await open(`${base}/`);
-  const menu = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('.tab-menu [role="menuitemradio"]')].map((b) => b.textContent))`).then(JSON.parse).then(called);
+  const menu = () => page.evaluate<string>(`JSON.stringify(${menuOf(tabAt(1))}.filter((b) => b.dataset.key.startsWith('follow:')).map((b) => b.textContent))`).then(JSON.parse).then(called);
   const opened = async (ok: (names: string[]) => boolean) => {
     for (let n = 0; n < 40; n++) {
-      await page.evaluate(`document.querySelector('[aria-label="This tab: whom it follows, pop it out"]').click()`);
-      await page.until(`Boolean(document.querySelector('.tab-menu:popover-open [role="menuitem"]'))`, 2000);
       const names = await menu();
-      await page.evaluate(`document.querySelector('.tab-menu').hidePopover()`);
       if (ok(names)) return names;
       await wait(200);
     }

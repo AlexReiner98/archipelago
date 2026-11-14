@@ -71,7 +71,7 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 .pm-path-dash { stroke-dasharray: var(--space-5) var(--space-3); }
 .pm-plane text { fill: currentColor; font-size: var(--pm-size, var(--text-3)); }
 
-/* A note, as the item page and a part's note mark read it (packs/walls/page/body.js). A callout's colour is the one the
+/* A note, as the item page and a part's note mark read it (packs/kit/page/body.js). A callout's colour is the one the
    style names for its tone (notes.callouts), set on it as --callout. */
 .body-text { max-width: var(--note-measure, var(--measure)); }
 .body-text em { font-style: italic; }
@@ -90,3 +90,105 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 .body-text ul.checklist li.check input { margin: 0; flex: none; cursor: pointer; }
 .body-text ul.checklist li.check input:disabled { cursor: default; }
 .body-text ul.checklist li.done > span { color: var(--muted); text-decoration: line-through; }
+
+/* A box that fits shows one line of its marks and counts the rest (packs/walls/page/part-fits.js). */
+.pm-fits { flex-wrap: nowrap; overflow: hidden; }
+/* A part never makes its place wider than it is given (a grid or flex item is as wide as its words by default): so a
+   box that fits in it is given the place's width, and counts what does not fit, rather than running past its edge. */
+.part-body, .part-body > .pm-box, .part-body > .pm-list, .pm-list > .pm-box { min-width: 0; }
+/* Its marks keep their width rather than shrinking to an ellipsis, so the box overflows and the host can count what
+   does not fit (packs/walls/page/part-fits.js); without this they shrink, nothing overflows and nothing is counted. */
+.pm-fits > * { flex-shrink: 0; }
+/* What the host hides past what fits stays hidden, a box among them too (its display would otherwise win over hidden). */
+.pm-fits > [hidden] { display: none; }
+.pm-fits > .pm-fits-rest { flex: none; cursor: default; }
+.pm-fits > button.pm-fits-rest { cursor: pointer; }
+/* A mark that lights items on the canvas says so when it is pointed at. */
+.pm-lights:hover { text-decoration: underline dotted; }
+/* Each mark keeps its width in a box that fits, so the host counts whole marks; the first gives way where one alone is too wide. */
+.pm-fits > :first-child { flex: 0 1 auto; min-width: 0; }
+.pm-fits > *, .pm-fits[data-measuring] > :first-child { flex: none; }
+.pm-fits > .pm-narrowed, .pm-narrowed { display: none; }
+
+/* A menu's steps (packs/walls/page/part-menu.js): a menu in a menu leads on (›); opened, it is all its step shows, and
+   its words lead back (‹). The choices a field narrowed away are not drawn. */
+details.pm-menu details.pm-menu { position: static; }
+details.pm-menu details.pm-menu > .menu-items { position: static; display: grid; min-width: 0; padding: 0; border: 0; box-shadow: none; background: none; }
+details.pm-menu details.pm-menu > summary { padding: var(--space-4) var(--space-6); border-radius: var(--radius-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+details.pm-menu details.pm-menu:not([open]) > summary::after { content: " ›"; color: var(--muted); }
+details.pm-menu details.pm-menu[open] > summary::before { content: "‹ "; color: var(--muted); }
+details.pm-menu details.pm-menu[open] > summary { color: var(--muted); background: none; }
+.menu-items:has(> details.pm-menu[open]) > :not(details.pm-menu[open]) { display: none; }
+
+/* A tab a part draws: a button or a box selected, ringing once, in its session's hue. */
+.pm-button-tab { border: var(--border-1) solid transparent; border-radius: var(--radius-2) var(--radius-2) 0 0; background: none; color: var(--muted); }
+.pm-button-tab[aria-selected="true"], .pm-box[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
+.pm-ring { animation: pm-ring 1.2s ease 2; }
+@keyframes pm-ring { 50% { background: var(--accent-soft); } }
+@keyframes pm-ring-pane { from { box-shadow: inset 0 0 0 var(--border-2) var(--accent); } to { box-shadow: none; } }
+[data-drag] { touch-action: none; }
+body[data-dragging] { user-select: none; cursor: grabbing; }
+/* Where a dragged mark would land (packs/walls/page/part-drag.js). */
+.pm-zone { position: fixed; z-index: 30; pointer-events: none; background: var(--accent-soft); border: var(--border-2) solid var(--accent); border-radius: var(--radius-2); }
+
+/* A web page framed, its ↗ in a corner; panes side by side or one over another, each by its share, the lines between them the host's. */
+.pm-web { position: relative; min-width: 0; min-height: 0; flex: 1 1 0; align-self: stretch; display: flex; }
+.pm-web-page { flex: 1 1 auto; width: 100%; min-height: var(--box-10); border: 0; background: var(--panel); }
+.pm-web-own { padding: var(--space-6); }
+.pm-web-out { position: absolute; top: var(--space-3); right: var(--space-3); color: var(--muted); text-decoration: none; padding: 0 var(--space-3); background: var(--panel); border-radius: var(--radius-2); }
+.pm-panes { position: fixed; inset: 0; z-index: 1; display: flex; min-width: 0; min-height: 0; }
+.pm-panes:not([data-count="1"]) { top: var(--band, 0); }
+.pm-panes[data-dir="row"] { flex-direction: row; }
+.pm-panes[data-dir="column"] { flex-direction: column; }
+/* A frame slot holding panes fills its node, so nothing it holds collapses. */
+.part-body:has(> .pm-panes) { display: flex; flex: 1; min-height: 0; }
+.pm-pane { position: relative; display: flex; flex-direction: column; flex: var(--pm-grow, 1) 1 0; min-width: 0; min-height: 0; background: var(--ln-sea, var(--bg)); box-sizing: border-box; }
+.pm-pane.pm-ring { animation: pm-ring-pane 1.2s ease; }
+/* Each pane's strip, as the page's panes keep one: one height, in or out of focus, so nothing moves when focus does; the
+   pane in focus a line of the accent along its top and its name given to the bar over it; a pane alone has none. */
+.pm-pane-strip { flex: none; box-sizing: border-box; height: var(--strip); display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-5); min-width: 0; overflow: hidden; background: var(--panel); border-bottom: var(--border-1) solid var(--line); }
+.pm-pane-strip > .pm-text { flex: 1; min-width: 0; font-size: var(--text-3); font-weight: 600; }
+.pm-pane:not([aria-selected="true"]) > .pm-pane-strip > .pm-text { color: var(--muted); font-weight: 400; }
+.pm-pane[aria-selected="true"] > .pm-pane-strip { box-shadow: inset 0 var(--border-2) 0 var(--accent); }
+.pm-pane[aria-selected="true"] > .pm-pane-strip > .pm-text { visibility: hidden; }
+.pm-panes[data-count="1"] > .pm-pane > .pm-pane-strip { display: none; }
+.pm-pane[data-drag] > .pm-pane-strip { cursor: grab; }
+.pm-pane-body { position: relative; flex: 1 1 auto; min-height: 0; display: flex; overflow: clip; }
+.pm-pane-body > * { flex: 1 1 auto; min-width: 0; min-height: 0; }
+/* The line between two panes: drawn by the sash itself, wider and in the accent while pointed at or dragged. */
+.pm-sash { position: absolute; z-index: 3; }
+.pm-sash::after { content: ''; position: absolute; background: var(--line); }
+.pm-sash-row::after { top: 0; bottom: 0; left: 50%; width: var(--border-1); transform: translateX(-50%); }
+.pm-sash-column::after { left: 0; right: 0; top: 50%; height: var(--border-1); transform: translateY(-50%); }
+.pm-sash:hover::after, body[data-dragging="sash"] .pm-sash::after { background: var(--accent); }
+.pm-sash-row:hover::after, body[data-dragging="sash"] .pm-sash-row::after { width: var(--border-3); }
+.pm-sash-column:hover::after, body[data-dragging="sash"] .pm-sash-column::after { height: var(--border-3); }
+.pm-sash-row { top: 0; bottom: 0; left: var(--pm-at); width: var(--space-4); margin-left: calc(var(--space-4) / -2); cursor: col-resize; }
+.pm-sash-column { left: 0; right: 0; top: var(--pm-at); height: var(--space-4); margin-top: calc(var(--space-4) / -2); cursor: row-resize; }
+
+/* A style preset's colours, painted by the host from the preset (packs/surface/page/swatch.js): Aa on its paper, its sea a line. */
+.pm-swatch { display: inline-flex; flex-direction: column; gap: var(--space-3); flex: none; min-width: 0; padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; }
+.pm-swatch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-2); color: var(--muted); }
+.pm-swatch-name:empty { display: none; }
+.pm-swatch:hover .pm-swatch-paint { border-color: var(--edge-strong); }
+.pm-swatch[data-on="kept"] .pm-swatch-paint { box-shadow: 0 0 0 var(--border-2) var(--accent); }
+.pm-swatch[data-on="trying"] .pm-swatch-paint { box-shadow: 0 0 0 var(--border-2) var(--accent-soft); border-style: dashed; }
+.pm-swatch-paint { position: relative; display: block; width: 100%; min-width: var(--box-9); height: var(--box-9); padding: var(--space-3) var(--space-4); border: var(--border-1) solid var(--line); border-radius: var(--radius-3); background: var(--bg); color: var(--text); font-weight: 600; }
+.pm-swatch-sea { position: absolute; left: var(--space-4); right: var(--space-4); bottom: var(--space-4); height: var(--box-1); border-radius: var(--radius-1); background: var(--accent); }
+
+/* What a part says that is drawn nowhere itself: a trace (painted on its item's marks) and a replay (played on the canvas). */
+.pm-trace, .pm-replay { display: none; }
+
+/* A ghost is data the canvas reads back into its answer, drawn there where it would land, never here. */
+.pm-ghost { display: none; }
+/* Shapes on a paint surface filled as a diagram's are: an area, a box wires pass under, a strong box. */
+.pm-path-area { fill: var(--ln-inner, var(--panel)); stroke: var(--ln-line, currentColor); }
+.pm-path-box { fill: var(--ln-land, var(--bg)); stroke: var(--ln-line, currentColor); }
+.pm-path-strong { fill: var(--ln-text, var(--text)); stroke: var(--ln-line, currentColor); }
+.pm-plane a:is(:hover, :focus) > .pm-path { stroke: var(--ln-text, currentColor); }
+/* A paint surface's −, Fit and + in its corner. */
+.pm-zooms { position: absolute; right: var(--space-3); bottom: var(--space-3); display: flex; gap: var(--space-2); z-index: 2; }
+.pm-zoom { padding: var(--space-2) var(--space-4); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); color: var(--text); cursor: pointer; }
+
+/* A slot a part opens: the parts that fill it, one under another, drawn by the runtime. */
+.pm-slot { display: flex; flex-direction: column; min-width: 0; }

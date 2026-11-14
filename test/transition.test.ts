@@ -1,4 +1,4 @@
-// What a scene mounted again plays (ui/transition.js), without a page: marks matched by key, staged as leave, move,
+// What a scene mounted again plays (packs/walls/page/transition.js), without a page: marks matched by key, staged as leave, move,
 // arrive, and a cut where motion would not help.
 
 import assert from 'node:assert/strict';
@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 // @ts-ignore: a module of the page, plain JavaScript
-import { stagesOf } from '../ui/transition.js';
+import { stagesOf } from '../packs/walls/page/transition.js';
 
 const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'canvas', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house');
 const numbers = house.props?.numbers ?? house.numbers;

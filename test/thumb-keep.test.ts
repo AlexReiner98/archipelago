@@ -1,10 +1,10 @@
-// When a view's thumbnail is drawn again (ui/thumb-keep.js): only once the view asks for something else or the log
+// When a view's thumbnail is drawn again (packs/surface/page/thumb-keep.js): only once the view asks for something else or the log
 // after the position it was drawn at touches what its answer held.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { keyOf, movedOn, readOn } from '../ui/thumb-keep.js';
+import { keyOf, movedOn, readOn } from '../packs/surface/page/thumb-keep.js';
 
 const asked = 'find=type+task';
 const thumb = { key: keyOf('e_view0001', false), asked, pos: 10, ids: ['e_aaaaaaaa', 'e_bbbbbbbb', 'r_link0001', 'e_view0001'], image: 'data:image/svg+xml,' };

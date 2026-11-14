@@ -90,12 +90,13 @@ test('a note holds words in the dialect, a menu holds buttons, and any mark on t
   assert.equal(root.kids[0].words, '## Why\n- [ ] check it');
   assert.equal(root.kids[0].at.tick, true);
   assert.equal(root.kids[1].kids[0].mark, 'button');
-  refused(['menu', { label: 'More' }, ['text', 'loose']], /a text in a menu: it holds buttons only/);
+  // A menu holds the steps of what is done rarely: buttons, and the text, boxes, lists and fields that make steps of them.
+  refused(['menu', { label: 'More' }, ['note', 'loose']], /a note in a menu: it holds/);
   refused(['menu', {}, ['button', { key: 'a' }, 'A']], /a menu with no label/);
   refused(['note', {}, ['text', 'x']], /a note holding a mark/);
   refused(['note', { tick: true }, '- [ ] a'], /a note that ticks with no key/);
-  refused(['paint', { width: 10, height: 10 }, ['path', { d: 'M0 0', tip: 'x' }]], /the attribute "tip" on a path/);
-  refused(['paint', { width: 10, height: 10 }, ['text', { x: 1, y: 1, tip: 'x' }, 'a']], /a tip on a text on a paint surface/);
+  // What lies on a paint surface may say itself (a tip) and lead out (an href): a diagram's boxes do (test/part-marks-asked.test.ts).
+  refused(['paint', { width: 10, height: 10 }, ['path', { d: 'M0 0', tip: 'x'.repeat(partLimits.label + 1) }]], /tip: more than 200 characters/);
   refused(['text', { tip: 'x'.repeat(partLimits.label + 1) }, 'a'], /tip: more than 200 characters/);
   refused(['note', {}, 'x'.repeat(partLimits.words + 1)], /more than 200000 characters/);
 });
@@ -145,7 +146,7 @@ test('an input may be a pick, a day, a time, yes or no, a title; text may open a
   refused(['input', { key: 's', kind: 'colour' }], /kind: "colour", not one of/);
   refused(['text', { href: 'javascript:alert(1)' }, 'x'], /not an address on the web/);
   refused(['text', { href: 'https://x.test/"onmouseover' }, 'x'], /not an address on the web/);
-  refused(['paint', { width: 9, height: 9 }, ['text', { x: 1, y: 1, href: 'https://x.test' }, 'x']], /an href on text on a paint surface/);
+  refused(['paint', { width: 9, height: 9 }, ['path', { d: 'M0 0', href: 'javascript:alert(1)' }]], /not an address on the web/);
 });
 
 test('an item is found by name or picked on the canvas, the host doing the finding', () => {
@@ -162,4 +163,20 @@ test('a picture names an item and holds nothing: the host draws it', () => {
   assert.throws(() => checkMarks(['picture', {}]), /a picture with no item/);
   assert.throws(() => checkMarks(['picture', { item: 'e_aaaaaaaa' }, ['text', 'x']]), /holding something/);
   assert.throws(() => checkMarks(['picture', { item: 'https://x' }]), /not an item's id/);
+});
+
+test('a slot mark names a slot, which the host fills with the parts that fill it', () => {
+  const node = checkMarks(['box', {}, ['slot', { name: 'sheet.bands' }]], { kinds: ['box', 'slot'] }).kids[0];
+  assert.equal(node.mark, 'slot');
+  assert.equal(node.at.name, 'sheet.bands');
+  refused(['slot', {}], /name/);
+  refused(['slot', { name: 'Sheet Bands' }], /not a slot's name/);
+  refused(['slot', { name: 'sheet.bands' }, ['text', 'inside']], /slot/);
+});
+
+test('a slot mark may hand the parts that fill it a piece of words', () => {
+  const node = checkMarks(['slot', { name: 'tab.mark', piece: { tab: 't1', current: true, state: 'busy', for: ['e_aaaaaaaa'] } }], { kinds: ['slot'] });
+  assert.deepEqual(node.at.piece, { tab: 't1', current: true, state: 'busy', for: ['e_aaaaaaaa'] });
+  refused(['slot', { name: 'tab.mark', piece: { tab: { deep: 1 } } }], /not settings/);
+  refused(['slot', { name: 'tab.mark', piece: ['t1'] }], /not settings/);
 });

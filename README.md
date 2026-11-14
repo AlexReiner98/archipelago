@@ -7,18 +7,19 @@
   <img alt="Agent memory for human brains: islands drawn in stacked rows, the water opening round the title and its line, your agent's plans and decisions as a map you read, correct, share." src="brand/hero-light.svg">
 </picture>
 
-**Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.**
+**If you're going somewhere uncharted, you should make a map. Archipelago is a map that draws itself while you work, so you and your agents never get lost.**
+
+Agent memory for human brains: your agent's plans and decisions as a map you read, correct, share.
 
 *Early: built and used daily by its author; expect rough edges.*
 
-AI is speeding up lots of tasks, but more speed is only helpful if you're
-moving in the right direction. Making a map before you execute helps identify
-risks and dependencies, and makes it easy to keep track as people and agents
-work.
-
-One shared map means anyone can pick up the work at any time, from anywhere.
-Detailed history makes it possible to analyze how projects actually
-developed, what was missed, and how to improve.
+- **Make a plan:** Your agents make plans you can see on the map.
+- **Work through it:** Watch agents work through the map, keeping it up to date so you don't have to.
+- **Customize:** Tell your agent any problem you want to solve, and watch it create custom types, rules, views, styles, and more to model it clearly.
+- **Never forget:** Every change is saved. You and your agents can look back and see every step you've made so far.
+- **Share:** Collaborate live with your team, or publish for all. Anyone with the link can add it to their own map in a click.
+- **Automate:** Turn your map into a machine that acts. Automations reach into your programs or the web. Run them on a schedule, or respond to something changing on the map.
+- **Own your data:** Open source, MIT, and a database you can download any time.
 
 The site is [archipelago.tools](https://archipelago.tools/?ref=github).
 

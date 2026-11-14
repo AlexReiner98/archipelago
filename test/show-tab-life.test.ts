@@ -1,4 +1,4 @@
-// A chat's tab over its life (ui/tab-life.js, the tab lifecycle e_p6fr4uye): opened by its first show, out of sight;
+// A chat's tab over its life (the panes part, packs/panes/parts/life.js, the tab lifecycle e_p6fr4uye): opened by its first show, out of sight;
 // closed by hand or gone quiet it stays closed until its next show; it ends with the chat. Beside test/show-lands.test.ts.
 
 import assert from 'node:assert/strict';
@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
-import { agent, called, heard, ready } from './tab-page.ts';
+import { TAB, agent, called, heard, ready, tabAt } from './tab-page.ts';
 
 const browser = chrome();
 
@@ -14,7 +14,7 @@ test('in a browser, a chat has a tab once it shows something, out of sight; clos
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'a', type: 'work', title: 'Something shown' }] })).result.created as Record<string, string>;
   const page = await open(`${base}/`);
-  const strip = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('.tab-name')].map((t) => t.textContent))`).then(JSON.parse).then(called);
+  const strip = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('${TAB} [data-key^="front:"]')].map((t) => t.textContent))`).then(JSON.parse).then(called);
   const until = async (what: string, ok: (names: string[]) => boolean) => {
     if (!(await holds(() => strip().then(ok), 20_000, 250))) assert.fail(`${what}: ${JSON.stringify(await strip())} ${page.logs().join(' ')}`);
   };
@@ -33,7 +33,7 @@ test('in a browser, a chat has a tab once it shows something, out of sight; clos
     assert.equal(await page.evaluate<string>('location.hash'), before, 'its shows go to its tab, not the one in sight');
     assert.equal((await strip()).filter((t) => t === 'Tab one').length, 1, 'taking it up again opens no second tab');
     // Closed by hand, it stays closed, a reload too, until the chat next shows something.
-    await page.evaluate(`document.querySelector('#tabs .tab:nth-child(2) [aria-label="Close this tab"]').click()`);
+    await page.evaluate(`${tabAt(2)}.querySelector('[data-key^="close:"]').click()`);
     await until('closed', (names) => !names.includes('Tab one'));
     await page.evaluate('(window.beforeReload = true, location.reload())');
     assert.ok(await page.until('!window.beforeReload'), 'reloaded');

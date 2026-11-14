@@ -64,9 +64,25 @@ test('a published picture keeps its first frame, its page carries its data, and 
   assert.deepEqual(JSON.parse(inPage[1]), data);
   assert.equal(html.match(/<script/g)?.length, 2, 'no script but its own and its data');
   for (const file of ['/doc-lens.js', '/layout.js', '/marks.js', '/base.js']) assert.match(html, new RegExp(`<link rel="modulepreload" href="${file}[?]v=`), file);
-  assert.ok(html.indexOf('src="/doc.js') < html.indexOf('id="page-data"'), 'its script is asked for before its data is read');
+  assert.ok(html.indexOf('src="/frozen-page.js') < html.indexOf('id="page-data"'), 'its script is asked for before its data is read');
   assert.ok(!html.includes('Loading'));
   assert.ok(!html.includes('noindex'), 'what the text says is not read as a replacement pattern');
+});
+
+test('a page keeps the marks its part drew it with, and one published before pages kept them is given them when served', async () => {
+  const { call, base, workspaces } = await serve('off');
+  const { d, l } = await published(call);
+  const kept = await (await fetch(`${base}/p/default/${d}/data`)).json();
+  assert.equal(kept.marks.part, 'publish.doc', 'its reader is sent marks, not the part');
+  assert.ok(JSON.stringify(kept.marks.marks).includes(`"item":"${l}"`), 'its picture is a mark');
+  assert.ok(Object.keys(kept.marks.sheets ?? {}).length > 0, 'with the sheet of each item its picture froze');
+  // As one published before this was: its row holds no marks.
+  await (await workspaces.get('default')).pelago.db.query(`update published set given = given - 'marks' where entity_id = $1`, [d]);
+  const served = await (await fetch(`${base}/p/default/${d}/data`)).json();
+  assert.equal(served.marks?.part, 'publish.doc', 'made the first time it is served');
+  assert.deepEqual(served.marks.marks, kept.marks.marks, 'as publishing would have made them');
+  const page = await (await fetch(`${base}/p/default/${d}`)).text();
+  assert.match(page, /"part":"publish.doc"/, 'and its page carries them');
 });
 
 test('a picture drawn by the owner’s version of a drawing is drawn only in the sandbox', async () => {

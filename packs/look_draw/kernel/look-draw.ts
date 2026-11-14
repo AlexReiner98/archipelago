@@ -1,6 +1,6 @@
 // A view drawn for an agent's look, in the server's headless Chrome (packs/look_draw/kernel/chrome.ts): the app's own page, opened in
 // look mode with a pass that reads as the agent (packs/look_draw/kernel/looks.ts), so the drawing, its sandboxed frame and a style's own
-// code run exactly as they do for any reader. The page says when it has drawn (`data-look` on its root: ui/look.js);
+// code run exactly as they do for any reader. The page says when it has drawn (`data-look` and `data-look_why` on its root, published by look_draw's part: packs/look_draw/parts/page);
 // then the picture is taken twice, a moment apart, to say whether it had settled, and the faces its text was drawn in
 // are read off Chrome, to say which fell back to another (decision e_vr5vyrhr: said, never installed). Up to AT_ONCE
 // looks are drawn at a time in this process, each in a tab of its own, and none waits for a turn past WAIT_MS or is
@@ -41,7 +41,7 @@ export interface Drawn {
   /** Whether two pictures a moment apart were the same: false for a drawing that moves. */
   settled: boolean;
   ms: number;
-  /** The drawing as marks, where they were asked for and it has them (ui/look-marks.js). */
+  /** The drawing as marks, where they were asked for and it has them (packs/walls/page/look-marks.js). */
   marks?: Marks;
   /** Each face the page asked for and Chrome drew another in: the first named in its family, and what drew instead. */
   fell_back?: { asked: string; drawn: string }[];
@@ -161,7 +161,7 @@ async function drawNow(address: string, pass: string, width: number, height: num
     let said: { state?: string; why?: string } = {};
     for (const until = Date.now() + DRAW_MS; Date.now() < until; await wait(150)) {
       // Asked again until it answers: while the page loads there is nothing yet to ask.
-      said = (await tab.evaluate<{ state?: string; why?: string }>(`({ state: document.documentElement.dataset.look, why: document.documentElement.dataset.lookWhy })`).catch(() => ({}))) ?? {};
+      said = (await tab.evaluate<{ state?: string; why?: string }>(`({ state: document.documentElement.dataset.look, why: document.documentElement.dataset.look_why })`).catch(() => ({}))) ?? {};
       if (said.state && said.state !== 'drawing') break;
     }
     const state = (['drawn', 'empty', 'error'].includes(String(said.state)) ? said.state : 'late') as Drawn['state'];

@@ -13,7 +13,7 @@ const KINDS = {
   away: { redirect: '//evil.example/' },
   pass: { pass: true },
   stream: { stream: true },
-  ui: { html: '<!doctype html><head><title>t</title></head><body><script type="module" src="/doc.js"></script><a href="/doc.js">a</a></body>' },
+  ui: { html: '<!doctype html><head><title>t</title></head><body><script type="module" src="/frozen-page.js"></script><a href="/frozen-page.js">a</a></body>' },
 };
 export default {
   page(parts) {

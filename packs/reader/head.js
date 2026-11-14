@@ -11,7 +11,7 @@ export function describe(parts, most = 160) {
     const text = 'text' in part ? part.text : 'section' in part ? part.section.body : '';
     for (const block of text.split(/\n[ \t]*\n/)) {
       const lines = block.split('\n').map((line) => line.trim()).filter((line) => line && !/^#/.test(line) && !/^\|/.test(line));
-      // A short line on its own above a paragraph is that paragraph's title (as ui/doc.js draws it).
+      // A short line on its own above a paragraph is that paragraph's title (as a published page draws it).
       if (lines.length > 1 && lines[0].length <= 90 && !/[.;,:!?]$/.test(lines[0]) && !/^(-|\*|\d+\.)\s/.test(lines[0])) lines.shift();
       const words = lines
         .map((line) => line.replace(/^(-|\*|\d+\.)\s+/, ''))

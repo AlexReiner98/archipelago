@@ -68,3 +68,16 @@ test('what the tool surface asks by name: a show pointed, a told beat, a page po
   assert.ok(given.told > 0, 'a told beat moves the stamp');
   assert.deepEqual(await sightAnswer(ctx, { whose, actor: 'robot', focus: true }), { pages: { open: 1, following: 1 }, sight: { looking: true, where: 'In the tab they are looking at.' } });
 });
+
+test("two maps of one workspace in one process keep their own steps: one's show never lands on the other's screen", async () => {
+  const a = fake();
+  const b = fake();
+  const w = { workspace: 'w1', viewer: 'e_owner001' };
+  await took(a.ctx, w, { kind: 'show', actor: 'robot', hash: 'v?canvas=e_aaaaaaaa' }, true);
+  await took(b.ctx, w, { kind: 'show', actor: 'robot', hash: 'v?canvas=e_bbbbbbbb' }, true);
+  assert.deepEqual((await presence(b.ctx, w)).steps.map((s) => s.hash), ['v?canvas=e_bbbbbbbb'], "the other map's step is not this one's");
+  assert.deepEqual((await presence(a.ctx, w)).steps.map((s) => s.hash), ['v?canvas=e_aaaaaaaa']);
+  assert.deepEqual([...b.store].filter(([k]) => k.startsWith('steps:w1:e_owner001:')).flatMap(([, v]) => v as { hash: string }[]).map((s) => s.hash), ['v?canvas=e_bbbbbbbb'], 'and kept so');
+  await looked(a.ctx, w, { page: 'pa', on: true });
+  assert.deepEqual(await watching(b.ctx, w), { open: 0, following: 0 }, "nor is its page this one's");
+});

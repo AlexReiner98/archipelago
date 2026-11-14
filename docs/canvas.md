@@ -113,7 +113,7 @@ stack in one line: the packs', the workspace's, the view's, then a person's own
 colours. What moved from the styles made for one view is `packs/styles/kernel/style-move.ts`;
 how the styles with code became layouts is `packs/styles/kernel/layout-move.ts`.
 A layout is the pane's: editing the query keeps it, opening a saved view
-brings its own. The view band switches it (`ui/look-switch.js`), which lists
+brings its own. The view band switches it (the styles pack's part `styles.layout_switch`), which lists
 layouts and nothing else. A change in a pane is a draft: Save is marked and
 writes it to the view, and Save as new view makes another. The band's ⋯ holds
 Fit for the main canvas (decision e_yxp78scv). Find never
@@ -158,15 +158,15 @@ would land and decided there. A node is never moved by hand.
 ### 8. An item reads the same everywhere
 Rule 11 of the target model (decided 26 Oct 2026, e_bed3aj7d). An item's page
 is its head, its fields and its note. A field is drawn by the kind its type
-declares it as (`ui/fields.js`), and by its shape where the kind does not say,
+declares it as (`packs/sheet/page/fields.js`), and by its shape where the kind does not say,
 so a field a pack adds that no one foresaw is still read; never by its name.
-It is changed where it stands the same way (`ui/field-edit.js`): a pick (a
+It is changed where it stands the same way (`packs/sheet/page/field-edit.js`): a pick (a
 value from a menu, a day, yes or no, an item) is a change at once, and words
 (text, numbers, lists, rows, a set of names, JSON) wait with the note for the
 page's one Save (decided 26 Oct 2026, e_mvzugyga). System fields are only
 read. What a field means beyond its kind comes from capabilities: a question
 whose type declares `settles.choices` (and `chosen`, `why`, `on`) is settled
-by picking one, as one change (e_xyxct9nq). A note is written in one dialect (`packs/walls/page/text.js`: titles,
+by picking one, as one change (e_xyxct9nq). A note is written in one dialect (`packs/kit/page/text.js`: titles,
 lists, checklists, callouts, tables, code, emphasis, links, items by id),
 read the same by the sheet and the published reader; ticking a checklist is a
 change to that line. How it looks is the style's `notes` (callout colours, the
@@ -192,8 +192,8 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `pan-zoom.js` | the infinite plane |
 | `pinch.js` | two fingers on it |
 | `canvas-wires.js` | a held change's badge clicked, opening where it is decided |
-| `live.js`, `replica.js`, `membership.js`, `ghosts.js` | tailing the log; the one store, keyed by item, shared by views; when a view asks again; held changes drawn into it |
-| `panes.js`, `pane-drag.js`, `pane-address.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's |
+| `live.js`, `replica.js`, `membership.js` | tailing the log; the one store, keyed by item, shared by views; when a view asks again; held changes drawn into it |
+| the panes part (`packs/panes/parts/`), `panes.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's; `panes.js` draws each pane's canvas |
 | `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
 | `item.js`, `item-sections.js`, `field-edit.js`, `link-pick.js`, `settle.js` | the item's page, the host's by who owns what (the owner, 13 Nov 2026): its frame, fields, links, choices and settling for any type; a piece only one type or screen has is a part of the pack that owns it (a screen's note: `canvas.note`) |
 | `fields.js` | a field's value by its kind, else by its shape; the choices a question settles by |

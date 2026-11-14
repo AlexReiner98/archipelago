@@ -5,11 +5,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
+import * as F from './find-dom.ts';
 import { serve } from './serve.ts';
 
-/** The layout switch, in the view band's menu (task e_xvz8g89r): the menu opened afresh, so the switch is the bar's now. */
-// The bar's own menu, by its name: the tab bar's menu is a .tab-menu too, and which comes first in the page varies.
-const look = `(() => { const m = document.querySelector('.tab-menu[aria-label="This view"]'); if (m?.matches(':popover-open')) m.hidePopover(); document.querySelector('#query .q-band-menu')?.click(); return m?.querySelector('.q-look') ?? null; })()`;
+/** The layout switch, in the view band's menu (task e_xvz8g89r): the styles pack's part (slot bar.layouts), its pick a select. */
+// The menu that holds it, found by the switch's row: the tab bar's menu is a .tab-menu too.
+const look = `(() => { const m = document.querySelector('.q-look-row')?.closest('.tab-menu'); if (m?.matches(':popover-open')) m.hidePopover(); document.querySelector('#query .q-band-menu')?.click(); return document.querySelector('.q-look-row select'); })()`;
 
 const browser = chrome();
 
@@ -23,11 +24,12 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/#/v?find=id+${made.t}`);
-  const type = (q: string) => page.evaluate(`(() => { if (!document.getElementById('find').classList.contains('open')) document.getElementById('find-lens').click(); const i = document.querySelector('#find input[type=search]'); i.value = ${JSON.stringify(q)}; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
-  const list = `document.querySelector('#find .find-choices')`;
-  const choice = (kind: string, name: string) => `[...${list}.querySelectorAll('.find-choice')].find((c) => c.querySelector('.q-label').textContent === ${JSON.stringify(kind)} && c.querySelector('.find-name').textContent === ${JSON.stringify(name)})`;
-  // The choices are drawn again when their counts come, so a choice is found and clicked in one step, once it is there.
-  const take = (kind: string, name: string) => page.until(`(() => { const c = ${choice(kind, name)}; c?.click(); return Boolean(c); })()`);
+  // Find is the find pack's part (test/find-dom.ts).
+  const type = (q: string) => page.evaluate(F.type(q));
+  const list = F.list;
+  const choice = F.choice;
+  // The choices are drawn again when their counts come, so a choice is found and pressed in one step, once it is there.
+  const take = (kind: string, name: string) => page.until(F.press(kind, name));
   const hash = `new URLSearchParams(location.hash.split('?')[1] ?? '')`;
   const applied = (id: string) => `(${hash}.get('style') === ${JSON.stringify(id)})`;
   const onPage = (id: string) => `document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${id}?')`;
@@ -41,19 +43,19 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     await page.evaluate(`(() => { const s = ${look}; s.value = ''; s.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   };
   try {
-    assert.ok(await page.until(`Boolean(document.querySelector('#find-lens .q-sum'))`), `the canvas is up: ${page.logs().join('\n')}`);
+    assert.ok(await page.until(`Boolean(document.querySelector('#find-lens .part-body .pm-text'))`), `the canvas is up: ${page.logs().join('\n')}`);
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
       // In Find a style is found as an item: its page opens over the lens, and nothing is applied.
       await type('Harbour');
       assert.ok(await page.until(`Boolean(${choice('Item', 'Harbour blueprint')})`), `a style is found by its name: ${await page.evaluate(`${list}.textContent`)}`);
       // Read once the counts have come: the choices are drawn again with them.
-      await page.until(`[...${list}.querySelectorAll('.find-count')].length > 0 || !${list}.textContent.includes('Pour')`);
+      await page.until(`${F.saidAll}.some((c) => c.notes.some((n) => /^[+−]/.test(n))) || !${list}?.textContent.includes('Pour')`);
       assert.ok(await page.still(`${list}.innerHTML`), 'the choices are drawn');
       // Measured once the choice is there, asked again while the list is drawn again under it.
       type Row = { tall: number; bar: number; note: string; drawing: boolean } | null;
       let row: Row = null;
-      for (let n = 0; n < 100 && !row; n++) row = await page.evaluate<Row>(`(() => { const c = ${choice('Item', 'Harbour blueprint')}; if (!c) return null; return { tall: c.getBoundingClientRect().height, bar: document.querySelector('#find .find-row').getBoundingClientRect().height, note: c.querySelector('.find-note')?.textContent ?? '', drawing: [...${list}.querySelectorAll('.q-label')].some((l) => l.textContent === 'Style') }; })()`);
+      for (let n = 0; n < 100 && !row; n++) row = await page.evaluate<Row>(`(() => { const c = ${choice('Item', 'Harbour blueprint')}; if (!c) return null; return { tall: c.getBoundingClientRect().height, bar: document.querySelector('#find .find-row').getBoundingClientRect().height, note: ${F.said('c')}.notes[0] ?? '', drawing: ${F.saidAll}.some((x) => x.kind === 'Style') }; })()`);
       assert.ok(row, 'the choice is drawn');
       assert.equal(row.note, 'Style', 'it says its type');
       assert.ok(!row.drawing, 'and no choice in Find draws the canvas in it');
@@ -91,7 +93,7 @@ test('in a browser, find opens a style’s page and Apply draws the canvas in it
     })).result.created as Record<string, string>;
     await page.evaluate(`location.reload()`);
     const options = `((s) => (s ? [...s.options].map((o) => o.textContent) : []))(${look})`;
-    assert.ok(await page.until(`${options}.includes('Board layout')`), 'the switch offers a layout kept on the map');
+    assert.ok(await page.until(`${options}.includes('Board layout')`), `the switch offers a layout kept on the map: ${await page.evaluate(`JSON.stringify(${options})`)}\n${page.logs().join('\n')}`);
     assert.ok(!(await page.evaluate(`${options}.includes('Slab section look')`)), 'and no style');
     assert.equal(await page.evaluate(`${look}.selectedOptions[0].textContent`), 'Map', 'and a layout draws only where it is chosen: the map, the first shipped, is the choice of none');
     await type('style slab');

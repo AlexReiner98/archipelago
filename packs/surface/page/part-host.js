@@ -10,8 +10,9 @@
 // query is asked as the person looking, so what they may not see it never gets. Beside them every part is handed, as
 // data (decision e_fx62gsjb), the schema's `words` of the island it draws for (root.parts) and the `style` values a
 // part may read: the style's numbers and page settings, never a colour or a length, and `up`, the saved view the
-// canvas draws now. A mark that names a view opens it, and a thumb shows it small, both as the app says
-// (hooks.openView, hooks.viewThumb, hooks.viewUp: ui/canvases.js), or as the one drawing the part says (`openView`).
+// canvas draws now. A part that declares `go` is handed the page's `address` too, again each time it changes
+// (addressMoved), and may name another after a gesture (hooks.go checks it). A mark that names a view opens it, and a thumb shows it small, both as the app says
+// (hooks.openView, hooks.viewThumb, hooks.viewUp: packs/surface/page/views-kept.js), or as the one drawing the part says (`openView`).
 
 import { api, h, hooks, state } from './base.js';
 import { partBridge } from './part-bridge.js';
@@ -20,8 +21,17 @@ import { pageType } from './page-schema.js';
 import { endPart, partPort } from './layout.js';
 import { MARKS, checkMarks } from './part-check.js';
 import { mountPart } from './part-render.js';
-import { pickOnCanvas } from './canvas-pick.js';
-import { itemOf, waysBetween } from './layout-asks.js';
+import { sessionHue } from './words.js';
+import { addressSaid, canvasNow, queryGiven } from './part-lens.js';
+import { cut, findFor, keepFor, keptFor, keptKey, pickFor, settingsOf, styleValues, viewsOf, wholeWords } from './part-input.js';
+import { readFor } from './part-read.js';
+import { inOrder, pressesHeld } from './part-order.js';
+import { hearAway, tellAway } from './part-away.js';
+import { focusWindow, goHash, hearPage, openWindow, pageOf } from './part-page.js';
+import { AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
+import { paintSwatch, tryTheme } from './swatch.js';
+import { replayIn } from './replay.js';
+import { project } from './project.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -50,7 +60,11 @@ async function partsOn(island, shipped) {
   if (answer?.drew) drew.set(island ?? '', answer.drew);
   const parts = (answer?.parts ?? []).map((p) => (p.modules && modules.set(p.hash, p.modules), { ...p, modules: modules.get(p.hash), ...(loaded && { host: loaded }) }));
   if (answer?.words?.types) wordsBy.set(answer.words.hash, { types: answer.words.types, links: answer.words.links });
-  return { parts, refined: answer?.refined, words: wordsBy.get(answer?.words?.hash) ?? { types: {}, links: {} } };
+  // The fields and capabilities by type, sent only where a root pack's part reads items whole: kept by hash as the words are.
+  if (answer?.schema?.types) wordsBy.set(answer.schema.hash, answer.schema.types);
+  const words = wordsBy.get(answer?.words?.hash) ?? { types: {}, links: {} };
+  const schema = answer?.schema && wordsBy.get(answer.schema.hash);
+  return { parts, refined: answer?.refined, words, ...(schema && { whole: wholeWords(words, schema) }) };
 }
 
 /** The style a part on `island` is drawn by: the island's own, as its page is; the map's where there is none. */
@@ -60,118 +74,24 @@ async function styleOn(island) {
   return styles.get(at);
 }
 
-const NAME = /^[a-z][a-z0-9_]*$/;
-/** What of a style a part is handed: its numbers, and its page settings that are words, numbers or yes and no. */
-function styleValues(style) {
-  const plain = (o, keep) => Object.fromEntries(Object.entries(o && typeof o === 'object' ? o : {}).filter(([k, v]) => NAME.test(k) && keep(v)));
-  return { numbers: plain(style?.numbers, Number.isFinite), page: plain(style?.page, (v) => ['string', 'number', 'boolean'].includes(typeof v)) };
-}
 
 /** A pack version's name for its worker: the pack and the hashes of its parts, so new code is a new worker. */
 const versionOf = (parts, pack) => `${pack}:${parts.filter((p) => p.pack === pack).map((p) => p.hash.slice(0, 12)).join('.')}`;
 
-/** The types an item is, nearest first: its own and each it is a flavour of. */
-function typesOf(item) {
-  const out = [item.type];
-  for (let t = pageType(item.type)?.flavour_of; t && !out.includes(t); t = pageType(t)?.flavour_of) out.push(t);
-  return [...out, ...(item.is ?? []).filter((t) => !out.includes(t))];
-}
-
-/** An item cut to what a part reads of its type: its id and type always, else nothing when it reads none of it. */
-function cut(item, reads) {
-  const fields = typesOf(item).map((t) => reads[t]).find(Boolean);
-  if (!fields) return null;
-  const all = { ...(item.props ?? {}), ...(item.fields ?? {}), ...item };
-  return { id: item.id, type: item.type, ...Object.fromEntries(fields.filter((f) => all[f] !== undefined).map((f) => [f, all[f]])) };
-}
-
-/** What of a piece's settings on its screen a part is handed: words, numbers, yes and no, and lists of words. */
-function settingsOf(piece) {
-  const fit = (v) => ['string', 'number', 'boolean'].includes(typeof v) || (Array.isArray(v) && v.length <= 50 && v.every((w) => typeof w === 'string'));
-  return Object.fromEntries(Object.entries(piece ?? {}).filter(([k, v]) => NAME.test(k) && k !== 'piece' && fit(v)));
-}
 
 /**
- * A view's param filled for where the part stands: `{here}` is the item's id, and a param that is only `{piece.<name>}`
- * is that setting of its piece, list or not. A param that is only one of these, with nothing to fill it, is left out.
+ * What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read
+ * them, and its piece's settings. What the page says now is read before anything is awaited, so of two hands the one
+ * begun later is never the older (the host delivers only the latest begun: `mountOn`).
  */
-function paramsFor(params, item, piece) {
-  const out = {};
-  for (const [k, p] of Object.entries(params ?? {})) {
-    if (typeof p !== 'string') { out[k] = p; continue; }
-    const set = /^\{piece\.([a-z][a-z0-9_]*)\}$/.exec(p)?.[1];
-    if (set) { if (piece[set] !== undefined) out[k] = piece[set]; continue; }
-    if (p === '{here}' && !item) continue;
-    out[k] = p.replaceAll('{here}', item?.id ?? '');
-  }
-  return out;
-}
-
-/** The named reads a part declared, each asked as the person looking, by name: one that fails is handed as null. */
-async function viewsOf(part, item, piece) {
-  const asked = await Promise.all(part.views.map((v) => api('view', { name: v.name, params: paramsFor(v.params, item, piece) }).catch(() => null)));
-  return Object.fromEntries(part.views.map((v, i) => [v.name, asked[i] ?? null]));
-}
-
-/**
- * Words a part has not saved yet, kept in this browser by part, item and name until it lets them go (tools.keep): a
- * walled worker has no storage of its own. Storage may be blocked or full: then nothing is kept, and the words last as
- * long as the page.
- */
-const keptMost = 100000;
-const keptKey = (part, item, name = '') => `pelago-part:${part.id}:${item?.id ?? '-'}:${name}`;
-function keepFor(part, item, name, value) {
-  try {
-    const said = value === null || value === undefined ? null : JSON.stringify(value);
-    if (said === null || said.length > keptMost) localStorage.removeItem(keptKey(part, item, name));
-    else localStorage.setItem(keptKey(part, item, name), said);
-  } catch {
-    // Not kept: the words are still on the page.
-  }
-}
-function keptFor(part, item) {
-  const out = {};
-  try {
-    const prefix = keptKey(part, item);
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k?.startsWith(prefix)) out[k.slice(prefix.length)] = JSON.parse(localStorage.getItem(k));
-    }
-  } catch {
-    // Nothing could be kept, so nothing is handed back.
-  }
-  return out;
-}
-
-/** An item as a part is told of it when the person picks it, with the ways it may be linked to `from` when asked. */
-const pickedItem = (from, x, link) => {
-  const said = { id: x.id, title: x.title, type: x.type };
-  if (!link || !from) return said;
-  return { ...said, ways: waysBetween(from, x).map((w) => ({ type: w.type, from: w.from, to: w.to, verb: w.verb })) };
-};
-
-/** The items an item input offers as the person types: found as they may see them, of the types it names, and, for a link, only those it may be linked to. */
-async function findFor(from, q, types, link) {
-  const hits = (await Promise.all((types?.length ? types : [undefined]).map((type) => api('search', { q, ...(type && { type }), limit: 8 }).catch(() => [])))).flat();
-  return hits
-    .filter((x) => x.id !== from?.id && !String(x.type).startsWith('sys.'))
-    .map((x) => pickedItem(from, x, link))
-    .filter((x) => !link || x.ways.length)
-    .slice(0, 8);
-}
-
-/** The item clicked on the canvas for a pick button, as the person may read it; null when let go or unread. */
-async function pickFor(from, kind) {
-  const id = await pickOnCanvas(from?.id);
-  const other = id && (await itemOf(id));
-  return other ? pickedItem(from, other, kind === 'link') : null;
-}
-
-/** What a part is handed: the item it stands on, its query's items and its named reads, as the person looking may read them, and its piece's settings. */
 async function inputOf(part, item, given) {
+  const now = canvasNow();
+  // The theme this screen alone is painted in, if one is being tried (a button's `try`), so a part can say Keep or Stop;
+  // and the page's origin, for a part that shows an address of this server (connect's MCP address): words only.
+  const page = { up: hooks.viewUp?.() ?? null, trying: state.trying ?? null, origin: location.origin, ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
-  given = { ...given, up: hooks.viewUp?.() ?? null };
+  given = { ...given, ...page, ...(part.go && { address: await addressSaid(given.words, now) }), ...(await queryGiven(part.slot, given.words, now)) };
   const kept = keptFor(part, item);
   if (Object.keys(kept).length) given = { ...given, kept };
   if (!part.query) return { item: here, ...views, ...given };
@@ -183,9 +103,17 @@ async function inputOf(part, item, given) {
 
 /** A version's worker, started once: its port heard here, each message going to the part mounted under its id. */
 async function workerOf(version, parts, pack) {
-  if (versions.get(version)) return versions.get(version);
+  // One asked again while it starts (a slot drawn twice at once) waits for it to be ready, its port and bridge set.
+  const starting = versions.get(version);
+  if (starting) {
+    await starting.ready;
+    if (!starting.port) throw new Error('The pack did not start.');
+    return starting;
+  }
   const mine = parts.filter((p) => p.pack === pack);
   const one = { mounted: new Map() };
+  let ready;
+  one.ready = new Promise((done) => (ready = done));
   versions.set(version, one);
   const stopped = (said) => {
     for (const m of one.mounted.values()) m.failed(said?.message ?? 'The pack stopped.');
@@ -195,6 +123,7 @@ async function workerOf(version, parts, pack) {
     one.port = await partPort(version, Object.fromEntries(mine.map((p) => [p.id, p.modules])), stopped);
   } catch (err) {
     versions.delete(version);
+    ready();
     throw err;
   }
   // Once an action a part sent has gone out, its version's parts are handed their items again: what it changed is
@@ -204,9 +133,14 @@ async function workerOf(version, parts, pack) {
     postMessage(message) {
       port.postMessage(message);
       if (message?.type === 'acted' && !message.error) for (const m of one.mounted.values()) void m.refresh();
+      // An action whose answer says it changed how the page looks (`looks`, a theme kept) has the page read its look
+      // again, which also ends a theme tried on this screen: the page then shows what was kept.
+      if (message?.type === 'acted' && !message.error && message.answer?.looks === true) void import('./swatch.js').then((s) => s.tryTheme('')).catch(() => {});
     },
   };
-  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part });
+  // A part that declares `go` names another address after a gesture; the app checks it and moves (hooks.go, ui/canvas.js).
+  // A part that declares `state` publishes page state; the runtime writes it on the root (publishState).
+  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part, go: (address, part) => (PAGE_SLOTS.includes(part?.slot) && address?.hash ? goHash(address) : hooks.go?.(address)), state: publishState });
   one.port.onmessage = (ev) => {
     const said = ev.data ?? {};
     if (one.bridge.heard(said)) return;
@@ -214,27 +148,90 @@ async function workerOf(version, parts, pack) {
     if (!m) return;
     if (said.type === 'marks') {
       try {
-        m.render.draw(checkMarks(said.marks, { kinds: m.part.marks }));
+        const marks = checkMarks(said.marks, { kinds: m.part.marks, opens: m.part.opens ?? [] });
+        m.render.draw(marks, said.seen);
+        m.heard?.(said.seen, marks);
       } catch (err) {
         m.failed(err.message);
       }
-    } else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
+    } else if (said.type === 'seen') m.heard?.(said.seen);
+    else if (said.type === 'decided') m.decided?.(said.asked, said.value);
+    else if (said.type === 'read') void readFor(m, said, (message) => one.port.postMessage(message));
+    else if ((said.type === 'window' || said.type === 'focus') && PAGE_SLOTS.includes(m.part.slot)) (said.type === 'window' ? openWindow : focusWindow)(said);
+    else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
     else if (said.type === 'error') m.failed(said.message);
   };
+  ready();
   return one;
 }
+
+/** Which part publishes each name of page state: one name, one owner, and a second part naming it is ignored. */
+const publishing = new Map();
+
+/**
+ * Page state a part publishes (`state` in its manifest): written on the root as `data-<name>`, where anything watching
+ * the page from outside reads it (the picture taken once the canvas has drawn). The part never touches the page: it
+ * says a name and a value, and this writes it. Nothing (null) takes the name off.
+ */
+function publishState(name, value, part) {
+  const owner = publishing.get(name);
+  if (owner !== undefined && owner !== part.id) return;
+  publishing.set(name, part.id);
+  if (value === null) delete document.documentElement.dataset[name];
+  else document.documentElement.dataset[name] = value;
+  shownWhile();
+}
+
+/** A part on a slot drawn only while a page state is set (`bar.find.rows` while find is open) is shown while it is. */
+function shownWhile() {
+  for (const one of versions.values()) for (const m of one.mounted.values()) if (SHOWN_WHILE[m.part.slot]) m.node.hidden = !(SHOWN_WHILE[m.part.slot] in document.documentElement.dataset);
+}
+
+/** The address the page draws has changed: the app says so by name (`hooks.addressMoved`, set below), never by importing this file. */
+export function addressMoved() {
+  const now = JSON.stringify(hooks.address?.() ?? null);
+  const answer = hooks.answer?.()?.answer;
+  for (const one of versions.values()) {
+    for (const m of one.mounted.values()) {
+      // A part on a slot drawn from the canvas's query hears each new answer too, as the canvas draws it: a live read.
+      const moved = (m.part.go && m.address !== now) || (QUERY_SLOTS.includes(m.part.slot) && (m.address !== now || m.answer !== answer));
+      if (moved) ((m.address = now), (m.answer = answer), void m.refresh());
+    }
+  }
+}
+hooks.addressMoved = addressMoved;
 
 /** Take down every part whose place has left the page, and every worker none is drawn by. */
 function sweep() {
   for (const [version, one] of versions) {
     for (const [id, m] of one.mounted) if (!m.node.isConnected) (m.render.stop(), one.bridge?.send({ type: 'unmount', id }), one.mounted.delete(id));
-    if (one.port && !one.mounted.size) (endPart(version), versions.delete(version));
+    if (one.port && !one.mounted.size && !opening.has(version)) (endPart(version), versions.delete(version));
   }
 }
 
+/** How many parts deep a slot mark may hold others, and how deep a node stands among them. */
+const slotsDeep = 4;
+const depthOf = (node) => { let n = 0; for (let at = node.closest?.('.part-body'); at; at = at.parentElement?.closest('.part-body')) n++; return n; };
+
 /** Mount one part under `node` on its version's worker, with what it reads; `picture(item, el, input)` draws a picture mark out of what it was handed. */
-async function mount(node, part, parts, item, words, piece, { openView, picture } = {}) {
+async function mount(node, part, parts, item, words, piece, ways = {}) {
   const version = versionOf(parts, part.pack);
+  // Counted from before its worker is asked for until it is among the mounted, so no sweep in between (a slot drawn
+  // again while this one starts, as a cold first load does) ends the worker under it.
+  opening.set(version, (opening.get(version) ?? 0) + 1);
+  try {
+    return await mountOn(version, node, part, parts, item, words, piece, ways);
+  } finally {
+    const left = opening.get(version) - 1;
+    if (left) opening.set(version, left);
+    else opening.delete(version);
+  }
+}
+
+/** How many parts of each version are mounting now: a version with one is not taken down. */
+const opening = new Map();
+
+async function mountOn(version, node, part, parts, item, words, piece, { openView, picture } = {}) {
   const one = await workerOf(version, parts, part.pack);
   const id = `m${++mounts}`;
   // A mark that stands for an item opens that item's page when pressed: the host's, so a part names items, never addresses.
@@ -247,32 +244,93 @@ async function mount(node, part, parts, item, words, piece, { openView, picture 
   };
   const body = h('div', { class: 'part-body', 'data-part-id': part.id, onclick: opens, onkeydown: (ev) => ev.key === 'Enter' && ev.target.dataset?.view && opens(ev) });
   node.replaceChildren(body);
-  const failed = (message) => node.isConnected && node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
-  const style = await styleOn(islandOf(item));
+  const failed = (message) => {
+    // A part that publishes page state and fails says so in it, so whatever waits on that state is not left waiting.
+    for (const name of part.state ?? []) if (name === 'look') (publishState('look_why', String(message).slice(0, 300), part), publishState('look', 'error', part));
+    if (node.isConnected) node.replaceChildren(h('div', { class: 'error', title: String(message) }, `${part.title}: ${String(message).slice(0, 120)}`));
+  };
+  const style = await styleOn(pinFor(item));
   // What every part is handed beside its items: the island's words, the style's values (none of its looks), and what
   // its piece says of it on its screen (a title, a limit).
   const given = { words, style: styleValues(style), piece: settingsOf(piece) };
   // A picture mark is drawn out of what the part was handed last, never out of what it sent.
   let handed;
-  const hand = async () => (handed = await inputOf(part, item, given));
+  // A press on marks the part has since moved past (it was handed a newer page) lands on what was pressed.
+  const presses = pressesHeld((event) => one.bridge.send({ type: 'event', id, event }));
+  // Hands are worked out apart and may finish in any order: only one begun after the last delivered is delivered, the
+  // first as `mount`, so a part is never handed an older page after a newer one (two quick moves of the canvas).
+  const handOne = inOrder((input, first) => {
+    if (!one.mounted.has(id) || (!first && !node.isConnected)) return false;
+    presses.handed(one.bridge.send(first ? { type: 'mount', id, part: part.id, input } : { type: 'update', id, input }));
+    handed = input;
+  });
+  const hand = () => handOne(() => inputOf(part, item, given));
   const render = mountPart(body, {
     style,
-    tell: (event) => one.bridge.send({ type: 'event', id, event }),
+    tell: (event, mark) => presses.tell(event, mark),
     thumb: (view) => hooks.viewThumb?.(view) ?? null,
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),
     pick: (kind) => pickFor(item, kind),
+    // What a mark lights while the person points at it: those items lit on the canvas in sight (the view the bar is
+    // over, ./bar-band.js), the rest faded. hooks.viewUp is the saved view up, an id: no view to light.
+    lights: (ids) => hooks.lights?.(ids),
+    // A pane's canvas, drawn at its address by whoever keeps the panes (hooks.paneFrame), told back what is done in it.
+    frame: (at, el, said) => hooks.paneFrame?.(at, el, said) ?? null,
+    // A session's hue, named by its words, as every session is marked.
+    hue: (words) => sessionHue(words),
+    // A style preset's colours, and a theme tried on this screen alone: the page's, as a part paints no colour.
+    swatch: (preset, el) => paintSwatch(preset, el),
+    tryTheme: (preset) => tryTheme(preset),
+    // What the person missed, played on the canvas the part stands over (its store, hooks.storeUnder: ./canvas.js).
+    replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
+    // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
+    ghosts: (list) => hooks.ghosts?.(node, list),
+    // A `slot` mark: a slot this part opens, filled by its parts in the mark's node, unseen by the holder; a few deep at most.
+    slot: (name, el, given) => ((part.opens ?? []).includes(name) && depthOf(node) < slotsDeep ? drawParts(el, { slot: name, item, piece: given ?? piece, openView, picture }) : Promise.resolve(0)),
   });
-  const refresh = async () => node.isConnected && one.mounted.has(id) && one.bridge.send({ type: 'update', id, input: await hand() });
+  const refresh = async () => node.isConnected && one.mounted.has(id) && hand();
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.
-  one.mounted.set(id, { part: { ...part, island: islandOf(item) }, item, node, render, failed, refresh });
-  one.bridge.send({ type: 'mount', id, part: part.id, input: await hand() });
+  one.mounted.set(id, { part: { ...part, island: pinFor(item) }, item, node, render, failed, refresh, heard: presses.heard, address: JSON.stringify(hooks.address?.() ?? null), answer: hooks.answer?.()?.answer });
+  await hand();
+  shownWhile();
+  if (AWAY_SLOTS.includes(part.slot)) hearAway(mountedNow);
+  if (PAGE_SLOTS.includes(part.slot)) hearPage((event) => tellSlot(part.slot, event), () => refreshOn(PAGE_SLOTS));
 }
+
+// Words one window kept are handed to the same part in every other window of this browser (the tabs across windows).
+addEventListener('storage', (ev) => {
+  if (!ev.key?.startsWith('pelago-part:')) return;
+  for (const { m } of mountedNow()) if (ev.key.startsWith(keptKey(m.part, m.item))) void m.refresh();
+});
+
+/** Whether a part is mounted on a slot now: what is worked out only for one (the beat's rows for `traces`) waits on it. */
+hooks.slotFilled = (slot) => [...mountedNow()].some(({ m }) => m.part.slot === slot && m.node.isConnected);
+
+/** Hand every part on these slots its input again. */
+const refreshOn = (slots) => { for (const { m } of mountedNow()) if (slots.includes(m.part.slot)) void m.refresh(); };
+/** Every part mounted now, each with a way to tell it an event. */
+function* mountedNow() {
+  for (const one of versions.values()) for (const [id, m] of one.mounted) yield { m, tell: (event) => one.bridge.send({ type: 'event', id, event }) };
+}
+/** Another pane took the focus: the parts on find's slots are away (the canvas says so by name, packs/surface/page/canvas.js). */
+hooks.partsAway = () => tellAway(mountedNow);
 
 /** The island an item is on: its own id when it is one (its type has the field an island pins a version by), else its island. */
 function islandOf(item) {
   if (!item) return undefined;
   return pageType(item.type)?.fields?.pack_version ? item.id : (item.props?.island ?? item.island ?? undefined);
+}
+
+/**
+ * Which pinned version of a part is mounted and fetched, given what the part stands on: the island of the item, where
+ * it stands on one. A part that stands on nothing (the tabs, the panes, Home, the menu, a bar over a canvas that spans
+ * islands) is the chrome, and is to be pinned per person (decision e_x6bqupud, task e_fpm9n7er); until that lands the
+ * chrome runs the map's version, which is what `undefined` asks for here. Every place that resolves a version goes
+ * through this one function, so that change is one function's.
+ */
+function pinFor(item) {
+  return islandOf(item);
 }
 
 /** Show the way back for an island while it draws anything but the shipped parts, and take down another island's. */
@@ -283,6 +341,72 @@ function wayBackFor(island, refined, redraw) {
   back = { island, press: wayBack({ island, refined, redraw }) };
 }
 
+/** The last event each slot was told, handed to a part mounted there later (`told`), so it starts where the others are. */
+const told = new Map();
+
+/**
+ * Tell every part mounted on `slot` of something the runtime saw: a beat of the log for `traces`, the reading position
+ * for `sheet` (`{ name: 'scrolled', reading }`). Data only, as an event the part hears in `on`; answers how many parts
+ * were told, so a root with none decides as it did before.
+ */
+export function tellSlot(slot, event) {
+  const said = JSON.parse(JSON.stringify(event ?? null));
+  told.set(slot, said);
+  let n = 0;
+  for (const one of versions.values()) for (const [id, m] of one.mounted) if (m.part.slot === slot && m.node.isConnected) (one.bridge.send({ type: 'event', id, event: said }), n++);
+  return n;
+}
+hooks.tellSlot = tellSlot;
+
+/** The part mounted to answer each decision slot, by slot and version: mounted once, asked as often as the root asks. */
+const deciders = new Map();
+/** How long a decision is waited for, in milliseconds, and how many characters of input it may be handed. */
+const decideWithin = 2000;
+const decideMost = 200000;
+
+/**
+ * Ask the part that fills a decision slot (`tabs.land`, `tabs.life`) to decide: it is handed `input` as data and
+ * answers a value, which comes back as data for the root that asked to check and apply. Undefined when no part fills
+ * the slot, or the part fails or takes too long: the root then decides as it did before. A part never applies anything.
+ */
+export async function askSlot(slot, input) {
+  if (!DECISION_SLOTS.includes(slot)) throw new Error(`${slot} is not a slot that asks a decision`);
+  const said = JSON.stringify(input ?? null);
+  if (said.length > decideMost) return undefined;
+  const { parts, words } = await partsOn(undefined, false);
+  const part = parts.find((p) => p.slot === slot);
+  if (!part || part.waiting || !part.modules) return undefined;
+  const version = versionOf(parts, part.pack);
+  const one = await workerOf(version, parts, part.pack);
+  const key = `${slot}@${version}`;
+  let m = deciders.get(key);
+  if (!m || !one.mounted.has(m.id)) {
+    // Never drawn: a hidden node kept on the page, so the sweep keeps the part mounted.
+    const node = Object.assign(document.createElement('div'), { hidden: true });
+    document.body.append(node);
+    const waiting = new Map();
+    m = {
+      id: `m${++mounts}`, part, item: null, node, waiting, asks: 0,
+      render: { draw() {}, stop() {} },
+      failed: () => [...waiting.values()].forEach((done) => done(undefined)),
+      refresh: async () => {},
+      decided: (asked, value) => waiting.get(asked)?.(value),
+    };
+    one.mounted.set(m.id, m);
+    deciders.set(key, m);
+    one.bridge.send({ type: 'mount', id: m.id, part: part.id, input: { item: null, words, style: styleValues(await styleOn(undefined)) } });
+  }
+  const asked = ++m.asks;
+  return new Promise((resolve) => {
+    const late = setTimeout(() => done(undefined), decideWithin);
+    const done = (value) => (clearTimeout(late), m.waiting.delete(asked), resolve(value));
+    m.waiting.set(asked, done);
+    one.bridge.send({ type: 'decide', id: m.id, asked, input: JSON.parse(said) });
+  });
+}
+/** Here by name, so the root that asks (the panes root) reaches it without importing this file. */
+hooks.askSlot = askSlot;
+
 /**
  * Draw the part that fills `slot` in `node`, standing on `item`: true when a part fills it, false when none does (the
  * caller draws what it did before). `piece` is what its screen says of it; `redraw` draws the page again when the way back is pressed;
@@ -291,15 +415,38 @@ function wayBackFor(island, refined, redraw) {
  */
 export async function drawPart(node, { slot, item, piece, redraw = () => {}, openView, picture }) {
   sweep();
-  const island = islandOf(item);
+  const island = pinFor(item);
   const shipped = Boolean(island && shippedOn(island));
-  const { parts, refined, words } = await partsOn(island, shipped);
+  const { parts, refined, words, whole } = await partsOn(island, shipped);
   wayBackFor(island, shipped ? undefined : refined, async () => redraw());
   const part = parts.find((p) => p.slot === slot);
   if (!part) return false;
   // A part naming a mark this host does not draw waits: said in one line, its code never sent or run.
   if (part.waiting) return (node.replaceChildren(h('div', { class: 'muted', title: `${part.title} waits: ${part.waiting}` }, `${part.title} waits`)), true);
   if (!part.modules) throw new Error(`${part.title}: its code did not come`);
-  await mount(node, part, parts, item, words, piece, { openView, picture });
+  await mount(node, part, parts, item, part.reads === '*' && whole ? whole : words, piece, { openView, picture });
   return true;
+}
+
+/**
+ * Draw every part that fills `slot`, each in a node of its own under `node`, and answer how many: a slot a page holds
+ * several of (a card on the workspace page, a mark on a tab). The page draws what it has itself and asks for this
+ * beside it, so a slot no pack fills yet simply adds nothing. Takes what `drawPart` takes.
+ */
+export async function drawParts(node, { slot, item, piece, redraw = () => {}, openView, picture }) {
+  sweep();
+  const island = pinFor(item);
+  const shipped = Boolean(island && shippedOn(island));
+  const { parts, refined, words, whole } = await partsOn(island, shipped);
+  wayBackFor(island, shipped ? undefined : refined, async () => redraw());
+  const filling = parts.filter((p) => p.slot === slot);
+  for (const part of filling) {
+    // Its name on the node, so a step that names a card (#/workspace?at=agent) brings this part into view.
+    const mine = h('div', { class: 'part-in', 'data-at': part.id.split('.').slice(1).join('.') || part.id });
+    node.append(mine);
+    if (part.waiting) mine.replaceChildren(h('div', { class: 'muted', title: `${part.title} waits: ${part.waiting}` }, `${part.title} waits`));
+    else if (!part.modules) mine.replaceChildren(h('div', { class: 'muted' }, `${part.title}: its code did not come`));
+    else await mount(mine, part, parts, item, part.reads === '*' && whole ? whole : words, piece, { openView, picture });
+  }
+  return filling.length;
 }

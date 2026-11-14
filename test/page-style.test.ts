@@ -27,11 +27,11 @@ test('a page is drawn by its style: the house style, a kind\'s preset over it, t
   // Every length, face and text role the app, the reader and the public page read is one the house style names, and /layout.css says it.
   const named = new Set([...Object.keys(light), ...Object.keys(workspace.style.lengths), ...Object.keys(workspace.style.faces).map((n) => `face_${n}`), ...Object.keys(workspace.style.type).flatMap((r) => ['family', 'weight', 'style', 'case', 'track'].map((p) => `type_${r}_${p}`))].map((n) => n.replaceAll('_', '-')));
   const sheet = lengthsSheet(l.registry.packs);
-  for (const file of ['ui/style.css', 'ui/doc.css', 'ui/public.css']) {
+  for (const file of ['packs/surface/page/style.css', 'packs/surface/page/doc.css', 'packs/surface/page/public.css']) {
     const css = readFileSync(file, 'utf8');
     const local = new Set([...css.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1].slice(2)));
     // Set on an element by the page's own code, not by a style: the graph's zoom, a ring's share, a calendar's lane, a session's hue,
-    // the main canvas's frame among the panes and the frame of the one the bar acts on (ui/panes.js).
+    // the main canvas's frame among the panes and the frame of the one the bar acts on (packs/panes/page/panes.js).
     const byCode = new Set(['k', 'pct', 'cal-agents', 'cal-hue', 'session-hue', 'main-top', 'main-left', 'main-right', 'main-bottom', 'active-top', 'active-left', 'active-right', 'active-bottom']);
     const unnamed = [...css.matchAll(/var\(--([a-z0-9-]+)/g)].map((m) => m[1]).filter((n) => !named.has(n) && !local.has(n) && !byCode.has(n) && !n.startsWith('ln-'));
     assert.deepEqual([...new Set(unnamed)], [], `${file} reads lengths the house style does not name`);

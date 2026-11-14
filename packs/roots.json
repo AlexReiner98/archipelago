@@ -2,7 +2,7 @@
   "roots": [
     {
       "id": "core",
-      "hash": "42ad63072073fbb28e4a90361fa14d92ae11658ff0dfe1a8275ed9793cae518e"
+      "hash": "d212eaef179cdad4c482058f4020bd68c693824b59ae9b16659973adf7135209"
     },
     {
       "id": "database",
@@ -14,19 +14,23 @@
     },
     {
       "id": "log",
-      "hash": "4c0a72d18a45c0574180f5d5baa9ec834e34bbb79ac27a134922e7027cde5900"
+      "hash": "0622e6606e8964461735c816c0bce3c126989b270843e96050ff854e1aa0b977"
+    },
+    {
+      "id": "kit",
+      "hash": "1fd1f67d7a30ff270227493ad0d9eb01314396b94eab87e3f22dc20c514cbbd5"
     },
     {
       "id": "identity",
-      "hash": "2a4f148e4dfee96ec9cc0067d4ba2b5554f2207df58dcdcbd6a945350877f4a6"
+      "hash": "ad32ff5f16f1720ac3d5e0750a0677db7487be9e45bedce44a9c6df9ab7bb76e"
     },
     {
       "id": "walls",
-      "hash": "774b059b93543669bfb318f2a3b55d37ac37c1611d26c9cb38af72c6952ca34c"
+      "hash": "231bd73709cfb2c08148658019d26fc089aaf05429136606405b1ed0b836445d"
     },
     {
       "id": "loader",
-      "hash": "019456c377fcab08b24b70947405bdac4aa070cad04c0037438c5e92cd9fe26b"
+      "hash": "0100b157f07f2c95fdb93682242b1f22edfb770a7a4496e5c900d2b0ce0f214b"
     },
     {
       "id": "rules",
@@ -34,11 +38,27 @@
     },
     {
       "id": "write",
-      "hash": "c4a82541d03e00d7b8d8417ccb12e11a4996381dd46279bd3baddf90a32142f1"
+      "hash": "1441eb17963456488dfe6ab772813ee1563b4b819e5a0e92707f2aac10154c0b"
     },
     {
       "id": "surface",
-      "hash": "ee4564f7c23ca7bae80b8416d7999a6ace4c493f33bbf77a21f5ee0ae28b1315"
+      "hash": "0db415068a056aa444e90f40e601b4505990ef4fa60b7a808cf96bfb0c03c280"
+    },
+    {
+      "id": "panes",
+      "hash": "ef9c4a4edac7350d7988706b299ff7da715f3a2bd09a1812518cb7515060b46e"
+    },
+    {
+      "id": "bar",
+      "hash": "17a82ece6e1beee0f55c1c579755d8687a7239ccc892955f75ea8d591f9891bd"
+    },
+    {
+      "id": "sheet",
+      "hash": "1220fe99f208ea19556175a2f20512051d6b0e03cc96087fd0fb2f133043bf6f"
+    },
+    {
+      "id": "shell",
+      "hash": "73ca19d2449af58fa1b013b52389d0af403cbf37b4cc9b82fcfe5025bd8580a4"
     }
   ],
   "calls": {
@@ -78,6 +98,9 @@
       "publish"
     ],
     "root.scene": [
+      "publish"
+    ],
+    "root.part_marks": [
       "publish"
     ],
     "root.parts": [

@@ -1,0 +1,67 @@
+{
+  "id": "sheet",
+  "version": "0.1.0",
+  "title": "Sheet",
+  "description": "The sheet over the canvas, an item's one page: its frame and the sections in it, its fields and how one is edited, the links picked on it, and the note being written. What keeps a person in control here stays protected (decisions e_gyzm7rj3, e_axz9au5f, e_dd7gdy8z); a root pack, so its parts change only through a root re-pin (task e_zhxd9bhb).",
+  "kernel": {
+    "trust": "root",
+    "internal": true
+  },
+  "parts": [
+    {
+      "id": "sheet.page",
+      "title": "Page",
+      "slot": "sheet",
+      "reads": "*",
+      "writes": [
+        "actor",
+        "aim",
+        "work",
+        "question",
+        "record",
+        "occurrence",
+        "place",
+        "system"
+      ],
+      "opens": [
+        "sheet.sections",
+        "sheet.bands"
+      ],
+      "go": true,
+      "state": [
+        "draft"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "list",
+        "input",
+        "button",
+        "note",
+        "menu",
+        "slot"
+      ],
+      "modules": {
+        "index.js": "parts/page/index.js",
+        "words.js": "parts/page/words.js",
+        "fields.js": "parts/page/fields.js",
+        "sections.js": "parts/page/sections.js",
+        "draft.js": "parts/page/draft.js",
+        "links.js": "parts/page/links.js",
+        "note-count.js": "parts/page/note-count.js"
+      }
+    },
+    {
+      "id": "sheet.follow",
+      "title": "Follow the reading",
+      "slot": "sheet",
+      "go": true,
+      "marks": [
+        "box"
+      ],
+      "modules": {
+        "index.js": "parts/follow/index.js"
+      }
+    }
+  ]
+}

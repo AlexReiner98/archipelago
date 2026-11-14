@@ -7,7 +7,6 @@
 
 import { api, drawFrame, h, state, whoami } from './base.js';
 import { drawingActs, drawingAsked } from './layout-asks.js';
-import { HELD } from './ghosts.js';
 import { tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
 import { build, cssFor, patch, step } from './marks.js';
@@ -19,6 +18,9 @@ import { saidDrawn } from './look.js';
 import { relations, types as registry, typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
 import { transition } from './transition.js';
+
+/** A held change's id, as a drawing names it in the key of the mark that decides it: `held:<id>`. */
+export const HELD = /^held:(p_[a-z0-9]+)/;
 
 // A reader frame on the canvas asks the page whether a document is published, and whose workspace it is.
 readerAsks({ api, whoami, style: () => state.style });
@@ -176,7 +178,7 @@ export function drawWith(host, answer, style, keep) {
   const end = () => ((ended = true), reshape?.disconnect(), host.moves?.stop(), surface?.end(), port.postMessage({ type: 'end' }), port.close());
   host.endDrawing = end;
   const send = (event) => !ended && port.postMessage({ type: 'event', event });
-  // Every event is told as it is. A click on a mark keyed for a held change (`held:<proposal>…`, ui/ghosts.js) also asks the page to put that change to
+  // Every event is told as it is. A click on a mark keyed for a held change (`held:<proposal>…`, HELD) also asks the page to put that change to
   // the person, where it is drawn (`drawing-held` on the host): the drawing only says where; the page says what it is.
   // A drop says which mark it came from (`from`).
   const tell = (key, name, ev, from) => {
@@ -257,7 +259,7 @@ export function drawWith(host, answer, style, keep) {
   const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
   // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
   const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
-  // What the session may do (packs/surface/page/base.js may): a drawing that opts into gestures draws no handle where it may not write.
+  // What the session may do (packs/kit/page/base.js may): a drawing that opts into gestures draws no handle where it may not write.
   const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, may: [...(state.may ?? [])] };
   const seen = `${drawing.hash}
 ${JSON.stringify(input)}`;

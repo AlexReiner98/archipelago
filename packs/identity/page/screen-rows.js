@@ -1,0 +1,64 @@
+// The screens on a pack's card (task e_pe3fjd75, from ui/nav.js): each screen a pack offers or the owner keeps, with the
+// switch that puts it on Home or in the nav, or takes it away, as the person's change. The menu that lists the nav's
+// pages is the menu pack's part (menu.nav); this draws it again, by name, once a screen moves (hooks.drawNav).
+
+import { api, ask, h, hooks, may, state, tell } from './base.js';
+import { loadSchema, menu, typeTitle } from './words.js';
+
+const byPlace = (a, b) => a.nav - b.nav;
+/** The screens in the nav, in their places. */
+const inNav = () => (state.schema?.screens ?? []).filter((s) => typeof s.nav === 'number').sort(byPlace);
+
+/** Where a screen is: on Home, its place in the nav, or the kinds whose pages it is on. */
+const where = (s) =>
+  [s.at === 'home' && 'on Home', typeof s.nav === 'number' && 'in the nav', s.on.length > 0 && `on ${s.on.map(typeTitle).join('\n')}`].filter(Boolean).join(' · ') ||
+  (s.homeable ? 'taken off Home' : s.offered ? 'offered for the nav' : 'not shown');
+
+/** Rows for some screens (a pack's, on its card on the Workspace page), each with the switch that puts it on Home or in the nav, or takes it away. */
+export function screenRows(screens, then) {
+  const write = async (ops, reason) => {
+    try {
+      await api('change', { ops, reason });
+      await loadSchema();
+      hooks.drawNav?.();
+      then();
+    } catch (err) {
+      tell('That was not changed', err.message);
+    }
+  };
+  const last = Math.max(0, ...inNav().map((s) => s.nav));
+  const add = (s) =>
+    s.item
+      ? write([{ op: 'update', id: s.item, props: { nav: last + 1 } }], `${s.title} put in the nav`)
+      : write([{ op: 'create', type: 'screen', title: s.title, status: 'current', props: { preset: s.id, nav: last + 1 } }], `${s.title} added to the nav`);
+  const remove = async (s) => (await ask({ title: `Take ${s.title} out of the nav?`, message: 'It stays here, to be put back.', action: 'Take out' })) && write([{ op: 'update', id: s.item, props: { nav: null } }], `${s.title} taken out of the nav`);
+  // On Home or off it: a preset for Home is on it unless the owner's version says false; their own screen only when it says true.
+  const home = (s, on) =>
+    s.item
+      ? write([{ op: 'update', id: s.item, props: { home: s.homeable ? (on ? null : false) : on || null } }], `${s.title} ${on ? 'put on' : 'taken off'} Home`)
+      : write([{ op: 'create', type: 'screen', title: s.title, status: 'current', props: { preset: s.id, home: on } }], `${s.title} ${on ? 'put on' : 'taken off'} Home`);
+  // What could be a page in the nav: what is there, what a pack offers, and the owner's own.
+  const navable = (s) => typeof s.nav === 'number' || Boolean(s.offered) || Boolean(s.item && !s.pack && !s.on.length);
+  // Taking a screen off Home or out of the nav, in its menu: room kept where there is nothing to take away.
+  const writes = may('write');
+  const rare = (s) => {
+    if (!writes) return h('span', { class: 'menu-room' });
+    const items = [s.at === 'home' && ['Take off Home', () => home(s, false)], typeof s.nav === 'number' && ['Take out of the nav', () => remove(s)]].filter(Boolean);
+    return items.length ? menu('⋯', items) : h('span', { class: 'menu-room' });
+  };
+  const row = (s) =>
+    h(
+      'li',
+      { class: 'one' },
+      h('span', { class: 'grow', title: `${s.title}${s.pack ? `, from the ${s.pack} pack` : ''}: ${where(s)}` }, s.item ? h('a', { href: `#/e/${s.item}` }, h('strong', {}, s.title)) : h('strong', {}, s.title), ' ', h('span', { class: 'muted small' }, where(s))),
+      // Putting a screen somewhere is in sight; taking it away is rarer, and in its menu.
+      writes && s.homeable && s.at !== 'home' && h('button', { title: 'Draw it on Home again, where its pack put it', onclick: () => home(s, true) }, 'Put on Home'),
+      writes && navable(s) && typeof s.nav !== 'number' && h('button', { title: 'Give it a place in the nav, after the others', onclick: () => add(s) }, 'Add to nav'),
+      rare(s),
+    );
+  // A screen on the pages of a kind has no switch here: it is a row of its own, saying which pages it is on.
+  const actionable = (s) => s.at === 'home' || Boolean(s.homeable) || navable(s);
+  const onPages = screens.filter((s) => !actionable(s));
+  const sorted = [...screens].filter(actionable).sort((a, b) => Number(b.at === 'home' || Boolean(b.homeable)) - Number(a.at === 'home' || Boolean(a.homeable)) || (typeof a.nav === 'number' ? a.nav : 1e9) - (typeof b.nav === 'number' ? b.nav : 1e9) || Number(navable(b)) - Number(navable(a)));
+  return [...sorted.map(row), ...onPages.map(row)];
+}
