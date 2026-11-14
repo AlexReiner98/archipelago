@@ -4,6 +4,7 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
+import { guestBand, tryPage } from './guest.js';
 import { SignInNeeded, api, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { warmLayouts } from './layout.js';
@@ -62,6 +63,8 @@ async function route(pulse = false) {
   if (name === 'join' && arg) return join(arg);
   // A client asking to connect: before anything is read of a map, as whoever may not be signed in yet.
   if (name === 'authorize') return void authorizePage(query);
+  // Try it with your agent, or Make it yours: a guest map made and opened (packs/identity/page/guest.js).
+  if (name === 'try') return void tryPage(query);
   if (['home', 'activity', 'review', 'projects', 'today', 'map', 'automations'].includes(name)) return void (location.hash = '#/');
   if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
@@ -79,6 +82,7 @@ async function route(pulse = false) {
   // In a workspace: the page is the app again, whatever signed-out page was up.
   ungate();
   drawFindSlot();
+  guestBand();
   drawNav();
   startTabs();
   const params = new URLSearchParams(query);

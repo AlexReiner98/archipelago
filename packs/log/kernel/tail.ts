@@ -57,6 +57,20 @@ type Said = { pos: number; n: number; op: '+' | '-'; id: string; field: string; 
  * The facts after `after` on the ids held and on what lives on the `islands` followed (on a map with islands on), as
  * the viewer may see them. A read that names nothing is refused: it would read the whole log.
  */
+/**
+ * How many items the viewer may see were made after `after`, up to `to`: what a page that holds nothing yet is told, so
+ * a view that may find what is new (a type, a text) asks again. A guest's first item lands on an empty canvas.
+ */
+export async function madeAfter(db: Q, after: number, to: number): Promise<number> {
+  if (to <= after) return 0;
+  const { rows } = await db.query<{ n: number }>(
+    `select count(*)::int as n from entity where id in (select id from log_fact where stream = 'facts' and pos > $1 and pos <= $2
+       and at >= coalesce((select at from log_entry where stream = 'facts' and pos = $1), '-infinity') and field = 'type' and op = '+' and left(id, 2) = 'e_')`,
+    [after, to],
+  );
+  return rows[0].n;
+}
+
 export async function factsAfter(db: Q, input: { after: number; ids: string[]; islands?: string[]; limit?: number }): Promise<FactsAfter> {
   const ids = [...new Set(input.ids ?? [])];
   const islands = [...new Set(input.islands ?? [])];
