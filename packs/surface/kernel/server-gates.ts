@@ -8,10 +8,10 @@
 //
 // A server with no gate asks nothing: nobody owes anything, and nothing is limited.
 
-import { controlValue } from '../../identity/kernel/control.ts';
+import { controlValue, setControlValue } from '../../identity/kernel/control.ts';
 import type { Q } from '../../database/kernel/db.ts';
 import type { ServerPacks } from './server-host.ts';
-import { standingFrom, type Standing } from '../../identity/kernel/standing.ts';
+import { standingChanged, standingFrom, type Standing } from '../../identity/kernel/standing.ts';
 
 /** One document to agree to: where it is read and the version in force. */
 export interface Agreement {
@@ -118,4 +118,22 @@ export async function dueForDeletion(packs: ServerPacks, control: Q, now = new D
     if (ended && Date.parse(ended.delete_at) <= now.getTime()) due.push(id);
   }
   return due;
+}
+
+/**
+ * A guest map kept at an address (packs/identity/kernel/guest-keep.ts): the pack with the gate kept is told, and from then
+ * it is that pack's, as one it made (its acts reach it, and its standing gate says what it may do). Given { workspace,
+ * email, machine? }, it answers { trial?: { ends }, upgrade? }: a trial begun, or where to choose a plan. A server with
+ * no such pack keeps the map with nothing limited.
+ */
+export async function keptGate(packs: ServerPacks, control: Q, ask: { workspace: string; email: string; machine?: string }): Promise<{ trial?: { ends: string }; upgrade?: string }> {
+  const pack = packs.packs.find((p) => p.file.reach.server.gates?.kept);
+  if (!pack) return {};
+  await setControlValue(control, madeKey(ask.workspace), pack.file.id);
+  standingChanged(ask.workspace);
+  const answer = ((await packs.call(pack.file.id, 'entry', pack.file.reach.server.gates!.kept!, ask, undefined, true)) ?? {}) as Record<string, unknown>;
+  standingChanged(ask.workspace);
+  const trial = answer.trial as { ends?: unknown } | undefined;
+  const ends = typeof trial?.ends === 'string' && !Number.isNaN(Date.parse(trial.ends)) ? new Date(trial.ends).toISOString() : undefined;
+  return { ...(ends && { trial: { ends } }), ...(linked(answer.upgrade) && { upgrade: answer.upgrade }) };
 }

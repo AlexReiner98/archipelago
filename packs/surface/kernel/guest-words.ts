@@ -21,9 +21,9 @@ The answer's result.created.p is its id.
 2. Then the plan to connect you properly, beside it, as one change. Fill in which agent you are (Claude Code, Codex or Cursor) and the project's id. The steps follow your section of ${origin}/install.md; those only your user can do wait on them (${owner}, the person this map belongs to).
   {"reason":"Setup plan","ops":[
     {"op":"create","ref":"s1","type":"task","title":"Install Archipelago for <your agent>","body":"Run the installer from ${origin}/install.md for <your agent>."},
-    {"op":"create","ref":"s2","type":"task","title":"Sign in to keep this map","body":"The browser opens to sign in; signing in connects <your agent> and saves this map."},
-    {"op":"create","ref":"s3","type":"task","title":"Restart <your agent>","body":"Its Archipelago tools load with the next session."},
-    {"op":"create","ref":"s4","type":"task","title":"Fill in the project","body":"Connected, <your agent> draws the rest of the project on the map."},
+    {"op":"create","ref":"s2","type":"task","title":"Sign in to keep this map","body":"The browser opens to sign in; signing in connects <your agent> and keeps this map. Done by itself when they sign in."},
+    {"op":"create","ref":"s3","type":"task","title":"Restart <your agent>","body":"Its Archipelago tools load with the next session. Connected, <your agent> marks this done and takes away its wait, through those tools."},
+    {"op":"create","ref":"s4","type":"task","title":"Fill in the project","body":"Connected, <your agent> draws the rest of the project on the map, then marks this done."},
     {"op":"link","type":"part_of","from":"s1","to":"<project id>"},
     {"op":"link","type":"part_of","from":"s2","to":"<project id>"},
     {"op":"link","type":"part_of","from":"s3","to":"<project id>"},
@@ -36,6 +36,8 @@ The answer's result.created.p is its id.
   ]}
 
 3. Then stop, and tell your user in two short lines: the project and its setup plan are on the map in their browser; when they want to keep it, say so and you will run step 1 of the plan (signing in saves the map, which is otherwise deleted in a week). Run nothing else until they answer.
+
+4. When they say so: run the installer for your agent (step 1); its sign-in opens in the browser where they watch the map, and signing in there keeps it, starts their trial and connects you. Ask them to restart you, then, connected, tick the plan's steps through your Archipelago tools as its notes say.
 
 If a change is refused, the answer says why in "error": fix that and send it again. The map is your user's to shape as they like (types, links, rules, views, styles, layouts: POST ${origin}/agent/query with {"name":"actions"} lists what each takes); only publishing and what reaches outside the map wait for them to sign in.
 `;
