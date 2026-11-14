@@ -68,7 +68,7 @@ const decision: Op = { op: 'create', ref: 'd', type: 'decision', title: 'Which w
 // now that science's hypothesis and work's document are the hosted service's.
 const hypothesis: Op = { op: 'create', ref: 'h', type: 'conjecture', title: 'It is faster' };
 const style = (ref = 's'): Op => ({ op: 'create', ref, type: 'style', title: `Style ${ref}` });
-const layout = (ref = 's'): Op => ({ op: 'create', ref, type: 'layout', title: `Layout ${ref}` });
+const layout = (ref = 's', props?: Record<string, unknown>): Op => ({ op: 'create', ref, type: 'layout', title: `Layout ${ref}`, ...(props && { props }) });
 const doc: Op = { op: 'create', ref: 'doc', type: 'page', title: 'Guide' };
 const automation: Op = { op: 'create', ref: 'a', type: 'automation', title: 'Nightly', status: 'paused', props: { trigger: 'daily', at: '03:00', action: 'notify', message: 'hi' } };
 /** An automation lives with what it is about (packs/placement/kernel/subject.ts): given with a task, linked by ref. */
@@ -107,8 +107,8 @@ const CASES: Record<string, Case> = {
   'update style title': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, title: 'Calmer' }] },
   'update layout code': { given: [layout()], ops: (i) => [{ op: 'update', id: i.s, props: { code: 'export default () => []' } }] },
   // An edit of a code field is the whole field it leaves (packs/write/kernel/edit.ts): it comes to what update layout code does.
-  'edit layout code': { given: [{ ...layout(), props: { code: 'export default () => [1]' } }], ops: (i) => [{ op: 'update', id: i.s, edit: { field: 'code', find: '[1]', with: '[2]' } }] },
-  'edit layout module': { given: [{ ...layout(), props: { modules: { 'index.js': 'export const picture = () => [1];' } } }], ops: (i) => [{ op: 'update', id: i.s, edit: { field: 'modules', file: 'index.js', find: '[1]', with: '[2]' } }] },
+  'edit layout code': { given: [layout('s', { code: 'export default () => [1]' })], ops: (i) => [{ op: 'update', id: i.s, edit: { field: 'code', find: '[1]', with: '[2]' } }] },
+  'edit layout module': { given: [layout('s', { modules: { 'index.js': 'export const picture = () => [1];' } })], ops: (i) => [{ op: 'update', id: i.s, edit: { field: 'modules', file: 'index.js', find: '[1]', with: '[2]' } }] },
   'update style page_css': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, props: { page_css: 'h2 { color: red }' } }] },
   'update automation': { given: [task(), automation, about], ops: (i) => [{ op: 'update', id: i.a, title: 'Weekly' }] },
   'archive automation': { given: [task(), automation, about], ops: (i) => [{ op: 'archive', id: i.a }] },
