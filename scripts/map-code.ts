@@ -22,6 +22,14 @@ const MANIFEST = '.map-code.json';
 const ROOT = resolve(import.meta.dirname, '..');
 /** The drawing contract's types, copied into a folder for tsc's checkJs when the repository has them (task e_p5s9br82). */
 const TYPES = join(ROOT, 'packs', 'walls', 'page', 'draw.d.ts');
+/**
+ * How tsc checks a pulled folder: as test/draw-types.test.ts checks drawings against draw.d.ts. Not strict (Field alone
+ * gives hundreds of errors under it), and dom without webworker, which clashes with it.
+ */
+const JSCONFIG = {
+  compilerOptions: { allowJs: true, checkJs: true, noEmit: true, strict: false, target: 'es2024', module: 'esnext', moduleResolution: 'bundler', allowImportingTsExtensions: true, lib: ['es2024', 'dom'], skipLibCheck: true, types: [] },
+  include: ['**/*.js', '*.d.ts'],
+};
 
 /** A call to a map's agent tools over HTTP, answering the tool's result. */
 export function httpCall(url: string, token?: string): Call {
@@ -86,7 +94,7 @@ export async function pull(call: Call, url: string, id: string, folder: string):
   writeFileSync(join(folder, MANIFEST), JSON.stringify(pulled, null, 2) + '\n');
   if (existsSync(TYPES) && fields.some((f) => f.kind === 'text' ? !f.css : true)) {
     copyFileSync(TYPES, join(folder, 'draw.d.ts'));
-    writeFileSync(join(folder, 'jsconfig.json'), JSON.stringify({ compilerOptions: { checkJs: true, allowJs: true, noEmit: true, strict: false, target: 'es2022', module: 'es2022', moduleResolution: 'bundler', lib: ['es2022', 'webworker'] }, include: ['**/*.js', 'draw.d.ts'] }, null, 2) + '\n');
+    writeFileSync(join(folder, 'jsconfig.json'), JSON.stringify(JSCONFIG, null, 2) + '\n');
   }
   return pulled;
 }
@@ -200,6 +208,7 @@ async function main() {
     const folder = resolve(plain[1] ?? join(ROOT, '.map-code', id));
     const p = await pull(call, url, id, folder);
     console.log(`${p.title}: ${Object.values(p.fields).flatMap((f) => Object.keys(f.files)).join(', ') || 'no code yet'} in ${folder}`);
+    if (existsSync(join(folder, 'jsconfig.json'))) console.log(`check it: npx tsc -p "${join(folder, 'jsconfig.json')}" (with /** @param {import('./draw.d.ts').DrawInput} input */ on draw)`);
   } else if (verb === 'push' || verb === 'status') {
     const folder = folderOf(plain[0]);
     const { call } = await target(args);
