@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { editAfter } from '../packs/write/kernel/edit.ts';
 import { textDiff as serverDiff } from '../packs/surface/kernel/line-diff.ts';
+import { schemaOf } from '../packs/loader/kernel/part-words.ts';
 // @ts-ignore: a module of the page, plain JavaScript
 import { checkMarks, MARKS } from '../packs/walls/page/part-check.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
@@ -144,4 +145,10 @@ test('code as files, where its field takes them, is tried whole: the file writte
   const q = page({ item: mods, words, views: {} }, { change: async () => ({}), keep: () => {}, state: () => {} });
   assert.equal(inputs(await q.on({ key: 'field-open:modules', name: 'press' })).find((i) => i.kind === 'code')?.preview, undefined);
   assert.throws(() => checkMarks(['input', { key: 'k', kind: 'code', preview: { item: layout.id, field: 'code', others: {} } }]), /preview/);
+});
+
+test('a part that reads items whole is told which code takes files and which is CSS', () => {
+  const types = new Map([['layout', { id: 'layout', columns: {}, fields: { code: { type: 'string', code: true, files: true }, page_css: { type: 'string', code: true, css: true } }, capabilities: {} }]]);
+  const said = schemaOf({ types } as never).types.layout.fields;
+  assert.deepEqual([said.code.files, said.code.css, said.page_css.css, said.page_css.files], [true, undefined, true, undefined]);
 });

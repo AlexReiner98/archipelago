@@ -36,6 +36,10 @@ export interface FieldWords {
   type: string;
   values?: string[];
   code?: true;
+  /** Code that may be files by path (layout.code): the sheet tries it whole, the file written beside the others. */
+  files?: true;
+  /** Code that is a stylesheet: the sheet colours it as CSS and never tries it on the canvas. */
+  css?: true;
   system?: true;
   description?: string;
 }
@@ -55,7 +59,7 @@ export function schemaOf(reg: Pick<Registry, 'types'>): SchemaWords {
     const fields: Record<string, FieldWords> = {};
     for (const [name, f] of Object.entries({ ...t.columns, ...t.fields })) {
       if (!f) continue;
-      fields[name] = { type: String(f.type), ...(f.values && { values: [...f.values] }), ...(f.code && { code: true as const }), ...(f.system && { system: true as const }), ...(f.description && { description: f.description }) };
+      fields[name] = { type: String(f.type), ...(f.values && { values: [...f.values] }), ...(f.code && { code: true as const }), ...(f.files && { files: true as const }), ...(f.css && { css: true as const }), ...(f.system && { system: true as const }), ...(f.description && { description: f.description }) };
     }
     types[t.id] = { fields, capabilities: JSON.parse(JSON.stringify(t.capabilities ?? {})) };
   }
