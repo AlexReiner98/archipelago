@@ -31,3 +31,4 @@ brand/content/
 
 # Test output a session leaves in its worktree.
 *.log
+.map-code/
