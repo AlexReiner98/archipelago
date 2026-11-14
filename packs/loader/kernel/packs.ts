@@ -24,7 +24,7 @@ export interface FieldDef {
   /** Maintained by the system; shown but not offered for editing. */
   system?: boolean;
   /** Sent with the item in a lens answer, so a style can draw by it (a type to colour, an amount, a date). */
-  shown?: boolean;
+  shown?: boolean; /** Never carried off the map: a frozen (published) view leaves its value out, and so does a copy made from one. */ private?: boolean;
   /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (packs/loader/kernel/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (packs/walls/kernel/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
   /** Of type json, holding a value of the simple type another field of the item names (packs/loader/kernel/fields.ts SIMPLE_TYPES): checked on write with the two together. */ typed_by?: string;
 }
@@ -45,7 +45,7 @@ export interface TypeDef {
   deliverable?: boolean;
   /** How high its items sit (ALTITUDES): a project, a stream in it, a step in that. A flavour inherits it. */ altitude?: Altitude;
   /** What anyone may see, with no login, once a person makes it public (a product, what it has built, how we know). A flavour inherits it. */
-  public?: boolean;
+  public?: boolean; /** None of its fields is carried off the map: a frozen (published) view holds its items' titles and words, never their fields. A flavour inherits it. */ private?: boolean;
   /** What it goes with (linked by relation, out from it or in to it): public when that is, a limited token's when that is. A flavour inherits it. */
   belongs_with?: BelongsWith[];
   /** What the kernel computes from it, each naming the field it reads. A flavour inherits them. */
@@ -93,7 +93,7 @@ export interface ResolvedType {
   /** The fields kept in props, and those kept in the item's row (status and the rest its starter declares). */
   fields: Record<string, FieldDef>; columns: Partial<Record<ColumnField, FieldDef>>;
   deliverable: boolean; altitude?: Altitude;
-  public: boolean;
+  public: boolean; private?: boolean;
   belongs_with?: BelongsWith[];
   capabilities: Capabilities;
   noteMax?: NoteMax; movedFrom?: string[]; movedStatuses?: Record<string, Record<string, string>>;
@@ -217,7 +217,7 @@ export class Registry {
         // A type that extends nothing keeps in its row the columns it declares, or the common ones (packs/loader/kernel/head.ts, ownHead).
         ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD }) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
-        public: def.public ?? parent?.public ?? false,
+        public: def.public ?? parent?.public ?? false, ...((def.private ?? parent?.private) && { private: true }),
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
         ...((def.belongs_with ?? parent?.belongs_with)?.length && { belongs_with: def.belongs_with ?? parent?.belongs_with }),
         capabilities: { ...parent?.capabilities, ...def.capabilities },

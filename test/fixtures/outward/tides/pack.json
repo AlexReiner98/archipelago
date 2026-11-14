@@ -1,0 +1,19 @@
+{
+  "id": "tides",
+  "version": "1",
+  "title": "Tides",
+  "description": "For the guest map's tests: a pack whose type a shared map uses and that calls a host outside, so a guest gets its type as data and waits for sign-in to turn it on.",
+  "requires": ["core"],
+  "types": [
+    {
+      "id": "tides.reading",
+      "extends": "record",
+      "title": "Reading",
+      "description": "A tide read at a place and a time.",
+      "fields": { "metres": { "type": "number", "description": "How high the water stood." } }
+    }
+  ],
+  "reach": {
+    "hosts": [{ "id": "tides", "base": "https://tides.example.test" }]
+  }
+}

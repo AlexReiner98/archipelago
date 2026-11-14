@@ -1,0 +1,13 @@
+{
+  "id": "seller",
+  "version": "0.1.0",
+  "title": "Seller",
+  "description": "A server pack for the tests: a kept guest map starts a trial, once per address and per machine.",
+  "reach": {
+    "server": {
+      "acts": ["mail.send"],
+      "entries": [{ "id": "peek" }],
+      "gates": { "standing": "standing", "kept": "kept" }
+    }
+  }
+}

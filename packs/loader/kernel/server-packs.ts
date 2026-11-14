@@ -95,9 +95,11 @@ export interface ServerReach extends MoreReach {
    * agree?, via? } and answers { documents, owes? }: the documents a person agrees to before they are signed in, each
    * { id, title, url, version, also? }, and of those, by id, what the address has not agreed to at its version, with
    * agree recorded first. standing is given { workspace }, one the pack made, and answers what it may do: { limits?,
-   * ended? } (packs/identity/kernel/standing.ts). With no gate, nothing is asked and nothing is limited.
+   * ended? } (packs/identity/kernel/standing.ts). kept is given { workspace, email, machine? }, a guest map signed in to
+   * and kept, which is the pack's from then on, and answers { trial?: { ends }, upgrade? } (packs/identity/kernel/guest-keep.ts).
+   * With no gate, nothing is asked and nothing is limited.
    */
-  gates?: { signin?: string; standing?: string };
+  gates?: { signin?: string; standing?: string; kept?: string };
 }
 
 /**
@@ -148,7 +150,7 @@ export function checkServerPack(p: Partial<Manifest>, folder: string): string[] 
     if (hook ? !webhooks.some((w) => w.id === hook[1]) : !names.includes(to)) problems.push(`"${path}" leads to no route of its own: "${to}"`);
   }
   for (const [gate, name] of Object.entries(server.gates ?? {})) {
-    if (!['signin', 'standing'].includes(gate)) problems.push(`"${gate}" is not a gate: signin or standing`);
+    if (!['signin', 'standing', 'kept'].includes(gate)) problems.push(`"${gate}" is not a gate: signin, standing or kept`);
     else if (!NAME.test(String(name)) || names.includes(String(name))) problems.push(`its gate ${gate} names a function of its handler that is no entry or page: "${name}"`);
   }
   const html = (server.entries ?? []).filter((e) => e.answers === 'html').map((e) => e.id);

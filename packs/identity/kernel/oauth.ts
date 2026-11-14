@@ -15,6 +15,7 @@ import type { Q } from '../../database/kernel/db.ts';
 import { clientOf, listedRedirect, registerClient, returnsTo, type Client } from './oauth-clients.ts';
 import { json as reply, PRIVATE } from './reply.ts';
 import { keep, take } from '../../database/kernel/transient.ts';
+import { standingOf } from './standing.ts';
 
 /** How long a code waits to be traded. */
 const CODE_MINUTES = 5;
@@ -112,6 +113,8 @@ async function answerAsked(res: ServerResponse, origin: string, at: OpenRoutes):
   if (who.kind !== 'human') return json(res, 403, { error: 'A person says Allow, not an agent.' });
   const named = workspaceNamed(query.get('resource'), origin);
   if (named && named !== ws.id) return json(res, 403, { error: `This address is for the workspace "${named}": sign in to that one.` });
+  // A guest map is connected once it is kept: signing in to connect is signing in to keep it (./guest-keep.ts).
+  if (body.allow === true && (await standingOf(ws.id, true))?.guest) return json(res, 403, { error: 'Sign in to keep this map first: then its agent connects.', keep: true });
   if (body.allow !== true) return json(res, 200, { redirect: back(asked, origin, { error: 'access_denied' }) });
   const code = workspaceSecret('oac', ws.id);
   await keep(ws.pelago.db, KEY + hash(code), { client: asked.client.id, name: asked.client.name, redirect: asked.redirect, challenge: asked.challenge, person: who.person ?? null, resource: query.get('resource') }, CODE_MINUTES * 60_000);
