@@ -7,7 +7,7 @@ import { kernelCodeOf, packOf, resolve, resolveServed, rootCodeOf, rootPacksOf, 
 export const ROOT = join(import.meta.dirname, '..');
 const CODE = /\.(ts|js|mjs|css|html)$/;
 /** Vendored as a file at the owner's asking (CLAUDE.md), not written here. */
-export const VENDORED = ['packs/walls/page/three.module.min.js'];
+export const VENDORED = ['packs/walls/page/three.module.min.js', 'packs/walls/page/codemirror.min.js'];
 
 /** Every file under a folder, as it is on disk. */
 export const rawWalk = (dir: string): string[] => walkFiles(ROOT, dir);

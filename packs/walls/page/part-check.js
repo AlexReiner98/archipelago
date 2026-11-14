@@ -8,7 +8,9 @@
 //   text    words; with an href, an address on the web the host opens apart
 //   list    marks one under another, a row each
 //   input   a field the person types in or picks from (its kind: words, a number, an address, a day, a time, yes or
-//           no, one of its values); its edits and picks go back to the part
+//           no, one of its values, or code in the host's code editor, in its `lang`); its edits and picks go back to
+//           the part. Code may carry `preview`: the item and field it is the code of, which the host tries on the
+//           person's own canvas at each pause, for a part that writes (packs/walls/page/part-code.js)
 //   button  words the person presses; the press goes back to the part, or (pick) the item then clicked on the canvas
 //   paint   a surface in its own units that pans and zooms in the host, holding paths and placed text
 //   path    a line or a shape on a paint surface
@@ -83,7 +85,11 @@ const path = (v, why) => (typeof v !== 'string' ? why('not a path') : v.length >
  * What an input may be: words typed (text, number, url, search), a pick sent at once (date, time, check, pick), or an
  * item found by name (item): the host finds as the person types and tells the part only the one picked.
  */
-export const INPUT_KINDS = ['text', 'number', 'url', 'search', 'date', 'time', 'check', 'pick', 'item'];
+export const INPUT_KINDS = ['text', 'number', 'url', 'search', 'date', 'time', 'check', 'pick', 'item', 'code'];
+/** The languages code is written in, for the editor's colours. */
+export const CODE_LANGS = ['js', 'css'];
+/** What code is tried as: the item and the field it is the code of. */
+const codeOf = (v, why) => (plain(v) && Object.keys(v).length === 2 && ITEM.test(v.item) && typeof v.field === 'string' && /^[A-Za-z0-9_.-]{1,60}$/.test(v.field) ? { item: v.item, field: v.field } : why("not { item, field }: an item's id and a field's name"));
 /** The kinds of input whose change is a pick, sent as one gesture, not words being typed. */
 export const PICKS = ['date', 'time', 'check', 'pick'];
 
@@ -134,7 +140,7 @@ export const MARKS = {
   box: { attrs: { ...anyMark, ...handled, look: oneOf('plain', 'band', 'sunk'), tone, flow: oneOf('row', 'column'), gap: step(0, 14), pad: step(0, 14), grow: flag, align: oneOf('start', 'center', 'end', 'between'), wrap: flag, fits: flag, more: key, dock: flag }, holds: 'marks' },
   text: { attrs: { ...anyMark, look: oneOf('body', 'title', 'muted', 'mark', 'code'), tone, size: step(1, 9), bold: flag, x: number, y: number, anchor: oneOf('start', 'middle', 'end'), href, hue: words(partLimits.key) }, holds: 'words' },
   list: { attrs: { ...anyMark, look: oneOf('plain', 'rows'), gap: step(0, 14) }, holds: 'marks' },
-  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag, keys: keyNames }, holds: 'nothing', keyed: true },
+  input: { attrs: { key, tip: anyMark.tip, value: words(partLimits.words), hint: words(partLimits.label), label: words(partLimits.label), lines: step(1, 20), grow: flag, kind: oneOf(...INPUT_KINDS), values: wordList, names: wordList, look: oneOf('plain', 'title'), fits: flag, focus: flag, types: wordList, link: flag, keys: keyNames, lang: oneOf(...CODE_LANGS), preview: codeOf }, holds: 'nothing', keyed: true },
   button: { attrs: { ...anyMark, ...handled, look: oneOf('main', 'quiet', 'tab'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(2000), try: tryOn }, holds: 'words', keyed: true },
   paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag, controls: flag }, holds: 'drawn' },
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash', 'area', 'box', 'strong'), tone, weight: step(1, 4), tip: words(partLimits.label), href }, holds: 'nothing', plane: true, needs: ['d'] },
@@ -208,6 +214,7 @@ function node(mark, seen, where, onPlane) {
   if (kind === 'input' && at.names !== undefined && at.names.length !== (at.values ?? []).length) why('names that are not one for each value');
   if (kind === 'input' && at.kind !== 'item' && (at.types !== undefined || at.link !== undefined)) why('types or link on an input that finds no item');
   if (kind === 'input' && (PICKS.includes(at.kind) || at.kind === 'item') && (at.lines ?? 1) > 1) why(`lines on ${a(at.kind)}`);
+  if (kind === 'input' && at.kind !== 'code' && (at.lang !== undefined || at.preview !== undefined)) why('lang or preview on an input that is not code');
   if (kind === 'text' && !onPlane && placed) why('x, y or anchor on text off a paint surface');
   if (at.more !== undefined && !at.fits) why('more on a box that does not fit: the count it names is drawn only by one that fits');
   if ((at.drag !== undefined || at.aux) && at.key === undefined) why(`${a(kind)} that is dragged or closed with no key: what is done to it goes back by its key`);

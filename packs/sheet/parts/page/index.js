@@ -11,7 +11,7 @@
 import { label, typeOf } from './words.js';
 import { fieldEvent, fieldsMarks } from './fields.js';
 import { choicesMarks, choicesOf, headEvent, headMarks, historyMarks, section, settleOps, sourceMarks } from './sections.js';
-import { blank, barMarks, draftEvent, noteMarks, saveOps, titleMarks, unsaved } from './draft.js';
+import { blank, barMarks, codeChanges, draftEvent, noteMarks, saveOps, titleMarks, unsaved } from './draft.js';
 import { linkEvent, linkMarks } from './links.js';
 
 /** The link types it walks from, read from this end: what it holds walks part_of down only. */
@@ -32,7 +32,7 @@ const HEAD = ['status', 'owner', 'confidence', 'visibility', 'source'];
 export const pageTold = (now, told) => (told?.name === 'page' && told.item?.id ? { ...now, item: told.item, views: { ...(now?.views ?? {}), ...(told.views ?? {}) }, piece: { ...(now?.piece ?? {}), ...(told.count && { count: told.count }) } } : now);
 
 /** The page's state as one value: what is open, what is written, what is asked, what was said. */
-const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) } }, open: new Set(), emptyOpen: false, diffs: new Set(), writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined });
+const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) }, from: { ...(kept?.draft?.from ?? {}) } }, open: new Set(), files: {}, emptyOpen: false, diffs: new Set(), writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined, moved: false });
 
 /** The whole page as marks. */
 export function pageMarks(input, s) {
@@ -63,10 +63,10 @@ export function pageMarks(input, s) {
     headMarks({ ...item, owner_title: view.owner?.title }, type, { writes }),
     section('note', 'Note', 0, noteMarks(item, s.draft, { writes, writing: s.writing, count })),
     c && choicesMarks(item, c, { writes, asking: s.asking }),
-    section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : [])], titles: view.titles ?? {} }) ?? ['text', { look: 'muted' }, 'None']),
+    section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : [])], titles: view.titles ?? {}, files: s.files }) ?? ['text', { look: 'muted' }, 'None']),
     sourceMarks(view.source),
     ['slot', { key: 'slot-sections', name: 'sheet.sections' }],
-    barMarks(s.draft, item, { saving: s.saving, said: s.saveSaid }),
+    barMarks(s.draft, item, { saving: s.saving, said: s.saveSaid, diffs: codeChanges(s.draft, type.fields), diffOpen: s.diffOpen, moved: s.moved }),
     historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names, shown: s.diffs }),
   ].filter(Boolean);
 }
@@ -122,17 +122,27 @@ export default function page(input, tools) {
     if (d) {
       if (d.draft) return written(() => (s.draft = d.draft), event);
       if (d.writing) return ((s.writing = true), draw());
-      if (d.discard) return ((s = { ...s, draft: blank(), open: new Set(), writing: false, saveSaid: undefined }), keep(), draw());
+      if (d.diff) return ((s.diffOpen = !s.diffOpen), draw());
+      if (d.discard) return ((s = { ...s, draft: blank(), open: new Set(), writing: false, saveSaid: undefined, moved: false }), keep(), draw());
+      // Code changed since it was opened: what is there now is opened in its place, and what was written of it let go.
+      if (d.reload) {
+        const fields = { ...s.draft.fields }, from = { ...s.draft.from };
+        for (const k of Object.keys(from)) (delete fields[k], delete from[k]);
+        s = { ...s, draft: { ...s.draft, fields, from }, saveSaid: undefined, moved: false };
+        return (keep(), draw());
+      }
       if (d.ops) return (await change(d), draw());
       if (d.save) {
-        const made = saveOps(s.draft, it);
+        const made = saveOps(s.draft, it, type().fields);
         if (!made || s.saving) return draw();
         if (made.ops[0].title === '') return ((s.saveSaid = 'It needs a name'), draw());
         s.saving = true;
         tools.marks?.(draw());
         const r = await change(made);
         s.saving = false;
-        if (!r?.error) ((s.draft = blank()), (s.open = new Set()), (s.writing = false), (s.saveSaid = undefined), keep());
+        if (!r?.error) ((s.draft = blank()), (s.open = new Set()), (s.writing = false), (s.saveSaid = undefined), (s.moved = false), keep());
+        // The code was changed by someone else since it was opened: said plainly, with a way to open it as it is now.
+        else if (/edit\.base moved/.test(r.error)) ((s.said = undefined), (s.moved = true), (s.saveSaid = 'Changed since you opened it'));
         else s.saveSaid = s.said;
         return draw();
       }
@@ -141,12 +151,19 @@ export default function page(input, tools) {
     const f = fieldEvent(event, it, type().fields, s.draft.fields);
     if (f) {
       if (f.empty) return ((s.emptyOpen = !s.emptyOpen), draw());
+      if (f.file) return ((s.files = { ...s.files, [f.file[0]]: f.file[1] }), draw());
       if (f.open || f.fold) {
         const name = f.open ?? f.fold;
+        // Code opened to write is diffed, at Save, against what it held when it was opened.
+        if (type().fields[name]?.code && !s.open.has(name) && s.draft.from[name] === undefined) s.draft.from[name] = it.props?.[name] ?? null;
+        else if (s.open.has(name) && !(name in s.draft.fields)) delete s.draft.from[name];
         s.open.has(name) ? s.open.delete(name) : s.open.add(name);
         return draw();
       }
-      if (f.keep) return written(() => (s.draft = { ...s.draft, fields: { ...s.draft.fields, [f.keep[0]]: f.keep[1] } }), event);
+      if (f.keep) {
+        if (type().fields[f.keep[0]]?.code && s.draft.from[f.keep[0]] === undefined) s.draft.from[f.keep[0]] = it.props?.[f.keep[0]] ?? null;
+        return written(() => (s.draft = { ...s.draft, fields: { ...s.draft.fields, [f.keep[0]]: f.keep[1] } }), event);
+      }
       if (f.bad) return undefined;
       if (f.save) return on({ key: 'draft:save', name: 'press' });
       if (f.pick) return (s.open.delete(f.pick[0]), await change({ ops: [{ op: 'update', id: it.id, props: { [f.pick[0]]: f.pick[1] } }], reason: `${label(f.pick[0])} set in the UI` }), draw());

@@ -24,6 +24,7 @@ import { buildPane, frameWeb, layPanes, paneBody, paneGone, sashes } from './par
 import { draggable } from './part-drag.js';
 import { traceGone, traceMark } from './part-trace.js';
 import { setsField } from './part-echo.js';
+import { codeAt, codeField, codeSet, codeText } from './part-code.js';
 
 /** What each element was drawn from, and the surface that runs a paint mark. */
 const drawnFrom = new WeakMap();
@@ -50,8 +51,8 @@ const sent = new WeakMap();
  * `draw(node, seen)` for each answer the part gives, `seen` the number of the last message the part had heard when it
  * gave it (what `tell` answers each event with), and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {}, slot = async () => 0 } = {}) {
-  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts, slot };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {}, slot = async () => 0, preview } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts, slot, preview };
   let ended = false;
   return {
     draw(node, seen) {
@@ -181,6 +182,11 @@ const FIELD_TYPES = { text: 'text', number: 'number', url: 'url', search: 'searc
 function field(node, ctx) {
   const kind = node.at.kind ?? 'text';
   if (kind === 'item') return finder(node, ctx);
+  // Code, in the host's code editor: its words go back as a box's do, numbered so a stale answer leaves them be.
+  if (kind === 'code') {
+    const el = codeField(node, { said: (name, value) => { const n = ctx.tell({ key: drawnFrom.get(el).key, name, ...(name === 'edit' && { value }) }); if (name === 'edit' && Number.isFinite(n)) sent.set(el, n); }, preview: ctx.preview });
+    return el;
+  }
   const many = (node.at.lines ?? 1) > 1;
   const el = kind === 'pick' ? make('select', 'pm-input') : make(many ? 'textarea' : 'input', 'pm-input');
   if (el.tagName === 'INPUT') el.type = FIELD_TYPES[kind];
@@ -313,7 +319,10 @@ function update(el, node, ctx, fresh = false) {
   }
   if (node.mark === 'button' || node.mark === 'input') at.label !== undefined ? el.setAttribute('aria-label', at.label) : el.removeAttribute('aria-label');
   if (node.mark === 'input' && at.kind === 'item') el.firstElementChild.placeholder = at.hint ?? '';
-  else if (node.mark === 'input') {
+  else if (node.mark === 'input' && at.kind === 'code') {
+    codeAt(el, at);
+    if (setsField(at.value ?? '', codeText(el), sent.get(el), ctx.seen)) codeSet(el, at.value ?? '');
+  } else if (node.mark === 'input') {
     el.placeholder = at.hint ?? '';
     if (el.tagName === 'TEXTAREA') el.rows = at.lines;
     // A pick offers its values, made again only when they change.
