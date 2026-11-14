@@ -31,6 +31,8 @@ export interface Action {
   /** The JSON Schema of its params. */
   params: unknown;
   humanOnly?: boolean;
+  /** Only a workspace admin's session may run it: never offered to an agent. */
+  admin?: boolean;
   devOnly?: boolean;
 }
 
@@ -47,7 +49,8 @@ const schemaOf = (input: z.ZodRawShape) => {
 
 /**
  * Every action in a workspace: the kernel's (KERNEL_VERBS) and those its packs declare, by the name an agent calls it.
- * A pack's action for admins is offered as before: it says so, and refuses anyone else when it runs.
+ * A pack's action for admins says so (`admin`): only a person's admin session may run it, so no agent is offered it
+ * (decision e_ssrawn4v: an agent never carries an admin's authority), and one that calls it is refused when it runs.
  */
 export function actionsOf(reg: Registry, tools: Record<string, Tool>): Action[] {
   const kernel = Object.entries(KERNEL_VERBS)
@@ -55,7 +58,7 @@ export function actionsOf(reg: Registry, tools: Record<string, Tool>): Action[] 
     .map(([name, verb]): Action => ({ name, verb, tool: name, description: tools[name].description, params: schemaOf(tools[name].input), humanOnly: tools[name].humanOnly, devOnly: tools[name].devOnly }));
   const packs = [...reg.tools]
     .filter(([, t]) => t.call !== 'view') // an action, not a view
-    .map(([tool, t]): Action => ({ name: t.def.id, verb: (t.def as ActionDef).verb, tool, description: `${t.def.description} (from the ${t.pack} pack)`, params: t.def.input, humanOnly: (t.def as ActionDef).humanOnly }));
+    .map(([tool, t]): Action => ({ name: t.def.id, verb: (t.def as ActionDef).verb, tool, description: `${t.def.description} (from the ${t.pack} pack)`, params: t.def.input, humanOnly: (t.def as ActionDef).humanOnly, admin: (t.def as ActionDef).admin }));
   return [...kernel, ...packs];
 }
 

@@ -1,7 +1,8 @@
 // A part of the page sends its own pack's actions, as the person looking (decision e_3mdf9gn8, task e_9ests3je). The
 // page names the part and the hash of its code on the call (`part`), and here that is checked before the action runs:
 // the call is a person's, the part is drawn here at that hash (its pack's code, or the owner's version of it), the
-// action is one of its `sends`, its own pack's, and not one only a person or an admin may choose to call. The change it
+// action is one of its `sends`, its own pack's, and not one only a person may choose to call. An admin's action
+// goes only with the grant an admin's press minted (./press-grants.ts), taken once here, the session admin again. The change it
 // makes then names the part (`ChangeInput.part`), so the log says which version of which part asked. Whether that
 // change applies or waits is the rules' to say, as for any change of that person's: nothing here lifts a hold.
 //
@@ -10,6 +11,7 @@
 
 import type { ActionDef } from './declared.ts';
 import { islandRegistry } from './island-pin.ts';
+import { mintGrant, takeGrant } from './press-grants.ts';
 import { commitOf } from './pack-versions.ts';
 import type { Registry } from './packs.ts';
 import { partsFor } from './ui-parts.ts';
@@ -48,10 +50,29 @@ export async function partCall(l: Archipelago, actor: Actor, action: string, isl
   const part = [...partsFor(reg, kept), ...partsFor(reg)].find((p) => p.id === ref.id && p.hash === ref.hash);
   if (!part) throw no(`no part "${ref.id.slice(0, 80)}" with that code is drawn here.`);
   if (!part.sends.includes(def.id) || found.pack !== part.pack) throw no(`${part.id} does not send "${def.id}": a part sends the actions its pack declares for it.`);
-  if (def.humanOnly || def.admin) throw no(`"${def.id}" is one a person chooses to call themselves.`);
+  if (def.humanOnly) throw no(`"${def.id}" is one a person chooses to call themselves.`);
+  // An admin's action carries an admin's press: the grant the page minted on it, for this person and this part, once.
+  if (def.admin && !(actor.admin && takeGrant((given as { grant?: unknown }).grant, l.workspace, actor, part))) throw no(`"${def.id}" is an admin's, sent only on an admin's own press.`);
   // The host the page loaded with, where it names one: with the log position, all a refiner needs to know what drew it.
   const host = commitOf(ref.host);
   return { id: part.id, hash: part.hash, ...(host && { host }) };
+}
+
+/**
+ * A grant for an admin's press on a part (the page's press_grant, packs/surface/page/part-bridge.js): only for a person
+ * whose session is an admin, and a part drawn here, at that hash, that sends an admin action. Throws why not.
+ */
+export async function pressGrant(l: Archipelago, actor: Actor, island: unknown, given: unknown): Promise<string> {
+  if (actor.kind !== 'human') throw no('only a person’s press carries an admin’s authority.');
+  if (!actor.admin) throw no('only a workspace admin’s press carries an admin’s authority.');
+  const ref = (given ?? {}) as Partial<PartRef>;
+  if (typeof ref.id !== 'string' || typeof ref.hash !== 'string' || !HASH.test(ref.hash)) throw no('part is { id, hash }: the part and the hash of its code.');
+  const reg = await islandRegistry(l, island);
+  const kept = await versionsOf(l, reg, ref.id);
+  const part = [...partsFor(reg, kept), ...partsFor(reg)].find((p) => p.id === ref.id && p.hash === ref.hash);
+  if (!part) throw no(`no part "${ref.id.slice(0, 80)}" with that code is drawn here.`);
+  if (!part.admin?.length) throw no(`${part.id} sends no admin's action: a press on it carries nothing.`);
+  return mintGrant(l.workspace, actor, part);
 }
 
 /** What a part's change may do: never a merge, a type, or a forget (as a drawing's: packs/rules/kernel/layout-changes.ts). */

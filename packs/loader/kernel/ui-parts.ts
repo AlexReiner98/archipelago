@@ -79,6 +79,8 @@ export interface Part {
   query?: PartQuery;
   views?: PartView[];
   sends: string[];
+  /** The admin's actions among those it sends: each goes only with the grant an admin's press minted (./press-grants.ts). */
+  admin?: string[];
   opens: string[];
   marks: string[];
   go?: true;
@@ -122,7 +124,8 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
   const problems: string[] = [];
   const seen = new Set<string>(), opened = new Set<string>(), claimed = new Set<string>();
   const actions = new Set(declared(pack).actions.map((a) => a.id));
-  const personal = new Set(declared(pack).actions.filter((a) => a.humanOnly || a.admin).map((a) => a.id));
+  // An admin's action a part may send, carried by an admin's press (./press-grants.ts); one only a person calls, never.
+  const personal = new Set(declared(pack).actions.filter((a) => a.humanOnly).map((a) => a.id));
   const open = slotsOpenTo(pack);
   for (const part of given as PartDef[]) {
     const at = `part "${String(part?.id)}"`;
@@ -172,7 +175,7 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
     else for (const a of part.sends ?? []) {
       if (!actions.has(a)) problems.push(`${at} sends "${String(a)}", which is not an action of ${pack.id}: a part sends its own pack's actions alone`);
       // What only a person or an admin may call is theirs to choose, never a part's to send (packs/loader/kernel/part-calls.ts).
-      else if (personal.has(a)) problems.push(`${at} sends "${a}", which only a person or an admin may call: a part never sends it`);
+      else if (personal.has(a)) problems.push(`${at} sends "${a}", which only a person may call: a part never sends it`);
     }
     // By shape alone: whether the host draws them is asked where the part is drawn, so a host's change never refuses the pack.
     // A part that only publishes page state, or only answers a decision (a slot that asks one: tabs.land), draws
@@ -259,11 +262,13 @@ function modulesOf(packs: Packs, d: PartDef & { pack: string }, mine?: Kept): Re
  */
 export function partsFor(packs: Packs, kept: Kept[] = [], have: string[] = [], host?: string[]): Part[] {
   const out: Part[] = [];
+  const admin = new Set(packs.packs.flatMap((p) => declared(p).actions.filter((a) => a.admin).map((a) => a.id)));
   for (const d of partsOf(packs.packs)) {
     const mine = kept.find((v) => v.props.preset === d.id);
+    const admins = (d.sends ?? []).filter((a) => admin.has(a));
     if (mine && !mine.is_open) continue;
     const modules = modulesOf(packs, d, mine), hash = hashOf(modules), waiting = host && marksWaiting(d.marks, host);
-    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], ...(d.writes?.length && { writes: d.writes }), opens: d.opens ?? [], marks: d.marks ?? [], ...(d.go && { go: true as const }), ...(d.state?.length && { state: d.state }), hash, ...(waiting ? { waiting } : !have.includes(hash) && { modules }) });
+    out.push({ id: d.id, pack: d.pack, title: d.title, slot: d.slot, reads: d.reads ?? {}, ...(d.query && { query: d.query }), ...(d.views && { views: d.views }), sends: d.sends ?? [], ...(admins.length && { admin: admins }), ...(d.writes?.length && { writes: d.writes }), opens: d.opens ?? [], marks: d.marks ?? [], ...(d.go && { go: true as const }), ...(d.state?.length && { state: d.state }), hash, ...(waiting ? { waiting } : !have.includes(hash) && { modules }) });
   }
   return out;
 }

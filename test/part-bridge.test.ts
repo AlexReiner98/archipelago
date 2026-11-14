@@ -96,7 +96,7 @@ test('a part that would send an action only a person may call does not load', ()
     // Its pack waits with why, and the map loads without it (e_6g34wqdm).
     const state = new Registry(dir).states.get('shelf');
     assert.equal(state?.state, 'waiting');
-    assert.match(state?.why ?? '', /sends "shelf.mine", which only a person or an admin may call: a part never sends it/);
+    assert.match(state?.why ?? '', /sends "shelf.mine", which only a person may call: a part never sends it/);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
