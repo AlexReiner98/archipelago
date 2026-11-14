@@ -11,6 +11,7 @@ import { bypassingRls } from '../../identity/kernel/outbox.ts';
 import type { TypeDef } from '../../loader/kernel/packs.ts';
 import { actorId } from '../../write/kernel/pelago.ts';
 import { whose } from './tool-change.ts';
+import { triesAfter } from './tool-preview.ts';
 import { UI_DIRS } from './ui-files.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
@@ -38,8 +39,12 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
         .object({ page: z.string().max(40), on: z.boolean(), where: z.string().max(2000).optional(), tab: z.object({ chat: z.string().max(40), own: z.boolean() }).optional(), lands: z.array(z.string().max(60)).max(24).optional() })
         .optional()
         .describe('The page asking, whether a show can land in it, and where it stands (its address after "#/"): an agent’s show says how many pages can take it, and an agent is told what the owner is looking at, and whether its show lands in the tab in sight (lands: the sessions whose shows go there).'),
+      tries: z.number().int().nonnegative().optional().describe('The `at` of the last tries heard (0 for none): answered with only the tries of code the person looking sent (packs/surface/kernel/tool-preview.ts), once they move after it.'),
+      wait: z.number().int().min(0).max(25).optional().describe('With tries: seconds to wait for them to move.'),
     },
-    run: async (l, _actor, { after, seq, ids = [], islands = [], page, was }) => {
+    run: async (l, _actor, { after, seq, ids = [], islands = [], page, was, tries, wait }) => {
+      // The tries a page waits for, apart from the rest: one call held open until they move.
+      if (tries !== undefined) return { tries: await triesAfter(l, tries, wait) };
       // The page says it is open and where it stands, and is given what its screen shows (the presence pack's act.report.screen).
       const screen = callAs<{ told: number } & Record<string, unknown>>(l, 'act.report.screen', { whose: whose(l), ...(page && { page }) });
       const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), screen, headPos(l.db)]);

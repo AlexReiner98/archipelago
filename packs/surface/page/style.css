@@ -386,6 +386,11 @@ details.menu.ok > summary { font-size: var(--text-2); color: var(--warn); }
 .held-band .held-acts > .who { flex: 0 1 auto; min-width: 0; color: var(--muted); font-size: var(--text-3); }
 /* The same, called out over the canvas while no sheet is open: one press from the band. */
 #find .held-call { display: flex; align-items: center; gap: var(--space-6); margin: 0 0 var(--space-5); padding: var(--space-4) var(--space-4) var(--space-4) var(--space-7); background: var(--panel); border: var(--border-1) solid var(--warn); border-left-width: var(--border-4); border-radius: var(--radius-2); }
+/* A try of code the person sent (preview.js): a line above find for each, and the views drawn with one dashed at their edge, as a ghost is. */
+#find .try-call { display: flex; align-items: center; gap: var(--space-6); margin: 0 0 var(--space-5); padding: var(--space-4) var(--space-4) var(--space-4) var(--space-7); background: var(--panel); border: var(--border-1) dashed var(--accent); border-radius: var(--radius-2); }
+#find .try-call > .try-call-n { flex: none; color: var(--accent); font-weight: 600; }
+#find .try-call > button { flex: none; }
+.lens-wrap[data-preview] > .lens-view { outline: var(--border-1) dashed var(--accent); outline-offset: calc(-1 * var(--border-1)); }
 #find .held-call[hidden], body[data-sheet="open"] #find .held-call, #find.open .held-call { display: none; }
 #find .held-call > .held-call-n { flex: none; color: var(--warn); font-weight: 600; }
 #find .held-call > button { flex: none; }

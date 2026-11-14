@@ -35,7 +35,7 @@ export const STORES: Record<string, string> = {
   act: 'A request a pack made outside the map: one that cannot be taken back waits for a person; once made it is logged, never undone.',
   type_def: "Every type and relation the packs declare, dormant ones included: written when a workspace opens, never by a change.",
   local_type: "A workspace's own types, kept beside the workspaces so the server can read them: written when one is defined.",
-  transient: "Short-lived keys and values with an expiry: gone when they lapse, never part of a backup or the log; unlogged on a Postgres server. Among them the set of items each session touched (packs/sessions/kernel/touched.ts), kept by run until a week after it was last heard from or ended, and where the owner’s page stands (packs/presence/kernel/seeing.ts), kept a day.",
+  transient: "Short-lived keys and values with an expiry: gone when they lapse, never part of a backup or the log; unlogged on a Postgres server. Among them the set of items each session touched (packs/sessions/kernel/touched.ts), kept by run until a week after it was last heard from or ended, where the owner’s page stands (packs/presence/kernel/seeing.ts), kept a day, and the tries of code a person sent to their own pages (packs/surface/kernel/tool-preview.ts), kept 15 minutes after the last.",
   pack_store: 'Keys and values a server pack keeps, each pack its own: written through the pack host only.',
   control_workspace: 'The workspaces this server holds: written when one is made.',
   control_value: "The server's own keys and values, across workspaces.",

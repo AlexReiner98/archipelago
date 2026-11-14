@@ -25,6 +25,7 @@ const CALLERS: Record<string, number> = {
   'packs/identity/kernel/token-tools.ts': 1,
   'packs/surface/kernel/tool-human.ts': 1, // import_backup: everything in the file goes in, whoever it is private to
   'packs/surface/kernel/tool-reads.ts': 1,
+  'packs/surface/kernel/tool-preview.ts': 1, // a try of code: kept in the transient store under the sender's own screen, which only the whole database reaches
   'packs/loader/kernel/typetable.ts': 2,
   'packs/surface/kernel/workspace-tools.ts': 4, // root.counters, the usage view's whole count (was packs/usage/kernel/usage.ts's)
 };
