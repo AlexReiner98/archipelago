@@ -245,7 +245,8 @@ is, each named by the SHA-256 of its text, as a pack's code is (section 8):
   Nothing was rewritten (section 6): the form is a value's shape, read like a
   blob's (section 4), not an entry's.
 - Left for later: a held change's `ops` (its header) still carries the whole
-  field, and `layout.code` is still one text to whoever sends it.
+  field. A layout's `code` may be files by path since e_4pfjppqg (docs/layouts.md),
+  stored here as files like any other.
 
 ### Today's ops as facts
 

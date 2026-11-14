@@ -79,3 +79,21 @@ test('a value stored whole before this is where a later value finds the texts it
   assert.deepEqual((stored[1] as { $texts: object }).$texts, { [sha(now['index.js'])]: now['index.js'] }, 'the text the old value had is not kept again');
   assert.deepEqual((await all(l)).flatMap((e) => e.facts).filter((f) => f[1] === m && f[2] === 'modules').map((f) => f[3]), [modules, now]);
 });
+
+test('a layout\'s code may be files by path: an edit of one file logs that file, and the code reads back as its files', async () => {
+  const l = await fresh();
+  const physics = `export const step = (n) => n + 1;\n${'// ballast\n'.repeat(1500)}`;
+  const files = { 'index.js': `import { step } from './physics.js';\nexport default function draw() { step(1); }\n`, 'physics.js': physics };
+  const { s } = await make(l, [{ op: 'create', ref: 's', type: 'layout', title: 'Field', props: { code: files } }]);
+  assert.deepEqual((await l.entity(s))!.props.code, files);
+  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: s, edit: { field: 'code', file: 'index.js', find: 'step(1)', with: 'step(2)' } }] });
+  const { rows } = await l.db.query<{ id: string; field: string; value: unknown }>(`select id, field, value from log_fact where id = $1 and field = 'code' order by pos`, [s]);
+  const stored = (await openRows(l.db, rows)).map((r) => r.value as { $files: Record<string, string>; $texts?: Record<string, string>; $one?: true });
+  assert.deepEqual(Object.keys(stored[1].$texts!), [sha(files['index.js'].replace('step(1)', 'step(2)'))], 'the edit kept index.js alone');
+  assert.equal(stored[1].$one, undefined, 'files stay files');
+  assert.equal(((await l.entity(s))!.props.code as Record<string, string>)['physics.js'], physics);
+  // One text stays one text, and is split by writing it whole as files.
+  const { t } = await make(l, [{ op: 'create', ref: 't', type: 'layout', title: 'One', props: { code: 'export default function draw() {}\n' } }]);
+  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, edit: { field: 'code', file: 'index.js', find: 'draw', with: 'go' } }] }), /one text, not modules by name: leave edit\.file out, or write it whole as files by path/);
+  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, props: { code: { 'main.js': 'x' } } }] }), /index\.js among them/);
+});

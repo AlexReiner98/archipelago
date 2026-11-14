@@ -89,7 +89,7 @@ export async function savedViews(ctx: KernelContext, input: { limit?: number; pi
       const found = x.about.map((id) => items.get(id)).find(Boolean);
       const of = found && { id: found.id, title: found.title, type: found.type };
       // A style it names lies over its own settings, and a layout with code draws no shape.
-      const shape = named ? (typeof named.props.code === 'string' ? undefined : (named.props.shape ?? own.shape)) : (own.shape ?? style?.props.shape);
+      const shape = named ? (typeof named.props.code === 'string' || (named.props.code && typeof named.props.code === 'object') ? undefined : (named.props.shape ?? own.shape)) : (own.shape ?? style?.props.shape);
       const document = documents.get(x.id);
       const why = cannot.get(x.id);
       return { lens: x.id, title: x.title, ...(typeof shape === 'string' && { shape }), ...(of && { of }), ...(of && projectOf(of.id) && { project: projectOf(of.id) }), ...(document && { document }), ...(notes.has(x.id) && { note: notes.get(x.id) }), ...(why && { cannot: why }), life: kept.has(x.id) ? 'kept' : 'working', ...(input.pick === true && { updated_at: x.updated_at, filter: x.props.filter ?? {}, walk: x.props.walk ?? { over: [], steps: 0 } }) };

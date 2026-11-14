@@ -13,6 +13,9 @@ const saidDrawn = (el, state, why) => el.dispatchEvent(new CustomEvent('view-dra
 /** The frame's address (named with the UI's version as it is served), asked for opened. */
 const opened = (frame) => ((frame = new URL(frame, location.href)), frame.searchParams.set('open', '1'), frame.pathname + frame.search);
 
+/** Whether a layout's code is there to run: one text, or files by path entered at index.js. */
+export const coded = (code) => (typeof code === 'string' && code.trim() !== '') || (!!code && typeof code === 'object' && typeof code['index.js'] === 'string');
+
 /** The most ops one ask of a drawing may carry. */
 const mostOps = 50;
 
@@ -38,7 +41,7 @@ export function drawCode(host, answer, style, keep, _place, coder) {
   const { style: _kept, ...data } = answer;
   const was = host.coded;
   const warm = was?.sent && was.frame?.isConnected && host.contains(was.frame);
-  if (warm && was.code === code && JSON.stringify(fields) === was.fields) return void ((was.data = data), was.frame.contentWindow.postMessage({ type: 'answer', answer: data }, '*'));
+  if (warm && JSON.stringify(was.code) === JSON.stringify(code) && JSON.stringify(fields) === was.fields) return void ((was.data = data), was.frame.contentWindow.postMessage({ type: 'answer', answer: data }, '*'));
   if (warm) return void (Object.assign(was, { code, fields: JSON.stringify(fields), style: fields, data, keep, coder }), was.swap());
   const error = h('div', { class: 'lens-error', hidden: true });
   const stage = h('div', { class: 'code-stage' });

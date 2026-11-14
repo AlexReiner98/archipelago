@@ -15,7 +15,7 @@ const OWN = ['code', 'modules', 'writes', 'preset'];
 
 /** Whether a style is a layout: it has code, or modules, or is the owner's version of a pack's drawing. */
 export const isLayout = (props: Props, drawings: Set<string>) =>
-  typeof props.code === 'string' || (props.modules != null && typeof props.modules === 'object') || (typeof props.preset === 'string' && drawings.has(props.preset));
+  typeof props.code === 'string' || (props.code != null && typeof props.code === 'object') || (props.modules != null && typeof props.modules === 'object') || (typeof props.preset === 'string' && drawings.has(props.preset));
 
 /** The facts that make each such style a layout: its type, and its other fields put in its settings. Pure. */
 export function layoutsMoved(styles: { id: string; props: Props }[], drawings: Set<string>, layout = 'layout'): Fact[] {

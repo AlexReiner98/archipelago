@@ -161,3 +161,18 @@ test('try: the changed fields go to query look as tries, the picture is saved be
     rmSync(folder, { recursive: true, force: true });
   }
 });
+
+test('a layout\'s code that may be files: one text pulls as index.js, a new file splits it, and files pull at their paths', () => {
+  const fields = codeFields({ code: { type: 'string', code: true, files: true } });
+  assert.deepEqual(fields, [{ name: 'code', kind: 'text', files: true }]);
+  const base = { url: 'x', item: 'e_1', type: 'layout', title: 'T' };
+  const one = toFiles(fields, { code: DRAW });
+  assert.deepEqual(one.files, { 'index.js': DRAW });
+  const pulled = record(base, fields, one);
+  assert.deepEqual(fromFiles(pulled, { 'index.js': DRAW, 'physics.js': 'export const g = 1;\n' }), { props: { code: { 'index.js': DRAW, 'physics.js': 'export const g = 1;\n' } }, changed: ['physics.js'] }, 'a new file joins the code, which becomes files');
+  const split = toFiles(fields, { code: { 'index.js': DRAW, 'physics.js': 'x' } });
+  assert.deepEqual(split.files, { 'index.js': DRAW, 'physics.js': 'x' }, 'files pull at their paths, as a pack folder holds them');
+  const back = record(base, fields, split);
+  assert.deepEqual(fromFiles(back, { 'index.js': DRAW, 'physics.js': 'y' }), { props: { code: { 'index.js': DRAW, 'physics.js': 'y' } }, changed: ['physics.js'] });
+  assert.deepEqual(fromFiles(back, { 'index.js': DRAW }).props, { code: DRAW }, 'back to index.js alone, it is one text again');
+});

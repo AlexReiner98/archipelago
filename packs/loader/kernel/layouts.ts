@@ -51,7 +51,7 @@ export function layoutFor(
   versions: { is_open: boolean; props: Record<string, unknown> }[],
   have: string[] = [],
 ): Layout | undefined {
-  if (typeof style.code === 'string' && style.code.trim()) return undefined;
+  if ((typeof style.code === 'string' && style.code.trim()) || (style.code && typeof style.code === 'object')) return undefined;
   // A shape no pack draws (one retired, or none said) is drawn by the first drawing the packs ship: canvas's map, where only it ships one.
   const shipped = layoutsOf(packs.packs);
   const d = shipped.find((one) => one.shape === style.shape) ?? shipped[0];
