@@ -10,7 +10,8 @@ export function checkValue(field: FieldDef, value: unknown): string | undefined 
   if (!field.large && sizeOf(value) > LARGE) return `is too large (${sizeOf(value)} characters; a field holds ${LARGE} at most, unless it is a system item's declared large)`;
   switch (field.type) {
     case 'string':
-      if (typeof value !== 'string') return 'must be a string';
+      if (field.files && value && typeof value === 'object') return filesProblem(value);
+      if (typeof value !== 'string') return field.files ? 'must be a text, or files by path ({ "index.js": ... })' : 'must be a string';
       // A published page's stylesheet, refused here by the rules the page reads it by, so a page never meets one it would drop.
       return field.css && cssProblem(value, true) ? `is a stylesheet a page refuses: ${cssProblem(value, true)}` : undefined;
     case 'number':
@@ -55,4 +56,15 @@ export function typedProblems(typeId: string, fields: Record<string, FieldDef>, 
     if (problem) problems.push(`${typeId}.${key} is said to be ${named} (${by}), and ${problem}`);
   }
   return problems;
+}
+
+/** A plain module name a file of code may have: one imports another as './name.js', so no folders. */
+const FILE = /^[A-Za-z0-9_][A-Za-z0-9_.-]*\.js$/;
+/** What is wrong with code as files by path (a field declared files): each a text, by a plain name, index.js the entry. */
+export function filesProblem(value: object): string | undefined {
+  if (Array.isArray(value)) return 'must be a text, or files by path ({ "index.js": ... }), not a list';
+  const entries = Object.entries(value as Record<string, unknown>);
+  const bad = entries.filter(([p, t]) => !FILE.test(p) || typeof t !== 'string').map(([p]) => p);
+  if (bad.length) return `holds files by plain names ending .js, each a text (one imports another as './name.js'): not ${bad.join(', ')}`;
+  return entries.some(([p]) => p === 'index.js') ? undefined : 'holds files by path with index.js among them: the file that is run';
 }

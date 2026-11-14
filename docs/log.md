@@ -216,6 +216,38 @@ log keeps as a blob (section 8). So a type whose pack is gone stays readable
 (dormant) at any position, and today's `types.sync` becomes the pack's fact
 asserted again when its manifest changes.
 
+### Code fields: files by hash (14 Nov 2026, task `e_ubdb4u7c`)
+
+A field its type declares `code` (a layout's `code` and `modules`, a part's
+`code`, a version's `code`, a style's `page_css`) is stored as the files it
+is, each named by the SHA-256 of its text, as a pack's code is (section 8):
+
+```json
+["+", "e_x", "modules", { "$files": { "index.js": "9c1e…", "rows.js": "07af…" }, "$texts": { "9c1e…": "export …" } }]
+```
+
+- `$texts` holds a file's text only where the field's last assertion did not
+  have that hash, so a one-line change to one module logs that module alone.
+  A field that is one text is one file (`index.js`, a stylesheet
+  `index.css`) and says `$one: true`.
+- The value is sealed with the item's key like any field (section 5): a text
+  is found again only among the facts of the same item and field
+  (`log_fact_history`), never another item's, and a forget takes them all.
+- **Read back whole.** Every opener of the log
+  (`packs/seal/kernel/seal.ts`) reads such a value back as the text or
+  modules it was written as, from the texts beside it or in the field's
+  earlier facts, each checked against its hash
+  (`packs/seal/kernel/code-files.ts`). So the projection, the page's replica,
+  history, look, an edit and a pull read what they always read, and an agent
+  sends what it always sent.
+- **No new version.** A value written before this is the text itself and
+  reads as it was; a later value finds the texts it names by hash in it too.
+  Nothing was rewritten (section 6): the form is a value's shape, read like a
+  blob's (section 4), not an entry's.
+- Left for later: a held change's `ops` (its header) still carries the whole
+  field. A layout's `code` may be files by path since e_4pfjppqg (docs/layouts.md),
+  stored here as files like any other.
+
 ### Today's ops as facts
 
 | op | facts |

@@ -25,6 +25,7 @@ import { ACT_TOOLS } from './tool-acts.ts';
 import { WRITE_TOOLS } from './tool-change.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
+import { PREVIEW_TOOLS } from './tool-preview.ts';
 import { READ_TOOLS } from './tool-reads.ts';
 import { readsSaid, toolsSaid } from './tool-said.ts';
 import { declaredTools, type DeclaredTool } from './tool-input.ts';
@@ -92,7 +93,7 @@ async function step(l: Archipelago, actor: Actor, name: string, input: Record<st
 const PACK_TOOLS: Record<string, Tool> = Object.assign({}, ...(await serverFillings<Record<string, DeclaredTool<KernelContext>>>('surface.tools')).map(({ pack, filled }) => declaredTools(filled, (l) => ownContext(l, pack))));
 
 export const TOOLS: Record<string, Tool> = {
-  ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HUMAN_TOOLS,
+  ...READ_TOOLS, ...WRITE_TOOLS, ...ACT_TOOLS, ...HUMAN_TOOLS, ...PREVIEW_TOOLS,
   ...PACK_STATE_TOOLS, ...BACKUP_TOOLS, ...REPORT_TOOLS,
   ...TOKEN_TOOLS, ...MEMBER_TOOLS, ...WORKSPACE_TOOLS, ...PACK_TOOLS,
 };

@@ -19,6 +19,9 @@ import type { KernelContext, RegistryRead } from '#pelago/kernel';
 import { finishTheme, mergeTheme } from './colours.ts';
 import { cssProblem } from './page-css.ts';
 
+/** Whether a layout's code is there to run: one text, or files by path entered at index.js. */
+const coded = (v: unknown) => (typeof v === 'string' && v.trim() !== '') || (!!v && typeof v === 'object' && typeof (v as Record<string, unknown>)['index.js'] === 'string');
+
 /** A preset a pack ships (packs/loader/kernel/declared.ts, StyleDef). */
 export interface StyleDef {
   id: string;
@@ -88,7 +91,7 @@ const keptOf = async (ctx: KernelContext, type: 'style' | 'layout' | ('style' | 
 /** What a layout draws with, as a layer: its settings, and its code. */
 const layoutLayer = (props: Record<string, unknown>): Record<string, unknown> => ({
   ...(props.settings && typeof props.settings === 'object' && !Array.isArray(props.settings) ? ownStyle(props.settings) : {}),
-  ...(typeof props.code === 'string' && { code: props.code }),
+  ...(coded(props.code) && { code: props.code }),
 });
 
 /** What a style draws with, as a layer: never code, which only a layout holds. */
@@ -152,9 +155,9 @@ export async function styleFor(ctx: KernelContext, kept: Kept[], ask: StyleAsk, 
   let coder: string | undefined;
   for (const layer of layers) {
     // A nearer style that names a shape and has no code of its own, or says code: null, is drawn as it says: the code beneath it is cleared.
-    if (typeof layer.props.code !== 'string' && (layer.props.code === null || typeof layer.props.shape === 'string')) (delete style.code, (coder = undefined));
+    if (!coded(layer.props.code) && (layer.props.code === null || typeof layer.props.shape === 'string')) (delete style.code, (coder = undefined));
     style = over(style, fields(layer.props));
-    if (typeof layer.props.code === 'string' && layer.id !== layer.preset) coder = layer.id;
+    if (coded(layer.props.code) && layer.id !== layer.preset) coder = layer.id;
   }
   if (style.theme != null) style.theme = finishTheme(style.theme);
   return { style, used: layers.map(({ id, title, preset }) => ({ id, title, ...(preset && { preset }) })), ...(coder && { coder }) };

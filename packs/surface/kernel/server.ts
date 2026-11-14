@@ -265,7 +265,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // A file named by the UI's current version is kept for good (packs/surface/kernel/ui-files.ts); the pages, and the rest, never. The drawing frame has its scripts written in (drawPage).
         res.writeHead(200, {
           'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
-          'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' ? 'public, max-age=604800' : 'no-store',
+          'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' || file === 'codemirror.min.js' ? 'public, max-age=604800' : 'no-store',
           ...GUARD,
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
           ...(file === 'draw.html' ? { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed), frame!.hashes, framedBy) } : {}),

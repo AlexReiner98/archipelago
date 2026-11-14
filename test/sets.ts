@@ -25,6 +25,7 @@ export const SLOW: Record<string, string> = {
   'test/code-style-starts.test.ts': 'browser',
   'test/layouts.test.ts': 'browser',
   'test/layouts-open.test.ts': 'browser',
+  'test/layouts-hot.test.ts': 'browser',
   'test/layouts-queued.test.ts': 'browser',
   'test/layouts-sw.test.ts': 'browser',
   'test/part-workers.test.ts': 'browser',

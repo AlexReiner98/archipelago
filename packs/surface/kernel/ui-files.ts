@@ -7,7 +7,7 @@ import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'bar-band', 'menu-place', 'draft', 'note-count', 'item', 'page-schema', 'screens', 'query', 'query-base', 'style-code', 'pan-zoom', 'style-number', 'live', 'settle', 'workspace', 'workspace-cards', 'workspaces-card', 'members-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'start', 'doc-lens', 'marks', 'marks-add', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-asks', 'layout-tip', 'tip', 'surface', 'replica', 'membership', 'thumbs', 'thumb-keep', 'thumb-still', 'canvas-wires', 'authorize', 'guest', 'password', 'text', 'look', 'look-marks', 'panes', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'pane-land', 'item-link', 'way-back', 'part-bridge', 'part-going', 'part-host', 'part-check', 'part-render', 'part-fits', 'part-paint', 'dom', 'canvas-pick', 'frozen-page', 'frozen-chrome', 'lens-terms', 'part-lens', 'part-slots', 'part-menu', 'part-pane', 'part-drag', 'light-items', 'part-read', 'part-away', 'part-page', 'swatch', 'part-trace', 'replay', 'frozen-doc', 'beat-rows', 'screen-page', 'screen-rows', 'views-kept', 'part-input', 'item-share', 'item-reading', 'part-echo', 'part-order'];
+const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'home', 'held', 'held-card', 'diff-view', 'item-held', 'canvas', 'pinch', 'bar-band', 'menu-place', 'draft', 'note-count', 'item', 'page-schema', 'screens', 'query', 'query-base', 'style-code', 'preview', 'pan-zoom', 'style-number', 'live', 'settle', 'workspace', 'workspace-cards', 'workspaces-card', 'members-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'start', 'doc-lens', 'marks', 'marks-add', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-asks', 'layout-tip', 'tip', 'surface', 'replica', 'membership', 'thumbs', 'thumb-keep', 'thumb-still', 'canvas-wires', 'authorize', 'guest', 'password', 'text', 'look', 'look-marks', 'panes', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'pane-land', 'item-link', 'way-back', 'part-bridge', 'part-going', 'part-host', 'part-check', 'part-render', 'part-fits', 'part-paint', 'dom', 'canvas-pick', 'frozen-page', 'frozen-chrome', 'lens-terms', 'part-lens', 'part-slots', 'part-menu', 'part-pane', 'part-drag', 'light-items', 'part-read', 'part-away', 'part-page', 'swatch', 'part-trace', 'replay', 'frozen-doc', 'beat-rows', 'screen-page', 'screen-rows', 'views-kept', 'part-input', 'item-share', 'item-reading', 'part-echo', 'part-order', 'part-code'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -48,7 +48,11 @@ export const UI_FILES: Record<string, string> = {
   '/css-check.js': 'css-check.js',
   // three.js as its authors build it (MIT), offered to a layout's code; loaded only when one asks for it.
   '/three.js': 'three.module.min.js',
+  // CodeMirror 6 as one file (MIT, the owner, 14 Nov 2026), for code written in the sheet (part-code.js); loaded only when code is opened.
+  '/codemirror.js': 'codemirror.min.js',
 };
+/** Files kept as their authors build them: served as they are, never rewritten, and loaded only when asked for. */
+const VENDORED = new Set(['three.module.min.js', 'codemirror.min.js']);
 
 const PACKS = join(import.meta.dirname, '..', '..');
 /**
@@ -92,7 +96,7 @@ async function current() {
   const text = new Map<string, string>();
   for (const [f, body] of raw) {
     if (f.endsWith('.html')) text.set(f, body.replace(/\b(href|src)="(\/[\w.-]+)"/g, (all, attr, path) => (named(path) ? `${attr}="${at(path)}"` : all)));
-    else if (f.endsWith('.js') && f !== 'three.module.min.js')
+    else if (f.endsWith('.js') && !VENDORED.has(f))
       // An import of another of the UI's modules, or a quoted address of one of its files ('/draw.html').
       text.set(f, body.replace(/(\bfrom\s*|\bimport\s*\(\s*)?(['"])(\.?\/)([\w.-]+)\2/g, (all, imp, q, dot, name) => ((dot === '/' || imp) && named(`/${name}`) ? `${imp ?? ''}${q}${dot}${name}?v=${version}${q}` : all)));
     else text.set(f, body);
@@ -113,7 +117,7 @@ export const uiVersion = async () => (await current()).version;
 function reached(text: Map<string, string>, from: string[]): string[] {
   const seen = new Set<string>();
   const visit = (path: string) => {
-    if (seen.has(path) || !named(path) || !path.endsWith('.js') || path === '/three.js') return;
+    if (seen.has(path) || !named(path) || !path.endsWith('.js') || VENDORED.has(UI_FILES[path])) return;
     seen.add(path);
     for (const m of (text.get(UI_FILES[path]) ?? '').matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*)['"]\.?(\/[\w.-]+\.js)\?v=/g)) visit(m[1]);
   };

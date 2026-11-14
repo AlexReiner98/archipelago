@@ -5,6 +5,7 @@
 
 import { api, h, hooks, may, part } from './base.js';
 import { proposalCard } from './held-card.js';
+import { diffCounts, diffView } from './diff-view.js';
 import { decide } from './held.js';
 import { renderBody } from './body.js';
 import { ago, typeMark, gist, who } from './words.js';
@@ -55,6 +56,14 @@ export async function heldBand(p, again) {
   by.classList.add('cut');
   by.title = [p.run_name, who(p.actor).textContent, ago(p.ts)].filter(Boolean).join(' · ');
   const parts = p.ops.length > 1;
+  // What it would do to code is read where it is decided: its counts a press, the lines under it (task e_vc5tpunk).
+  const diffs = p.diffs ?? [];
+  const lines = h('div', { hidden: true });
+  const see = (e) => {
+    lines.hidden = !lines.hidden;
+    if (!lines.hidden && !lines.childElementCount) lines.append(diffView(diffs));
+    e.currentTarget.textContent = `${diffCounts(diffs)} ${lines.hidden ? '▾' : '▴'}`;
+  };
   return h(
     'section',
     { class: 'held-band', 'data-held': p.id },
@@ -64,10 +73,12 @@ export async function heldBand(p, again) {
       'div',
       { class: 'held-acts' },
       ...buttons,
+      diffs.length > 0 && h('button', { type: 'button', class: 'quiet-button', title: 'See the lines of code it changes', onclick: see }, `${diffCounts(diffs)} ▾`),
       parts && h('button', { type: 'button', class: 'quiet-button', title: 'See each part, and leave out or correct any before applying', onclick: look }, `${p.ops.length} parts ▾`),
       h('span', { class: 'grow' }),
       by,
     ),
+    lines,
     whole,
   );
 }

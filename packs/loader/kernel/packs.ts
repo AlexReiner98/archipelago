@@ -25,7 +25,7 @@ export interface FieldDef {
   system?: boolean;
   /** Sent with the item in a lens answer, so a style can draw by it (a type to colour, an amount, a date). */
   shown?: boolean; /** Never carried off the map: a frozen (published) view leaves its value out, and so does a copy made from one. */ private?: boolean;
-  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (packs/loader/kernel/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (packs/walls/kernel/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean;
+  /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (packs/loader/kernel/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (packs/walls/kernel/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean; /** Of type string and code: may instead hold files by path, each a text, entered at index.js (packs/loader/kernel/fields.ts). */ files?: boolean;
   /** Of type json, holding a value of the simple type another field of the item names (packs/loader/kernel/fields.ts SIMPLE_TYPES): checked on write with the two together. */ typed_by?: string;
 }
 

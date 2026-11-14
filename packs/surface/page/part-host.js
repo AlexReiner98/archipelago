@@ -290,6 +290,9 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
     ghosts: (list) => hooks.ghosts?.(node, list),
     // A `slot` mark: a slot this part opens, filled by its parts in the mark's node, unseen by the holder; a few deep at most.
     slot: (name, el, given) => ((part.opens ?? []).includes(name) && depthOf(node) < slotsDeep ? drawParts(el, { slot: name, item, piece: given ?? piece, openView, picture }) : Promise.resolve(0)),
+    // Code a part that writes has written, tried on the person's own canvas at each pause, or (null) the try dropped.
+    // For code as files, the field whole: the one written beside the others as written.
+    ...(part.writes?.length && may('write') && { preview: ({ item: of, field, file, others }, text) => api('preview', text === null ? { item: of, field, discard: true } : { item: of, field, value: file === undefined ? text : { ...others, [file]: text } }).catch((err) => console.warn('The try was not sent:', err.message)) }),
   });
   const refresh = async () => node.isConnected && one.mounted.has(id) && hand();
   // The bridge sends the island with the part, so the server checks the part's code where it is drawn.

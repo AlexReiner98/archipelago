@@ -196,3 +196,8 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 
 /* A slot a part opens: the parts that fill it, one under another, drawn by the runtime. */
 .pm-slot { display: flex; flex-direction: column; min-width: 0; }
+
+/* Code in the host's code editor (part-code.js): its own look is in its shadow root, from the style's variables. */
+.pm-input[data-code] { display: block; width: 100%; min-width: 0; }
+.pm-input[data-code][data-loading] { min-height: var(--code-fold); }
+.pm-input[data-code][data-failed] { color: var(--bad); }

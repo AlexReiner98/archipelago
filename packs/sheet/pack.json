@@ -46,9 +46,11 @@
         "words.js": "parts/page/words.js",
         "fields.js": "parts/page/fields.js",
         "sections.js": "parts/page/sections.js",
+        "diff.js": "parts/page/diff.js",
         "draft.js": "parts/page/draft.js",
         "links.js": "parts/page/links.js",
-        "note-count.js": "parts/page/note-count.js"
+        "note-count.js": "parts/page/note-count.js",
+        "code.js": "parts/page/code.js"
       }
     },
     {

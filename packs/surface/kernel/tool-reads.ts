@@ -16,8 +16,10 @@ import { LARGE, sizeOf } from '../../loader/kernel/head.ts';
 import { props } from './tool-ops.ts'; import { searchMap } from './search.ts'; import { getItem, proposals } from './map-reads.ts';
 import type { Tool } from './tools.ts';
 import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
+import { tryOf } from './tool-preview.ts';
 import { withCovers } from '../../write/kernel/withdraw.ts';
 import { itemLink } from '../../identity/kernel/members.ts';
+import { eventsWithDiffs, proposalsWithDiffs } from './code-diffs.ts';
 
 /** One thing the human did to the map, small enough to put in front of a model. */
 export interface HumanChange {
@@ -91,7 +93,7 @@ function shortHistory<T>(events: T[], once = true, more = 'ask again with full: 
     const again = once && Boolean(changeset && said.has(changeset));
     if (changeset) said.add(changeset);
     if (!again && !detail?.changes) return ev;
-    const changes = detail?.changes && Object.fromEntries(Object.entries(detail.changes).map(([key, c]) => [key, { from: cut(c.from), to: cut(c.to) }]));
+    const changes = detail?.changes && Object.fromEntries(Object.entries(detail.changes).map(([key, c]) => [key, 'from' in c || 'to' in c ? { ...c, from: cut(c.from), to: cut(c.to) } : c]));
     return { ...ev, ...(again && { reason: undefined }), detail: detail && { ...detail, ...(changes && { changes }), ...(again && { authority: undefined }) } };
   });
 }
@@ -258,7 +260,9 @@ export const READ_TOOLS: Record<string, Tool> = {
     input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for all of it whole. Past ${GET_LISTED} links in a direction, an agent is given those and a count by type (links_cut); of what names it the first ${GET_MENTIONS}; of what holds it the number of views about each; and of a large field (a layout's code) its first lines and size. The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
       // Its recent events are the activity log's (packs/log/kernel/eventlog.ts), read beside the item as get read them.
-      const [item_, events_] = await Promise.all([getItem(l, input.id), readEvents(l.db, { target: input.id, limit: 8 })]);
+      const [item_, read_] = await Promise.all([getItem(l, input.id), readEvents(l.db, { target: input.id, limit: 8 })]);
+      // A change to its code is said as a line diff (./code-diffs.ts), as the history is anywhere.
+      const events_ = input.full ? read_ : eventsWithDiffs(l, read_, actor.kind === 'agent');
       const found = { ...item_, recent_events: events_.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })), shown_in: [] as unknown[] };
       // The views it is drawn in are the lenses pack's to say (answer.shown_in).
       found.shown_in = await callAs<unknown[]>(l, 'answer.shown_in', { id: input.id, trail: found.trail });
@@ -297,7 +301,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       if (!Array.isArray(events)) return forAgent(input.name, answer);
       const counted = Object.values((answer as { counts?: Record<string, number> }).counts ?? {}).reduce((sum, n) => sum + n, 0);
       const few = input.params?.limit === undefined && events.length > NEWEST;
-      return forAgent(input.name, { ...(answer as object), events: shortHistory(few ? events.slice(0, NEWEST) : events), ...(few && { more: `The newest ${NEWEST} of ${counted}; counts has each kind. Ask with a limit, or query events, for more.` }) });
+      return forAgent(input.name, { ...(answer as object), events: shortHistory(eventsWithDiffs(l, few ? events.slice(0, NEWEST) : events, true)), ...(few && { more: `The newest ${NEWEST} of ${counted}; counts has each kind. Ask with a limit, or query events, for more.` }) });
     },
   },
   events: {
@@ -314,7 +318,10 @@ export const READ_TOOLS: Record<string, Tool> = {
     },
     run: async (l, actor, { full, by, ...input }) => {
       const events = await readEvents(l.db, { ...input, ...(by && { actor: by }) });
-      return actor.kind === 'human' || full ? events : shortHistory(events);
+      if (full) return events;
+      // A change to code is its line diff (./code-diffs.ts): hunks for a person's page, text for an agent.
+      const diffed = eventsWithDiffs(l, events, actor.kind !== 'human');
+      return actor.kind === 'human' ? diffed : shortHistory(diffed);
     },
   },
   proposals: {
@@ -323,7 +330,9 @@ export const READ_TOOLS: Record<string, Tool> = {
     input: { status: z.enum(['pending', 'approved', 'rejected', 'superseded', 'withdrawn']).optional(), full: z.boolean().optional().describe(`true for all of them, whole. Left out, an agent is given long values cut, and of a closed status the newest ${PROPOSALS_LISTED}.`) },
     run: async (l, actor, { full, ...input }) => {
       const listed = await proposals(l, input);
-      const all = (input.status ?? 'pending') === 'pending' ? withCovers(listed) : listed;
+      const pending = (input.status ?? 'pending') === 'pending';
+      // What each would do to code, as a line diff against what is there now (./code-diffs.ts).
+      const all = pending ? await proposalsWithDiffs(l, withCovers(listed), actor.kind === 'agent' && !full) : listed;
       const short = actor.kind === 'agent' && !full;
       const held = short ? all.slice(input.status && input.status !== 'pending' ? -PROPOSALS_LISTED : 0).map((p) => ({ ...p, ops: (p.ops as unknown[]).map((op) => shorter(op, 'proposals with full: true has it')) })) : all;
       // The session each was proposed in, named by its name, as everywhere a session is (the held entry says which).
@@ -391,9 +400,22 @@ export const READ_TOOLS: Record<string, Tool> = {
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
 
       at: z.number().int().min(1).optional().describe('Redraw as it was: a log position (an earlier look’s drew.at), so the page’s parts run the code their packs had then. The host is the server’s code now; drew says if its commit differs.'),
+      tries: z
+        .array(z.object({ item: z.string().regex(/^e_[a-z0-9]{8}$/), field: z.string().min(1).max(60), value: z.unknown() }))
+        .min(1)
+        .max(8)
+        .optional()
+        .describe('Code not yet saved, drawn in place of what the map holds for this one look (a dry run): each a layout’s code field whole, as change or report preview would send it. Nothing is logged and no page of anyone’s sees it. With no view named, the tasks (300 at most), drawn by the first try’s layout. The answer adds errors: what the drawing’s code threw, or that it did not draw in time.'),
     },
     // Drawn by the looks pack, at the address the surface reads off what is asked (the databases handed are not read).
-    run: async (l, actor, input) => looks(l, 'answer.look', { actor: actor.name, hash: input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), size: input }),
+    run: async (l, actor, input) => {
+      // A dry run: each try checked as report preview checks it, and drawn always fresh (its code is no part of the map's state).
+      const tries = input.tries ? await Promise.all(input.tries.map((t: { item: string; field: string; value: unknown }) => tryOf(l, t))) : undefined;
+      const named = input.entity || input.query || input.lens || input.style;
+      const asked = tries && !named ? { ...input, query: { filter: { find: ['type task'] }, limit: 300 }, style: { id: tries[0].item } } : input;
+      const hash = input.published ? await previewAddress(l, input.entity) : await viewAddress(l, asked);
+      return looks(l, 'answer.look', { actor: actor.name, hash, size: { ...input, tries: undefined, ...(tries && { tries, fresh: true }) } });
+    },
   },
   seeing: {
     description:

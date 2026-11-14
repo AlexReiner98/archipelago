@@ -164,7 +164,9 @@ reply ending) is `docs/agents.md`.
   2026 at the owner's asking), offered to a layout's drawing code and to
   a drawing that paints on a surface (`packs/walls/page/surface.js`, since 23 Oct 2026, for
   the landing page's relief), loaded only when one asks for it, in the
-  sandbox. The app's own pages do not use it. WebCola went with the cola
+  sandbox. The app's own pages do not use it. A second is kept the same way:
+  `packs/walls/page/codemirror.min.js` (CodeMirror 6, MIT, since 14 Nov 2026 at the owner's agreement), the
+  code editor in the sheet (`packs/walls/page/part-code.js`), loaded only when code is opened to write. WebCola went with the cola
   layout on 9 Nov 2026 (git tag `archive/layouts-2026-11-09`).
 - **A layout's code runs behind two walls, and only there.** A layout item
   (core's `layout` type, apart from `style` since 4 Nov 2026) carries a drawing

@@ -3,7 +3,8 @@ import { kinds, replicate } from './live.js';
 import { ghostAsker, unfollow } from './replica.js';
 import { drawWith, layouts, warmLayouts } from './layout.js';
 import { dress, layered } from './query-base.js';
-import { drawCode } from './style-code.js';
+import { coded as hasCode, drawCode } from './style-code.js';
+import { markTry, onTries, triedOn, tryOn } from './preview.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles } from './words.js';
 
@@ -228,6 +229,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   // What is drawn is the answer with what is held for the owner and the links drawn here not yet answered for drawn
   // into it (`shown`, packs/surface/page/replica.js); what the canvas holds (`host.answer`) is the answer alone.
   const draw = (answer, shown, refreshing) => {
+    host.drawnWith = [answer, shown];
     if (only) [answer, shown] = [answer, shown].map(narrowed(only));
     if (extra) [answer, shown] = [answer, shown].map((a) => ({ ...a, ...extra, ...(extra.steps && { steps: phased(extra.steps, a.items) }) }));
     if (nest) shown = nested(shown, typeof nest === 'string' ? nest : undefined);
@@ -249,9 +251,14 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     for (const name of Object.keys(chosen)) delete chosen[name];
     Object.assign(chosen, layered(look.style, keptStyle(key), style), { noLit: true });
     dress(body, chosen);
+    // A try of the code that draws it, sent by the person looking, is drawn in its place, marked (./preview.js).
+    host.untried = { code: chosen.code, drawing: chosen.drawing };
+    const preview = tryOn(chosen, look.coder);
+    host.tried = preview?.at;
+    markTry(host, preview);
     // The server names the drawing a pack ships for the shape asked, or the first it ships for one no pack draws.
     const drawn = Boolean(chosen.drawing);
-    const coded = typeof chosen.code === 'string' && chosen.code.trim();
+    const coded = hasCode(chosen.code);
     if (coded || drawn) return void (coded ? drawCode : drawWith)(body, asDrawn(shown), chosen, keep, place, look.coder);
     body.replaceChildren(h('div', { class: 'empty', title: 'No pack ships a layout this workspace can draw with' }, 'Nothing draws this view.'));
     saidDrawn(body, 'drawn');
@@ -295,9 +302,12 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     }
     if (host.store) unfollow(host.store);
     host.store = store;
+    store.styled = new Set((look.used ?? []).map((u) => u.id));
     store.on((changed) => {
       if (host.store !== store) return;
       if (!host.isConnected) return unfollow(store);
+      // What draws it changed (its layout's code kept, its style's settings): read again and drawn with what it holds now.
+      if (changed.restyle) return void ((host.said = undefined), load(true));
       // What the query finds may have moved (packs/surface/page/membership.js), or on a time axis an item changed may fall elsewhere:
       // both are the server's to work out, so the lens is read again. Not while the store is played from where its
       // reader last looked (the replay mark, ./replay.js): it ends as the map is.
@@ -327,6 +337,15 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   host.refresh = () => load(true);
   // A drawing that made something asks for the lens again: a new item is not among those the store follows.
   host.addEventListener('lens-read', () => load(true));
+  // The tries moved: drawn again only when the one it would be drawn with is another. One it was drawn with that is gone
+  // (kept, or dropped) reads the style again, which holds what was kept: the answer alone would not draw it again.
+  onTries(host, () => {
+    if (!host.drawnWith || !look) return;
+    const now = triedOn({ ...chosen, ...host.untried }, look.coder)?.at;
+    if (now === host.tried) return;
+    if (now === undefined) return void ((host.said = undefined), load(true));
+    draw(...host.drawnWith);
+  });
   host.mark = (id) => {
     style.here = chosen.here = id;
     body.redraw?.();

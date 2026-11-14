@@ -14,8 +14,12 @@
 // what went wrong. A field is this page's own: what is typed in it stays here,
 // and the code is told only the field's value. A change goes to the page, which
 // sends it as the person looking and the rules judge (packs/rules/kernel/layout-changes.ts);
-// the code is told what came of it. If it stops answering it is ended. Each
-// picture gets a new frame, so nothing is left running.
+// the code is told what came of it. If it stops answering it is ended. New code
+// (a try, a change to the layout) is swapped in this same frame: the old worker
+// is asked for what it keeps (its module's optional `hot()`), ended, and a new
+// one is started on a new canvas, handed that as `hot`. What it keeps stays in
+// this frame, and nothing of the old code is left running. Opened, the code cannot
+// be ended in this window: the page asks what it keeps and starts a new frame with it.
 //
 // A drawing a pack ships (or the owner's version of one) runs here too, but
 // differently: one frame serves every picture on the page, and the drawing
@@ -61,13 +65,48 @@ function inside(home, port, given) {
     deepen(root, -1);
     return { me, byId, root };
   };
+  // A module from its text: by a blob's address where the browser allows that here, else as a data address.
+  const blob = (text) => URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+  const data = (text) => `data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}`;
+  /**
+   * The code, loaded: one text is one module; files by path are linked from index.js, each './name.js' it imports
+   * made the address of that file, as a pack drawing's modules are (draw-inside.js). Nothing else can be imported.
+   */
+  const load = async (code) => {
+    if (typeof code === 'string') return import(blob(code)).catch(() => import(data(code)));
+    const link = (asUrl) => {
+      const urls = new Map(), on = new Set();
+      const urlOf = (name) => {
+        if (urls.has(name)) return urls.get(name);
+        if (typeof code?.[name] !== 'string') throw new Error(`The code imports "${name}", which it does not have: its files are ${Object.keys(code ?? {}).join(', ')}`);
+        if (on.has(name)) throw new Error(`The code's files import each other in a ring, at "${name}"`);
+        on.add(name);
+        urls.set(name, asUrl(code[name].replace(/(\bfrom\s*|\bimport\s*\(?\s*)(['"])\.\/([\w.-]+\.js)\2/g, (_, before, q, dep) => `${before}${q}${urlOf(dep)}${q}`)));
+        return urls.get(name);
+      };
+      return import(urlOf('index.js'));
+    };
+    return link(blob).catch((err) => (/imports|ring/.test(err?.message ?? '') ? Promise.reject(err) : link(data)));
+  };
   const heard = {};
   const asking = new Map();
   let asked = 0;
   const size = { width: 0, height: 0, dpr: 1 };
+  let made;
   me.onmessage = async (ev) => {
     const said = ev.data;
     if (said.type === 'ping') return post({ type: 'pong' });
+    // New code is coming: what this code keeps (its camera, its pins), if it says, for the code after it.
+    if (said.type === 'hot') {
+      let state;
+      try {
+        state = typeof made?.hot === 'function' ? await made.hot() : undefined;
+        return post({ type: 'hot', state });
+      } catch (err) {
+        post({ type: 'hot' });
+        return fail(`What hot() kept could not be handed on: ${err?.message ?? err}`);
+      }
+    }
     if (said.type === 'event') {
       if (said.name === 'resize') Object.assign(size, said.event);
       // A new answer, to code that does not listen for one, is drawn again from the start, in a new frame.
@@ -89,8 +128,8 @@ function inside(home, port, given) {
     if (said.type !== 'draw') return;
     Object.assign(size, { width: said.width, height: said.height, dpr: said.dpr });
     try {
-      // The code is a module of its own, loaded from its text: by a blob's address where the browser allows that here, else as a data address.
-      const made = await import(URL.createObjectURL(new Blob([said.code], { type: 'text/javascript' }))).catch(() => import(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(said.code)))}`));
+      // The code is a module of its own (or files linked from index.js), loaded from its text.
+      made = await load(said.code);
       if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change, sandboxed, root }) { … }. An item in answer has its values under fields; a change writes them as props.');
       await made.default({
         canvas: given?.canvas ?? said.canvas,
@@ -100,6 +139,8 @@ function inside(home, port, given) {
         answer: said.answer,
         style: said.style,
         theme: said.theme,
+        // What the code before it in this frame kept (its hot()), or undefined.
+        hot: said.hot,
         size,
         tree: () => tree(said.answer),
         three: () => import(`${home}/three.js`),
@@ -124,11 +165,10 @@ function inside(home, port, given) {
   };
 }
 
-const canvas = document.createElement('canvas');
 const tip = document.createElement('div');
 tip.className = 'tip';
 tip.hidden = true;
-document.body.append(canvas, tip);
+document.body.append(tip);
 const CURSORS = ['default', 'pointer', 'grab', 'grabbing', 'crosshair', 'move'];
 const mostFields = 24;
 const fields = new Map();
@@ -136,6 +176,10 @@ const EVENTS = ['pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'whee
 
 let worker;
 let heldTell = () => undefined;
+/** The picture running: what it keeps, and how it is ended (start). */
+let current;
+/** The longest new code waits for what the old keeps: code that does not answer by then hands on nothing. */
+const keptWait = 1000;
 
 /** A text field the code asked for, drawn by this page over the canvas: the code hears its value, never a key. */
 function place(key, at, theme) {
@@ -160,7 +204,11 @@ function place(key, at, theme) {
 }
 
 /** The picture, started once: a worker that answers, given the canvas and what to draw. */
-function start({ code, answer, style, theme }) {
+function start({ code, answer, style, theme, hot }) {
+  const canvas = document.createElement('canvas');
+  document.body.prepend(canvas);
+  let ended = false;
+  let keeping;
   document.body.style.background = theme.sea;
   Object.assign(tip.style, { background: theme.land, color: theme.text, borderColor: theme.line });
   const room = () => ({ width: innerWidth, height: innerHeight, dpr: Math.min(devicePixelRatio || 1, 2) });
@@ -187,6 +235,7 @@ function start({ code, answer, style, theme }) {
   let started = false;
   const hear = ({ data: said }) => {
     unanswered = 0;
+    if (said?.type === 'hot') return void keeping?.(said.state);
     // Only these, and each one checked: what the code says is never trusted.
     if (said?.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) say({ type: 'open', id: said.id });
     else if (said?.type === 'open' && opened && /^https:\/\/\S+$/.test(said.id)) open(said.id, '_blank', 'noopener');
@@ -209,7 +258,7 @@ function start({ code, answer, style, theme }) {
   let failed = 0;
   const lost = () => (++failed >= ways.length ? fail('The code of this style could not be started: this browser lets a sandboxed page start no worker.') : another());
   const another = () => {
-    if (started || tried.length >= ways.length) return;
+    if (started || ended || tried.length >= ways.length) return;
     let mine;
     try {
       mine = ways[tried.length]();
@@ -219,7 +268,7 @@ function start({ code, answer, style, theme }) {
     }
     tried.push(mine);
     const next = setTimeout(another, 1500);
-    mine.onerror = () => (clearTimeout(next), mine.terminate(), started || lost());
+    mine.onerror = () => (clearTimeout(next), mine.terminate(), started || ended || lost());
     mine.onmessage = (ev) => {
       if (!started) {
         // Its first answer says it runs: only now is it given the canvas, which can be handed over once.
@@ -228,8 +277,8 @@ function start({ code, answer, style, theme }) {
         worker = mine;
         for (const other of tried) if (other && other !== mine) other.terminate();
         worker.onerror = (err) => fail(err.message || 'The code of this style stopped.');
-        if (opened) worker.postMessage({ type: 'draw', code, answer, style, theme, ...room() });
-        else worker.postMessage({ type: 'draw', code, answer, style, theme, canvas: surface, ...room() }, [surface]);
+        if (opened) worker.postMessage({ type: 'draw', code, answer, style, theme, hot, ...room() });
+        else worker.postMessage({ type: 'draw', code, answer, style, theme, hot, canvas: surface, ...room() }, [surface]);
       }
       if (mine === worker) hear(ev);
     };
@@ -238,7 +287,7 @@ function start({ code, answer, style, theme }) {
   another();
 
   // Where the pointer is and what it does are told to the code; nothing typed ever is, only what a field holds.
-  const tell = (name, event) => started && worker.postMessage({ type: 'event', name, event });
+  const tell = (name, event) => started && !ended && worker.postMessage({ type: 'event', name, event });
   heldTell = tell;
   for (const name of EVENTS) {
     canvas.addEventListener(
@@ -251,7 +300,8 @@ function start({ code, answer, style, theme }) {
       { passive: false },
     );
   }
-  addEventListener('resize', () => tell('resize', room()));
+  const resized = () => tell('resize', room());
+  addEventListener('resize', resized);
   // Code that stops answering is ended: it cannot hold the page, and it is not left to burn. A slow draw is waited for:
   // only a minute of silence ends it. A hidden page is not asked: the browser slows what runs there, so long work is
   // not to be told from code that has stopped. Opened, the code shares this page's one thread: nothing here runs while it does.
@@ -264,6 +314,50 @@ function start({ code, answer, style, theme }) {
     tip.hidden = true;
     fail('It did not answer for a minute and was stopped.');
   }, 2000);
+  return {
+    // What this code keeps for the next: its hot(), asked of it and waited for a while; nothing where it has none.
+    keep: () =>
+      new Promise((resolve) => {
+        if (!started) return resolve(undefined);
+        const late = setTimeout(() => resolve(undefined), keptWait);
+        keeping = (state) => (clearTimeout(late), (keeping = undefined), resolve(state));
+        worker.postMessage({ type: 'hot' });
+      }),
+    // Ended: its worker, every way tried, its canvas, its fields and its listeners, so nothing of it is left running.
+    stop: () => {
+      ended = true;
+      clearInterval(watch);
+      removeEventListener('resize', resized);
+      for (const way of tried) way?.terminate();
+      canvas.remove();
+      for (const input of fields.values()) input.remove();
+      fields.clear();
+      tip.hidden = true;
+    },
+  };
+}
+
+/** New code waiting to be swapped in, while one is. */
+let swapping;
+/** What the picture starts with, once its pane has a size. */
+let queued;
+/** New code for the picture running: swapped in this frame, handed what the old kept. Opened, the page draws a new frame instead. */
+async function swap(next) {
+  if (opened) return;
+  // Code sent while the last is still being swapped in waits, and only the latest is drawn.
+  if (swapping) return void (swapping = next);
+  // A picture not started yet (its pane has no size) starts with the latest code.
+  if (!current) return void (queued &&= { ...queued, ...next });
+  swapping = next;
+  while (swapping) {
+    const was = current;
+    const now = swapping;
+    const hot = await was.keep();
+    was.stop();
+    worker = true;
+    current = start({ ...now, hot });
+    if (swapping === now) swapping = undefined;
+  }
 }
 
 addEventListener('message', (ev) => {
@@ -273,13 +367,23 @@ addEventListener('message', (ev) => {
   if (worker && worker !== true && ev.data?.type === 'changed') return void worker.postMessage({ type: 'event', name: 'changed', event: ev.data });
   // A page that started this frame before it listened (the frame in ui/index.html) asks whether it is ready.
   if (ev.data?.type === 'ready?') return void say({ type: 'ready' });
+  if (ev.data?.type === 'swap') return void swap(ev.data);
+  // Opened, the page asks what the code keeps, for the frame that replaces this one; walled in, it never leaves here.
+  if (ev.data?.type === 'keep' && opened) return void (current?.keep() ?? Promise.resolve()).then((state) => {
+    try {
+      say({ type: 'kept', state });
+    } catch {
+      say({ type: 'kept' });
+    }
+  });
   if (ev.data?.type !== 'draw' || worker) return;
   worker = true;
   // A frame put up while its pane is hidden (a view opened from Home) has no size yet: its code starts once it has one,
   // so it is never handed a canvas of no pixels.
   const sized = () => innerWidth > 0 && innerHeight > 0;
-  if (sized()) return start(ev.data);
-  const once = () => sized() && (removeEventListener('resize', once), start(ev.data));
+  queued = ev.data;
+  if (sized()) return void (current = start(queued));
+  const once = () => sized() && (removeEventListener('resize', once), (current = start(queued)));
   addEventListener('resize', once);
 });
 say({ type: 'ready' });

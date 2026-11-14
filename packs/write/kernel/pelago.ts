@@ -5,14 +5,14 @@ import { agentChanges, beginApplying, decide, DEFAULT_AGENT_POLICY, mayDo, type 
 import { mayWrite } from './within.ts'; import { fillLogSlots } from '../../loader/kernel/log-slots.ts'; import { roomForItems, roomToStore, stillWritable } from '../../identity/kernel/standing.ts'; import { authorityOf } from '../../rules/kernel/authority.ts';
 import { anyone, newId, scoped, type Db, type Q } from '../../database/kernel/db.ts';
 import { once } from './merge.ts'; import { doneFact, type Done } from '../../log/kernel/activity.ts';
-import type { Registry } from '../../loader/kernel/packs.ts'; import { currentNames } from '../../loader/kernel/type-items.ts'; import { follow, retyped, rewrite, type Who } from './write-hooks.ts';
+import type { Registry } from '../../loader/kernel/packs.ts'; import { currentNames } from '../../loader/kernel/type-items.ts'; import { codeFields } from '../../loader/kernel/pack-code.ts'; import { follow, retyped, rewrite, type Who } from './write-hooks.ts';
 import { readSecret, writeSecret } from '../../seal/kernel/secrets.ts';
 import { KEPT_FIELDS } from '../../log/kernel/operational.ts'; import { operationalFacts, record, type OpFact, type OpStream } from '../../log/kernel/streams.ts';
 import { layoutOf } from '../../rules/kernel/layout-changes.ts';
 import { append, headOf, type Fact } from '../../log/kernel/log.ts'; import { projectDecision, projectFacts, stamp } from '../../log/kernel/replay.ts'; import { linkFacts } from '../../log/kernel/facts.ts';
 import { decideProposal } from './proposals.ts'; import { needHuman } from '../../identity/kernel/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
+import { planChange } from './change-plan.ts'; import { editsResolved } from './edit.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
 
 export * from './pelago-types.ts';
 export type { Level, OpKind, Policy } from '../../rules/kernel/rules.ts';
@@ -109,6 +109,10 @@ export class Archipelago {
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
+    // An edit of a code field is the whole field it leaves from here on: judged, held and logged as any update (packs/write/kernel/edit.ts).
+    const { ops: whole, edited } = await editsResolved(this.registry, input.ops, async (id) => (await this.entity(id)) ?? null);
+    input = { ...input, ops: whole };
+    const said = edited.length ? { edited } : {};
     // The write path's hook points (packs/write/kernel/write-hooks.ts): rewrite, then who may write, then what follows the change, then
     // validate as it is planned. The verdict covers every op, what followed included.
     currentNames(this.registry, input.ops); await rewrite({ map: this, reg: this.registry, island: input.island }, input.ops); await stillWritable(this.workspace); await roomToStore(this.workspace); await roomForItems(this.workspace, input.ops.filter((o) => o.op === 'create').length, this.itemsHeld); await mayWrite(this, actor, input.ops, measured);
@@ -146,18 +150,18 @@ export class Archipelago {
       const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say, ...(verdict.by.version && { version: verdict.by.version }) };
       // The queue is a projection of the pending stream: the record makes its row (packs/log/kernel/replay.ts).
       await this.db.transaction(async (tx) =>
-        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts)),
+        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts, codeFields(this.registry))),
       );
       return {
         status: 'proposed' as const,
         proposal: id,
         held_by: verdict.by,
-        warnings, would_make: would,
+        warnings, would_make: would, ...said,
         note: 'Nothing has changed yet: this waits for a person. would_make names what it makes once approved. Those ids do not exist until then, so send what builds on them in this same change, or carry on with other work.',
       };
     }
     const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];
-    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared }, ...(followed.length && { followed }) })), ...letThrough(verdict.spared) };
+    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared }, ...(followed.length && { followed }) })), ...letThrough(verdict.spared), ...said };
     return answered.length ? { ...applied, answered } : applied;
   }
 
