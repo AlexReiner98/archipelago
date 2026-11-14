@@ -18,11 +18,11 @@
     },
     {
       "id": "kit",
-      "hash": "1fd1f67d7a30ff270227493ad0d9eb01314396b94eab87e3f22dc20c514cbbd5"
+      "hash": "6d1c94e95be6a4cb71f91f5771ea93f163e87e06b798b6d432622a6a55957a2e"
     },
     {
       "id": "identity",
-      "hash": "454a3b53aa6fc548b30840735062631ec348889b8a12f2ec567b680998a90986"
+      "hash": "ed9c656a6fee903e29184798221de8a0ea5d2bb53f862c61861166ac540f8337"
     },
     {
       "id": "walls",
@@ -30,7 +30,7 @@
     },
     {
       "id": "loader",
-      "hash": "4cf903c35c38c50cabc1ba5ce72f0b7c292ae5a69831b66508bdbaf9d9d458c0"
+      "hash": "c10d81289ef74836b38595b0245a9c85e36083ff323266bb6e89460d51a684c0"
     },
     {
       "id": "rules",
@@ -38,11 +38,11 @@
     },
     {
       "id": "write",
-      "hash": "1441eb17963456488dfe6ab772813ee1563b4b819e5a0e92707f2aac10154c0b"
+      "hash": "c38a810029b82b1ec6edfc281291f180347aff75d121595dabd21fcb47502887"
     },
     {
       "id": "surface",
-      "hash": "98186acd0d3bfb32c7b51da146f988cabadcd604cf571bdb4422687997c3b8de"
+      "hash": "a656bbd82d33d2b97d386bb055ce31321802fb0f5711dd49b2eb8f9135ba0e1e"
     },
     {
       "id": "panes",
