@@ -149,3 +149,21 @@ export function versionCodeProblems(code: unknown, of: string, server: boolean):
 
 /** The folder that holds a version's pack folder: its pack's code, its own files over them by path. */
 export const versionWhere = (pack: string, base: string, code: Record<string, string>) => layOut(pack, { ...codeTexts(base), ...code });
+
+/** What a code field's value is called as a file when it is one text: a stylesheet's or a module's. */
+const ONE = (f: { css?: boolean }) => (f.css ? 'index.css' : 'index.js');
+const fieldsOf = new WeakMap<object, Map<string, string>>();
+/**
+ * The fields a registry's types declare as code, each to the name its value has as a file when it is one text: what the
+ * log stores as files by hash (packs/seal/kernel/code-files.ts). By name across types: a field of that name that holds
+ * no code reads back as it was written all the same.
+ */
+export function codeFields(reg: { types: Map<string, { fields: Record<string, { code?: boolean; css?: boolean }> }> }): Map<string, string> {
+  let out = fieldsOf.get(reg.types);
+  if (!out) {
+    out = new Map();
+    for (const t of reg.types.values()) for (const [k, f] of Object.entries(t.fields)) if (f.code && !out.has(k)) out.set(k, ONE(f));
+    fieldsOf.set(reg.types, out);
+  }
+  return out;
+}
