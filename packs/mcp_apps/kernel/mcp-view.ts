@@ -1,11 +1,11 @@
 // A view drawn inline in a chat, through the MCP Apps extension (SEP-1865, stable 2026-01-26): one tool, draw, names
-// one ui:// resource, the page in ui/mcp-view.html, and a host that draws Apps opens it beside each call of draw. The
+// one ui:// resource, the page in packs/surface/page/mcp-view.html, and a host that draws Apps opens it beside each call of draw. The
 // extension ties a page to a tool, not a call, so draw is a tool of its own and no other tool names the page: an
 // ordinary call opens nothing. A host that does not draw Apps has draw's words.
 //
 // The resource holds no data and no token. It is told of the call by the host, and it asks the server, by
 // the host, for a look (packs/look_draw/kernel/looks.ts): the server's own browser draws it in the sandbox, as the agent sees the map, and
-// the page mounts the marks that come back (ui/look-marks.js), or the picture of a drawing that has none. No drawing's
+// the page mounts the marks that come back (packs/walls/page/look-marks.js), or the picture of a drawing that has none. No drawing's
 // code runs in the host's frame: it could not (no worker, no second origin), and a layout's code runs behind its two
 // walls or not at all. The drawing is static, as a published page's still frame is.
 //
@@ -47,9 +47,9 @@ let page: string | undefined;
 export function viewPage(): string {
   if (page) return page;
   // A checkout may hold it with CRLF, and a browser hashes a script with LF.
-  const file = readFileSync(join(import.meta.dirname, '..', '..', '..', 'ui', 'mcp-view.html'), 'utf8').replace(/\r\n/g, '\n');
+  const file = readFileSync(join(import.meta.dirname, '..', '..', 'surface', 'page', 'mcp-view.html'), 'utf8').replace(/\r\n/g, '\n');
   const script = /<script>([\s\S]*?)<\/script>/.exec(file)?.[1];
-  if (!script) throw new Error('ui/mcp-view.html has no script.');
+  if (!script) throw new Error('packs/surface/page/mcp-view.html has no script.');
   page = file.replace('{{policy}}', policyFor(script));
   return page;
 }

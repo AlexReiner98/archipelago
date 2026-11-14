@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -43,9 +43,11 @@ function hookOf(base: string, data: string) {
 }
 
 test('the core loop, as a stranger meets it: install, write, read, correct, remember, share', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
-  // A map with the kernel and what keeps its ids (the default look, a session's pages), as a new workspace starts.
+  // A map with the kernel, what keeps its ids (the default look, a session's pages) and the app's own packs (`app`: the
+  // menu, find...), as a new workspace starts.
   const packs = mkdtempSync(join(tmpdir(), 'pelago-loop-packs-'));
-  for (const name of ['core', 'canvas', 'sessions']) cpSync(join(ROOT, 'packs', name), join(packs, name), { recursive: true });
+  const app = readdirSync(join(ROOT, 'packs')).filter((name) => existsSync(join(ROOT, 'packs', name, 'pack.json')) && JSON.parse(readFileSync(join(ROOT, 'packs', name, 'pack.json'), 'utf8')).app === true);
+  for (const name of ['core', 'canvas', 'sessions', ...app]) cpSync(join(ROOT, 'packs', name), join(packs, name), { recursive: true });
   const { base, call } = await serve('off', undefined, undefined, packs);
   const work = mkdtempSync(join(tmpdir(), 'pelago-loop-'));
   const project = join(work, 'todo');
@@ -71,7 +73,8 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
   const empty = await open(`${base}/`);
   try {
     assert.ok(await empty.until(`[...document.querySelectorAll('a')].some((a) => a.textContent === 'Connect an agent')`, 20000), 'an empty map points at connecting an agent');
-    assert.ok(await empty.evaluate<boolean>(`Boolean(document.querySelector('#menu-pages a[href="#/you"]'))`), 'For you is in the menu');
+    // The menu's pages are the menu pack's part (menu.nav): For you a button that goes to the page by name.
+    assert.ok(await empty.until(`[...document.querySelectorAll('#menu-pages .pm-button')].some((b) => b.textContent === 'For you')`), 'For you is in the menu');
   } finally {
     await empty.close();
   }
@@ -136,18 +139,23 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
 
   // 6. Share: a view of the plan, made public as it is now, which anyone opens with no login and search engines list,
   // drawn by its layout, with a way to start a map of their own.
-  // Made where a person is: the view up on the canvas, its band's menu, Share it (saved first, named in the page),
-  // what goes out said first, then the address.
+  // Made where a person is: the view up on the canvas, saved in its band (the menu pack's part asks its name there),
+  // then its band's menu, Share it, what goes out said first, then the address.
   const sharer = await open(`${base}/#/v?find=in+${ids.hub}`);
   let link: { path: string };
   try {
+    const bandButton = (tip: string) => `[...document.querySelectorAll('#query .pm-button')].find((b) => b.title === ${JSON.stringify(tip)})`;
+    assert.ok(await sharer.until(`Boolean(${bandButton('Save this view')})`, 20000), 'the band offers to save it');
+    await sharer.evaluate(`${bandButton('Save this view')}.click()`);
+    assert.ok(await sharer.until(`Boolean(document.querySelector('#query input[aria-label="The view’s name"]'))`), `asked for a name: ${await sharer.evaluate('document.querySelector("#query")?.innerText')} | ${await sharer.evaluate('location.hash')}`);
+    await sharer.evaluate(`(() => { const i = document.querySelector('#query input[aria-label="The view’s name"]'); i.value = 'The login plan'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await sharer.evaluate(`${bandButton('Keep what is up under this name')}.click()`);
+    assert.ok(await sharer.until(`document.querySelector('#query .q-pick')?.dataset.title === 'The login plan'`), `kept, the bar names it: ${await sharer.evaluate('document.querySelector("#query")?.innerText')} | ${await sharer.evaluate('location.hash')} | ${sharer.logs().join(" ").slice(-400)}`);
     assert.ok(await sharer.until(`Boolean(document.querySelector('.q-band-menu'))`, 20000), 'the band has its menu');
     await sharer.evaluate(`document.querySelector('.q-band-menu').click()`);
     assert.ok(await sharer.until(`[...document.querySelectorAll('.tab-menu button')].some((b) => b.textContent === 'Share it')`), 'the menu offers to share it');
     await sharer.evaluate(`[...document.querySelectorAll('.tab-menu button')].find((b) => b.textContent === 'Share it').click()`);
-    // Named first, since a public view is of a view kept on the map; then asked to share it.
-    assert.ok(await sharer.until(`Boolean(document.querySelector('dialog.ask textarea'))`), 'asked for a name');
-    await sharer.evaluate(`(() => { const d = document.querySelector('dialog.ask'); d.querySelector('textarea').value = 'The login plan'; d.querySelector('button[value="ok"]').click(); })()`);
+    // A public view is of a view kept on the map: kept above, it is asked how to share it.
     const choose = `document.querySelector('dialog.ask button[value="choice:0"]')`;
     const sure = `/^Share “The login plan”\\?/.test(document.querySelector('dialog.ask h2')?.textContent ?? '')`;
     assert.ok(await sharer.until(`Boolean(${choose}) || ${sure}`, 10000), 'asked how to share it');

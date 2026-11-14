@@ -1,0 +1,291 @@
+// The lookups every screen shares (types, relations, titles) and the ways of saying things briefly: a row, a mark, a word.
+
+import { applyTheme } from './theme.js';
+import { api, apiFirst, h, state } from './base.js';
+// A menu (below) is placed in sight each time it opens.
+import './menu-place.js';
+import { noteContext } from './body.js';
+
+// ---- shared lookups ------------------------------------------------------
+
+export const types = new Map();
+export const relations = new Map();
+
+export async function loadSchema() {
+  // The schema, and the workspace's style: what a page that is not a picture is drawn by, until it asks for its own;
+  // with the theme being tried on this screen over it (the styles pack's theme card), which nothing keeps.
+  // The first time, as the page started (packs/surface/page/early.js).
+  const style = state.trying ? api('view', { name: 'style', params: { try: state.trying } }) : apiFirst('style', () => api('view', { name: 'style', params: {} }));
+  [state.schema, state.style] = await Promise.all([apiFirst('schema', () => api('schema')), style.then((r) => r.style)]);
+  applyTheme(state.style);
+  types.clear();
+  relations.clear();
+  for (const t of state.schema.types) types.set(t.id, t);
+  for (const r of state.schema.relations) relations.set(r.id, r);
+}
+
+export const typeTitle = (id) => types.get(id)?.title ?? id;
+/** A type as a choice in a list: its title, and its pack's name only where another type has the same title. */
+export const typeChoice = (t) => `${t.title}${(state.schema?.types ?? []).some((o) => o.id !== t.id && !o.dormant && o.title === t.title) ? ` (${t.pack})` : ''}`;
+/** What a new item is when nothing says which: the first type of work that can be estimated (a task). */
+export const workType = () => (state.schema?.types ?? []).find((t) => !t.dormant && t.capabilities?.plannable && t.flavour_of === 'work' && t.fields?.tokens_estimated)?.id ?? 'work';
+/** The starter type a type comes from: the last of its lineage, a type that extends nothing. */
+export const starterOf = (typeId) => {
+  let t = typeId;
+  for (const seen = new Set(); types.get(t)?.flavour_of && !seen.has(t); t = types.get(t).flavour_of) seen.add(t);
+  return t;
+};
+export const statusesOf = (typeId) => {
+  const s = types.get(typeId)?.statuses;
+  return s ? [...s.open, ...s.closed] : [];
+};
+export const isClosed = (typeId, status) => types.get(typeId)?.statuses.closed.includes(status) ?? false;
+/** Whether a type is the ancestor or a flavour of it; given a link end that names a capability (has:owned), whether it declares it. */
+export const isA = (typeId, ancestor) => {
+  const cap = /^has:(.+)$/.exec(ancestor)?.[1];
+  if (cap) return types.get(typeId)?.capabilities?.[cap] !== undefined;
+  for (let t = typeId; t; t = types.get(t)?.flavour_of) if (t === ancestor) return true;
+  return false;
+};
+/** Whether a type may sit at one end of a relation, given that end's allowed types. */
+export const fits = (allowed, typeId) => allowed.some((a) => a === '*' || isA(typeId, a));
+// Relations the system keeps itself (what a session works on, who holds a resource) are not edited by hand.
+export const kept = (relId) => relId.startsWith('sys.') || relId === 'holds';
+/** A link the walk follows and which way (decision e_gue6cg6q): `>` out along it, `<` in to it, else either way. */
+export const wayOf = (term) => {
+  const way = term.endsWith('>') ? 'out' : term.endsWith('<') ? 'in' : 'either';
+  return { link: way === 'either' ? term : term.slice(0, -1), way };
+};
+/** A walked link written with its way, as the lens keeps it. */
+export const withWay = (link, way) => `${link}${{ out: '>', in: '<' }[way] ?? ''}`;
+/** Each way's arrow, and the way a click on it turns to. */
+export const ARROW = { either: '↔', out: '→', in: '←' };
+export const NEXT_WAY = { either: 'out', out: 'in', in: 'either' };
+
+export const when = (ts) => new Date(ts).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+/** A day as a person reads it: a time, or a day as kept (2026-11-08, read where it is, not in UTC). */
+export const day = (ts, dateStyle = 'medium') => new Date(/^\d{4}-\d{2}-\d{2}$/.test(ts) ? `${ts}T12:00` : ts).toLocaleDateString(undefined, { dateStyle });
+/** The hour and minute of a time. */
+export const clock = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+// ---- Saying things briefly -------------------------------------------------
+// The screens show what agents write, and agents write paragraphs. These keep
+// a row to one line: a short name, a few words, a mark. The whole of it is
+// always one click or one hover away.
+
+/** How long ago, in a word: "now", "5 min", "3 h", "yesterday", "12 Oct". The exact time is the tooltip. */
+export const ago = (ts) => {
+  const then = new Date(ts);
+  const mins = Math.floor((Date.now() - then.getTime()) / 60_000);
+  const text =
+    mins < 1 ? 'now' : mins < 60 ? `${mins} min` : mins < 24 * 60 ? `${Math.floor(mins / 60)} h` : mins < 48 * 60 ? 'yesterday' : then.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return h('span', { class: 'ago', title: when(ts) }, text);
+};
+
+/** A session's word among the names, however it is said: its name, or its title (`Session Sark · what Claude calls it`). */
+const wordOf = (said = '') => /^Session (\S+?)(?: · .*)?$/.exec(said)?.[1] ?? said;
+/**
+ * A session's mark among the style's hues: where its name stands among the names the run type gives sessions. The
+ * same name has the same hue on every page, and two open sessions are named so that their hues differ.
+ */
+export function sessionHue(name) {
+  const names = types.get('run')?.fields?.name?.values ?? [];
+  const hues = state.style?.hues ?? [];
+  const i = names.indexOf(wordOf(name));
+  return i >= 0 && hues.length ? hues[i % hues.length] : undefined;
+}
+/** A session as a person names it everywhere, `Session Sark`, marked in its hue; its whole title and `tip` (whose it is) are the tooltip. A run named otherwise is said as it is. */
+export function sessionWho(name, tip = '') {
+  const hue = sessionHue(name);
+  const said = hue || wordOf(name) !== name ? `Session ${wordOf(name)}` : name;
+  return h('span', { class: 'who who-session', title: [name !== said && name, tip].filter(Boolean).join(' · '), style: hue ? `--session-hue: ${hue}` : null }, said);
+}
+
+/** An actor as a person would name it; what the log holds ("agent:claude-code/claude-code:pelago") is the tooltip. With the session it acted in, the session's name. */
+export function who(actor, session) {
+  if (session) return sessionWho(session, actor ?? '');
+  const raw = actor ?? '';
+  const [kind, ...rest] = raw.split(':');
+  const name = rest.join(':').split('/').at(-1) ?? '';
+  const label =
+    kind === 'human' ? (name === 'local' || name === 'owner' ? 'You' : name)
+    : kind === 'github' ? 'GitHub'
+    : name.startsWith('automation:') ? 'Automation'
+    : name.startsWith('launched:') ? 'Launched session'
+    : name === 'pelago' && !raw.includes('/') ? 'Archipelago'
+    : name.split(':').at(-1) || raw;
+  return h('span', { class: `who who-${kind === 'human' ? 'human' : kind === 'github' ? 'github' : 'agent'}`, title: raw }, label);
+}
+
+/** The first clause of a reason. Agents explain at length; a row has room for the point. */
+export const gist = (text) => (typeof text === 'string' ? text : '').split(/(?<=[.:;])\s|\n/)[0].replace(/[.:;]$/, '');
+
+/** On whose authority, as a mark. The sentence is the tooltip. */
+export function authorityMark(a) {
+  if (!a) return h('span', { class: 'mark mark-none', title: 'Authority not recorded' }, '?');
+  const yours = a.of === 'human';
+  return h('span', { class: `mark ${yours ? 'mark-human' : 'mark-agent'}`, title: authorityText(a) }, yours ? 'your word' : 'its call');
+}
+
+/** What an event did, in a word. */
+export const VERBS = {
+  'entity.create': 'created', 'entity.update': 'changed', 'entity.archive': 'archived', 'entity.restore': 'restored', 'entity.merge': 'merged',
+  'relation.link': 'linked', 'relation.unlink': 'unlinked', 'type.define': 'new type',
+  'proposal.create': 'held', 'proposal.approve': 'applied', 'proposal.reject': 'declined', 'proposal.supersede': 'overtaken', 'proposal.withdraw': 'withdrew',
+  'changeset.undo': 'undid', 'changes.seen': 'marked seen', 'questions.confirmed': 'owner answered', 'repo.push': 'push', 'recheck.done': 're-checked',
+  'automation.fire': 'automation', 'automation.fired': 'fired','run.stale': 'went quiet', 'connection.check': 'connection', 'resource.claim': 'took', 'resource.release': 'gave back',
+};
+export const verb = (ev) => (ev.action === 'entity.update' && !Object.keys(ev.detail?.changes ?? {}).length ? 'confirmed' : (VERBS[ev.action] ?? ev.action));
+
+/**
+ * One change set as one line: who, the point of it, what it did, on whose
+ * word, when. Opened, it gives the whole reason and each thing it touched.
+ */
+/** An event that belongs to no change set (a push heard, a session gone quiet), as the same kind of line. */
+export function eventLine(ev) {
+  const about = describeEvent(ev);
+  return h(
+    'div',
+    { class: 'change line' },
+    who(ev.actor, ev.detail?.run_name),
+    h('span', { class: 'gist', title: ev.reason ?? '' }, h('span', { class: 'muted' }, `${verb(ev)} `), ev.target_id ? h('a', { href: `#/e/${ev.target_id}`, title: ev.target_id }, ev.target_title ?? nameOr(ev.target_id)) : gist(ev.reason) || about),
+    ago(ev.ts),
+  );
+}
+
+export function changeRow(g, { undone, onUndo, attention, onRead, here, fresh }) {
+  const first = g.events[0];
+  const work = g.events.find((e) => !e.action.startsWith('proposal.')) ?? first;
+  const reason = g.events.find((e) => e.reason && e.reason !== 'Source of this change')?.reason ?? '';
+  const isUndo = g.events.some((e) => e.action === 'changeset.undo' || e.detail?.undoes);
+  // An undo is said by what it took back: "undid" and the point of the change it undid; the undo of an undo, "redid".
+  const base = isUndo ? reason.replace(/^(Undo: )+/, '') : reason;
+  const said = base !== reason ? `${((reason.length - base.length) / 6) % 2 ? 'undid' : 'redid'} ${gist(base)}` : gist(reason);
+  const approver = work.detail?.approved_by;
+  // What it did, as marks: a status that moved, or how many things it touched.
+  const touched = g.events.filter((e) => (e.target_type ?? '') !== 'source' && e.action !== 'changeset.undo' && !e.action.startsWith('proposal.'));
+  const moved = touched.filter((e) => e.action === 'entity.update' && e.detail?.changes?.status);
+  const effect =
+    moved.length === 1
+      ? h('span', { class: 'effect' }, h('span', { class: 'mark closed' }, moved[0].detail.changes.status.from), ' \u2192 ', h('span', { class: 'mark' }, moved[0].detail.changes.status.to))
+      : touched.length > 0 && h('span', { class: 'effect muted' }, `${new Set(touched.map((e) => e.target_id)).size} item${new Set(touched.map((e) => e.target_id)).size === 1 ? '' : 's'}`);
+  const subject = moved.length === 1 ? moved[0] : touched.length && touched.every((e) => e.target_id === touched[0].target_id) ? touched[0] : undefined;
+  // A change is a line, not a page of its own: what it changed has a page, and
+  // the line leads there. One that touched several things offers each. One
+  // the owner has been told about is marked, and going to what it changed is
+  // reading what was said.
+  const ids = [...new Set(touched.map((e) => e.target_id).filter(Boolean))];
+  const read = () => attention?.length && onRead?.(attention, row);
+  const nameOf = (id) => touched.find((e) => e.target_id === id)?.target_title ?? nameOr(id);
+  // On the page of the thing it changed, the line does not name that thing again.
+  const only = subject?.target_id ?? (ids.length === 1 ? ids[0] : undefined);
+  const one = only === here ? undefined : only;
+  const row = h(
+    'div',
+    { class: `change line${undone || isUndo ? ' quiet' : ''}${attention?.length ? ' attn' : ''}${fresh ? ' fresh' : ''}`, title: attention?.map((n) => n.title).join(' / ') ?? '' },
+    who(work.actor, work.detail?.run_name),
+    h('span', { class: 'gist', title: reason }, one ? [h('a', { href: `#/e/${one}`, onclick: read }, h('strong', {}, nameOf(one))), said && ` · ${said}`] : said || verb(first)),
+    moved.length === 1 ? effect : ids.length > 1 && !here && menu(`${ids.length} items`, ids.map((id) => [nameOf(id), () => (read(), (location.hash = `#/e/${id}`))])),
+    approver ? h('span', { class: 'mark mark-human', title: `Applied by ${approver}` }, 'you applied') : touched.length > 0 && authorityMark(work.detail?.authority),
+    ago(first.ts),
+    undone ? h('span', { class: 'mark', title: 'Taken back by a later change' }, 'undone') : onUndo && h('button', { class: 'quiet-button', title: isUndo ? 'Take this undo back: what it reversed is made again' : 'Put back what this change did, as a new change', onclick: () => onUndo(g) }, 'Undo'),
+  );
+  return row;
+}
+
+/** A type's name as a word on the surface, never boxed (rule e_vgs9vt5j). */
+export const typeMark = (typeId) => h('span', { class: 'mark mark-type', title: typeId }, typeTitle(typeId));
+/** A status as a word in its tone: open in the accent, closed quiet. */
+export const statusMark = (typeId, status) => h('span', { class: `mark ${isClosed(typeId, status) ? 'closed' : 'open'}` }, status);
+// The old names, for ui/item-links.js only, which another branch removes: drop these with it.
+/** Titles of the items the pages have shown, so a line that only holds an id can still say a name. */
+export const titles = new Map();
+// A note (packs/kit/page/body.js, the host's) is read by the page's style and names items by the titles known here.
+noteContext({ style: () => state.style, title: (id) => titles.get(id) });
+/** An item's name where the page knows it, else a word for it: never its id. */
+export const nameOr = (id, word = 'an item') => titles.get(id) ?? word;
+/** Text an agent wrote, with each item id in it as a link by the item's name: an id is something to follow, never something to read. */
+export const idsAsLinks = (text) => {
+  const out = [];
+  let from = 0;
+  // An item's id is a way to it; a source written [its name](its address) is its name, opening the address.
+  for (const m of text.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|\be_[a-z0-9]{8}\b/g)) {
+    out.push(text.slice(from, m.index), m[1] ? h('a', { href: m[2], target: '_blank', rel: 'noopener noreferrer', title: m[2] }, m[1]) : h('a', { href: `#/e/${m[0]}`, title: 'Open it' }, titles.get(m[0]) ?? 'this item'));
+    from = m.index + m[0].length;
+  }
+  return [...out, text.slice(from)];
+};
+/** The item ids a text names, each once: what idsAsLinks will need a name for. */
+export const idsIn = (text) => [...new Set(text.match(/\be_[a-z0-9]{8}\b/g) ?? [])];
+export const link = (e) => (e ? (titles.set(e.id, e.title), h('a', { href: `#/e/${e.id}` }, e.title)) : h('span', { class: 'muted' }, '(missing)'));
+
+export function card(title, { wide } = {}) {
+  const count = h('span', { class: 'n' });
+  const body = h('div', {}, h('div', { class: 'empty' }, 'Loading…'));
+  const el = h('section', { class: `card${wide ? ' wide' : ''}` }, h('header', {}, h('h2', {}, title), count), body);
+  return {
+    el,
+    /** Fill from a promise; `render` returns [count, node]. */
+    async fill(promise, render, emptyText) {
+      try {
+        const [n, node] = render(await promise);
+        count.textContent = n ?? '';
+        body.replaceChildren(n === 0 ? h('div', { class: 'empty' }, emptyText) : node);
+      } catch (err) {
+        body.replaceChildren(h('div', { class: 'error' }, err.message));
+      }
+    },
+  };
+}
+
+/** A small menu for what is done rarely: the page keeps one or two actions in sight. */
+export function menu(label, items) {
+  const box = h('details', { class: 'menu' }, h('summary', {}, label), h('div', { class: 'menu-items' }, items.filter(Boolean).map(([text, onclick, cls]) => h('button', { class: cls ?? '', onclick: (ev) => ((box.open = false), onclick(ev)) }, text))));
+  return box;
+}
+// A menu shuts on a click anywhere else, and once one of its options is chosen (☰ and what it holds included); a tick
+// (a checkbox, or an item that is one) keeps it open, as more than one may be ticked.
+const isTick = (el) => el.matches('[role="menuitemcheckbox"], input[type="checkbox"]') || Boolean(el.matches('label') && el.querySelector('input[type="checkbox"]'));
+document.addEventListener('click', (ev) => {
+  const hit = ev.target.closest?.('.menu-items :is(button, a, label, input)');
+  const option = hit && !isTick(hit) ? hit : null;
+  for (const open of document.querySelectorAll('details.menu[open]')) if (!open.contains(ev.target) || (option && open.contains(option))) open.open = false;
+});
+
+/** Which of each item's sections are unfolded, kept while the page is open. */
+export const unfolded = new Map();
+/** A sentence of explanation, kept behind a small mark: there to be asked for, not to be read past. */
+export const hint = (text) => h('span', { class: 'hint', title: text, tabindex: 0 }, '?');
+
+/** A stored field name as a person would label it: "recheck_days" is "Recheck days". */
+export const label = (key) => key.charAt(0).toUpperCase() + key.slice(1).replaceAll('_', ' ');
+// On whose authority a change was made, as the log has it.
+export function authorityText(a) {
+  if (!a) return '';
+  if (a.of === 'agent') return `on the agent's own judgment${a.basis ? `: ${a.basis}` : ''}`;
+  return a.stated_by ? `on a human's word, as ${a.stated_by} reports it: ${a.basis}` : `on the authority of ${a.who}`;
+}
+
+export function describeEvent(ev) {
+  const d = ev.detail ?? {};
+  if (ev.origin === 'external') return `${d.ok === false ? 'failed' : 'ok'}${d.durationMs != null ? ` in ${d.durationMs} ms` : ''}`;
+  const short = (v) => (v == null ? 'none' : String(typeof v === 'object' ? JSON.stringify(v) : v).replaceAll('\n', ' ').slice(0, 80));
+  // A rewritten note is said to be rewritten; printing both versions is what made a row a paragraph.
+  if (ev.action === 'entity.update')
+    return (
+      Object.entries(d.changes ?? {})
+        .map(([k, c]) => (k === 'body' ? 'notes rewritten' : `${k.replace(/^props./, '')}: ${short(c.from)} → ${short(c.to)}`))
+        .join('; ') || 'checked: still true as written'
+    );
+  if (ev.action === 'changeset.undo') return `undid a change${d.skipped?.length ? `, ${d.skipped.length} left alone` : ''}`;
+  if (ev.action === 'relation.link' || ev.action === 'relation.unlink') return `${relations.get(d.type)?.title ?? d.type} ${nameOr(d.to)}`;
+  if (ev.action === 'entity.create') return `${typeTitle(d.type)}, ${d.status ?? ''}`;
+  if (ev.action === 'proposal.supersede') return 'it asked only for what a newer change had already made so';
+  if (ev.action === 'proposal.withdraw') return d.by ? 'covered by a newer change' : 'a held change';
+  if (ev.action.startsWith('proposal.')) return `a held change${d.revised ? ', with corrections' : ''}`;
+  if (ev.action === 'connection.check') return `${d.from} → ${d.to}`;
+  if (ev.action.startsWith('resource.')) return d.holder_title ?? (d.holder ? nameOr(d.holder, 'someone') : '');
+  return '';
+}
+
+/** A count of tokens as a person says it: 1.2M, 340k. */
+export const tokensText = (t) => (t >= 1e6 ? `${+(t / 1e6).toFixed(1)}M` : t >= 1000 ? `${Math.round(t / 1000)}k` : `${Math.round(t)}`);

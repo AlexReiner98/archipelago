@@ -271,7 +271,7 @@ const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh
 const FACE = /^[A-Za-z0-9 ,'"-]+$/;
 const NAME = /^[a-z][a-z0-9_]*$/;
 
-/** A style's faces and text roles as the variables every stylesheet reads, as packs/surface/page/theme.js sets them (typeVars there). */
+/** A style's faces and text roles as the variables every stylesheet reads, as packs/kit/page/theme.js sets them (typeVars there). */
 function typeVars(type: unknown, faces: unknown): [string, string][] {
   const out: [string, string][] = [], fs = (faces && typeof faces === 'object' ? faces : {}) as Record<string, unknown>;
   const face = (name: unknown) => (NAME.test(String(name)) && typeof fs[String(name)] === 'string' && FACE.test(fs[String(name)] as string) ? `var(--face-${String(name).replaceAll('_', '-')})` : 'var(--face-text)');
@@ -287,7 +287,7 @@ function typeVars(type: unknown, faces: unknown): [string, string][] {
 
 /**
  * The page's lengths, typefaces and text roles as the presets on nothing give them, as a stylesheet: what the page is laid out by
- * until the workspace's own style is read (packs/surface/page/theme.js paints that over it). Only a plain name and a length, or a
+ * until the workspace's own style is read (packs/kit/page/theme.js paints that over it). Only a plain name and a length, or a
  * plain list of families, go in.
  */
 export function lengthsSheet(packs: Parameters<typeof stylesOf>[0]): string {

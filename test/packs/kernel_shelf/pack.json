@@ -1,0 +1,22 @@
+{
+  "id": "kernel_shelf",
+  "version": "0.1.0",
+  "title": "Kernel shelf",
+  "description": "A service pack for testing an internal pack's actions: its part sends put, which runs in-process as act.capture.put; bare declares no service.",
+  "requires": ["type:task"],
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "provides": {
+      "act.capture.put": { "in": "any", "out": "any", "run": "shelf.ts#put" }
+    }
+  },
+  "actions": [
+    { "id": "kernel_shelf.put", "title": "Put", "description": "Put a task on the shelf.", "verb": "capture", "input": { "type": "object", "properties": { "title": { "type": "string" } }, "additionalProperties": false } },
+    { "id": "kernel_shelf.bare", "title": "Bare", "description": "Declared with no service.", "verb": "capture", "input": { "type": "object", "properties": {}, "additionalProperties": false } }
+  ],
+  "parts": [
+    { "id": "kernel_shelf.row", "title": "Row", "slot": "sheet", "marks": ["box", "text", "button"], "sends": ["kernel_shelf.put", "kernel_shelf.bare"], "modules": { "index.js": "parts/row/index.js" } }
+  ]
+}

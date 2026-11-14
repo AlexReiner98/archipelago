@@ -64,7 +64,7 @@ const settings = async (l: Archipelago) => {
   return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), agent_backups, agent_publish, agent_code, drawings_open: await drawingsOpen(l), [ISLANDS]: await islandsOn(l), [HOLDS_OFF]: await holdsOff(l.db), ...(names.length && { lifted, reply_rules: await replyRules(l, lifted, set) }), ...(Object.keys(provided).length && { settings: provided }) };
 };
 
-/** Whether the owner has turned the sandbox off for drawings here: read whole, since every member's page draws by it (ui/style-code.js). */
+/** Whether the owner has turned the sandbox off for drawings here: read whole, since every member's page draws by it (packs/walls/page/style-code.js). */
 const drawingsOpen = async (l: Archipelago) => (await (await bypassingRls(l)).setting(DRAWINGS_OPEN)) === true;
 
 /**

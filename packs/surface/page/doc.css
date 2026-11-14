@@ -1,0 +1,412 @@
+:root {
+  color-scheme: light dark;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--reader-page, Canvas);
+  color: var(--reader-ink, CanvasText);
+  font: var(--reader-text)/1.6 Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+}
+/* A published page's words for a reader that runs no script (packs/reader/head.js): the page itself is drawn in main. */
+.page-words {
+  display: none;
+}
+main {
+  max-width: var(--reader-measure);
+  margin: 0 auto;
+  padding: var(--reader-top) var(--reader-side) var(--reader-bottom);
+}
+h1,
+h2,
+h3,
+h4,
+nav,
+footer,
+.muted,
+.part-body .pm-text-title,
+.part-body .pm-text-muted,
+.part-body .pm-button,
+.part-body .part-title {
+  font-family: var(--face-text);
+}
+h1 {
+  font-size: var(--reader-h1);
+  line-height: 1.2;
+  margin: 0 0 var(--space-3);
+}
+h2 {
+  font-size: var(--reader-h2);
+  margin: var(--rhythm-9) 0 var(--rhythm-2);
+  padding-top: var(--rhythm-3);
+  border-top: var(--border-1) solid var(--reader-line);
+}
+h3 {
+  font-size: var(--reader-h3);
+  margin: var(--rhythm-7) 0 var(--rhythm-2);
+}
+h4 {
+  font-size: var(--reader-h4);
+  margin: var(--rhythm-6) 0 var(--rhythm-1);
+}
+p,
+ul,
+ol {
+  margin: 0 0 var(--rhythm-4);
+}
+li {
+  margin: var(--rhythm-1) 0;
+}
+a {
+  color: var(--reader-link);
+  overflow-wrap: anywhere;
+}
+.muted {
+  color: var(--reader-muted);
+  font-size: var(--reader-small);
+}
+.error {
+  color: var(--reader-bad);
+}
+header {
+  margin-bottom: var(--rhythm-8);
+}
+/* A site's header: its name and its main pages on one line; what does not fit scrolls sideways, never wraps. */
+nav.site-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-9);
+  margin: calc(-1 * var(--rhythm-5)) 0 var(--rhythm-9);
+  padding-bottom: var(--space-6);
+  border-bottom: var(--border-1) solid var(--reader-line);
+  font-size: var(--reader-small);
+  white-space: nowrap;
+}
+nav.site-head a {
+  text-decoration: none;
+  color: var(--reader-muted);
+}
+nav.site-head a:hover,
+nav.site-head a[aria-current] {
+  color: var(--reader-ink);
+}
+nav.site-head .site-name {
+  flex: none;
+  font-weight: 600;
+  color: var(--reader-ink);
+}
+.site-pages {
+  display: flex;
+  gap: var(--space-8);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+footer {
+  margin-top: var(--rhythm-10);
+  padding-top: var(--rhythm-5);
+  border-top: var(--border-1) solid var(--reader-line);
+}
+/* A site's footer: its legal and contact lines, quieter than the page above them. */
+footer.site-foot {
+  color: var(--reader-muted);
+  font-size: var(--reader-small);
+}
+footer.site-foot p {
+  margin: var(--rhythm-2) 0;
+}
+/* A page read with no login: its way to print, and at the far side its quiet way to start a map of one's own. */
+footer.muted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-7);
+}
+a.start-own {
+  margin-left: auto;
+  color: var(--reader-muted);
+  font-size: var(--reader-small);
+}
+button.print {
+  font: inherit;
+  padding: var(--space-4) var(--space-7);
+  border: var(--border-1) solid var(--reader-line);
+  border-radius: var(--radius-2);
+  background: transparent;
+  color: var(--reader-ink);
+  cursor: pointer;
+}
+@media print {
+  /* On paper, the theme's print colours: set on the body, so they win over the page's own. */
+  body {
+    --reader-ink: var(--reader-print-ink);
+    --reader-muted: var(--reader-print-muted);
+    --reader-link: var(--reader-print-ink);
+    --reader-page: var(--reader-print-page);
+    font-size: 11pt;
+  }
+  main {
+    max-width: none;
+    padding: 0;
+  }
+  footer {
+    display: none;
+  }
+  h2 {
+    break-after: avoid;
+  }
+  section {
+    break-inside: auto;
+  }
+}
+/* Text between two sections is the document's own, not the end of the section above it. */
+section + div.text {
+  margin-top: var(--rhythm-9);
+  padding-top: var(--rhythm-4);
+  border-top: var(--border-1) solid var(--reader-line);
+}
+/* A section's figure: as wide as the text, on its own light card so a drawing made on white reads in the dark too. */
+figure {
+  margin: var(--rhythm-2) 0 var(--rhythm-6);
+}
+figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: var(--border-1) solid var(--reader-line);
+  border-radius: var(--radius-3);
+  background: var(--reader-figure);
+}
+/* A front page that opens on a figure (packs/surface/page/frozen-page.js) runs it from edge to edge of the window, with no card round it:
+   its ground is the page's own. */
+html:has(section.lead) {
+  overflow-x: clip;
+}
+section.lead figure {
+  width: var(--reader-window);
+  margin-left: calc((100% - var(--reader-window)) / 2);
+}
+section.lead figure img {
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+section.lead + div.text {
+  border-top: none;
+}
+/* An invoice: its number, dates and what is due as a heading block; the rest reads as the bill, in a plain face. */
+body.invoice main {
+  font-family: var(--face-text);
+  font-size: var(--text-6);
+}
+.invoice-head {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-11);
+  padding-bottom: var(--space-10);
+  margin-bottom: var(--rhythm-7);
+  border-bottom: var(--border-3) solid var(--reader-ink);
+}
+.invoice-head h1 {
+  font-size: var(--reader-title);
+  letter-spacing: var(--track-1);
+}
+.invoice-facts {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: var(--space-3) var(--space-10);
+  margin: var(--space-4) 0 0;
+  text-align: right;
+}
+.invoice-facts dt {
+  color: var(--reader-muted);
+}
+.invoice-facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.invoice-total {
+  font-size: var(--reader-h2);
+  font-weight: 700;
+}
+.stamp {
+  position: absolute;
+  left: 46%;
+  top: var(--space-5);
+  padding: var(--space-3) var(--space-8);
+  border: var(--border-4) solid var(--reader-paid);
+  border-radius: var(--radius-2);
+  color: var(--reader-paid);
+  font-weight: 800;
+  letter-spacing: var(--track-3);
+  text-transform: uppercase;
+  transform: rotate(-8deg);
+}
+.stamp.void {
+  border-color: var(--reader-void);
+  color: var(--reader-void);
+}
+body.invoice ul {
+  padding-left: var(--rhythm-6);
+}
+body.invoice li {
+  font-variant-numeric: tabular-nums;
+}
+/* Tables: ruled rows, numbers that line up, a head in the plain face. */
+table.text-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--rhythm-2) 0 var(--rhythm-6);
+  font-variant-numeric: tabular-nums;
+}
+table.text-table th {
+  font-family: var(--face-text);
+  font-size: var(--reader-tiny);
+  font-weight: 600;
+  letter-spacing: var(--track-2);
+  text-transform: uppercase;
+  color: var(--reader-muted);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: var(--border-2) solid var(--reader-ink);
+}
+table.text-table td {
+  padding: var(--space-5) var(--space-5);
+  border-bottom: var(--border-1) solid var(--reader-line);
+  vertical-align: top;
+}
+table.text-table tr:last-child td {
+  border-bottom: 0;
+}
+/* On an invoice, the totals sit to the right under the work, and its last row is what is due. */
+body.invoice h3 + table.text-table:not(:has(thead)) {
+  width: auto;
+  min-width: 46%;
+  margin-left: auto;
+}
+body.invoice table.text-table:not(:has(thead)) tr:last-child td {
+  border-top: var(--border-2) solid var(--reader-ink);
+  font-size: var(--reader-total);
+}
+body.invoice table.text-table:first-of-type td {
+  border-bottom: 0;
+  padding: var(--space-2) var(--space-5);
+}
+@media print {
+  table.text-table th {
+    color: var(--reader-print-ink);
+  }
+  table.text-table tr {
+    break-inside: avoid;
+  }
+}
+
+.align-left {
+  text-align: left;
+}
+.align-right {
+  text-align: right;
+}
+.align-center {
+  text-align: center;
+}
+/* The one dialect's callouts, checklists and code (packs/kit/page/text.js), in the reader's own colours. */
+aside.callout {
+  margin: 0 0 var(--rhythm-4);
+  padding: var(--rhythm-2) var(--rhythm-4);
+  border-left: var(--border-4) solid var(--reader-line);
+}
+aside.callout.quote {
+  color: var(--reader-muted);
+}
+aside.callout > :last-child {
+  margin-bottom: 0;
+}
+ul.checklist {
+  list-style: none;
+  padding-left: 0;
+}
+ul.checklist li.done {
+  color: var(--reader-muted);
+}
+code,
+pre {
+  font-family: var(--face-mono);
+  font-size: var(--reader-small);
+}
+pre {
+  margin: 0 0 var(--rhythm-4);
+  overflow-x: auto;
+}
+/* Copying code: two squares, in line with the code, in its corner when it is a block. */
+button.copy {
+  all: unset;
+  display: inline-block;
+  position: relative;
+  box-sizing: border-box;
+  width: var(--space-6);
+  height: var(--space-6);
+  margin: 0 var(--space-3) 0 var(--space-4);
+  border: var(--border-1) solid var(--reader-muted);
+  color: var(--reader-muted);
+  cursor: pointer;
+  vertical-align: baseline;
+}
+button.copy::after {
+  content: '';
+  position: absolute;
+  inset: var(--space-2) calc(var(--space-3) * -1) calc(var(--space-3) * -1) var(--space-2);
+  border: var(--border-1) solid currentColor;
+  background: var(--reader-page, Canvas);
+}
+button.copy:hover,
+button.copy:hover::after {
+  border-color: var(--reader-link);
+}
+button.copy:focus-visible {
+  outline: var(--border-2) solid var(--reader-link);
+  outline-offset: var(--space-3);
+}
+button.copy.copied,
+button.copy.copied::after {
+  border-color: transparent;
+  background: none;
+}
+button.copy.copied::before {
+  content: '✓';
+  position: absolute;
+  inset: calc(var(--space-3) * -1) 0 0 0;
+  line-height: 1;
+  color: var(--reader-link);
+}
+.code-block {
+  position: relative;
+}
+.code-line {
+  white-space: nowrap;
+}
+.code-line code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.code-block pre {
+  margin-right: var(--space-12);
+}
+.code-block button.copy {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-5);
+  margin: 0;
+}
+
+/* An item of a link's view, opened read only in a sheet over the page (packs/surface/page/frozen-chrome.js). */
+.doc-sheet { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--reader-measure), 100%); overflow: auto; padding: var(--space-8) var(--reader-side); background: var(--reader-page, Canvas); color: var(--reader-ink, CanvasText); border-left: var(--border-1) solid var(--reader-line); }
+.doc-sheet-close { position: sticky; top: 0; float: right; border: 0; background: none; color: inherit; font: inherit; font-size: var(--reader-h1); line-height: 1; cursor: pointer; }
+.doc-sheet h2 { margin-top: 0; }
+.doc-sheet-fields { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2) var(--space-5); font-family: var(--face-text); font-size: var(--reader-small); }
+.doc-sheet-fields dt { color: var(--reader-muted); }
+.doc-sheet-fields dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media print { .doc-sheet { display: none; } }

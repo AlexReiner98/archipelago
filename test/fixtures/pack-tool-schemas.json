@@ -12,6 +12,10 @@
         "drawn": {
           "description": "true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft.",
           "type": "boolean"
+        },
+        "page": {
+          "description": "with drawn, as its page is read: with the look its style gives a page and the marks its reader draws it with (/read/<id>).",
+          "type": "boolean"
         }
       },
       "required": [
@@ -28,6 +32,10 @@
         },
         "drawn": {
           "description": "true for the drawing of each view it brings in as well, as publishing would keep it (lenses): for a page that draws a draft.",
+          "type": "boolean"
+        },
+        "page": {
+          "description": "with drawn, as its page is read: with the look its style gives a page and the marks its reader draws it with (/read/<id>).",
           "type": "boolean"
         }
       },

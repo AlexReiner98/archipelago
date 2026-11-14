@@ -29,7 +29,7 @@ test('a change runs the tests that import it or name it, the structure test, and
 
   assert.deepEqual(affected(['test/kinds.test.ts']).files, ['test/kinds.test.ts', 'test/sets.test.ts', 'test/structure.test.ts'], 'a test alone, with the structure test (and this one, which names it)');
 
-  const page = affected(['ui/canvas.js']).files;
+  const page = affected(['ui/item.js']).files;
   assert.ok(page.includes('test/layouts.test.ts'), 'a page of the app: the browser tests');
   assert.ok(!page.includes('test/rules.test.ts'), 'but not a test that never reads a page');
   const host = affected(['packs/walls/page/marks.js']).files;

@@ -28,3 +28,6 @@ CLAUDE.local.md
 
 # Content kept on one machine, never in the repository.
 brand/content/
+
+# Test output a session leaves in its worktree.
+*.log

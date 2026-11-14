@@ -38,12 +38,20 @@
         },
         "out": "any",
         "run": "share-tools.ts#reading"
+      },
+      "answer.shared": {
+        "in": {
+          "id": "id"
+        },
+        "out": "any",
+        "run": "share-read.ts#sharedOf"
       }
     },
     "hooks": {
       "surface.published": "served.ts#served",
       "surface.public": "public-route.ts#servePublic",
       "surface.preview": "published-preview.ts#previewOf",
+      "surface.page_marks": "page-marks.ts#servedMarks",
       "surface.site_nav": "site.ts#siteNav",
       "surface.bake": "public-bake.ts#bake",
       "surface.counts_since": "pack-counts.ts#countsSince",
@@ -56,6 +64,7 @@
     "service:root.picture",
     "service:root.layout",
     "service:root.scene",
+    "service:root.part_marks",
     "service:root.drawing",
     "service:root.public_product",
     "service:page.look",
@@ -69,6 +78,13 @@
       "lens": {},
       "answer": "reading",
       "description": "A document read whole as its reader meets it, with the drawing of each view it brings in as publishing would keep it: what its sheet reads. Params: id (required)."
+    },
+    {
+      "id": "publish.shared",
+      "shape": "data",
+      "lens": {},
+      "answer": "shared",
+      "description": "An item's public view, when a person shared it (its address and when), and whether it is a document anyone may read whole: what the item's menu offers to open, copy and print. Params: id (required)."
     }
   ],
   "parts": [
@@ -92,6 +108,46 @@
       "modules": {
         "index.js": "parts/reading/index.js",
         "sections.js": "parts/reading/sections.js"
+      }
+    },
+    {
+      "id": "publish.doc",
+      "title": "A document's page",
+      "slot": "page.doc",
+      "marks": ["box", "text", "note", "list", "button", "picture"],
+      "reads": {},
+      "modules": {
+        "index.js": "parts/doc/index.js",
+        "page.js": "parts/doc/page.js",
+        "sheet.js": "parts/doc/sheet.js"
+      }
+    },
+    {
+      "id": "publish.public",
+      "title": "A product's public page",
+      "slot": "page.public",
+      "marks": ["box", "text", "list", "input", "button", "picture"],
+      "reads": {},
+      "modules": {
+        "index.js": "parts/public/index.js"
+      }
+    },
+    {
+      "id": "publish.share",
+      "title": "Its public view",
+      "slot": "item.menu",
+      "marks": ["box", "text", "button"],
+      "reads": {},
+      "views": [
+        {
+          "name": "shared",
+          "params": {
+            "id": "{here}"
+          }
+        }
+      ],
+      "modules": {
+        "index.js": "parts/share/index.js"
       }
     }
   ]

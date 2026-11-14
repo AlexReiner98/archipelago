@@ -201,8 +201,8 @@ test('kernel modules import one way', () => {
 const CLASSIC_SCRIPTS: Record<string, number> = {
   // The sandboxed drawing frame has no origin of its own; a module there is untried. Its two halves (a style's code,
   // drawings that answer with marks) are one script split to stay under 500 lines (e_vbmkhnyb), not a second page's.
-  'ui/draw.html: <script src="/draw-marks.js">': 1,
-  'ui/draw.html: <script src="/draw.js">': 1,
+  'packs/walls/page/draw.html: <script src="/draw-marks.js">': 1,
+  'packs/walls/page/draw.html: <script src="/draw.js">': 1,
 };
 
 test('the UI loads as modules', () => {
@@ -236,9 +236,9 @@ test('every UI module parses', () => {
 // keeps the mechanism (layouts, renderers, CSS rules that read variables) and no values: no colours, no lengths, no
 // numeric constants. Counted here as hex colours, CSS lengths and UPPER_CASE number constants, as of 20 Oct 2026.
 const LOOKS_IN_KERNEL: Record<string, number> = {
-  'ui/draw.html': 6,
-  'ui/public.css': 1,
-  'ui/style.css': 5,
+  'packs/walls/page/draw.html': 6,
+  'packs/surface/page/public.css': 1,
+  'packs/surface/page/style.css': 5,
   'packs/identity/page/token-ask.js': 1,
 };
 const LOOKS = /#[0-9a-fA-F]{3,8}\b|\b\d+(?:\.\d+)?(?:px|rem|em|ch|vh|vw)\b|^(?:export )?const [A-Z][A-Z0-9_]* = -?[\d.]/gm;
@@ -251,10 +251,10 @@ test('how things look lives in style presets, not in the kernel', () => {
 // 10b. No pills (the owner, 27 Oct 2026, rule e_vgs9vt5j): a state, a kind or a count is a word on the surface, its
 // tone a colour (`.mark`), never a capsule. Counted as pill or chip classes and capsule radii; a key's `-chip` is a
 // colour swatch, not a word, and the one left is the toggle switch's own track (ui/shell.css). Frozen 9 Nov 2026.
-const CAPSULES: Record<string, number> = { 'ui/shell.css': 1 };
+const CAPSULES: Record<string, number> = { 'packs/surface/page/shell.css': 1 };
 const CAPSULE = /(?:class(?:Name)?:\s*[`'"][^`'"]*?|\.)(?<![\w-])(?:pill|chip|[\w-]+-pill)(?![\w-])|999px|radius-pill/g;
 test('no term or control is wrapped in a capsule', () => {
-  const files = [...walk('ui'), ...walk('packs')].filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
+  const files = walk('packs').filter((f) => /\.(js|css|html)$/.test(f) && !VENDORED.includes(f));
   assert.deepEqual(ratchet(count(files, CAPSULE), CAPSULES), [], 'Draw it as a word with class mark and a tone (open, closed, ok, warn, bad): no background, padding or round ends.');
 });
 
@@ -266,7 +266,7 @@ const KERNEL_SHAPES: Record<string, number> = {};
 const SHAPES = /(?:LENS_SHAPES|SHAPES) = \{([^}]*)\}/;
 
 test('the kernel draws no shape of its own: each is a drawing a pack ships', () => {
-  const counted = Object.fromEntries(['ui/query.js', 'ui/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
+  const counted = Object.fromEntries(['packs/surface/page/query.js', 'packs/surface/page/doc-lens.js'].map((f) => [f, (SHAPES.exec(read(f))?.[1] ?? '').split(',').filter((s) => s.trim()).length]));
   assert.deepEqual(ratchet(counted, KERNEL_SHAPES), [], "Make the shape a drawing in a pack (pack.json drawings: its modules, entered at index.js, answering with marks), as packs/canvas/layouts/architecture is.");
 });
 
@@ -399,7 +399,7 @@ test('the page calls no more tools through /api than it did', () => {
 // a document or a screen). Places are never kept (the owner, 3 Nov 2026): a view is drawn from its query alone, so
 // nothing reads or appends to the places stream, which stays only so entries from before still read.
 test('the canvas draws no depth, and nothing keeps places', () => {
-  assert.doesNotMatch(read('ui/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
+  assert.doesNotMatch(read('packs/surface/page/canvas.js'), /\bnest\s*:/, 'The canvas draws a flat lens flat: part_of is a tie, never a box inside a box.');
   assert.doesNotMatch(read('packs/query/kernel/query-flat.ts').replace(/\/\/.*$/gm, ''), /\b(?:depth|places?)\b|\binside\s*:/, 'The flat lens answers items and links: no containment and no places.');
   const keepers = srcCode.filter((f) => /(?:readOps|record)\([^)]*'places'/.test(read(f)));
   assert.deepEqual(keepers, [], 'Nothing keeps where a person put a thing: a view is drawn from its query alone; grouping that matters is a link.');

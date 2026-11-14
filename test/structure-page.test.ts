@@ -5,36 +5,20 @@
 // it needs moves to the host (task e_qhrvu922).
 
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { test } from 'node:test';
-import { pageImports, ratchet, rootOrder, uiFiles, VENDORED, walk } from './structure-kit.ts';
+import { pageImports, ratchet, ROOT, rootOrder, uiFiles, VENDORED, walk } from './structure-kit.ts';
 
 /** A served path's root, and so its place in the order; none for the app's own files. */
 const rootOf = (path: string) => /^packs\/([\w-]+)\/page\//.exec(path)?.[1];
 
-// Frozen 12 Nov 2026, as the host moved out of ui/: mostly words.js and the canvas's modules, and base.js, the page's
-// fetch and ask, which sits in surface, the last root (the owner agreed it stays there, 12 Nov 2026).
-const AGAINST_THE_ORDER: Record<string, number> = {
-  'packs/identity/page/agents-card.js': 2,
-  'packs/identity/page/authorize.js': 1,
-  'packs/identity/page/members-card.js': 2,
-  'packs/identity/page/password.js': 1,
-  'packs/identity/page/token-ask.js': 2,
-  'packs/identity/page/token-piece.js': 2,
-  'packs/identity/page/workspace-cards.js': 3,
-  'packs/identity/page/workspace.js': 7,
-  'packs/identity/page/workspaces-card.js': 2,
-  'packs/walls/page/layout-asks.js': 4,
-  'packs/walls/page/layout.js': 8,
-  'packs/walls/page/marks.js': 2,
-  'packs/walls/page/surface.js': 1,
-  'packs/loader/page/packs.js': 5,
-  'packs/loader/page/page-schema.js': 2,
-  'packs/write/page/held-card.js': 2,
-  'packs/write/page/held.js': 3,
-  'packs/write/page/item-held.js': 2,
-  'packs/surface/page/live.js': 9,
-  'packs/surface/page/replica.js': 1,
-};
+// Emptied 13 Nov 2026 (task e_bjeev9py, the port's last step): the page kit every root draws with (base, theme, words,
+// dom, body, text, menu-place, plates) is its own root, kit, before identity; the page's entry (app.js) is the last root,
+// shell; the host's readers of what the panes publish (tabs.js, pane-route.js) are surface's; what a root needs of a
+// later one it asks by name (hooks: partsRuntime, passwordPage, store, savedCanvases, canvasAt, mayLeave). Nothing
+// imports against the order, and a new entry is never added: ask by name, or move the module to the root it belongs after.
+const AGAINST_THE_ORDER: Record<string, number> = {};
 
 test("the host's page imports one way along roots.json", () => {
   const counted: Record<string, number> = {};
@@ -53,75 +37,20 @@ test("the host's page imports one way along roots.json", () => {
 // to become a part of a map pack, its moves_to on the Pack anatomy island) asks the host for what it needs by name, a
 // slot, a piece or a service the bridge offers, not by importing a host module. The count is frozen per file and only
 // falls, each import going as its module becomes a part or what it needs is offered by name.
-const APP_ON_HOST: Record<string, number> = {
-  'ui/app.js': 8,
-  'ui/canvas-menu.js': 2,
-  'ui/canvas.js': 3,
-  'ui/canvases.js': 4,
-  'ui/catch-up.js': 1,
-  'ui/connect-agent.js': 2,
-  'ui/connections-card.js': 1,
-  'ui/diagram.js': 2,
-  'ui/doc-lens.js': 2,
-  'ui/doc-sheet.js': 1,
-  'ui/doc.js': 6,
-  'ui/draft.js': 3,
-  'ui/field-edit.js': 1,
-  'ui/fields.js': 1,
-  'ui/find-choices.js': 1,
-  'ui/find.js': 1,
-  'ui/home.js': 1,
-  'ui/island-new.js': 2,
-  'ui/item-doc.js': 3,
-  'ui/item-links.js': 1,
-  'ui/item-sections.js': 2,
-  'ui/item.js': 3,
-  'ui/keep-in-view.js': 1,
-  'ui/layout-tip.js': 2,
-  'ui/limits-card.js': 1,
-  'ui/link-pick.js': 2,
-  'ui/look-marks.js': 1,
-  'ui/look-switch.js': 1,
-  'ui/marks-add.js': 1,
-  'ui/nav.js': 1,
-  'ui/pane-busy.js': 1,
-  'ui/pane-drag.js': 1,
-  'ui/pane-land.js': 1,
-  'ui/pane-web.js': 1,
-  'ui/panes.js': 1,
-  'ui/plates.js': 1,
-  'ui/public.js': 3,
-  'ui/query-bar.js': 1,
-  'ui/query-base.js': 3,
-  'ui/query-light.js': 1,
-  'ui/query.js': 4,
-  'ui/screens.js': 6,
-  'ui/sheet-follow.js': 1,
-  'ui/start.js': 1,
-  'ui/style-code.js': 1,
-  'ui/styles-card.js': 1,
-  'ui/tab-bar.js': 2,
-  'ui/tab-life.js': 1,
-  'ui/tabs.js': 1,
-  'ui/term-kinds.js': 1,
-  'ui/term-pick.js': 2,
-  'ui/themes-card.js': 1,
-  'ui/thumbs.js': 3,
-  'ui/traces.js': 1,
-  'ui/view-frame.js': 1,
-  'ui/words.js': 3,
-};
+//
+// Frozen again 13 Nov 2026, as the runtime moved out of ui/ (task e_6hhx2ub8, decision e_6d2g62tg): eleven modules
+// left ui/ and their entries went with them; a module still in ui/ that imports one of them counts it from now on,
+// and that import goes when its own cluster makes it a part of a map pack. A number here may be re-frozen only when
+// the boundary itself moves, as it did here and on 12 Nov; otherwise it falls. It moved once more the same day:
+// doc-lens.js, the picture mark's drawing, went to surface (task e_atxefw2s), so doc.js and item-doc.js count it.
 
 /** Whether a served path is the host's: a root pack's page/ folder. */
 const isHost = (path: string) => rootOf(path) !== undefined;
 
-test('the app asks the host by name, not by importing its files', () => {
-  const counted: Record<string, number> = {};
-  for (const f of uiFiles.filter((f) => f.startsWith('ui/') && f.endsWith('.js') && !VENDORED.includes(f))) {
-    const onHost = pageImports(f).filter(isHost).length;
-    if (onHost) counted[f] = onHost;
-  }
-  assert.deepEqual(ratchet(counted, APP_ON_HOST), [], 'Ask the host by name (a slot, a piece, a service the bridge offers), or make the module a part that does.');
+// The page is packs alone (the owner, 13 Nov 2026: everything a part, flat like the back end): ui/ is gone, every module a
+// part of a map pack or a root pack's own (task e_m6frzed9). Nothing brings it back.
+test("the page has no ui/ folder: every module is a pack's", () => {
+  assert.ok(!existsSync(join(ROOT, 'ui')), "Put a module of the page in a pack: a part in a map pack, or a root pack's page/ if it is the runtime.");
 });
 
 // A part (a map pack's parts/, run walled, its manifest's parts) imports only its own pack's files: everything else it

@@ -7,33 +7,33 @@ import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 
 /** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'query-bar', 'find', 'find-choices', 'menu-place', 'draft', 'note-count', 'item', 'item-doc', 'item-links', 'link-pick', 'keep-in-view', 'item-sections', 'page-schema', 'screens', 'nav', 'query', 'query-base', 'style-code', 'pan-zoom', 'style-number', 'live', 'settle', 'workspace', 'workspace-cards', 'workspaces-card', 'connections-card', 'members-card', 'styles-card', 'themes-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'canvases', 'diagram', 'start', 'limits-card', 'doc-lens', 'doc-sheet', 'marks', 'marks-add', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-asks', 'island-new', 'layout-tip', 'tip', 'surface', 'replica', 'membership', 'changes', 'traces', 'catch-up', 'catch-up-steps', 'thumbs', 'thumb-keep', 'thumb-still', 'ghosts', 'canvas-wires', 'authorize', 'password', 'text', 'fields', 'field-edit', 'look', 'look-marks', 'panes', 'pane-drag', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'tab-count', 'tab-life', 'pane-land', 'item-link', 'pane-web', 'picker-rank', 'term-pick', 'look-switch', 'canvas-menu', 'only-words', 'term-kinds', 'way-back', 'part-bridge', 'part-going', 'part-host', 'part-check', 'part-render', 'part-paint', 'dom', 'canvas-pick'];
+const APP_MODULES = ['doc-ref', 'base', 'words', 'body', 'home', 'held', 'held-card', 'item-held', 'canvas', 'pinch', 'bar-band', 'menu-place', 'draft', 'note-count', 'item', 'page-schema', 'screens', 'query', 'query-base', 'style-code', 'pan-zoom', 'style-number', 'live', 'settle', 'workspace', 'workspace-cards', 'workspaces-card', 'connections-card', 'members-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'start', 'doc-lens', 'marks', 'marks-add', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-asks', 'layout-tip', 'tip', 'surface', 'replica', 'membership', 'thumbs', 'thumb-keep', 'thumb-still', 'canvas-wires', 'authorize', 'password', 'text', 'look', 'look-marks', 'panes', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'pane-land', 'item-link', 'way-back', 'part-bridge', 'part-going', 'part-host', 'part-check', 'part-render', 'part-fits', 'part-paint', 'dom', 'canvas-pick', 'frozen-page', 'frozen-chrome', 'lens-terms', 'part-lens', 'part-slots', 'part-menu', 'part-pane', 'part-drag', 'light-items', 'part-read', 'part-away', 'part-page', 'swatch', 'part-trace', 'replay', 'frozen-doc', 'beat-rows', 'screen-page', 'screen-rows', 'views-kept', 'part-input', 'item-share', 'item-reading', 'part-echo', 'part-order'];
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
   '/': 'index.html',
   '/app.js': 'app.js',
-  // The reads every page waits on, asked as it starts, before its modules have loaded (packs/surface/page/base.js takes them).
+  // The reads every page waits on, asked as it starts, before its modules have loaded (packs/kit/page/base.js takes them).
   '/early.js': 'early.js',
   // The house style's lengths as a stylesheet, so the page is laid out before the workspace's style is read (packs/styles/kernel/styles.ts).
   '/layout.css': 'layout.css',
   '/style.css': 'style.css',
   '/shell.css': 'shell.css',
   '/flow.css': 'flow.css',
-  '/diagram.css': 'diagram.css',
+  
   '/notes.css': 'notes.css',
   '/story.css': 'story.css',
   '/menus.css': 'menus.css',
   // How a part's marks look: classes and steps the style gives values to (packs/walls/page/part-render.js).
   '/part-marks.css': 'part-marks.css',
-  '/public.js': 'public.js',
+  
   '/public.css': 'public.css',
-  '/doc.js': 'doc.js',
+  
   '/doc.css': 'doc.css',
   '/doc-lens.css': 'doc-lens.css',
   '/packs.js': 'packs.js',
-  '/query-light.js': 'query-light.js',
-  '/lit-by.js': 'lit-by.js',
+  
+  
   // A scene mounted again moves into place, its marks matched by key (packs/walls/page/layout.js mounts, ui/transition.js plays).
   '/transition.js': 'transition.js',
   // Where a style's own drawing code runs: a page of its own in a sandboxed frame, and what it starts with.
@@ -51,12 +51,11 @@ export const UI_FILES: Record<string, string> = {
 };
 
 const PACKS = join(import.meta.dirname, '..', '..');
-const UI_DIR = join(PACKS, '..', 'ui');
 /**
- * Where the files are: the app's, in ui/, and the host's, in each root pack's page/ (packs/roots.json), where its hash
+ * Where the files are: each root pack's page/ (packs/roots.json), where its hash
  * keeps them. A file is served by its name alone, whichever folder holds it, so a name is in one folder only.
  */
-export const UI_DIRS = [UI_DIR, ...(JSON.parse(readFileSync(join(PACKS, 'roots.json'), 'utf8')) as { roots: { id: string }[] }).roots.map((r) => join(PACKS, r.id, 'page')).filter((d) => existsSync(d))];
+export const UI_DIRS = [...(JSON.parse(readFileSync(join(PACKS, 'roots.json'), 'utf8')) as { roots: { id: string }[] }).roots.map((r) => join(PACKS, r.id, 'page')).filter((d) => existsSync(d))];
 const DIR_OF = new Map<string, string>();
 for (const dir of UI_DIRS)
   for (const f of readdirSync(dir)) {
@@ -65,7 +64,7 @@ for (const dir of UI_DIRS)
   }
 /** Files served to the page from the kernel's source, as the page names them: TypeScript of erasable syntax only, its types stripped. */
 const FROM_SOURCE: Record<string, string> = { 'project.js': join(PACKS, 'log', 'kernel', 'project.ts'), 'css-check.js': join(PACKS, 'walls', 'kernel', 'css-check.ts') };
-const pathOf = (f: string) => FROM_SOURCE[f] ?? join(DIR_OF.get(f) ?? UI_DIR, f);
+const pathOf = (f: string) => FROM_SOURCE[f] ?? join(DIR_OF.get(f) ?? join(PACKS, 'surface', 'page'), f);
 const readText = async (f: string) => (FROM_SOURCE[f] ? stripTypeScriptTypes(await readFile(FROM_SOURCE[f], 'utf8')) : readFile(pathOf(f), 'utf8'));
 /** The pages a browser opens, and so asks for again on every visit; read whole, with the files they name versioned. */
 const PAGES = ['index.html', 'doc.html', 'public.html', 'draw.html'];

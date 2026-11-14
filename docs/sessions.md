@@ -202,7 +202,7 @@ makes them true.
 | Wiring (part of e_ees7hr6q) | `packs/runs/kernel/session-state.ts`, `packs/query/kernel/views.ts` (the `sessions` view only), `packs/query/kernel/query-flat.ts`, the two numbers in the house style |
 | 7. Ended leave; quiet dim, then end (e_9jduzn9c) | the stale sweep in `packs/sessions/kernel/session-quiet.ts`, `packs/sessions/kernel/sessions.ts` if ending needs it |
 | 8. A Sessions view (e_htwjh45d) | a lens preset and style preset in `packs/core/pack.json` (`views`, `styles`), `packs/canvas/layouts/flow/state.js` and the flow's marks for a session |
-| 9. The tab bar's count (e_82rggead) | `ui/tab-bar.js`, `ui/tab-life.js` |
+| 9. The tab bar's count (e_82rggead) | `packs/panes/page/tab-bar.js`, the panes part's `packs/panes/parts/life.js` |
 | 10. A session's page shows its turns (e_ezyzr7ms) | `packs/sessions/kernel/session-turns.ts` (the `turns` read), a screen piece in `packs/loader/kernel/declared.ts` and its `ui/` module |
 | 11. What turns tell (e_ys9d9n25) | `packs/runs/kernel/session-measures.ts` and its view's one line in `packs/query/kernel/views.ts` |
 | 12. An SDK adapter (e_bu29txug) | `scripts/pelago-sdk-runner.mjs`, `scripts/pelago-events.mjs` if it shares the posting |

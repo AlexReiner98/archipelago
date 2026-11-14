@@ -91,6 +91,20 @@ export async function open(url: string): Promise<Page> {
     });
   await send('Page.enable');
   await send('Runtime.enable');
+  // PELAGO_THROTTLE=<rate> slows Chrome's CPU that many times, the page and every frame of its own process it starts
+  // (the parts' walled frame), so a run here meets the timing of a loaded CI runner. Nothing is paused to do it: a
+  // worker Chrome cannot slow (it answers an error) starts as ever, within the time the frame gives it.
+  const rate = Number(process.env.PELAGO_THROTTLE);
+  if (rate > 1) {
+    const slow = (sessionId?: string) => send('Emulation.setCPUThrottlingRate', { rate }, sessionId);
+    const attach = (sessionId?: string) => send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, sessionId);
+    ws.addEventListener('message', (ev) => {
+      const m = JSON.parse(String(ev.data));
+      if (m.method === 'Target.attachedToTarget') void slow(m.params.sessionId).then(() => attach(m.params.sessionId));
+    });
+    await slow();
+    await attach();
+  }
   const go = async (to: string) => {
     events.length = 0;
     // Only the hash moved: the page stays, and no load follows (Chrome gives no loader for it). A test waits for what

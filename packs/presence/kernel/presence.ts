@@ -79,12 +79,23 @@ export const LISTEN_MS = 15_000;
 export type Whose = { workspace: string; viewer?: string };
 export const whose = (w: Whose) => `${w.workspace}:${w.viewer ?? ''}`;
 
-// This process's own steps, per screen, and those not yet kept.
+// Each map this process holds, by its registry (made once as it opens): two maps of one workspace in one process (a
+// test's map beside one a server opened) are two screens' worth of steps, never one.
+const maps = new WeakMap<object, number>();
+let mapsHeld = 0;
+const mapOf = (ctx: KernelContext) => {
+  const map: object = ctx.registry ?? ctx;
+  return maps.get(map) ?? (maps.set(map, ++mapsHeld), mapsHeld);
+};
+/** A screen of one map, as this process keeps its own steps. */
+const screenOf = (ctx: KernelContext, w: Whose) => `${mapOf(ctx)}|${whose(w)}`;
+
+// This process's own steps, per screen of each map, and those not yet kept (with the screen they are kept under).
 const mine = new Map<string, Step[]>();
 // The session each agent last named on this screen, for its steps that name none (a change, a read): sessions of one
 // agent that each give a name of their own are told apart; two that go by one name are as one, but for what they name.
 const runs = new Map<string, string>();
-const unkept = new Map<string, KernelContext>();
+const unkept = new Map<string, { ctx: KernelContext; at: string }>();
 let timer: NodeJS.Timeout | undefined;
 
 /** Point the screen there. */
@@ -94,7 +105,7 @@ export async function point(ctx: KernelContext, w: Whose, focus: Focus): Promise
 
 /** A step taken: kept at once when `now`, else with the next flush. */
 export async function took(ctx: KernelContext, w: Whose, step: Omit<Step, 'at'>, now = false): Promise<void> {
-  const key = whose(w);
+  const key = screenOf(ctx, w);
   const named = `${key}|${step.actor}`;
   if (step.run) runs.set(named, step.run);
   const run = step.run ?? runs.get(named);
@@ -103,13 +114,13 @@ export async function took(ctx: KernelContext, w: Whose, step: Omit<Step, 'at'>,
   // Two steps in one millisecond are still two.
   list.push({ at: Math.max(Date.now(), (list.at(-1)?.at ?? 0) + 1), ...step, ...(run && { run }), ...called });
   mine.set(key, list.slice(-STEPS_KEPT));
-  unkept.set(key, ctx);
+  unkept.set(key, { ctx, at: whose(w) });
   if (now) return flush(key);
   timer ??= setTimeout(() => void flushAll().catch(() => {}), FLUSH_MS).unref();
 }
 
 /** The session an agent last named on this screen, for a step of its that names none. */
-export const runNamed = (w: Whose, actor: string) => runs.get(`${whose(w)}|${actor}`);
+export const runNamed = (ctx: KernelContext, w: Whose, actor: string) => runs.get(`${screenOf(ctx, w)}|${actor}`);
 
 /** A session's word and what its chat is called, which may change while it runs: read each time, by its id. */
 async function namesOf(ctx: KernelContext, run: string): Promise<{ name?: string; title?: string; label?: string }> {
@@ -130,10 +141,10 @@ async function withinOf(ctx: KernelContext, run: string): Promise<{ within?: str
 }
 
 async function flush(key: string): Promise<void> {
-  const ctx = unkept.get(key);
-  if (!ctx) return;
+  const un = unkept.get(key);
+  if (!un) return;
   unkept.delete(key);
-  await keep(ctx, `steps:${key}:${PROCESS}`, mine.get(key) ?? [], KEPT_MS);
+  await keep(un.ctx, `steps:${un.at}:${PROCESS}`, mine.get(key) ?? [], KEPT_MS);
 }
 
 /** Keep every step not yet kept. */
@@ -176,14 +187,14 @@ export interface Page {
   on: boolean;
   at: number;
 }
-// The pages that looked at this process, per screen, and when they were last kept for the other servers.
+// The pages that looked at this process, per screen of each map, and when they were last kept for the other servers.
 const pages = new Map<string, Map<string, Page>>();
 const pagesKept = new Map<string, { value: string; at: number }>();
 const openNow = (key: string) => [...(pages.get(key)?.values() ?? [])].filter((p) => Date.now() - p.at < PAGE_MS);
 
 /** A page looked: kept for the other servers only when whether it takes shows changed, or before the last keeping runs out. */
 export async function looked(ctx: KernelContext, w: Whose, page: Omit<Page, 'at'>): Promise<void> {
-  const key = whose(w);
+  const key = screenOf(ctx, w);
   const list = pages.get(key) ?? new Map<string, Page>();
   list.set(page.page, { ...page, at: Date.now() });
   pages.set(key, list);
@@ -193,7 +204,7 @@ export async function looked(ctx: KernelContext, w: Whose, page: Omit<Page, 'at'
   const last = pagesKept.get(key);
   if (last?.value === value && Date.now() - last.at < PAGE_MS / 2) return;
   pagesKept.set(key, { value, at: Date.now() });
-  await keep(ctx, `pages:${key}:${PROCESS}`, open, PAGE_MS);
+  await keep(ctx, `pages:${whose(w)}:${PROCESS}`, open, PAGE_MS);
 }
 
 /** The pages open on this screen, on any server, and how many of them take a show. */
@@ -201,7 +212,7 @@ export async function watching(ctx: KernelContext, w: Whose): Promise<{ open: nu
   const key = whose(w);
   const rows = (await scan(ctx, [], [`pages:${key}:`], [`pages:${key}:${PROCESS}`])) as { value: Page[] }[];
   // Another server's pages are as it last kept them, for as long as that keeping lasts.
-  const open = [...rows.flatMap((r) => r.value), ...openNow(key)];
+  const open = [...rows.flatMap((r) => r.value), ...openNow(screenOf(ctx, w))];
   return { open: open.length, following: open.filter((p) => p.on).length };
 }
 
@@ -211,7 +222,7 @@ export async function presence(ctx: KernelContext, w: Whose): Promise<{ focus?: 
   const rows = await scan(ctx, [`focus:${key}`, `told:${w.workspace}`], [`steps:${key}:`, `listening:${w.workspace}:`], [`steps:${key}:${PROCESS}`, `listening:${w.workspace}:${PROCESS}`]);
   const value = (k: string) => rows.find((r) => r.key === k)?.value;
   const theirs = rows.filter((r) => r.key.startsWith('steps:')).flatMap((r) => r.value as Step[]);
-  const steps = [...theirs, ...(mine.get(key) ?? [])].sort((a, b) => a.at - b.at).slice(-STEPS_KEPT);
+  const steps = [...theirs, ...(mine.get(screenOf(ctx, w)) ?? [])].sort((a, b) => a.at - b.at).slice(-STEPS_KEPT);
   const listeners = rows.filter((r) => r.key.startsWith('listening:')).reduce((sum, r) => sum + Number(r.value), waiting.get(w.workspace)?.count ?? 0);
   return { focus: value(`focus:${key}`) as Focus | undefined, steps, told: (value(`told:${w.workspace}`) as number | undefined) ?? 0, listening: listeners };
 }

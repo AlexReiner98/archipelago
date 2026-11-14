@@ -1,0 +1,15 @@
+/* A session's story on its page: one line a beat, opened for the whole of it (ui/query.js). */
+.beats { list-style: none; margin: 0; padding: var(--space-3) 0 var(--space-5); }
+.beat summary { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-8); cursor: pointer; list-style: none; white-space: nowrap; }
+.beat summary::-webkit-details-marker { display: none; }
+.beat summary .n { flex: none; min-width: var(--rhythm-8); color: var(--muted); font-size: var(--text-2); text-align: right; }
+.beat summary .said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.beat summary .ago { flex: none; }
+.beat:hover summary, .beat summary:focus-visible { background: var(--accent-soft); }
+.beat.found summary .said { font-weight: 600; }
+.beat.taken-back summary .said { text-decoration: line-through; color: var(--muted); }
+.beat-more { padding: var(--space-2) var(--space-8) var(--space-6) calc(var(--space-8) + var(--rhythm-8) + var(--space-5)); max-width: var(--measure); }
+.beat-more p { margin: 0 0 var(--space-4); }
+.beat-items { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-7); font-size: var(--text-4); }
+/* The overlay of traces over the canvases (the catch_up pack's parts): what changed since the person last looked, offered to play, stands where the old band stood. */
+#traces { position: fixed; right: var(--space-9); top: calc(var(--box-8) + var(--space-9)); z-index: 5; white-space: nowrap; }

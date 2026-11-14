@@ -8,7 +8,7 @@ design, the canvas's look and the rest) is the hosted service's, kept in
 `archipelago-hosted` and read from a folder `PELAGO_PACKS` names (decision
 e_8jd82drh, 9 Nov 2026). A pack's tests live beside it and reach the kernel
 only through `#pelago/test`. The manifest says what the pack declares, in
-nineteen keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
+twenty keys and no others (Rule 8 of the target model; `packs/loader/kernel/manifest.ts`
 reads it, `test/structure.test.ts` refuses any other key).
 
 ## The keys
@@ -29,6 +29,7 @@ reads it, `test/structure.test.ts` refuses any other key).
 | `reach` | What it may reach beyond the map: `hosts`, `secrets`, `webhooks`, `via`, and `server`; an internal pack also `items`, the addresses the map's own items keep (a type and its field: connect's check of each connection). |
 | `shared` | Core's alone: the shared set, the type ids every pack on an island map may build on (below). |
 | `kernel` | A kernel pack's code in the server process alone (the root packs and the service packs): its `trust`, where its `modules` are, the `service:` names it `provides` (each with the shapes it takes and gives, and the module and function that run it) and `calls`, its `hooks`, `timers`, `tables` and `memory`. Allowed only on the server's own packs; `docs/kernel-packs.md` says it whole. |
+| `app` | One of the app's own screens (decision e_y9dcs4nv): `true` and it is on in every map, existing and new, until that map's owner takes it out; taken out, it stays out. Only a pack of the server's own folder. |
 | `moved_from` | The packs it took declarations from, keeping their ids (below, In time): it may name a rule, view, style, action or layout `<pack>.<name>` for each, as well as its own. The kernel's packs it never needs to name. |
 
 A **server pack** is a pack whose reach includes `server` (`acts`, `entries`,
@@ -134,20 +135,212 @@ answering with marks the host checks.
 | Field | What it says | Checked when the pack loads |
 |---|---|---|
 | `id`, `title` | The part, `<pack>.<name>`. | Its pack's name. |
-| `slot` | The slot it fills. | The host's, one its pack's parts open, or one it asks for as `slot:<name>`. |
-| `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). |
+| `slot` | The slot it fills, or the slots: a part drawn in two places (the strip in `tabs` and the panes in `panes`) is one part, mounted once per slot and handed `slot` to say which (decision e_tq3fk4g8). | Each the host's, one its pack's parts open, or one it asks for as `slot:<name>`. |
+| `reads` | The fields it reads, by type: `{ "task": ["title", "status"] }`; or `"*"`, items whole (head and every field) with each type's fields and capabilities beside the words. | Each field is on the type, and the type is its pack's, core's, or asked for (`type:` or `field:` in requires or uses). `"*"` only for a root pack's part. |
+| `writes` | The types it changes as the person looking, with `tools.change(ops, reason)` (and `tools.undo(changeset)` just after a press): applied through the one write path as that person's change, naming the part. | A root pack's part only; each type the map has. The server checks each op touches a type it writes, and allows no merge, type or forget. |
 | `sends` | The actions it may send. | Each its own pack's. |
 | `opens` | The slots it draws for others to fill. | Named `<pack>.<name>`, or a piece or page the host no longer draws. |
 | `marks` | The marks it answers with (`box`, `text`, ...). | A list of mark kinds, checked by shape. One the host does not draw (`packs/walls/page/part-check.js`) makes the part wait, its pack still active; at draw, a mark it did not name is refused. |
+| `go` | Whether it may move the page: it is handed the page's `address` and, after a press or Enter, may name another (`tools.go`), which the canvas checks. | true or false. |
+| `state` | The page state it publishes (`tools.state`): names the runtime writes on the root as `data-<name>`, where anything watching the page from outside reads it (the picture taken once the canvas has drawn). | A list of names; one name, one owner, and the page refuses a name the part did not declare. |
 | `modules` | Its code, files of the pack entered at `index.js`, as a layout's. | The files are there. |
 
 **A slot has one owner** (`packs/loader/kernel/slots.ts`). The host owns its
-frame (`bar`, `canvas`, `sheet`, `find`, `home`) and each piece and page it
-still draws (`piece.<name>`, `page.<name>`, from `PIECES` and `PAGES`): the
-step that moves one into a pack's part takes it off the host's list and the
-part opens it. Any other slot is opened by one pack's part, and `slot:<name>`
-is provided by that pack (core for the host's); a second pack opening it
-waits, as one declaring a taken type does (`packs/loader/kernel/packorder.ts`).
+frame (`FRAME_SLOTS`) and each piece and page it still draws
+(`piece.<name>`, `page.<name>`, from `PIECES` and `PAGES`): the step that
+moves one into a pack's part takes it off the host's list and the part opens
+it. Any other slot is opened by one pack's part, and `slot:<name>` is
+provided by that pack (core for the host's); a second pack opening it waits,
+as one declaring a taken type does (`packs/loader/kernel/packorder.ts`).
+
+**The frame's slots**, and what each hands the part beside the item it
+stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
+
+| Slot | Where | Handed |
+|---|---|---|
+| `panes` | The panes of the page. | — |
+| `tabs` | The bar of tabs across them. | `tabs`, `current`, `page` |
+| `tab.mark` | A mark on one tab: whose it is, how much it holds. | `tab`, `current` |
+| `bar` | The bar over the canvas. | `current`, `home` |
+| `bar.views` | What its view button opens. | `current`, `home` |
+| `bar.find` | Find's input and its terms. | `query`, `home`, `answer`, `names` |
+| `bar.find.rows` | The query's rows above find, shown while find publishes `find_open`. | `query`, `home`, `answer`, `names` |
+| `bar.layouts` | The layout a view is drawn in. | `current`, `layout` |
+| `canvas` | The canvas itself. | `query`, `layout` |
+| `traces` | The overlay of traces over it. | `query` |
+| `sheet` | The sheet over the canvas, an item's one page. | `reading` |
+| `item.menu` | What is done rarely to that item. | — |
+| `find` | Find at the canvas's foot. | `query`, `shapes` |
+| `home` | The page with no query up. | — |
+| `nav` | What the menu leads to. | — |
+| `look` | Drawn by nothing: the part is handed whether the canvas has drawn (`drawn`, and `why` when there is one) and publishes it as page state, so a picture is taken at the right moment. The host mounts it under `?look`, two frames after the page's first drawing word. | `drawn`, `why` |
+| `workspace.card` | A card on the workspace page, one pack's say on it. | `workspace`, `section` |
+| `tabs.land` | A decision: where a show lands among the tabs and panes. | `step`, `tabs`, `drawable` |
+| `tabs.life` | A decision: which kept tabs' sessions have ended or rested. | `open`, `tabs` |
+| `ghosts` | A decision: what the changes held would look like, read back into the canvas's answer. | `held`, `drawn`, `loose` |
+
+**What the query slots are handed.** `bar.find`, `bar.find.rows`, `find`,
+`canvas` and `traces` are handed the lens the canvas in focus draws as
+`query` (Home's where no query is up, and `home` true), and `names`, the
+titles of the items it names. The bar's two are handed `answer` too, in
+brief: each item's `id`, `type`, `status`, the `terms` that found it or the
+`step` that reached it, the `links` (`id`, `type`, `from`, `to`), and `cut`,
+`failed` and `limit`. Each is handed again as the canvas draws a new answer.
+A slot's mount lands with the part that fills it: `bar.find` goes in find's
+line (`#find-lens`) and `bar.find.rows` in the rows above it (`#find-rows`),
+which `ui/query-bar.js` then leaves to the part.
+
+**The runtime tells a slot what it saw** (`tellSlot(slot, event)`, as
+`hooks.tellSlot`): every part mounted there hears it as an event in `on`,
+and one mounted later is handed the last as `told`. The sheet's reading
+position is told to `sheet` as `{ name: 'scrolled', reading: { open, sight,
+unsaved, holding } }` (`open` the item whose page is shown, `sight` the
+document in sight, `holding` while the sheet waits for the frames above); a
+part there names the page to show with
+`tools.go({ item, replace: true })`, which replaces the address and never
+leaves words not yet saved. With no part told, the page follows the reading
+itself.
+
+**What the traces are told.** A part on `traces` is handed `me` in its piece (the
+person's actor, as the log names one) and told each beat of the log as
+`{ name: 'beat', from, to, rows: [{ id, was, now, by?, at?, pos }] }`: the
+rows the beat touched as they were and are (null where not held, or gone),
+projected by the runtime, which keeps the store and the projector
+(`packs/surface/page/beat-rows.js`); the part compares them. On the first
+canvas of a page it is told `{ name: 'missed', from, to, entries: [{ pos, at,
+by?, moved?, facts, rows: [{ id, was, now }] }] }`, entry by entry from where
+the person last looked, then one beat for the whole span. Neither is worked
+out unless a part is mounted on `traces`.
+
+**A part may hold other parts** (`['slot', { name }]`, decision
+e_hp9xmrbq): only a slot in its own `opens`, and it may hand them a `piece` of words, numbers, yes and no (a
+tab's `tab.mark`: `{ tab, current, state, for }`). A root pack is the host, so its part may open a slot of the frame
+(panes opens `tab.mark`); a map pack's part may not. The runtime draws whatever parts
+fill it in the mark's node; the holding part never sees them, nor they it,
+and nesting stops four deep.
+
+**What find's parts are told.** `find` is handed `shapes`, the layouts the
+packs ship (`{ shape, title }`). A part on `find`, `bar.find` or
+`bar.find.rows` is told `{ name: 'away' }` when a press lands outside all
+of them or another pane takes the focus, and the part on `find` is told
+`{ name: 'summon' }`, its input focused, when `/` is pressed outside a
+field. A go part is handed in its `address` the ids drawn (`drawn.ids`) and,
+on Home, Home's lens (`home`), and may go to a saved view (`{ view: id }`).
+
+**The page's address is the runtime's.** The part on `tabs` is handed
+`page`, `{ hash, popped? }` (`popped` the tab a popped-out window draws),
+again whenever the address moves, and is told `{ name: 'step', step, hash }`
+when the person goes back (-1) or forth (1). It writes the address with
+`tools.go({ hash, push })`: a step of history when `push`, written over the
+entry when not. A step, and a show landing, count as the person's move, so it
+may answer either by moving the page. It opens a tab in a window of its own
+with `tools.window(key, hash)` and brings one forward with `tools.focus(key)`.
+The runtime tells it, as events, `{ name: 'land', step }` for each show (it
+keeps what waits itself), `{ name: 'ended', run, why }` and
+`{ name: 'rested', run }`; it reads the open sessions live. All of this is
+heard only once a part fills `tabs`.
+
+**Kept words.** `tools.keep(value, name)` keeps by the item a part stands on,
+or, for a part on none, by the workspace; words kept in one window are
+handed again (`kept`) to the same part in every other.
+
+**Live reads.** A `views` entry with `live: true` is not handed at mount: the
+part asks it when it needs it, `tools.read(name, params)`, as the person
+looking, and is answered its result or null. Four may be out at once per
+part. `search` may be declared live with no pack answering it.
+
+**The lens algebra is the runtime's** (`packs/walls/page/lens-terms.js`).
+Every lens handed to a part carries `said`, the lens in a few words
+("Task · is part of Server"). A part that declares `go` changes the lens
+by naming the change, never by working it out: `tools.go({ add: { find |
+only | not: term } })` adds a term, `tools.go({ take: { part, value } })`
+takes one out, and the runtime makes the lens and draws it.
+
+**A slot that asks a decision** (`tabs.land`, `tabs.life`, `ghosts`) is filled by a
+part that answers a value, not marks: it exports `decide(input)` beside
+`marks` (none), may name no mark, and the root that asks
+(`askSlot(slot, input)` in `base.js`) checks the value and applies it. No
+part, a failure or two seconds without an answer gives `undefined`, and the
+root decides as it did before.
+
+A part is handed the item it stands on cut to the fields it `reads`, its
+query's items, its named reads, and, where it declares `go`, the page's
+address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
+`text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`,
+`picture`, `web`, `pane`, `panes`, `swatch`, `trace`, `replay`, `ghost` and `slot`, each named in its `marks`.
+
+**What any mark may carry**, beside `key`, `item`, `view` and `tip`:
+`lights`, up to 500 items it lights on the canvas in sight while the person
+points at it, the rest faded by the style's `dim`
+(`packs/surface/page/light-items.js`) — pointing is not a gesture, so the
+part is told nothing.
+
+**What the host does with the marks it draws** (each event goes back as
+`{ key, name, value }`):
+
+| Mark | What it is | What the part hears |
+| --- | --- | --- |
+| `box` `fits` | As many of its marks as fit on one line, one at least; then `+N`, its tip the hidden marks' tips (`part-fits.js`). | With `more: <key>`, the `+N` is a button: `press`, value N. |
+| `input` `keys`, `focus` | `keys` (up to 8 key names, such as ArrowUp, Escape) are the part's: the page does nothing with them (Escape goes no further). `focus: true` puts the caret in it whenever it is drawn so. Shift held on Enter or on a button's press adds `shift: true`. | `key` with `value` (the key) and `empty`; `focus` when it is come into; `submit` and `press` with `shift`. |
+| `button` `copy` | The words (up to 2000) go to the clipboard on the press; the button says Copied for a moment, or Copy failed with the words in its tip. | `press`, with `copied` true or false. |
+| `button` `try` | A theme (a preset used once chosen) tried on this screen alone, nothing kept; `null` the workspace's own again (`packs/surface/page/swatch.js`). Every part is handed `trying`, the preset tried or null. | `press`. |
+| `swatch` | A style preset's paper, ink and sea for the screen's scheme, painted by the host from the preset the part names (`preset`): a part paints no colour. `label` under it, `on: kept` or `trying` outlines it; an unknown preset is blank. | `press`, with a key. |
+| `text` `hue` | A session, named by its words, marked in its hue as every session is. | nothing. |
+| `slot` | A slot the part opens (`name`, one of its `opens`), drawn in its place by the parts that fill it, four deep at most (`slot(name, el)` in part-host). | nothing. |
+| `ghost` | Nothing where it stands: a change held for the owner, as data (`of` item, link or mark; `id` such as `p_x:ref`, `proposal`, `op`, and the item's or link's fields), handed to whoever hosts the part (`ghosts(list)`, `hooks.ghosts`) for the canvas to read back into its answer and draw where it would land. | nothing. |
+| `paint` `controls` | −, Fit and + in the surface's corner, zoomed by the style's `zoom_step`. A `path` may be filled as a diagram's shapes are (`look: area`, `box`, `strong`), and a path or placed text may carry a `tip` and an `href` (opened apart). | nothing. |
+| `replay` | Nothing where it stands: the canvas under the part shows what the person missed (`store.missed`, set as the canvas mounts) up to step `at` of `steps` (`[{ pos, ids }]`, each the facts of entry `pos` about those ids), the store `playing` while it is said; a step back or other steps rewinds first. With no replay mark, what was not played is projected at once and the store is the map as it is now (`packs/surface/page/replay.js`). The part drives the timer. | nothing. |
+| `trace` | Nothing where it stands: its `item`'s marks on the canvas painted with its line (`tip`, the page's tip over them) in a session's `hue`, until each was in sight for the style's `trace_seen_after` while the page painted; then it fades over `trace_fade` (`part-trace.js`). A trace no longer sent is taken off. | `seen`, with `item`. |
+| `menu` | What is done rarely, in steps (`part-menu.js`): a head (`text`), a field, buttons, and a `menu` in it as the next step (›, opened it is all its step shows, ‹ back). A `search` field narrows its step's choices in the page and Enter takes the first left; Backspace in it, empty, goes back. `open: true` opens it; it stays as the person leaves it while its key stays. | `press` from a choice, `edit` from a field; a `text` field still `submit`s, an `item` field `pick`s. |
+| `web` | A page on the web framed in place (`url`, http or https), sandboxed (`allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox`), no referrer, with ↗ to open it apart; this server's own pages are refused, drawn as what they are. A new `reload` loads it again. | nothing. |
+| `pane` | A canvas at an address (`at`) the page draws in its body (`hooks.paneFrame(at, el, said)`, whoever keeps the panes), the part's marks in its strip; `at` of `w?url=` frames that page as `web` does. `share` is its room; `ring` rings it once. | `focus` when pressed or focused in; whatever the frame says (`open`, `opened`, `named`). |
+| `panes` | Panes side by side (`dir: row`) or one over another (`column`, and a row on a page taller than wide), each by its share of the room; the host draws the lines between them (`part-pane.js`). It stands as the page's panes do: the whole page for one (its strip not drawn), under the band for several, the open sheet's room kept beside it; the pane marked `selected` gives its frame to the bar and find (`--active-left`, `right`, `top`, `bottom`). | `share { index, at }` as a line is dragged, `at` a share of the room. |
+
+A box, a button or a pane may carry `drag: <kind>`: the host follows it once
+it moves a few pixels, shows where it would land, and answers `drop { onto,
+zone }` (`part-drag.js`): over a pane, a side of it or its middle (`left
+right above below center`, onto its key); over another dragged mark (a tab)
+or a box with `dock` (the strip), `tabs` (onto that mark's key, or null); off
+the page, `out`. Less was a press. A box or a button may also be `selected`,
+`ring` once as it is asked for, take a session's `hue` (named by its words),
+and with `aux` go back as `close` when pressed with the middle button; a
+button's `look: 'tab'` draws it as a tab.
+
+**A part decides, the runtime draws.** A part runs in a worker: it never
+holds a node, never reads the page, and answers when it is ready, which is
+what lets nearly everything become a part. The runtime hands it what it
+declared it reads and keeps only the drawing — so where a module used to
+work something out and paint it, the working out is the part and the
+painting is a mark the contract names. Three shapes to write against:
+
+- **Proposals in, ghosts out.** The part is handed the changes held and the
+  items drawn; it answers with the marks of what would land, and the runtime
+  draws them where it draws anything.
+- **A view in, a thumbnail out.** The part names the view (`thumb`); the
+  runtime keeps and draws the picture. A part never holds an image.
+- **A view named, a frame drawn.** The part answers with the view it wants
+  in sight; the runtime frames it and brings it into view.
+
+Where a part must say something about the page rather than draw it (that the
+canvas has finished drawing, say), it publishes page state it declared
+(`state`), and the runtime writes it on the root.
+
+An action whose answer says `looks: true` changed how the page looks (a theme
+kept): once it has gone out, the page reads its look again, ending any theme
+tried on that screen.
+
+**Where a part may go.** A part that declares `go` names an address after a
+gesture and the canvas checks it: an item (`item`), a query and the layout
+to draw it in (`query`, `layout`), or a page of the app the host draws
+(`page`: `you`, `workspace`, or `screen` with `of`, the screen's id).
+
+**Which version of a part runs** depends on what it stands on: the island of
+the item it stands on, as today. A part that stands on nothing — the tabs,
+the panes, Home, the menu, a bar over a canvas that spans islands — is the
+chrome, and is to be pinned per person (decision e_x6bqupud, task
+e_fpm9n7er); until that lands the chrome runs the map's version. The page
+resolves it in one function, `pinFor` in
+`packs/surface/page/part-host.js`.
 
 **Its code is the version's its island pins.** A part's modules are read
 from its pack's folder as the registry has it (`folderOf`): on an island

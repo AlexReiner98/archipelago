@@ -4,6 +4,7 @@
 // part's worker); it moves with the plane, so what is painted there stays under what is drawn over it.
 
 import { panZoom } from './pan-zoom.js';
+import { numberOf } from './style-number.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -11,7 +12,7 @@ const SVG = 'http://www.w3.org/2000/svg';
  * Make a paint surface for `node`. `drawn(mark)` makes one mark on the plane (packs/walls/page/part-render.js). Answers with its
  * element, the pixel canvas when it has one, `update(node)` with a new answer, and `stop()`.
  */
-export function paintSurface(node, { style, drawn }) {
+export function paintSurface(node, { style, drawn, controls = false }) {
   const el = Object.assign(document.createElement('div'), { className: 'pm-paint' });
   const svg = document.createElementNS(SVG, 'svg');
   svg.setAttribute('class', 'pm-plane');
@@ -29,6 +30,19 @@ export function paintSurface(node, { style, drawn }) {
   sized(node);
   fill(node);
   let moves = panZoom(el, svg, { width, height, start: node.at.start, style, told: follow });
+  // With `controls`, the frame keeps −, Fit and + in a corner, as every drawing's does: zoomed by the style's step.
+  if (controls) {
+    const step = numberOf(style, 'zoom_step');
+    const button = (label, title, go) => {
+      const b = Object.assign(document.createElement('button'), { type: 'button', className: 'pm-zoom', title, textContent: label });
+      b.setAttribute('aria-label', title);
+      b.addEventListener('click', go);
+      return b;
+    };
+    const bar = Object.assign(document.createElement('span'), { className: 'pm-zooms' });
+    bar.append(button('−', 'Zoom out', () => moves.zoomBy(1 / step)), button('Fit', 'All of it in sight', () => moves.fit()), button('+', 'Zoom in', () => moves.zoomBy(step)));
+    el.append(bar);
+  }
   return {
     el,
     pixels,

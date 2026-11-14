@@ -79,7 +79,8 @@ export async function publishedState(ctx: KernelContext, id: string) {
   const row = (await ctx.reads({ published_row: id })) as { given: Record<string, unknown>; published_by: string; published_at: Date } | null;
   if (!row) return { published: false };
   const now = await freezeDocument(ctx, id).catch((err: unknown) => (ctx.said(`published ${id}: its draft could not be frozen to compare, so it reads as changed: ${err instanceof Error ? err.message : String(err)}`), null));
-  const { style_at: _, look: _look, ...given } = row.given;
+  // What was kept beside the words (the look, the marks its part drew them with) is not the draft to compare.
+  const { style_at: _, look: _look, marks: _marks, marks_error: _error, ...given } = row.given;
   return { published: true, at: row.published_at, by: row.published_by, changed: !now || !same(now, given) };
 }
 

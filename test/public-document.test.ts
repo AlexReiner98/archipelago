@@ -64,7 +64,7 @@ test('a document a human makes public is read by anyone at its own address, with
   assert.match(html, /<title>Why maps<\/title>/);
   assert.match(html, /<meta name="description" content="A map keeps people and work in one place, so that anyone can see it\." \/>/);
   assert.match(html, new RegExp(`<link rel="canonical" href="/p/default/${d}" />`));
-  assert.match(html, /doc\.js/);
+  assert.match(html, /frozen-page\.js/);
 
   const data = await fetch(`${base}/p/default/${d}/data`);
   assert.equal(data.status, 200);

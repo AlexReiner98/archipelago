@@ -1,10 +1,10 @@
-// The one dialect a note is written in (Rule 11, packs/walls/page/text.js): read the same by the item page and the published reader,
+// The one dialect a note is written in (Rule 11, packs/kit/page/text.js): read the same by the item page and the published reader,
 // text in and blocks out, with no page to draw on.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 // @ts-expect-error a page's module, plain JavaScript with no types
-import { readSpans, readText, ticked } from '../packs/walls/page/text.js';
+import { readSpans, readText, ticked } from '../packs/kit/page/text.js';
 
 const NOTE = [
   'The point, in a sentence.',
@@ -86,7 +86,8 @@ test('a line reads as spans: strong, said so, code, links, pages of the site and
 });
 
 test('the item page and the published reader read one dialect', () => {
-  for (const page of ['packs/walls/page/body.js', 'ui/doc.js']) {
+  // A published page's words are the note marks its part made (packs/publish/parts/doc), drawn in the page's own elements.
+  for (const page of ['packs/kit/page/body.js', 'packs/surface/page/frozen-doc.js']) {
     const code = readFileSync(page, 'utf8');
     assert.match(code, /from '\.\/text\.js'/, `${page} reads notes through the host's text.js`);
     assert.doesNotMatch(code, /TABLE_RULE|function readTable/, `${page} keeps no reader of its own`);

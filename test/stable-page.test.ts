@@ -11,6 +11,7 @@ import { chrome, open } from './browser.ts';
 import { heard } from './tab-page.ts';
 import { fresh, human, make } from './map.ts';
 import { serve } from './serve.ts';
+import * as S from './sheet-page.ts';
 
 test('the tail says what the changes since a look did to what is shown: what changed and the link made to it', async () => {
   const l = await fresh();
@@ -55,13 +56,13 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
   ]);
   const page = await open(`${base}/#/e/${made.p}`);
   try {
-    assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Read here'`), 'the page is drawn');
+    assert.ok(await page.until(`${S.title} === 'Read here'`), 'the page is drawn');
     await heard(page);
     await page.evaluate(`(() => {
       window.stillMark = 1;
       window.swaps = 0;
       new MutationObserver((list) => (window.swaps += list.reduce((n, m) => n + m.addedNodes.length, 0))).observe(document.querySelector('.part[data-part="item"]'), { childList: true });
-      const part = [...document.querySelectorAll('.part[data-part="item"] details.section')].at(-1);
+      const part = [...document.querySelectorAll('${S.PAGE} details.section')].at(-1);
       part.open = true;
     })()`);
     // Three agents at once, each changing what is not on the page, for a few pulses.
@@ -70,11 +71,11 @@ test('in a browser, a page left open is still while agents write elsewhere, and 
       await heard(page);
     }
     const still = await page.evaluate<{ mark: number; swaps: number; hash: string }>(`({ mark: window.stillMark, swaps: window.swaps, hash: location.hash })`);
-    assert.deepEqual(still, { mark: 1, swaps: 0, hash: `#/e/${made.p}` }, 'not reloaded, not drawn again, not taken elsewhere: with three agents at work, a change moves no pane its session has not shown into (ui/pane-route.js)');
+    assert.deepEqual(still, { mark: 1, swaps: 0, hash: `#/e/${made.p}` }, 'not reloaded, not drawn again, not taken elsewhere: with three agents at work, a change moves no pane its session has not shown into (packs/surface/page/pane-route.js)');
     // A change to what is on the page shows on it, in place.
     await change('agent:a', [{ op: 'update', id: made.p, title: 'Renamed on the page' }]);
-    assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Renamed on the page'`), 'the change shows');
-    const after = await page.evaluate<{ mark: number; open: boolean }>(`({ mark: window.stillMark, open: [...document.querySelectorAll('.part[data-part="item"] details.section')].at(-1).open })`);
+    assert.ok(await page.until(`${S.title} === 'Renamed on the page'`), 'the change shows');
+    const after = await page.evaluate<{ mark: number; open: boolean }>(`({ mark: window.stillMark, open: [...document.querySelectorAll('${S.PAGE} details.section')].at(-1).open })`);
     assert.deepEqual(after, { mark: 1, open: true }, 'not reloaded, the open fold still open');
   } finally {
     await page.close();
@@ -96,7 +97,7 @@ test("in a browser, an agent's change reaches a view of the store with no lens r
   ]);
   const page = await open(`${base}/#/e/${made.p}`);
   try {
-    assert.ok(await page.until(`document.querySelector('.part[data-part="item"] h1')?.textContent === 'Canvas'`), 'the page is drawn');
+    assert.ok(await page.until(`${S.title} === 'Canvas'`), 'the page is drawn');
     // The page's own modules, as it loaded them: a store from live.js, holding the flat lens around the hub.
     await page.evaluate(`(async () => {
       const at = (name) => document.querySelector('link[rel="modulepreload"][href^="/' + name + '.js"]').getAttribute('href');
