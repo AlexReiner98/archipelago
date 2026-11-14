@@ -50,7 +50,9 @@ test("a try of a pack drawing's modules comes with the drawing it makes", async 
 test('a try is of a code field its type declares, in the shape change would send', async () => {
   const { l, code, mine } = await setUp();
   await assert.rejects(callTool(l, agent, 'preview', { item: code, field: 'settings', value: {} }), /no code field "settings"/);
-  await assert.rejects(callTool(l, agent, 'preview', { item: code, field: 'code', value: { 'index.js': '' } }), /its text/);
+  // A layout's code is its text or, since it may be files by path (task e_4pfjppqg), its files: anything else is refused.
+  await assert.rejects(callTool(l, agent, 'preview', { item: code, field: 'code', value: 42 }), /its text, or its files by path/);
+  await callTool(l, agent, 'preview', { item: code, field: 'code', value: { 'index.js': 'export default () => {};' } });
   await assert.rejects(callTool(l, agent, 'preview', { item: mine, field: 'modules', value: 'text' }), /modules by name/);
   await assert.rejects(callTool(l, agent, 'preview', { item: 'e_nothing0', field: 'code', value: '' }), /No item/);
 });

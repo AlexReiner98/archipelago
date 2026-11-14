@@ -36,7 +36,7 @@ test('settings.json: one change of the settings alone, status names what it watc
   const l = await fresh();
   const { l: id } = (await make(l, [{ op: 'create', ref: 'l', type: 'layout', title: 'Sample', props: { code: DRAW, settings: { numbers: { hold_ms: 400 } } } }])) as any;
   const call: Call = (tool, body) => callTool(l, human, tool, body) as Promise<any>;
-  const folder = mkdtempSync(join(tmpdir(), 'map-code-'));
+  const folder = mkdtempSync(join(tmpdir(), 'pelago-map-code-'));
   const sent: any[] = [];
   const previewing: Call = async (tool, body) => (tool === 'report' ? (sent.push(body.params), {}) : call(tool, body));
   try {
@@ -89,7 +89,7 @@ test('pull, edit, push: one change; a map that moved refuses the push; an agentâ
   const l = await fresh();
   const { l: id } = (await make(l, [{ op: 'create', ref: 'l', type: 'layout', title: 'Sample', props: { code: DRAW } }])) as any;
   const as = (who: typeof human): Call => (tool, body) => callTool(l, who, tool, body) as Promise<any>;
-  const folder = mkdtempSync(join(tmpdir(), 'map-code-'));
+  const folder = mkdtempSync(join(tmpdir(), 'pelago-map-code-'));
   try {
     const p = await pull(as(human), 'local', id, folder);
     assert.deepEqual(Object.keys(p.fields.code.files), ['index.js']);
@@ -142,7 +142,7 @@ test('try: the changed fields go to query look as tries, the picture is saved be
   const l = await fresh();
   const { l: id } = (await make(l, [{ op: 'create', ref: 'l', type: 'layout', title: 'Sample', props: { code: DRAW } }])) as any;
   const real: Call = (tool, body) => callTool(l, human, tool, body) as Promise<any>;
-  const folder = mkdtempSync(join(tmpdir(), 'map-code-'));
+  const folder = mkdtempSync(join(tmpdir(), 'pelago-map-code-'));
   const asked: any[] = [];
   // The look itself needs the server's Chrome (test/looks.test.ts): here, what is sent and what is done with the answer.
   const looking = (answer: Record<string, unknown>): Call => async (tool, body) => (tool === 'query' && body.name === 'look' ? (asked.push(body.params), answer) : real(tool, body));

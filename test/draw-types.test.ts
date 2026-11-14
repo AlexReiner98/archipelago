@@ -20,7 +20,7 @@ const JSCONFIG = {
 
 /** tsc's report on a folder holding these modules, the types and the jsconfig. */
 function check(modules: Record<string, string>): { ok: boolean; out: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'draw-types-'));
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-draw-types-'));
   try {
     copyFileSync(TYPES, join(dir, 'draw.d.ts'));
     writeFileSync(join(dir, 'jsconfig.json'), JSON.stringify(JSCONFIG));
