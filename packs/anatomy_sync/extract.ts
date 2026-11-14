@@ -7,6 +7,7 @@ import { checks } from './extract-checks.ts';
 import { modules, tests } from './extract-code.ts';
 import { manifests } from './extract-manifests.ts';
 import { kindOfKey, merge, type Extractor, type Model, type Source } from './model.ts';
+import { isServed, servedNames } from './reader.ts';
 
 export const EXTRACTORS: Extractor[] = [manifests, modules, tests, checks];
 
@@ -51,6 +52,22 @@ export function runOf(changes: Change[]): Run {
 /** The files a run reads: those it names, of the extractors it runs. */
 export const readsIn = (run: Run) => (path: string) => run.extractors.some(({ extractor, only }) => extractor.owns(path) && (!only || only.has(path) || !!extractor.whole?.(path)));
 
+/**
+ * A served page module names another by `./<name>`, which the page loads from whichever root's page/ serves that name
+ * (reader.ts, resolveServed). An extractor reads one file at a time and resolves it beside itself, so its import lands
+ * here, on the served module of that name among every module wanted or already on the island.
+ */
+function served(models: Model[], known: ReadonlySet<string>): Model[] {
+  const paths = [...models.flatMap((m) => m.items.map((i) => i.key)), ...known].filter((k) => k.startsWith('module:')).map((k) => k.slice(7));
+  const names = servedNames(paths);
+  const to = (from: string, key: string) => {
+    if (!from.startsWith('module:') || !key.startsWith('module:') || !isServed(from.slice(7)) || !isServed(key.slice(7))) return key;
+    const at = names[key.slice(7).split('/').pop()!];
+    return at ? `module:${at}` : key;
+  };
+  return models.map((m) => ({ ...m, links: m.links.map((l) => (l.type === 'anatomy.imports' ? { ...l, to: to(l.from, l.to) } : l)) }));
+}
+
 /** What the extractors of a run want of the island, from the files they read; `known` keys may end a link all the same. */
 export const extract = (files: Source[], run: Run = fullRun(), known: ReadonlySet<string> = new Set()): Model =>
-  merge(run.extractors.map(({ extractor, only }) => extractor.extract(files.filter((f) => extractor.owns(f.path) && (!only || only.has(f.path) || !!extractor.whole?.(f.path))))), known);
+  merge(served(run.extractors.map(({ extractor, only }) => extractor.extract(files.filter((f) => extractor.owns(f.path) && (!only || only.has(f.path) || !!extractor.whole?.(f.path))))), known), known);
