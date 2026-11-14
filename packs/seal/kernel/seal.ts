@@ -10,6 +10,7 @@ import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import type { Q } from '../../database/kernel/db.ts';
 import type { Entry, Fact } from '../../log/kernel/log.ts';
 import { keysFor, keysIn, keysOf, type Key, type VaultDump } from './vault.ts';
+import { codeRead, isCodeStored, type Said } from './code-files.ts';
 
 export type Sealed = { $k: number; $n: string; $c: string };
 export type Digest = { $h: string };
@@ -138,7 +139,7 @@ export async function openEntries(q: Q, entries: Entry[]): Promise<Entry[]> {
   const named = entries.flatMap((e) => e.facts.map((f) => f[1]).filter((id) => id.startsWith('e_') || id.startsWith('r_')));
   const [ring, visible] = await Promise.all([keysOf(q, [...ids]), seen(q, [...new Set([...ids, ...named]), ...entries.filter((e) => e.stream === 'pending').map((e) => e.id)])]);
   const read = (id: string, field: string, v: unknown, may: boolean) => (isSealed(v) ? opened(may ? openNoting(ring.get(id), field, v) : undefined, v) : v);
-  return entries.map((e) => {
+  return readBack(q, entries.map((e) => {
     // A held change's reader also reads what it would make, which no one can see yet.
     const making = new Set(e.stream === 'pending' && visible.has(e.id) ? Object.values((e.ids as Record<string, string> | undefined) ?? {}) : []);
     const mayRead = (id: string) => visible.has(id) || making.has(id);
@@ -152,14 +153,24 @@ export async function openEntries(q: Q, entries: Entry[]): Promise<Entry[]> {
     const authority = e.authority as { basis?: unknown } | null | undefined;
     if (authority?.basis !== undefined) out.authority = { ...authority, basis: read(BASIS(e.id), 'basis', authority.basis, may) };
     return out;
-  });
+  }), (rows) => openRows(q, rows));
+}
+
+/** Entries with each code field's value stored by hash read back whole (packs/seal/kernel/code-files.ts). */
+async function readBack(q: Q, entries: Entry[], open: (rows: Said[]) => Promise<Said[]>): Promise<Entry[]> {
+  const said = entries.flatMap((e, i) => e.facts.flatMap((f, n) => (f[0] === '+' && isCodeStored(f[3]) ? [{ id: f[1], field: f[2], value: f[3], i, n }] : [])));
+  if (!said.length) return entries;
+  const out = entries.map((e) => ({ ...e, facts: [...e.facts] }));
+  for (const r of await codeRead(q, said, open)) out[r.i].facts[r.n] = [...out[r.i].facts[r.n].slice(0, 3), r.value, ...out[r.i].facts[r.n].slice(4)] as Fact;
+  return out;
 }
 
 /** One stored value of one field of an item or link, opened for this reader. */
 export async function openValue(q: Q, id: string, field: string, value: unknown): Promise<unknown> {
   if (!isSealed(value)) return value;
   const [ring, visible] = await Promise.all([keysOf(q, [id]), seen(q, [id])]);
-  return opened(visible.has(id) ? openNoting(ring.get(id), field, value) : undefined, value);
+  const plain = opened(visible.has(id) ? openNoting(ring.get(id), field, value) : undefined, value);
+  return isCodeStored(plain) ? (await codeRead(q, [{ id, field, value: plain }], (rows) => openRows(q, rows)))[0].value : plain;
 }
 
 /**
@@ -167,6 +178,11 @@ export async function openValue(q: Q, id: string, field: string, value: unknown)
  * left as its digest. Whether the reader may see them is the caller's to check.
  */
 export async function openSaid<T extends { id: string; field: string; value: unknown }>(q: Q, said: T[]): Promise<T[]> {
+  return codeRead(q, await openRows(q, said), (rows) => openRows(q, rows));
+}
+
+/** Values read straight from the log's rows, opened, with nothing read back. */
+export async function openRows<T extends { id: string; field: string; value: unknown }>(q: Q, said: T[]): Promise<T[]> {
   const ids = [...new Set(said.filter((r) => isSealed(r.value)).map((r) => r.id))];
   if (!ids.length) return said;
   const ring = await keysOf(q, ids);
@@ -186,13 +202,13 @@ export async function openAll(q: Q, entries: Entry[], vault?: VaultDump): Promis
   if (!ids.size) return entries;
   const ring = new Map([...(vault ? keysIn(vault, ids) : []), ...(await keysOf(q, [...ids]))]);
   const read = (id: string, field: string, v: unknown) => (isSealed(v) ? opened(openNoting(ring.get(id), field, v), v) : v);
-  return entries.map((e) => {
+  return readBack(q, entries.map((e) => {
     const out: Entry = { ...e, facts: e.facts.map((f): Fact => (f[0] === '+' && isSealed(f[3]) ? ([...f.slice(0, 3), read(f[1], f[2], f[3]), ...f.slice(4)] as Fact) : f)) };
     for (const [field, key] of HEAD[e.stream] ?? []) if (field in e) out[field] = read(key(e.id), field, e[field]);
     const authority = e.authority as { basis?: unknown } | null | undefined;
     if (authority?.basis !== undefined) out.authority = { ...authority, basis: read(BASIS(e.id), 'basis', authority.basis) };
     return out;
-  });
+  }), async (rows) => rows.map((r) => ({ ...r, value: read(r.id, r.field, r.value) })));
 }
 
 const opened = (plain: unknown, v: Sealed) => (plain === undefined ? digestOf(v) : plain);

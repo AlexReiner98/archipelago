@@ -145,3 +145,50 @@ export function codeOps(id, declared, fields, from, props) {
   }
   return { ops, whole };
 }
+
+/** Lines kept around a change in its diff, as the server's line diffs keep them (packs/surface/kernel/line-diff.ts CONTEXT). */
+const context = 3;
+const bare = (line) => line.replace(/\r?\n$/, '');
+
+/**
+ * One text's change as line diffs say it (packs/sheet/parts/page/diff.js draws it): its counts and its hunks, each
+ * where it starts in the old text and the new (from 1), its lines led by ' ', '-' or '+', with a few kept around.
+ */
+export function textDiff(was, now) {
+  const a = linesOf(was), runs = runsOf(was, now);
+  const hunks = [];
+  let shift = 0, add = 0, del = 0;
+  for (let k = 0; k < runs.length;) {
+    // Runs close together are one hunk, as the server joins them.
+    let last = k;
+    while (last + 1 < runs.length && runs[last + 1].at - (runs[last].at + runs[last].gone) <= 2 * context) last++;
+    const from = Math.max(0, runs[k].at - context);
+    const b = from + 1 + shift;
+    const lines = a.slice(from, runs[k].at).map((l) => ` ${bare(l)}`);
+    for (let r = k; r <= last; r++) {
+      const run = runs[r];
+      lines.push(...a.slice(run.at, run.at + run.gone).map((l) => `-${bare(l)}`), ...run.put.map((l) => `+${bare(l)}`));
+      (del += run.gone), (add += run.put.length);
+      const next = r < last ? runs[r + 1].at : Math.min(a.length, run.at + run.gone + context);
+      lines.push(...a.slice(run.at + run.gone, next).map((l) => ` ${bare(l)}`));
+    }
+    hunks.push({ a: from + 1, b, lines });
+    for (let r = k; r <= last; r++) shift += runs[r].put.length - runs[r].gone;
+    k = last + 1;
+  }
+  return { add, del, hunks };
+}
+
+/** What Save changes in the code fields written, as line diffs say it: each field ({ field, diff: { files, add, del } }). */
+export function codeDiffs(declared, fields, from) {
+  const out = [];
+  for (const [field, now] of Object.entries(fields ?? {})) {
+    const was = from?.[field];
+    if (!declared?.[field]?.code || was === undefined) continue;
+    const texts = typeof now === 'string' ? [[undefined, typeof was === 'string' ? was : '', now]]
+      : Object.keys({ ...(modulesOf(was) ?? {}), ...(modulesOf(now) ?? {}) }).sort().map((m) => [m, was?.[m], now?.[m]]);
+    const files = texts.filter(([, x, y]) => x !== y).map(([file, x, y]) => ({ ...(file !== undefined && { file }), ...(x === undefined ? { was: 'added' } : y === undefined ? { was: 'removed' } : {}), ...textDiff(x ?? '', y ?? '') }));
+    if (files.length) out.push({ field, diff: { files, add: files.reduce((n, f) => n + f.add, 0), del: files.reduce((n, f) => n + f.del, 0) } });
+  }
+  return out;
+}

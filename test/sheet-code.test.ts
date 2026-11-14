@@ -6,12 +6,13 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { editAfter } from '../packs/write/kernel/edit.ts';
+import { textDiff as serverDiff } from '../packs/surface/kernel/line-diff.ts';
 // @ts-ignore: a module of the page, plain JavaScript
 import { checkMarks, MARKS } from '../packs/walls/page/part-check.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import page from '../packs/sheet/parts/page/index.js';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
-import { changeCount, passagesOf, sha256 } from '../packs/sheet/parts/page/code.js';
+import { changeCount, passagesOf, sha256, textDiff } from '../packs/sheet/parts/page/code.js';
 
 type Edit = { field: string; file?: string; find: string; with: string; base?: string };
 type Op = { op: string; id: string; edit?: Edit; props?: Record<string, unknown> };
@@ -55,6 +56,12 @@ test('passages make the new text of the old one, each found once, in the order t
   assert.equal(apply(rep, passagesOf(rep, cut).map((p: Edit) => ({ op: 'update', id: 'x', edit: { ...p, field: 'code' } }))), cut);
 });
 
+test('the diff before Save says what the server’s line diffs say', () => {
+  const now = code.replace('const v3 = 3;\n', 'const v3 = 33;\n').replace('const v1 = 280;\n', '').replace('const v6 = 6;\n', 'const v6 = 6;\nconst w = 1;\n');
+  assert.deepEqual(textDiff(code, now), serverDiff(code, now));
+  assert.deepEqual(textDiff('a\nb\n', 'a\nB\nc\n'), serverDiff('a\nb\n', 'a\nB\nc\n'));
+});
+
 test('a code field opens in the code editor, tried as it is written; CSS is not tried', () => {
   const p = page({ item: layout, words, views: {} }, { change: async () => ({ status: 'applied' }), keep: () => {}, state: () => {} });
   return p.on({ key: 'field-open:code', name: 'press' }).then((marks: unknown) => {
@@ -77,7 +84,9 @@ test('Save sends one edit for one line changed, based on the text as it was open
   await p.on({ key: 'field-open:code', name: 'press' });
   const now = code.replace('const v5 = 5;\n', 'const v5 = 50;\n');
   const marks = await p.on({ key: 'field:code', name: 'edit', value: now });
-  assert.ok(JSON.stringify(marks).includes('−1 +1 lines, 1 passage'));
+  assert.ok(JSON.stringify(marks).includes('+1 −1'), 'the bar counts what Save changes');
+  const shown = JSON.stringify(await p.on({ key: 'draft:diff', name: 'press' }));
+  assert.ok(shown.includes('v5 = 5;') && shown.includes('v5 = 50;') && shown.includes('"tone":"ok"'), 'the diff is shown before Save');
   await p.on({ key: 'draft:save', name: 'press' });
   assert.equal(sent.length, 1);
   assert.equal(sent[0].length, 1);

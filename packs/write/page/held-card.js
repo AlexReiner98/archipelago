@@ -3,6 +3,7 @@
 
 import { api, ask, h, may } from './base.js';
 import { ago, typeMark, gist, link, loadSchema, relations, statusesOf, typeTitle, who } from './words.js';
+import { diffCounts, diffView } from './diff-view.js';
 
 /** The change `p`, drawn as a table of its parts; `names` says what its ids are (id to item), `done` is told once it is decided. */
 export function proposalCard(p, names, done) {
@@ -104,7 +105,7 @@ export function proposalCard(p, names, done) {
         fallback && h('option', { value: '', selected: !current }, fallback),
         statusesOf(typeId).map((s) => h('option', { value: s, selected: s === current }, s)),
       );
-    let kind, what, st;
+    let kind, what, st, below;
     if (op.op === 'create') {
       kind = typeMark(op.type);
       what = [
@@ -128,14 +129,21 @@ export function proposalCard(p, names, done) {
     } else if (op.op === 'update') {
       const target = names.get(op.id);
       const { op: _op, id: _id, status: newStatus, ...changes } = op;
+      // A field marked code is said as its line diff (./diff-view.js), folded to its counts, not as its text.
+      const diffs = (p.diffs ?? []).filter((d) => d.op === i);
+      const coded = new Set(diffs.map((d) => d.field));
+      if (coded.size && changes.props) changes.props = Object.fromEntries(Object.entries(changes.props).filter(([k]) => !coded.has(k)));
+      if (changes.props && !Object.keys(changes.props).length) delete changes.props;
       kind = target ? typeMark(target.type) : 'update';
       what = [
         h('div', {}, nameOf(op.id), op.title && op.title !== target?.title && [' ', h('span', { class: 'arrow' }, '→'), ` ${op.title}`]),
         target && newStatus && h('div', { class: 'detail' }, `status: ${target.status} → ${newStatus}`),
-        !newStatus && Object.keys(changes).length === 0 && h('div', { class: 'detail' }, 'checked: still true as written'),
+        !newStatus && Object.keys(changes).length === 0 && !diffs.length && h('div', { class: 'detail' }, 'checked: still true as written'),
         fold(i, Object.entries(changes).filter(([k]) => k !== 'title').map(([k, v]) => (k === 'replace' ? `replace: ${v.find} → ${v.with}` : `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`))),
       ];
       st = target ? statusSelect(target.type, newStatus, `unchanged (${target.status})`) : '';
+      // Its lines of code take the row's whole width, under it, folded to their counts.
+      if (diffs.length) below = h('details', { class: 'more' }, h('summary', {}, h('span', { class: 'preview' }, `${[...coded].join(', ')} ${diffCounts(diffs)}`)), diffView(diffs));
     } else if (op.op === 'link') {
       kind = h('span', { class: 'muted' }, 'link');
       what = h('div', {}, nameOf(op.from), ' ', h('span', { class: 'arrow' }, relations.get(op.type)?.title ?? op.type), ' ', nameOf(op.to));
@@ -150,7 +158,8 @@ export function proposalCard(p, names, done) {
               ? [h('strong', { title: op.type.id }, op.type.title ?? op.type.id), op.type.extends && ` (flavour of ${typeTitle(op.type.extends)})`, fold(i, op.type.description)]
               : (op.title ?? '');
     }
-    return h('tr', { class: off ? 'off' : '' }, h('td', { class: 'check' }, check), mark(h('td', { class: 'kind' }, kind)), h('td', {}, what), h('td', { class: 'status' }, st ?? ''));
+    const row = h('tr', { class: [off && 'off', below && 'below'].filter(Boolean).join(' ') }, h('td', { class: 'check' }, check), mark(h('td', { class: 'kind' }, kind)), h('td', {}, what), h('td', { class: 'status' }, st ?? ''));
+    return below ? [row, h('tr', { class: off ? 'off' : '' }, h('td', {}), h('td', { colSpan: 3, class: 'diff-cell' }, below))] : row;
   }
 
   async function decide(yes) {

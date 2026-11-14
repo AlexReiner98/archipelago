@@ -5,7 +5,8 @@
 // `draft`), so the person is asked before leaving them.
 
 import { counted } from './note-count.js';
-import { changeCount, codeOps, modulesOf } from './code.js';
+import { codeDiffs, codeOps } from './code.js';
+import { counts, diffMarks } from './diff.js';
 
 /** The draft as kept: what is written of the title, the note and each field, and what each code field held when it was opened (`from`). */
 export const blank = () => ({ title: undefined, body: undefined, fields: {}, from: {} });
@@ -35,20 +36,8 @@ export function saveOps(draft, item, declared = {}) {
   return ops.length ? { ops, reason: code.ops.length ? 'Code written in the sheet' : 'Written in the sheet' } : null;
 }
 
-/** What Save changes in the code written, as counts of lines (the diff joins once line diffs land): words, or nothing. */
-export function codeSaid(draft, item, declared = {}) {
-  let gone = 0, put = 0, passages = 0;
-  for (const [k, v] of Object.entries(draft.fields)) {
-    const was = draft.from?.[k];
-    if (!declared[k]?.code || was === undefined) continue;
-    const pairs = typeof v === 'string' ? [[was, v]] : Object.keys({ ...(modulesOf(was) ?? {}), ...(modulesOf(v) ?? {}) }).map((m) => [was?.[m] ?? '', v?.[m] ?? '']);
-    for (const [a, b] of pairs) {
-      const c = changeCount(typeof a === 'string' ? a : '', typeof b === 'string' ? b : '');
-      (gone += c.gone), (put += c.put), (passages += c.passages);
-    }
-  }
-  return passages ? `−${gone.toLocaleString()} +${put.toLocaleString()} lines, ${passages} ${passages === 1 ? 'passage' : 'passages'}` : '';
-}
+/** What Save changes in the code written, as line diffs say it: each field's hunks (packs/sheet/parts/page/diff.js draws them). */
+export const codeChanges = (draft, declared = {}) => codeDiffs(declared, draft.fields, draft.from);
 
 /** The count under the note while it is written, as its screen's count piece says, or how long it is. */
 export function countMarks(body, piece, props = {}) {
@@ -81,14 +70,16 @@ export function noteMarks(item, draft, { writes = false, writing = false, count 
 }
 
 /** The bar that saves it, in sight at the page's foot while anything is unsaved. */
-export function barMarks(draft, item, { saving = false, said, code = '', moved = false } = {}) {
+export function barMarks(draft, item, { saving = false, said, diffs = [], diffOpen = false, moved = false } = {}) {
   if (!unsaved(draft, item)) return said ? ['text', { look: 'muted', tone: 'bad' }, said] : null;
-  return ['box', { key: 'draft-bar', look: 'band', flow: 'row', gap: 2, align: 'end' },
-    ...(code ? [['text', { look: 'muted', tip: 'What Save changes in the code: lines taken out and put in' }, code]] : []),
+  const bar = ['box', { key: 'draft-bar', look: 'band', flow: 'row', gap: 2, align: 'end' },
+    ...(diffs.length ? [['button', { key: 'draft:diff', look: 'quiet', tip: diffOpen ? 'Fold the diff' : 'What Save changes in the code, line by line' }, `${counts(diffs)}${diffOpen ? ' ▴' : ''}`]] : []),
     ...(said ? [['text', { tone: 'bad', tip: said.slice(0, 200) }, said]] : []),
     ...(moved ? [['button', { key: 'draft:reload', look: 'quiet', tip: 'Open the code as it is now: what you wrote in it is let go' }, 'Reload']] : []),
     ['button', { key: 'draft:discard', look: 'quiet', tip: 'Let what is written go' }, 'Discard'],
     ['button', { key: 'draft:save', look: 'main', tip: saving ? 'Saving' : 'Save it, as one change' }, saving ? 'Saving…' : 'Save']];
+  // The diff of the code before it is saved, folded under the bar until asked for.
+  return diffOpen && diffs.length ? ['box', { flow: 'column', gap: 1 }, diffMarks(diffs), bar] : bar;
 }
 
 /** A line of the note ticked or unticked, by its number among the lines. */
@@ -113,6 +104,7 @@ export function draftEvent(event, item, draft) {
   if (k === 'draft:save' && event.name === 'press') return { save: true };
   if (k === 'draft:discard' && event.name === 'press') return { discard: true };
   if (k === 'draft:reload' && event.name === 'press') return { reload: true };
+  if (k === 'draft:diff' && event.name === 'press') return { diff: true };
   if (k === 'draft:tick' && event.name === 'tick') {
     const body = ticked(item.body, Number(event.value?.line), Boolean(event.value?.done));
     return body === null ? null : { ops: [{ op: 'update', id: item.id, body }], reason: 'Ticked in the UI' };

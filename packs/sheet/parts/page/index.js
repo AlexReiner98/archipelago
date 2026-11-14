@@ -11,7 +11,7 @@
 import { label, typeOf } from './words.js';
 import { fieldEvent, fieldsMarks } from './fields.js';
 import { choicesMarks, choicesOf, headEvent, headMarks, historyMarks, section, settleOps, sourceMarks } from './sections.js';
-import { blank, barMarks, codeSaid, draftEvent, noteMarks, saveOps, titleMarks, unsaved } from './draft.js';
+import { blank, barMarks, codeChanges, draftEvent, noteMarks, saveOps, titleMarks, unsaved } from './draft.js';
 import { linkEvent, linkMarks } from './links.js';
 
 /** The link types it walks from, read from this end: what it holds walks part_of down only. */
@@ -32,7 +32,7 @@ const HEAD = ['status', 'owner', 'confidence', 'visibility', 'source'];
 export const pageTold = (now, told) => (told?.name === 'page' && told.item?.id ? { ...now, item: told.item, views: { ...(now?.views ?? {}), ...(told.views ?? {}) }, piece: { ...(now?.piece ?? {}), ...(told.count && { count: told.count }) } } : now);
 
 /** The page's state as one value: what is open, what is written, what is asked, what was said. */
-const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) }, from: { ...(kept?.draft?.from ?? {}) } }, open: new Set(), files: {}, emptyOpen: false, writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined, moved: false });
+const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) }, from: { ...(kept?.draft?.from ?? {}) } }, open: new Set(), files: {}, emptyOpen: false, diffs: new Set(), writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined, moved: false });
 
 /** The whole page as marks. */
 export function pageMarks(input, s) {
@@ -66,8 +66,8 @@ export function pageMarks(input, s) {
     section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : [])], titles: view.titles ?? {}, files: s.files }) ?? ['text', { look: 'muted' }, 'None']),
     sourceMarks(view.source),
     ['slot', { key: 'slot-sections', name: 'sheet.sections' }],
-    barMarks(s.draft, item, { saving: s.saving, said: s.saveSaid, code: codeSaid(s.draft, item, type.fields), moved: s.moved }),
-    historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names }),
+    barMarks(s.draft, item, { saving: s.saving, said: s.saveSaid, diffs: codeChanges(s.draft, type.fields), diffOpen: s.diffOpen, moved: s.moved }),
+    historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names, shown: s.diffs }),
   ].filter(Boolean);
 }
 
@@ -122,6 +122,7 @@ export default function page(input, tools) {
     if (d) {
       if (d.draft) return written(() => (s.draft = d.draft), event);
       if (d.writing) return ((s.writing = true), draw());
+      if (d.diff) return ((s.diffOpen = !s.diffOpen), draw());
       if (d.discard) return ((s = { ...s, draft: blank(), open: new Set(), writing: false, saveSaid: undefined, moved: false }), keep(), draw());
       // Code changed since it was opened: what is there now is opened in its place, and what was written of it let go.
       if (d.reload) {
@@ -202,6 +203,9 @@ export default function page(input, tools) {
     if (k === 'archive' && event.name === 'press') return ((s.archiving = true), draw());
     if (k === 'archive-no') return ((s.archiving = false), draw());
     if (k === 'archive-yes' && event.name === 'press') return ((s.archiving = false), await change({ ops: [{ op: 'archive', id: it.id }], reason: 'Archived in the UI' }), draw());
+    // A change to code: its line diff unfolded under its line, or folded again.
+    const dk = /^diff:(c_[a-z0-9]+)$/.exec(k);
+    if (dk && event.name === 'press') return (s.diffs.has(dk[1]) ? s.diffs.delete(dk[1]) : s.diffs.add(dk[1]), draw());
     const u = /^undo:(c_[a-z0-9]+)$/.exec(k);
     if (u && event.name === 'press') {
       const r = await tools.undo?.(u[1]);

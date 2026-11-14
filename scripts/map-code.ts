@@ -1,6 +1,6 @@
 // Code kept on the map, worked on as files (task e_ahu6xmuv; the path agreed by the owner, 14 Nov 2026, e_pjb56hte):
 //
-//   node scripts/map-code.ts pull <item> [folder]   lay the item's code fields out as files (scripts/map-code-files.ts)
+//   node scripts/map-code.ts pull <item> [folder]   lay the item's code, and the json it runs with, out as files (scripts/map-code-files.ts)
 //   node scripts/map-code.ts push [folder]          send what changed as one change, refused if the map moved since
 //   node scripts/map-code.ts watch [folder]         push on each save; with --preview, send each save as a preview
 //   node scripts/map-code.ts status [folder]        what changed here, and whether the map moved
@@ -14,7 +14,7 @@
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, watch, writeFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { codeFields, fromFiles, moved, record, toFiles, TOOLING, type CodeField, type Pulled } from './map-code-files.ts';
+import { folderFields, fromFiles, moved, record, toFiles, TOOLING, watched, type CodeField, type Pulled } from './map-code-files.ts';
 import { codePath } from '../packs/loader/kernel/pack-code.ts';
 
 export type Call = (tool: string, body: Record<string, unknown>) => Promise<any>;
@@ -46,14 +46,14 @@ export function httpCall(url: string, token?: string): Call {
   };
 }
 
-/** The item as the map holds it now, with its type's code fields. */
+/** The item as the map holds it now, with the fields a folder of its type holds. */
 async function read(call: Call, id: string): Promise<{ entity: any; fields: CodeField[] }> {
   const got = await call('query', { name: 'get', params: { id, full: true } });
   const entity = got.entity ?? got;
   if (!entity?.type) throw new Error(`${id}: no such item`);
   const schema = await call('query', { name: 'schema', params: { type: entity.type, full: true } });
   const type = (schema.types ?? []).find((t: any) => t.id === entity.type);
-  const fields = codeFields(type?.fields ?? {});
+  const fields = folderFields(type?.fields ?? {});
   if (!fields.length) throw new Error(`${entity.title} (${entity.type}) has no code fields`);
   return { entity, fields };
 }
@@ -95,7 +95,7 @@ export async function pull(call: Call, url: string, id: string, folder: string):
   }
   const pulled = record({ url, item: entity.id, type: entity.type, title: entity.title, updated_at: entity.updated_at }, fields, laid);
   writeFileSync(join(folder, MANIFEST), JSON.stringify(pulled, null, 2) + '\n');
-  if (existsSync(TYPES) && fields.some((f) => f.kind === 'text' ? !f.css : true)) {
+  if (existsSync(TYPES) && fields.some((f) => f.kind === 'files' || (f.kind === 'text' && !f.css))) {
     copyFileSync(TYPES, join(folder, 'draw.d.ts'));
     writeFileSync(join(folder, 'jsconfig.json'), JSON.stringify(JSCONFIG, null, 2) + '\n');
   }
@@ -116,20 +116,25 @@ export interface Pushed {
  * When the map holds just what the folder does (a try kept with the page's Save, the same edit sent another way), the
  * folder's record moves to it: nothing is changed here, and nothing moved. Answers whether it did.
  */
-function caughtUp(folder: string, pulled: Pulled, fields: CodeField[], entity: any): boolean {
+function caughtUp(folder: string, pulled: Pulled, all: CodeField[], entity: any): boolean {
+  const fields = watched(pulled, all);
   const now = record({ ...pulled, updated_at: entity.updated_at }, fields, toFiles(fields, entity.props ?? {}));
   if (fromFiles(now, readFolder(folder)).changed.length) return false;
   writeFileSync(join(folder, MANIFEST), JSON.stringify(now, null, 2) + '\n');
   return true;
 }
 
-/** What changed in the folder since the pull, and whether the map moved under it. */
-export async function status(call: Call, folder: string): Promise<{ changed: string[]; moved: string[] }> {
+/** The fields a folder watches, each with the files it is laid out as (a json field left empty: the file it would be). */
+export const watching = (pulled: Pulled) =>
+  Object.entries(pulled.fields).map(([name, f]) => `${name} (${Object.keys(f.files).join(', ') || (f.kind === 'json' ? `${name}.json, none yet` : 'none yet')})`);
+
+/** What changed in the folder since the pull, whether the map moved under it, and the fields both are of. */
+export async function status(call: Call, folder: string): Promise<{ changed: string[]; moved: string[]; watching: string[] }> {
   const pulled = manifestOf(folder);
   const { changed } = fromFiles(pulled, readFolder(folder));
   const { entity, fields } = await read(call, pulled.item);
-  if (changed.length && caughtUp(folder, pulled, fields, entity)) return { changed: [], moved: [] };
-  return { changed, moved: moved(pulled, fields, entity.props ?? {}) };
+  if (changed.length && caughtUp(folder, pulled, fields, entity)) return { changed: [], moved: [], watching: watching(manifestOf(folder)) };
+  return { changed, moved: moved(pulled, fields, entity.props ?? {}), watching: watching(pulled) };
 }
 
 /**
@@ -153,24 +158,36 @@ export async function push(call: Call, folder: string, opts: { force?: boolean; 
   });
   if (res.status === 'applied') {
     const now = await read(call, pulled.item);
-    const laid = toFiles(now.fields, now.entity.props ?? {});
-    writeFileSync(join(folder, MANIFEST), JSON.stringify(record({ ...pulled, updated_at: now.entity.updated_at }, now.fields, laid), null, 2) + '\n');
+    const kept = watched(pulled, now.fields);
+    const laid = toFiles(kept, now.entity.props ?? {});
+    writeFileSync(join(folder, MANIFEST), JSON.stringify(record({ ...pulled, updated_at: now.entity.updated_at }, kept, laid), null, 2) + '\n');
     return { status: 'applied', changed };
   }
   if (res.status === 'proposed' || res.status === 'held' || res.proposal) return { status: 'held', changed, held_by: res.held_by, proposal: res.proposal };
   throw new Error(`change ${res.status ?? 'refused'}: ${JSON.stringify(res).slice(0, 600)}`);
 }
 
+/** The changed fields a try can carry: the server tries code fields alone, so a json field's edit is named, not sent. */
+function triable(pulled: Pulled, props: Record<string, unknown>): { code: Record<string, unknown>; untried: string[] } {
+  const code: Record<string, unknown> = {}, untried: string[] = [];
+  for (const [field, value] of Object.entries(props)) {
+    if (pulled.fields[field]?.kind === 'json') untried.push(field);
+    else code[field] = value;
+  }
+  return { code, untried };
+}
+
 /**
  * Send what the folder holds as a preview of the item (task e_p5zjynrb): off the log, seen only by the sender's open
- * pages. Each changed field whole, as change would send it.
+ * pages. Each changed code field whole, as change would send it; a changed json field is named in untried.
  */
-export async function preview(call: Call, folder: string, discard = false): Promise<{ changed: string[] }> {
+export async function preview(call: Call, folder: string, discard = false): Promise<{ changed: string[]; untried: string[] }> {
   const pulled = manifestOf(folder);
   const { props, changed } = fromFiles(pulled, readFolder(folder));
-  const names = discard ? Object.keys(pulled.fields) : Object.keys(props);
-  for (const field of names) await call('report', { action: 'preview', params: discard ? { item: pulled.item, field, discard: true } : { item: pulled.item, field, value: props[field] } });
-  return { changed };
+  const { code, untried } = triable(pulled, props);
+  const names = discard ? Object.keys(pulled.fields).filter((f) => pulled.fields[f].kind !== 'json') : Object.keys(code);
+  for (const field of names) await call('report', { action: 'preview', params: discard ? { item: pulled.item, field, discard: true } : { item: pulled.item, field, value: code[field] } });
+  return { changed, untried: discard ? [] : untried };
 }
 
 export interface Tried {
@@ -178,6 +195,8 @@ export interface Tried {
   state: string;
   errors: string[];
   why?: string;
+  /** Changed json fields, which a try cannot carry: drawn as the map holds them. */
+  untried?: string[];
   /** Where the picture was saved. */
   picture?: string;
 }
@@ -190,7 +209,8 @@ export interface Tried {
 export async function tryFolder(call: Call, folder: string, view: Record<string, unknown> = {}, size: { width?: number; height?: number; scheme?: string } = {}): Promise<Tried> {
   const pulled = manifestOf(folder);
   const { props, changed } = fromFiles(pulled, readFolder(folder));
-  const tries = Object.entries(props).map(([field, value]) => ({ item: pulled.item, field, value }));
+  const { code, untried } = triable(pulled, props);
+  const tries = Object.entries(code).map(([field, value]) => ({ item: pulled.item, field, value }));
   // Nothing changed: drawn by the code the map holds, so a try of nothing still shows this item's drawing.
   const named = Object.keys(view).length ? view : { query: { filter: { find: ['type task'] }, limit: 300 }, style: { id: pulled.item } };
   const got = await call('query', { name: 'look', params: { ...named, ...size, ...(tries.length ? { tries } : { fresh: true }) } });
@@ -200,7 +220,7 @@ export async function tryFolder(call: Call, folder: string, view: Record<string,
     picture = join(folder, '.map-code-try.' + (got.image.content_type === 'image/jpeg' ? 'jpg' : 'png'));
     writeFileSync(picture, Buffer.from(got.image.data, 'base64'));
   }
-  return { changed, state: got.state, errors, ...(got.why && { why: got.why }), ...(picture && { picture }) };
+  return { changed, state: got.state, errors, ...(got.why && { why: got.why }), ...(picture && { picture }), ...(untried.length && { untried }) };
 }
 
 /** Push (or preview) on each save, a save being quiet for a moment; answers a stop. */
@@ -258,7 +278,11 @@ async function main() {
   } else if (verb === 'push' || verb === 'status') {
     const folder = folderOf(plain[0]);
     const { call } = await target(args);
-    if (verb === 'status') { const s = await status(call, folder); console.log(`changed here: ${s.changed.join(', ') || 'nothing'}; moved on the map: ${s.moved.join(', ') || 'nothing'}`); return; }
+    if (verb === 'status') {
+      const s = await status(call, folder);
+      console.log(`watching ${s.watching.join('; ')}\nchanged here: ${s.changed.join(', ') || 'nothing'}; moved on the map: ${s.moved.join(', ') || 'nothing'}`);
+      return;
+    }
     console.log(say(await push(call, folder, { force: args.has('force'), run: runArg, reason: args.get('reason') as string | undefined })));
   } else if (verb === 'watch') {
     const folder = folderOf(plain[0]);
@@ -267,7 +291,7 @@ async function main() {
     manifestOf(folder);
     console.log(`watching ${folder}: each save ${asPreview ? 'previewed on your open pages' : 'pushed'}; Ctrl+C to stop`);
     watchFolder(folder, async () => {
-      if (asPreview) { const r = await preview(call, folder); console.log(`previewed: ${r.changed.join(', ') || 'as pulled'}`); }
+      if (asPreview) { const r = await preview(call, folder); console.log(`previewed: ${r.changed.join(', ') || 'as pulled'}${r.untried.length ? `; not previewed (a try carries code alone): ${r.untried.join(', ')}` : ''}`); }
       else console.log(say(await push(call, folder, { force: args.has('force'), run: runArg })));
     });
     // A preview lapses 15 minutes after it was last sent (e_p5zjynrb): while watching, send it again before then.
@@ -282,7 +306,9 @@ async function main() {
     }
     const t = await tryFolder(call, folder, view, { width: Number(args.get('width')) || undefined, height: Number(args.get('height')) || undefined });
     for (const e of t.errors) console.log(`error: ${e}`);
-    console.log(`${t.errors.length ? 'failed' : t.state}: ${t.changed.length ? `tried ${t.changed.join(', ')}` : 'nothing changed, drawn as the map holds it'}${t.picture ? `; picture in ${t.picture}` : ''}`);
+    if (t.untried) console.log(`not tried (a try carries code alone; push to see them): ${t.untried.join(', ')}`);
+    const tried = t.changed.filter((p) => !t.untried?.some((f) => p === `${f}.json`));
+    console.log(`${t.errors.length ? 'failed' : t.state}: ${tried.length ? `tried ${tried.join(', ')}` : 'no code changed, drawn as the map holds it'}${t.picture ? `; picture in ${t.picture}` : ''}`);
     if (t.errors.length || t.state === 'error' || t.state === 'late') process.exitCode = 1;
   } else if (verb === 'discard') {
     const { call } = await target(args);

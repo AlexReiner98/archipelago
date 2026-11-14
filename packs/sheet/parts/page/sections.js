@@ -3,6 +3,7 @@
 // a band under a short title, never a box in a box (rule e_vgs9vt5j).
 
 import { ago, label } from './words.js';
+import { counts, diffMarks } from './diff.js';
 
 /** A section: its title, a count where it has one, what it holds. */
 export const section = (key, title, n, ...content) =>
@@ -75,8 +76,11 @@ export function sourceMarks(source) {
     row('Address', ['text', { tip: source.uri.slice(0, 200), ...(web && { href: source.uri }) }, source.uri]));
 }
 
-/** History: a change set a line, newest first, with who, what and when; each but a forget can be taken back. */
-export function historyMarks(events, { writes = false, names = {}, now } = {}) {
+/**
+ * History: a change set a line, newest first, with who, what and when; each but a forget can be taken back. A change
+ * to code says its counts, and pressed, its line diff under the line (`shown`: the change sets unfolded).
+ */
+export function historyMarks(events, { writes = false, names = {}, now, shown } = {}) {
   const sets = [];
   for (const ev of events ?? []) {
     const last = sets.at(-1);
@@ -89,11 +93,16 @@ export function historyMarks(events, { writes = false, names = {}, now } = {}) {
     const said = first.reason ?? first.target_title ?? label(String(first.action ?? '').replace(/^\w+\./, ''));
     const undone = g.events.some((e) => e.detail?.undone_by);
     const forgot = g.events.some((e) => e.detail?.forgot);
-    return ['box', { flow: 'row', gap: 2, key: `set:${g.changeset ?? first.seq}` },
+    const diffs = g.events.flatMap((e) => e.detail?.diffs ?? []);
+    const open = diffs.length > 0 && g.changeset && shown?.has(g.changeset);
+    const headRow = ['box', { flow: 'row', gap: 2, ...(!diffs.length && { key: `set:${g.changeset ?? first.seq}` }) },
       ['text', { look: 'muted' }, who(first.actor)],
       ['text', { tip: String(said).slice(0, 200), ...(undone && { tone: 'closed' }) }, String(said)],
       ['text', { look: 'muted', tip: first.ts ?? '' }, ago(first.ts, now)],
+      ...(diffs.length && g.changeset ? [['button', { key: `diff:${g.changeset}`, look: 'quiet', tip: open ? 'Fold the lines it changed' : 'See the lines it changed' }, `${counts(diffs)} ${open ? '▴' : '▾'}`]] : []),
       ...(writes && g.changeset && !undone && !forgot ? [['button', { key: `undo:${g.changeset}`, look: 'quiet', tip: 'Put back what it did, as a new change' }, 'Undo']] : [])];
+    if (!diffs.length) return headRow;
+    return ['box', { flow: 'column', gap: 1, key: `set:${g.changeset ?? first.seq}` }, headRow, ...(open ? [diffMarks(diffs)] : [])];
   };
   return section('history', 'History', sets.length, ['list', { look: 'rows' }, ...sets.map(line)]);
 }

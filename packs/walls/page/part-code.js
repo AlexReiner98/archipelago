@@ -127,7 +127,10 @@ export function codeField(node, { said, preview }) {
     el.dataset.failed = '';
   });
   // Escape in the editor's search closes the search, not the sheet.
-  el.addEventListener('keydown', (e) => e.key === 'Escape' && root.querySelector('.cm-search') && e.stopPropagation());
+  // Heard on the way in (capture), while the search is still open: CodeMirror closes it before the key comes back out.
+  let searching = false;
+  el.addEventListener('keydown', (e) => (searching = e.key === 'Escape' && Boolean(root.querySelector('.cm-search'))), true);
+  el.addEventListener('keydown', (e) => searching && e.stopPropagation());
   return el;
 }
 
