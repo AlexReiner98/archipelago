@@ -13,12 +13,12 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createToken, verifyToken, workspaceOf } from '../../identity/kernel/auth.ts';
 import { GUEST_DAYS, GUEST_GRACE_DAYS, GUEST_ITEMS, guestOf, guestStanding, isGuestId, markGuest, newGuestId } from '../../identity/kernel/guests.ts';
 import { HOLDS_OFF } from '../../rules/kernel/rules.ts';
-import type { Actor } from '../../write/kernel/pelago.ts';
+import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { copyShared, sharedAt } from './guest-copy.ts';
 import type { Workspaces } from '../../identity/kernel/workspaces.ts';
 import { json, PRIVATE, UNLISTED } from './reply.ts';
 import type { RouteFilling } from './surface-slots.ts';
-import { guestPrompt, guestWords } from './guest-words.ts';
+import { guestPrompt, guestWords, INSTALL_TITLE, installNote } from './guest-words.ts';
 
 /** Where the request reached this server: what the link and the instructions name. */
 const originOf = (req: IncomingMessage) => {
@@ -36,6 +36,27 @@ async function makeGuest(workspaces: Workspaces): Promise<string> {
   await ws.pelago.init(MAKER, { name: 'You' });
   await ws.pelago.db.query(`insert into setting (key, value) values ($1, 'true'::jsonb) on conflict (key) do update set value = excluded.value`, [HOLDS_OFF]);
   await ws.pelago.record('settings', 'pelago', [['+', 'setting', HOLDS_OFF, true]], 'A guest map: nothing waits for a person');
+  return id;
+}
+
+/** The setting that keeps the id of the install note a guest map starts with: its agent is told it is there. */
+const INSTALL = 'guest_install';
+
+/**
+ * The one item a guest map starts with: the install note, the sentence to paste and what happens next, opened in the
+ * visitor's tab as the map opens (the owner, 14 Nov 2026: "it should already be seeded with the install document").
+ * A document where the map's packs have the type, else a record, core's. Answers its id.
+ */
+async function seedInstall(l: Archipelago, actor: Actor, prompt: string, origin: string): Promise<string> {
+  const type = l.registry.type('document') ? 'document' : 'record';
+  // On the island of the pack its type is of, named: a copy of a shared map has several.
+  const pack = l.registry.type(type)?.pack ?? 'core';
+  const island = (await l.db.query<{ id: string }>(`select id from entity where type = 'island' and props->>'pack' = $1 and archived_at is null limit 1`, [pack])).rows[0]?.id;
+  const done = (await l.change(actor, { reason: 'The install note a guest map starts with', ops: [{ op: 'create', ref: 'n', type, title: INSTALL_TITLE, body: installNote(prompt, origin), ...(island && { props: { island } }) }] } as never)) as { status: string; created?: Record<string, string> };
+  const id = done.created?.n;
+  if (done.status !== 'applied' || !id) throw new Error(`The install note was not made (${done.status}).`);
+  await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [INSTALL, JSON.stringify(id)]);
+  await l.record('settings', 'pelago', [['+', 'setting', INSTALL, id]], 'The install note a guest map starts with');
   return id;
 }
 
@@ -86,8 +107,9 @@ export const guestMake: RouteFilling = {
       const days = GUEST_DAYS + GUEST_GRACE_DAYS;
       const agent = await createToken(ws.pelago.db, id, { kind: 'agent', name: 'guest agent', expires_days: days });
       const page = await createToken(ws.pelago.db, id, { kind: 'human', name: 'guest', entity: me, admin: true, expires_days: days });
-      const link = `${originOf(req)}/g/${agent.token}`;
-      return json(res, 200, { result: { workspace: { id, name: ws.name }, link, prompt: guestPrompt(link), page_token: page.token, expires_at: guest.expires_at, ...(copied !== undefined && { copied }) } }, PRIVATE);
+      const link = `${originOf(req)}/g/${agent.token}`, prompt = guestPrompt(link);
+      const install = await seedInstall(ws.pelago, { ...MAKER, ...(me && { person: me }) }, prompt, originOf(req));
+      return json(res, 200, { result: { workspace: { id, name: ws.name }, link, prompt, install, page_token: page.token, expires_at: guest.expires_at, ...(copied !== undefined && { copied }) } }, PRIVATE);
     } finally {
       done();
     }
@@ -108,6 +130,6 @@ export const guestLink: RouteFilling = {
     if (!who || who.actor.kind !== 'agent' || who.actor.may === 'read') return gone();
     const ended = guestStanding(await guestOf(await workspaces.control(), id))?.ended;
     if (ended) return text(res, 410, `This guest map ended on ${ended.since.slice(0, 10)} and takes no more writes. Tell your user: signing in keeps a map; this one is deleted on ${ended.delete_at.slice(0, 10)}.\n`);
-    return text(res, 200, guestWords(originOf(req), key, id, (await ws.pelago.setting<string>('me')) ?? ''));
+    return text(res, 200, guestWords(originOf(req), key, id, (await ws.pelago.setting<string>('me')) ?? '', await ws.pelago.setting<string>(INSTALL)));
   },
 };

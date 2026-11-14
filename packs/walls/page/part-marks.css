@@ -77,6 +77,10 @@ a.pm-text:hover { border-bottom-color: var(--accent); }
 .body-text em { font-style: italic; }
 .body-text code.note-code { font-family: ui-monospace, monospace; font-size: var(--text-3); padding: 0 var(--space-2); border-radius: var(--radius-1); background: var(--closed-soft); }
 .body-text pre.note-block { font-family: ui-monospace, monospace; font-size: var(--text-3); margin: 0 0 var(--space-6); padding: var(--space-5) var(--space-6); border-radius: var(--radius-2); background: var(--closed-soft); overflow-x: auto; white-space: pre; }
+/* A code block's Copy (a Share on a phone), beside it at its right, on the block's own ground (packs/kit/page/body.js). */
+.body-text .note-code { display: flex; align-items: center; gap: var(--space-5); margin: 0 0 var(--space-6); padding-right: var(--space-6); border-radius: var(--radius-2); background: var(--closed-soft); }
+.body-text .note-code > pre.note-block { flex: 1; min-width: 0; margin: 0; background: none; }
+.body-text .note-code > .note-take { flex: none; }
 .body-text a.note-item { text-decoration: none; border-bottom: var(--border-1) solid var(--accent-soft); }
 .body-text a.note-item:hover { border-bottom-color: var(--accent); }
 .body-text h4.part-title { margin: var(--space-8) 0 var(--space-3); font-size: var(--text-5); }
