@@ -58,7 +58,7 @@ const look = (cm) => cm.EditorView.theme({
 
 /**
  * The element a code input is drawn in. `said(name, value)` tells the part (`edit` with the text, `submit`);
- * `preview(at, text)` tries the text as the code of `at` ({ item, field }), null drops the try (absent where the part
+ * `preview(at, text)` tries the text as the code of `at` ({ item, field }, and for files the file it is and the others), null drops the try (absent where the part
  * may not write). Answers with the element; `codeText`, `codeSet` and `codeAt` read and move it.
  */
 export function codeField(node, { said, preview }) {
@@ -71,7 +71,8 @@ export function codeField(node, { said, preview }) {
   const tryNow = () => {
     timer = 0;
     if (!preview || !at.preview) return;
-    if (text === opened) return void (tried && ((tried = false), preview(at.preview, null)));
+    // Back to what it was opened with, and no other file of it changed: what the map holds is drawn again.
+    if (text === opened && !at.preview.edited) return void (tried && ((tried = false), preview(at.preview, null)));
     tried = true;
     preview(at.preview, text);
   };

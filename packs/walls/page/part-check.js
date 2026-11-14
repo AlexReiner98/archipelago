@@ -89,7 +89,14 @@ export const INPUT_KINDS = ['text', 'number', 'url', 'search', 'date', 'time', '
 /** The languages code is written in, for the editor's colours. */
 export const CODE_LANGS = ['js', 'css'];
 /** What code is tried as: the item and the field it is the code of. */
-const codeOf = (v, why) => (plain(v) && Object.keys(v).length === 2 && ITEM.test(v.item) && typeof v.field === 'string' && /^[A-Za-z0-9_.-]{1,60}$/.test(v.field) ? { item: v.item, field: v.field } : why("not { item, field }: an item's id and a field's name"));
+const FILE = /^[A-Za-z0-9_.-]{1,60}$/;
+/** The other files of code as files, by path, each a text: what the host sends with the one written, as the field whole. */
+const filesOf = (v) => plain(v) && Object.keys(v).length <= 50 && Object.entries(v).every(([k, t]) => FILE.test(k) && typeof t === 'string');
+const codeOf = (v, why) => {
+  const ok = plain(v) && Object.keys(v).every((k) => ['item', 'field', 'file', 'others', 'edited'].includes(k)) && ITEM.test(v.item) && typeof v.field === 'string' && FILE.test(v.field)
+    && (v.file === undefined ? v.others === undefined && v.edited === undefined : typeof v.file === 'string' && FILE.test(v.file) && filesOf(v.others ?? {}) && (v.edited === undefined || v.edited === true));
+  return ok ? { item: v.item, field: v.field, ...(v.file !== undefined && { file: v.file, others: v.others ?? {}, ...(v.edited && { edited: true }) }) } : why("not { item, field } (and for files, file, others and edited): an item's id, a field's name, a file's name and the other files' texts");
+};
 /** The kinds of input whose change is a pick, sent as one gesture, not words being typed. */
 export const PICKS = ['date', 'time', 'check', 'pick'];
 
