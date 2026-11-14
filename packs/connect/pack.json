@@ -10,6 +10,64 @@
     "service:root.token",
     "service:root.connections"
   ],
+  "actions": [
+    {
+      "id": "connect.start",
+      "title": "Connect a server pack",
+      "description": "Where to go to connect a server pack to this workspace (choose there what it is given), or with setup, to ready it for the whole server once (the default workspace only). An admin’s, sent by the connections card only on an admin’s own press.",
+      "verb": "revise",
+      "admin": true,
+      "input": {
+        "type": "object",
+        "properties": {
+          "pack": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "The server pack, by id."
+          },
+          "setup": {
+            "type": "boolean",
+            "description": "Ready it for the whole server, not connect it here."
+          }
+        },
+        "required": [
+          "pack"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "connect.end",
+      "title": "Disconnect a server pack",
+      "description": "Stop a server pack’s connection to this workspace: what it hears no longer reaches the map. An admin’s, sent by the connections card only on an admin’s own press.",
+      "verb": "revise",
+      "admin": true,
+      "input": {
+        "type": "object",
+        "properties": {
+          "pack": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "The server pack, by id."
+          }
+        },
+        "required": [
+          "pack"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "views": [
+    {
+      "id": "connect.connections",
+      "shape": "data",
+      "lens": {},
+      "answer": "connections",
+      "description": "What this server offers to connect this workspace to, each with whether it is ready and connected here: a person’s alone. Params: none.",
+      "humanOnly": true
+    }
+  ],
   "kernel": {
     "trust": "service",
     "internal": true,
@@ -20,8 +78,55 @@
       "surface.token_asked": "connect.ts#asked",
       "surface.token_polled": "connect.ts#polled",
       "surface.tools": "surface-tools.ts#tools"
+    },
+    "provides": {
+      "answer.connections": {
+        "in": {},
+        "out": {
+          "packs": [
+            "any"
+          ]
+        },
+        "run": "part-connections.ts#connectionsListed"
+      },
+      "act.revise.start": {
+        "in": "any",
+        "out": "any",
+        "run": "part-connections.ts#startAct"
+      },
+      "act.revise.end": {
+        "in": "any",
+        "out": "any",
+        "run": "part-connections.ts#endAct"
+      }
     }
   },
+  "parts": [
+    {
+      "id": "connect.connections",
+      "title": "Connections",
+      "slot": "workspace.card",
+      "views": [
+        {
+          "name": "connections"
+        }
+      ],
+      "sends": [
+        "connect.start",
+        "connect.end"
+      ],
+      "marks": [
+        "box",
+        "text",
+        "list",
+        "button",
+        "menu"
+      ],
+      "modules": {
+        "index.js": "parts/connections/index.js"
+      }
+    }
+  ],
   "reach": {
     "items": [
       {

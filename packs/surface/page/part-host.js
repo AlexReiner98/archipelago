@@ -14,7 +14,7 @@
 // (addressMoved), and may name another after a gesture (hooks.go checks it). A mark that names a view opens it, and a thumb shows it small, both as the app says
 // (hooks.openView, hooks.viewThumb, hooks.viewUp: packs/surface/page/views-kept.js), or as the one drawing the part says (`openView`).
 
-import { api, h, hooks, state } from './base.js';
+import { api, h, hooks, may, state } from './base.js';
 import { partBridge } from './part-bridge.js';
 import { shippedOn, wayBack } from './way-back.js';
 import { pageType } from './page-schema.js';
@@ -251,8 +251,9 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
   };
   const style = await styleOn(pinFor(item));
   // What every part is handed beside its items: the island's words, the style's values (none of its looks), and what
-  // its piece says of it on its screen (a title, a limit).
-  const given = { words, style: styleValues(style), piece: settingsOf(piece) };
+  // its piece says of it on its screen (a title, a limit). A part that sends an admin's action is told whether the
+  // person may (`admin`), to offer it only to an admin: whether it goes is the press's grant's, checked by the server.
+  const given = { words, style: styleValues(style), piece: settingsOf(piece), ...(part.admin?.length && may('admin') && { admin: true }) };
   // A picture mark is drawn out of what the part was handed last, never out of what it sent.
   let handed;
   // A press on marks the part has since moved past (it was handed a newer page) lands on what was pressed.
@@ -267,7 +268,8 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
   const hand = () => handOne(() => inputOf(part, item, given));
   const render = mountPart(body, {
     style,
-    tell: (event, mark) => presses.tell(event, mark),
+    // A press the person made (a trusted event, never a script's) may carry an admin's authority: the bridge asks for it now.
+    tell: (event, mark, trusted) => (trusted && one.bridge.trusted(id), presses.tell(event, mark)),
     thumb: (view) => hooks.viewThumb?.(view) ?? null,
     picture: (at, el) => handed && picture?.(at, el, handed),
     find: (q, types, link) => findFor(item, q, types, link),

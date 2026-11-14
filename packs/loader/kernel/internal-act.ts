@@ -9,6 +9,7 @@ import type { ActionDef } from './declared.ts';
 import type { Check, Done, PackHost } from './packhost.ts';
 import type { Registry } from './packs.ts';
 import { providedBy } from './services.ts';
+import { actorId } from '../../identity/kernel/actor-checks.ts';
 import type { Actor, Archipelago, PartRef } from '../../write/kernel/pelago.ts';
 
 /** The service an internal pack's action runs as: styles.keep, of the verb capture, is act.capture.keep. */
@@ -20,7 +21,8 @@ export async function internalAct(l: Archipelago, reg: Registry, host: PackHost,
   const file = reg.packs.find((p) => p.id === pack);
   if (!file || !providedBy(file).includes(service)) throw new Error(`The ${pack} pack runs in the server's process and provides no ${service} for its action "${def.id}".`);
   const { callAs } = await import('./kernel-context.ts');
-  const done = await callAs<Done | null | undefined>(l, service, input ?? {});
+  // Handed who calls it, as surface.act's are (packs/surface/kernel/surface-slots.ts packAct): what it records of them.
+  const done = await callAs<Done | null | undefined>(l, service, input ?? {}, { kind: actor.kind, name: actorId(actor) });
   if (done !== undefined && done !== null && (typeof done !== 'object' || Array.isArray(done))) throw new Error(`${service} answered with no ops, reason and answer.`);
   return host.applied(l, actor, pack, def.id, done ?? {}, input, 'action', check, part);
 }

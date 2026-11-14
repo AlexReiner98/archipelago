@@ -22,15 +22,15 @@
     },
     {
       "id": "identity",
-      "hash": "ed9c656a6fee903e29184798221de8a0ea5d2bb53f862c61861166ac540f8337"
+      "hash": "6abeb01700d3fa345e555d9273a133ab2695c3cbe7865ee602e92c85ec49b07e"
     },
     {
       "id": "walls",
-      "hash": "1a7c558e0b960d46913afc94e3ea0607c3e827a46f37fa018170f2d3b9644fcd"
+      "hash": "b82e366ac72f38185aff24ed49d13db91152546151adc28c3a8e8c6351ce1b53"
     },
     {
       "id": "loader",
-      "hash": "c10d81289ef74836b38595b0245a9c85e36083ff323266bb6e89460d51a684c0"
+      "hash": "7155bbbf4a0d22f5d83c76a28112a85c9146e102a925e9acfdbf0f7d8908f7a3"
     },
     {
       "id": "rules",
@@ -42,7 +42,7 @@
     },
     {
       "id": "surface",
-      "hash": "a656bbd82d33d2b97d386bb055ce31321802fb0f5711dd49b2eb8f9135ba0e1e"
+      "hash": "a3aae5bedae37eccfcbdeb3e14e9724657a3ded585f3487db9dba4ba4cde4e02"
     },
     {
       "id": "panes",
