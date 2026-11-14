@@ -15,7 +15,8 @@ export function memberMail(n: MemberNotice): Mail {
   if (n.kind === 'sign_in_code')
     return {
       to: n.to,
-      subject: 'Your Archipelago sign-in code',
+      // One code is in the subject, so it is read off the notification without opening the mail (e_9ewt9kc6).
+      subject: n.codes.length === 1 ? `${n.codes[0].split(': ').pop()} is your Archipelago code` : 'Your Archipelago sign-in codes',
       text: [
         'Hello,',
         `Here is the code you asked for to sign in to Archipelago. Type it on the page where you asked. It works once, for the next ${n.minutes} minutes, and keeps that browser signed in for ${n.days} days.`,

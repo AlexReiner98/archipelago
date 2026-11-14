@@ -79,6 +79,36 @@ async function keepPassword(at: SignInAt): Promise<Answered> {
   return answer(200, { email, set: await passwordSet(control, email) });
 }
 
+/** The workspaces here that an address is a member of, each with its database. */
+async function memberships(at: OpenRoutes, email: string): Promise<{ id: string; name: string; db: () => Promise<Q> }[]> {
+  const listed = await at.workspaces.list();
+  const all = async () => listed.map((w) => ({ ...w, db: async () => (await at.workspaces.get(w.id)).pelago.db }));
+  const ids = new Set(await workspacesOf(await at.workspaces.control(), email, all));
+  const mine: { id: string; name: string; db: () => Promise<Q> }[] = [];
+  for (const w of listed.filter((w) => ids.has(w.id))) {
+    const db = async () => (await at.workspaces.get(w.id)).pelago.db;
+    if (await memberOf(await db(), email)) mine.push({ id: w.id, name: w.name, db });
+  }
+  return mine;
+}
+
+/**
+ * Sign in an address already proved this person's (a password, a passkey, Google or GitHub): its workspace is the one
+ * named, or the only one, and for several the answer lists them; what it owes is asked first. An address that is a
+ * member of none is told so (`none`), with where a person begins.
+ */
+export async function signInAs(at: SignInAt, email: string, workspace: unknown, agree: unknown): Promise<Answered> {
+  const mine = await memberships(at, email);
+  if (!mine.length) return answer(200, { none: email });
+  const ws = mine.length === 1 ? mine[0] : mine.find((w) => w.id === workspace);
+  if (!ws) return answer(200, { workspaces: mine.map(({ id, name }) => ({ id, name })) });
+  const owed = await at.owes(email, agree);
+  if (owed.length) return answer(200, { agree: owed });
+  at.hold(ws.id);
+  const db = await ws.db();
+  return answer(200, { token: await signedIn(db, ws.id, (await memberOf(db, email))!) });
+}
+
 /** A sign-in path's answer (SIGN_IN_PATHS), once the route has checked this server signs people in and the request is not too often. */
 export async function signIn(path: string, at: SignInAt): Promise<Answered> {
   if (path === '/connect/password/set') return keepPassword(at);
@@ -107,15 +137,8 @@ export async function signIn(path: string, at: SignInAt): Promise<Answered> {
     const wait = `Too many wrong passwords for this address. Wait ${TRIES_MINUTES} minutes, or ask for an email instead.`;
     if (await passwordTriesSpent(control, email)) return answer(429, { error: wait });
     if (!(await passwordWorks(control, email, body.password))) return (await passwordTriesSpent(control, email)) ? answer(429, { error: wait }) : answer(401, { error: 'That email and password do not match.' });
-    const mine: { id: string; name: string; db: () => Promise<Q> }[] = [];
-    for (const w of await theirs(email)) if (await memberOf(await w.db(), email)) mine.push(w);
-    if (!mine.length) return answer(403, { error: 'This address is a member of no workspace here.' });
-    const ws = mine.length === 1 ? mine[0] : mine.find((w) => w.id === body.workspace);
-    if (!ws) return answer(200, { workspaces: mine.map(({ id, name }) => ({ id, name })) });
-    const owed = await owes(email);
-    if (owed.length) return answer(200, { agree: owed });
-    const db = await ws.db();
-    return answer(200, { token: await signedIn(db, ws.id, (await memberOf(db, email))!) });
+    const said = await signInAs(at, email, body.workspace, body.agree);
+    return (said.body as { none?: string }).none ? answer(403, { error: 'This address is a member of no workspace here.' }) : said;
   }
   // A code from the mail, typed with the address it was sent to.
   if (path === '/connect/code') {

@@ -13,6 +13,7 @@ import { guestOf, keepGuest } from './guests.ts';
 import { keepAt, keepCode, mailKeepCode, signedIn } from './members.ts';
 import { bypassingRls } from './outbox.ts';
 import type { Answered, SignInAt } from './sign-in.ts';
+import type { Workspace } from './workspaces.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Op } from '../../write/kernel/pelago-types.ts';
 
@@ -39,15 +40,48 @@ async function tickSignIn(whole: Archipelago, me: string): Promise<void> {
   await whole.apply('system', { ops, reason: 'Signed in: the map is kept' }).catch((err: Error) => console.error(`guest map ${whole.workspace}: its sign-in step was not ticked: ${err.message}`));
 }
 
-export async function keepGuestMap(at: KeepAt): Promise<Answered> {
+/** The guest map this request's person owns and may keep, or why not: only its owner, in their browser, while it is a guest's. */
+export async function guestToKeep(at: SignInAt): Promise<{ ws: Workspace; me: string } | Answered> {
   const { ws, actor, look } = await at.person();
   const who = actor();
-  const control = await at.workspaces.control();
-  const guest = await guestOf(control, ws.id);
+  const guest = await guestOf(await at.workspaces.control(), ws.id);
   if (!guest) return answer(404, { error: 'This is not a guest map: sign in as usual.' });
   const me = await ws.pelago.setting<string>('me');
   if (look || who.kind !== 'human' || !who.admin || !me || who.person !== me) return answer(403, { error: 'Only the guest map’s owner keeps it, in their browser.' });
   if (guest.saved) return answer(409, { error: 'This map is kept already.' });
+  return { ws, me };
+}
+
+/**
+ * Keep a guest map at an address its owner has proved theirs (a code typed, or a sign-up with Google or GitHub:
+ * ./social.ts): the address becomes the owner's, the plan's sign-in step is ticked, the map is kept, and the pack that
+ * sells workspaces is told. Answers the owner's new sign-in.
+ */
+export async function keepVerified(at: KeepAt, ws: Workspace, me: string, email: string, given?: unknown): Promise<Answered> {
+  const control = await at.workspaces.control();
+  const guest = await guestOf(control, ws.id);
+  if (!guest || guest.saved) return answer(409, { error: 'This map is kept already.' });
+  const whole = await bypassingRls(ws.pelago);
+  const member = await keepAt(whole, email);
+  // Ticked while the map is still a guest's: what the pack says next may leave it read-only.
+  await tickSignIn(whole, me);
+  await keepGuest(control, ws.id);
+  const machine = typeof given === 'string' && MACHINE.test(given) ? given : undefined;
+  let kept: Kept = {};
+  try {
+    kept = await at.kept({ workspace: ws.id, email, ...(machine && { machine }) });
+  } catch (err) {
+    // Kept all the same: the map is theirs, and the pack is asked again by whoever runs the server.
+    console.error(`guest map ${ws.id}: kept, and the pack that sells workspaces did not answer: ${(err as Error).message}`);
+  }
+  return answer(200, { token: await signedIn(ws.pelago.db, ws.id, member), workspace: { id: ws.id, name: ws.name }, ...kept });
+}
+
+export async function keepGuestMap(at: KeepAt): Promise<Answered> {
+  const mine = await guestToKeep(at);
+  if ('status' in mine) return mine;
+  const { ws, me } = mine;
+  const control = await at.workspaces.control();
   at.hold(ws.id);
   const body = ((await at.body()) ?? {}) as { email?: unknown; code?: unknown; agree?: unknown; machine?: unknown };
   const email = at.email(body.email);
@@ -67,18 +101,5 @@ export async function keepGuestMap(at: KeepAt): Promise<Answered> {
   }
   const taken = await keepCode(db, control, email, code);
   if (taken !== 'ok') return taken === 'tries' ? spent : answer(410, { error: 'That code was not accepted: it may be mistyped, used or run out.' });
-  const whole = await bypassingRls(ws.pelago);
-  const member = await keepAt(whole, email);
-  // Ticked while the map is still a guest's: what the pack says next may leave it read-only.
-  await tickSignIn(whole, me);
-  await keepGuest(control, ws.id);
-  const machine = typeof body.machine === 'string' && MACHINE.test(body.machine) ? body.machine : undefined;
-  let kept: Kept = {};
-  try {
-    kept = await at.kept({ workspace: ws.id, email, ...(machine && { machine }) });
-  } catch (err) {
-    // Kept all the same: the map is theirs, and the pack is asked again by whoever runs the server.
-    console.error(`guest map ${ws.id}: kept, and the pack that sells workspaces did not answer: ${(err as Error).message}`);
-  }
-  return answer(200, { token: await signedIn(db, ws.id, member), workspace: { id: ws.id, name: ws.name }, ...kept });
+  return keepVerified(at, ws, me, email, body.machine);
 }

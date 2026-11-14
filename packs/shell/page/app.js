@@ -5,6 +5,7 @@
 
 import { authorizePage } from './authorize.js';
 import { tryPage } from './guest.js';
+import { otherWays, signInBack, signUpOffer, signUpPage } from './sign-up.js';
 import { SignInNeeded, api, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { warmLayouts } from './layout.js';
@@ -26,6 +27,7 @@ import { workspace } from './workspace.js';
 // parts, and the password page.
 hooks.partsRuntime = () => import('./part-host.js');
 hooks.passwordPage = () => import('./password.js').then((m) => m.passwordPage());
+hooks.otherWays = otherWays;
 
 /** The pages the sheet holds, by the name in their address. */
 /** The address of an item a held change would make, as a drawing links it (packs/surface/page/replica.js). */
@@ -65,6 +67,9 @@ async function route(pulse = false) {
   if (name === 'authorize') return void authorizePage(query);
   // Try it with your agent, or Make it yours: a guest map made and opened (packs/identity/page/guest.js).
   if (name === 'try') return void tryPage(query);
+  // Sign up to save a guest map, and what Google or GitHub sends back to it or to the sign-in page (packs/identity/page/sign-up.js).
+  if (name === 'sign-up') return void signUpPage(query);
+  if (name === 'sign-in' && signInBack(query)) return;
   if (['home', 'activity', 'review', 'projects', 'today', 'map', 'automations'].includes(name)) return void (location.hash = '#/');
   if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');
@@ -83,6 +88,7 @@ async function route(pulse = false) {
   ungate();
   drawFindSlot();
   drawNav();
+  signUpOffer();
   startTabs();
   const params = new URLSearchParams(query);
   // The canvas: the pane in focus draws the lens the address says (the bar pack's parts show it); an item's page with none

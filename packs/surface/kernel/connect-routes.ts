@@ -13,6 +13,9 @@ import { bearer } from '../../identity/kernel/auth.ts';
 import { serveOAuth } from '../../identity/kernel/oauth.ts';
 import { SIGN_IN_PATHS, signIn, type OpenRoutes } from '../../identity/kernel/sign-in.ts';
 import { keepGuestMap } from '../../identity/kernel/guest-keep.ts';
+import { socialCallback, socialWays, startSocial } from '../../identity/kernel/social.ts';
+import { addOptions, addPasskey, hasPasskey, passkeySignIn, signInOptions } from '../../identity/kernel/passkeys.ts';
+import { finishVerified } from '../../identity/kernel/verified.ts';
 import { json, PRIVATE } from './reply.ts';
 import { serverPacksOf } from './server-host.ts';
 import { documentsInForce, keptGate, signinGate } from './server-gates.ts';
@@ -45,6 +48,8 @@ export const SHORT: Record<string, string> = {
 };
 
 const reply = (res: ServerResponse, status: number, body: unknown) => json(res, status, body, PRIVATE);
+/** The ways in that are posted to, beside the code in the mail. */
+const OTHER_WAYS = ['/connect/social', '/connect/verified', '/connect/passkey/options', '/connect/passkey', '/connect/passkey/add/options', '/connect/passkey/add', '/connect/passkey/mine'];
 
 /** Every /connect/, /x/, /oauth/ and /.well-known/ request, given only under a name this server answers to. */
 export async function serveConnect(req: IncomingMessage, res: ServerResponse, path: string, at: ConnectRoutes) {
@@ -109,6 +114,30 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     const owes = async (email: string, agree: unknown) => (await signinGate(packs, { email, agree, via: 'keep' })).owes;
     const kept = async (ask: { workspace: string; email: string; machine?: string }) => keptGate(packs, await at.workspaces.control(), ask);
     const answer = await keepGuestMap({ ...at, owes, kept, hold: (workspace) => void res.once('close', at.workspaces.hold(workspace)) });
+    return reply(res, answer.status, answer.body);
+  }
+  // Signing up or in without a code in the mail: Google or GitHub, or a passkey, each proving an address the same
+  // ticket finishes with (identity's social.ts, passkeys.ts, verified.ts).
+  const social = /^\/connect\/social\/([a-z]+)\/callback$/.exec(path);
+  if ((req.method === 'GET' && (path === '/connect/ways' || social)) || (req.method === 'POST' && OTHER_WAYS.includes(path))) {
+    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
+    if (at.tooOften()) return;
+    if (path === '/connect/ways') return reply(res, 200, { social: socialWays(), passkeys: true });
+    const packs = serverPacksOf(at.workspaces);
+    const owes = async (email: string, agree: unknown) => (await signinGate(packs, { email, agree, via: 'sign-in' })).owes;
+    const signing = { ...at, owes, hold: (workspace: string) => void res.once('close', at.workspaces.hold(workspace)) };
+    if (social) return void res.writeHead(302, { ...PRIVATE, location: await socialCallback(signing, social[1], new URL(req.url ?? '', origin).searchParams) }).end();
+    const kept = async (ask: { workspace: string; email: string; machine?: string }) => keptGate(packs, await at.workspaces.control(), ask);
+    const ways: Record<string, () => Promise<{ status: number; body: unknown }>> = {
+      '/connect/social': () => startSocial(signing, origin),
+      '/connect/verified': () => finishVerified({ ...signing, kept }, async (via, email, agree) => (await signinGate(packs, { email, agree, via })).owes),
+      '/connect/passkey/options': () => signInOptions(signing, origin),
+      '/connect/passkey': () => passkeySignIn(signing, origin),
+      '/connect/passkey/add/options': () => addOptions(signing, origin),
+      '/connect/passkey/add': () => addPasskey(signing, origin),
+      '/connect/passkey/mine': () => hasPasskey(signing),
+    };
+    const answer = await ways[path]();
     return reply(res, answer.status, answer.body);
   }
   // A system's request for a token (POST /connect/request) and its poll (POST /connect/poll/<workspace>/<id>, the
