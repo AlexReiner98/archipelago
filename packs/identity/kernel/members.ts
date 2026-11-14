@@ -235,6 +235,41 @@ export async function requestSignIn(workspaces: { id: string; name: string; db: 
   await notices.send({ kind: 'sign_in_code', to: email, codes: links, minutes: LINK_MINUTES, days: SIGNED_IN_DAYS });
 }
 
+/**
+ * A guest map's owner asks to keep it at an address (packs/identity/kernel/guest-keep.ts): one mail with a code for that
+ * map, to an address that is no member yet. Only its owner, signed in to it, can ask, so it is no way to mail strangers.
+ */
+export async function mailKeepCode(db: Q, workspace: string, email: string): Promise<void> {
+  await notices.send({ kind: 'sign_in_code', to: email, codes: [`${await site.nameOf(workspace)}: ${await codeFor(db, email, LINK_MINUTES * 60_000)}`], minutes: LINK_MINUTES, days: SIGNED_IN_DAYS });
+}
+
+/** Whether a typed keep code is good for this address: looked at only (peek), or taken once. Wrong ones count as a sign-in's do. */
+export async function keepCode(db: Q, control: Q, email: string, code: string, peek = false): Promise<'ok' | 'gone' | 'tries'> {
+  const tries = (await kept<number>(control, TRIES + email)) ?? 0;
+  if (tries >= CODE_TRIES) return 'tries';
+  const key = CODE + hash(`${email}:${typed(code)}`);
+  if (peek ? (await kept(db, key)) !== undefined : await take(db, key)) return 'ok';
+  if (!peek) await keep(control, TRIES + email, tries + 1, LINK_MINUTES * 60_000);
+  return 'gone';
+}
+
+/**
+ * The address a guest map is kept at becomes its owner's: the person the map was made for (setting me) takes the
+ * address and is its first member, an admin. Nothing else on the map changes, the person's name (You) included.
+ */
+export async function keepAt(whole: Archipelago, email: string): Promise<Member> {
+  const me = await whole.setting<string>('me');
+  if (!me) throw new Error('This map has no owner to keep it.');
+  await whole.apply('system', { ops: [{ op: 'update', id: me, props: { email } }], reason: 'Signed in to keep the map' });
+  await whole.db.query(
+    `insert into member (email, person_id, admin, added_by) values ($1, $2, true, 'signing in')
+     on conflict (email) do update set person_id = excluded.person_id, admin = true, removed_at = null`,
+    [email, me],
+  );
+  await noted(email, whole.workspace, true);
+  return (await memberOf(whole.db, email))!;
+}
+
 
 export const MEMBER_TOOLS: Record<string, Tool> = {
   member_add: {

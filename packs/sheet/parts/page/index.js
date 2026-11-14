@@ -29,7 +29,7 @@ const HEAD = ['status', 'owner', 'confidence', 'visibility', 'source'];
  * the frame read it, its links, source and owner, and its history, read once by the frame beside its own menu. Told
  * again each time the page is drawn again, so the part is not mounted anew under the person's typing.
  */
-export const pageTold = (now, told) => (told?.name === 'page' && told.item?.id ? { ...now, item: told.item, views: { ...(now?.views ?? {}), ...(told.views ?? {}) }, piece: { ...(now?.piece ?? {}), ...(told.count && { count: told.count }) } } : now);
+export const pageTold = (now, told) => (told?.name === 'page' && told.item?.id ? { ...now, item: told.item, views: { ...(now?.views ?? {}), ...(told.views ?? {}) }, piece: { ...(now?.piece ?? {}), ...(told.count && { count: told.count }), folds: told.folds ?? [] } } : now);
 
 /** The page's state as one value: what is open, what is written, what is asked, what was said. */
 const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) } }, open: new Set(), emptyOpen: false, writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined });
@@ -44,6 +44,9 @@ export function pageMarks(input, s) {
   const c = choicesOf(item, type);
   const walk = along(view);
   const count = input.piece?.count ?? input.views?.item?.count;
+  // A part its own style folds (page.head, fields, source, history: folded) is one quiet row, opened with a click.
+  const folds = input.piece?.folds ?? [];
+  const fold = (part, title, tip, marks) => (folds.includes(part) && !s.open.has(`part:${part}`) ? ['button', { key: `unfold:${part}`, look: 'quiet', tip }, `▸ ${title}`] : marks());
   const head = ['box', { flow: 'row', gap: 2, align: 'between' },
     titleMarks(item, s.draft, { writes }),
     ['box', { flow: 'row', gap: 1 },
@@ -60,14 +63,14 @@ export function pageMarks(input, s) {
     s.said && ['text', { tone: 'bad', tip: s.said.slice(0, 200) }, s.said],
     s.archiving && ['box', { look: 'sunk', flow: 'row', gap: 2, pad: 2 }, ['text', {}, `Archive "${item.title}"? It leaves every view but stays in the history.`], ['button', { key: 'archive-yes', look: 'main', tone: 'bad' }, 'Archive'], ['button', { key: 'archive-no', look: 'quiet' }, 'Cancel']],
     ['slot', { key: 'slot-bands', name: 'sheet.bands' }],
-    headMarks({ ...item, owner_title: view.owner?.title }, type, { writes }),
+    fold('head', 'Head', 'Type, status, owner, who may see it, when made', () => headMarks({ ...item, owner_title: view.owner?.title }, type, { writes })),
     section('note', 'Note', 0, noteMarks(item, s.draft, { writes, writing: s.writing, count })),
     c && choicesMarks(item, c, { writes, asking: s.asking }),
-    section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : [])], titles: view.titles ?? {} }) ?? ['text', { look: 'muted' }, 'None']),
-    sourceMarks(view.source),
+    fold('fields', 'Fields', 'Its fields', () => section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : [])], titles: view.titles ?? {} }) ?? ['text', { look: 'muted' }, 'None'])),
+    fold('source', 'Source', 'Where its facts came from', () => sourceMarks(view.source)),
     ['slot', { key: 'slot-sections', name: 'sheet.sections' }],
     barMarks(s.draft, item, { saving: s.saving, said: s.saveSaid }),
-    historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names }),
+    fold('history', 'History', 'What was done to it, and by whom', () => historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names })),
   ].filter(Boolean);
 }
 
@@ -117,6 +120,9 @@ export default function page(input, tools) {
     const it = item();
     if (!it.id || !event?.key) return undefined;
     const k = event.key;
+    // A part folded by its style, opened.
+    const unfold = /^unfold:(head|fields|source|history)$/.exec(k);
+    if (unfold && event.name === 'press') return (s.open.add(`part:${unfold[1]}`), draw());
     // The draft: title, note, Save and Discard.
     const d = draftEvent(event, it, s.draft);
     if (d) {

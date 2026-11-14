@@ -28,7 +28,9 @@ export function reads(lens) {
   const out = { fields: new Set(), links: new Set(), anchors: new Set(), islands: new Set(), unanchored: false, all: false };
   const field = (...f) => (f[0] === '*' ? (out.fields = '*') : out.fields !== '*' && f.forEach((x) => out.fields.add(x)));
   const link = (l) => (l === '*' ? (out.links = '*') : out.links !== '*' && out.links.add(l));
-  const filter = lens?.filter ?? {};
+  // A lens as the page writes one keeps its terms in filter; as an answer gives it back (packs/query/kernel/query-flat.ts,
+  // what a view holds), they stand on the lens itself. Read under filter alone, a view of a type never heard a new item.
+  const filter = lens?.filter ?? lens ?? {};
   for (const part of ['find', 'only', 'not']) {
     for (const raw of filter[part] ?? []) {
       const t = String(raw).trim().replace(/\s+/g, ' ');

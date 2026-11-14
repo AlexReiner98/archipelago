@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from '../../identity/kernel/auth.ts'; import { firstStart } from './first-start.ts';
 import { dutyOf, mailing, onMap, onServer, openRoutes, published, type Backups, type Walked } from './above.ts'; import { callAs } from '../../loader/kernel/kernel-context.ts';
-import { parseBackup, parseVault } from '../../log/kernel/backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../identity/kernel/members.ts'; import { requestWait } from '../../identity/kernel/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
+import { parseBackup, parseVault } from '../../log/kernel/backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../identity/kernel/members.ts'; import { requestWait, standingOf } from '../../identity/kernel/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from '../../database/kernel/config.ts'; import { env } from '../../../src/env.ts'; import type { Booted } from '../../../src/boot.ts';
 import { SHORT, serveConnect } from './connect-routes.ts'; import { challenge, mcpAddress } from '../../identity/kernel/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
 import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
@@ -51,7 +51,7 @@ import { configureSecrets } from '../../seal/kernel/secrets.ts'; import { serveF
 import { adapterBefore, answerAt, hookAt } from '../../loader/kernel/server-adapter.ts'; import { mountOf, serveMounted } from './server-mounts.ts';
 import { callTool, configureBackup, configureRestart, devMode, replacementOf } from './tools.ts';
 import { UI_FILES, drawPage, uiFile, uiPage } from './ui-files.ts'; import { drawPolicy, markPage, PAGE_POLICY, PREVIEW_POLICY, SIGNED_IN_READER_POLICY } from '../../walls/kernel/page-policies.ts'; import { drawHostServes, drawHosts, type DrawHostOptions } from '../../walls/kernel/draw-host.ts'; import { serveDrawingFile } from './server-routes.ts';
-import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../identity/kernel/workspaces.ts';
+import { DEFAULT_WORKSPACE, Workspaces, type Workspace } from '../../identity/kernel/workspaces.ts'; import { guestOf, guestsDue, guestStanding } from '../../identity/kernel/guests.ts';
 
 /** The most a request may carry: GitHub's largest delivery is 25 MB, and a backup sent as base64 is the other large thing. */
 const BODY_MAX = 32_000_000; /** What a route open to anyone takes: a form's worth, or a webhook's delivery. */ const OPEN_BODY_MAX = 64_000, HOOK_BODY_MAX = 1_000_000;
@@ -101,7 +101,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   serverPacks.origin = named[0] ? `https://${named[0]}` : origins[0];
   configureConnections(serverPacks);
   setReach({ hold: (id) => workspaces.hold(id), connection: async (id, pack) => { const c = await serverPacks.connectionOf(pack, id); return c ? { id: c.id, account: c.account } : null; }, via: (id, pack, host, path) => serverPacks.lent(pack, host, id, path) });
-  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => dueForDeletion(serverPacks, await workspaces.control(), now); slowTokensAt(options.limits?.token);
+  configureMembers({ origin: serverPacks.origin, nameOf: async (id) => (await workspaces.list()).find((w) => w.id === id)?.name ?? id, rename: (id, name) => workspaces.rename(id, name), standingOf: async (id) => (id === 'default' ? undefined : guestStanding(await guestOf(await workspaces.control(), id)) ?? standingGate(serverPacks, await workspaces.control(), id)) }); configureIndex(() => workspaces.control()); configureUse(async (id) => storageBytes((await workspaces.get(id)).pelago.db)); workspaces.dueForDeletion = async (now) => [...(await dueForDeletion(serverPacks, await workspaces.control(), now)), ...(await guestsDue(await workspaces.control(), now))]; slowTokensAt(options.limits?.token);
   void mailing().then((mail) => mail.setBounced(async (email) => onMap<boolean>((await workspaces.get(DEFAULT_WORKSPACE)).pelago, 'surface.bounced', email)), (err: Error) => console.error(`mail: ${err.message}`)); // a bounced address is sent nothing (the mailer's bounces)
 
   // Which code this is and since when: after a push the old server goes on answering until the new one is up.
@@ -279,7 +279,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'GET' && url.pathname === '/whoami') {
         if (!local(req, false)) return send(res, 403, { error: 'Local requests only.' });
         const { ws, actor, look } = await resolve(req, res, 'human'), me = actor(); // what it may do draws the page's controls (packs/surface/kernel/may.ts)
-        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: me, may: pageMay(me, Boolean(look), devMode() ? url.searchParams.get('may') : null) });
+        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name, ...((await standingOf(ws.id))?.guest && { guest: true }) }, actor: me, may: pageMay(me, Boolean(look), devMode() ? url.searchParams.get('may') : null) });
       }
 
       // A pack's webhook: /hook/<pack>/<id> in the default workspace, /hook/<workspace>/<pack>/<id> in another.

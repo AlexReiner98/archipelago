@@ -95,12 +95,15 @@ function drawDoc() {
   // One read with no login, not on its site's own domain, ends with a quiet way to start a map of one's own; one read with a sign-in may be printed.
   const startsOwn = !own && !preview && !d.site?.host && typeof d.start === 'string' && Boolean(d.start);
   const printable = !published && !d.site;
+  // A map shared at /p/<workspace>/<id> may be copied into a guest map of one's own, opened as Try it with your agent
+  // opens one (packs/identity/page/guest.js).
+  const yours = published && !d.site?.host && h('button', { class: 'primary', title: 'A copy of this map, yours to change, with your agent drawing on it', onclick: () => location.assign(`/#/try?from=${encodeURIComponent(here)}`) }, 'Make it yours');
   main.replaceChildren(
     ...[
       d.site && siteHead(d.site),
       pageParts(root, d, ways, pictureOf),
       d.site?.footer && h('footer', { class: 'site-foot' }, blocks(d.site.footer, ways, 3)),
-      (printable || startsOwn) && h('footer', { class: 'muted' }, printable && h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF'), startsOwn && h('a', { class: 'start-own', href: start ?? '/' }, d.start)),
+      (printable || startsOwn || yours) && h('footer', { class: 'muted' }, printable && h('button', { class: 'print', onclick: () => print() }, 'Print or save as PDF'), yours, startsOwn && h('a', { class: 'start-own', href: start ?? '/' }, d.start)),
     ].flat(Infinity).filter(Boolean),
   );
   // Its pictures, with the words: a drawing's first frame is kept with the picture, and the drawing takes it over once started.
