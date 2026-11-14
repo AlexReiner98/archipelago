@@ -46,7 +46,10 @@ function fillSlots(m, above, sections) {
 }
 
 /** What the page part is told of the page, as data: the item, its links, source, owner and history, its note's count. */
-function told(data, past, owner, count, named, head) {
+/** The parts of an item's page its style may fold a click away. */
+const FOLDS = ['head', 'fields', 'source', 'history'];
+
+function told(data, past, owner, count, named, folds) {
   const e = data.entity;
   const tie = (r) => ({ type: r.type, root: rootOf(r.type) });
   const names = {};
@@ -59,8 +62,8 @@ function told(data, past, owner, count, named, head) {
       history: { events: past.map(({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail }) => ({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail: { ...(detail?.undone_by && { undone_by: detail.undone_by }), ...(detail?.forgot && { forgot: true }) } })), names },
     },
     ...(count && { count }),
-    // How its own style opens the head (page.head: closed folds it a click away), a style on its type or about it.
-    ...(typeof head === 'string' && { head }),
+    // The parts its own style folds a click away (page.head, fields, source, history: folded), a style on its type or about it.
+    ...(folds.length && { folds }),
   };
 }
 
@@ -188,7 +191,7 @@ export async function entity(id, here) {
   );
   // A document reads in its note's place as it will publish (the publish pack's reading), above the page's note.
   const reading = doc && readingOf(e, doc, ownStyle ?? state.style, again);
-  const said = told(data, past, owner, countOn(data), named, ownStyle?.page?.head);
+  const said = told(data, past, owner, countOn(data), named, FOLDS.filter((part) => ownStyle?.page?.[part] === 'folded'));
   const sections = sectionsOn(data);
   const above = [...bands, acting, reading && h('section', { class: 'page-section note' }, reading)].filter(Boolean);
 
