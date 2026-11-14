@@ -11,7 +11,7 @@ import { VIEWS, type Actor } from './views.ts';
 type Registry = KernelContext['registry'];
 type Manifest = Registry['packs'][number];
 /** A view a pack declares, as the list of views reads it. */
-type ViewDef = PresetDef & { description: string };
+type ViewDef = PresetDef & { description: string; humanOnly?: boolean };
 
 /** The kernel's own pack: its views, wherever they live now, are the kernel's. */
 const KERNEL_PACKS = ['core'];
@@ -21,6 +21,8 @@ const short = (id: string) => id.slice(id.indexOf('.') + 1);
 /** The views a pack declares that are views (not a tree, a screen or a reason): what the loader's parts reads as views. */
 const viewsOf = (pack: Manifest): ViewDef[] => ((pack.views ?? []) as unknown as (ViewDef & { form?: string })[]).filter((v) => v.form === undefined);
 
+/** The views an agent is told of: not one only a person may ask (`humanOnly`, as connect's list of connections). */
+const listedOf = (pack: Manifest): ViewDef[] => viewsOf(pack).filter((v) => !v.humanOnly);
 /** Whether a view is the kernel's: its pack's, or by its id (`core.x`) wherever it lives now: a pack that took it from core keeps the id. */
 const kernels = (pack: string, id: string) => KERNEL_PACKS.includes(pack) || KERNEL_PACKS.some((k) => id.startsWith(`${k}.`));
 
@@ -50,20 +52,20 @@ const REPLACED: Record<string, string> = {
 /** Every question that can be asked here, with what each answers. */
 export function viewList(at: { registry: Registry }): Record<string, string> {
   const out = Object.fromEntries(Object.entries(VIEWS).map(([name, v]) => [name, v.description]));
-  for (const pack of at.registry.packs) for (const v of viewsOf(pack)) out[short(v.id)] ??= kernels(pack.id, v.id) ? v.description : `${v.description} (from the ${pack.id} pack)`;
+  for (const pack of at.registry.packs) for (const v of listedOf(pack)) out[short(v.id)] ??= kernels(pack.id, v.id) ? v.description : `${v.description} (from the ${pack.id} pack)`;
   return out;
 }
 
 /** The name of every question that can be asked here, the flat lens first: what the tool list says, the list above saying the rest. */
 export function viewNames(reg: Pick<Registry, 'packs'>): string[] {
   const names = new Set(['flat', ...Object.keys(VIEWS)]);
-  for (const pack of reg.packs) for (const v of viewsOf(pack)) names.add(short(v.id));
+  for (const pack of reg.packs) for (const v of listedOf(pack)) names.add(short(v.id));
   return [...names];
 }
 
 /** The views the other packs on here add, by name, or nothing when only core is on. */
 function packsSaid(reg?: Pick<Registry, 'packs'>): string {
-  const added = (reg?.packs ?? []).flatMap((p) => viewsOf(p).filter((v) => !kernels(p.id, v.id)).map((v) => short(v.id)));
+  const added = (reg?.packs ?? []).flatMap((p) => listedOf(p).filter((v) => !kernels(p.id, v.id)).map((v) => short(v.id)));
   return added.length ? ` The other packs on here add their own (${[...new Set(added)].join(', ')}): call with no name for what each answers.` : '';
 }
 
@@ -96,6 +98,7 @@ export async function askView(map: KernelContext, actor: Actor, name: string, pa
   const found = packView(ctx.registry, name);
   if (!found && REPLACED[name]) throw new Error(`No view "${name}": attention answers it now. Ask query attention with params ${REPLACED[name]}.`);
   if (!found) throw new Error(`No view "${name}". Views: ${Object.keys(viewList(ctx)).join(', ')}`);
+  if (found.def.humanOnly && actor?.kind !== 'human') throw new Error(`"${name}" is asked by a person alone.`);
   used(ctx, found.def.id);
   if (found.def.lens) return answerPreset(ctx, found.def, params);
   // A pack's own code answers it, in the sandbox, as the one who asked.

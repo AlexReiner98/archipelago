@@ -64,7 +64,8 @@
       "shape": "data",
       "lens": {},
       "answer": "connections",
-      "description": "What this server offers to connect this workspace to, each with whether it is ready and connected here. Params: none."
+      "description": "What this server offers to connect this workspace to, each with whether it is ready and connected here: a person’s alone. Params: none.",
+      "humanOnly": true
     }
   ],
   "kernel": {

@@ -73,6 +73,9 @@ test('connect’s actions go from its part only with an admin’s press, and an 
     const part = { id: card.id, hash: card.hash };
     const listed = (await callTool(l, admin, 'view', { name: 'connections' })) as { packs: { pack: string }[] };
     assert.deepEqual(listed.packs.map((p) => p.pack), ['github_app']);
+    // The list is a person's alone, as the connections tool was: an agent is neither told of it nor answered.
+    await assert.rejects(callTool(l, { kind: 'agent', name: 'a' }, 'view', { name: 'connections' }), /asked by a person alone/);
+    assert.ok(!Object.keys((await callTool(l, { kind: 'agent', name: 'a' }, 'view', {})) as object).includes('connections'), 'not in the list an agent reads');
     await assert.rejects(callTool(l, admin, 'connect_start', { pack: 'github_app', part }), /an admin's own press/);
     const grant = ((await callTool(l, admin, 'press_grant', { part })) as { grant: string }).grant;
     const started = (await callTool(l, admin, 'connect_start', { pack: 'github_app', part: { ...part, grant } })) as { answer: { url: string; packs: unknown[] } };
