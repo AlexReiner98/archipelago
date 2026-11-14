@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { setIslands } from '../packs/loader/kernel/packstate.ts';
 import { after, test } from 'node:test';
 import { createToken } from '../packs/identity/kernel/auth.ts';
-import { askedFace, fellBack, stopLayout } from '../packs/look_draw/kernel/look-draw.ts';
+import { askedFace, errorsOf, fellBack, stopLayout } from '../packs/look_draw/kernel/look-draw.ts';
 import { passFor } from '../packs/walls/kernel/look-pass.ts';
 import { contentOf } from '../packs/surface/kernel/mcp.ts';
 import { chrome, open } from './browser.ts';
@@ -64,6 +64,13 @@ test('a face asked for is the first named in its family, and fell back when Chro
 
 const browser = chrome();
 const PNG = /^iVBORw0KGgo/;
+
+test('a dry run’s errors: what the page said when it failed, then each shown, each once', () => {
+  assert.deepEqual(errorsOf('error', 'It threw', ['It threw', 'And then this']), ['It threw', 'And then this']);
+  assert.deepEqual(errorsOf('drawn', undefined, []), []);
+  assert.deepEqual(errorsOf('drawn', 'a word', []), [], 'a drawing that drew said no error');
+  assert.match(errorsOf('late', 'The view did not say it had drawn within 15 s', [])[0], /15 s/);
+});
 
 test('in a browser, a look is the view as drawn: a flow, a style’s own code, a lens that finds nothing', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
@@ -125,6 +132,21 @@ test('in a browser, a look is the view as drawn: a flow, a style’s own code, a
     const painted = await look({ entity: made.c, width: 800, height: 500 });
     assert.equal(painted.state, 'drawn', JSON.stringify({ ...painted, image: undefined }));
     assert.deepEqual((await colours(painted.image.data)).middle, [255, 0, 255], 'what the style’s code painted, once it had');
+
+    // A dry run: code not yet saved, drawn in the layout's place for this one look. Nothing is logged, and the view's
+    // own picture is never the try's.
+    const head = JSON.stringify((await call('/agent/query', undefined, { name: 'events', params: { limit: 1 } })).result);
+    const green = "export default function draw({ canvas }) { const c = canvas.getContext('2d'); c.fillStyle = '#00ff00'; c.fillRect(0, 0, canvas.width, canvas.height); }";
+    const tried = await look({ entity: made.c, width: 800, height: 500, tries: [{ item: made.s, field: 'code', value: green }] });
+    assert.equal(tried.state, 'drawn', JSON.stringify({ ...tried, image: undefined }));
+    assert.deepEqual([tried.tried, tried.errors], [[`${made.s} code`], []]);
+    assert.deepEqual((await colours(tried.image.data)).middle, [0, 255, 0], 'the try painted, not the map’s code');
+    const broken = await look({ entity: made.c, width: 800, height: 500, tries: [{ item: made.s, field: 'code', value: "export default function draw() { throw new Error('broken on purpose'); }" }] });
+    assert.equal(broken.state, 'error', JSON.stringify({ ...broken, image: undefined }));
+    assert.match(broken.errors.join(' '), /broken on purpose/);
+    assert.deepEqual((await colours((await look({ entity: made.c, width: 800, height: 500 })).image.data)).middle, [255, 0, 255], 'the view as the map holds it, again');
+    assert.equal(JSON.stringify((await call('/agent/query', undefined, { name: 'events', params: { limit: 1 } })).result), head, 'a dry run logs nothing');
+    assert.match(JSON.stringify(await look({ entity: made.c, tries: [{ item: made.f, field: 'code', value: green }] })), /no code field/, 'a try is of a code field its type declares');
 
     const none = await look({ lens: { filter: { find: ['text nothing is called this zzqx'] } } });
     assert.equal(none.state, 'empty', JSON.stringify({ ...none, image: undefined }));

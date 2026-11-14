@@ -16,6 +16,7 @@ import { LARGE, sizeOf } from '../../loader/kernel/head.ts';
 import { props } from './tool-ops.ts'; import { searchMap } from './search.ts'; import { getItem, proposals } from './map-reads.ts';
 import type { Tool } from './tools.ts';
 import { previewAddress, VIEW_INPUT, viewAddress } from './view-address.ts';
+import { tryOf } from './tool-preview.ts';
 import { withCovers } from '../../write/kernel/withdraw.ts';
 import { itemLink } from '../../identity/kernel/members.ts';
 
@@ -391,9 +392,22 @@ export const READ_TOOLS: Record<string, Tool> = {
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
 
       at: z.number().int().min(1).optional().describe('Redraw as it was: a log position (an earlier look’s drew.at), so the page’s parts run the code their packs had then. The host is the server’s code now; drew says if its commit differs.'),
+      tries: z
+        .array(z.object({ item: z.string().regex(/^e_[a-z0-9]{8}$/), field: z.string().min(1).max(60), value: z.unknown() }))
+        .min(1)
+        .max(8)
+        .optional()
+        .describe('Code not yet saved, drawn in place of what the map holds for this one look (a dry run): each a layout’s code field whole, as change or report preview would send it. Nothing is logged and no page of anyone’s sees it. With no view named, the tasks (300 at most), drawn by the first try’s layout. The answer adds errors: what the drawing’s code threw, or that it did not draw in time.'),
     },
     // Drawn by the looks pack, at the address the surface reads off what is asked (the databases handed are not read).
-    run: async (l, actor, input) => looks(l, 'answer.look', { actor: actor.name, hash: input.published ? await previewAddress(l, input.entity) : await viewAddress(l, input), size: input }),
+    run: async (l, actor, input) => {
+      // A dry run: each try checked as report preview checks it, and drawn always fresh (its code is no part of the map's state).
+      const tries = input.tries ? await Promise.all(input.tries.map((t: { item: string; field: string; value: unknown }) => tryOf(l, t))) : undefined;
+      const named = input.entity || input.query || input.lens || input.style;
+      const asked = tries && !named ? { ...input, query: { filter: { find: ['type task'] }, limit: 300 }, style: { id: tries[0].item } } : input;
+      const hash = input.published ? await previewAddress(l, input.entity) : await viewAddress(l, asked);
+      return looks(l, 'answer.look', { actor: actor.name, hash, size: { ...input, tries: undefined, ...(tries && { tries, fresh: true }) } });
+    },
   },
   seeing: {
     description:
