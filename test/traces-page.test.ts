@@ -46,6 +46,8 @@ test("in a browser, an agent's change is traced in its session's hue and clears 
     await page.evaluate(`${row}.closest('.pm-pane').hidden = false`);
     // Over the row, the page's one tip says the trace.
     await page.evaluate(`${row}.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }))`);
+    // The tip is drawn after the hover is handled, perhaps a frame later: waited for, then read.
+    await page.until(`document.querySelector('.tip')?.textContent === ${JSON.stringify(traced.line)}`);
     assert.equal(await page.evaluate(`document.querySelector('.tip')?.textContent`), traced.line, 'the tip says who and why');
     assert.ok(await page.until(`!${row}.classList.contains('traced')`, 6000), 'in sight a moment, it clears');
     // What the traces part keeps, under its own name in this workspace (tools.keep: packs/surface/page/part-host.js).

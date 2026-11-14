@@ -2,7 +2,7 @@
   "roots": [
     {
       "id": "core",
-      "hash": "d212eaef179cdad4c482058f4020bd68c693824b59ae9b16659973adf7135209"
+      "hash": "9b2729cd09a85015e20f514c16ac011faf80b9f0b1ecb946e72727d13832da4b"
     },
     {
       "id": "database",
@@ -26,7 +26,7 @@
     },
     {
       "id": "walls",
-      "hash": "1e1b52e10189e5118fee4e5855286e16dc522055f5b3bd0881297ab8f93e4301"
+      "hash": "b82e366ac72f38185aff24ed49d13db91152546151adc28c3a8e8c6351ce1b53"
     },
     {
       "id": "loader",
