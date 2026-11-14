@@ -77,6 +77,17 @@ async function itemOf(l: Archipelago, item: string, field: string) {
   return { ...row, declared };
 }
 
+/** A try as the page draws it: the field whole, checked against what its item's type declares of it (also a dry-run look's, ./tool-reads.ts). */
+export async function tryOf(l: Archipelago, input: { item: string; field: string; value?: unknown }): Promise<Preview> {
+  const it = await itemOf(l, input.item, input.field);
+  const { value } = input;
+  const isText = typeof value === 'string';
+  const isModules = Boolean(value) && typeof value === 'object' && !Array.isArray(value) && Object.values(value as object).every((v) => typeof v === 'string');
+  if (it.declared.type === 'string' ? !isText : !isModules) throw new Error(`value is ${input.field} whole: ${it.declared.type === 'string' ? 'its text' : 'an object of modules by name, each its text'}.`);
+  const drawing = isModules && it.preset ? drawingWith(l.registry, it.preset, value as Record<string, unknown>) : undefined;
+  return { item: input.item, field: input.field, value, title: it.title, ...(drawing && { drawing }), at: Date.now() };
+}
+
 export const PREVIEW_TOOLS: Record<string, Tool> = {
   preview: {
     description:
@@ -93,15 +104,9 @@ export const PREVIEW_TOOLS: Record<string, Tool> = {
       const { previews } = await keptOf(l);
       const others = previews.filter((p) => !(p.item === input.item && p.field === input.field));
       if (input.discard) return { discarded: others.length < previews.length, at: (await put(l, others)).at };
-      const it = await itemOf(l, input.item, input.field);
-      const { value } = input;
-      const isText = typeof value === 'string';
-      const isModules = Boolean(value) && typeof value === 'object' && !Array.isArray(value) && Object.values(value as object).every((v) => typeof v === 'string');
-      if (it.declared.type === 'string' ? !isText : !isModules) throw new Error(`value is ${input.field} whole: ${it.declared.type === 'string' ? 'its text' : 'an object of modules by name, each its text'}.`);
-      const drawing = isModules && it.preset ? drawingWith(l.registry, it.preset, value as Record<string, unknown>) : undefined;
-      const preview: Preview = { item: input.item, field: input.field, value, title: it.title, ...(drawing && { drawing }), at: Date.now() };
+      const preview = await tryOf(l, input);
       const now = await put(l, [...others, preview]);
-      return { previewing: true, at: now.at, ...(drawing && { hash: drawing.hash }), until: new Date(Date.now() + PREVIEW_MS).toISOString() };
+      return { previewing: true, at: now.at, ...(preview.drawing && { hash: preview.drawing.hash }), until: new Date(Date.now() + PREVIEW_MS).toISOString() };
     },
   },
 };

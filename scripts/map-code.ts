@@ -4,6 +4,7 @@
 //   node scripts/map-code.ts push [folder]          send what changed as one change, refused if the map moved since
 //   node scripts/map-code.ts watch [folder]         push on each save; with --preview, send each save as a preview
 //   node scripts/map-code.ts status [folder]        what changed here, and whether the map moved
+//   node scripts/map-code.ts try [folder]           draw what changed in the server's frame, unsaved: errors, the picture
 //
 // The folder defaults to .map-code/<item> under the repository (ignored by git). The log stays the record: a push is
 // one ordinary change through the one write path, on the agent's own authority, held for the human where the map's
@@ -172,6 +173,36 @@ export async function preview(call: Call, folder: string, discard = false): Prom
   return { changed };
 }
 
+export interface Tried {
+  changed: string[];
+  state: string;
+  errors: string[];
+  why?: string;
+  /** Where the picture was saved. */
+  picture?: string;
+}
+
+/**
+ * Draw what the folder holds without keeping it (task e_ypkza3k6): query look with each changed field as a try, in the
+ * server's own frame, and the picture saved beside the folder. Nothing is logged; no page of anyone's sees it.
+ * `view` names what to draw (a look's entity, query or style); left out, the tasks (300 at most), drawn by this item.
+ */
+export async function tryFolder(call: Call, folder: string, view: Record<string, unknown> = {}, size: { width?: number; height?: number; scheme?: string } = {}): Promise<Tried> {
+  const pulled = manifestOf(folder);
+  const { props, changed } = fromFiles(pulled, readFolder(folder));
+  const tries = Object.entries(props).map(([field, value]) => ({ item: pulled.item, field, value }));
+  // Nothing changed: drawn by the code the map holds, so a try of nothing still shows this item's drawing.
+  const named = Object.keys(view).length ? view : { query: { filter: { find: ['type task'] }, limit: 300 }, style: { id: pulled.item } };
+  const got = await call('query', { name: 'look', params: { ...named, ...size, ...(tries.length ? { tries } : { fresh: true }) } });
+  const errors: string[] = got.errors ?? [];
+  let picture: string | undefined;
+  if (got.image?.data) {
+    picture = join(folder, '.map-code-try.' + (got.image.content_type === 'image/jpeg' ? 'jpg' : 'png'));
+    writeFileSync(picture, Buffer.from(got.image.data, 'base64'));
+  }
+  return { changed, state: got.state, errors, ...(got.why && { why: got.why }), ...(picture && { picture }) };
+}
+
 /** Push (or preview) on each save, a save being quiet for a moment; answers a stop. */
 export function watchFolder(folder: string, onSave: () => Promise<void>, quiet = 120): () => void {
   let timer: NodeJS.Timeout | undefined, running = Promise.resolve();
@@ -211,7 +242,7 @@ async function main() {
   for (let i = 0; i < rest.length; i++) {
     const a = rest[i];
     if (!a.startsWith('--')) plain.push(a);
-    else if (['url', 'map', 'run', 'reason'].includes(a.slice(2))) args.set(a.slice(2), rest[++i]);
+    else if (['url', 'map', 'run', 'reason', 'entity', 'query', 'style', 'width', 'height'].includes(a.slice(2))) args.set(a.slice(2), rest[++i]);
     else args.set(a.slice(2), true);
   }
   const folderOf = (p?: string) => resolve(p ?? process.cwd());
@@ -241,12 +272,24 @@ async function main() {
     });
     // A preview lapses 15 minutes after it was last sent (e_p5zjynrb): while watching, send it again before then.
     if (asPreview) setInterval(() => preview(call, folder).catch((err) => console.error(String(err?.message ?? err))), RESEND_MS).unref?.();
+  } else if (verb === 'try') {
+    const folder = folderOf(plain[0]);
+    const { call } = await target(args);
+    const view: Record<string, unknown> = {};
+    for (const key of ['entity', 'query', 'style'] as const) {
+      const v = args.get(key);
+      if (typeof v === 'string') view[key] = key === 'entity' ? v : JSON.parse(v);
+    }
+    const t = await tryFolder(call, folder, view, { width: Number(args.get('width')) || undefined, height: Number(args.get('height')) || undefined });
+    for (const e of t.errors) console.log(`error: ${e}`);
+    console.log(`${t.errors.length ? 'failed' : t.state}: ${t.changed.length ? `tried ${t.changed.join(', ')}` : 'nothing changed, drawn as the map holds it'}${t.picture ? `; picture in ${t.picture}` : ''}`);
+    if (t.errors.length || t.state === 'error' || t.state === 'late') process.exitCode = 1;
   } else if (verb === 'discard') {
     const { call } = await target(args);
     await preview(call, folderOf(plain[0]), true);
     console.log('preview dropped');
   } else {
-    console.log('map-code pull <item> [folder] | push [folder] | watch [folder] [--preview] | discard [folder] | status [folder]');
+    console.log('map-code pull <item> [folder] | push [folder] | try [folder] [--entity id | --query json | --style json] | watch [folder] [--preview] | discard [folder] | status [folder]');
   }
 }
 

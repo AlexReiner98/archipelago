@@ -7,6 +7,8 @@ import { api, h, loadMay, may } from './base.js';
 
 /** The tries now, by `${item} ${field}`. */
 const held = new Map();
+// A look of code not yet saved (query look with tries, packs/look_draw/kernel/look-draw.ts): the server's Chrome sets its tries before any code runs, so the first drawing is already the try.
+for (const p of globalThis.lookTries ?? []) held.set(`${p.item} ${p.field}`, p);
 /** Where the tries last stood, as the server stamps them. */
 let at;
 
