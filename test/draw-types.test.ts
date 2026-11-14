@@ -33,7 +33,7 @@ function check(modules: Record<string, string>): { ok: boolean; out: string } {
 }
 
 const LAYOUT = `/** @param {import('./draw.d.ts').DrawInput} input */
-export default function draw({ canvas, answer, style, theme, size, tree, on, open, tip, cursor, field, change, sandboxed, root }) {
+export default function draw({ canvas, answer, style, theme, size, tree, on, open, tip, cursor, field, change, sandboxed, root, hot }) {
   const ctx = /** @type {OffscreenCanvasRenderingContext2D} */ (canvas.getContext('2d'));
   ctx.fillStyle = theme.dark ? theme.sea : theme.land;
   on('pointermove', (e) => tip(e.shift ? answer.items[0]?.title : null, e.x, e.y));
@@ -42,12 +42,16 @@ export default function draw({ canvas, answer, style, theme, size, tree, on, ope
   on('field', (f) => f.done && change([{ op: 'create', type: 'task', title: f.value }], 'typed').then((came) => came.error ?? came.created));
   on('resize', (s) => ctx.fillRect(0, 0, s.width * size.dpr, size.height));
   on('answer', (a) => a.items.length);
-  cursor('grab');
+  const kept = /** @type {{ zoom?: number } | undefined} */ (hot);
+  cursor(kept?.zoom ? 'grab' : 'default');
   field('name', { x: 1, y: 2, width: 3, height: 4, placeholder: 'Name' });
   field('name', null);
   if (!sandboxed && root) root.textContent = String(style.title ?? '');
   return void tree().byId.get('e_00000000')?.kids.length;
 }
+
+/** @type {import('./draw.d.ts').Hot} */
+export const hot = () => ({ zoom: 2 });
 `;
 
 const PICTURE = `/** @type {import('./draw.d.ts').PictureFn} */

@@ -196,6 +196,11 @@ export interface DrawInput {
   /** The style's fields it is drawn with: its settings, under the style's and the view's own. */
   style: Record<string, unknown>;
   theme: Theme;
+  /**
+   * What the code before this one in the same frame kept: its module's `hot()`, when new code (a try, a saved change)
+   * is swapped in. Undefined on a first draw, or where the code before kept nothing.
+   */
+  hot?: unknown;
   /** Kept current as the frame resizes. */
   size: Size;
   tree(): Tree;
@@ -215,6 +220,13 @@ export interface DrawInput {
 
 /** A layout's code: index.js's default export. */
 export type Draw = (input: DrawInput) => void | Promise<void>;
+
+/**
+ * index.js's optional `export function hot()`: asked when new code replaces this one in the frame, for what the next
+ * should keep (its camera, its pins); the next is handed it as `input.hot`. Anything structured clone carries, no
+ * functions; waited for a second at most. Without it, new code starts from the beginning, as on a first draw.
+ */
+export type Hot = () => unknown | Promise<unknown>;
 
 // ---------------------------------------------------------------- a drawing a pack ships: picture(input, tools)
 
