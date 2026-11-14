@@ -7,7 +7,8 @@
 import { GENESIS, entryHash } from '../../../src/jcs.ts';
 import type { Q } from '../../database/kernel/db.ts';
 import { makePartitions, partitionMade } from './partitions.ts';
-import { openEntries, openValue, sealEntry } from '../../seal/kernel/seal.ts';
+import { openEntries, openRows, openValue, sealEntry } from '../../seal/kernel/seal.ts';
+import { codeFacts, knownHashes } from '../../seal/kernel/code-files.ts';
 
 export type Stream = 'facts' | 'pending';
 
@@ -104,11 +105,14 @@ export async function headOf(q: Q, stream: Stream = 'facts'): Promise<{ pos: num
 /**
  * Append one entry under the stream's lock: the next position, a time never before the last entry's, the hash of the
  * one before. Run it in the transaction that writes what it records, so the two stand or fall together. The entry
- * it answers is in clear, with the stored entry's position, time and hash.
+ * it answers is in clear, with the stored entry's position, time and hash. `code` names the fields that hold code, each
+ * to the name a one-text value's file has: their values are stored as files by hash (packs/seal/kernel/code-files.ts).
  */
-export async function append(tx: Q, ws: string, stream: Stream, head: { id: string; actor: Entry['actor']; reason: string; [field: string]: unknown }, facts: Fact[]): Promise<Entry> {
+export async function append(tx: Q, ws: string, stream: Stream, head: { id: string; actor: Entry['actor']; reason: string; [field: string]: unknown }, facts: Fact[], code?: ReadonlyMap<string, string>): Promise<Entry> {
   // Every value that is someone's words goes in sealed with its key (packs/seal/kernel/seal.ts), and `keys` names them.
   const plain = facts;
+  // A text the field already has on the log is named by its hash alone: it is there already, whatever is appended beside this.
+  if (code?.size) facts = codeFacts(facts, code, await knownHashes(tx, facts, code, (rows) => openRows(tx, rows)));
   const sealed = await sealEntry(tx, ws, stream, head, facts);
   facts = sealed.facts;
   await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.log'), hashtext($1))`, [stream]);

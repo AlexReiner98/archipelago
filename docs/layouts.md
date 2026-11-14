@@ -48,6 +48,8 @@ An agent reads how a layout's code is written from the map, not from this file: 
 
 A query's answer carries the drawing as `style.drawing`: its id, the hash of its modules, and the modules only when the page did not say it has them (`have`).
 
+**On the log a layout's code is files by hash**, as a pack's code is (docs/log.md section 2, "Code fields"; task e_ubdb4u7c, 14 Nov 2026): `code` is the file `index.js`, `modules` a file per module, each named by the SHA-256 of its text and its text logged only when it changed, so an edit of one module logs that module alone. Every read gives the text back whole: the style answer and the drawing's hash, the frame, look, an edit and a pull see what was written.
+
 ## What a drawing is
 
 Modules, entered at `index.js`; one imports another as `'./name.js'`, and nothing else. `index.js` exports:

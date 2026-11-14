@@ -10,11 +10,11 @@
     },
     {
       "id": "seal",
-      "hash": "948d8676b07b5f1e10138e0df3d9928bc7e8cca42f7237742e23e655f59fcdf9"
+      "hash": "50ed119de4beec65b47a485146457a15cef348938503c46f49cb9c46e0bebdc6"
     },
     {
       "id": "log",
-      "hash": "aa71a565ea2ac7c0375da11941ad4125082a9fb6856232b89daf9b451993711a"
+      "hash": "3d89a62003378400bdc668c39113c497e73d0c813c563f1ff80b5c2727ad7649"
     },
     {
       "id": "kit",
@@ -30,7 +30,7 @@
     },
     {
       "id": "loader",
-      "hash": "5442d44f2eafa29d158427f1f2d486e1b04829b837a969e364342f22332b95a7"
+      "hash": "1d0ff83d89921c2f31378d9caf0f930ca727e311701de32c9136532729c8c4b7"
     },
     {
       "id": "rules",
@@ -38,7 +38,7 @@
     },
     {
       "id": "write",
-      "hash": "0cdc4e880e64bc59784e944b59421ba1484531de4709962a5f33b9430ae7dfb8"
+      "hash": "f55b3c8e47657acfebdda7f60872f183ec052a3c24bab220be73f409c60f2412"
     },
     {
       "id": "surface",

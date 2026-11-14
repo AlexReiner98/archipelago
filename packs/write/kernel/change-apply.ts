@@ -5,7 +5,7 @@ import { newId, type Q } from '../../database/kernel/db.ts';
 import { bodyAfter, dropExcepted } from './ops.ts'; import { editsResolved } from './edit.ts'; import { ownerFollows } from './owner-link.ts';
 import { roomToStore, stillWritable } from '../../identity/kernel/standing.ts';
 import { after, followedStill, rewrite, riders, type Followed } from './write-hooks.ts';
-import { typesAfter } from '../../loader/kernel/type-items.ts';
+import { typesAfter } from '../../loader/kernel/type-items.ts'; import { codeFields } from '../../loader/kernel/pack-code.ts';
 import { KEPT_FIELDS } from '../../log/kernel/operational.ts';
 import { append, type Decision, type Fact } from '../../log/kernel/log.ts'; import { FORGET_ROWS, projectDecision, projectFacts, stamp } from '../../log/kernel/replay.ts'; import { changedFacts, itemFacts, linkFacts } from '../../log/kernel/facts.ts';
 import { asOwner, forgetIn, ownerRows } from './forget.ts';
@@ -182,7 +182,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
     if (opts.dry) throw DRY;
     const rule: Decision = opts.rule ?? { outcome: 'apply', spared: [] };
     const by = { id: actor, ...(opts.token && { token: opts.token }) };
-    const done = await append(tx, map.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [], ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), ...(input.pack && { pack: { id: input.pack, manifest: map.registry.hashes.get(input.pack) ?? null, action: input.action ?? null } }), ...(opts.followed?.length && { follows: opts.followed.map((f) => ({ pack: f.pack, ops: f.ops.length })) }) }, facts);
+    const done = await append(tx, map.workspace, 'facts', { id: changeset, actor: by, authority: opts.authority ?? null, rule, reason: input.reason, source: defaultSource, action: input.action ?? null, undoes: input.undoes ?? null, keys: [], ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), ...(input.pack && { pack: { id: input.pack, manifest: map.registry.hashes.get(input.pack) ?? null, action: input.action ?? null } }), ...(opts.followed?.length && { follows: opts.followed.map((f) => ({ pack: f.pack, ops: f.ops.length })) }) }, facts, codeFields(map.registry));
     if (done.at !== when) throw new Error(`The log's time moved under its lock (${when}, then ${done.at})`);
     await projectDecision(tx, done);
   }).catch((err) => { if (err !== DRY) throw err; });
