@@ -386,6 +386,10 @@ body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; 
 .gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
 .gate-row > input { flex: 1; min-width: 0; }
 .gate-row > button, .gate-row > a { flex: none; }
+/* A way in on a row of its own (Sign up with Google...): the width of the column; the ways sit in the column as its rows do. */
+.gate-row > button.grow { flex: 1; }
+.gate-ways { display: contents; }
+.gate-row[hidden] { display: none; }
 .gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .gate-others { display: flex; gap: var(--space-6); }
 .gate-error:empty { display: none; }

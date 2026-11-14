@@ -67,7 +67,7 @@ export async function signUpPage(query = '', { machine } = {}) {
     }
   };
   // By email: the address and the code, typed here, the rest of the screen kept.
-  const byEmail = h('div', { hidden: true });
+  const byEmail = h('div', { class: 'gate-ways' });
   const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email', spellcheck: false });
   const send = h('button', { class: 'primary', title: 'A code is mailed to it' }, 'Email me a code');
   const code = h('input', { type: 'text', placeholder: 'Code from the email', autocomplete: 'one-time-code', autocapitalize: 'characters', spellcheck: false });
@@ -81,7 +81,7 @@ export async function signUpPage(query = '', { machine } = {}) {
     try {
       await keep({ email: email.value.trim() });
       send.textContent = 'Send again';
-      codeRow.hidden = false;
+      codeRow.hidden = hint.hidden = false;
       fail('');
       code.focus();
     } catch (err) {
@@ -104,10 +104,11 @@ export async function signUpPage(query = '', { machine } = {}) {
   go.onclick = typed;
   email.addEventListener('keydown', (e) => e.key === 'Enter' && ask());
   code.addEventListener('keydown', (e) => e.key === 'Enter' && typed());
-  byEmail.append(gateRow(email, send), codeRow, gateRow(h('span', { class: 'muted grow small' }, 'Not there? Check spam or junk.')));
+  const hint = gateRow(h('span', { class: 'muted grow small' }, 'Not there? Check spam or junk.'));
+  hint.hidden = true;
+  byEmail.append(gateRow(email, send), codeRow, hint);
   const emailButton = button('Sign up with email', () => {
-    emailButton.hidden = true;
-    byEmail.hidden = false;
+    emailButton.replaceWith(byEmail);
     email.focus();
   });
   gate(
@@ -115,7 +116,6 @@ export async function signUpPage(query = '', { machine } = {}) {
     row,
     ...social.filter((p) => PROVIDERS[p]).map((p) => button(`Sign up with ${PROVIDERS[p]}`, withProvider(p), true)),
     emailButton,
-    byEmail,
     error,
   );
 }
