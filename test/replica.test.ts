@@ -206,6 +206,34 @@ test("an agent's change reaches a view of the store with no lens read; what may 
   assert.deepEqual([view.item(made.p).found, view.item(made.a).step], [['id'], 1], 'what it holds keeps why it was there');
 });
 
+test('a view hears the layout it is drawn with change, though the layout is not in its answer (e_6fycyp7h)', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 't', type: 'task', title: 'Drawn' },
+    { op: 'create', ref: 'f', type: 'layout', title: 'Particles', props: { code: 'export default function draw() {}' } },
+  ]);
+  const { Store, View } = (await pageModules()).replica;
+  const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;
+  const store = new Store(kindsOf(l));
+  const view = store.keep(new View(store));
+  view.hold(await callTool(l, human, 'view', { name: 'flat', params: { filter: { find: [`id ${made.t}`] } } }), (await tail({})).pos);
+  const heard: any[] = [];
+  view.on((changed: any) => heard.push(changed));
+
+  // Not followed, a push to the layout's code reaches nothing.
+  await make(l, [{ op: 'update', id: made.f, props: { code: 'export default function draw() { /* 1 */ }' } }]);
+  store.apply(await tail({ after: store.pos, ids: store.ids() }));
+  assert.equal(heard.length, 0);
+
+  // Followed as what draws it (the style's `used`), the same push tells the view to read its style again.
+  view.styled = new Set([made.f]);
+  assert.ok(store.ids().includes(made.f));
+  await make(l, [{ op: 'update', id: made.f, props: { code: 'export default function draw() { /* 2 */ }' } }]);
+  store.apply(await tail({ after: store.pos, ids: store.ids() }));
+  assert.deepEqual(heard.map((c) => c.restyle), [true]);
+  assert.equal(view.item(made.f), undefined, 'the layout is followed, never held in the answer');
+});
+
 test('two views share one store: a fact folds in once and both are told; each asks again only for what its query reads', async () => {
   const l = await fresh();
   const made = await make(l, [

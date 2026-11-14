@@ -302,9 +302,12 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     }
     if (host.store) unfollow(host.store);
     host.store = store;
+    store.styled = new Set((look.used ?? []).map((u) => u.id));
     store.on((changed) => {
       if (host.store !== store) return;
       if (!host.isConnected) return unfollow(store);
+      // What draws it changed (its layout's code kept, its style's settings): read again and drawn with what it holds now.
+      if (changed.restyle) return void ((host.said = undefined), load(true));
       // What the query finds may have moved (packs/surface/page/membership.js), or on a time axis an item changed may fall elsewhere:
       // both are the server's to work out, so the lens is read again. Not while the store is played from where its
       // reader last looked (the replay mark, ./replay.js): it ends as the map is.

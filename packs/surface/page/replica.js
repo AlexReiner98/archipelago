@@ -129,9 +129,9 @@ export class Store {
     for (const [id, r] of this.links) if (!kept.has(r.from_id) || !kept.has(r.to_id)) (this.links.delete(id), this.at.delete(id));
   }
 
-  /** The ids the tail reads facts on: every item and link held, and the items the views' queries name. */
+  /** The ids the tail reads facts on: every item and link held, the items the views' queries name, and what draws them. */
   ids() {
-    return [...new Set([...this.items.keys(), ...this.links.keys(), ...[...this.views].flatMap((v) => [...v.reads.anchors])])];
+    return [...new Set([...this.items.keys(), ...this.links.keys(), ...[...this.views].flatMap((v) => [...v.reads.anchors, ...v.styled])])];
   }
 
   /** The islands the open views touch: those their items live on and those their queries name. */
@@ -243,6 +243,8 @@ export class View {
     this.placed = new Map();
     this.whole = new Set();
     this.reads = reads(undefined);
+    /** The styles and layouts the view is drawn with (the style's `used`): not in its answer, followed for their facts alone. */
+    this.styled = new Set();
   }
 
   /** Hold a lens answer read at a position: `pos` must be read before the answer, so nothing between is missed. */
@@ -359,7 +361,9 @@ export class View {
     }
     const sessions = new Set([...this.ids].filter((id) => this.store.items.get(id)?.session));
     out.ask = mayMove({ lens: this.lens, reads: this.reads, items: this.ids, islands: this.touched(), sessions }, touches, made);
-    if (out.ask || anyIn(out)) this.tell(out);
+    // A change to what draws it (a layout's code pushed, a style's settings): its style is read again.
+    out.restyle = touches.some((t) => this.styled.has(t.id));
+    if (out.ask || out.restyle || anyIn(out)) this.tell(out);
     return out;
   }
 
