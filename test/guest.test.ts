@@ -33,6 +33,11 @@ test('one click makes a guest map its agent writes to at once, with the key alon
   const note = (await call('/api/get', page_token, { id: install })).result?.entity;
   assert.ok(note?.body.includes(`\`\`\`\n${prompt}\n\`\`\``), 'the sentence, in a block of its own');
   assert.ok(words.includes(`{"op":"link","type":"about","from":"${install}","to":"p"}`), 'the agent ties its project to the note');
+  // Its page opens on its words: a style about it folds the head, over the house style's page (the owner, 14 Nov 2026).
+  const page = (await call('/api/view', page_token, { name: 'style', params: { of: install } })).result?.style?.page;
+  assert.equal(page?.head, 'closed', JSON.stringify(page));
+  const elsewhere = (await call('/api/view', page_token, { name: 'style', params: {} })).result?.style?.page;
+  assert.notEqual(elsewhere?.head, 'closed', 'only the note');
 
   // The agent's first item, then its plan, each applied as sent: a guest approves nothing.
   const first = await call('/agent/change', key, { reason: 'The project', ops: [{ op: 'create', ref: 'p', type: 'work', title: 'Lantern', body: 'A lamp app.' }, { op: 'link', type: 'about', from: install, to: 'p' }] });
