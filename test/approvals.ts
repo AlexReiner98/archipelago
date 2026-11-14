@@ -106,6 +106,9 @@ const CASES: Record<string, Case> = {
   'settle hypothesis, said': { given: [hypothesis], authority: said, ops: (i) => [{ op: 'update', id: i.h, status: 'supported' }] },
   'update style title': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, title: 'Calmer' }] },
   'update layout code': { given: [layout()], ops: (i) => [{ op: 'update', id: i.s, props: { code: 'export default () => []' } }] },
+  // An edit of a code field is the whole field it leaves (packs/write/kernel/edit.ts): it comes to what update layout code does.
+  'edit layout code': { given: [{ ...layout(), props: { code: 'export default () => [1]' } }], ops: (i) => [{ op: 'update', id: i.s, edit: { field: 'code', find: '[1]', with: '[2]' } }] },
+  'edit layout module': { given: [{ ...layout(), props: { modules: { 'index.js': 'export const picture = () => [1];' } } }], ops: (i) => [{ op: 'update', id: i.s, edit: { field: 'modules', file: 'index.js', find: '[1]', with: '[2]' } }] },
   'update style page_css': { given: [style()], ops: (i) => [{ op: 'update', id: i.s, props: { page_css: 'h2 { color: red }' } }] },
   'update automation': { given: [task(), automation, about], ops: (i) => [{ op: 'update', id: i.a, title: 'Weekly' }] },
   'archive automation': { given: [task(), automation, about], ops: (i) => [{ op: 'archive', id: i.a }] },

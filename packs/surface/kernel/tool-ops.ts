@@ -55,6 +55,16 @@ export const op = z.discriminatedUnion('op', [
       .object({ find: z.string().min(1).describe('An exact passage of the note as it is now. It must be there exactly once.'), with: z.string().describe('What goes in its place; empty to remove it.') })
       .optional()
       .describe('Replace one passage of the note; the rest is left as it is.'),
+    edit: z
+      .object({
+        field: z.string().describe('A code field of the item’s type (query schema marks it code): a layout’s code or modules, a part’s code, a style’s page_css, a version’s code.'),
+        file: z.string().optional().describe('For a field of modules by name (modules, a part’s or a version’s code): the module, as index.js. Left out for a field that is one text.'),
+        find: z.string().min(1).describe('An exact passage of that text as it is now. It must be there exactly once: give more around it if it repeats.'),
+        with: z.string().describe('What goes in its place; empty to remove it.'),
+        base: z.string().optional().describe('The sha256 (hex) of that text as you read it, as a change that edits it answers in edited: refused if it has changed since.'),
+      })
+      .optional()
+      .describe('Replace one passage of a code field, as a text editor’s str_replace: the rest is left as it is. It becomes the whole field in the change, judged as any change of code.'),
     status: z.string().optional(),
     owner: z.string().nullable().optional(),
     visibility: visibility.optional(),
