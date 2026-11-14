@@ -108,7 +108,8 @@ test('in a browser, a lens of many long terms stays in the line, and each term c
     // A walk of no steps reaches nothing: the line says nothing of it.
     assert.equal(await page.evaluate<string>(labels), 'Find|Only|Not', 'no Walk on the line');
     assert.ok(!(await page.evaluate<string>(lineSays)).includes('×0'), 'nor ×0');
-    assert.ok(await page.evaluate<boolean>(`Boolean([...document.querySelectorAll('#find-rows .pm-box')].find((b) => b.firstElementChild?.textContent === 'Walk')?.textContent.includes('depends on'))`), 'its link is still in the row, to take out');
+    // The rows are a part of their own (slot bar.find.rows), drawn when it has been handed the lens: waited for.
+    assert.ok(await page.until(`Boolean([...document.querySelectorAll('#find-rows .pm-box')].find((b) => b.firstElementChild?.textContent === 'Walk')?.textContent.includes('depends on'))`), `its link is still in the row, to take out: ${await page.evaluate(`document.getElementById('find-rows')?.textContent`)}`);
     await page.evaluate(`location.hash = location.hash.replace('steps=0', 'steps=2')`);
     assert.ok(await page.until(`${labels} === 'Find|Only|Not|Walk'`), 'with steps it is on the line');
     for (const width of [1280, 560]) {
