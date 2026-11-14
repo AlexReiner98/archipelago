@@ -64,6 +64,10 @@ test('modules are diffed by name: new, gone and changed, the same left out', () 
   assert.equal(codeDiff(3, 'x'), null, 'what is not code is no diff');
   assert.equal(codeDiff(null, 'x\ny')!.files[0].was, 'added');
   assert.equal(codeDiff('a\r\nb\r\n', 'a\nb\n'), null, 'line endings are not a change');
+  // A layout's code split from one text into files by path: the text was its index.js.
+  const split = codeDiff('a\nb\n', { 'index.js': 'a\nB\n', 'x.js': 'x\n' })!;
+  assert.deepEqual(split.files.map((f) => [f.file, f.was ?? 'changed', f.add, f.del]), [['index.js', 'changed', 1, 1], ['x.js', 'added', 1, 0]]);
+  assert.deepEqual(codeDiff({ 'index.js': 'a\n' }, 'a\n'), null, 'the same code, written either way, is no change');
 });
 
 test('a whole rewrite is cut past the most lines a diff carries, and says how many', () => {

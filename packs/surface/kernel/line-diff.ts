@@ -146,7 +146,9 @@ export function codeDiff(from: unknown, to: unknown, most = MOST_LINES): CodeDif
   if ((typeof from === 'string' || none(from)) && (typeof to === 'string' || none(to)) && !(none(from) && none(to))) {
     files = [{ ...(none(from) ? { was: 'added' as const } : none(to) ? { was: 'removed' as const } : {}), ...textDiff((from as string) ?? '', (to as string) ?? '') }];
   } else {
-    const was = none(from) ? {} : modulesOf(from), now = none(to) ? {} : modulesOf(to);
+    // A text on one side and files by path on the other (a layout's code split into files): the text is its index.js.
+    const filesOf = (v: unknown) => (none(v) ? {} : typeof v === 'string' ? { 'index.js': v } : modulesOf(v));
+    const was = filesOf(from), now = filesOf(to);
     if (!was || !now) return null;
     const names = [...new Set([...Object.keys(was), ...Object.keys(now)])].sort();
     files = names
