@@ -39,6 +39,7 @@ export default function draw({ canvas, answer, style, theme, size, tree, on, ope
   on('pointermove', (e) => tip(e.shift ? answer.items[0]?.title : null, e.x, e.y));
   on('pointerdown', (e) => e.button === 0 && open(answer.items[0].id));
   on('wheel', (e) => e.deltaY);
+  on('pointerdown', (e) => e.kind === 'touch' && e.id > 0);
   on('field', (f) => f.done && change([{ op: 'create', type: 'task', title: f.value }], 'typed').then((came) => came.error ?? came.created));
   on('resize', (s) => ctx.fillRect(0, 0, s.width * size.dpr, size.height));
   on('answer', (a) => a.items.length);

@@ -272,7 +272,7 @@ function start({ code, answer, style, theme, hot }) {
       (e) => {
         if (name === 'wheel') e.preventDefault();
         if (name === 'pointerdown') canvas.setPointerCapture(e.pointerId);
-        tell(name, { x: e.clientX, y: e.clientY, button: e.button, buttons: e.buttons, deltaY: e.deltaY ?? 0, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
+        tell(name, { x: e.clientX, y: e.clientY, button: e.button, buttons: e.buttons, deltaY: e.deltaY ?? 0, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, id: e.pointerId ?? 0, kind: e.pointerType ?? 'mouse' });
       },
       { passive: false },
     );
