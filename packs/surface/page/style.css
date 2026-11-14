@@ -377,6 +377,17 @@ details.menu.ok > summary { font-size: var(--text-2); color: var(--warn); }
 /* A routine for nothing (dinner) only holds the time: grey, quiet. */
 
 /* A held change on the sheet it touches: a thing to act on, set apart by its tone and room (Alex, 11 Nov 2026; packs/write/page/item-held.js). */
+/* A change to code, as its line diff (packs/write/page/diff-view.js): a line each, never wrapped, scrolling in its box. */
+.line-diff { margin-top: var(--space-4); padding: var(--space-3) 0; font: var(--text-3)/1.5 var(--face-mono); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); max-height: var(--code-open); overflow: auto; contain: inline-size; }
+.line-diff .ld-line, .line-diff .ld-hunk, .line-diff .ld-file { white-space: pre; overflow: hidden; text-overflow: ellipsis; padding: 0 var(--space-5); }
+.line-diff .ld-add { background: var(--ok-soft); }
+.line-diff .ld-del { background: var(--bad-soft); }
+.line-diff .ld-m { display: inline-block; width: var(--space-7); color: var(--muted); user-select: none; }
+.line-diff .ld-hunk { color: var(--muted); margin-top: var(--space-3); }
+.line-diff .ld-file { font-family: var(--type-region-family); font-weight: 600; color: var(--muted); margin-top: var(--space-4); }
+.line-diff .ld-n { margin-left: var(--space-5); font-weight: 400; }
+.ops tr.below td { border-bottom: none; }
+.ops td.diff-cell { padding-top: 0; }
 .held-band { margin: var(--space-6) 0 var(--space-9); padding: var(--space-7) var(--space-8); background: var(--warn-soft); border-left: var(--border-4) solid var(--warn); border-radius: var(--radius-2); }
 .held-band .held-head { color: var(--warn); font-weight: 600; font-size: var(--text-3); }
 .held-band .held-why { margin: var(--space-4) 0 var(--space-7); font-size: var(--text-6); }
