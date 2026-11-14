@@ -4,7 +4,7 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { guestBand, tryPage } from './guest.js';
+import { tryPage } from './guest.js';
 import { SignInNeeded, api, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { warmLayouts } from './layout.js';
@@ -82,7 +82,6 @@ async function route(pulse = false) {
   // In a workspace: the page is the app again, whatever signed-out page was up.
   ungate();
   drawFindSlot();
-  guestBand();
   drawNav();
   startTabs();
   const params = new URLSearchParams(query);

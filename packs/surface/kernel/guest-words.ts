@@ -6,16 +6,48 @@
 /** The one sentence the visitor pastes into their agent. */
 export const guestPrompt = (link: string) => `Read ${link} and do what it says: it puts this project on a map I can watch.`;
 
-/** `owner`: the id of the person the map belongs to, whom the steps only they can do wait on. */
-export function guestWords(origin: string, key: string, workspace: string, owner: string): string {
+/** The install note's title: the one item a guest map starts with, open in the visitor's tab (the owner, 14 Nov 2026). */
+export const INSTALL_TITLE = 'Try it with your agent';
+
+/**
+ * The install note a guest map starts with, read in the visitor's tab as the map opens: the sentence to paste, with its
+ * link, each in a block the page gives a Copy to (a Share on a phone), and what happens next. On a phone, where no
+ * agent runs, the address to send to a computer. Placeholder words: the owner writes every public one.
+ */
+export const installNote = (prompt: string, origin: string) => [
+  "Paste this into your agent (Claude Code, Codex or Cursor), in your project's folder:",
+  '',
+  '```',
+  prompt,
+  '```',
+  '',
+  '## What happens next',
+  'Your agent puts your project on this map, then a plan to connect it properly. Each item appears here as it is written.',
+  '',
+  '## On a phone',
+  '> [!NOTE]',
+  '> A recording of an agent drawing a map comes here.',
+  '',
+  'No agent runs on a phone. Send this to your computer and open it there:',
+  '',
+  '```',
+  `${origin}/#/try`,
+  '```',
+].join('\n');
+
+/**
+ * `owner`: the id of the person the map belongs to, whom the steps only they can do wait on; `install`: the install
+ * note the map starts with, which the visitor is reading, if it has one.
+ */
+export function guestWords(origin: string, key: string, workspace: string, owner: string, install?: string): string {
   const post = `curl -s -X POST ${origin}/agent/change -H "authorization: Bearer ${key}" -H "content-type: application/json" -d '<the change, as JSON on one line>'`;
   return `Archipelago guest map ${workspace}: your user is watching it in their browser and sees each write the moment you send it. Nothing to install: every write is one POST of a change, and it applies at once. Be quick: they are waiting to see it.
 
 Send each change as one command, the JSON in single quotes (in PowerShell, write the JSON to a file and send it with curl.exe and -d "@file.json"):
   ${post}
 
-1. Now, before anything else: one item naming the project in your working folder. Run one command to look, \`ls; head -n 5 README* package.json\`, and nothing more; then send:
-  {"reason":"The project","ops":[{"op":"create","ref":"p","type":"work","title":"<the project's name, a few words>","body":"<one sentence: what it is and what it is for>"}]}
+${install ? `The map already holds one item, ${install}: the note your user is reading, which gave them the sentence they pasted. Leave it as it is and write nothing like it; your project is tied to it below.\n\n` : ''}1. Now, before anything else: one item naming the project in your working folder. Run one command to look, \`ls; head -n 5 README* package.json\`, and nothing more; then send:
+  {"reason":"The project","ops":[{"op":"create","ref":"p","type":"work","title":"<the project's name, a few words>","body":"<one sentence: what it is and what it is for>"}${install ? `,{"op":"link","type":"about","from":"${install}","to":"p"}` : ''}]}
 The answer's result.created.p is its id.
 
 2. Then the plan to connect you properly, beside it, as one change. Fill in which agent you are (Claude Code, Codex or Cursor) and the project's id. The steps follow your section of ${origin}/install.md; those only your user can do wait on them (${owner}, the person this map belongs to).
