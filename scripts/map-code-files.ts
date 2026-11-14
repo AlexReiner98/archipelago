@@ -7,6 +7,10 @@
 // - a field of modules by name (layout.modules, part.code) or of files by path (a pack version's code) is those files,
 //   each at its name, as a pack's folder holds them.
 //
+// The data its code is run with comes along (task e_swa43ssr): each other field of json its type declares, not kept by
+// the system (a layout's settings and writes), is <field>.json, written with its keys in order so the text is the same
+// each time; a field of json is read back by its value, so a file only reformatted has not changed.
+//
 // Each file is kept by the SHA-256 of its text and the whole by codeHash, as the log keeps a pack's code
 // (packs/loader/kernel/pack-code.ts), so the hashes a pull records are the ones code kept as files by hash will have.
 // Input in, files out: nothing here reads the network or the disk.
@@ -17,8 +21,8 @@ import { createHash } from 'node:crypto';
 /** A code field as the schema declares it. */
 export interface CodeField {
   name: string;
-  /** text: one file; files: modules by name, or files by path. */
-  kind: 'text' | 'files';
+  /** text: one file; files: modules by name, or files by path; json: the data the code runs with, one file. */
+  kind: 'text' | 'files' | 'json';
   css?: boolean;
 }
 
@@ -32,7 +36,7 @@ export interface Pulled {
   updated_at?: string;
   /** Each code field, with the paths it was laid out as and each one's hash. */
   fields: Record<string, { kind: CodeField['kind']; files: Record<string, string> }>;
-  /** codeHash of every file. */
+  /** codeHash of every file of code (the json fields' files left out). */
   code: string;
 }
 
@@ -48,8 +52,36 @@ export function codeFields(fields: Record<string, { type?: string; code?: boolea
     .map(([name, f]) => ({ name, kind: f.type === 'json' ? ('files' as const) : ('text' as const), ...(f.css && { css: true }) }));
 }
 
+/**
+ * The fields a folder holds: the code fields, then the type's other fields of json the system does not keep, which
+ * are what the code is run with (a layout's settings). Asked of the schema, never of a type by name.
+ */
+export function folderFields(fields: Record<string, { type?: string; code?: boolean; css?: boolean; system?: boolean }>): CodeField[] {
+  const code = codeFields(fields);
+  if (!code.length) return code;
+  const data = Object.entries(fields).filter(([, f]) => f.type === 'json' && f.code !== true && f.system !== true);
+  return [...code, ...data.map(([name]) => ({ name, kind: 'json' as const }))];
+}
+
 /** The file a field of text is laid out as. */
 export const textPath = (f: CodeField) => (f.name === 'code' ? 'index.js' : `${f.name}.${f.css ? 'css' : 'js'}`);
+
+/** The file a field of json is laid out as. */
+export const jsonPath = (name: string) => `${name}.json`;
+
+/** A value in order: each object's keys sorted, arrays as they are. */
+const ordered = (v: unknown): unknown =>
+  Array.isArray(v) ? v.map(ordered) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, ordered((v as Record<string, unknown>)[k])])) : v;
+
+/** A json field's value as its file holds it: pretty, keys in order, a newline at the end. */
+export const jsonText = (v: unknown) => JSON.stringify(ordered(v), null, 2) + '\n';
+
+/** A json field's file read back: its value, and the text it is kept as. */
+function jsonOf(path: string, text: string): { value: unknown; text: string } {
+  let value: unknown;
+  try { value = JSON.parse(text); } catch (err) { throw new Error(`${path} is not JSON: ${(err as Error).message}`); }
+  return { value, text: jsonText(value) };
+}
 
 /**
  * An item's code fields as files by path, and which field each path belongs to. A field left empty lays out nothing.
@@ -69,6 +101,8 @@ export function toFiles(fields: CodeField[], props: Record<string, unknown>): { 
     if (f.kind === 'text') {
       if (typeof v !== 'string') throw new Error(`${f.name} is not text`);
       put(textPath(f), v, f.name);
+    } else if (f.kind === 'json') {
+      put(jsonPath(f.name), jsonText(v), f.name);
     } else {
       if (typeof v !== 'object' || Array.isArray(v)) throw new Error(`${f.name} is not files by name`);
       for (const [path, text] of Object.entries(v as Record<string, unknown>)) if (typeof text === 'string') put(path, text, f.name);
@@ -82,7 +116,9 @@ export function record(base: Omit<Pulled, 'fields' | 'code'>, fields: CodeField[
   const out: Pulled['fields'] = {};
   for (const f of fields) out[f.name] = { kind: f.kind, files: {} };
   for (const [path, text] of Object.entries(laid.files)) out[laid.owner[path]].files[path] = sha(text);
-  return { ...base, fields: out, code: codeHash(Object.fromEntries(Object.entries(laid.files).map(([p, t]) => [p, sha(t)]))) };
+  const json = new Set(fields.filter((f) => f.kind === 'json').map((f) => f.name));
+  const code = Object.entries(laid.files).filter(([p]) => !json.has(laid.owner[p]));
+  return { ...base, fields: out, code: codeHash(Object.fromEntries(code.map(([p, t]) => [p, sha(t)]))) };
 }
 
 /**
@@ -92,7 +128,11 @@ export function record(base: Omit<Pulled, 'fields' | 'code'>, fields: CodeField[
  */
 export function fromFiles(pulled: Pulled, folder: Record<string, string>): { props: Record<string, unknown>; changed: string[] } {
   const owner = new Map<string, string>();
-  for (const [name, f] of Object.entries(pulled.fields)) for (const p of Object.keys(f.files)) owner.set(p, name);
+  for (const [name, f] of Object.entries(pulled.fields)) {
+    for (const p of Object.keys(f.files)) owner.set(p, name);
+    // A json field left empty when pulled has no file yet: its file, made here, is still its own.
+    if (f.kind === 'json') owner.set(jsonPath(name), name);
+  }
   const filesFields = Object.entries(pulled.fields).filter(([, f]) => f.kind === 'files').map(([n]) => n);
   const values: Record<string, Record<string, string>> = {};
   for (const name of Object.keys(pulled.fields)) values[name] = {};
@@ -103,7 +143,7 @@ export function fromFiles(pulled: Pulled, folder: Record<string, string>): { pro
       if (filesFields.length !== 1) throw new Error(`${path} is new, and ${pulled.type} has ${filesFields.length ? 'more than one field' : 'no field'} of files to put it in`);
       field = filesFields[0];
     }
-    values[field][path] = text;
+    values[field][path] = pulled.fields[field].kind === 'json' ? jsonOf(path, text).text : text;
   }
   const props: Record<string, unknown> = {}, changed: string[] = [];
   for (const [name, f] of Object.entries(pulled.fields)) {
@@ -111,14 +151,18 @@ export function fromFiles(pulled: Pulled, folder: Record<string, string>): { pro
     const same = Object.keys(now).length === Object.keys(f.files).length && Object.entries(now).every(([p, t]) => f.files[p] === sha(t));
     if (same) continue;
     changed.push(...[...new Set([...Object.keys(now), ...Object.keys(f.files)])].filter((p) => f.files[p] !== (now[p] === undefined ? undefined : sha(now[p]))));
-    props[name] = f.kind === 'text' ? (Object.values(now)[0] ?? '') : now;
+    props[name] = f.kind === 'text' ? (Object.values(now)[0] ?? '') : f.kind === 'json' ? (now[jsonPath(name)] === undefined ? null : JSON.parse(now[jsonPath(name)])) : now;
   }
   return { props, changed: changed.sort() };
 }
 
+/** The fields of the type a folder watches: those it was pulled with (a field declared since waits for a pull). */
+export const watched = (pulled: Pulled, fields: CodeField[]) => fields.filter((f) => pulled.fields[f.name]);
+
 /** Which of the pulled fields the map holds differently now: the map moved under the folder. */
 export function moved(pulled: Pulled, fields: CodeField[], props: Record<string, unknown>): string[] {
-  const now = record(pulled, fields, toFiles(fields, props));
+  const kept = watched(pulled, fields);
+  const now = record(pulled, kept, toFiles(kept, props));
   return Object.keys({ ...pulled.fields, ...now.fields }).filter((name) => {
     const a = pulled.fields[name]?.files ?? {}, b = now.fields[name]?.files ?? {};
     return Object.keys(a).length !== Object.keys(b).length || Object.entries(a).some(([p, h]) => b[p] !== h);
