@@ -19,6 +19,8 @@ import { codePath } from '../packs/loader/kernel/pack-code.ts';
 export type Call = (tool: string, body: Record<string, unknown>) => Promise<any>;
 
 const MANIFEST = '.map-code.json';
+/** How often watch --preview sends the preview again: well inside the 15 minutes a preview is kept. */
+const RESEND_MS = 10 * 60_000;
 const ROOT = resolve(import.meta.dirname, '..');
 /** The drawing contract's types, copied into a folder for tsc's checkJs when the repository has them (task e_p5s9br82). */
 const TYPES = join(ROOT, 'packs', 'walls', 'page', 'draw.d.ts');
@@ -224,6 +226,8 @@ async function main() {
       if (asPreview) { const r = await preview(call, folder); console.log(`previewed: ${r.changed.join(', ') || 'as pulled'}`); }
       else console.log(say(await push(call, folder, { force: args.has('force'), run: runArg })));
     });
+    // A preview lapses 15 minutes after it was last sent (e_p5zjynrb): while watching, send it again before then.
+    if (asPreview) setInterval(() => preview(call, folder).catch((err) => console.error(String(err?.message ?? err))), RESEND_MS).unref?.();
   } else if (verb === 'discard') {
     const { call } = await target(args);
     await preview(call, folderOf(plain[0]), true);
