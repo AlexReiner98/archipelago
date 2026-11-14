@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { parseBackup, parseVault, readable } from '../../log/kernel/backup.ts';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
+import { pressGrant } from '../../loader/kernel/part-calls.ts';
 import { launch } from './launcher.ts';
 import { bypassingRls } from '../../identity/kernel/outbox.ts';
 import type { TypeDef } from '../../loader/kernel/packs.ts';
@@ -140,6 +141,16 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       await l.record('settings', actorId(actor), [['+', actorId(actor), 'changes.seen', input.upto]]);
       return { seen_upto: input.upto };
     },
+  },
+  press_grant: {
+    description:
+      'A grant for an admin’s press on a part of the page, minted the moment the person presses it (decision e_ssrawn4v): the one admin action the part sends just after goes with it, once. ' +
+      'Only for a person whose session is an admin; the page asks it, and keeps the grant from the part.',
+    humanOnly: true,
+    input: {
+      part: z.object({ id: z.string().max(200), hash: z.string().max(64), island: z.string().max(40).optional() }).describe('The part pressed: its id, the hash of its code, and the island it is drawn on, if any.'),
+    },
+    run: async (l, actor, input: { part: { id: string; hash: string; island?: string } }) => ({ grant: await pressGrant(l, actor, input.part.island, input.part) }),
   },
   decide: {
     description: 'Apply a held change (approve: true) or decline it, with a note for whoever made it.',

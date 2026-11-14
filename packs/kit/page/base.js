@@ -148,24 +148,24 @@ export function ask({ title, message, input, choices, action = 'OK', cancel = 'C
 }
 export const tell = (title, message) => ask({ title, message, cancel: null });
 
-// The token, when the server wants one. Kept for this browser only.
+// The token, when the server wants one. Each tab keeps its own (sessionStorage), so two tabs can stand in two
+// workspaces; the last one entered is kept for the browser too (localStorage), where a new tab starts.
+// A tab's first read takes the browser's last and keeps it, whatever another tab enters later. Storage can be
+// blocked; the token then lasts until the page is closed.
+const TOKEN = 'pelago-token', tab = () => sessionStorage.getItem(TOKEN) ?? (localStorage.getItem(TOKEN) && (sessionStorage.setItem(TOKEN, localStorage.getItem(TOKEN)), localStorage.getItem(TOKEN))) ?? '';
 export const store = {
   get token() {
-    try {
-      return localStorage.getItem('pelago-token') ?? '';
-    } catch {
-      return this.memory ?? '';
-    }
+    try { return tab() || (this.memory ?? ''); } catch { return this.memory ?? ''; }
   },
   set token(value) {
+    const was = this.token;
     this.memory = value;
     asked = undefined;
     try {
-      if (value) localStorage.setItem('pelago-token', value);
-      else localStorage.removeItem('pelago-token');
-    } catch {
-      // Storage can be blocked; the token then lasts until the page is closed.
-    }
+      if (value) [sessionStorage, localStorage].forEach((s) => s.setItem(TOKEN, value));
+      // Signed out here: so is a new tab, unless another tab has since entered elsewhere.
+      else sessionStorage.removeItem(TOKEN), localStorage.getItem(TOKEN) === was && localStorage.removeItem(TOKEN);
+    } catch {}
   },
 };
 export const authHeaders = () => (store.token ? { authorization: `Bearer ${store.token}` } : {});
