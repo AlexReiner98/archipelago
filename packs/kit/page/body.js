@@ -16,6 +16,27 @@ export function noteContext({ style, title } = {}) {
 
 const NAME = /^[a-z][a-z0-9_]*$/;
 
+/** A phone or a tablet: touched, with no mouse to hover, and a Share of its own. */
+const shares = () => typeof navigator.share === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
+
+/**
+ * A block of code, as written, and a way to take it: Copy, or on a phone its own Share, so what a note says to paste
+ * elsewhere (a guest map's install note: packs/surface/kernel/guest-words.ts) is taken in one press. As a published
+ * page's code block (packs/surface/page/frozen-doc.js).
+ */
+function codeBlock(text) {
+  const code = h('code', {}, text);
+  const take = h('button', { type: 'button', class: 'quiet note-take', title: shares() ? 'Share' : 'Copy' }, shares() ? 'Share' : 'Copy');
+  take.onclick = () => {
+    if (shares()) return void navigator.share({ text }).catch(() => undefined);
+    (navigator.clipboard?.writeText(text) ?? Promise.reject()).then(
+      () => ((take.textContent = 'Copied'), setTimeout(() => (take.textContent = 'Copy'), 2000)),
+      () => getSelection()?.selectAllChildren(code),
+    );
+  };
+  return h('div', { class: 'note-code' }, h('pre', { class: 'note-block' }, code), take);
+}
+
 /** A line's spans as the page draws them: an item it names is the way to that item's page, an address opens apart. */
 export function drawSpans(text) {
   const draw = (spans) =>
@@ -55,7 +76,7 @@ function drawBlocks(blocks, { style, tick }) {
     if (b.kind === 'para') return h('p', {}, drawSpans(b.text));
     if (b.kind === 'title') return h('h4', { class: 'part-title' }, drawSpans(sentence(b.text)));
     if (b.kind === 'table') return drawTable(b, cell);
-    if (b.kind === 'code') return h('pre', { class: 'note-block' }, h('code', {}, b.text));
+    if (b.kind === 'code') return codeBlock(b.text);
     if (b.kind === 'callout') {
       const box = h('aside', { class: b.tone ? 'callout' : 'callout quote' }, drawBlocks(b.blocks, { style, tick }));
       const colour = b.tone && style.notes?.callouts?.[b.tone];

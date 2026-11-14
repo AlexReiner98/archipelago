@@ -10,7 +10,7 @@ import { checkValue } from './fields.ts'; import { checkFieldDecls, headOf, ownH
 import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts'; import { checkRules } from './rule-check.ts';
-import { isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
+import { isApp, isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
 import { OWN_PACKS, readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts'; import { checkParts } from './ui-parts.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from '../../../src/phases.ts'; import { keepVersionTypes } from './version-types.ts';
 
@@ -24,7 +24,7 @@ export interface FieldDef {
   /** Maintained by the system; shown but not offered for editing. */
   system?: boolean;
   /** Sent with the item in a lens answer, so a style can draw by it (a type to colour, an amount, a date). */
-  shown?: boolean;
+  shown?: boolean; /** Never carried off the map: a frozen (published) view leaves its value out, and so does a copy made from one. */ private?: boolean;
   /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (packs/loader/kernel/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (packs/walls/kernel/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean; /** Of type string and code: may instead hold files by path, each a text, entered at index.js (packs/loader/kernel/fields.ts). */ files?: boolean;
   /** Of type json, holding a value of the simple type another field of the item names (packs/loader/kernel/fields.ts SIMPLE_TYPES): checked on write with the two together. */ typed_by?: string;
 }
@@ -45,7 +45,7 @@ export interface TypeDef {
   deliverable?: boolean;
   /** How high its items sit (ALTITUDES): a project, a stream in it, a step in that. A flavour inherits it. */ altitude?: Altitude;
   /** What anyone may see, with no login, once a person makes it public (a product, what it has built, how we know). A flavour inherits it. */
-  public?: boolean;
+  public?: boolean; /** None of its fields is carried off the map: a frozen (published) view holds its items' titles and words, never their fields. A flavour inherits it. */ private?: boolean;
   /** What it goes with (linked by relation, out from it or in to it): public when that is, a limited token's when that is. A flavour inherits it. */
   belongs_with?: BelongsWith[];
   /** What the kernel computes from it, each naming the field it reads. A flavour inherits them. */
@@ -93,7 +93,7 @@ export interface ResolvedType {
   /** The fields kept in props, and those kept in the item's row (status and the rest its starter declares). */
   fields: Record<string, FieldDef>; columns: Partial<Record<ColumnField, FieldDef>>;
   deliverable: boolean; altitude?: Altitude;
-  public: boolean;
+  public: boolean; private?: boolean;
   belongs_with?: BelongsWith[];
   capabilities: Capabilities;
   noteMax?: NoteMax; movedFrom?: string[]; movedStatuses?: Record<string, Record<string, string>>;
@@ -158,7 +158,7 @@ export class Registry {
     for (const p of [...made.packs, ...(this.swap ? [{ manifest: this.swap.manifest, hash: this.swap.hash }] : [])]) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash); this.versions = new Map(made.versions.map((v) => [v.item, v])); if (this.swap?.code) where.set(this.swap.of, versionWhere(this.swap.of, join(where.get(this.swap.of) ?? this.dir, this.swap.of), this.swap.code)); // a version's own code runs from its own folder
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
-    const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK && !this.made.has(id)).map((id) => [id, 'not enabled on this server']));
+    const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK && !this.made.has(id) && !(isApp(found.get(id)!) && [this.dir, OWN_PACKS].includes(this.where.get(id) ?? ''))).map((id) => [id, 'not enabled on this server'])); // an app pack of the server's own folder is the app's own screen, on in every map (decision e_y9dcs4nv): a server's list does not leave it out
     for (const id of this.turnedOff) off.set(id, 'turned off here');
     for (const id of this.made.keys()) if (!this.madeOn.has(id)) off.set(id, 'kept as an item: the owner has not added it here');
     if (this.islands) for (const [id, why] of islandsOff([...found.values()].filter((p) => !off.has(p.id) || KERNEL_PACKS.includes(p.id)), LOCAL_PACK)) off.set(id, why); const refused = new Map(kernelRefused(found.values(), (id) => !this.made.has(id) && this.swap?.of !== id && (!!this.given || this.where.get(id) === this.dir || this.where.get(id) === OWN_PACKS))); for (const p of found.values()) if (isRequired(p)) off.delete(p.id); for (const [id, why] of refused) off.set(id, why); this.internal = new Set([...found.values()].filter((p) => isInternal(p) && !refused.has(p.id)).map((p) => p.id)); // a required internal pack is always on, an optional one off where the map turned it off (kernel.optional); kernel code from anywhere but the server's own folder never runs
@@ -217,7 +217,7 @@ export class Registry {
         // A type that extends nothing keeps in its row the columns it declares, or the common ones (packs/loader/kernel/head.ts, ownHead).
         ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD }) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
-        public: def.public ?? parent?.public ?? false,
+        public: def.public ?? parent?.public ?? false, ...((def.private ?? parent?.private) && { private: true }),
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
         ...((def.belongs_with ?? parent?.belongs_with)?.length && { belongs_with: def.belongs_with ?? parent?.belongs_with }),
         capabilities: { ...parent?.capabilities, ...def.capabilities },

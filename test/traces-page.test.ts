@@ -37,19 +37,20 @@ test("in a browser, an agent's change is traced in its session's hue and clears 
     const line = `Session ${session.name}, doing: Started on the tail`;
     // Checked in the one read that waits: a read after it may meet the row a redraw has just put in its place.
     const ready = await page.until(`${row}?.classList.contains('traced') && ${row}.dataset.trace === ${JSON.stringify(line)} && /^#[0-9a-f]{6}$/i.test(${row}.style.getPropertyValue('--trace-hue'))`);
-    const traced = await page.evaluate<{ line: string; hue: string }>(`({ line: ${row}?.dataset.trace, hue: ${row}?.style.getPropertyValue('--trace-hue') })`);
-    assert.ok(ready, `the row is traced with who, what and why, in a line, in the session's hue: ${JSON.stringify(traced)}`);
+    if (!ready) assert.fail(`the row is traced with who, what and why, in a line, in the session's hue: ${JSON.stringify(await page.evaluate(`({ line: ${row}?.dataset.trace, hue: ${row}?.style.getPropertyValue('--trace-hue') })`))}`);
     // About time passing: a mark is seen after its moment in sight (the style's trace_seen_after), and a hidden pane's
     // moment never comes. It is given well past that moment.
     await wait(2500);
-    assert.ok(await page.evaluate(`${row}.classList.contains('traced')`), 'a hidden pane never counts as seen');
-    await page.evaluate(`${row}.closest('.pm-pane').hidden = false`);
+    // Each read of the row waits for it: a redraw may have it gone a moment.
+    assert.ok(await page.until(`${row}?.classList.contains('traced') === true`), 'a hidden pane never counts as seen');
+    await page.until(`Boolean(${row}) && ((${row}.closest('.pm-pane').hidden = false), true)`);
     // Over the row, the page's one tip says the trace.
-    await page.evaluate(`${row}.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' }))`);
-    // The tip is drawn after the hover is handled, perhaps a frame later: waited for, then read.
-    await page.until(`document.querySelector('.tip')?.textContent === ${JSON.stringify(traced.line)}`);
-    assert.equal(await page.evaluate(`document.querySelector('.tip')?.textContent`), traced.line, 'the tip says who and why');
-    assert.ok(await page.until(`!${row}.classList.contains('traced')`, 6000), 'in sight a moment, it clears');
+    await page.until(`Boolean(${row}) && (${row}.dispatchEvent(new PointerEvent('pointerover', { bubbles: true, pointerType: 'mouse' })), true)`);
+    // The tip is drawn after the hover is handled, perhaps a frame later: waited for, and compared with the line itself,
+    // not with a read of the row, which a redraw may have replaced between the wait above and that read.
+    const tipped = await page.until(`document.querySelector('.tip')?.textContent === ${JSON.stringify(line)}`);
+    assert.ok(tipped, `the tip says who and why: ${await page.evaluate(`document.querySelector('.tip')?.textContent`)}`);
+    assert.ok(await page.until(`${row}?.classList.contains('traced') === false`, 6000), 'in sight a moment, it clears');
     // What the traces part keeps, under its own name in this workspace (tools.keep: packs/surface/page/part-host.js).
     const kept = await page.evaluate<string>(`localStorage.getItem(Object.keys(localStorage).find((k) => k.startsWith('pelago-part:catch_up.changes:') && k.endsWith(':traces')) ?? '')`);
     assert.ok(Object.keys(JSON.parse(kept).seen).some((k) => k.startsWith(made.a)), 'kept as seen in this browser');
@@ -57,7 +58,7 @@ test("in a browser, an agent's change is traced in its session's hue and clears 
     assert.ok(await page.until(`Boolean(${row})`), 'drawn again');
     // About time passing as above: a reload is given past the moment in which it would (wrongly) trace it again.
     await wait(1000);
-    assert.ok(!(await page.evaluate(`${row}.classList.contains('traced')`)), 'a reload does not bring it back');
+    assert.ok(await page.until(`${row}?.classList.contains('traced') === false`), 'a reload does not bring it back');
   } finally {
     await page.close();
   }

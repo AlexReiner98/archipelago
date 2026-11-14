@@ -8,6 +8,7 @@ import { layoutCode, pageData, publicPath } from './published-data.ts';
 import { listen, republished } from './published-live.ts';
 import { countsSince } from './pack-counts.ts';
 import { siteNav } from './site.ts';
+import { carriedOf } from './map.ts';
 import type { KernelContext } from '#pelago/kernel';
 
 /** A context whose reads answer by their key from what is given, and say each read asked. */
@@ -78,4 +79,17 @@ test('counts are summed per key per day after a position, whole entries only', a
   assert.deepEqual(read, { counts: [{ key: 'home', day: '2026-11-11', n: 3 }, { key: 'docs', day: '2026-11-12', n: 3 }], pos: 5 });
   assert.deepEqual(asked, [{ counts: { stream: 'visits', after: 3 } }]);
   assert.deepEqual(await countsSince(fake({ counts: [] }), 'visits', 7), { counts: [], pos: 7 });
+});
+
+test('a frozen view carries the fields an item’s type declares, and nothing private, the system’s or its row’s', () => {
+  const types: Record<string, unknown> = {
+    dish: { fields: { serves: { type: 'number' }, secret: { type: 'string', private: true }, made_by: { type: 'string', system: true }, status: { type: 'string', column: true }, island: { type: 'string' }, code: { type: 'string', code: true } } },
+    diary: { private: true, fields: { mood: { type: 'string' } } },
+    lens: { system: true, fields: { filter: { type: 'json' } } },
+  };
+  const ctx = { registry: { type: (id: string) => types[id] } } as unknown as KernelContext;
+  assert.deepEqual(carriedOf(ctx, 'dish', { serves: 4, secret: 'stock', made_by: 'x', status: 'done', island: 'e_aaaaaaaa', code: 'x', loose: 1, empty: null }), { serves: 4 });
+  assert.deepEqual(carriedOf(ctx, 'diary', { mood: 'calm' }), {}, 'a type marked private carries no field');
+  assert.deepEqual(carriedOf(ctx, 'lens', { filter: {} }), {}, 'the kernel’s own carry none');
+  assert.deepEqual(carriedOf(ctx, 'gone', { serves: 4 }), {}, 'a type not known here carries none');
 });

@@ -76,6 +76,21 @@ export const shownOf = (ctx: Pick<KernelContext, 'registry'>, type: string, prop
   return Object.fromEntries(Object.entries(props ?? {}).filter(([key, value]) => defs[key]?.shown && value != null));
 };
 
+/**
+ * The fields of an item a frozen view carries, so a copy made from it keeps them (the owner, 13 Nov 2026, e_8yd7wh5r:
+ * "Yes, carry them"): each its type declares and the item holds, but none the system keeps, none in the item's row
+ * (its status is said already), no code, stylesheet or long value, nothing its field or its type marks private, and
+ * never the island it lives on. Only a view frozen with this carries them: one frozen before is served as it was.
+ */
+export const carriedOf = (ctx: Pick<KernelContext, 'registry'>, type: string, props: Record<string, unknown>) => {
+  const t = ctx.registry.type(type) as { system?: boolean; private?: boolean; fields?: Record<string, { system?: boolean; private?: boolean; column?: boolean; code?: boolean; css?: boolean; large?: boolean }> } | undefined;
+  if (!t || t.system || t.private) return {};
+  return Object.fromEntries(Object.entries(props ?? {}).filter(([key, value]) => {
+    const def = t.fields?.[key];
+    return def && value != null && key !== 'island' && !def.system && !def.private && !def.column && !def.code && !def.css && !def.large;
+  }));
+};
+
 /** A line that brings an item in: its id and nothing else. */
 const SECTION = /^[ \t]*(e_[a-z0-9]{8})[ \t]*$/;
 /** The ids a document's note brings in, in the order it brings them (packs/views/kernel/documents.ts, sectionIds). */

@@ -12,9 +12,10 @@ import type { Q } from '../../database/kernel/db.ts';
 import { bearer } from '../../identity/kernel/auth.ts';
 import { serveOAuth } from '../../identity/kernel/oauth.ts';
 import { SIGN_IN_PATHS, signIn, type OpenRoutes } from '../../identity/kernel/sign-in.ts';
+import { keepGuestMap } from '../../identity/kernel/guest-keep.ts';
 import { json, PRIVATE } from './reply.ts';
 import { serverPacksOf } from './server-host.ts';
-import { documentsInForce, signinGate } from './server-gates.ts';
+import { documentsInForce, keptGate, signinGate } from './server-gates.ts';
 import { serveFile, setupPack } from './server-files.ts';
 import { serveServerPack } from './server-routes.ts';
 
@@ -98,6 +99,16 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
     if (at.tooOften()) return;
     const owes = async (email: string, agree: unknown) => (await signinGate(serverPacksOf(at.workspaces), { email, agree, via: 'sign-in' })).owes;
     const answer = await signIn(path, { ...at, owes, hold: (workspace) => void res.once('close', at.workspaces.hold(workspace)) });
+    return reply(res, answer.status, answer.body);
+  }
+  // Signing in to keep a guest map: the address becomes its owner's, and the pack that sells workspaces is told (identity's guest-keep.ts).
+  if (req.method === 'POST' && path === '/connect/keep') {
+    if (!at.tokens) return reply(res, 404, { error: 'This server signs nobody in.' });
+    if (at.tooOften()) return;
+    const packs = serverPacksOf(at.workspaces);
+    const owes = async (email: string, agree: unknown) => (await signinGate(packs, { email, agree, via: 'keep' })).owes;
+    const kept = async (ask: { workspace: string; email: string; machine?: string }) => keptGate(packs, await at.workspaces.control(), ask);
+    const answer = await keepGuestMap({ ...at, owes, kept, hold: (workspace) => void res.once('close', at.workspaces.hold(workspace)) });
     return reply(res, answer.status, answer.body);
   }
   // A system's request for a token (POST /connect/request) and its poll (POST /connect/poll/<workspace>/<id>, the

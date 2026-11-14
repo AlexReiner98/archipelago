@@ -55,6 +55,24 @@ test('run as the page is published, it keeps the sheet of every item its picture
   assert.equal(doc({ page, at: { own: true } }).sheets, undefined, 'drawn in a browser, it opens them as asked');
 });
 
+test("an item's sheet shows the fields its view carried, a row each, as its page in the app reads them", () => {
+  const long = 'Slice the onions thin and cook them slowly in butter until they are deep brown and sweet, then add the stock.';
+  const fields = { cook_time: '1 h 30 min', serves: 1200, vegetarian: false, source_url: 'https://example.com/soup/', method: long, made_with: ['e_gggggggg', 'e_hhhhhhhh'], empty: '' };
+  const items = [{ id: 'e_ffffffff', title: 'Onion soup', type: 'dish', gist: 'Slow onions.', fields }, { id: 'e_gggggggg', title: 'Stock', type: 'dish' }];
+  const sheet = doc({ page: { ...page, lenses: { e_bbbbbbbb: { items, style: {} } } }, at }).sheets.e_ffffffff;
+  checkMarks(sheet, { kinds: docKinds });
+  const rows = all(sheet, 'box').filter((b) => String(b[1].key ?? '').startsWith('field-row:'));
+  const said = Object.fromEntries(rows.map((r) => [r[2][2], r[3]]));
+  assert.deepEqual(Object.keys(said), ['Cook time', 'Serves', 'Vegetarian', 'Source url', 'Method', 'Made with'], 'a field that holds nothing is left out');
+  assert.equal(said['Cook time'][2], '1 h 30 min');
+  assert.equal(said.Serves[2], (1200).toLocaleString());
+  assert.equal(said.Vegetarian[2], 'no');
+  assert.deepEqual([said['Source url'][1].href, said['Source url'][2]], ['https://example.com/soup/', 'example.com/soup']);
+  assert.ok(said.Method[2].endsWith('…') && said.Method[2].length <= 81 && said.Method[1].tip === long, 'long words are one line, the whole of them its tip');
+  assert.equal(said['Made with'][2], 'Stock, an item', 'an item is said by its name where the page froze it, never its id');
+  assert.equal(doc({ page, at }).sheets.e_ffffffff.flat(Infinity).includes('fields'), false, 'an item with none has no fields');
+});
+
 test('an invoice has its own head', () => {
   const invoice = { ...page, title: 'Invoice 7: work', head: 'invoice', status: 'paid', fields: { number: 'INV-7', issued: '2026-11-01', total: 100, paid: 100 } };
   const part = doc({ page: invoice, at });
