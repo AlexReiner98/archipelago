@@ -7,7 +7,8 @@
 // The owner acts a guest's agent may call (turning a pack on, the map's settings) run as the guest map's owner: on a
 // guest map there is nobody else to ask, since its changes never wait (holds off, ./guest-route.ts).
 
-import { GUEST_OWNER } from '../../identity/kernel/guests.ts';
+import { controlDb } from '../../identity/kernel/control-index.ts';
+import { GUEST_OWNER, noteFirstItem } from '../../identity/kernel/guests.ts';
 import { standingOf } from '../../identity/kernel/standing.ts';
 import { bundlesHere } from '../../loader/kernel/packstate.ts';
 import { packsNamed } from '../../loader/kernel/bundles.ts';
@@ -43,6 +44,14 @@ function outward(l: Archipelago, pack: string): string | undefined {
   if (p.hosts.length || p.secrets.length || p.webhooks.length || p.via.length || p.server) return `turn on ${pack}, which reaches outside the map`;
   if (p.schedules.length) return `turn on ${pack}, which runs on a schedule`;
   return undefined;
+}
+
+/** After a change on a guest map that made an item: its first, noted once, for the count from click to first item (e_neesnubg). */
+export async function guestAfter(l: Archipelago, name: string, answer: unknown): Promise<void> {
+  const made = (answer as { status?: string; created?: Record<string, string> } | undefined) ?? {};
+  if (name !== 'change' || made.status !== 'applied' || !Object.keys(made.created ?? {}).length || !(await standingOf(l.workspace))?.guest) return;
+  const control = await controlDb();
+  if (control) await noteFirstItem(control, l.workspace);
 }
 
 /**

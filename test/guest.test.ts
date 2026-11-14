@@ -206,3 +206,20 @@ test('a type whose pack reaches outside comes as data, and the pack itself waits
   const key = copy.result.link.split('/g/')[1];
   assert.match((await call('/agent/pack_set', key, { pack: 'tides', on: true })).error, /reaches outside the map: sign in/);
 });
+
+test('the operator counts how many guest maps reach a first item, and how fast, naming none', async () => {
+  const { workspaces, call, base } = await serve('tokens');
+  const operator = (await workspaces.ensureOperator())!;
+  const counts = async (secret?: string) => (await fetch(`${base}/guest/counts`, { headers: secret ? { authorization: `Bearer ${secret}` } : {} })).json();
+  assert.match((await counts()).error, /operator/);
+  const drawn = (await call('/guest', undefined, {})).result, idle = (await call('/guest', undefined, {})).result;
+  assert.ok(idle.workspace.id);
+  const key = drawn.link.split('/g/')[1];
+  assert.equal((await call('/agent/change', key, { reason: 'The project', ops: [{ op: 'create', type: 'work', title: 'Lantern' }] })).result?.status, 'applied');
+  await call('/agent/change', key, { reason: 'More', ops: [{ op: 'create', type: 'task', title: 'Later' }] });
+  const { result } = await counts(operator);
+  assert.equal(result.made, 2, 'the map made ahead and never taken is not counted');
+  assert.equal(result.first_item, 1);
+  assert.ok(result.seconds.median >= 0 && result.seconds.median < 30, JSON.stringify(result));
+  assert.deepEqual(Object.keys(result).sort(), ['first_item', 'made', 'seconds']);
+});

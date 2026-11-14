@@ -25,6 +25,10 @@ export interface Guest {
   expires_at: string;
   /** When signing in kept it: it is then a workspace like any other. */
   saved?: string;
+  /** A visitor's click took it (one made ahead and never taken has none): `made` is then that click. */
+  clicked?: true;
+  /** When its first item was written through its tools: what the 30 seconds are counted to (e_neesnubg). */
+  first_item?: string;
 }
 
 const KEY = 'guest:';
@@ -35,9 +39,9 @@ export const isGuestId = (id: string) => /^guest-[a-f0-9]{12}$/.test(id);
 
 export const guestOf = (control: Q, workspace: string) => controlValue<Guest>(control, guestKey(workspace));
 
-/** Note a new workspace as a guest map, from now. */
-export async function markGuest(control: Q, workspace: string, now = new Date()): Promise<Guest> {
-  const guest: Guest = { made: now.toISOString(), expires_at: new Date(now.getTime() + GUEST_DAYS * DAY).toISOString() };
+/** Note a new workspace as a guest map, from now: made ahead, or taken by a visitor's click. */
+export async function markGuest(control: Q, workspace: string, now = new Date(), clicked = false): Promise<Guest> {
+  const guest: Guest = { made: now.toISOString(), expires_at: new Date(now.getTime() + GUEST_DAYS * DAY).toISOString(), ...(clicked && { clicked: true as const }) };
   await setControlValue(control, guestKey(workspace), guest);
   standingChanged(workspace); // read as none while it opened
   return guest;
@@ -58,6 +62,24 @@ export function guestStanding(guest: Guest | undefined, now = new Date()): Stand
   const ends = Date.parse(guest.expires_at);
   if (now.getTime() < ends) return { limits: LIMITS, guest: true };
   return { limits: LIMITS, guest: true, ended: { since: guest.expires_at, delete_at: new Date(ends + GUEST_GRACE_DAYS * DAY).toISOString(), note: `A guest map is kept for ${GUEST_DAYS} days unless someone signs in to save it.` } };
+}
+
+/** Note a guest map's first item, once: the change that wrote it was made through its tools (packs/surface/kernel/guest-gate.ts). */
+export async function noteFirstItem(control: Q, workspace: string, now = new Date()): Promise<void> {
+  const guest = await guestOf(control, workspace);
+  if (guest?.clicked && !guest.first_item) await setControlValue(control, guestKey(workspace), { ...guest, first_item: now.toISOString() });
+}
+
+/**
+ * The number to watch (e_neesnubg), counts only: how many guest maps a click took, how many of them reached a first
+ * item, and the seconds from the click to it (the median and the slowest tenth). No map and no person is named.
+ */
+export async function guestCounts(control: Q): Promise<{ made: number; first_item: number; seconds: { median: number; p90: number } | null }> {
+  const { rows } = await control.query<{ value: Guest }>(`select value from control_value where key like 'guest:%'`);
+  const clicked = rows.map((r) => r.value).filter((g) => g.clicked);
+  const took = clicked.filter((g) => g.first_item).map((g) => (Date.parse(g.first_item!) - Date.parse(g.made)) / 1000).sort((a, b) => a - b);
+  const at = (share: number) => Math.round(took[Math.min(took.length - 1, Math.floor(share * took.length))] * 10) / 10;
+  return { made: clicked.length, first_item: took.length, seconds: took.length ? { median: at(0.5), p90: at(0.9) } : null };
 }
 
 /** The guest maps whose day to be deleted has come. */

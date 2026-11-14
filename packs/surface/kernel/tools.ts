@@ -29,7 +29,7 @@ import { READ_TOOLS } from './tool-reads.ts';
 import { readsSaid, toolsSaid } from './tool-said.ts';
 import { declaredTools, type DeclaredTool } from './tool-input.ts';
 import { serverFillings } from './server-fillings.ts';
-import { guestGate } from './guest-gate.ts';
+import { guestAfter, guestGate } from './guest-gate.ts';
 
 export { configureBackup, configureRestart, devMode } from './tool-config.ts';
 export { describeChanges, humanChanges, latestSeq, type HumanChange } from './tool-reads.ts';
@@ -185,5 +185,6 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   // A session that has just started is named by the run its answer gives, so its first step is already its own.
   const begun = tool.begins && typeof (answer as { run?: unknown })?.run === 'string' ? { run: (answer as { run: string }).run } : {};
   if (actor.kind === 'agent' && !surface) await step(l, actor, name, { ...(parsed.data as Record<string, unknown>), ...begun }, tool).catch((err) => console.error(`${name}: the session's step could not be kept: ${(err as Error).message}`));
+  await guestAfter(l, name, answer).catch((err: Error) => console.error(`guest map: its first item could not be noted: ${err.message}`));
   return answer;
 }

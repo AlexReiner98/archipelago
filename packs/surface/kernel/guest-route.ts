@@ -3,6 +3,7 @@
 //                      copy of a shared map (./guest-copy.ts), and answers with the link for the visitor's agent, the
 //                      sentence to paste into it, and the token the page acts as the map's owner with
 //   GET  /g/<key>      what the agent reads first: a few plain lines on what to write, and how (./guest-words.ts)
+//   GET  /guest/counts  for the operator: how many guest maps reached a first item, and how fast (e_neesnubg)
 // The key is an agent token of that map alone, so the agent writes as any agent does, POST /agent/change with the key
 // as its bearer: there is no second write path. Its changes apply at once, whatever they are: a guest map has holds off
 // from the start, so nothing waits for a person, since the agent's own permission prompts already ask (the owner,
@@ -10,8 +11,8 @@
 // Both answer before the server's own routes (./surface-slots.ts), counted against the address's open limit.
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { createToken, verifyToken, workspaceOf } from '../../identity/kernel/auth.ts';
-import { GUEST_DAYS, GUEST_GRACE_DAYS, GUEST_ITEMS, guestOf, guestStanding, isGuestId, markGuest, newGuestId } from '../../identity/kernel/guests.ts';
+import { bearer, createToken, verifyToken, workspaceOf } from '../../identity/kernel/auth.ts';
+import { GUEST_DAYS, GUEST_GRACE_DAYS, GUEST_ITEMS, guestCounts, guestOf, guestStanding, isGuestId, markGuest, newGuestId } from '../../identity/kernel/guests.ts';
 import { HOLDS_OFF } from '../../rules/kernel/rules.ts';
 import type { Actor } from '../../write/kernel/pelago.ts';
 import { copyShared, sharedAt } from './guest-copy.ts';
@@ -75,7 +76,7 @@ export const guestMake: RouteFilling = {
     const ws = await workspaces.get(id);
     const done = workspaces.hold(id);
     try {
-      const guest = await markGuest(control, id); // its days count from the click, not from when it was made
+      const guest = await markGuest(control, id, new Date(), true); // its days count from the click, not from when it was made
       const me = await ws.pelago.setting<string>('me');
       let copied: number | undefined;
       try {
@@ -109,5 +110,16 @@ export const guestLink: RouteFilling = {
     const ended = guestStanding(await guestOf(await workspaces.control(), id))?.ended;
     if (ended) return text(res, 410, `This guest map ended on ${ended.since.slice(0, 10)} and takes no more writes. Tell your user: signing in keeps a map; this one is deleted on ${ended.delete_at.slice(0, 10)}.\n`);
     return text(res, 200, guestWords(originOf(req), key, id, (await ws.pelago.setting<string>('me')) ?? ''));
+  },
+};
+
+/** GET /guest/counts: how many guest maps a click took, how many reached a first item, and how fast (guestCounts). The operator's. */
+export const guestCountsRoute: RouteFilling = {
+  method: 'GET',
+  path: /^\/guest\/counts$/,
+  serve: async (req, res, _match, { workspaces, tooOften }) => {
+    if (tooOften('open')) return;
+    if (!(await workspaces.isOperator(bearer(req.headers.authorization)))) return json(res, 401, { error: 'The operator secret is required.' }, PRIVATE);
+    return json(res, 200, { result: await guestCounts(await workspaces.control()) }, PRIVATE);
   },
 };
