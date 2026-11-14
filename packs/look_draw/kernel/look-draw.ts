@@ -47,6 +47,18 @@ export interface Drawn {
   fell_back?: { asked: string; drawn: string }[];
   /** What the page's parts drew with, one for each island it drew parts on (packs/loader/kernel/pack-versions.ts, Drew). */
   drew?: unknown[];
+  /** A dry run's: what its drawings said went wrong, each once, the first first. */
+  errors?: string[];
+}
+
+/** Code not yet saved, drawn in place of a field the map holds (packs/surface/kernel/tool-preview.ts, Preview): the page's tries, set before its code runs. */
+export interface Try {
+  item: string;
+  field: string;
+  value: unknown;
+  title: string;
+  drawing?: unknown;
+  at: number;
 }
 
 /** A drawing as marks: what an inline view mounts, with no code of the drawing's. */
@@ -91,10 +103,10 @@ async function turn(): Promise<() => void> {
 }
 
 /** Draw `address` (the app's page in look mode, or a document's preview) at this size, once it has a turn. */
-export async function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks = false): Promise<Drawn> {
+export async function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks = false, tries?: Try[]): Promise<Drawn> {
   const done = await turn();
   try {
-    return await drawNow(address, pass, width, height, scheme, marks);
+    return await drawNow(address, pass, width, height, scheme, marks, tries);
   } finally {
     done();
   }
@@ -144,7 +156,16 @@ async function facesOf(tab: Tab): Promise<Drawn['fell_back']> {
   return out.size ? [...out].map(([asked, drawn]) => ({ asked, drawn })) : undefined;
 }
 
-async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks: boolean): Promise<Drawn> {
+/** What a page's drawings say went wrong, as they show it (packs/walls/page/style-code.js, `lens-error`): the text of each shown. */
+const SHOWN_ERRORS = `[...document.querySelectorAll('.lens-error')].filter((el) => !el.hidden && el.textContent.trim()).map((el) => el.textContent.trim())`;
+
+/** A dry run's errors: what the page said, then each shown, each once; a drawing that never said it drew, said so. */
+export function errorsOf(state: Drawn['state'], why: string | undefined, shown: string[]): string[] {
+  const out = [...(state === 'error' || state === 'late') && why ? [why] : [], ...shown];
+  return [...new Set(out.map((e) => e.slice(0, 300)))];
+}
+
+async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks: boolean, tries?: Try[]): Promise<Drawn> {
   clearTimeout(idle);
   const began = Date.now();
   const tab = await (await getBrowser()).tab();
@@ -157,6 +178,8 @@ async function drawNow(address: string, pass: string, width: number, height: num
     await tab.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }] });
     // The pass is the page's token for this one look: put where the page reads its token, before any of its code runs.
     await tab.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem('pelago-token', ${JSON.stringify(pass)}); } catch {}` });
+    // A dry run's code, where the page's tries are read (packs/surface/page/preview.js) before its first drawing: data, never run here.
+    if (tries?.length) await tab.send('Page.addScriptToEvaluateOnNewDocument', { source: `globalThis.lookTries = ${JSON.stringify(tries)};` });
     await tab.send('Page.navigate', { url: address });
     let said: { state?: string; why?: string } = {};
     for (const until = Date.now() + DRAW_MS; Date.now() < until; await wait(150)) {
@@ -179,7 +202,8 @@ async function drawNow(address: string, pass: string, width: number, height: num
     const fell_back = await facesOf(tab).catch(logged(`look ${address}: its faces could not be read`));
     const drew = await tab.evaluate<unknown[] | null>('window.lookDrew ? window.lookDrew() : null').catch(logged(`look ${address}: what it drew with could not be read`, null));
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
-    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }) };
+    const errors = tries?.length ? errorsOf(state, why, (await tab.evaluate<string[]>(SHOWN_ERRORS).catch(logged(`look ${address}: its errors could not be read`, []))) ?? []) : undefined;
+    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(errors && { errors }) };
   } catch (err) {
     throw Date.now() - began >= LATE_MS ? new Error(`The view had not drawn within ${LATE_MS / 1000} s, and its page stopped answering: it was closed.`) : err;
   } finally {

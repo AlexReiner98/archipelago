@@ -2,7 +2,7 @@
 // The apply loop of the one write path (packs/write/kernel/pelago.ts), which calls it once the rules have let the change through.
 
 import { newId, type Q } from '../../database/kernel/db.ts';
-import { bodyAfter, dropExcepted } from './ops.ts'; import { ownerFollows } from './owner-link.ts';
+import { bodyAfter, dropExcepted } from './ops.ts'; import { editsResolved } from './edit.ts'; import { ownerFollows } from './owner-link.ts';
 import { roomToStore, stillWritable } from '../../identity/kernel/standing.ts';
 import { after, followedStill, rewrite, riders, type Followed } from './write-hooks.ts';
 import { typesAfter } from '../../loader/kernel/type-items.ts';
@@ -25,7 +25,8 @@ const privateTo = (map: Archipelago, visibility: string, to?: string | null): st
  * the ids it would make, with nothing written; ids: those ids, to make the same ones again.
  */
 export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string>; privateTo?: string | null; followed?: Followed } = {}) {
-  const ops = dropExcepted(input.ops, opts.except ?? []); await stillWritable(map.workspace); if (!opts.dry) await roomToStore(map.workspace);
+  // A reviewer's corrected ops may edit a code field too: the whole field it leaves is what applies (packs/write/kernel/edit.ts).
+  const ops = (await editsResolved(map.registry, dropExcepted(input.ops, opts.except ?? []), async (id) => (await map.entity(id)) ?? null)).ops; await stillWritable(map.workspace); if (!opts.dry) await roomToStore(map.workspace);
   if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
   // Validate again: the map may have changed since this was proposed. A new item naming no island is placed again (packs/loader/kernel/island-items.ts).
   await rewrite({ map, reg: map.registry }, ops);

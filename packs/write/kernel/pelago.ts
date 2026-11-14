@@ -12,7 +12,7 @@ import { layoutOf } from '../../rules/kernel/layout-changes.ts';
 import { append, headOf, type Fact } from '../../log/kernel/log.ts'; import { projectDecision, projectFacts, stamp } from '../../log/kernel/replay.ts'; import { linkFacts } from '../../log/kernel/facts.ts';
 import { decideProposal } from './proposals.ts'; import { needHuman } from '../../identity/kernel/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
+import { planChange } from './change-plan.ts'; import { editsResolved } from './edit.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
 
 export * from './pelago-types.ts';
 export type { Level, OpKind, Policy } from '../../rules/kernel/rules.ts';
@@ -106,6 +106,10 @@ export class Archipelago {
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
+    // An edit of a code field is the whole field it leaves from here on: judged, held and logged as any update (packs/write/kernel/edit.ts).
+    const { ops: whole, edited } = await editsResolved(this.registry, input.ops, async (id) => (await this.entity(id)) ?? null);
+    input = { ...input, ops: whole };
+    const said = edited.length ? { edited } : {};
     // The write path's hook points (packs/write/kernel/write-hooks.ts): rewrite, then who may write, then what follows the change, then
     // validate as it is planned. The verdict covers every op, what followed included.
     currentNames(this.registry, input.ops); await rewrite({ map: this, reg: this.registry, island: input.island }, input.ops); await stillWritable(this.workspace); await roomToStore(this.workspace); await mayWrite(this, actor, input.ops, measured);
@@ -149,12 +153,12 @@ export class Archipelago {
         status: 'proposed' as const,
         proposal: id,
         held_by: verdict.by,
-        warnings, would_make: would,
+        warnings, would_make: would, ...said,
         note: 'Nothing has changed yet: this waits for a person. would_make names what it makes once approved. Those ids do not exist until then, so send what builds on them in this same change, or carry on with other work.',
       };
     }
     const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];
-    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared }, ...(followed.length && { followed }) })), ...letThrough(verdict.spared) };
+    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared }, ...(followed.length && { followed }) })), ...letThrough(verdict.spared), ...said };
     return answered.length ? { ...applied, answered } : applied;
   }
 

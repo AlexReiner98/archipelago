@@ -47,6 +47,8 @@ export interface UpdateOp {
   append?: string;
   /** One exact passage of the note, which must be there once, and what goes in its place. */
   replace?: { find: string; with: string };
+  /** One exact passage of a code field (a module of it, by file, for modules by name) and what goes in its place: made into the whole field before the change is judged (packs/write/kernel/edit.ts). base: the text's sha256 as it was read. */
+  edit?: { field: string; file?: string; find: string; with: string; base?: string };
   status?: string;
   owner?: string | null;
   visibility?: 'private' | 'shared' | 'public';

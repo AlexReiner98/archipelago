@@ -9,7 +9,7 @@ import test from 'node:test';
 import { agent, fresh, human, make } from './map.ts';
 import { callTool } from '../packs/surface/kernel/tools.ts';
 import { codeFields, fromFiles, record, toFiles } from '../scripts/map-code-files.ts';
-import { pull, push, status, type Call } from '../scripts/map-code.ts';
+import { pull, push, status, tryFolder, type Call } from '../scripts/map-code.ts';
 
 const DRAW = 'export default function draw({ canvas }) {\n  canvas.getContext("2d");\n}\n';
 
@@ -77,6 +77,30 @@ test('pull, edit, push: one change; a map that moved refuses the push; an agentâ
     assert.deepEqual((await status(as(human), folder)).changed, ['index.js']);
     unlinkSync(join(folder, 'index.js'));
     assert.deepEqual((await status(as(human), folder)).changed, ['index.js']);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
+  }
+});
+
+test('try: the changed fields go to query look as tries, the picture is saved beside the folder, errors come back first', async () => {
+  const l = await fresh();
+  const { l: id } = (await make(l, [{ op: 'create', ref: 'l', type: 'layout', title: 'Sample', props: { code: DRAW } }])) as any;
+  const real: Call = (tool, body) => callTool(l, human, tool, body) as Promise<any>;
+  const folder = mkdtempSync(join(tmpdir(), 'map-code-'));
+  const asked: any[] = [];
+  // The look itself needs the server's Chrome (test/looks.test.ts): here, what is sent and what is done with the answer.
+  const looking = (answer: Record<string, unknown>): Call => async (tool, body) => (tool === 'query' && body.name === 'look' ? (asked.push(body.params), answer) : real(tool, body));
+  try {
+    await pull(real, 'local', id, folder);
+    const png = Buffer.from('a picture').toString('base64');
+    const same = await tryFolder(looking({ state: 'drawn', image: { data: png, content_type: 'image/png' } }), folder);
+    assert.deepEqual([same.changed, same.errors, asked[0].tries, asked[0].fresh, asked[0].style], [[], [], undefined, true, { id }], 'nothing changed: drawn as the map holds it');
+    assert.equal(readFileSync(same.picture!, 'utf8'), 'a picture');
+    writeFileSync(join(folder, 'index.js'), DRAW.replace('2d', 'webgl2'));
+    const broken = await tryFolder(looking({ state: 'error', why: 'It threw', errors: ['It threw'] }), folder, { entity: id });
+    assert.deepEqual([broken.changed, broken.errors, broken.picture], [['index.js'], ['It threw'], undefined]);
+    assert.deepEqual(asked[1], { entity: id, tries: [{ item: id, field: 'code', value: DRAW.replace('2d', 'webgl2') }] });
+    assert.deepEqual(await status(real, folder), { changed: ['index.js'], moved: [] }, 'a try sends nothing to the map');
   } finally {
     rmSync(folder, { recursive: true, force: true });
   }
