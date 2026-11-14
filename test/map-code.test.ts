@@ -57,9 +57,16 @@ test('pull, edit, push: one change; a map that moved refuses the push; an agentâ
     assert.deepEqual(refused.moved, ['code']);
     assert.match(((await callTool(l, human, 'query', { name: 'get', params: { id, full: true } })) as any).entity.props.code, /bitmaprenderer/);
 
+    // The map takes the folder's edit another way (a try kept with the page's Save): the folder catches up, nothing moved.
+    await make(l, [{ op: 'update', id, props: { code: DRAW.replace('2d', 'webgpu') } }]);
+    assert.deepEqual(await status(as(human), folder), { changed: [], moved: [] });
+    assert.equal((await push(as(human), folder)).status, 'unchanged');
+    await make(l, [{ op: 'update', id, props: { code: DRAW.replace('2d', 'bitmaprenderer') } }]);
+    writeFileSync(join(folder, 'index.js'), DRAW.replace('2d', 'webgl'));
+
     // Pull again refuses to throw away an edit not pushed; with it undone, the pull takes the map's.
     await assert.rejects(pull(as(human), 'local', id, folder), /changes not pushed/);
-    writeFileSync(join(folder, 'index.js'), DRAW.replace('2d', 'webgl2'));
+    writeFileSync(join(folder, 'index.js'), DRAW.replace('2d', 'webgpu'));
     await pull(as(human), 'local', id, folder);
     assert.match(readFileSync(join(folder, 'index.js'), 'utf8'), /bitmaprenderer/);
 

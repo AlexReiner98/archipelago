@@ -111,11 +111,23 @@ export interface Pushed {
   proposal?: string;
 }
 
+/**
+ * When the map holds just what the folder does (a try kept with the page's Save, the same edit sent another way), the
+ * folder's record moves to it: nothing is changed here, and nothing moved. Answers whether it did.
+ */
+function caughtUp(folder: string, pulled: Pulled, fields: CodeField[], entity: any): boolean {
+  const now = record({ ...pulled, updated_at: entity.updated_at }, fields, toFiles(fields, entity.props ?? {}));
+  if (fromFiles(now, readFolder(folder)).changed.length) return false;
+  writeFileSync(join(folder, MANIFEST), JSON.stringify(now, null, 2) + '\n');
+  return true;
+}
+
 /** What changed in the folder since the pull, and whether the map moved under it. */
 export async function status(call: Call, folder: string): Promise<{ changed: string[]; moved: string[] }> {
   const pulled = manifestOf(folder);
   const { changed } = fromFiles(pulled, readFolder(folder));
   const { entity, fields } = await read(call, pulled.item);
+  if (changed.length && caughtUp(folder, pulled, fields, entity)) return { changed: [], moved: [] };
   return { changed, moved: moved(pulled, fields, entity.props ?? {}) };
 }
 
@@ -128,6 +140,7 @@ export async function push(call: Call, folder: string, opts: { force?: boolean; 
   const { props, changed } = fromFiles(pulled, readFolder(folder));
   if (!changed.length) return { status: 'unchanged', changed };
   const { entity, fields } = await read(call, pulled.item);
+  if (caughtUp(folder, pulled, fields, entity)) return { status: 'unchanged', changed: [] };
   const away = moved(pulled, fields, entity.props ?? {});
   if (away.length && !opts.force) return { status: 'moved', changed, moved: away };
   const res = await call('change', {
