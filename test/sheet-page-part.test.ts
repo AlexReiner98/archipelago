@@ -38,6 +38,21 @@ test('the page draws its head, note, fields, source and history as marks the hos
   assert.ok(text.indexOf('section:source') < text.indexOf('sheet.sections') && text.indexOf('sheet.sections') < text.indexOf('section:history'));
 });
 
+test('a part its style folds is one quiet row, opened with a click; the note stays (page.head, fields, source, history)', async () => {
+  const folds = ['head', 'fields', 'source', 'history'];
+  const input = { item: task, words, piece: { folds }, views: { item: {}, history: { events: [] } } };
+  const marks = pageMarks(input, { draft: { fields: {} }, open: new Set() });
+  assert.doesNotThrow(() => checkMarks(noSlots(marks), { kinds }));
+  const text = JSON.stringify(marks);
+  for (const part of folds) assert.ok(text.includes(`unfold:${part}`) && !text.includes(`section:${part}`), part);
+  assert.ok(text.includes('section:note'), 'the note is drawn');
+  // Told what the item page read of its style, the part keeps it; with none, nothing folds.
+  assert.deepEqual(pageTold({}, { name: 'page', item: task, folds: ['head'] }).piece.folds, ['head']);
+  assert.deepEqual(pageTold({}, { name: 'page', item: task }).piece.folds, []);
+  const opened = pageMarks(input, { draft: { fields: {} }, open: new Set(['part:history']) });
+  assert.ok(JSON.stringify(opened).includes('section:history'), 'opened, it is drawn whole');
+});
+
 test('a field is drawn by its kind: a pick for its values, a box for words, nothing to change for the system', () => {
   assert.equal(fieldMarks('size', 'm', words.types.task.fields.size, { writes: true })[1].kind, 'pick');
   assert.equal(fieldMarks('due', null, words.types.task.fields.due, { writes: true })[1].kind, 'date');
