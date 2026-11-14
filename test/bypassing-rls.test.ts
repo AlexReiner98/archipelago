@@ -16,6 +16,7 @@ const count = (pattern: RegExp) =>
 const CALLERS: Record<string, number> = {
   'packs/surface/kernel/backup-tools.ts': 1,
   'packs/identity/kernel/members.ts': 4,
+  'packs/identity/kernel/guest-keep.ts': 1, // keeping a guest map: the member row for the signing-in email and the system's tick of the plan's sign-in step, as members.ts signs a person in (approved by Alex, 14 Nov 2026, PR #387)
   'packs/walls/kernel/notify-mail.ts': 2,
   'packs/loader/kernel/pack-launch.ts': 1,
   'packs/write/kernel/root-notify.ts': 1, // root.notify: who a notification made by the system is for, the workspace's owner, read whole as packs/notifications/kernel/notify.ts read it
