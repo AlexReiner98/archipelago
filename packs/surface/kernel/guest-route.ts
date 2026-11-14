@@ -53,7 +53,16 @@ async function seedInstall(l: Archipelago, actor: Actor, prompt: string, origin:
   // On the island of the pack its type is of, named: a copy of a shared map has several.
   const pack = l.registry.type(type)?.pack ?? 'core';
   const island = (await l.db.query<{ id: string }>(`select id from entity where type = 'island' and props->>'pack' = $1 and archived_at is null limit 1`, [pack])).rows[0]?.id;
-  const done = (await l.change(actor, { reason: 'The install note a guest map starts with', ops: [{ op: 'create', ref: 'n', type, title: INSTALL_TITLE, body: installNote(prompt, origin), ...(island && { props: { island } }) }] } as never)) as { status: string; created?: Record<string, string> };
+  // Its page opens on its words, the head folded a click away: a style about it, as any item's page is shaped (the
+  // owner, 14 Nov 2026: "Yes, hide them").
+  const done = (await l.change(actor, {
+    reason: 'The install note a guest map starts with',
+    ops: [
+      { op: 'create', ref: 'n', type, title: INSTALL_TITLE, body: installNote(prompt, origin), ...(island && { props: { island } }) },
+      { op: 'create', ref: 's', type: 'style', title: 'The install note opens on its words', status: 'current', props: { page: { head: 'closed' } } },
+      { op: 'link', type: 'about', from: 's', to: 'n' },
+    ],
+  } as never)) as { status: string; created?: Record<string, string> };
   const id = done.created?.n;
   if (done.status !== 'applied' || !id) throw new Error(`The install note was not made (${done.status}).`);
   await l.db.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do update set value = excluded.value`, [INSTALL, JSON.stringify(id)]);

@@ -46,7 +46,7 @@ function fillSlots(m, above, sections) {
 }
 
 /** What the page part is told of the page, as data: the item, its links, source, owner and history, its note's count. */
-function told(data, past, owner, count, named) {
+function told(data, past, owner, count, named, head) {
   const e = data.entity;
   const tie = (r) => ({ type: r.type, root: rootOf(r.type) });
   const names = {};
@@ -59,6 +59,8 @@ function told(data, past, owner, count, named) {
       history: { events: past.map(({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail }) => ({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail: { ...(detail?.undone_by && { undone_by: detail.undone_by }), ...(detail?.forgot && { forgot: true }) } })), names },
     },
     ...(count && { count }),
+    // How its own style opens the head (page.head: closed folds it a click away), a style on its type or about it.
+    ...(typeof head === 'string' && { head }),
   };
 }
 
@@ -90,11 +92,13 @@ export async function entity(id, here) {
   };
   const run = isA(e.type, 'run');
   const session = run && e.is_open && !e.archived_at;
-  const [owner, { doc }, plan, shared] = await Promise.all([
+  const [owner, { doc }, plan, shared, ownStyle] = await Promise.all([
     e.owner ? api('get', { id: e.owner }).then((r) => r.entity, () => null) : null,
     readWhole(e.type) ? readDocument(id) : { doc: null },
     !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? api('publish_plan', { within: id }).catch(() => null) : null,
     publicOf(id),
+    // The item's own style (one on its type, or about it): how its page opens.
+    api('view', { name: 'style', params: { of: id } }).then((r) => r?.style ?? null, () => null),
   ]);
   const shown = doc && type?.public ? await api('published', { id }).catch(() => null) : null;
   const bands = await Promise.all((await heldHere).map((p) => heldBand(p, again)));
@@ -183,8 +187,8 @@ export async function entity(id, here) {
     ]),
   );
   // A document reads in its note's place as it will publish (the publish pack's reading), above the page's note.
-  const reading = doc && readingOf(e, doc, (await api('view', { name: 'style', params: { of: id } }).catch(() => null))?.style ?? state.style, again);
-  const said = told(data, past, owner, countOn(data), named);
+  const reading = doc && readingOf(e, doc, ownStyle ?? state.style, again);
+  const said = told(data, past, owner, countOn(data), named, ownStyle?.page?.head);
   const sections = sectionsOn(data);
   const above = [...bands, acting, reading && h('section', { class: 'page-section note' }, reading)].filter(Boolean);
 
