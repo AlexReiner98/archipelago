@@ -113,19 +113,25 @@ function writer(name, v, field, { fold = 80 } = {}) {
 
 /**
  * Code to write, in the host's code editor: its text, or one module of its modules by name, picked (`code-file:<name>`;
- * each module's words go back by `code:<name>:<module>`). A field that is one JavaScript module whole is tried as it is
- * written (`preview`): the host sends each pause as a try, drawn on the person's own canvas (task e_pbdxaxdy).
+ * each module's words go back by `code:<name>:<module>`). Code that is one JavaScript module whole, or files by path
+ * where its field takes them (`files`), is tried as it is written (`preview`): the host sends each pause as a try,
+ * drawn on the person's own canvas (task e_pbdxaxdy). For files, it is handed the others as written (`others`) to send
+ * the field whole, and whether any of them differs from what is saved (`edited`).
  */
-function coder(name, v, field, { item, file } = {}) {
+function coder(name, v, field, { item, file, saved } = {}) {
   const mods = modulesOf(v);
   if (typeof v !== 'string' && !mods) return null;
   if (typeof v === 'string' || v === undefined) return ['input', { key: `field:${name}`, kind: 'code', lang: langOf(field), value: v ?? '', ...(item && !field?.css && { preview: { item, field: name } }) }];
   const names = Object.keys(mods).sort();
   if (!names.length) return null;
   const at = names.includes(file) ? file : names.includes('index.js') ? 'index.js' : names[0];
+  const others = Object.fromEntries(names.filter((n) => n !== at).map((n) => [n, mods[n]]));
+  const was = modulesOf(saved) ?? {};
+  const edited = names.some((n) => n !== at && mods[n] !== was[n]) || Object.keys(was).some((n) => !(n in mods));
+  const tried = item && field?.files && { preview: { item, field: name, file: at, others, ...(edited && { edited }) } };
   return ['box', { flow: 'column', gap: 1 },
     ['input', { key: `code-file:${name}`, kind: 'pick', values: names, value: at, tip: 'Which module' }],
-    ['input', { key: `code:${name}:${at}`, kind: 'code', lang: langOf(field, at), value: mods[at] }]];
+    ['input', { key: `code:${name}:${at}`, kind: 'code', lang: langOf(field, at), value: mods[at], ...tried }]];
 }
 
 /**
@@ -138,7 +144,7 @@ export function fieldMarks(name, v, field, { writes = false, open = false, kept,
   if (pick) return pick;
   if (typeof v === 'string' && ID.test(v) && open) return ['input', { key: `field:${name}`, kind: 'item', hint: 'Find an item', focus: true }];
   if (typeof v === 'string' && ID.test(v)) return ['box', { flow: 'row', gap: 1 }, one(v), ['button', { key: `field-open:${name}`, look: 'quiet', tip: 'Name another item' }, '✎']];
-  const code = field?.code && (open || kept !== undefined) && coder(name, kept === undefined ? v : kept, field, { item, file });
+  const code = field?.code && (open || kept !== undefined) && coder(name, kept === undefined ? v : kept, field, { item, file, saved: v });
   if (code) return ['box', { flow: 'column', gap: 1 }, ['box', { flow: 'row' }, ['button', { key: `field-fold:${name}`, look: 'quiet', tip: kept === undefined ? 'Fold it' : 'Fold it: what is written waits for Save' }, '▴']], code];
   if (open || kept !== undefined) return writer(name, kept === undefined ? v : kept, field, { fold });
   return ['box', { flow: 'row', gap: 1 }, valueMarks(name, v, field, { fold }), ['button', { key: `field-open:${name}`, look: 'quiet', tip: 'Change it' }, '✎']];

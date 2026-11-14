@@ -127,3 +127,21 @@ test('the checker keeps lang and preview to code', () => {
   assert.throws(() => checkMarks(['input', { key: 'k', kind: 'code', preview: { item: 'nope', field: 'code' } }]), /preview/);
   assert.doesNotThrow(() => checkMarks(['input', { key: 'k', kind: 'code', lang: 'css', value: 'a {}' }]));
 });
+
+test('code as files, where its field takes them, is tried whole: the file written beside the others', async () => {
+  const filed = { ...words, types: { ...words.types, layout: { ...words.types.layout, fields: { code: { type: 'json', code: true, files: true } } } } };
+  const item = { ...layout, props: { code: { 'index.js': "import { a } from './a.js';\n", 'a.js': 'export const a = 1;\n' } } };
+  const p = page({ item, words: filed, views: {} }, { change: async () => ({ status: 'applied' }), keep: () => {}, state: () => {} });
+  let marks = await p.on({ key: 'field-open:code', name: 'press' });
+  assert.doesNotThrow(() => checkMarks(noSlots(marks), { kinds: Object.keys(MARKS) }));
+  assert.deepEqual(inputs(marks).find((i) => i.key === 'code:code:index.js')?.preview, { item: layout.id, field: 'code', file: 'index.js', others: { 'a.js': 'export const a = 1;\n' } });
+  // Another file written: the one in sight is tried with it, though it is as it was opened.
+  await p.on({ key: 'code:code:a.js', name: 'edit', value: 'export const a = 2;\n' });
+  marks = await p.on({ key: 'code-file:code', name: 'pick', value: 'index.js' });
+  assert.deepEqual(inputs(marks).find((i) => i.key === 'code:code:index.js')?.preview, { item: layout.id, field: 'code', file: 'index.js', others: { 'a.js': 'export const a = 2;\n' }, edited: true });
+  // Modules of a field that does not take files are not tried.
+  const mods = { ...layout, props: { modules: { 'index.js': 'x\n' } } };
+  const q = page({ item: mods, words, views: {} }, { change: async () => ({}), keep: () => {}, state: () => {} });
+  assert.equal(inputs(await q.on({ key: 'field-open:modules', name: 'press' })).find((i) => i.kind === 'code')?.preview, undefined);
+  assert.throws(() => checkMarks(['input', { key: 'k', kind: 'code', preview: { item: layout.id, field: 'code', others: {} } }]), /preview/);
+});
