@@ -114,6 +114,10 @@ export interface PointerInfo {
   shift: boolean;
   /** Ctrl, or Cmd on a Mac. */
   ctrl: boolean;
+  /** Which pointer: each finger of a touch its own, so two can pinch. 0 where the event has none. */
+  id: number;
+  /** What the pointer is, as the browser says it. */
+  kind: 'mouse' | 'pen' | 'touch' | (string & {});
 }
 
 /** What a text field the page drew holds: its value, never a key typed. `done` when Enter or leaving it. */
