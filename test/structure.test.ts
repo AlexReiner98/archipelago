@@ -378,9 +378,11 @@ test('no read of the whole map', () => {
 // screen names (ui/screens.js calls it by the name its pack declares) is the pack's, and is not counted. `undo`, one of
 // the agents' ten tools, came on 2 Nov 2026 at the owner's word: the page takes a change back as an agent does.
 // `pack_secret_set`, the owner's alone, came on 12 Nov 2026 (bug e_hvf78a2x): the Packs screen gives a pack its secrets.
+// `press_grant`, a person's alone, came on 14 Nov 2026 (decision e_ssrawn4v): an admin's press on a part carries their
+// authority, minted by the server as they press, so no agent and no part's code can forge it.
 const PAGE_CALLS = [
   'backup_download', 'change', 'connections', 'decide', 'events', 'get', 'import_backup', 'init',
-  'launch', 'member_add', 'member_list', 'member_set', 'pack_secret_set', 'pack_set', 'packs', 'picture',
+  'launch', 'member_add', 'member_list', 'member_set', 'pack_secret_set', 'pack_set', 'packs', 'picture', 'press_grant',
   'proposals', 'publish', 'publish_all', 'publish_plan', 'published', 'schema', 'search', 'server_packs',
   'share_create', 'share_list', 'share_plan', 'share_revoke', 'tail',
   'token_create', 'token_list',

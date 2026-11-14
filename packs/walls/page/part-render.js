@@ -34,7 +34,7 @@ const drawnTip = new WeakMap();
 const sent = new WeakMap();
 
 /**
- * Draw a part into `root`. `tell(event, mark)` hears what the person does (with the mark pressed, for a press); `style` is the workspace's style (a paint surface
+ * Draw a part into `root`. `tell(event, mark, trusted)` hears what the person does (with the mark pressed, for a press, and whether the person made it); `style` is the workspace's style (a paint surface
  * moves by its numbers); `canvas(key, el)` is handed a paint surface's pixel canvas (`pixels: true`) once, for whoever
  * hosts the part to give it to the part; `thumb(view)` answers with the element that shows a view small, or nothing;
  * `picture(item, el)` draws a picture mark's item into its element; `lights(ids)` lights those items on the canvas
@@ -120,7 +120,7 @@ function build(node, ctx) {
     el = make('button', 'pm-swatch');
     el.type = 'button';
     el.append(make('span', 'pm-swatch-tile'), make('span', 'pm-swatch-name'));
-    el.addEventListener('click', () => drawnFrom.get(el)?.key !== undefined && ctx.tell({ key: drawnFrom.get(el).key, name: 'press' }, drawnFrom.get(el)));
+    el.addEventListener('click', (ev) => drawnFrom.get(el)?.key !== undefined && ctx.tell({ key: drawnFrom.get(el).key, name: 'press' }, drawnFrom.get(el), ev.isTrusted));
   }
   else if (node.mark === 'text' && node.at.href) {
     // An address on the web, opened apart: the page never follows it in place, and tells it nothing of where it came from.
@@ -140,8 +140,10 @@ function build(node, ctx) {
       // A button that copies: its words go to the clipboard, the button says whether they went, and the part hears it.
       // Told with the mark pressed, so the press lands on it though the part has moved its marks since (part-host.js).
       const node = drawnFrom.get(el);
-      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', ...shift, copied: await copied(el, at.copy) }, node);
-      if (!at.pick) return ctx.tell({ key, name: 'press', ...shift }, node);
+      // Whether the person pressed it (a trusted event, never one a script made): only such a press may carry an admin's authority.
+      const trusted = ev.isTrusted;
+      if (at.copy !== undefined) return ctx.tell({ key, name: 'press', ...shift, copied: await copied(el, at.copy) }, node, trusted);
+      if (!at.pick) return ctx.tell({ key, name: 'press', ...shift }, node, trusted);
       // A pick waits for the item clicked on the canvas; told back either way, null when it was let go.
       el.setAttribute('aria-pressed', 'true');
       const value = await ctx.pick(at.pick).catch(() => null);
