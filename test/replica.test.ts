@@ -275,6 +275,10 @@ test('a view whose query reads a field asks again when it moves; one made anywhe
   assert.equal(mayMove(named, fact('archived', '-')), true, 'brought back from the archive, it is asked again');
   assert.equal(mayMove(status, [], 1), true, 'a type term may find what was made anywhere');
   assert.equal(mayMove(named, [], 1), false, 'an id term finds nothing new');
+  // A view holds its lens as the answer gave it back, its terms on the lens itself: a guest's view of the work its agent
+  // writes heard nothing made until this was read (e_vq634f66).
+  const answered = { lens: { find: ['type work'], only: [], not: ['kind system'], walk: { over: ['waits_on'], steps: 1 }, limit: 500 }, items };
+  assert.equal(mayMove(answered, [{ id: 'e_bbbbbbbb', field: 'type', op: '+', made: true, island: 'e_iiiiiiii' }], 1), true, 'the lens as an answer gives it');
   const isle = { lens: { filter: { find: ['island e_iiiiiiii'] } }, items, islands: ['e_iiiiiiii'] };
   assert.equal(mayMove(isle, [], 1), false, 'one looking at an island hears only what is made there');
   assert.equal(mayMove(isle, [{ id: 'e_bbbbbbbb', field: 'type', op: '+', made: true, island: 'e_iiiiiiii' }]), true);
@@ -320,6 +324,16 @@ test('the tail follows the islands a page names: what lives on them is read, hel
   assert.ok(followed.has(on) && followed.has(n), 'what lives on the island followed, changed or made');
   assert.ok(!followed.has(off), 'not what lives on another');
   assert.equal((await named()).size, 0, 'with no island named, as with islands off: only what is held');
+});
+
+test('a page holding nothing is told what was made, so a view on an empty map asks again (e_vq634f66)', async () => {
+  const l = await fresh();
+  const start = await headPos(l.db);
+  const tail = (input: Record<string, unknown>) => callTool(l, human, 'tail', input) as Promise<any>;
+  assert.equal((await tail({ after: start, ids: [] })).made, 0, 'nothing made yet');
+  await make(l, [{ op: 'create', ref: 'p', type: 'work', title: 'Lantern' }]);
+  const beat = await tail({ after: start, ids: [] });
+  assert.deepEqual([beat.made, beat.entries.length], [1, 0], 'one made, and no facts read without ids');
 });
 
 test("a session's state and line come from the latest answer, whatever its row's position (e_j7hdfq9m)", async () => {

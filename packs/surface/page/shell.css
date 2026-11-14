@@ -387,6 +387,11 @@ body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; 
 .gate-row > input { flex: 1; min-width: 0; }
 .gate-row > button, .gate-row > a { flex: none; }
 .gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A guest map: where the recording of an agent drawing goes on a phone, and the sentence to paste, above find (packs/identity/page/guest.js). */
+.guest-recording { display: grid; place-items: center; aspect-ratio: 16 / 10; background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); }
+.guest-band { display: flex; align-items: center; gap: var(--space-6); min-width: 0; box-sizing: border-box; margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-6); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); font-size: var(--text-4); white-space: nowrap; }
+.guest-band > .gist { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.guest-band > button { flex: none; }
 .gate-others { display: flex; gap: var(--space-6); }
 .gate-error:empty { display: none; }
 .gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }

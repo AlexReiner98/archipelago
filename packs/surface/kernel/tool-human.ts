@@ -15,7 +15,7 @@ import { UI_DIRS } from './ui-files.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { eventsAfter, factsAfter, factsUpTo, HELD_MOST, headPos, ISLANDS_MOST } from '../../log/kernel/tail.ts';
+import { eventsAfter, factsAfter, factsUpTo, HELD_MOST, headPos, ISLANDS_MOST, madeAfter } from '../../log/kernel/tail.ts';
 import { typeItemsIn, typesTaken } from '../../loader/kernel/type-items.ts';
 import { movesAgain, syncTypes } from '../../loader/kernel/typetable.ts';
 
@@ -47,7 +47,8 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       const events = await eventsAfter(l.db, { seq, ids });
       const then = was === undefined ? {} : { was: await factsUpTo(l.db, { pos: was, ids }) };
       if (after === undefined) return { ...stand, pos, seq: events.seq, ...then };
-      const facts = ids.length ? await factsAfter(l.db, { after, ids, islands }) : { pos, entries: [], gone: [], made: 0 };
+      // Holding nothing, the page is still told how many items were made: a view of a type on an empty map asks again.
+      const facts = ids.length ? await factsAfter(l.db, { after, ids, islands }) : { pos, entries: [], gone: [], made: await madeAfter(l.db, after, pos) };
       return { ...stand, ...facts, seq: events.seq, events: events.ids, ...then };
     },
   },
