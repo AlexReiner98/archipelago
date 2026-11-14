@@ -12,12 +12,12 @@ import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { openDb, type Db } from '../packs/database/kernel/db.ts';
 import { human, packsWith } from './map.ts';
 
-/** A map on this database, opened with the packs of these folders, on a server that starts a new map with the kernel's alone (the test runner starts with every pack). */
-async function open(db: Db, dirs: string | string[]) {
+/** A map on this database, opened with the packs of these folders, on a server that starts a new map with the kernel's alone (the test runner starts with every pack), and allows only `only` where it names a list. */
+async function open(db: Db, dirs: string | string[], only?: string[]) {
   const was = process.env.PELAGO_START_PACKS;
   process.env.PELAGO_START_PACKS = 'core';
   try {
-    const l = new Archipelago(db, new Registry(dirs));
+    const l = new Archipelago(db, new Registry(dirs, only));
     await syncTypes(l);
     await syncPacks(l);
     l.registry.turnOff(await packsOff(l), false);
@@ -56,6 +56,20 @@ test("an app pack is on in a map that existed before it, and in a new one, until
   } finally {
     rmSync(before, { recursive: true, force: true });
     rmSync(after, { recursive: true, force: true });
+  }
+});
+
+test("an app pack is on where the server names a list of packs that leaves it out", async () => {
+  const own = packsWith('app_probe');
+  try {
+    // A hosted server allows a list (PELAGO_ONLY_PACKS) that names no app pack: the app's own screens stay on.
+    const db = await openDb();
+    await open(db, own, ['core']);
+    const l = await open(db, own, ['core']);
+    assert.ok(!(await packsOff(l)).includes('app_probe'), 'on in a map that has packs on its log');
+    assert.equal(l.registry.states.get('app_probe')?.state, 'active', 'and loaded, not "not enabled on this server"');
+  } finally {
+    rmSync(own, { recursive: true, force: true });
   }
 });
 
