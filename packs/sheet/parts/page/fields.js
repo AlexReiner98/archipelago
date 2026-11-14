@@ -8,6 +8,7 @@
 // has parts, `fields-empty` the fold of the fields that hold nothing.
 
 import { ago, label } from './words.js';
+import { langOf, modulesOf } from './code.js';
 
 const ID = /^e_[a-z0-9]{8}$/;
 const DAY = /^(\d{4})-(\d{2})-(\d{2})/;
@@ -111,15 +112,34 @@ function writer(name, v, field, { fold = 80 } = {}) {
 }
 
 /**
+ * Code to write, in the host's code editor: its text, or one module of its modules by name, picked (`code-file:<name>`;
+ * each module's words go back by `code:<name>:<module>`). A field that is one JavaScript module whole is tried as it is
+ * written (`preview`): the host sends each pause as a try, drawn on the person's own canvas (task e_pbdxaxdy).
+ */
+function coder(name, v, field, { item, file } = {}) {
+  const mods = modulesOf(v);
+  if (typeof v !== 'string' && !mods) return null;
+  if (typeof v === 'string' || v === undefined) return ['input', { key: `field:${name}`, kind: 'code', lang: langOf(field), value: v ?? '', ...(item && !field?.css && { preview: { item, field: name } }) }];
+  const names = Object.keys(mods).sort();
+  if (!names.length) return null;
+  const at = names.includes(file) ? file : names.includes('index.js') ? 'index.js' : names[0];
+  return ['box', { flow: 'column', gap: 1 },
+    ['input', { key: `code-file:${name}`, kind: 'pick', values: names, value: at, tip: 'Which module' }],
+    ['input', { key: `code:${name}:${at}`, kind: 'code', lang: langOf(field, at), value: mods[at] }]];
+}
+
+/**
  * A field as it reads, changed where it stands. `writes`: the person may change it. `open`: its words are open to
  * write, or what has parts is shown whole. `kept`: what is written and not yet saved, which it shows in its place.
  */
-export function fieldMarks(name, v, field, { writes = false, open = false, kept, fold } = {}) {
+export function fieldMarks(name, v, field, { writes = false, open = false, kept, fold, item, file } = {}) {
   if (!writes) return valueMarks(name, v, field, { open, fold });
   const pick = picker(name, v, field);
   if (pick) return pick;
   if (typeof v === 'string' && ID.test(v) && open) return ['input', { key: `field:${name}`, kind: 'item', hint: 'Find an item', focus: true }];
   if (typeof v === 'string' && ID.test(v)) return ['box', { flow: 'row', gap: 1 }, one(v), ['button', { key: `field-open:${name}`, look: 'quiet', tip: 'Name another item' }, '✎']];
+  const code = field?.code && (open || kept !== undefined) && coder(name, kept === undefined ? v : kept, field, { item, file });
+  if (code) return ['box', { flow: 'column', gap: 1 }, ['box', { flow: 'row' }, ['button', { key: `field-fold:${name}`, look: 'quiet', tip: kept === undefined ? 'Fold it' : 'Fold it: what is written waits for Save' }, '▴']], code];
   if (open || kept !== undefined) return writer(name, kept === undefined ? v : kept, field, { fold });
   return ['box', { flow: 'row', gap: 1 }, valueMarks(name, v, field, { fold }), ['button', { key: `field-open:${name}`, look: 'quiet', tip: 'Change it' }, '✎']];
 }
@@ -128,7 +148,7 @@ export function fieldMarks(name, v, field, { writes = false, open = false, kept,
  * The fields section: each field its type declares, empty or not, and any it holds its type no longer declares. What
  * holds something first; what holds nothing after, in one fold. `skip`: a field shown elsewhere (the choices).
  */
-export function fieldsMarks(item, declared, { writes = false, open = new Set(), kept = {}, emptyOpen = false, skip = [], fold, titles = {} } = {}) {
+export function fieldsMarks(item, declared, { writes = false, open = new Set(), kept = {}, emptyOpen = false, skip = [], fold, titles = {}, files = {} } = {}) {
   titled = titles;
   const props = item?.props ?? {};
   const names = [...new Set([...Object.keys(declared), ...Object.keys(props)])].filter((k) => NAME.test(k) && !skip.includes(k));
@@ -136,9 +156,11 @@ export function fieldsMarks(item, declared, { writes = false, open = new Set(), 
   const row = (k) => {
     const f = declared[k];
     const may = writes && Boolean(f) && !f.system;
-    return ['box', { flow: 'row', gap: 3, key: `field-row:${k}` },
+    // Code being written stands under its name, the width of the page.
+    const writing = may && f.code && (open.has(k) || kept[k] !== undefined);
+    return ['box', { flow: writing ? 'column' : 'row', gap: writing ? 1 : 3, key: `field-row:${k}` },
       ['text', { look: 'muted', tip: (f?.description ?? 'Not declared by its type').slice(0, 200) }, label(k)],
-      fieldMarks(k, props[k], f, { writes: may, open: open.has(k), kept: kept[k], fold })];
+      fieldMarks(k, props[k], f, { writes: may, open: open.has(k), kept: kept[k], fold, item: item?.id, file: files[k] })];
   };
   const held = names.filter((k) => !empty(props[k]) || kept[k] !== undefined);
   const unheld = names.filter((k) => !held.includes(k));
@@ -159,8 +181,12 @@ export function fieldEvent(event, item, declared, kept = {}) {
   let m = /^field-open:(.+)$/.exec(k);
   if (m && event.name === 'press') return { open: m[1] };
   if ((m = /^field-fold:(.+)$/.exec(k)) && event.name === 'press') return { fold: m[1] };
+  if ((m = /^code-file:(.+)$/.exec(k)) && event.name === 'pick') return { file: [m[1], String(event.value ?? '')] };
   const props = item?.props ?? {};
   const now = (name) => (kept[name] !== undefined ? kept[name] : props[name]);
+  // One module of code by name: the field's modules with that one as written.
+  if ((m = /^code:([^:]+):(.+)$/.exec(k)) && event.name === 'edit' && declared[m[1]]?.code && !declared[m[1]].system) return { keep: [m[1], { ...(modulesOf(now(m[1])) ?? {}), [m[2]]: String(event.value ?? '') }] };
+  if (m && event.name === 'submit') return { save: true };
   if ((m = /^field-add:(.+)$/.exec(k)) && event.name === 'press') return { keep: [m[1], [...(Array.isArray(now(m[1])) ? now(m[1]) : []), '']] };
   if ((m = /^field-out:(.+):(\d+)$/.exec(k)) && event.name === 'press') {
     const list = [...(Array.isArray(now(m[1])) ? now(m[1]) : [])];
@@ -192,6 +218,7 @@ export function fieldEvent(event, item, declared, kept = {}) {
         return { bad: [name, 'Not valid JSON'] };
       }
     }
+    if (f.code) return { keep: [name, String(event.value ?? '')] };
     return { keep: [name, typed(event.value, f.type === 'number' ? 0 : was)] };
   }
   if (event.name === 'submit') return { save: true };

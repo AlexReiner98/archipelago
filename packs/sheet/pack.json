@@ -48,7 +48,8 @@
         "sections.js": "parts/page/sections.js",
         "draft.js": "parts/page/draft.js",
         "links.js": "parts/page/links.js",
-        "note-count.js": "parts/page/note-count.js"
+        "note-count.js": "parts/page/note-count.js",
+        "code.js": "parts/page/code.js"
       }
     },
     {
