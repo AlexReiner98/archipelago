@@ -32,7 +32,7 @@ const HEAD = ['status', 'owner', 'confidence', 'visibility', 'source'];
 export const pageTold = (now, told) => (told?.name === 'page' && told.item?.id ? { ...now, item: told.item, views: { ...(now?.views ?? {}), ...(told.views ?? {}) }, piece: { ...(now?.piece ?? {}), ...(told.count && { count: told.count }) } } : now);
 
 /** The page's state as one value: what is open, what is written, what is asked, what was said. */
-const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) } }, open: new Set(), emptyOpen: false, writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined });
+const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) } }, open: new Set(), emptyOpen: false, diffs: new Set(), writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined });
 
 /** The whole page as marks. */
 export function pageMarks(input, s) {
@@ -67,7 +67,7 @@ export function pageMarks(input, s) {
     sourceMarks(view.source),
     ['slot', { key: 'slot-sections', name: 'sheet.sections' }],
     barMarks(s.draft, item, { saving: s.saving, said: s.saveSaid }),
-    historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names }),
+    historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names, shown: s.diffs }),
   ].filter(Boolean);
 }
 
@@ -186,6 +186,9 @@ export default function page(input, tools) {
     if (k === 'archive' && event.name === 'press') return ((s.archiving = true), draw());
     if (k === 'archive-no') return ((s.archiving = false), draw());
     if (k === 'archive-yes' && event.name === 'press') return ((s.archiving = false), await change({ ops: [{ op: 'archive', id: it.id }], reason: 'Archived in the UI' }), draw());
+    // A change to code: its line diff unfolded under its line, or folded again.
+    const dk = /^diff:(c_[a-z0-9]+)$/.exec(k);
+    if (dk && event.name === 'press') return (s.diffs.has(dk[1]) ? s.diffs.delete(dk[1]) : s.diffs.add(dk[1]), draw());
     const u = /^undo:(c_[a-z0-9]+)$/.exec(k);
     if (u && event.name === 'press') {
       const r = await tools.undo?.(u[1]);

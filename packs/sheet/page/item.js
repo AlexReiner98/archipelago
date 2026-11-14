@@ -45,6 +45,12 @@ function fillSlots(m, above, sections) {
   m.watching = [fillSlot(m.node, 'sheet.bands', above), fillSlot(m.node, 'sheet.sections', sections)];
 }
 
+/** A change to code, as the server said it: each code field's line diff (packs/surface/kernel/code-diffs.ts). */
+const diffsOf = (detail) => {
+  const diffs = Object.entries(detail?.changes ?? {}).filter(([, c]) => c?.diff && typeof c.diff === 'object').map(([key, c]) => ({ field: key.replace(/^props./, ''), diff: c.diff }));
+  return diffs.length ? { diffs } : {};
+};
+
 /** What the page part is told of the page, as data: the item, its links, source, owner and history, its note's count. */
 function told(data, past, owner, count, named) {
   const e = data.entity;
@@ -56,7 +62,7 @@ function told(data, past, owner, count, named) {
     item: Object.fromEntries(['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'].filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),
     views: {
       item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(tie), titles: named, ...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
-      history: { events: past.map(({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail }) => ({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail: { ...(detail?.undone_by && { undone_by: detail.undone_by }), ...(detail?.forgot && { forgot: true }) } })), names },
+      history: { events: past.map(({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail }) => ({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail: { ...(detail?.undone_by && { undone_by: detail.undone_by }), ...(detail?.forgot && { forgot: true }), ...diffsOf(detail) } })), names },
     },
     ...(count && { count }),
   };
