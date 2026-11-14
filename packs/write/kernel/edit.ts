@@ -60,7 +60,8 @@ export async function editsResolved(reg: Registry, ops: Op[], read: (id: string)
       const props = { ...item.props, ...(now.get(op.id) ?? {}) };
       const value = props[edit.field];
       let after: unknown, text: string;
-      if (field.type === 'json') {
+      // Modules by name, or a layout's code written as files by path: one file of it is edited, by edit.file.
+      if (field.type === 'json' || (field.files && value !== null && typeof value === 'object')) {
         const modules = value === undefined || value === null ? {} : modulesOf(value);
         if (!modules) throw new Error(`"${edit.field}" of "${item.title}" is not modules by name`);
         const names = Object.keys(modules).sort();
@@ -69,7 +70,7 @@ export async function editsResolved(reg: Registry, ops: Op[], read: (id: string)
         text = editAfter(modules[edit.file], edit, `${edit.file} of "${item.title}"`);
         after = { ...modules, [edit.file]: text };
       } else {
-        if (edit.file) throw new Error(`"${edit.field}" is one text, not modules by name: leave edit.file out`);
+        if (edit.file) throw new Error(`"${edit.field}" is one text, not modules by name: leave edit.file out${field.files ? `, or write it whole as files by path ({ "index.js": ... }) to split it` : ""}`);
         if (typeof value !== 'string') throw new Error(`"${item.title}" has no ${edit.field} yet: write it whole, with props.${edit.field}`);
         after = text = editAfter(value, edit, `${edit.field} of "${item.title}"`);
       }

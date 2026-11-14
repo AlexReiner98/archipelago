@@ -18,9 +18,9 @@ const MOVED = 'previews-moved';
 /** The try a style is drawn with, if one is of what draws it: a layout's code (coder, the layout whose code draws), or a pack drawing's version. */
 export function triedOn(style, coder) {
   const code = coder && held.get(`${coder} code`);
-  if (code && typeof style.code === 'string') return code;
+  if (code && (typeof style.code === 'string' || (style.code && typeof style.code === 'object'))) return code;
   const id = style.drawing?.id;
-  return id && !(typeof style.code === 'string' && style.code.trim()) ? [...held.values()].find((p) => p.drawing?.id === id) : undefined;
+  return id && !((typeof style.code === 'string' && style.code.trim()) || (style.code && typeof style.code === 'object')) ? [...held.values()].find((p) => p.drawing?.id === id) : undefined;
 }
 
 /** Put the try a style is drawn with in its place, in the style itself; answers the try. */

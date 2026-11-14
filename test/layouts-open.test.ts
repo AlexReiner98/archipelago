@@ -69,3 +69,43 @@ test('in a browser, a style’s code reaches nothing in the sandbox, and with th
   assert.match(opened.frame, /^ \/draw\.html\?(v=\w+&)?open=1$/);
   assert.equal(opened.dial, 'A dial', 'its panel is read from the page, as an agent driving the browser would');
 });
+
+test('in a browser, a layout whose code is files by path runs from index.js, each import of ./name.js its file, walled in as one text is', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call } = await serve('off');
+  // The same code split in three: index.js re-exports the drawing, which imports a helper by './name.js'.
+  const files = {
+    'index.js': `export { default } from './reach.js';`,
+    'reach.js': REACH.replace('export default async function draw', `import { joined } from './join.js';\nexport default async function draw`).replace(`[sandboxed, page, net, Boolean(root)].join(' ')`, `joined([sandboxed, page, net, Boolean(root)])`),
+    'join.js': `export const joined = (list) => list.join(' ');`,
+  };
+  const made = (await call('/api/change', undefined, {
+    reason: 'test',
+    ops: [
+      { op: 'create', ref: 'a', type: 'work', title: 'Seed' },
+      { op: 'create', ref: 'c', type: 'lens', title: 'Split', props: { filter: { find: ['type work'] } } },
+      { op: 'create', ref: 's', type: 'layout', title: 'Split reacher', props: { code: files } },
+    ],
+  })).result.created as Record<string, string>;
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.c, props: { style: { style: made.s } } }] });
+  const page = await open(`${base}/#/v?canvas=${made.c}`);
+  try {
+    await page.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
+    let said = '';
+    for (let n = 0; n < 100 && !said; n++, await wait(200)) {
+      for (const t of (await page.send('Target.getTargets')).result.targetInfos as { targetId: string; type: string; url: string }[]) {
+        if (t.type !== 'iframe' || !new URL(t.url).pathname.endsWith('/draw.html')) continue;
+        const session = (await page.send('Target.attachToTarget', { targetId: t.targetId, flatten: true })).result.sessionId;
+        said = (await page.send('Runtime.evaluate', { expression: `document.querySelector('input.field')?.value ?? ''`, returnByValue: true }, session)).result?.result?.value ?? '';
+        if (said) break;
+      }
+    }
+    assert.equal(said, 'true false false false', 'linked from its files, it reaches neither the page nor the network');
+  } finally {
+    await page.close();
+  }
+  // A file that is not a plain ./name.js module, or files with no index.js, is refused on write.
+  for (const [code, why] of [[{ 'index.js': 'x', '../up.js': 'y' }, /plain names ending \.js/], [{ 'main.js': 'x' }, /index\.js among them/]] as const) {
+    const refused = await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.s, props: { code } }] }).then((r) => JSON.stringify(r), (e) => String(e));
+    assert.match(refused, why);
+  }
+});

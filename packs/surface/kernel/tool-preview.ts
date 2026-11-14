@@ -72,7 +72,7 @@ async function itemOf(l: Archipelago, item: string, field: string) {
   const { rows } = await l.db.query<{ type: string; title: string; preset: string | null }>(`select type, title, props->>'preset' as preset from entity where id = $1 and archived_at is null`, [item]);
   const row = rows[0];
   if (!row) throw new Error(`No item "${item}" you can see.`);
-  const declared = l.registry.type(row.type)?.fields?.[field] as { code?: boolean; type?: string } | undefined;
+  const declared = l.registry.type(row.type)?.fields?.[field] as { code?: boolean; type?: string; files?: boolean } | undefined;
   if (!declared?.code) throw new Error(`${row.title} has no code field "${field}": a try is of a field its type declares as code.`);
   return { ...row, declared };
 }
@@ -83,8 +83,9 @@ export async function tryOf(l: Archipelago, input: { item: string; field: string
   const { value } = input;
   const isText = typeof value === 'string';
   const isModules = Boolean(value) && typeof value === 'object' && !Array.isArray(value) && Object.values(value as object).every((v) => typeof v === 'string');
-  if (it.declared.type === 'string' ? !isText : !isModules) throw new Error(`value is ${input.field} whole: ${it.declared.type === 'string' ? 'its text' : 'an object of modules by name, each its text'}.`);
-  const drawing = isModules && it.preset ? drawingWith(l.registry, it.preset, value as Record<string, unknown>) : undefined;
+  // A layout's code is its text, or files by path (declared files); modules are an object of them by name.
+  if (it.declared.type === 'string' ? !(isText || (it.declared.files && isModules)) : !isModules) throw new Error(`value is ${input.field} whole: ${it.declared.type === 'string' ? (it.declared.files ? 'its text, or its files by path' : 'its text') : 'an object of modules by name, each its text'}.`);
+  const drawing = isModules && it.declared.type === 'json' && it.preset ? drawingWith(l.registry, it.preset, value as Record<string, unknown>) : undefined;
   return { item: input.item, field: input.field, value, title: it.title, ...(drawing && { drawing }), at: Date.now() };
 }
 

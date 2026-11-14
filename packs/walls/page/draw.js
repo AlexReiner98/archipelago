@@ -65,6 +65,29 @@ function inside(home, port, given) {
     deepen(root, -1);
     return { me, byId, root };
   };
+  // A module from its text: by a blob's address where the browser allows that here, else as a data address.
+  const blob = (text) => URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+  const data = (text) => `data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}`;
+  /**
+   * The code, loaded: one text is one module; files by path are linked from index.js, each './name.js' it imports
+   * made the address of that file, as a pack drawing's modules are (draw-inside.js). Nothing else can be imported.
+   */
+  const load = async (code) => {
+    if (typeof code === 'string') return import(blob(code)).catch(() => import(data(code)));
+    const link = (asUrl) => {
+      const urls = new Map(), on = new Set();
+      const urlOf = (name) => {
+        if (urls.has(name)) return urls.get(name);
+        if (typeof code?.[name] !== 'string') throw new Error(`The code imports "${name}", which it does not have: its files are ${Object.keys(code ?? {}).join(', ')}`);
+        if (on.has(name)) throw new Error(`The code's files import each other in a ring, at "${name}"`);
+        on.add(name);
+        urls.set(name, asUrl(code[name].replace(/(\bfrom\s*|\bimport\s*\(?\s*)(['"])\.\/([\w.-]+\.js)\2/g, (_, before, q, dep) => `${before}${q}${urlOf(dep)}${q}`)));
+        return urls.get(name);
+      };
+      return import(urlOf('index.js'));
+    };
+    return link(blob).catch((err) => (/imports|ring/.test(err?.message ?? '') ? Promise.reject(err) : link(data)));
+  };
   const heard = {};
   const asking = new Map();
   let asked = 0;
@@ -105,8 +128,8 @@ function inside(home, port, given) {
     if (said.type !== 'draw') return;
     Object.assign(size, { width: said.width, height: said.height, dpr: said.dpr });
     try {
-      // The code is a module of its own, loaded from its text: by a blob's address where the browser allows that here, else as a data address.
-      made = await import(URL.createObjectURL(new Blob([said.code], { type: 'text/javascript' }))).catch(() => import(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(said.code)))}`));
+      // The code is a module of its own (or files linked from index.js), loaded from its text.
+      made = await load(said.code);
       if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change, sandboxed, root }) { … }. An item in answer has its values under fields; a change writes them as props.');
       await made.default({
         canvas: given?.canvas ?? said.canvas,

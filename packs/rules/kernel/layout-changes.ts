@@ -14,7 +14,7 @@ export async function layoutOf(l: Archipelago, actor: Actor, input: ChangeInput)
   const no = (why: string) => new Error(`Change rejected:\n- ${why}`);
   if (actor.kind !== 'human') throw no('A change a drawing asked for is sent by the page, as the person looking at it.');
   const style = await l.entity(input.drawing);
-  if (!style || !l.registry.isA(style.type, 'layout') || !(typeof style.props.code === 'string' || style.props.modules)) throw no(`"${input.drawing}" is no layout with code, so no drawing of it can ask for a change.`);
+  if (!style || !l.registry.isA(style.type, 'layout') || !(typeof style.props.code === 'string' || (style.props.code && typeof style.props.code === 'object') || style.props.modules)) throw no(`"${input.drawing}" is no layout with code, so no drawing of it can ask for a change.`);
   const odd = input.ops.filter((o) => !DRAWING_OPS.includes(o.op)).map((o) => o.op);
   if (odd.length) throw no(`A drawing may ask to ${DRAWING_OPS.join(', ')}; not to ${[...new Set(odd)].join(', ')}.`);
   const writes = Array.isArray(style.props.writes) ? style.props.writes.map(String) : [];

@@ -3,7 +3,7 @@ import { kinds, replicate } from './live.js';
 import { ghostAsker, unfollow } from './replica.js';
 import { drawWith, layouts, warmLayouts } from './layout.js';
 import { dress, layered } from './query-base.js';
-import { drawCode } from './style-code.js';
+import { coded as hasCode, drawCode } from './style-code.js';
 import { markTry, onTries, triedOn, tryOn } from './preview.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles } from './words.js';
@@ -258,7 +258,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     markTry(host, preview);
     // The server names the drawing a pack ships for the shape asked, or the first it ships for one no pack draws.
     const drawn = Boolean(chosen.drawing);
-    const coded = typeof chosen.code === 'string' && chosen.code.trim();
+    const coded = hasCode(chosen.code);
     if (coded || drawn) return void (coded ? drawCode : drawWith)(body, asDrawn(shown), chosen, keep, place, look.coder);
     body.replaceChildren(h('div', { class: 'empty', title: 'No pack ships a layout this workspace can draw with' }, 'Nothing draws this view.'));
     saidDrawn(body, 'drawn');

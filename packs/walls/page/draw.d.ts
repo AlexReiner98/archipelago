@@ -5,6 +5,8 @@
 // Two kinds of drawing code:
 //   - A layout's own code (core's layout type, field `code`): `export default function draw(input)`, run by
 //     packs/walls/page/draw.js. In a pulled index.js: /** @param {import('./draw.d.ts').DrawInput} input */
+//     The field is one text, or files by path ({ "index.js": …, "physics.js": … }): index.js is the module, and one
+//     file imports another as './name.js' (flat names, nothing else importable).
 //   - A drawing a pack ships, or the owner's version of one (field `modules`): `export function picture(input, tools)`,
 //     answering with marks, run by packs/walls/page/draw-inside.js (docs/layouts.md, "What a drawing is").
 //     /** @param {import('./draw.d.ts').PictureInput} input @param {import('./draw.d.ts').PictureTools} tools */
