@@ -7,7 +7,9 @@
 if (!new URLSearchParams(location.search).has('may')) {
   let token = '';
   try {
-    token = localStorage.getItem('pelago-token') ?? '';
+    // This tab's own workspace (packs/kit/page/base.js, `tabToken`), else the browser's last, which the tab then keeps.
+    token = sessionStorage.getItem('pelago-token') ?? localStorage.getItem('pelago-token') ?? '';
+    if (token) sessionStorage.setItem('pelago-token', token);
   } catch {
     // Storage can be blocked: the page signs in as it would.
   }
