@@ -1,6 +1,7 @@
 // A view's drawing as a published page keeps it: its answer frozen, with nothing private in it and nothing that names
 // a person or a session (./published.ts). The picture is the lenses pack's (answer.kept_picture).
 
+import { createHash } from 'node:crypto';
 import type { KernelContext } from '#pelago/kernel';
 import { carriedOf, isKept, itemsOf, stepsShown, type Step } from './map.ts';
 import { framesFor } from './published-frames.ts';
@@ -23,11 +24,25 @@ export type Answer = { items: Item[]; links: Link[]; lens: Record<string, unknow
 export const keptPicture = (ctx: Pick<KernelContext, 'call'>, id: string) => ctx.call<{ id: string }, Answer>('answer.kept_picture', { id });
 
 /**
+ * A layout's code kept on the map, as a published page fetches it by its hash (./published-data.ts): its files by path,
+ * entered at index.js, and `coded`, so the page runs it in the frame a layout's code runs in, not as a pack's drawing.
+ */
+export function codeDrawing(code: unknown) {
+  const files = typeof code === 'string' ? { 'index.js': code } : code && typeof code === 'object' ? Object.fromEntries(Object.entries(code).filter(([, v]) => typeof v === 'string')) : {};
+  if (typeof files['index.js'] !== 'string' || !files['index.js'].trim()) return undefined;
+  const modules = Object.fromEntries(Object.keys(files).sort().map((k) => [k, files[k] as string]));
+  return { title: 'A layout kept on the map', hash: createHash('sha256').update(JSON.stringify(modules)).digest('hex'), modules, coded: true };
+}
+
+/**
  * A view's picture as a reader may have it: its items and the links among them, each item with its first line and
  * the counts a drawing reads all nothing, each link's type as its kind; nothing about who or which session.
  */
 export function freezeQuery(answer: Answer, bodies: Map<string, string>, partOf: string[] = ['part_of']) {
-  const { code: _code, ...style } = (answer.style ?? {}) as Record<string, unknown>;
+  const { code, ...rest } = (answer.style ?? {}) as Record<string, unknown>;
+  // A layout kept on the map is published with its code, by hash, run as the app runs it (packs/surface/page/doc-lens.js).
+  const coded = codeDrawing(code);
+  const style = coded ? { ...rest, drawing: coded } : rest;
   // What each is inside, for the drawings that nest: what it is part of, where that is drawn too, said by inside and not by a link as well.
   const ids = new Set(answer.items.map((i) => i.id));
   const inside = new Map<string, Link>();

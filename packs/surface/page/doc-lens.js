@@ -5,6 +5,7 @@
 import { h } from './base.js';
 import { drawWith } from './layout.js';
 import { dress } from './query-base.js';
+import { drawCode } from './style-code.js';
 import { types } from './words.js';
 
 const ITEM = /^#\/e\/(e_[a-z0-9]{8})$/;
@@ -25,6 +26,20 @@ function keepAddress(host, byId) {
   });
 }
 
+/**
+ * A layout kept on the map, published with its code (packs/publish/kernel/published-pictures.ts, codeDrawing): its files
+ * fetched by their hash and run in the sandboxed frame the app runs a layout's code in, which may change nothing here.
+ */
+function drawCoded(body, answer, style) {
+  const { drawing, ...fields } = style;
+  body.classList.toggle('shaped', Number(style.numbers?.frame_aspect) > 0);
+  const files = drawing.modules ? Promise.resolve(drawing.modules) : /^\/[^/]/.test(drawing.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : Promise.reject(new Error('its code was not sent'));
+  files.then(
+    (code) => drawCode(body, answer, { ...fields, code }, () => {}),
+    (err) => body.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(err.message).slice(0, 300)}`)),
+  );
+}
+
 /** Draw one frozen answer into host. `typeTitles` names each type the picture holds. `inApp`: drawn in the app's sheet, whose addresses are its own. `onItem`: a part opens there (a public view opens it in its sheet, ./frozen-chrome.js). */
 export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onItem = null } = {}) {
   for (const [id, title] of Object.entries(typeTitles)) if (!types.has(id)) types.set(id, { id, title });
@@ -34,7 +49,8 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onIte
   host.replaceChildren(body);
   dress(body, style);
   // Every picture has a drawing: packs/publish/kernel/published.ts gives one to a picture frozen without.
-  if (style.drawing) drawWith(body, answer, style, () => {});
+  if (style.drawing?.coded) drawCoded(body, answer, style);
+  else if (style.drawing) drawWith(body, answer, style, () => {});
   else body.replaceChildren(h('div', { class: 'empty' }, 'This view cannot be drawn here.'));
   // A link leaves out what is private; the page says so, rather than reading as a view with nothing in it.
   if (answer.hidden) host.append(h('p', { class: 'muted small' }, `${answer.hidden} ${answer.hidden === 1 ? 'item here is' : 'items here are'} private and not shown.`));
