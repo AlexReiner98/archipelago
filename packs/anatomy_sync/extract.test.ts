@@ -56,6 +56,17 @@ test('every item is found again by its type, its fields and its pack', () => {
   for (const i of items) assert.equal(keyOf(i.type, i.props, packOf.get(i.key)), i.key);
 });
 
+test('a page module\'s import by served name lands on the root page that serves it, wanted now or already on the island', () => {
+  const files = [
+    file('packs/roots.json', { roots: [{ id: 'kit' }, { id: 'shell' }], calls: {} }),
+    file('packs/kit/page/base.js', '// The kit.\n'),
+    file('packs/shell/page/app.js', "// The entry.\nimport { h } from './base.js';\nimport { sheet } from './item.js';\nimport { x } from './missing.js';\n"),
+  ];
+  const { links } = extract(files, undefined, new Set(['module:packs/sheet/page/item.js']));
+  const to = links.filter((l) => l.type === 'anatomy.imports' && l.from === 'module:packs/shell/page/app.js').map((l) => l.to).sort();
+  assert.deepEqual(to, ['module:packs/kit/page/base.js', 'module:packs/sheet/page/item.js'], 'a name nothing serves stays unresolved and is dropped');
+});
+
 test('a change reaches only the extractors that own its files', () => {
   assert.deepEqual(reached(['ui/find.js']).map((e) => e.id), ['modules']);
   assert.deepEqual(reached(['packs/loader/pack.json']).map((e) => e.id), ['manifests']);
