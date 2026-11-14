@@ -33,7 +33,7 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from '../../identity/kernel/auth.ts'; import { firstStart } from './first-start.ts';
 import { dutyOf, mailing, onMap, onServer, openRoutes, published, type Backups, type Walked } from './above.ts'; import { callAs } from '../../loader/kernel/kernel-context.ts';
-import { parseBackup, parseVault } from '../../log/kernel/backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../identity/kernel/members.ts'; import { requestWait } from '../../identity/kernel/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
+import { parseBackup, parseVault } from '../../log/kernel/backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../identity/kernel/members.ts'; import { requestWait, standingOf } from '../../identity/kernel/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from '../../database/kernel/config.ts'; import { env } from '../../../src/env.ts'; import type { Booted } from '../../../src/boot.ts';
 import { SHORT, serveConnect } from './connect-routes.ts'; import { challenge, mcpAddress } from '../../identity/kernel/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
 import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
@@ -279,7 +279,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       if (req.method === 'GET' && url.pathname === '/whoami') {
         if (!local(req, false)) return send(res, 403, { error: 'Local requests only.' });
         const { ws, actor, look } = await resolve(req, res, 'human'), me = actor(); // what it may do draws the page's controls (packs/surface/kernel/may.ts)
-        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name }, actor: me, may: pageMay(me, Boolean(look), devMode() ? url.searchParams.get('may') : null) });
+        return send(res, 200, { auth: tokens ? 'tokens' : 'off', dev: devMode(), workspace: { id: ws.id, name: ws.name, ...((await standingOf(ws.id))?.guest && { guest: true }) }, actor: me, may: pageMay(me, Boolean(look), devMode() ? url.searchParams.get('may') : null) });
       }
 
       // A pack's webhook: /hook/<pack>/<id> in the default workspace, /hook/<workspace>/<pack>/<id> in another.

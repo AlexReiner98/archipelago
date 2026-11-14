@@ -14,7 +14,7 @@
     },
     {
       "id": "log",
-      "hash": "3f30b773b98c12a8bc91cf89113d1dc59717056a1e6e774c1ff8678da9e142d0"
+      "hash": "0622e6606e8964461735c816c0bce3c126989b270843e96050ff854e1aa0b977"
     },
     {
       "id": "kit",
@@ -22,7 +22,7 @@
     },
     {
       "id": "identity",
-      "hash": "3319e1feaef7de482cb36f6be8a193d07a8db06541d4d7c78fe0973c105ceb18"
+      "hash": "454a3b53aa6fc548b30840735062631ec348889b8a12f2ec567b680998a90986"
     },
     {
       "id": "walls",
@@ -30,7 +30,7 @@
     },
     {
       "id": "loader",
-      "hash": "0100b157f07f2c95fdb93682242b1f22edfb770a7a4496e5c900d2b0ce0f214b"
+      "hash": "4cf903c35c38c50cabc1ba5ce72f0b7c292ae5a69831b66508bdbaf9d9d458c0"
     },
     {
       "id": "rules",
@@ -42,7 +42,7 @@
     },
     {
       "id": "surface",
-      "hash": "8706dacc7bcff6063664fd128596e83d280f3559ab7d7acd17b3f5037547353b"
+      "hash": "98186acd0d3bfb32c7b51da146f988cabadcd604cf571bdb4422687997c3b8de"
     },
     {
       "id": "panes",
@@ -58,7 +58,7 @@
     },
     {
       "id": "shell",
-      "hash": "3b11b3dd38aef65c622e629684b1b21d31123a93c37e7a65f65a72b9330e6f2c"
+      "hash": "73ca19d2449af58fa1b013b52389d0af403cbf37b4cc9b82fcfe5025bd8580a4"
     }
   ],
   "calls": {

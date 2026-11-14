@@ -111,6 +111,22 @@ export async function accessToken(origin, folder = folderOf()) {
   });
 }
 
+/**
+ * This computer's id: random, made once and kept beside the sign-ins (machine), sent with a sign-in so a guest map kept
+ * from it is one trial per computer (the owner, 14 Nov 2026). It says nothing of the computer.
+ */
+export function machineOf(folder = folderOf()) {
+  const file = join(folder, 'machine');
+  try {
+    const kept = readFileSync(file, 'utf8').trim();
+    if (/^[a-f0-9]{32}$/.test(kept)) return kept;
+  } catch { /* none yet */ }
+  const made = randomBytes(16).toString('hex');
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(file, made, { mode: 0o600 });
+  return made;
+}
+
 /** Forget the sign-in kept for this server (the server refused it). */
 export const forget = (origin, folder = folderOf()) => rmSync(fileOf(folder, origin, 'signed-in'), { force: true });
 
@@ -130,7 +146,7 @@ export async function signIn(origin, folder = folderOf(), { open = !process.env.
   const verifier = randomBytes(32).toString('base64url');
   const state = randomBytes(16).toString('base64url');
   const url = new URL(`${origin}/oauth/authorize`);
-  for (const [k, v] of Object.entries({ response_type: 'code', client_id, redirect_uri: redirect, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256', state, scope: 'map offline_access', resource: `${origin}/mcp` })) url.searchParams.set(k, v);
+  for (const [k, v] of Object.entries({ response_type: 'code', client_id, redirect_uri: redirect, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256', state, scope: 'map offline_access', resource: `${origin}/mcp`, machine: machineOf(folder) })) url.searchParams.set(k, v);
   const child = spawn(process.execPath, [fileURLToPath(import.meta.url), origin, folder, String(port), verifier, state, client_id, open ? url.href : ''], { detached: true, stdio: 'ignore', windowsHide: true });
   child.unref();
   keep(pending, { url: url.href, pid: child.pid, at: Date.now() });
