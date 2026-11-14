@@ -9,7 +9,7 @@
 //   Share for this address, to send it to a computer (e_hmmh2xta).
 // The host's: it enters a token and keeps the sentence beside it, which no pack's code may do.
 
-import { enter, gate, gateRow, h, keepLanding, postJson, store, workspaceOf } from './base.js';
+import { enter, gate, gateRow, h, keepLanding, known, postJson, store, workspaceOf } from './base.js';
 
 /** Where a guest map opens: a query, as an address says one (packs/surface/page/query.js, readAddress). */
 const LANDING = `#/v?${['work', 'aim', 'question', 'record'].map((t) => `find=${encodeURIComponent(`type ${t}`)}`).join('&')}&over=waits_on&steps=1`;
@@ -70,6 +70,10 @@ export async function tryPage(query = '') {
     // A new map has no view of its own, and an empty query draws nothing: the tab opens on the work, aims, questions
     // and records the agent writes, and whom they wait on, so each lands on the canvas as it is written.
     keepLanding(workspace.id, LANDING);
+    // The page token is this browser's sign-in, remembered as any workspace is: signing in to keep the map
+    // (packs/identity/page/authorize.js, /oauth/authorize opened by the agent's installer) finds the guest by it.
+    store.token = page_token;
+    known.remember(workspace);
     enter(page_token);
   } catch (err) {
     making = false;
