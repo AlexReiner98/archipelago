@@ -5,6 +5,8 @@
 <title>A view of the map</title>
 <style>
   html, body { margin: 0; height: 100%; overflow: hidden; }
+  /* A long press or a tap on the picture selects nothing and calls up nothing (iOS paints the frame blue otherwise). */
+  body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
   .tip { position: absolute; max-width: 300px; padding: 5px 9px; border: 1px solid; border-radius: 6px; font: 12.5px system-ui, "Segoe UI", sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
   .field { max-width: none; box-sizing: border-box; padding-block: 0; pointer-events: auto; outline: none; }

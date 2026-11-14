@@ -8,7 +8,6 @@ import { api, ask, drawSlots, h, may, part, state, whoami } from './base.js';
 import { screenRows } from './screen-rows.js';
 import { packsCard } from './packs.js';
 import { membersCard } from './members-card.js';
-import { connectionsCard } from './connections-card.js';
 import { agentsMayCard, drawingsOpenRow, tokenRow, tokensCard } from './agents-card.js';
 import { connectCard, connecting, isConnecting } from './connect-agent.js';
 import { workspacesCard } from './workspaces-card.js';
@@ -94,7 +93,7 @@ export async function workspace() {
       admin && agentsMayCard(info, workspace, fail),
     ],
     map: () => [at('backup', backupCard(workspace, visibilityRow(info, workspace, fail), islandsRow(info, workspace, fail), admin && drawingsOpenRow(info)))],
-    packs: () => [at('connections', connectionsCard()), packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard(), me.workspace.id === 'default' && tokensOn && admin && workspacesCard(me.workspace.id)],
+    packs: () => [packsCard({ info, then: workspace, goTo: go }), own.length > 0 && card('Your screens', 'Screens you made, which no pack offers', h('ul', { class: 'rows' }, screenRows(own, workspace))), me.workspace.id === 'default' && serverPacksCard(), me.workspace.id === 'default' && tokensOn && admin && workspacesCard(me.workspace.id)],
   };
   // What a person who is not an admin may change is only their own agent tokens.
   const shown = SECTIONS.filter(([key]) => admin || (key === 'agents' && tokensOn) || (key === 'people' && !tokensOn && !info.owner));

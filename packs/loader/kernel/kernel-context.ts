@@ -130,9 +130,10 @@ export class KernelHost {
   /**
    * A service name answered as the map that asks it: its provider handed a context of that map, so it reads as the
    * asker under row-level security (a person's view, `l.as(viewer)`), never as the map the names were filled for.
-   * Only an internal pack's name is answered here; any other is what fillServices was handed.
+   * Only an internal pack's name is answered here; any other is what fillServices was handed. An internal action's
+   * service is handed who called it too (`caller`, as surface.act's are: ./internal-act.ts).
    */
-  async answer<O>(l: Archipelago, name: string, input: unknown): Promise<O> {
+  async answer<O>(l: Archipelago, name: string, input: unknown, caller?: { kind: string; name: string }): Promise<O> {
     if (isRootName(name)) throw new Error(`${name} is a root service: only a pack packs/roots.json names for it calls it, through its context`);
     const pack = this.packs(l).find((p) => p.kernel?.provides?.[name]);
     if (!pack) {
@@ -140,7 +141,7 @@ export class KernelHost {
       if (!filled) throw new Error(`No pack here provides service:${name}`);
       return (await filled(input)) as O;
     }
-    return (await (await this.fn(pack, pack.kernel!.provides![name].run))(contextFor(l, pack, this), input)) as O;
+    return (await (await this.fn(pack, pack.kernel!.provides![name].run))(contextFor(l, pack, this), input, ...(caller ? [caller] : []))) as O;
   }
 
   /** The clocks the internal packs declare, each ready to fire with its pack's context: started by whoever leads. */
@@ -184,7 +185,7 @@ export const hostAt = (l: Archipelago): KernelHost => hostFor(l);
 
 
 /** A service name, answered as the map that asks it (KernelHost.answer): what a kernel caller uses, a lens preset's answer among them. */
-export const callAs = <O = unknown>(l: Archipelago, name: string, input: unknown): Promise<O> => hostFor(l).answer<O>(l, name, input);
+export const callAs = <O = unknown>(l: Archipelago, name: string, input: unknown, caller?: { kind: string; name: string }): Promise<O> => hostFor(l).answer<O>(l, name, input, caller);
 
 /**
  * The context of one internal pack for a map, as its own calls get it: what the shim at a moved module's old path

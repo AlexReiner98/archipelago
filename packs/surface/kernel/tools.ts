@@ -107,8 +107,8 @@ const viewTool = (reg: Registry): Tool => viewTools.get(reg) ?? (viewTools.set(r
 /** Every named tool in a workspace, as the human's CLI and API call them: the kernel's, then those its packs declare (a kernel tool's name wins). */
 export const toolsFor = (reg: Registry): [string, Tool][] => [...Object.entries(TOOLS).map(([name, tool]): [string, Tool] => [name, name === 'view' ? viewTool(reg) : tool]), ...packTools(reg).filter(([t]) => !TOOLS[t])];
 
-/** Whether an agent may call an action here: never the human's own, and the dev server's only in dev mode. */
-const offered = (a: Action) => !a.humanOnly && !(a.devOnly && !devMode());
+/** Whether an agent may call an action here: never the human's own or an admin's, and the dev server's only in dev mode. */
+const offered = (a: Action) => !a.humanOnly && !a.admin && !(a.devOnly && !devMode());
 
 /** The actions an agent is offered here, each as its verb and name ("revise withdraw"): what a restart is compared by. */
 export const offeredActions = (reg: Registry): string[] => actionsOf(reg, TOOLS).filter(offered).map((a) => `${a.verb} ${a.name}`);

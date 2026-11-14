@@ -8,6 +8,11 @@
 // A part may send on its own, not only from a press. The host tells the two apart itself: each press it passes the
 // part lets it send one action as that press's, for a moment; anything else is the part's own, and is shown as it goes
 // out (packs/surface/page/part-going.js), so nobody's map changes unseen. A part cannot claim a press it was not given.
+//
+// An admin's action (the part's `admin`) goes only on an admin's own press (decision e_ssrawn4v): the host tells the
+// bridge of a trusted press on the part's mark (`trusted`), and for an admin it asks the server for a grant then and
+// there (press_grant). The grant stays here, out of the part's reach, and goes with the one admin action the part sends
+// just after; the server takes it once and checks the session is an admin's (packs/loader/kernel/press-grants.ts).
 
 import { api, may } from './base.js';
 import { goingOut } from './part-going.js';
@@ -29,7 +34,7 @@ const MOVES = [...GESTURES, 'submit', 'scrolled', 'step', 'land'];
  * answers true when it was an action it took.
  */
 export function partBridge(port, { partOf, go, state } = {}) {
-  const pressed = new Map(), moved = new Map(), busy = new Set();
+  const pressed = new Map(), moved = new Map(), busy = new Set(), granted = new Map();
   // Every message to the parts is numbered, in the order sent: the parts answer with the last they had heard (`seen`).
   let seq = 0;
   const answer = (asked, result) => port.postMessage({ type: 'acted', asked, ...result });
@@ -87,11 +92,18 @@ export function partBridge(port, { partOf, go, state } = {}) {
     const ownAccord = !(press && performance.now() - press < pressLasts);
     pressed.delete(id);
     const params = said.params && typeof said.params === 'object' && !Array.isArray(said.params) ? said.params : {};
+    // An admin's action goes with the grant of the press just made, once; never of the part's own accord.
+    const grantFor = granted.get(id);
+    granted.delete(id);
+    const admin = (part.admin ?? []).includes(action);
+    if (admin && (ownAccord || !grantFor || performance.now() - grantFor.at > pressLasts)) return answer(asked, { error: `${part.title ?? part.id}: an admin's action is sent only on an admin's own press.` });
+    const grant = admin ? await grantFor.grant : undefined;
+    if (admin && !grant) return answer(asked, { error: `${part.title ?? part.id}: this press carries no admin's authority.` });
     const shown = ownAccord ? goingOut(part, action) : null;
     busy.add(id);
     try {
       // Called by its tool's name, as the kernel makes it of the action's id (toolName in packs/loader/kernel/declared.ts).
-      const made = await api(action.replaceAll('.', '_'), { ...params, part: { id: part.id, hash: part.hash, ...(part.island && { island: part.island }), ...(part.host && { host: part.host }) } });
+      const made = await api(action.replaceAll('.', '_'), { ...params, part: { id: part.id, hash: part.hash, ...(part.island && { island: part.island }), ...(part.host && { host: part.host }), ...(grant && { grant }) } });
       const result = { status: made?.status, created: made?.created ?? {}, ...(made?.proposal && { proposal: made.proposal, held: made.held_by?.say ?? '' }), ...(made?.answer !== undefined && { answer: made.answer }) };
       shown?.done(result);
       lastsTill(id, ownAccord);
@@ -125,12 +137,23 @@ export function partBridge(port, { partOf, go, state } = {}) {
   }
 
   return {
+    /**
+     * A trusted press on a mark of the part mounted under `id` (the person's own, not an event a script made): for a part
+     * that sends an admin's action, and a person who is an admin, a grant is asked for now, kept here for its one action.
+     */
+    trusted(id) {
+      id = String(id);
+      const part = partOf?.(id);
+      if (!part?.admin?.length || !may('admin')) return;
+      const ref = { id: part.id, hash: part.hash, ...(part.island && { island: part.island }) };
+      granted.set(id, { at: performance.now(), grant: api('press_grant', { part: ref }).then((r) => r?.grant ?? null, () => null) });
+    },
     /** Send the version's parts a message, numbered, and answer its number: a `press` (or a note's `tick`) lets that part send one action as its own. */
     send(message) {
       message = { ...message, seq: ++seq };
       if (message?.type === 'event' && GESTURES.includes(message.event?.name)) pressed.set(String(message.id), performance.now());
       if (message?.type === 'event' && MOVES.includes(message.event?.name)) moved.set(String(message.id), performance.now());
-      if (message?.type === 'unmount') (pressed.delete(String(message.id)), moved.delete(String(message.id)), busy.delete(String(message.id)));
+      if (message?.type === 'unmount') (pressed.delete(String(message.id)), moved.delete(String(message.id)), busy.delete(String(message.id)), granted.delete(String(message.id)));
       port.postMessage(message);
       return message.seq;
     },
