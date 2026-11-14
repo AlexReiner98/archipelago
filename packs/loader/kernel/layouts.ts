@@ -63,6 +63,17 @@ export function layoutFor(
   return { id: d.id, title: d.title, shape: d.shape, hash, ...(d.notes === 'whole' && { notes: d.notes }), ...(d.flat === true && { flat: true }), ...(!have.includes(hash) && { modules }) };
 }
 
+/**
+ * A pack's drawing as a version of it not yet kept would draw it (`modules`, a layout's field as a preview sends it):
+ * its hash and its modules whole, for the sender's page to draw with in place of the one the map holds.
+ */
+export function drawingWith(packs: { folderOf(pack: string): string; packs: { id: string; layouts?: LayoutDef[] }[] }, id: string, modules: Record<string, unknown>): Layout | undefined {
+  const d = layoutsOf(packs.packs).find((one) => one.id === id);
+  if (!d) return undefined;
+  const all = modulesWith(packs, d, { props: { modules } });
+  return { id: d.id, title: d.title, shape: d.shape, hash: hashOf(all), ...(d.notes === 'whole' && { notes: d.notes }), ...(d.flat === true && { flat: true }), modules: all };
+}
+
 /** A shipped drawing's modules, under the owner's version of it when there is one: its `modules` stand in file by file. */
 function modulesWith(packs: { folderOf(pack: string): string }, d: LayoutDef & { pack: string }, mine?: { props: Record<string, unknown> }): Record<string, string> {
   const changed = mine?.props.modules && typeof mine.props.modules === 'object' ? Object.entries(mine.props.modules as Record<string, unknown>).filter(([name, text]) => NAME.test(name) && typeof text === 'string') : [];

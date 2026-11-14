@@ -283,6 +283,7 @@ export const KERNEL_VERBS: Record<string, string> = {
   run_report: 'report',
   rechecked: 'report',
   show: 'report',
+  preview: 'report',
   check_connections: 'report',
   health: 'report',
   hook: 'report',

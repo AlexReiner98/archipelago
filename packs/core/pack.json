@@ -1297,7 +1297,7 @@
     {
       "id": "report",
       "title": "Report",
-      "description": "Say that something happened or is so: progress, a result, a payment, a check that it still holds. Also answers the owner with a view: show, with a kept view or an ad-hoc lens and style.",
+      "description": "Say that something happened or is so: progress, a result, a payment, a check that it still holds. show answers the owner with a view.",
       "kernel": true
     },
     { "id": "ask", "title": "Ask", "description": "Put a question to someone and wait for the answer.", "kernel": true },
