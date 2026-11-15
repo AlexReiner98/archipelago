@@ -380,9 +380,10 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
    in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
 body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
 body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; }
-.gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: 0 auto; padding-top: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
-.gate-mark { width: var(--box-10); height: var(--box-10); border-radius: var(--radius-2); }
-.gate h1 { margin: 0 0 var(--space-4); }
+/* In the middle of the page both ways, a little above centre, as most sign-in pages sit; the mark and title centred over it. */
+.gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); min-height: calc(100vh - var(--space-11) - var(--space-14)); margin: 0 auto; padding-bottom: var(--space-14); display: flex; flex-direction: column; justify-content: center; gap: var(--space-7); }
+.gate-mark { align-self: center; width: var(--box-10); height: var(--box-10); border-radius: var(--radius-2); }
+.gate h1 { margin: 0 0 var(--space-4); text-align: center; }
 .gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
 .gate-row > input { flex: 1; min-width: 0; }
 .gate-row > button, .gate-row > a { flex: none; }
