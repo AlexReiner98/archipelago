@@ -8,7 +8,7 @@ body {
   margin: 0;
   background: var(--reader-page, Canvas);
   color: var(--reader-ink, CanvasText);
-  font: var(--reader-text)/1.6 Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  font: var(--reader-text)/1.6 var(--face-chart, serif);
 }
 /* A published page's words for a reader that runs no script (packs/reader/head.js): the page itself is drawn in main. */
 .page-words {

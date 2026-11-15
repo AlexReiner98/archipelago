@@ -282,7 +282,9 @@ function typeVars(type: unknown, faces: unknown): [string, string][] {
   for (const [role, t] of Object.entries((type && typeof type === 'object' ? type : {}) as Record<string, any>)) {
     if (!NAME.test(role) || !t || typeof t !== 'object') continue;
     const at = `--type-${role.replaceAll('_', '-')}`;
-    out.push([`${at}-family`, face(t.face)], [`${at}-weight`, [400, 600].includes(t.weight) ? String(t.weight) : '400'], [`${at}-style`, t.style === 'italic' ? 'italic' : 'normal']);
+    const weight = Number.isInteger(t.weight) && t.weight >= 100 && t.weight <= 900 && t.weight % 50 === 0 ? String(t.weight) : '400';
+    const axes = (t.axes && typeof t.axes === 'object' ? Object.entries(t.axes as Record<string, unknown>).filter(([k, v]) => /^[A-Za-z]{4}$/.test(k) && typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= 1000).map(([k, v]) => `'${k}' ${v}`).join(', ') : '') || 'normal';
+    out.push([`${at}-family`, face(t.face)], [`${at}-weight`, weight], [`${at}-style`, t.style === 'italic' ? 'italic' : 'normal'], [`${at}-axes`, axes]);
     out.push([`${at}-case`, t.case === 'upper' ? 'uppercase' : 'none'], [`${at}-track`, typeof t.track === 'string' && /^-?\d+(\.\d+)?em$/.test(t.track) ? t.track : '0']);
   }
   return out;

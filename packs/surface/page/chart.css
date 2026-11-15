@@ -1,0 +1,133 @@
+/* The first-run pages (decision e_y76ysk7n, typeface e_sgzzhfba): a published site's pages and the gate's (sign in, sign up, a
+   guest map being made) in the house's map face, roles, colours and marks; every value is the house style's. The face is
+   Recursive: a person's words in its casual end (voice), an agent's in its monospace end (agent), names and controls in its
+   plain sans (wordmark, heading, label). The colours are chart_*, light and dark, and held is the one accent: something
+   proposed, waiting for you. The one way forward on a page is ink with a heavier foot (lengths action_rule, action_foot). */
+
+@font-face {
+  font-family: 'Recursive';
+  font-style: oblique 0deg 15deg;
+  font-weight: 300 1000;
+  font-display: swap;
+  src: url(/recursive.woff2) format('woff2');
+}
+
+/* Where it holds: a site's page (it has the site's header) and the gate, each with the chart's colours as c-*. A page
+   published before the house had chart_* keeps the look it was published in, so a site falls back to its reader colours
+   until it is published again; the gate always reads the house as it stands. */
+body:has(main > nav.site-head) {
+  --c-ground: var(--chart-ground, var(--reader-page));
+  --c-ink: var(--chart-ink, var(--reader-ink));
+  --c-muted: var(--chart-muted, var(--reader-muted));
+  --c-hair: var(--chart-hair, var(--reader-line));
+  --c-edge: var(--chart-edge, var(--reader-muted));
+  background: var(--c-ground);
+  color: var(--c-ink);
+}
+body[data-gate] {
+  --c-ground: var(--chart-ground, var(--bg));
+  --c-ink: var(--chart-ink, var(--text));
+  --c-muted: var(--chart-muted, var(--muted));
+  --c-hair: var(--chart-hair, var(--line));
+  --c-edge: var(--chart-edge, var(--muted));
+  background: var(--c-ground);
+  color: var(--c-ink);
+}
+body[data-gate] #sheet { background: var(--c-ground); }
+body[data-gate] .gate .muted { color: var(--c-muted); }
+
+/* The roles, each as the house gives it. */
+main:has(> nav.site-head), body[data-gate] .gate,
+main:has(> nav.site-head) :is(nav, footer, h3, h4) {
+  font-family: var(--type-voice-family);
+  font-weight: var(--type-voice-weight);
+  font-variation-settings: var(--type-voice-axes);
+}
+main > nav.site-head .site-name {
+  font-family: var(--type-wordmark-family);
+  font-weight: var(--type-wordmark-weight);
+  font-variation-settings: var(--type-wordmark-axes);
+  text-transform: var(--type-wordmark-case);
+  letter-spacing: var(--type-wordmark-track);
+}
+main:has(> nav.site-head) :is(h1, h2), body[data-gate] .gate h1 {
+  font-family: var(--type-heading-family);
+  font-weight: var(--type-heading-weight);
+  font-variation-settings: var(--type-heading-axes);
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--c-ink);
+}
+main:has(> nav.site-head) :is(.site-pages a, th, li > strong:first-child, p.action > a),
+body[data-gate] .gate :is(button, .primary, input) {
+  font-family: var(--type-label-family);
+  font-weight: var(--type-label-weight);
+  font-variation-settings: var(--type-label-axes);
+}
+/* What an agent wrote is set in its monospace end: code, and a guest map being made. */
+main:has(> nav.site-head) :is(code, pre), body[data-gate] .gate-row > .muted.grow:only-child {
+  font-family: var(--type-agent-family);
+  font-weight: var(--type-agent-weight);
+  font-variation-settings: var(--type-agent-axes);
+}
+
+/* Links are ink, underlined by a hairline. */
+main:has(> nav.site-head) :is(.text, section, footer) a, body[data-gate] .gate a:not(.primary) {
+  color: var(--c-ink);
+  text-decoration: underline;
+  text-decoration-color: var(--c-edge);
+  text-underline-offset: var(--chart-underline);
+}
+
+/* A section's title stands under a few fine lines that die away: the water between parts of the page. */
+main:has(> nav.site-head) section > h2 {
+  position: relative;
+  border-top: 0;
+  padding-top: var(--space-10);
+}
+main:has(> nav.site-head) section > h2::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--space-6);
+  background: repeating-linear-gradient(to bottom, var(--c-hair) 0 var(--border-1), transparent var(--border-1) var(--space-3));
+  -webkit-mask: linear-gradient(to right, black 15%, transparent 90%);
+  mask: linear-gradient(to right, black 15%, transparent 90%);
+}
+
+/* The one way forward on a page: a link alone on its line on a site (p.action), and the gate's primary button. Ink, a
+   heavier foot, no colour; it fills with ink when pointed at. */
+main:has(> nav.site-head) p.action > a,
+body[data-gate] .gate .primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-5);
+  padding: var(--space-7) var(--space-11);
+  background: var(--c-ground);
+  color: var(--c-ink);
+  border: var(--action-rule) solid var(--c-ink);
+  border-bottom-width: var(--action-foot);
+  border-radius: 0;
+  text-decoration: none;
+  text-align: center;
+  max-width: 100%;
+}
+main:has(> nav.site-head) p.action > a:hover,
+body[data-gate] .gate .primary:hover:not(:disabled) {
+  background: var(--c-ink);
+  color: var(--c-ground);
+}
+body[data-gate] .gate .primary:focus-visible { outline: var(--border-3) solid var(--c-ink); outline-offset: var(--border-3); }
+
+/* The gate: a clearing with room, the form at reading size; fields square, their edge strong enough to see. */
+body[data-gate] .gate { gap: var(--space-8); }
+body[data-gate] .gate h1, main:has(> nav.site-head) section > h2 { font-size: var(--chart-title); line-height: 1.2; }
+body[data-gate] .gate, main:has(> nav.site-head) { font-size: var(--chart-text); }
+body[data-gate] .gate input { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }
+body[data-gate] .gate input:focus { border-color: var(--c-ink); outline: var(--border-2) solid var(--c-ink); outline-offset: var(--border-1); }
+body[data-gate] .gate button:not(.primary) { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }
+/* A line that only says what is happening (Making your map…) stands centred under the title, in the clearing the land is drawn round. */
+body[data-gate] .gate-row > .muted.grow:only-child { text-align: center; }
