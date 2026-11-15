@@ -312,6 +312,8 @@ export function gate(title, ...kids) {
 export const ungate = () => delete document.body.dataset.gate;
 /** One line of a gate's page: a field and its button, or words and a link; never wraps. */
 export const gateRow = (...kids) => h('div', { class: 'gate-row' }, ...kids);
+/** Show or hide what is typed in a password field, for whoever wants to check it. */
+export const showOf = (input) => h('a', { href: '#', class: 'small', title: 'Show or hide the password', onclick: (e) => (e.preventDefault(), (e.target.textContent = (input.type = input.type === 'password' ? 'text' : 'password') === 'text' ? 'Hide' : 'Show')) }, 'Show');
 
 /** `back`: drawn from inside a workspace (Another workspace, in the menu), so there is a way back to it; `email`: the address to start from. */
 export function signIn(message, title = 'Sign in', { back = false, email: given = '' } = {}) {
@@ -409,7 +411,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
       newcomer && begin,
       newcomer && gateRow(h('span', { class: 'muted grow' }, 'Have one? Sign in')),
       gateRow(email, send),
-      gateRow(password, passwordGo),
+      gateRow(password, showOf(password), passwordGo),
       hooks.otherWays?.(fail),
       error,
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
