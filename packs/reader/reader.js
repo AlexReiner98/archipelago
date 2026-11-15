@@ -71,16 +71,22 @@ function rehomed(doc, from, to) {
   if (!doc.lenses) return doc;
   const lenses = Object.fromEntries(
     Object.entries(doc.lenses).map(([id, lens]) => {
-      const src = lens.style?.drawing?.src;
-      if (typeof src !== 'string' || !src.startsWith(`${from}/drawing/`)) return [id, lens];
-      return [id, { ...lens, style: { ...lens.style, drawing: { ...lens.style.drawing, src: `${to.replace(/\/$/, '')}${src.slice(from.length)}` } } }];
+      const drawing = lens.style?.drawing;
+      const moved = (src) => (typeof src === 'string' && src.startsWith(`${from}/drawing/`) ? `${to.replace(/\/$/, '')}${src.slice(from.length)}` : null);
+      if (!moved(drawing?.src)) return [id, lens];
+      // And its baked SVG, where it has one, read below the same address.
+      // Every address of what it baked moves with it, a page frame's bands too.
+      const deep = (v) => (typeof v === 'string' ? moved(v) ?? v : Array.isArray(v) ? v.map(deep) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, w]) => [k, deep(w)])) : v);
+      const baked = drawing.baked ? { baked: deep(drawing.baked) } : {};
+      return [id, { ...lens, style: { ...lens.style, drawing: { ...drawing, src: moved(drawing.src), ...baked } } }];
     }),
   );
   return { ...doc, lenses };
 }
 
 const picture = (found) => (found ? { picture: found, cache: PICTURE_KEPT } : null);
-const drawing = (code) => (code ? { json: code, cache: FOR_GOOD } : null);
+// A drawing's code is JSON; one baked as its document was published is its SVG, an image with nothing in it that runs.
+const drawing = (code) => (code?.content_type === 'image/svg+xml' && typeof code.base64 === 'string' ? { picture: code, styled: true, cache: FOR_GOOD } : code ? { json: code, cache: FOR_GOOD } : null);
 
 /** /p/<workspace>/<id>[/<what>[/<extra>]]: a public view's page, its data, a picture, a drawing, its stream. */
 export async function pageOf(parts, act, template) {

@@ -57,7 +57,10 @@ export async function publishedAct(at: ActPlaces, pack: ServerPackFile, act: Ser
       const id = word(input.id, ID, 'An id');
       const hash = word(input.hash, HASH, 'A hash');
       const doc = l && ((await publicView(l, id)) as Doc | null);
-      return (doc && (await published()).layoutCode(doc, hash)) ?? null;
+      const code = doc && ((await published()).layoutCode(doc, hash) as { svg?: unknown } | null);
+      // A drawing baked as its document was published is a picture: its SVG, as bytes the pack serves as they are.
+      if (typeof code?.svg === 'string') return { content_type: 'image/svg+xml', base64: Buffer.from(code.svg).toString('base64') };
+      return code ?? null;
     }
     case 'public.list':
       return l ? publicViews(l) : [];
