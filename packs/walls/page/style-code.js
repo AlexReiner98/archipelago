@@ -169,8 +169,8 @@ function pageAt(id, width) {
         const shown = [...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('footer')].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead) && el.getBoundingClientRect().height > 0).map(box);
         const above = shown.filter((b) => b.y + b.h <= heroFoot - (lead ? box(lead).h : 0) + 4), parts = shown.filter((b) => b.y >= heroFoot - 4);
         const x0 = Math.min(...parts.map((b) => b.x)), x1 = Math.max(...parts.map((b) => b.x + b.w)), y0 = Math.min(...parts.map((b) => b.y)), y1 = Math.max(...parts.map((b) => b.y + b.h));
-        // Words the page sets in its hero (its name as a heading) are its own: kept clear, and the drawing draws no name of its own.
-        const named = lead ? [...lead.querySelectorAll('h1, h2, .wordmark')].filter((el) => el.getBoundingClientRect().height > 0).map(box) : [];
+        // The page's name, where it shows it (its title over the hero, or a heading in it): kept clear, and the drawing draws no name of its own.
+        const named = [...doc.querySelectorAll('main h1, main section.lead h2, main .wordmark')].filter((el) => el.getBoundingClientRect().height > 0).map(box);
         resolve({ hero: lead && box(lead), above, named, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null });
       } catch (err) {
         reject(err);
