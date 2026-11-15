@@ -118,7 +118,9 @@ export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = 
   if (a.picture !== undefined) {
     const p = (a.picture ?? {}) as { content_type?: unknown; base64?: unknown };
     if (typeof p.content_type !== 'string' || !PICTURE.test(p.content_type) || typeof p.base64 !== 'string') return fault('a picture that is not one');
-    res.writeHead(status, { ...GUARD, 'content-type': p.content_type, 'cache-control': keptFor(a.cache, 'no-cache'), 'content-security-policy': "default-src 'none'" }).end(Buffer.from(p.base64, 'base64'));
+    // An SVG keeps its own stylesheet (a baked drawing turns its colours by it), and runs nothing.
+    const policy = p.content_type === 'image/svg+xml' ? "default-src 'none'; style-src 'unsafe-inline'" : "default-src 'none'";
+    res.writeHead(status, { ...GUARD, 'content-type': p.content_type, 'cache-control': keptFor(a.cache, 'no-cache'), 'content-security-policy': policy }).end(Buffer.from(p.base64, 'base64'));
     return true;
   }
   if (typeof a.text === 'string') {

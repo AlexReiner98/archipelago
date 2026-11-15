@@ -4,7 +4,7 @@
 
 const HASH = /^[0-9a-f]{64}$/;
 
-type Lens = { style?: { drawing?: { id: string; title: string; hash: string; modules?: Record<string, string>; baked?: { hash: string; width: number; height: number } } } } & Record<string, unknown>;
+type Lens = { style?: { drawing?: { id: string; title: string; hash: string; modules?: Record<string, string>; baked?: { hash?: string; width?: number; height?: number; page?: ({ svg: { top: string; strip: string; foot: string } } & Record<string, unknown>)[] } } } } & Record<string, unknown>;
 type Doc = { title: string; /** Its parts, as packs/views/kernel/documents.ts reads them: text, a section, or one missing. */ parts: unknown[]; lenses?: Record<string, Lens> } & Record<string, unknown>;
 
 /** Where a public item's page is read: stable for as long as it is public, whatever it is renamed. */
@@ -18,8 +18,9 @@ export function pageData(doc: Doc, here: string) {
       if (!drawing?.modules) return [id, lens];
       const { modules: _code, ...named } = drawing;
       const at = `${here.replace(/\/$/, '')}/drawing`;
-      // One baked as it was published is read as its SVG, by that SVG's hash.
-      const baked = drawing.baked && { ...drawing.baked, src: `${at}/${drawing.baked.hash}` };
+      // One baked as it was published is read as its SVG, by that SVG's hash; a page's frame as each width's three bands.
+      const was = drawing.baked;
+      const baked = was && (was.page ? { page: was.page.map(({ svg, ...w }) => ({ ...w, src: { top: `${at}/${svg.top}`, strip: `${at}/${svg.strip}`, foot: `${at}/${svg.foot}` } })) } : { ...was, src: `${at}/${was.hash}` });
       return [id, { ...lens, style: { ...lens.style, drawing: { ...named, src: `${at}/${drawing.hash}`, ...(baked && { baked }) } } }];
     }),
   );

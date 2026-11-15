@@ -40,9 +40,37 @@ test('a baking is kept as its SVG, by hash, only for the code that was frozen', 
 
 test('the reader serves a baked drawing as an image, kept for good', async () => {
   const D = 'e_dddddddd', H = 'a'.repeat(64);
-  const act = async (name: string) => (name === 'public.read' ? { id: D, title: 'Home', parts: [] } : name === 'public.drawing' ? { svg: '<svg xmlns="http://www.w3.org/2000/svg"/>' } : null);
-  const got = (await pageOf({ workspace: 'acme', id: D, what: 'drawing', extra: H }, act, '')) as { text: string; type: string; cache: number };
-  assert.equal(got.type, 'image/svg+xml');
-  assert.match(got.text, /^<svg /);
+  const act = async (name: string) => (name === 'public.read' ? { id: D, title: 'Home', parts: [] } : name === 'public.drawing' ? { content_type: 'image/svg+xml', base64: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>').toString('base64') } : null);
+  const got = (await pageOf({ workspace: 'acme', id: D, what: 'drawing', extra: H }, act, '')) as { picture: { content_type: string; base64: string }; cache: number };
+  assert.equal(got.picture.content_type, 'image/svg+xml');
+  assert.match(Buffer.from(got.picture.base64, 'base64').toString(), /^<svg /);
   assert.ok(got.cache > 86400);
+});
+
+test('a page frame keeps each width as its top, its margins and its foot, cut on channels, each read at its own address', () => {
+  const lens = freezeQuery({ items: [], links: [], lens: {}, style: { code } }, new Map());
+  const frozen = { title: 'Home', parts: [], lenses: { e_aaaaaaaa: lens } };
+  const hash = (lens.style.drawing as { hash: string }).hash;
+  const tall = (y: number) => ({ k: 'fill', d: [['M', [10, y]], ['L', [30, y]], ['L', [30, y + 20]], ['Z']], c: '#ff0000', a: 1, clip: 0 });
+  const page = { width: 420, height: 1000, clips: [], shapes: [tall(50), tall(400), tall(900)], looks: { red: ['#ff0000', '#ff0000', '#ff0000'] } };
+  const kept = withBaked(frozen, { e_aaaaaaaa: { hash, page: [{ width: 420, top: 200, period: 200, foot: 800, baking: page }] } }) as typeof frozen & { svgs: Record<string, string> };
+  const frame = (kept.lenses.e_aaaaaaaa.style.drawing as { baked: { page: { svg: Record<string, string>; top: number; foot: number }[] } }).baked.page[0];
+  assert.deepEqual([frame.top, frame.foot], [200, 800]);
+  assert.match(kept.svgs[frame.svg.top], /viewBox="0 0 420 200"/);
+  assert.match(kept.svgs[frame.svg.strip], /viewBox="0 200 420 600"/);
+  assert.match(kept.svgs[frame.svg.foot], /viewBox="0 800 420 200"/);
+  assert.equal((kept.svgs[frame.svg.top].match(/<path /g) ?? []).length, 1, 'a band keeps only the shapes that reach into it');
+  const given = pageData(kept as never, '/p/default/e_bbbbbbbb') as { lenses: Record<string, { style: { drawing: { baked: { page: { src: Record<string, string> }[] } } } }> };
+  assert.equal(given.lenses.e_aaaaaaaa.style.drawing.baked.page[0].src.strip, `/p/default/e_bbbbbbbb/drawing/${frame.svg.strip}`);
+  assert.throws(() => withBaked(frozen, { e_aaaaaaaa: { hash, page: [{ width: 420, top: 200, period: 250, foot: 800, baking: page }] } }), /whole periods/);
+});
+
+test('what was baked may come gzipped, as the page sends it', async () => {
+  const { gzipSync } = await import('node:zlib');
+  const lens = freezeQuery({ items: [], links: [], lens: {}, style: { code } }, new Map());
+  const frozen = { title: 'Home', parts: [], lenses: { e_aaaaaaaa: lens } };
+  const hash = (lens.style.drawing as { hash: string }).hash;
+  const sent = gzipSync(JSON.stringify({ e_aaaaaaaa: { hash, baking } })).toString('base64');
+  assert.equal(Object.keys((withBaked(frozen, sent) as unknown as { svgs: object }).svgs).length, 1);
+  assert.throws(() => withBaked(frozen, 'not gzip'), /could not be opened/);
 });

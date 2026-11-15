@@ -15,6 +15,8 @@ export const SLOW: Record<string, string> = {
   'test/agents-beside.test.ts': 'browser',
   // A layout's code baked in its frame: one Chrome page, and a wait out the quiet that ends a bake that never says bake.
   'test/bake-frame.test.ts': 'browser',
+  // A page's frame baked at three widths and published: a Chrome page that bakes, then the page read at two widths.
+  'test/bake-page.test.ts': 'browser',
   // The core loop end to end: a server, the plugin's hook script run per event, and two Chrome pages.
   'test/loop.test.ts': 'browser',
   'test/canvas-drag.test.ts': 'browser',

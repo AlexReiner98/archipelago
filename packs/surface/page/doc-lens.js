@@ -48,6 +48,60 @@ function drawBaked(body, baked, title) {
   body.replaceChildren(h('img', { class: 'baked', src: baked.src, width: baked.width, height: baked.height, alt: title ?? '', decoding: 'async' }));
 }
 
+/**
+ * A page's frame, baked as its document was published at a few widths (packs/publish/kernel/published-baked.ts): the land
+ * behind the whole page. The width that fits the window is cut to it from the middle; its top stands over the hero, as
+ * many periods of its margins as the page is long repeat below that, each cut on a channel of water, and its foot band
+ * stands at the page's foot, which is given room for it. Images only: nothing runs.
+ */
+function drawFrame(body, page) {
+  const widths = page.filter((w) => w.src?.top && w.src.strip && w.src.foot).sort((a, b) => a.width - b.width);
+  if (!widths.length) return;
+  body.replaceChildren();
+  body.classList.add('framed');
+  document.querySelector('.page-land')?.remove();
+  const land = h('div', { class: 'page-land', 'aria-hidden': 'true' });
+  const top = h('img', { class: 'land-top', alt: '', decoding: 'async' }), strip = h('div', { class: 'land-strip' }), foot = h('img', { class: 'land-foot', alt: '', decoding: 'async' });
+  land.append(top, strip, foot);
+  document.body.prepend(land);
+  let laid = '';
+  const lay = () => {
+    const room = document.documentElement.clientWidth;
+    const w = widths.find((x) => x.width >= room) ?? widths.at(-1);
+    const band = w.height - w.foot, left = Math.round((room - w.width) / 2);
+    // The hero is as high as it was when the page was baked, and the page's foot leaves room for the band.
+    const heroTop = body.getBoundingClientRect().top + scrollY;
+    body.style.height = `${Math.max(0, w.top - heroTop)}px`;
+    document.body.style.paddingBottom = `${band}px`;
+    // How long the page is without its land: where the last of the rest ends, and the band's room below it.
+    const ends = [...document.body.children].filter((el) => el !== land).map((el) => el.getBoundingClientRect().bottom + scrollY);
+    const high = Math.ceil(Math.max(0, ...ends)) + band;
+    const periods = Math.max(0, Math.floor((high - band - w.top) / w.period));
+    const key = [w.width, room, high].join(' ');
+    if (key === laid) return;
+    laid = key;
+    land.style.height = `${high}px`;
+    Object.assign(top, { src: w.src.top, width: w.width, height: w.top });
+    Object.assign(top.style, { left: `${left}px`, width: `${w.width}px`, height: `${w.top}px` });
+    // The margins as many times over as the page is long, each the strip baked between the top and the foot, cut on a channel.
+    const each = w.foot - w.top;
+    Object.assign(strip.style, { left: `${left}px`, top: `${w.top}px`, width: `${w.width}px`, height: `${periods * w.period}px` });
+    strip.replaceChildren(...Array.from({ length: Math.ceil((periods * w.period) / each) }, (_, i) => {
+      const piece = h('img', { alt: '', decoding: 'async', src: w.src.strip, width: w.width, height: each });
+      Object.assign(piece.style, { top: `${i * each}px`, width: `${w.width}px`, height: `${each}px` });
+      return piece;
+    }));
+    Object.assign(foot, { src: w.src.foot, width: w.width, height: band });
+    Object.assign(foot.style, { left: `${left}px`, top: `${high - band}px`, width: `${w.width}px`, height: `${band}px` });
+  };
+  lay();
+  let pending = 0;
+  const again = () => (cancelAnimationFrame(pending), (pending = requestAnimationFrame(lay)));
+  addEventListener('resize', again);
+  document.fonts?.ready.then(again);
+  new ResizeObserver(again).observe(document.body);
+}
+
 /** Draw one frozen answer into host. `typeTitles` names each type the picture holds. `inApp`: drawn in the app's sheet, whose addresses are its own. `onItem`: a part opens there (a public view opens it in its sheet, ./frozen-chrome.js). */
 export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onItem = null } = {}) {
   for (const [id, title] of Object.entries(typeTitles)) if (!types.has(id)) types.set(id, { id, title });
@@ -57,7 +111,8 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onIte
   host.replaceChildren(body);
   dress(body, style);
   // Every picture has a drawing: packs/publish/kernel/published.ts gives one to a picture frozen without.
-  if (/^\/[^/]/.test(style.drawing?.baked?.src ?? '')) drawBaked(body, style.drawing.baked, answer.lens?.title);
+  if (Array.isArray(style.drawing?.baked?.page)) drawFrame(body, style.drawing.baked.page);
+  else if (/^\/[^/]/.test(style.drawing?.baked?.src ?? '')) drawBaked(body, style.drawing.baked, answer.lens?.title);
   else if (style.drawing?.coded) drawCoded(body, answer, style);
   else if (style.drawing) drawWith(body, answer, style, () => {});
   else body.replaceChildren(h('div', { class: 'empty' }, 'This view cannot be drawn here.'));

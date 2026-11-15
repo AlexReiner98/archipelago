@@ -181,14 +181,32 @@ function sheet(b: Slotted): string {
   return `${turning(b.slots, b.timing)}${light}@media (prefers-reduced-motion:reduce){*{animation:none!important}}`;
 }
 
-/** The baked picture as one SVG: its clips, each shape in its slot's class, and the stylesheet that turns them. */
-export function bakedSvg(b: Slotted): string {
+/** How far up and down a shape reaches, for what a band of the picture keeps. */
+function reach(s: Shape): [number, number] {
+  if (s.k === 'text') return [s.m![5] - 200, s.m![5] + 200];
+  let lo = Infinity, hi = -Infinity;
+  for (const [, ...pts] of s.d!) for (const [, y] of pts) ((lo = Math.min(lo, y)), (hi = Math.max(hi, y)));
+  return [lo, hi];
+}
+
+/**
+ * The baked picture as one SVG: its clips, each shape in its slot's class, and the stylesheet that turns them. With a
+ * band (`y0` to `y1`), only that band of it: the shapes that reach into it, seen through it, for a page that sets the
+ * bands of one picture apart (its top, its margins repeated, its foot).
+ */
+export function bakedSvg(b: Slotted, band?: { y0: number; y1: number }): string {
   const clips = b.clips.map((c, i) => `<clipPath id="c${i + 1}"${c.up ? ` clip-path="url(#c${c.up})"` : ''}><path d="${pathData(c.d)}"/></clipPath>`).join('');
   const body: string[] = [];
   const clip = (n: number) => (n ? ` clip-path="url(#c${n})"` : '');
   const alpha = (a: number, prop: string) => (a < 1 ? ` ${prop}="${Math.round(Math.max(0, a) * 1000) / 1000}"` : '');
+  const within = (s: Shape) => {
+    if (!band) return true;
+    const [lo, hi] = reach(s);
+    return hi >= band.y0 && lo <= band.y1;
+  };
   for (let i = 0; i < b.shapes.length; i++) {
     const s = b.shapes[i];
+    if (!within(s)) continue;
     if (s.k === 'text') {
       const m = s.m!.map((v) => Math.round(v * 1000) / 1000).join(' ');
       const style = `font:${fontOf(s.font)}${s.sp && /^-?\d+(\.\d+)?(px|em)$/.test(s.sp) && s.sp !== '0px' ? `;letter-spacing:${s.sp}` : ''}`;
@@ -206,5 +224,6 @@ export function bakedSvg(b: Slotted): string {
     body.push(`<path class="${cls}" d="${pathData(s.d!)}"${s.k === 'stroke' ? ' fill="none"' : ''}${lineAttrs}${alpha(s.a, 'opacity')}${clip(s.clip)}/>`);
     if (both) i++;
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(b.width)} ${num(b.height)}"><style>${sheet(b)}</style>${clips ? `<defs>${clips}</defs>` : ''}${body.join('')}</svg>`;
+  const box = band ? `0 ${num(band.y0)} ${num(b.width)} ${num(band.y1 - band.y0)}` : `0 0 ${num(b.width)} ${num(b.height)}`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${box}"><style>${sheet(b)}</style>${clips ? `<defs>${clips}</defs>` : ''}${body.join('')}</svg>`;
 }
