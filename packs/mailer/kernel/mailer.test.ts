@@ -24,7 +24,9 @@ test('an address that bounced is kept as bounced, in the store of the map it is 
 
 test('a member notice is a mail, sent by the filling of identity.invited', async () => {
   const code = memberMail({ kind: 'sign_in_code', to: 'kim@example.com', codes: ['123456'], minutes: 15, days: 30 });
-  assert.equal(code.subject, 'Your Archipelago sign-in code');
+  // One code is in the subject, read off the notification without opening the mail; several are not.
+  assert.equal(code.subject, '123456 is your Archipelago code');
+  assert.equal(memberMail({ kind: 'sign_in_code', to: 'kim@example.com', codes: ['Acme: 123456', 'Beta: 654321'], minutes: 15, days: 30 }).subject, 'Your Archipelago sign-in codes');
   assert.match(code.text, /123456/);
   const invite = memberMail({ kind: 'invite_issued', to: 'kim@example.com', replyTo: 'alex@example.com', by: 'Alex', workspace: 'Acme', signIn: 'sign in at https://x.example.' });
   assert.equal(invite.subject, 'Alex invited you to Acme on Archipelago');

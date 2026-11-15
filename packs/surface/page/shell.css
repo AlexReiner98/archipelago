@@ -376,21 +376,6 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 #sheet .page-json { margin: var(--space-3) 0 0; font-size: var(--text-3); white-space: pre-wrap; overflow-wrap: anywhere; }
 #sheet .page-lines .change.line { padding-left: 0; padding-right: 0; }
 
-/* A page for whoever is not in a workspace yet (gate, packs/kit/page/base.js): sign in, agree, Allow a client. One column
-   in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
-body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
-body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; }
-.gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: 0 auto; padding-top: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
-.gate-mark { width: var(--box-10); height: var(--box-10); border-radius: var(--radius-2); }
-.gate h1 { margin: 0 0 var(--space-4); }
-.gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
-.gate-row > input { flex: 1; min-width: 0; }
-.gate-row > button, .gate-row > a { flex: none; }
-.gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.gate-others { display: flex; gap: var(--space-6); }
-.gate-error:empty { display: none; }
-.gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
-
 /* Panes (ui/panes.js): the canvases of a tab, each with its name, a way to keep only it and to close it. Their
    frames are set by the layout as shares of the page; the line between two is dragged. */
 #canvas > .pane { position: fixed; inset: 0; z-index: 1; display: flex; flex-direction: column; background: var(--ln-sea, var(--bg)); box-sizing: border-box; }

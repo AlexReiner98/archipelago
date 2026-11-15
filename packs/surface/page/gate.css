@@ -1,0 +1,34 @@
+/* A page for whoever is not in a workspace yet (gate, packs/kit/page/base.js): sign in, sign up, agree, Allow a client. One column
+   in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
+body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
+body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; display: flex; flex-direction: column; }
+body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
+/* In the middle of the page both ways, a little above centre, as most sign-in pages sit; the mark and title centred over it. */
+.gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: auto; padding-bottom: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
+.gate-mark { align-self: center; width: var(--gate-mark, var(--box-10)); height: var(--gate-mark, var(--box-10)); border-radius: var(--radius-2); }
+.gate h1 { margin: 0 0 var(--space-4); text-align: center; }
+.gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
+.gate-row > input { flex: 1; min-width: 0; }
+.gate-row > button, .gate-row > a { flex: none; }
+/* A way in on a row of its own (Sign up with Google...): the width of the column; the ways sit in the column as its rows do. */
+.gate-row > button.grow { flex: 1; display: flex; align-items: center; justify-content: center; gap: var(--space-5); }
+/* A provider's mark before its name, in the button's colour. */
+.way-mark { flex: none; width: var(--box-5); height: var(--box-5); }
+/* Fields stand apart from the buttons beside them: a border a step stronger. */
+.gate .gate-row > input { border-color: var(--muted); }
+.gate-ways { display: contents; }
+/* Show, inside the end of its password field. */
+.gate-row:has(> .gate-show) { position: relative; }
+.gate-row:has(> .gate-show) > input { padding-right: var(--box-10); }
+.gate-row > .gate-show { position: absolute; right: var(--space-6); }
+/* Between the ways in and the email: a line, "or", a line. */
+/* A last line of the form, centred under it: Use a passkey, New here? */
+.gate-foot { justify-content: center; }
+.gate-or { display: flex; align-items: center; gap: var(--space-6); color: var(--muted); }
+.gate-or::before, .gate-or::after { content: ''; flex: 1; border-top: var(--border-1) solid var(--line); }
+.gate-row[hidden] { display: none; }
+.gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.gate-others { display: flex; gap: var(--space-6); }
+.gate-error { color: var(--bad); text-align: center; }
+.gate-error:empty { display: none; }
+.gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }

@@ -263,7 +263,8 @@ function touchedBy(beat, pos) {
 /** A redraw under way: another is not started on top of it. */
 export let redrawing = false;
 export async function checkTail() {
-  if (still || document.hidden || redrawing) return;
+  // A gate page (sign in, sign up, Allow) follows no map: asked signed out, each ask is refused and counted against the address.
+  if (still || document.hidden || redrawing || document.body.dataset.gate) return;
   let now;
   let touched;
   let more = false;
