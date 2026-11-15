@@ -54,3 +54,26 @@ test('in a browser, a page published with its frame baked shows its land behind 
     await page.close();
   }
 });
+
+test('in a browser, a page shared with its frame baked keeps its frame as a published one does', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { call, base } = await serve('off', undefined, undefined, packsWith('reader'));
+  const made = (await call('/api/change', undefined, { reason: 'test', ops: [
+    { op: 'create', ref: 'd', type: 'writing', title: 'Home', visibility: 'shared', body: '{l}\n\nWords for the column.' },
+    { op: 'create', ref: 's', type: 'layout', title: 'Land', visibility: 'shared', props: { code: LAND } },
+    { op: 'create', ref: 'l', type: 'lens', title: 'The land', visibility: 'shared', body: 'The land.', props: { filter: { find: ['type writing'] } } },
+    { op: 'link', type: 'part_of', from: 'l', to: 'd' },
+  ] })).result.created as Record<string, string>;
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.l, props: { style: { style: made.s, numbers: { page_frame: 1, frame_aspect: 2 } } } }] });
+  const app = await open(`${base}/`);
+  try {
+    await app.evaluate(`${pageModule('style-code.js')}.then((m) => m.bakeBeforeGoingOut('${made.d}'))`);
+  } finally {
+    await app.close();
+  }
+  const shared = await call('/api/share_create', undefined, { id: made.d });
+  assert.equal(shared.status, 200, JSON.stringify(shared));
+  const data = await (await fetch(`${base}${shared.result.address}/data`)).json();
+  const frame = data.lenses[made.l].style.drawing.baked?.page;
+  assert.equal(frame?.length, 3, 'its frame at three widths');
+  assert.equal((await fetch(`${base}${frame[0].src.top}`)).headers.get('content-type'), 'image/svg+xml');
+});
