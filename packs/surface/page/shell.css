@@ -400,11 +400,14 @@ body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
 .gate-row:has(> .gate-show) > input { padding-right: var(--box-10); }
 .gate-row > .gate-show { position: absolute; right: var(--space-6); }
 /* Between the ways in and the email: a line, "or", a line. */
+/* A last line of the form, centred under it: Use a passkey, New here? */
+.gate-foot { justify-content: center; }
 .gate-or { display: flex; align-items: center; gap: var(--space-6); color: var(--muted); }
 .gate-or::before, .gate-or::after { content: ''; flex: 1; border-top: var(--border-1) solid var(--line); }
 .gate-row[hidden] { display: none; }
 .gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .gate-others { display: flex; gap: var(--space-6); }
+.gate-error { color: var(--bad); text-align: center; }
 .gate-error:empty { display: none; }
 .gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
 

@@ -36,8 +36,13 @@ const posted = async (path, body, headers = {}) => {
   if (!res.ok) throw new Error(said.error ?? 'That did not work.');
   return said;
 };
-/** The ways this server signs people in beside a code: the providers it has a client for, and passkeys. */
-const ways = () => fetch('/connect/ways').then((r) => (r.ok ? r.json() : { social: [] }), () => ({ social: [] }));
+/**
+ * The ways this server signs people in beside a code: the providers it has a client for, and passkeys. Asked once, as
+ * the page loads, so a sign-in page is drawn whole rather than its form pushed down a moment later; asked again after a failure.
+ */
+let asked;
+const ways = () => (asked ??= fetch('/connect/ways').then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status))))).catch(() => ((asked = undefined), { social: [] })));
+ways();
 
 /** A saved map opens on its canvas, unless a client is waiting to connect (enter goes to Allow first). */
 function landSaved(token) {
@@ -190,7 +195,7 @@ export function otherWays(fail, { withCodes }) {
     rows.replaceChildren(...providers.map((p) => gateRow(h('button', { class: 'grow', onclick: provider(p) }, markOf(p), `Sign in with ${PROVIDERS[p]}`))));
     if (providers.length) rows.append(h('div', { class: 'gate-or' }, 'or'));
     if (!passkeysHere()) return;
-    below.append(gateRow(h('a', { href: '#', class: 'small', title: 'If you added one, on this device or your phone', onclick: (e) => (e.preventDefault(), passkey(false)) }, 'Use a passkey')));
+    below.append(h('div', { class: 'gate-row gate-foot' }, h('a', { href: '#', title: 'If you added one, on this device or your phone', onclick: (e) => (e.preventDefault(), passkey(false)) }, 'Use a passkey')));
     if (await autofillHere()) passkey(true);
   });
   return { top: rows, below };

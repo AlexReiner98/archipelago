@@ -373,7 +373,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   const password = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password', title: 'The one you set under Password, in the menu' });
   const withPassword = async (more = {}) => {
     const address = email.value.trim();
-    if (!address || !password.value) return fail(address ? `Type your password${codes ? ', or ask for an email' : ''}.` : 'Type your email address.');
+    if (!address || !password.value) return (address ? password : email).focus(), fail(address ? `Type your password${codes ? ', or ask for an email' : ''}.` : 'Type your email address.');
     const post = (agree) => postJson('/connect/password', { email: address, password: password.value, ...more, ...(agree && { agree }) });
     send.disabled = true;
     const res = await post();
@@ -397,7 +397,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     const tip = 'Make a workspace of your own; a client waiting to connect is asked again once you are in';
     // Sent here by a client, in a browser that has never signed in: most likely they have no account, so it leads.
     const start = h(newcomer ? 'button' : 'a', { class: newcomer ? 'primary' : '', href: newcomer ? undefined : to.href, title: tip, onclick: newcomer ? () => location.assign(to.href) : undefined }, url ? 'Start a workspace' : 'Try it with your agent');
-    begin.replaceWith(gateRow(h('span', { class: 'muted grow' }, 'New here?'), start));
+    begin.replaceWith(h('div', { class: 'gate-row gate-foot' }, h('span', { class: 'muted' }, 'New here?'), start));
   }, () => undefined);
 
   // From inside a workspace the menu lists them already; signed out, they are the quickest way back in.
@@ -412,8 +412,8 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
       newcomer && gateRow(h('span', { class: 'muted grow' }, 'Have one? Sign in')),
       ways.top,
       gateRow(email), gateRow(password, showOf(password)), gateRow(send),
-      ways.below,
       error,
+      ways.below,
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
       !newcomer && begin,
       back && gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), ungate(), route()) }, state.workspace?.name ? `Back to ${state.workspace.name}` : 'Back')),
