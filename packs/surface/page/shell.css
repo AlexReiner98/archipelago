@@ -383,7 +383,7 @@ body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; 
 body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
 /* In the middle of the page both ways, a little above centre, as most sign-in pages sit; the mark and title centred over it. */
 .gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: auto; padding-bottom: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
-.gate-mark { align-self: center; width: var(--box-10); height: var(--box-10); border-radius: var(--radius-2); }
+.gate-mark { align-self: center; width: var(--gate-mark, var(--box-10)); height: var(--gate-mark, var(--box-10)); border-radius: var(--radius-2); }
 .gate h1 { margin: 0 0 var(--space-4); text-align: center; }
 .gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
 .gate-row > input { flex: 1; min-width: 0; }
