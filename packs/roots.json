@@ -18,11 +18,11 @@
     },
     {
       "id": "kit",
-      "hash": "fc39fb90c4bacb798e67f7472131b4feb8c396c27fa824eb7a392ab3c122e597"
+      "hash": "abe6b3ae110462c14dda101bd5633ba5f0383465784cee01445d4cd9499ec06f"
     },
     {
       "id": "identity",
-      "hash": "68b1eeedab035cb17ad1ab3c0f11488e9ee1685f6cc1313ab785e1d149948101"
+      "hash": "048e2a5a8c77611a1898250ee33ef80dd5c561e2e19a5da10b8b80cf032755bf"
     },
     {
       "id": "walls",
@@ -58,7 +58,7 @@
     },
     {
       "id": "shell",
-      "hash": "d14caa46c2e772a8de959ae406a433ccfca96137d3d99d018f82e3d9cd900f47"
+      "hash": "733bdaf743a3284a6ee3a8fea88ef0d7172c954ffb747801a80ec939cefab857"
     }
   ],
   "calls": {

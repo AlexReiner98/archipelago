@@ -6,7 +6,7 @@
 import { authorizePage } from './authorize.js';
 import { tryPage } from './guest.js';
 import { otherWays, signInBack, signUpOffer, signUpPage } from './sign-up.js';
-import { SignInNeeded, api, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
+import { SignInNeeded, api, tell, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { warmLayouts } from './layout.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
@@ -28,6 +28,8 @@ import { workspace } from './workspace.js';
 hooks.partsRuntime = () => import('./part-host.js');
 hooks.passwordPage = () => import('./password.js').then((m) => m.passwordPage());
 hooks.otherWays = otherWays;
+// A passkey, added from the menu: the device asks at once, and says so when it is kept (packs/identity/page/passkey.js).
+if (typeof window.PublicKeyCredential === 'function') hooks.addPasskey = () => import('./passkey.js').then((m) => m.addPasskey()).then(() => tell('Passkey added', 'Next time, sign in with a passkey.'), (err) => err.name !== 'NotAllowedError' && tell('No passkey added', err.message));
 
 /** The pages the sheet holds, by the name in their address. */
 /** The address of an item a held change would make, as a drawing links it (packs/surface/page/replica.js). */
