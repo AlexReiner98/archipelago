@@ -3,6 +3,7 @@
 // it as an SVG (./baked.ts) kept with the document by its hash, and a reader is shown that file, with nothing running.
 // A drawing baked from other code than the one frozen is not taken: the code is named by its hash.
 
+import type { KernelContext } from '#pelago/kernel';
 import { createHash } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { bakedSvg, slotted } from './baked.ts';
@@ -63,6 +64,31 @@ function unpacked(sent: string): unknown {
 }
 /** The most what was baked may hold, opened. */
 const MOST_UNPACKED = 300_000_000;
+
+/** What pages baked for their documents, kept until the publish that follows takes it, ten minutes at most. */
+const kept = new Map<string, { sent: unknown; at: number }>();
+const KEPT_FOR = 10 * 60 * 1000;
+const ID = /^e_[a-z0-9]{8}$/;
+
+/**
+ * What the page baked before it publishes (surface.keep_baked, from the preview's route, as the person publishing): kept
+ * in this process for the publish that follows, never on the map. It is opened and checked only as it is published.
+ */
+export function keepBaked(ctx: KernelContext, id: string, sent: unknown) {
+  if (!ID.test(id)) throw new Error('A document is named by its id');
+  if (typeof sent !== 'string' && (!sent || typeof sent !== 'object')) throw new Error('What was baked is gzipped JSON or an object');
+  const now = Date.now();
+  for (const [k, v] of kept) if (now - v.at > KEPT_FOR) kept.delete(k);
+  kept.set(`${ctx.workspace}:${id}`, { sent, at: now });
+  return { kept: id };
+}
+
+/** What a page baked for this document in the last ten minutes, taken: a publish uses it once. */
+export function takeBaked(workspace: string, id: string): unknown {
+  const key = `${workspace}:${id}`, was = kept.get(key);
+  kept.delete(key);
+  return was && Date.now() - was.at <= KEPT_FOR ? was.sent : undefined;
+}
 
 type Sent = { hash?: unknown; baking?: unknown; light?: unknown; page?: ({ baking?: unknown; light?: unknown } & Record<string, unknown>)[] };
 

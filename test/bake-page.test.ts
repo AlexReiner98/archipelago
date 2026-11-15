@@ -34,7 +34,8 @@ test('in a browser, a page published with its frame baked shows its land behind 
   const app = await open(`${base}/`);
   try {
     const packed = (await app.evaluate(`${pageModule('style-code.js')}.then(async (m) => m.packBaked(await m.bakeDocument('${made.d}', (id) => fetch('/preview/' + id + '/data', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).then((r) => r.json()).then((r) => r.result))))`)) as string;
-    assert.equal((await call('/api/publish', undefined, { id: made.d, baked: packed })).status, 200);
+    assert.equal((await call(`/preview/${made.d}/data`, undefined, { baked: packed })).status, 200);
+    assert.equal((await call('/api/publish', undefined, { id: made.d })).status, 200);
   } finally {
     await app.close();
   }

@@ -86,7 +86,7 @@ function rehomed(doc, from, to) {
 
 const picture = (found) => (found ? { picture: found, cache: PICTURE_KEPT } : null);
 // A drawing's code is JSON; one baked as its document was published is its SVG, an image with nothing in it that runs.
-const drawing = (code) => (code?.content_type === 'image/svg+xml' && typeof code.base64 === 'string' ? { picture: code, cache: FOR_GOOD } : code ? { json: code, cache: FOR_GOOD } : null);
+const drawing = (code) => (code?.content_type === 'image/svg+xml' && typeof code.base64 === 'string' ? { picture: code, styled: true, cache: FOR_GOOD } : code ? { json: code, cache: FOR_GOOD } : null);
 
 /** /p/<workspace>/<id>[/<what>[/<extra>]]: a public view's page, its data, a picture, a drawing, its stream. */
 export async function pageOf(parts, act, template) {

@@ -126,9 +126,9 @@ export const SHARE_TOOLS: Record<string, ShareTool> = {
   },
   publish: {
     description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with the ask verb, action publish_ask.',
-    input: { id: 'string', ...AUTHORITY, 'baked?': 'any' },
-    says: { id: DOCUMENT, ...AUTHORITY_SAYS, baked: 'Sent by the page alone: each layout kept on the map it baked from the preview, by its view.' },
-    run: async (ctx, actor, input: { id: string; authority?: Said; baked?: unknown }) => publish(ctx, actor, input.id, input.authority, input.baked),
+    input: { id: 'string', ...AUTHORITY },
+    says: { id: DOCUMENT, ...AUTHORITY_SAYS },
+    run: async (ctx, actor, input: { id: string; authority?: Said }) => publish(ctx, actor, input.id, input.authority),
   },
   unpublish: {
     description: 'Take a published document down: its address answers nothing, and it is shared with the workspace again.',

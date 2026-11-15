@@ -13,7 +13,7 @@ import { actorId, authorityOf, itemOf, publishable, type Actor, type Said } from
 import { freezeDocument, pathOf, publishPlan } from './published-freeze.ts';
 import { republished } from './published-live.ts';
 import { pageMarks } from './page-marks.ts';
-import { withBaked } from './published-baked.ts';
+import { takeBaked, withBaked } from './published-baked.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 
@@ -30,7 +30,7 @@ async function mayPublish(ctx: KernelContext, actor: Actor) {
 }
 
 /** Publish a document as it stands: it becomes public, and what anyone reads of it is this, until it is published again. */
-export async function publish(ctx: KernelContext, actor: Actor, id: string, said?: Said, baked?: unknown) {
+export async function publish(ctx: KernelContext, actor: Actor, id: string, said?: Said) {
   await mayPublish(ctx, actor);
   const authority = authorityOf(actor.kind === 'human', actorId(actor), said);
   const doc = ID.test(id) ? await itemOf(ctx, id) : null;
@@ -39,8 +39,8 @@ export async function publish(ctx: KernelContext, actor: Actor, id: string, said
   pathOf(doc.props.path);
   if (doc.visibility !== 'public') await ctx.call('root.publish', { act: 'visibility', id, actor: actorId(actor), visibility: 'public', authority });
   // Drawn as the map's styles stand now (the styles pack's page.look), kept with it until it is published again.
-  // And each layout kept on the map that the page baked as it asked (./published-baked.ts), as its SVG.
-  const frozen = withBaked(await freezeDocument(ctx, id), baked);
+  // And each layout kept on the map that the page baked just before (./published-baked.ts, keepBaked), as its SVG.
+  const frozen = withBaked(await freezeDocument(ctx, id), takeBaked(ctx.workspace, id));
   const look = await ctx.call<unknown, Record<string, unknown>>('page.look', { ...frozen, id });
   // And the marks its reader's part draws it with, so a reader with no login is sent marks, never the part's code.
   const given = { ...frozen, style_at: (await ctx.reads({ log_head: true })) as number, look, ...(await pageMarks(ctx, 'page.doc', { ...frozen, ...look }, { published: true })) };

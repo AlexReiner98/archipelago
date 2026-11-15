@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { freezeQuery } from '../packs/publish/kernel/published-pictures.ts';
 import { layoutCode, pageData } from '../packs/publish/kernel/published-data.ts';
-import { unbaked, withBaked } from '../packs/publish/kernel/published-baked.ts';
+import { keepBaked, takeBaked, unbaked, withBaked } from '../packs/publish/kernel/published-baked.ts';
 // @ts-expect-error: a plain module of the pack, with no types of its own.
 import { pageOf } from '../packs/reader/reader.js';
 
@@ -73,4 +73,12 @@ test('what was baked may come gzipped, as the page sends it', async () => {
   const sent = gzipSync(JSON.stringify({ e_aaaaaaaa: { hash, baking } })).toString('base64');
   assert.equal(Object.keys((withBaked(frozen, sent) as unknown as { svgs: object }).svgs).length, 1);
   assert.throws(() => withBaked(frozen, 'not gzip'), /could not be opened/);
+});
+
+test('what a page baked is kept for the publish that follows, once, in its own workspace', () => {
+  keepBaked({ workspace: 'default' } as never, 'e_aaaaaaaa', 'packed');
+  assert.equal(takeBaked('other', 'e_aaaaaaaa'), undefined, 'another workspace takes nothing');
+  assert.equal(takeBaked('default', 'e_aaaaaaaa'), 'packed');
+  assert.equal(takeBaked('default', 'e_aaaaaaaa'), undefined, 'taken once');
+  assert.throws(() => keepBaked({ workspace: 'default' } as never, 'nope', 'x'), /named by its id/);
 });

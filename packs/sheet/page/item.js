@@ -183,7 +183,9 @@ export async function entity(id, here) {
           if (!(await ask({ title: `Publish "${e.title}"?`, message: 'Anyone will be able to read it at its own address, with no login, and search engines to list it: its text, the sections it holds that are shared with the workspace and its views, as they are now. What you change afterwards stays a draft until you publish again.', action: 'Publish', danger: !shown.published }))) return;
           // A layout kept on the map is baked here first, as publishing will freeze it, so its page shows a picture with nothing running.
           const baked = await bakeDocument(id, (doc) => call(`/preview/${doc}/data`, {}, authHeaders())).catch((err) => (tell('Its drawings were not baked', `They run live on its page: ${err.message}`), null));
-          return api('publish', { id, ...(baked && Object.keys(baked).length && { baked: await packBaked(baked) }) }).then(again, (err) => tell('It was not published', err.message));
+          // Handed to the server beside the preview it was baked from, and taken by the publish that follows.
+          if (baked && Object.keys(baked).length) await call(`/preview/${id}/data`, { baked: await packBaked(baked) }, authHeaders()).catch((err) => tell('Its drawings were not kept', `They run live on its page: ${err.message}`));
+          return api('publish', { id }).then(again, (err) => tell('It was not published', err.message));
         },
       ],
       writes && shown?.published && ['Unpublish', async () => (await ask({ title: `Unpublish "${e.title}"?`, message: 'Its address will answer nothing; it stays shared with the workspace.', action: 'Unpublish', danger: true })) && api('unpublish', { id }).then(again, (err) => tell('It was not unpublished', err.message))],
