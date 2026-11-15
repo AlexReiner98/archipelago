@@ -50,7 +50,8 @@ test('a domain serves a workspace’s published pages at their address words, th
   // A page at its address word, its header listing what has a place in the menu, the front page apart.
   const page = JSON.parse((await visit(base, '/how-it-works/data', 'site.test')).body);
   assert.equal(page.title, 'How it works');
-  assert.deepEqual(page.site, { name: 'Default', home: '/', pages: [{ title: 'How it works', href: '/how-it-works' }], host: 'site.test' });
+  // The way in: the app's own address, so a page can say Sign in.
+  assert.deepEqual(page.site, { name: 'Default', home: '/', pages: [{ title: 'How it works', href: '/how-it-works' }], host: 'site.test', app: base });
   assert.deepEqual(page.paths, { [home]: 'home' });
   assert.match((await visit(base, '/how-it-works', 'site.test')).body, /<link rel="canonical" href="https:\/\/site\.test\/how-it-works" \/>/);
 
