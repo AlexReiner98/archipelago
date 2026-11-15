@@ -86,6 +86,9 @@ test('a site: its front page at /, each page at its word, its figures, drawings,
   const data = ((await at('/about/data')) as { json: { site: unknown; lenses: Record<string, { style: { drawing: { src: string } } }> } }).json;
   assert.deepEqual(data.site, { footer: 'Contact us.\n\nLegal.', name: 'Acme', home: '/', pages: [{ title: 'About', href: '/about' }], host: 'acme.example' });
   assert.equal(data.lenses[SEC].style.drawing.src, `/about/drawing/${HASH}`, "a drawing is read below the page's own address");
+  // Served beside an app, every page's head carries the way in to it.
+  const withApp = ((await siteOf({ workspace: 'acme', path: '/about/data', host: 'acme.example', name: 'Acme', app: 'https://app.example' }, act, TEMPLATE)) as { json: { site: { app?: string } } }).json;
+  assert.equal(withApp.site.app, 'https://app.example');
   assert.match(((await at('/')) as { html: string }).html, /<title>Home<\/title>/);
   assert.deepEqual(await at('/home'), { redirect: '/', status: 301 });
   assert.deepEqual(await at('/picture/e_sec00001'), { picture: { content_type: 'image/png', base64: 'AAAA' }, cache: 300 });

@@ -152,8 +152,10 @@ export function pageParts(root, d, ways, picture) {
   return [headOf(head), ...rest.map(part)];
 }
 
-/** The site's header: its name, a way home, and its main pages, the one open marked. */
+/** The site's header: its name, a way home, its main pages (the one open marked), and the way in to the app. */
 export function siteHead(site) {
   const at = (href) => href && (href === location.pathname || (href !== '/' && location.pathname.startsWith(`${href}/`)));
-  return h('nav', { class: 'site-head' }, h('a', { class: 'site-name', href: site.home ?? undefined }, site.name), h('span', { class: 'site-pages' }, site.pages.map((page) => h('a', { href: page.href, 'aria-current': at(page.href) ? 'page' : undefined }, page.title))));
+  // The way in for someone who has a map already: the app, which opens their map or asks them to sign in.
+  const signIn = /^https?:\/\/[^/]+$/.test(site.app ?? '') && h('a', { class: 'site-sign-in', href: `${site.app}/`, title: 'Open your map, or sign in to it' }, 'Sign in');
+  return h('nav', { class: 'site-head' }, h('a', { class: 'site-name', href: site.home ?? undefined }, site.name), h('span', { class: 'site-pages' }, site.pages.map((page) => h('a', { href: page.href, 'aria-current': at(page.href) ? 'page' : undefined }, page.title))), signIn);
 }

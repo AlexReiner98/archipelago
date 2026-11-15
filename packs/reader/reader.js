@@ -160,7 +160,8 @@ export async function siteOf(parts, act, template) {
   if (what === 'picture') return (ID.test(extra) && picture(await act('public.picture', { workspace, id: doc.id, section: extra }))) || NONE;
   if (what === 'live') return { stream: true, id: doc.id };
   if (what === 'drawing') return (HASH.test(extra) && drawing(await act('public.drawing', { workspace, id: doc.id, hash: extra }))) || NONE;
-  const site = { ...(await nav(act, workspace, name, (page) => (page.path ? siteHref(page.path) : null))), host };
+  // And the app its readers sign in to, for the way in at the head of every page.
+  const site = { ...(await nav(act, workspace, name, (page) => (page.path ? siteHref(page.path) : null))), host, ...(app && { app }) };
   const data = { ...rehomed(doc, publicPath(workspace, doc.id), siteHref(doc.path)), site };
   if (what === 'data') return { json: data };
   // Where a link to it is posted, it shows the figure its style names (page.share): its own, else the front page's.
