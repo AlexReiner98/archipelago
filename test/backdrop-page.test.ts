@@ -93,34 +93,42 @@ test('in a browser, a page published with a backdrop runs its layout behind its 
   }
 });
 
-// Baked as a page's frame (a block of land wherever the page leaves room), live as its backdrop; on a narrow window its
-// live code stops, as code with no WebGL2 would.
-const BOTH = `export default function draw({ canvas, style, page, bake }) {
-  if (style.bake) {
-    const p = style.page ?? { width: canvas.width, height: canvas.height, clear: [] }, ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#3f6269';
-    for (let y = 0; y < p.height; y += 40) ctx.fillRect(4, y + 4, 32, 32);
-    bake('sea');
-    return bake(null, { every: 5 });
-  }
+// One layout baked as the page's frame (a block of land down its margin), another live as its backdrop, which bakes
+// nothing (as the GPU land does) and on a narrow window stops, as code with no WebGL2 would.
+const FRAME = `export default function draw({ canvas, style, bake }) {
+  const p = style.page ?? { width: canvas.width, height: canvas.height, clear: [] }, ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#3f6269';
+  for (let y = 0; y < p.height; y += 40) ctx.fillRect(4, y + 4, 32, 32);
+  bake('sea');
+  bake(null, { every: 5 });
+}`;
+const GPU = `export default function draw({ canvas, page }) {
   if (page.view.width < 600) throw new Error('No WebGL2 here');
   const gl = canvas.getContext('webgl2');
   gl.clearColor(1, 0, 1, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
 }`;
 
-test('in a browser, a page baked as a frame and run as a backdrop shows its frame first, until the backdrop draws, and keeps it where it cannot', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a page with a baked frame and a backdrop shows its frame first, until the backdrop draws, and keeps it where it cannot', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { call, base } = await serve('off', undefined, undefined, packsWith('reader'));
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [
-    { op: 'create', ref: 'd', type: 'writing', title: 'Home', visibility: 'shared', body: '{l}\n\nWords for the column.' },
-    { op: 'create', ref: 's', type: 'layout', title: 'Land', visibility: 'shared', props: { code: BOTH } },
-    { op: 'create', ref: 'l', type: 'lens', title: 'The land', visibility: 'shared', body: 'The land.', props: { filter: { find: ['type writing'] } } },
-    { op: 'link', type: 'part_of', from: 'l', to: 'd' },
+    { op: 'create', ref: 'd', type: 'writing', title: 'Home', visibility: 'shared', body: '{f}\n\n{b}\n\nWords for the column.' },
+    { op: 'create', ref: 'sf', type: 'layout', title: 'Baked land', visibility: 'shared', props: { code: FRAME } },
+    { op: 'create', ref: 'sb', type: 'layout', title: 'Live land', visibility: 'shared', props: { code: GPU } },
+    { op: 'create', ref: 'f', type: 'lens', title: 'The frame', visibility: 'shared', body: 'The frame.', props: { filter: { find: ['type writing'] } } },
+    { op: 'create', ref: 'b', type: 'lens', title: 'The backdrop', visibility: 'shared', body: 'The backdrop.', props: { filter: { find: ['type writing'] } } },
+    { op: 'link', type: 'part_of', from: 'f', to: 'd' },
+    { op: 'link', type: 'part_of', from: 'b', to: 'd' },
   ] })).result.created as Record<string, string>;
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.l, props: { style: { style: made.s, numbers: { page_frame: 1, page_backdrop: 1, frame_aspect: 2 } } } }] });
+  await call('/api/change', undefined, { reason: 'test', ops: [
+    { op: 'update', id: made.f, props: { style: { style: made.sf, numbers: { page_frame: 1, frame_aspect: 2 } } } },
+    { op: 'update', id: made.b, props: { style: { style: made.sb, numbers: { page_backdrop: 1 } } } },
+  ] });
   const app = await open(`${base}/`);
   try {
-    const packed = (await app.evaluate(`${pageModule('style-code.js')}.then(async (m) => m.packBaked(await m.bakeDocument('${made.d}', (id) => fetch('/preview/' + id + '/data', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).then((r) => r.json()).then((r) => r.result))))`)) as string;
+    // Only the frame is baked: the backdrop bakes nothing, and is not asked to.
+    const { packed, views } = (await app.evaluate(`${pageModule('style-code.js')}.then(async (m) => { const baked = await m.bakeDocument('${made.d}', (id) => fetch('/preview/' + id + '/data', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).then((r) => r.json()).then((r) => r.result)); return { packed: await m.packBaked(baked), views: Object.keys(baked) }; })`)) as { packed: string; views: string[] };
+    assert.deepEqual(views, [made.f], 'only the frame is baked');
     assert.equal((await call(`/preview/${made.d}/data`, undefined, { baked: packed })).status, 200);
     assert.equal((await call('/api/publish', undefined, { id: made.d })).status, 200);
   } finally {
@@ -131,6 +139,7 @@ test('in a browser, a page baked as a frame and run as a backdrop shows its fram
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
     await page.go(`${base}/p/default/${made.d}`);
     assert.ok(await page.until(`document.querySelectorAll('.page-land img').length >= 3`, 10000), 'its baked land is laid first');
+    assert.equal(await page.evaluate(`document.getElementById('${made.b}')?.getBoundingClientRect().height`), 0, 'the backdrop takes no room');
     assert.ok(await page.until(`document.querySelector('body > iframe.page-backdrop.drew') !== null && document.querySelector('.page-land').classList.contains('under')`, 20000), 'once the backdrop has drawn, the land under it fades');
     assert.deepEqual(await shown(page), [255, 0, 255, 255], 'and the backdrop is shown');
     await page.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 800, deviceScaleFactor: 1, mobile: true });

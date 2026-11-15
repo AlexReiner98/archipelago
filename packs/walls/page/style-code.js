@@ -231,6 +231,8 @@ export async function bakeDocument(id, preview) {
   for (const [lens, frozen] of Object.entries(data?.lenses ?? {})) {
     const { style: { drawing, ...style } = {}, ...answer } = frozen;
     if (!drawing?.coded || !drawing.modules) continue;
+    // A view that only runs behind the page (numbers.page_backdrop) is not baked: a page's frame, another view, is its first paint.
+    if (Number(style.numbers?.page_backdrop) > 0 && !(Number(style.numbers?.page_frame) > 0)) continue;
     const at = (dark, width, height, page) => bakeCode({ code: drawing.modules, answer, style: { ...style, still: true, ...(page && { page }) }, theme: { dark }, width, height });
     if (Number(style.numbers?.page_frame) > 0) {
       const page = [];
