@@ -88,6 +88,50 @@ function inside(home, port, given) {
     };
     return link(blob).catch((err) => (/imports|ring/.test(err?.message ?? '') ? Promise.reject(err) : link(data)));
   };
+  /**
+   * Baked (task e_muh2979u): the code paints once on a canvas that keeps shapes (draw-record.js), and each time it holds
+   * a finished picture says so with bake(name); bake(null, { every, fade }) ends it, saying how the pictures turn. Only in a worker: a picture painted aside
+   * (an OffscreenCanvas) is recorded too, so the worker's own is put by.
+   */
+  const bake = async (said) => {
+    if (given) return post({ type: 'error', message: 'A drawing is baked in a worker, walled in' });
+    const kept = {}, most = 64;
+    // How the pictures turn, said as it ends: seconds each, and whether each fades into the next.
+    let timing = { every: 1, fade: false };
+    let ended, bakedAny = false;
+    const over = new Promise((resolve) => (ended = resolve));
+    // Quiet for 15 seconds, it is over: what it baked is kept, and code that never says bake is told it does not know how.
+    let late;
+    const quiet = () => (clearTimeout(late), (late = setTimeout(() => ended(bakedAny ? undefined : new Error('This code bakes nothing: it never calls bake(name)')), 15000)));
+    try {
+      const rec = record(new OffscreenCanvas(1, 1).getContext('2d'));
+      self.OffscreenCanvas = rec.Canvas;
+      const canvas = new rec.Canvas(said.width, said.height);
+      made = await load(said.code);
+      if (typeof made.default !== 'function') throw new Error('The code of a style must export a default function');
+      const no = () => undefined;
+      await made.default({
+        canvas, root: null, sandboxed: true, answer: said.answer, style: { ...said.style, still: true, bake: true }, theme: said.theme,
+        size: { width: said.width, height: said.height, dpr: 1 }, tree: () => tree(said.answer),
+        three: () => Promise.reject(new Error('A baked drawing is painted on a 2D canvas')), on: no, open: no, tip: no, cursor: no, field: no,
+        change: () => Promise.resolve({ error: 'A drawing being baked may not change the map' }),
+        bake: (name, how) => {
+          quiet();
+          if (name == null) return ((timing = { every: Math.max(0.2, Math.min(60, Number(how?.every) || 1)), fade: how?.fade === true }), ended());
+          if (Object.keys(kept).length >= most) throw new Error(`A drawing bakes at most ${most} looks`);
+          bakedAny = true;
+          kept[String(name).slice(0, 60)] = rec.shapes(canvas);
+        },
+      });
+      quiet();
+      const why = await over;
+      clearTimeout(late);
+      if (why) throw why;
+      post({ type: 'baked', pictures: kept, timing });
+    } catch (err) {
+      fail(err);
+    }
+  };
   const heard = {};
   const asking = new Map();
   let asked = 0;
@@ -125,6 +169,7 @@ function inside(home, port, given) {
       }
       return;
     }
+    if (said.type === 'bake') return bake(said);
     if (said.type !== 'draw') return;
     Object.assign(size, { width: said.width, height: said.height, dpr: said.dpr });
     try {
@@ -203,6 +248,50 @@ function place(key, at, theme) {
   Object.assign(input.style, { left: `${at.x}px`, top: `${at.y}px`, width: `${Math.max(0, at.width)}px`, height: `${Math.max(0, at.height)}px` });
 }
 
+/** What runs in a worker, around the code: the recording canvas (draw-record.js) and `inside`. */
+const text = `${record}
+(${inside})(${JSON.stringify(home)})`;
+/** A page with no origin may not start a worker every way a page can, and browsers differ in which: each is tried until one answers. */
+const walled = [
+  () => new Worker(URL.createObjectURL(new Blob([text], { type: 'text/javascript' })), { type: 'module' }),
+  () => new Worker(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}`, { type: 'module' }),
+  () => new Worker(URL.createObjectURL(new Blob([text], { type: 'text/javascript' }))),
+  () => new Worker(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}`),
+];
+
+/**
+ * A picture baked, once, in a worker walled in whether or not the page opened this frame: the pictures its code said
+ * were finished, as shapes, to the page (`baked`), or what went wrong. The frame is the page's to put away after.
+ */
+async function bakeOnce(said) {
+  for (const way of walled) {
+    let mine;
+    try {
+      mine = way();
+    } catch {
+      continue;
+    }
+    const answered = await new Promise((resolve) => {
+      const late = setTimeout(() => resolve(false), 3000);
+      mine.onerror = () => (clearTimeout(late), resolve(false));
+      mine.onmessage = () => (clearTimeout(late), resolve(true));
+      mine.postMessage({ type: 'ping' });
+    });
+    if (!answered) {
+      mine.terminate();
+      continue;
+    }
+    mine.onerror = (err) => (mine.terminate(), fail(err.message || 'The code of this style stopped.'));
+    mine.onmessage = ({ data }) => {
+      if (data?.type === 'baked') (mine.terminate(), say({ type: 'baked', pictures: data.pictures, timing: data.timing }));
+      else if (data?.type === 'error') (mine.terminate(), fail(data.message));
+    };
+    const { code, answer, style, theme, width, height } = said;
+    return void mine.postMessage({ type: 'bake', code, answer, style, theme, width: Number(width) || 1200, height: Number(height) || 630 });
+  }
+  fail('The code of this style could not be started: this browser lets a sandboxed page start no worker.');
+}
+
 /** The picture, started once: a worker that answers, given the canvas and what to draw. */
 function start({ code, answer, style, theme, hot }) {
   const canvas = document.createElement('canvas');
@@ -216,19 +305,13 @@ function start({ code, answer, style, theme, hot }) {
   const surface = opened ? canvas : canvas.transferControlToOffscreen();
   Object.assign(surface, { width: Math.round(room().width * room().dpr), height: Math.round(room().height * room().dpr) });
   // A page with no origin may not start a worker every way a page can, and browsers differ in which: each is tried until one answers.
-  const text = `(${inside})(${JSON.stringify(home)})`;
   const inPage = () => {
     const { port1, port2 } = new MessageChannel();
     addEventListener('error', (ev) => fail(ev.error ?? ev.message));
     inside(home, port2, { canvas, root: frameElement?.parentElement?.querySelector(':scope > .code-panel') ?? document.body });
     return Object.assign(port1, { terminate: () => port1.close() });
   };
-  const ways = opened ? [inPage] : [
-    () => new Worker(URL.createObjectURL(new Blob([text], { type: 'text/javascript' })), { type: 'module' }),
-    () => new Worker(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}`, { type: 'module' }),
-    () => new Worker(URL.createObjectURL(new Blob([text], { type: 'text/javascript' }))),
-    () => new Worker(`data:text/javascript;base64,${btoa(String.fromCharCode(...new TextEncoder().encode(text)))}`),
-  ];
+  const ways = opened ? [inPage] : walled;
   // How many pings in a row have gone unanswered: counted, not timed, so a page the browser has slowed (a tab left in
   // the background runs its timers once a minute) does not stop code that answers whenever it is asked.
   let unanswered = 0;
@@ -368,6 +451,7 @@ addEventListener('message', (ev) => {
   // A page that started this frame before it listened (the frame in ui/index.html) asks whether it is ready.
   if (ev.data?.type === 'ready?') return void say({ type: 'ready' });
   if (ev.data?.type === 'swap') return void swap(ev.data);
+  if (ev.data?.type === 'bake' && !worker) return void ((worker = true), bakeOnce(ev.data));
   // Opened, the page asks what the code keeps, for the frame that replaces this one; walled in, it never leaves here.
   if (ev.data?.type === 'keep' && opened) return void (current?.keep() ?? Promise.resolve()).then((state) => {
     try {
