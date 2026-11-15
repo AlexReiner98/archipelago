@@ -254,8 +254,10 @@ export async function packBaked(baked) {
  * take. What could not be baked is said, and the page goes out with its drawings running, as before.
  */
 export async function bakeBeforeGoingOut(id) {
-  const preview = (doc) => call(`/preview/${doc}/data`, {}, authHeaders());
-  const baked = await bakeDocument(id, preview).catch((err) => (tell('Its drawings were not baked', `They run live on its page: ${err.message}`), null));
+  // Only a document has a preview to bake from: anything else (a view shared on its own) goes out as it is, nothing said.
+  const data = await call(`/preview/${id}/data`, {}, authHeaders()).catch(() => null);
+  if (!data) return;
+  const baked = await bakeDocument(id, async () => data).catch((err) => (tell('Its drawings were not baked', `They run live on its page: ${err.message}`), null));
   if (!baked || !Object.keys(baked).length) return;
   await call(`/preview/${id}/data`, { baked: await packBaked(baked) }, authHeaders()).catch((err) => tell('Its drawings were not kept', `They run live on its page: ${err.message}`));
 }
