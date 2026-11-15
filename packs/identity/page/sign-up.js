@@ -150,7 +150,7 @@ export function signInBack(query = '') {
   return true;
 }
 
-/** The sign-in page's other ways in, beside the code: Google, GitHub, a passkey. Rows for it to draw; none where none is offered. */
+/** The sign-in page's other ways in, above the email: Google, GitHub, a passkey, then a line and "or". None where none is offered. */
 export function otherWays(fail) {
   const rows = h('div', { class: 'gate-ways' });
   ways().then(({ social = [] }) => {
@@ -176,6 +176,7 @@ export function otherWays(fail) {
       ...social.filter((p) => PROVIDERS[p]).map((p) => gateRow(h('button', { class: 'grow', onclick: provider(p) }, `Sign in with ${PROVIDERS[p]}`))),
       ...(passkeysHere() ? [gateRow(h('button', { class: 'grow', title: 'If you added one on this device', onclick: passkey }, 'Sign in with a passkey'))] : []),
     );
+    if (rows.children.length) rows.append(h('div', { class: 'gate-or' }, 'or'));
   });
   return rows;
 }

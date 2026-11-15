@@ -313,7 +313,7 @@ export const ungate = () => delete document.body.dataset.gate;
 /** One line of a gate's page: a field and its button, or words and a link; never wraps. */
 export const gateRow = (...kids) => h('div', { class: 'gate-row' }, ...kids);
 /** Show or hide what is typed in a password field, for whoever wants to check it. */
-export const showOf = (input) => h('a', { href: '#', class: 'small', title: 'Show or hide the password', onclick: (e) => (e.preventDefault(), (e.target.textContent = (input.type = input.type === 'password' ? 'text' : 'password') === 'text' ? 'Hide' : 'Show')) }, 'Show');
+export const showOf = (input) => h('a', { href: '#', class: 'small gate-show', title: 'Show or hide the password', onclick: (e) => (e.preventDefault(), (e.target.textContent = (input.type = input.type === 'password' ? 'text' : 'password') === 'text' ? 'Hide' : 'Show')) }, 'Show');
 
 /** `back`: drawn from inside a workspace (Another workspace, in the menu), so there is a way back to it; `email`: the address to start from. */
 export function signIn(message, title = 'Sign in', { back = false, email: given = '' } = {}) {
@@ -322,7 +322,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   // Someone a client sent here to connect, with no account yet, came by MCP: where they begin says so (?ref=mcp).
   const ref = waitingOnSignIn() ? 'mcp' : undefined;
   const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email', spellcheck: false, value: given });
-  const send = h('button', { class: 'primary' }, 'Email me a code');
+  const send = h('button', { class: 'primary grow', title: 'With a password: signed in now; without one, a code is mailed' }, 'Email me a code');
 
   // Where a person with no account begins (/connect/start), once known: offered again after asking, since an address
   // with no workspace is sent no mail, and the page says the same to everyone.
@@ -366,26 +366,26 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     return body.sent_to;
   };
   const sendLink = () => email.value.trim() && ask(email.value.trim()).then(codeStep, () => undefined);
-  send.onclick = sendLink;
-  email.addEventListener('keydown', (e) => e.key === 'Enter' && (password.value ? withPassword() : sendLink()));
+  send.onclick = () => (password.value ? withPassword() : sendLink());
+  email.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
 
   // Or the address and its password, for whoever set one (packs/identity/kernel/passwords.ts). A member of several picks one.
   const password = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password', title: 'If you set a password; otherwise ask for an email' });
-  const passwordGo = h('button', { title: 'Sign in with your email and password' }, 'Sign in');
   const withPassword = async (more = {}) => {
     const address = email.value.trim();
     if (!address || !password.value) return fail(address ? 'Type your password, or ask for an email.' : 'Type your email address.');
     const post = (agree) => postJson('/connect/password', { email: address, password: password.value, ...more, ...(agree && { agree }) });
-    passwordGo.disabled = true;
+    send.disabled = true;
     const res = await post();
     const body = await res.json().catch(() => ({}));
-    passwordGo.disabled = false;
+    send.disabled = false;
     if (!res.ok) return fail(body.error ?? 'That did not work.');
     if (body.workspaces) return gate('Open which workspace?', ...body.workspaces.map((w) => gateRow(h('span', { class: 'grow gist', title: w.name }, w.name), h('button', { class: 'primary', onclick: () => withPassword({ workspace: w.id }) }, 'Open'))), error);
     if (body.agree) return agreeFirst(body.agree, post);
     enter(body.token);
   };
-  passwordGo.onclick = () => withPassword();
+  // One button, as on most sign-in pages: it signs in with a password typed, else mails a code.
+  password.addEventListener('input', () => (send.textContent = password.value ? 'Sign in' : 'Email me a code'));
   password.addEventListener('keydown', (e) => e.key === 'Enter' && withPassword());
 
   // Where a person with no account begins, if this server offers it; a client waiting to connect is returned to after.
@@ -410,9 +410,8 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
       title,
       newcomer && begin,
       newcomer && gateRow(h('span', { class: 'muted grow' }, 'Have one? Sign in')),
-      gateRow(email, send),
-      gateRow(password, showOf(password), passwordGo),
       hooks.otherWays?.(fail),
+      gateRow(email), gateRow(password, showOf(password)), gateRow(send),
       error,
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
       !newcomer && begin,

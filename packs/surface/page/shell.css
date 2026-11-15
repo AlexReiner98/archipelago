@@ -389,6 +389,13 @@ body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; 
 /* A way in on a row of its own (Sign up with Google...): the width of the column; the ways sit in the column as its rows do. */
 .gate-row > button.grow { flex: 1; }
 .gate-ways { display: contents; }
+/* Show, inside the end of its password field. */
+.gate-row:has(> .gate-show) { position: relative; }
+.gate-row:has(> .gate-show) > input { padding-right: var(--box-10); }
+.gate-row > .gate-show { position: absolute; right: var(--space-6); }
+/* Between the ways in and the email: a line, "or", a line. */
+.gate-or { display: flex; align-items: center; gap: var(--space-6); color: var(--muted); }
+.gate-or::before, .gate-or::after { content: ''; flex: 1; border-top: var(--border-1) solid var(--line); }
 .gate-row[hidden] { display: none; }
 .gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .gate-others { display: flex; gap: var(--space-6); }
