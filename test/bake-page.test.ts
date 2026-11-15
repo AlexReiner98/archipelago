@@ -30,7 +30,8 @@ test('in a browser, a page published with its frame baked shows its land behind 
     { op: 'create', ref: 'l', type: 'lens', title: 'The land', visibility: 'shared', body: 'The land.', props: { filter: { find: ['type writing'] } } },
     { op: 'link', type: 'part_of', from: 'l', to: 'd' },
   ] })).result.created as Record<string, string>;
-  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.l, props: { style: { style: made.s, numbers: { page_frame: 1, frame_aspect: 2 } } } }, { op: 'update', id: made.d, props: { path: 'home' } }] });
+  // Its hero kept to a quarter of the window (frame_room): lower than baked on a wide window, as baked on a phone's.
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.l, props: { style: { style: made.s, numbers: { page_frame: 1, frame_aspect: 2, frame_room: 0.25 } } } }, { op: 'update', id: made.d, props: { path: 'home' } }] });
   const app = await open(`${base}/`);
   try {
     const packed = (await app.evaluate(`${pageModule('style-code.js')}.then(async (m) => m.packBaked(await m.bakeDocument('${made.d}', (id) => fetch('/preview/' + id + '/data', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).then((r) => r.json()).then((r) => r.result))))`)) as string;
@@ -45,7 +46,10 @@ test('in a browser, a page published with its frame baked shows its land behind 
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 });
       await page.go(`${base}/p/default/${made.d}`);
       assert.ok(await page.until(`[...document.querySelectorAll('.page-land img')].length >= 3 && [...document.querySelectorAll('.page-land img')].every((i) => i.complete && i.naturalWidth > 0)`, 10000), `at ${width} its land is drawn from its baked pictures`);
-      const at = (await page.evaluate(`(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { foot: r('.land-foot').top + scrollY, words: r('main').bottom + scrollY, high: document.documentElement.scrollHeight, frames: document.querySelectorAll('iframe').length }; })()`)) as { foot: number; words: number; high: number; frames: number };
+      const at = (await page.evaluate(`(() => { const r = (s) => document.querySelector(s).getBoundingClientRect(); return { foot: r('.land-foot').top + scrollY, words: r('main').bottom + scrollY, high: document.documentElement.scrollHeight, frames: document.querySelectorAll('iframe').length, hero: r('.lens-view.framed').height, raised: !document.querySelector('.land-raised').hidden, strip: r('.land-strip').top, heroFoot: r('.lens-view.framed').bottom }; })()`)) as { foot: number; words: number; high: number; frames: number; hero: number; raised: boolean; strip: number; heroFoot: number };
+      assert.ok(at.hero <= 0.25 * 900 + 1, `at ${width} the hero is kept to its share of the window`);
+      assert.equal(at.raised, width === 1280, `at ${width} the land's foot is raised to the words only where the hero was cut`);
+      assert.ok(Math.abs(at.strip - at.heroFoot) <= 1, `at ${width} the margins start where the hero ends`);
       assert.ok(at.foot >= at.words - 1, `at ${width} the foot band is under the words`);
       assert.ok(at.high < 4000, `at ${width} the page keeps its length`);
       assert.equal(at.frames, 0, 'nothing runs: no frame is started');
