@@ -146,6 +146,26 @@ export function bakeCode({ code, answer, style, theme, width, height }) {
 }
 
 /**
+ * Where a page's words stand, in the page's own coordinates: its hero (the section it opens on), what stands above it
+ * (its nav, a title), its name where it shows one, and its column (everything else in its main, and its foot), as one
+ * box. A page's frame is baked around them (pageAt), and a backdrop is told them (packs/walls/page/backdrop.js).
+ */
+export function pageWords(doc, win) {
+  const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top + win.scrollY, w: r.width, h: r.height }; };
+  // The section it opens on, of those shown (a backdrop's own is taken away).
+  const seen = (el) => (el && el.getBoundingClientRect().height > 0 ? el : null);
+  const lead = seen(doc.querySelector('main section.lead')) ?? [...doc.querySelectorAll('main section')].find(seen) ?? null;
+  // What stands above the hero (the site's nav, a title) is kept clear where it is; the rest below it is the column.
+  const heroFoot = lead ? box(lead).y + box(lead).h : 0;
+  const shown = [...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('footer')].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead) && el.getBoundingClientRect().height > 0).map(box);
+  const above = shown.filter((b) => b.y + b.h <= heroFoot - (lead ? box(lead).h : 0) + 4), parts = shown.filter((b) => b.y >= heroFoot - 4);
+  const x0 = Math.min(...parts.map((b) => b.x)), x1 = Math.max(...parts.map((b) => b.x + b.w)), y0 = Math.min(...parts.map((b) => b.y)), y1 = Math.max(...parts.map((b) => b.y + b.h));
+  // The page's name, where it shows it (its title over the hero, or a heading in it): kept clear, and the drawing draws no name of its own.
+  const named = [...doc.querySelectorAll('main h1, main section.lead h2, main .wordmark')].filter((el) => el.getBoundingClientRect().height > 0).map(box);
+  return { hero: lead && box(lead), above, named, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null };
+}
+
+/**
  * How a page lays out at a width, read from its preview in a frame of that width out of sight: its hero (the section it
  * opens on), its nav, and its column (everything else in its main and its foot). The frame is put away after.
  */
@@ -162,16 +182,7 @@ function pageAt(id, width) {
         for (let n = 0; n < 100 && !doc.querySelector('main section'); n++) await new Promise((r) => setTimeout(r, 100));
         await doc.fonts?.ready;
         await new Promise((r) => setTimeout(r, 800));
-        const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top + win.scrollY, w: r.width, h: r.height }; };
-        const lead = doc.querySelector('main section.lead') ?? doc.querySelector('main section');
-        // What stands above the hero (the site's nav, a title) is kept clear where it is; the rest below it is the column.
-        const heroFoot = lead ? box(lead).y + box(lead).h : 0;
-        const shown = [...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('footer')].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead) && el.getBoundingClientRect().height > 0).map(box);
-        const above = shown.filter((b) => b.y + b.h <= heroFoot - (lead ? box(lead).h : 0) + 4), parts = shown.filter((b) => b.y >= heroFoot - 4);
-        const x0 = Math.min(...parts.map((b) => b.x)), x1 = Math.max(...parts.map((b) => b.x + b.w)), y0 = Math.min(...parts.map((b) => b.y)), y1 = Math.max(...parts.map((b) => b.y + b.h));
-        // The page's name, where it shows it (its title over the hero, or a heading in it): kept clear, and the drawing draws no name of its own.
-        const named = [...doc.querySelectorAll('main h1, main section.lead h2, main .wordmark')].filter((el) => el.getBoundingClientRect().height > 0).map(box);
-        resolve({ hero: lead && box(lead), above, named, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null });
+        resolve(pageWords(doc, win));
       } catch (err) {
         reject(err);
       } finally {

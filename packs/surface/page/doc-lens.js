@@ -5,6 +5,7 @@
 import { h } from './base.js';
 import { drawWith } from './layout.js';
 import { dress } from './query-base.js';
+import { runBackdrop } from './backdrop.js';
 import { drawCode } from './style-code.js';
 import { types } from './words.js';
 
@@ -26,6 +27,31 @@ function keepAddress(host, byId) {
   });
 }
 
+/** A published layout's files: sent with the page, or fetched by their hash. */
+const filesOf = (drawing) => (drawing.modules ? Promise.resolve(drawing.modules) : /^\/[^/]/.test(drawing.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : Promise.reject(new Error('its code was not sent')));
+
+/**
+ * A layout kept on the map run behind the whole page (numbers.page_backdrop, task e_m2wsf8m5): walled in, in a frame
+ * fixed to the window (packs/walls/page/backdrop.js). The page's baked frame, where it has one, is its first paint: it
+ * fades out once the backdrop has drawn, and stays where the backdrop cannot run.
+ */
+function drawBackdrop(body, answer, style) {
+  const { drawing, ...fields } = style;
+  // Live, whatever a picture read here is otherwise: it moves unless its reader asks for less motion, which it is told.
+  const { still: _still, ...live } = fields;
+  const land = (under) => document.querySelector('body > .page-land')?.classList.toggle('under', under);
+  filesOf(drawing).then(
+    (code) => runBackdrop({ code, answer, style: live, dressed: body, drew: () => land(true), failed: () => land(false) }),
+    () => land(false),
+  );
+}
+
+/** A view's place on the page taken away: its section, its title and words with it (a section is one view's, by its id). */
+function tookAway(host) {
+  const section = host.closest('section');
+  (section?.contains(host) && section.querySelectorAll('.doc-lens').length === 1 ? section : host).hidden = true;
+}
+
 /**
  * A layout kept on the map, published with its code (packs/publish/kernel/published-pictures.ts, codeDrawing): its files
  * fetched by their hash and run in the sandboxed frame the app runs a layout's code in, which may change nothing here.
@@ -33,8 +59,7 @@ function keepAddress(host, byId) {
 function drawCoded(body, answer, style) {
   const { drawing, ...fields } = style;
   body.classList.toggle('shaped', Number(style.numbers?.frame_aspect) > 0);
-  const files = drawing.modules ? Promise.resolve(drawing.modules) : /^\/[^/]/.test(drawing.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : Promise.reject(new Error('its code was not sent'));
-  files.then(
+  filesOf(drawing).then(
     (code) => drawCode(body, answer, { ...fields, code }, () => {}),
     (err) => body.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(err.message).slice(0, 300)}`)),
   );
@@ -110,8 +135,12 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onIte
   const body = h('div', { class: 'lens-view' });
   host.replaceChildren(body);
   dress(body, style);
+  // A view run behind the page takes no room on it, unless it is the page's baked frame too, which lays the page out.
+  const backdrop = !inApp && Number(style.numbers?.page_backdrop) > 0 && style.drawing?.coded;
+  if (backdrop) drawBackdrop(body, answer, style);
   // Every picture has a drawing: packs/publish/kernel/published.ts gives one to a picture frozen without.
   if (Array.isArray(style.drawing?.baked?.page)) drawFrame(body, style.drawing.baked.page);
+  else if (backdrop) tookAway(host);
   else if (/^\/[^/]/.test(style.drawing?.baked?.src ?? '')) drawBaked(body, style.drawing.baked, answer.lens?.title);
   else if (style.drawing?.coded) drawCoded(body, answer, style);
   else if (style.drawing) drawWith(body, answer, style, () => {});

@@ -17,6 +17,8 @@ export const SLOW: Record<string, string> = {
   'test/bake-frame.test.ts': 'browser',
   // A page's frame baked at three widths and published: a Chrome page that bakes, then the page read at two widths.
   'test/bake-page.test.ts': 'browser',
+  // A layout run behind a published page: two Chrome pages at two widths, one baking its frame first.
+  'test/backdrop-page.test.ts': 'browser',
   // The core loop end to end: a server, the plugin's hook script run per event, and two Chrome pages.
   'test/loop.test.ts': 'browser',
   'test/canvas-drag.test.ts': 'browser',

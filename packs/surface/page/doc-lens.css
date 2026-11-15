@@ -42,7 +42,13 @@ main:has(.doc-band) > :is(section, .doc-band) + div.text { max-width: calc(var(-
 .doc-lens .lens-view > img.baked { display: block; width: 100%; height: auto; }
 /* A page's frame (doc-lens.js, drawFrame): the land behind the whole page, the page above it, the hero's room kept. */
 body:has(> .page-land) { position: relative; }
-body:has(> .page-land) > :not(.page-land) { position: relative; z-index: 1; }
+body:has(> .page-land, > .page-backdrop) > :not(.page-land, .page-backdrop) { position: relative; z-index: 1; }
+/* A layout run behind the page (backdrop.js): fixed to the window, under its words, touched by nothing; shown once it
+   has drawn, when the baked land under it fades. */
+body > iframe.page-backdrop { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity var(--motion-slow, 0.6s) ease; }
+body > iframe.page-backdrop.drew { opacity: 1; }
+.page-land { transition: opacity var(--motion-slow, 0.6s) ease; }
+.page-land.under { opacity: 0; }
 .page-land { position: absolute; inset: 0 0 auto 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .page-land > * { position: absolute; display: block; }
 .page-land > .land-strip { overflow: hidden; }

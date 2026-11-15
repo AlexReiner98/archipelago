@@ -143,6 +143,9 @@ function inside(home, port, given) {
     }
   };
   const heard = {};
+  // The page around a backdrop (packs/walls/page/backdrop.js): the latest it said, handed to code that listens late.
+  let pageLast = null;
+  const call = (fn, event) => { try { fn(event); } catch (err) { fail(err); } };
   const asking = new Map();
   let asked = 0;
   const size = { width: 0, height: 0, dpr: 1 };
@@ -163,6 +166,7 @@ function inside(home, port, given) {
     }
     if (said.type === 'event') {
       if (said.name === 'resize') Object.assign(size, said.event);
+      if (said.name === 'page') pageLast = said.event;
       // A new answer, to code that does not listen for one, is drawn again from the start, in a new frame.
       if (said.name === 'answer' && !heard.answer?.length) return post({ type: 'stale' });
       if (said.name === 'changed') {
@@ -170,18 +174,13 @@ function inside(home, port, given) {
         asking.delete(said.event.asked);
         return resolve?.(said.event);
       }
-      for (const fn of heard[said.name] ?? []) {
-        try {
-          fn(said.event);
-        } catch (err) {
-          fail(err);
-        }
-      }
+      for (const fn of heard[said.name] ?? []) call(fn, said.event);
       return;
     }
     if (said.type === 'bake') return bake(said);
     if (said.type !== 'draw') return;
     Object.assign(size, { width: said.width, height: said.height, dpr: said.dpr });
+    const pageGiven = (pageLast = said.page ?? pageLast);
     try {
       // The code is a module of its own (or files linked from index.js), loaded from its text.
       made = await load(said.code);
@@ -197,9 +196,12 @@ function inside(home, port, given) {
         // What the code before it in this frame kept (its hot()), or undefined.
         hot: said.hot,
         size,
+        // Run as a page's backdrop: its size, scroll and the boxes of its words, or null; and whether its reader asks for less motion.
+        page: pageGiven, reducedMotion: pageGiven?.reducedMotion === true,
         tree: () => tree(said.answer),
         three: () => import(`${home}/three.js`),
-        on: (name, fn) => (heard[name] ??= []).push(fn),
+        // What a backdrop's page said while the code was loading, after it was handed `page`, is not lost.
+        on: (name, fn) => ((heard[name] ??= []).push(fn), name === 'page' && setTimeout(() => pageLast && pageLast !== pageGiven && call(fn, pageLast))),
         // An item's id, or opened, an https address too.
         open: (id) => post({ type: 'open', id: String(id) }),
         tip: (text, x, y) => post({ type: 'tip', text: text == null ? null : String(text), x: Number(x), y: Number(y) }),
@@ -256,6 +258,18 @@ function place(key, at, theme) {
   if (document.activeElement !== input) input.value = at.value.slice(0, 500);
   Object.assign(input, { placeholder: at.placeholder.slice(0, 100), title: at.title.slice(0, 200) });
   Object.assign(input.style, { left: `${at.x}px`, top: `${at.y}px`, width: `${Math.max(0, at.width)}px`, height: `${Math.max(0, at.height)}px` });
+}
+
+/** The latest the page around a backdrop said of itself (packs/walls/page/backdrop.js), checked, for code started after it. */
+let pageNow = null;
+/** What that page says, made numbers and at most 64 boxes: its size, scroll, window and words, or that it is out of sight; and whether its reader asks for less motion. */
+function pageOf(said) {
+  const n = (v) => (Number.isFinite(v) ? v : 0);
+  if (!said || typeof said !== 'object') return null;
+  const reducedMotion = said.reducedMotion === true;
+  if (said.visible === false) return { visible: false, reducedMotion };
+  const box = (b) => ({ x: n(b?.x), y: n(b?.y), w: Math.max(0, n(b?.w)), h: Math.max(0, n(b?.h)) });
+  return { visible: true, reducedMotion, width: n(said.width), height: n(said.height), scroll: n(said.scroll), view: { width: n(said.view?.width), height: n(said.view?.height) }, clear: Array.isArray(said.clear) ? said.clear.slice(0, 64).map(box) : [] };
 }
 
 /** What runs in a worker, around the code: the recording canvas (draw-record.js) and `inside`. */
@@ -370,8 +384,8 @@ function start({ code, answer, style, theme, hot }) {
         worker = mine;
         for (const other of tried) if (other && other !== mine) other.terminate();
         worker.onerror = (err) => fail(err.message || 'The code of this style stopped.');
-        if (opened) worker.postMessage({ type: 'draw', code, answer, style, theme, hot, ...room() });
-        else worker.postMessage({ type: 'draw', code, answer, style, theme, hot, canvas: surface, ...room() }, [surface]);
+        if (opened) worker.postMessage({ type: 'draw', code, answer, style, theme, hot, page: pageNow, ...room() });
+        else worker.postMessage({ type: 'draw', code, answer, style, theme, hot, page: pageNow, canvas: surface, ...room() }, [surface]);
       }
       if (mine === worker) hear(ev);
     };
@@ -458,6 +472,8 @@ addEventListener('message', (ev) => {
   // After the picture starts, the page says only these: a new answer, and what came of a change asked for.
   if (worker && worker !== true && ev.data?.type === 'answer') return void worker.postMessage({ type: 'event', name: 'answer', event: ev.data.answer });
   if (worker && worker !== true && ev.data?.type === 'changed') return void worker.postMessage({ type: 'event', name: 'changed', event: ev.data });
+  // A backdrop's page, said at any time: kept for code started later, and told to code running.
+  if (ev.data?.type === 'page') return void ((pageNow = pageOf(ev.data.page)), worker && worker !== true && pageNow && worker.postMessage({ type: 'event', name: 'page', event: pageNow }));
   // A page that started this frame before it listened (the frame in ui/index.html) asks whether it is ready.
   if (ev.data?.type === 'ready?') return void say({ type: 'ready' });
   if (ev.data?.type === 'swap') return void swap(ev.data);
