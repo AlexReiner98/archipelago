@@ -45,7 +45,7 @@ const fail = (err) => say({ type: 'error', message: String(err?.message ?? err).
  */
 function inside(home, port, given) {
   const me = port ?? self;
-  const post = (message) => me.postMessage(message);
+  const post = (message, moved = []) => me.postMessage(message, moved);
   const fail = (err) => post({ type: 'error', message: String(err?.message ?? err) });
   self.addEventListener('unhandledrejection', (ev) => fail(ev.reason));
   /** A lens answer as a tree, each thing with what it says of itself and of all that is inside it: the same numbers at every depth. */
@@ -202,6 +202,8 @@ function inside(home, port, given) {
         three: () => import(`${home}/three.js`),
         // What a backdrop's page said while the code was loading, after it was handed `page`, is not lost.
         on: (name, fn) => ((heard[name] ??= []).push(fn), name === 'page' && setTimeout(() => pageLast && pageLast !== pageGiven && call(fn, pageLast))),
+        // A backdrop that draws more than the window says, after each frame, the page height its canvas's top stands at: that frame is shown there, scrolling with the page's words (draw-scroll.js).
+        drawn: (top) => pageGiven && Number.isFinite(Number(top)) && said.canvas?.transferToImageBitmap && ((b) => post({ type: 'frame', bitmap: b, top: Number(top) }, [b]))(said.canvas.transferToImageBitmap()),
         // An item's id, or opened, an https address too.
         open: (id) => post({ type: 'open', id: String(id) }),
         tip: (text, x, y) => post({ type: 'tip', text: text == null ? null : String(text), x: Number(x), y: Number(y) }),
@@ -262,15 +264,8 @@ function place(key, at, theme) {
 
 /** The latest the page around a backdrop said of itself (packs/walls/page/backdrop.js), checked, for code started after it. */
 let pageNow = null;
-/** What that page says, made numbers and at most 64 boxes: its size, scroll, window and words, or that it is out of sight; and whether its reader asks for less motion. */
-function pageOf(said) {
-  const n = (v) => (Number.isFinite(v) ? v : 0);
-  if (!said || typeof said !== 'object') return null;
-  const reducedMotion = said.reducedMotion === true;
-  if (said.visible === false) return { visible: false, reducedMotion };
-  const box = (b) => ({ x: n(b?.x), y: n(b?.y), w: Math.max(0, n(b?.w)), h: Math.max(0, n(b?.h)) });
-  return { visible: true, reducedMotion, width: n(said.width), height: n(said.height), scroll: n(said.scroll), view: { width: n(said.view?.width), height: n(said.view?.height) }, clear: Array.isArray(said.clear) ? said.clear.slice(0, 64).map(box) : [] };
-}
+/** The pictures of a backdrop that says where on the page it drew them (landing, draw-scroll.js), once one has come. */
+let landed;
 
 /** What runs in a worker, around the code: the recording canvas (draw-record.js) and `inside`. */
 const text = `${record}
@@ -347,6 +342,7 @@ function start({ code, answer, style, theme, hot }) {
     if (said?.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) say({ type: 'open', id: said.id });
     else if (said?.type === 'open' && opened && /^https:\/\/\S+$/.test(said.id)) open(said.id, '_blank', 'noopener');
     else if (said?.type === 'drew') say({ type: 'drew' });
+    else if (said?.type === 'frame' && said.bitmap instanceof ImageBitmap && Number.isFinite(said.top)) (landed ??= landing(() => (canvas.style.visibility = 'hidden'))).show(said);
     else if (said?.type === 'error') fail(said.message);
     else if (said?.type === 'cursor' && CURSORS.includes(said.name)) canvas.style.cursor = said.name;
     else if (said?.type === 'field' && typeof said.key === 'string') place(said.key, said.at, theme);
@@ -437,6 +433,7 @@ function start({ code, answer, style, theme, hot }) {
       removeEventListener('resize', resized);
       for (const way of tried) way?.terminate();
       canvas.remove();
+      landed = landed?.end();
       for (const input of fields.values()) input.remove();
       fields.clear();
       tip.hidden = true;
@@ -474,6 +471,8 @@ addEventListener('message', (ev) => {
   if (worker && worker !== true && ev.data?.type === 'changed') return void worker.postMessage({ type: 'event', name: 'changed', event: ev.data });
   // A backdrop's page, said at any time: kept for code started later, and told to code running.
   if (ev.data?.type === 'page') return void ((pageNow = pageOf(ev.data.page)), worker && worker !== true && pageNow && worker.postMessage({ type: 'event', name: 'page', event: pageNow }));
+  // The page scrolls this frame with its words now, its top at this height of the page (draw-scroll.js).
+  if (ev.data?.type === 'scrolling') return void landed?.placed(Number(ev.data.top));
   // A page that started this frame before it listened (the frame in ui/index.html) asks whether it is ready.
   if (ev.data?.type === 'ready?') return void say({ type: 'ready' });
   if (ev.data?.type === 'swap') return void swap(ev.data);
