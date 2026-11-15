@@ -34,3 +34,7 @@ main:has(.doc-band) > :is(section, .doc-band) + div.text { max-width: calc(var(-
    to the column, a view of a few steps read two or three times its size. */
 .doc-lens .lf-stage.still > svg { display: block; width: auto; max-width: 100%; height: auto; margin: 0 auto; }
 .doc-lens .sp-chat { margin-top: var(--space-8); }
+/* A layout kept on the map, run from its code: the column's width, at the app's frame height, or at the shape its view
+   says (numbers.frame_aspect, width over height), right on the page. */
+.doc-lens .code-stage > .lens-frame { display: block; width: 100%; height: var(--frame-most); border: 0; background: none; }
+.doc-lens .lens-view.shaped .code-stage > .lens-frame { height: auto; aspect-ratio: var(--ln-frame-aspect); }

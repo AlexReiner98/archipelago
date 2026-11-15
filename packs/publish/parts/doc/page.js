@@ -64,8 +64,9 @@ export function page(d) {
   // The section the style names for the page's picture (page.share) is shown where its address is posted, not here.
   const list = d.parts.filter((p) => !p.section || p.section.id !== d.share);
   const first = d.parts.find((p) => p.section)?.section;
-  // A front page whose first section is a figure opens on it, with no title over it (its title is its words).
-  const lead = d.path === FRONT && first?.picture && !d.lenses?.[first.id] ? first.id : null;
+  // A front page whose first section is a figure or a view opens on it, with no title over it (its title is its words),
+  // and a view with no note under it: it is its picture.
+  const lead = d.path === FRONT && (first?.picture || d.lenses?.[first?.id]) ? first.id : null;
   // A page that is one item alone has its title once, over the page.
   const alone = d.parts.length === 1 && first?.title === d.title ? first.id : null;
   const part = (p, i) => {
@@ -77,7 +78,7 @@ export function page(d) {
       ...(s.id !== lead && s.id !== alone ? [['text', { look: 'title', size: 6 }, String(s.title ?? '')]] : []),
       // A lens is its picture, as it was frozen when the page was published; otherwise a section shows its figure.
       ...(d.lenses?.[s.id] || s.picture ? [['picture', { key: `p:${s.id}`, item: s.id, tip: tip(s.title) }]] : []),
-      ...(s.body ? [['note', { key: `n:${s.id}` }, named(s.body, names)]] : []),
+      ...(s.body && !(s.id === lead && d.lenses?.[s.id]) ? [['note', { key: `n:${s.id}` }, named(s.body, names)]] : []),
     ];
   };
   // A picture that plays stands beside the words before it, in a band of the page; everything else keeps to the column.
