@@ -34,6 +34,9 @@ export const SETTINGS: Record<string, Record<string, unknown>> = {
   // Holds off (the owner, 3 Nov 2026, e_66mwta3w): whatever a rule holds applies; asked and propose-only still wait.
   off: { holds_off: true },
   'hold+off': { agent_changes: 'hold', holds_off: true },
+  // What a new workspace begins with since 15 Nov 2026 (beginApplying: "completely remove all approvals for now"):
+  // every change applies as made, its answer naming the stakes; only a wait the agent or its token asked for holds.
+  begun: { agent_changes: 'apply', holds_off: true },
 };
 
 /** How many files check each policy's rows: its settings dealt among them, the first to part 1, the next to part 2, ... */
