@@ -123,7 +123,7 @@ function headOf(node) {
  * gives a section's picture holder (a .doc-lens or a figure), filled once the page is in place.
  */
 export function pageParts(root, d, ways, picture) {
-  const lead = (s) => d.path === FRONT && d.parts?.find((p) => p.section)?.section?.id === s && d.parts.find((p) => p.section).section.picture && !d.lenses?.[s];
+  const lead = (s) => d.path === FRONT && d.parts?.find((p) => p.section)?.section?.id === s && (d.parts.find((p) => p.section).section.picture || Boolean(d.lenses?.[s]));
   const section = (node) => {
     const id = SECTION.exec(node.key ?? '')?.[1];
     return h(
