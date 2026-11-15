@@ -19,6 +19,7 @@ export const UI_FILES: Record<string, string> = {
   '/layout.css': 'layout.css',
   '/style.css': 'style.css',
   '/shell.css': 'shell.css',
+  '/gate.css': 'gate.css',
   '/flow.css': 'flow.css',
   
   '/notes.css': 'notes.css',
