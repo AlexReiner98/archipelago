@@ -4,7 +4,7 @@
 // a layout's code runs in and hears it, which a worker never can. It says what came of a drawing as look mode hears
 // it (a view-drawn event, as ui/look.js says it), so it imports nothing of the app.
 
-import { api, drawingsOpen, frameSandbox, h, may } from './base.js';
+import { api, authHeaders, call, drawingsOpen, frameSandbox, h, may, tell } from './base.js';
 import { STYLE_COLORS, litSwitch } from './query-base.js';
 
 /** Say on `el` how its drawing went, as look mode listens for it (ui/look.js, saidDrawn). */
@@ -246,4 +246,18 @@ export async function packBaked(baked) {
   const zipped = await new Response(new Blob([JSON.stringify(baked)]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
   const url = await new Promise((resolve, reject) => Object.assign(new FileReader(), { onload: (e) => resolve(e.target.result), onerror: reject }).readAsDataURL(zipped));
   return String(url).slice(String(url).indexOf(',') + 1);
+}
+
+/**
+ * Before a document is published or shared: each layout kept on the map in it baked (bakeDocument), made small
+ * (packBaked) and handed to the server beside the preview it was baked from, for the publish or share that follows to
+ * take. What could not be baked is said, and the page goes out with its drawings running, as before.
+ */
+export async function bakeBeforeGoingOut(id) {
+  // Only a document has a preview to bake from: anything else (a view shared on its own) goes out as it is, nothing said.
+  const data = await call(`/preview/${id}/data`, {}, authHeaders()).catch(() => null);
+  if (!data) return;
+  const baked = await bakeDocument(id, async () => data).catch((err) => (tell('Its drawings were not baked', `They run live on its page: ${err.message}`), null));
+  if (!baked || !Object.keys(baked).length) return;
+  await call(`/preview/${id}/data`, { baked: await packBaked(baked) }, authHeaders()).catch((err) => tell('Its drawings were not kept', `They run live on its page: ${err.message}`));
 }

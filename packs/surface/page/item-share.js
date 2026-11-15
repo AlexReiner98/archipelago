@@ -5,6 +5,7 @@
 
 import { api, ask, h, may, tell } from './base.js';
 import { menu, when } from './words.js';
+import { bakeBeforeGoingOut } from './style-code.js';
 
 /** The item's public view, when it has one: its address, who shared it and when. */
 export const publicOf = async (id) => (await api('share_list', { id }).catch(() => []))[0] ?? null;
@@ -30,6 +31,8 @@ export async function sharePublicly(id, title) {
   ].filter(Boolean).join('\n');
   const again = plan.shared;
   if (!(await ask({ title: `${again ? 'Share again' : 'Share'} “${title}”?`, message, action: again ? 'Share again' : 'Share' }))) return null;
+  // A layout kept on the map in it is baked first, so its page shows a picture with nothing running.
+  await bakeBeforeGoingOut(id);
   try {
     const made = await api('share_create', { id });
     const url = `${location.origin}${made.address}`;
