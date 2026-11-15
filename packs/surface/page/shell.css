@@ -389,7 +389,11 @@ body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
 .gate-row > input { flex: 1; min-width: 0; }
 .gate-row > button, .gate-row > a { flex: none; }
 /* A way in on a row of its own (Sign up with Google...): the width of the column; the ways sit in the column as its rows do. */
-.gate-row > button.grow { flex: 1; }
+.gate-row > button.grow { flex: 1; display: flex; align-items: center; justify-content: center; gap: var(--space-5); }
+/* A provider's mark before its name, in the button's colour. */
+.way-mark { flex: none; width: var(--box-5); height: var(--box-5); }
+/* Fields stand apart from the buttons beside them: a border a step stronger. */
+.gate .gate-row > input { border-color: var(--muted); }
 .gate-ways { display: contents; }
 /* Show, inside the end of its password field. */
 .gate-row:has(> .gate-show) { position: relative; }

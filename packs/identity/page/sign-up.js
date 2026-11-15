@@ -6,10 +6,29 @@
 // (packs/identity/kernel/verified.ts). The host's: it enters a token, which no pack's code may do.
 
 import { authHeaders, enter, gate, gateRow, h, keepLanding, postJson, whoami, workspaceOf } from './base.js';
-import { passkeyTicket, passkeysHere } from './passkey.js';
+import { autofillHere, passkeyTicket, passkeysHere } from './passkey.js';
 
 const TITLE = 'Sign up to save your map';
 const PROVIDERS = { google: 'Google', github: 'GitHub' };
+/** Each provider's mark, one path in the button's own colour (simple-icons' Google, GitHub's Octicons), and its box. */
+const MARKS = {
+  google: ['0 0 24 24', 'M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z'],
+  github: ['0 0 16 16', 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z'],
+};
+const SVG = 'http://www.w3.org/2000/svg';
+/** A provider's mark, drawn before its name on a button. */
+function markOf(provider) {
+  const [box, d] = MARKS[provider];
+  const svg = document.createElementNS(SVG, 'svg');
+  const path = document.createElementNS(SVG, 'path');
+  svg.setAttribute('viewBox', box);
+  svg.setAttribute('class', 'way-mark');
+  svg.setAttribute('aria-hidden', 'true');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', 'currentColor');
+  svg.append(path);
+  return svg;
+}
 
 const posted = async (path, body, headers = {}) => {
   const res = await postJson(path, body, headers);
@@ -51,8 +70,8 @@ export async function signUpPage(query = '', { machine } = {}) {
   const buttons = [];
   const { row, agreed } = terms(agreements, (on) => buttons.forEach((b) => (b.disabled = !on)));
   const ready = !row;
-  const button = (label, onclick, primary = false) => {
-    const b = h('button', { class: primary ? 'primary grow' : 'grow', disabled: !ready, title: ready ? '' : 'Tick the box first', onclick }, label);
+  const button = (label, onclick, provider) => {
+    const b = h('button', { class: 'grow', disabled: !ready, title: ready ? '' : 'Tick the box first', onclick }, provider && markOf(provider), label);
     buttons.push(b);
     return gateRow(b);
   };
@@ -107,17 +126,9 @@ export async function signUpPage(query = '', { machine } = {}) {
   const hint = gateRow(h('span', { class: 'muted grow small' }, 'Not there? Check spam or junk.'));
   hint.hidden = true;
   byEmail.append(gateRow(email, send), codeRow, hint);
-  const emailButton = button('Sign up with email', () => {
-    emailButton.replaceWith(byEmail);
-    email.focus();
-  });
-  gate(
-    TITLE,
-    row,
-    ...social.filter((p) => PROVIDERS[p]).map((p) => button(`Sign up with ${PROVIDERS[p]}`, withProvider(p), true)),
-    emailButton,
-    error,
-  );
+  // Mail is blocked too often to lean on (the owner, 15 Nov 2026): by email only where the server has no provider.
+  const providers = social.filter((p) => PROVIDERS[p]);
+  gate(TITLE, row, ...providers.map((p) => button(`Sign up with ${PROVIDERS[p]}`, withProvider(p), p)), !providers.length && byEmail, error, gateRow(h('a', { href: '#/', class: 'small', title: 'It is kept for a week unsaved' }, 'Back to your map')));
 }
 
 /** A ticket traded: a token entered, or the agreement, the workspace or the start it waits on. `purpose`: keep or sign-in. */
@@ -150,10 +161,15 @@ export function signInBack(query = '') {
   return true;
 }
 
-/** The sign-in page's other ways in, above the email: Google, GitHub, a passkey, then a line and "or". None where none is offered. */
-export function otherWays(fail) {
+/**
+ * The sign-in page's other ways in (`top`): Google and GitHub, then a line and "or"; a passkey offered in the email
+ * field's autofill and as a link under the form (`below`). Where the server has no provider, the page mails codes
+ * (`withCodes`).
+ */
+export function otherWays(fail, { withCodes }) {
   const rows = h('div', { class: 'gate-ways' });
-  ways().then(({ social = [] }) => {
+  const below = h('div', { class: 'gate-ways' });
+  ways().then(async ({ social = [] }) => {
     const provider = (p) => async (e) => {
       e.target.disabled = true;
       try {
@@ -163,22 +179,21 @@ export function otherWays(fail) {
         e.target.disabled = false;
       }
     };
-    const passkey = async (e) => {
-      e.target.disabled = true;
-      try {
-        await finish(await passkeyTicket(), 'sign-in');
-      } catch (err) {
-        fail(err.name === 'NotAllowedError' ? 'No passkey was used.' : err.message);
-        e.target.disabled = false;
-      }
-    };
-    rows.replaceChildren(
-      ...social.filter((p) => PROVIDERS[p]).map((p) => gateRow(h('button', { class: 'grow', onclick: provider(p) }, `Sign in with ${PROVIDERS[p]}`))),
-      ...(passkeysHere() ? [gateRow(h('button', { class: 'grow', title: 'If you added one on this device', onclick: passkey }, 'Sign in with a passkey'))] : []),
-    );
-    if (rows.children.length) rows.append(h('div', { class: 'gate-or' }, 'or'));
+    const passkey = (autofill) =>
+      passkeyTicket({ autofill }).then(
+        (ticket) => finish(ticket, 'sign-in'),
+        // Autofill is offered quietly: where it cannot be (an address passkeys are not kept for), nothing is said.
+        (err) => !autofill && fail(err.name === 'NotAllowedError' ? 'No passkey was used.' : err.message),
+      );
+    const providers = social.filter((p) => PROVIDERS[p]);
+    if (!providers.length) withCodes();
+    rows.replaceChildren(...providers.map((p) => gateRow(h('button', { class: 'grow', onclick: provider(p) }, markOf(p), `Sign in with ${PROVIDERS[p]}`))));
+    if (providers.length) rows.append(h('div', { class: 'gate-or' }, 'or'));
+    if (!passkeysHere()) return;
+    below.append(gateRow(h('a', { href: '#', class: 'small', title: 'If you added one, on this device or your phone', onclick: (e) => (e.preventDefault(), passkey(false)) }, 'Use a passkey')));
+    if (await autofillHere()) passkey(true);
   });
-  return rows;
+  return { top: rows, below };
 }
 
 /** On a guest map, Sign up in the bar, loud: the one thing the page asks of its owner. Gone once the map is saved. */

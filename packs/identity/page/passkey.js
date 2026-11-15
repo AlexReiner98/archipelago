@@ -18,6 +18,7 @@ const said = async (res) => {
 
 /** Add a passkey for the address signed in. Rejects with why not, a person's cancel among them. */
 export async function addPasskey() {
+  stopOffer();
   const o = await said(await postJson('/connect/passkey/add/options', {}, authHeaders()));
   const made = await navigator.credentials.create({
     publicKey: {
@@ -34,10 +35,23 @@ export async function addPasskey() {
   return said(await postJson('/connect/passkey/add', { id: made.id, clientDataJSON: b64(r.clientDataJSON), authenticatorData: b64(r.getAuthenticatorData()), publicKey: b64(r.getPublicKey()), alg: r.getPublicKeyAlgorithm() }, authHeaders()));
 }
 
-/** Sign in with a passkey this device has: the ticket the server trades for a sign-in (POST /connect/verified). */
-export async function passkeyTicket() {
+/** A sign-in offered in the email field's autofill (mediation conditional), waiting until a passkey is picked there: one at a time. */
+let offered;
+const stopOffer = () => offered?.abort();
+
+/** Whether this browser lists passkeys in a field's autofill. */
+export const autofillHere = async () => passkeysHere() && Boolean(await window.PublicKeyCredential.isConditionalMediationAvailable?.().catch(() => false));
+
+/**
+ * Sign in with a passkey this device has: the ticket the server trades for a sign-in (POST /connect/verified).
+ * `autofill`: offered in the field marked `webauthn` until picked there, or until another asks.
+ */
+export async function passkeyTicket({ autofill = false } = {}) {
+  stopOffer();
   const o = await said(await postJson('/connect/passkey/options', {}));
-  const got = await navigator.credentials.get({ publicKey: { challenge: unb64(o.challenge), rpId: o.rpId, userVerification: 'preferred' } });
+  const signal = autofill ? (offered = new AbortController()).signal : undefined;
+  if (autofill) addEventListener('hashchange', stopOffer, { once: true });
+  const got = await navigator.credentials.get({ publicKey: { challenge: unb64(o.challenge), rpId: o.rpId, userVerification: 'preferred' }, ...(autofill && { mediation: 'conditional', signal }) });
   const r = got.response;
   return (await said(await postJson('/connect/passkey', { id: got.id, clientDataJSON: b64(r.clientDataJSON), authenticatorData: b64(r.authenticatorData), signature: b64(r.signature) }))).ticket;
 }

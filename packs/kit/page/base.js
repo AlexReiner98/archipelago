@@ -321,12 +321,12 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   const fail = (text) => (error.textContent = text);
   // Someone a client sent here to connect, with no account yet, came by MCP: where they begin says so (?ref=mcp).
   const ref = waitingOnSignIn() ? 'mcp' : undefined;
-  const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email', spellcheck: false, value: given });
-  const send = h('button', { class: 'primary grow', title: 'With a password: signed in now; without one, a code is mailed' }, 'Email me a code');
+  const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'email webauthn', spellcheck: false, value: given });
+  const send = h('button', { class: 'primary grow' }, 'Sign in');
+  let codes = false; // Mail is blocked too often to lean on (the owner, 15 Nov 2026): a code only where there is no other way in.
+  const withCodes = () => ((codes = true), (send.textContent = password.value ? 'Sign in' : 'Email me a code'), (password.title = 'If you set one; otherwise a code is mailed'));
 
-  // Where a person with no account begins (/connect/start), once known: offered again after asking, since an address
-  // with no workspace is sent no mail, and the page says the same to everyone.
-  let startAt;
+  let startAt; // Where a person with no account begins (/connect/start): offered again after asking, as no-one's address is mailed.
   // Step two: a code is in the mail, typed here, in whichever browser asked.
   const codeStep = (sentTo) => {
     const code = h('input', { type: 'text', placeholder: 'Code from the email', autocomplete: 'one-time-code', autocapitalize: 'characters', spellcheck: false });
@@ -366,14 +366,14 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     return body.sent_to;
   };
   const sendLink = () => email.value.trim() && ask(email.value.trim()).then(codeStep, () => undefined);
-  send.onclick = () => (password.value ? withPassword() : sendLink());
+  send.onclick = () => (password.value || !codes ? withPassword() : sendLink());
   email.addEventListener('keydown', (e) => e.key === 'Enter' && send.click());
 
   // Or the address and its password, for whoever set one (packs/identity/kernel/passwords.ts). A member of several picks one.
-  const password = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password', title: 'If you set a password; otherwise ask for an email' });
+  const password = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password', title: 'The one you set under Password, in the menu' });
   const withPassword = async (more = {}) => {
     const address = email.value.trim();
-    if (!address || !password.value) return fail(address ? 'Type your password, or ask for an email.' : 'Type your email address.');
+    if (!address || !password.value) return fail(address ? `Type your password${codes ? ', or ask for an email' : ''}.` : 'Type your email address.');
     const post = (agree) => postJson('/connect/password', { email: address, password: password.value, ...more, ...(agree && { agree }) });
     send.disabled = true;
     const res = await post();
@@ -384,34 +384,35 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     if (body.agree) return agreeFirst(body.agree, post);
     enter(body.token);
   };
-  // One button, as on most sign-in pages: it signs in with a password typed, else mails a code.
-  password.addEventListener('input', () => (send.textContent = password.value ? 'Sign in' : 'Email me a code'));
+  // One button, as on most sign-in pages: it signs in with a password typed, else (where codes are offered) mails a code.
+  password.addEventListener('input', () => codes && (send.textContent = password.value ? 'Sign in' : 'Email me a code'));
   password.addEventListener('keydown', (e) => e.key === 'Enter' && withPassword());
 
   // Where a person with no account begins, if this server offers it; a client waiting to connect is returned to after.
   const begin = h('div', { hidden: true });
   fetch('/connect/start').then((r) => r.json()).then(({ url }) => {
-    if (!url) return;
-    const to = new URL(url, location.origin);
+    const to = new URL(url ?? '#/try', location.origin); // with no pack's start page, a guest map (packs/identity/page/guest.js)
     if (ref) to.searchParams.set('ref', ref);
     startAt = to.href;
     const tip = 'Make a workspace of your own; a client waiting to connect is asked again once you are in';
     // Sent here by a client, in a browser that has never signed in: most likely they have no account, so it leads.
-    const start = newcomer ? h('button', { class: 'primary', title: tip, onclick: () => location.assign(to.href) }, 'Start a workspace') : h('a', { href: to.href, title: tip }, 'Start a workspace');
+    const start = h(newcomer ? 'button' : 'a', { class: newcomer ? 'primary' : '', href: newcomer ? undefined : to.href, title: tip, onclick: newcomer ? () => location.assign(to.href) : undefined }, url ? 'Start a workspace' : 'Try it with your agent');
     begin.replaceWith(gateRow(h('span', { class: 'muted grow' }, 'New here?'), start));
   }, () => undefined);
 
   // From inside a workspace the menu lists them already; signed out, they are the quickest way back in.
   const others = back ? [] : Object.values(known.all());
   const newcomer = Boolean(ref) && !back && others.length === 0;
+  const ways = hooks.otherWays?.(fail, { email, withCodes }) ?? {};
   const first = () => {
     if (error.textContent !== (message ?? '')) fail('');
     gate(
       title,
       newcomer && begin,
       newcomer && gateRow(h('span', { class: 'muted grow' }, 'Have one? Sign in')),
-      hooks.otherWays?.(fail),
+      ways.top,
       gateRow(email), gateRow(password, showOf(password)), gateRow(send),
+      ways.below,
       error,
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
       !newcomer && begin,
