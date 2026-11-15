@@ -97,6 +97,11 @@ nav.site-head .site-name {
   font-weight: 600;
   color: var(--reader-ink);
 }
+nav.site-head .site-sign-in {
+  flex: none;
+  margin-left: auto;
+  color: var(--reader-ink);
+}
 .site-pages {
   display: flex;
   gap: var(--space-8);
