@@ -7,7 +7,8 @@
 // above history (sheet.sections, e_axz9au5f). The frame reads the item once and tells the parts (`page`), so a page
 // drawn again in place is not mounted anew under the person's typing.
 
-import { api, ask, drawSlots, h, hooks, may, part, state, tell } from './base.js';
+import { api, ask, authHeaders, call, drawSlots, h, hooks, may, part, state, tell } from './base.js';
+import { bakeDocument, packBaked } from './style-code.js';
 import { drawIn, openHere } from './canvas.js';
 import { viewsOn } from './views-kept.js';
 import { readDocument, readingOf } from './item-reading.js';
@@ -178,9 +179,14 @@ export async function entity(id, here) {
       publishable && doc && ['Preview as published', () => window.open(`/preview/${id}`, '_blank')],
       writes && shown && [
         shown.published ? 'Publish again' : 'Publish',
-        async () =>
-          (await ask({ title: `Publish "${e.title}"?`, message: 'Anyone will be able to read it at its own address, with no login, and search engines to list it: its text, the sections it holds that are shared with the workspace and its views, as they are now. What you change afterwards stays a draft until you publish again.', action: 'Publish', danger: !shown.published })) &&
-          api('publish', { id }).then(again, (err) => tell('It was not published', err.message)),
+        async () => {
+          if (!(await ask({ title: `Publish "${e.title}"?`, message: 'Anyone will be able to read it at its own address, with no login, and search engines to list it: its text, the sections it holds that are shared with the workspace and its views, as they are now. What you change afterwards stays a draft until you publish again.', action: 'Publish', danger: !shown.published }))) return;
+          // A layout kept on the map is baked here first, as publishing will freeze it, so its page shows a picture with nothing running.
+          const baked = await bakeDocument(id, (doc) => call(`/preview/${doc}/data`, {}, authHeaders())).catch((err) => (tell('Its drawings were not baked', `They run live on its page: ${err.message}`), null));
+          // Handed to the server beside the preview it was baked from, and taken by the publish that follows.
+          if (baked && Object.keys(baked).length) await call(`/preview/${id}/data`, { baked: await packBaked(baked) }, authHeaders()).catch((err) => tell('Its drawings were not kept', `They run live on its page: ${err.message}`));
+          return api('publish', { id }).then(again, (err) => tell('It was not published', err.message));
+        },
       ],
       writes && shown?.published && ['Unpublish', async () => (await ask({ title: `Unpublish "${e.title}"?`, message: 'Its address will answer nothing; it stays shared with the workspace.', action: 'Unpublish', danger: true })) && api('unpublish', { id }).then(again, (err) => tell('It was not unpublished', err.message))],
       publishable && !shown && e.visibility !== 'public' && [

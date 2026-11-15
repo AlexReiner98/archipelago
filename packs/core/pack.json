@@ -494,6 +494,7 @@
         },
         "packs": {
           "type": "json",
+          "large": true,
           "description": "The packs active when the run started, as [{ id, version, manifest }], manifest the hash of its pack file: what lets a measure tell one version of the harness from another.",
           "system": true
         },

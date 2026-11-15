@@ -101,7 +101,7 @@ export function requestOf(req: Pick<IncomingMessage, 'url' | 'headers'>) {
 const keptFor = (cache: unknown, otherwise: string) =>
   Number.isInteger(cache) && (cache as number) > 0 ? `public, max-age=${Math.min(cache as number, YEAR)}${(cache as number) >= YEAR ? ', immutable' : ''}` : otherwise;
 
-type Answer = { status?: unknown; html?: unknown; json?: unknown; picture?: unknown; text?: unknown; type?: unknown; redirect?: unknown; stream?: unknown; id?: unknown; pass?: unknown; cache?: unknown };
+type Answer = { status?: unknown; html?: unknown; json?: unknown; picture?: unknown; styled?: unknown; text?: unknown; type?: unknown; redirect?: unknown; stream?: unknown; id?: unknown; pass?: unknown; cache?: unknown };
 type Sent = { pack?: string; workspace?: string; id?: string; site?: boolean; app?: string } & Pick<MountCall, 'workspaces' | 'from'>;
 
 /** Send what a mounted entry answered, by its kind; anything else is the pack's fault. False when it passed. */
@@ -118,7 +118,9 @@ export async function sendPage(res: ServerResponse, answer: unknown, at: Sent = 
   if (a.picture !== undefined) {
     const p = (a.picture ?? {}) as { content_type?: unknown; base64?: unknown };
     if (typeof p.content_type !== 'string' || !PICTURE.test(p.content_type) || typeof p.base64 !== 'string') return fault('a picture that is not one');
-    res.writeHead(status, { ...GUARD, 'content-type': p.content_type, 'cache-control': keptFor(a.cache, 'no-cache'), 'content-security-policy': "default-src 'none'" }).end(Buffer.from(p.base64, 'base64'));
+    // A baked drawing (styled) keeps its own stylesheet, which turns its colours; any other picture is held to nothing.
+    const policy = a.styled === true && p.content_type === 'image/svg+xml' ? "default-src 'none'; style-src 'unsafe-inline'" : "default-src 'none'";
+    res.writeHead(status, { ...GUARD, 'content-type': p.content_type, 'cache-control': keptFor(a.cache, 'no-cache'), 'content-security-policy': policy }).end(Buffer.from(p.base64, 'base64'));
     return true;
   }
   if (typeof a.text === 'string') {

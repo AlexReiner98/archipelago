@@ -7,6 +7,7 @@
 import type { KernelContext } from '#pelago/kernel';
 import { itemOf, publishable } from './map.ts';
 import { picturesOf } from './published-pictures.ts';
+import { unbaked } from './published-baked.ts';
 
 const ID = /^e_[a-z0-9]{8}$/;
 
@@ -80,7 +81,8 @@ export async function publishedState(ctx: KernelContext, id: string) {
   if (!row) return { published: false };
   const now = await freezeDocument(ctx, id).catch((err: unknown) => (ctx.said(`published ${id}: its draft could not be frozen to compare, so it reads as changed: ${err instanceof Error ? err.message : String(err)}`), null));
   // What was kept beside the words (the look, the marks its part drew them with) is not the draft to compare.
-  const { style_at: _, look: _look, marks: _marks, marks_error: _error, ...given } = row.given;
+  // Nor what was baked, which a draft never has.
+  const { style_at: _, look: _look, marks: _marks, marks_error: _error, ...given } = unbaked(row.given);
   return { published: true, at: row.published_at, by: row.published_by, changed: !now || !same(now, given) };
 }
 

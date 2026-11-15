@@ -249,6 +249,9 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         const { ws, pelago } = await resolve(req, res, 'human');
         try {
           const nav = async () => onMap<Record<string, unknown>>((await workspaces.get(ws.id)).pelago, 'surface.site_nav', (await workspaces.list()).find((w) => w.id === ws.id)?.name ?? ws.id, (page: { id: string }) => `/preview/${page.id}`);
+          // What the page baked before it publishes (the publish pack's, surface.keep_baked), kept for the publish that follows.
+          const sent = (await readJson(req)) as { baked?: unknown } | undefined;
+          if (sent?.baked !== undefined) return send(res, 200, { result: await onMap(pelago, 'surface.keep_baked', preview[1], sent.baked) });
           return send(res, 200, { result: await onMap(pelago, 'surface.preview', preview[1], nav) });
         } catch (err) {
           if (err instanceof Refused) throw err;

@@ -38,3 +38,12 @@ main:has(.doc-band) > :is(section, .doc-band) + div.text { max-width: calc(var(-
    says (numbers.frame_aspect, width over height), right on the page. */
 .doc-lens .code-stage > .lens-frame { display: block; width: 100%; height: var(--frame-most); border: 0; background: none; }
 .doc-lens .lens-view.shaped .code-stage > .lens-frame { height: auto; aspect-ratio: var(--ln-frame-aspect); }
+/* One baked as its document was published: its picture, the column's width, at the shape it was baked at. */
+.doc-lens .lens-view > img.baked { display: block; width: 100%; height: auto; }
+/* A page's frame (doc-lens.js, drawFrame): the land behind the whole page, the page above it, the hero's room kept. */
+body:has(> .page-land) { position: relative; }
+body:has(> .page-land) > :not(.page-land) { position: relative; z-index: 1; }
+.page-land { position: absolute; inset: 0 0 auto 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.page-land > * { position: absolute; display: block; }
+.page-land > .land-strip { overflow: hidden; }
+.page-land > .land-strip > img { position: absolute; left: 0; display: block; }

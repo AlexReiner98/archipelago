@@ -4,7 +4,7 @@
 
 const HASH = /^[0-9a-f]{64}$/;
 
-type Lens = { style?: { drawing?: { id: string; title: string; hash: string; modules?: Record<string, string> } } } & Record<string, unknown>;
+type Lens = { style?: { drawing?: { id: string; title: string; hash: string; modules?: Record<string, string>; baked?: { hash?: string; width?: number; height?: number; page?: ({ svg: { top: string; strip: string; foot: string } } & Record<string, unknown>)[] } } } } & Record<string, unknown>;
 type Doc = { title: string; /** Its parts, as packs/views/kernel/documents.ts reads them: text, a section, or one missing. */ parts: unknown[]; lenses?: Record<string, Lens> } & Record<string, unknown>;
 
 /** Where a public item's page is read: stable for as long as it is public, whatever it is renamed. */
@@ -17,16 +17,24 @@ export function pageData(doc: Doc, here: string) {
       const drawing = lens.style?.drawing;
       if (!drawing?.modules) return [id, lens];
       const { modules: _code, ...named } = drawing;
-      return [id, { ...lens, style: { ...lens.style, drawing: { ...named, src: `${here.replace(/\/$/, '')}/drawing/${drawing.hash}` } } }];
+      const at = `${here.replace(/\/$/, '')}/drawing`;
+      // One baked as it was published is read as its SVG, by that SVG's hash; a page's frame as each width's three bands.
+      const was = drawing.baked;
+      const baked = was && (was.page ? { page: was.page.map(({ svg, ...w }) => ({ ...w, src: { top: `${at}/${svg.top}`, strip: `${at}/${svg.strip}`, foot: `${at}/${svg.foot}` } })) } : { ...was, src: `${at}/${was.hash}` });
+      return [id, { ...lens, style: { ...lens.style, drawing: { ...named, src: `${at}/${drawing.hash}`, ...(baked && { baked }) } } }];
     }),
   );
   // The look it was published in is sent as the page's own fields (packs/styles/kernel/styles.ts, pageLook), never twice.
-  const { look: _look, ...rest } = doc as Doc & { look?: unknown };
+  // Nor the baked drawings, each read at its own address by its hash.
+  const { look: _look, svgs: _svgs, ...rest } = doc as Doc & { look?: unknown; svgs?: unknown };
   return { ...rest, ...(doc.lenses && { lenses }) };
 }
 
 /** The code of a drawing a published document's pictures are drawn by, by its hash, or null. */
 export function layoutCode(doc: Doc, hash: string) {
   if (!HASH.test(hash)) return null;
+  // A drawing baked as its document was published: its SVG, an image with nothing in it that runs.
+  const svg = (doc as Doc & { svgs?: Record<string, string> }).svgs?.[hash];
+  if (typeof svg === 'string') return { svg };
   return Object.values(doc.lenses ?? {}).find((lens) => lens.style?.drawing?.hash === hash && lens.style.drawing.modules)?.style?.drawing?.modules ?? null;
 }
