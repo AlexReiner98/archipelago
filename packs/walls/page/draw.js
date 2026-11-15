@@ -127,7 +127,17 @@ function inside(home, port, given) {
       const why = await over;
       clearTimeout(late);
       if (why) throw why;
-      post({ type: 'baked', pictures: kept, timing });
+      // One drawing in many colours: its outlines once, and each look's colours in their order. A look whose outlines
+      // differ is not one of them, and is said so here, before anything is sent.
+      const names = Object.keys(kept), first = kept[names[0]];
+      if (!first) throw new Error('This code baked no look');
+      const outline = (pic) => JSON.stringify([pic.width, pic.height, pic.clips, pic.shapes.map(({ c: _c, ...rest }) => rest)]);
+      const same = outline(first), looks = {};
+      for (const name of names) {
+        if (outline(kept[name]) !== same) throw new Error(`${name} is not the same drawing as ${names[0]} in other colours`);
+        looks[name] = kept[name].shapes.map((s) => s.c);
+      }
+      post({ type: 'baked', baking: { width: first.width, height: first.height, clips: first.clips, shapes: first.shapes, looks, timing } });
     } catch (err) {
       fail(err);
     }
@@ -283,7 +293,7 @@ async function bakeOnce(said) {
     }
     mine.onerror = (err) => (mine.terminate(), fail(err.message || 'The code of this style stopped.'));
     mine.onmessage = ({ data }) => {
-      if (data?.type === 'baked') (mine.terminate(), say({ type: 'baked', pictures: data.pictures, timing: data.timing }));
+      if (data?.type === 'baked') (mine.terminate(), say({ type: 'baked', baking: data.baking }));
       else if (data?.type === 'error') (mine.terminate(), fail(data.message));
     };
     const { code, answer, style, theme, width, height } = said;

@@ -121,3 +121,45 @@ export function drawCode(host, answer, style, keep, _place, coder) {
   host.replaceChildren(...[lit && h('div', { class: 'toolbar fold-bar' }, h('span', { class: 'grow' }), lit), error, stage].filter(Boolean));
   draw();
 }
+
+/**
+ * A layout's code baked once (task e_p6xkk2fg): run in a frame walled in, whatever the workspace lets drawings do, its
+ * code painting each of its looks on a canvas that keeps outlines (packs/walls/page/draw.js, bake). Resolves to its
+ * outlines and each look's colours, or rejects with why; the frame is put away either way.
+ */
+export function bakeCode({ code, answer, style, theme, width, height }) {
+  return new Promise((resolve, reject) => {
+    const frame = h('iframe', { class: 'bake-frame', sandbox: frameSandbox(), src: '/draw.html', title: 'A drawing being baked', hidden: true });
+    const done = (fn, value) => (removeEventListener('message', hear), clearTimeout(late), frame.remove(), fn(value));
+    const hear = (ev) => {
+      if (ev.source !== frame.contentWindow) return;
+      const said = ev.data ?? {};
+      if (said.type === 'ready') frame.contentWindow.postMessage({ type: 'bake', code, answer, style, theme, width, height }, '*');
+      else if (said.type === 'baked') done(resolve, said.baking);
+      else if (said.type === 'error') done(reject, new Error(String(said.message).slice(0, 300)));
+    };
+    // A bake that says nothing for two minutes has stopped.
+    const late = setTimeout(() => done(reject, new Error('The drawing did not finish baking')), 120000);
+    addEventListener('message', hear);
+    document.body.append(frame);
+  });
+}
+
+/**
+ * Each layout kept on the map in a document, baked as publishing it would freeze it (its preview), in the dark and in
+ * the light: by its view, the hash of the code it ran and what it painted, for publish to keep as its SVG.
+ */
+export async function bakeDocument(id, preview) {
+  const data = await preview(id);
+  const baked = {};
+  for (const [lens, frozen] of Object.entries(data?.lenses ?? {})) {
+    const { style: { drawing, ...style } = {}, ...answer } = frozen;
+    if (!drawing?.coded || !drawing.modules) continue;
+    // Its own units: as wide as a frame on a wide page, as high as the shape its view says.
+    const width = 1200, aspect = Number(style.numbers?.frame_aspect);
+    const height = Math.round(aspect > 0 ? width / aspect : (width * 9) / 16);
+    const at = (dark) => bakeCode({ code: drawing.modules, answer, style: { ...style, still: true }, theme: { dark }, width, height });
+    baked[lens] = { hash: drawing.hash, baking: await at(true), light: await at(false) };
+  }
+  return baked;
+}

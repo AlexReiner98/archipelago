@@ -41,6 +41,8 @@ export interface Slotted {
   shapes: (Shape & { slot: number })[];
   names: string[];
   slots: string[][];
+  /** Each slot's colours where the page is light, when it was baked light too. */
+  light?: string[][];
   timing: Timing;
 }
 
@@ -62,6 +64,7 @@ function checkSteps(d: unknown, where: string): Step[] {
 /** A picture as the frame sent it, checked: numbers, colours of the two forms a canvas says, and words. */
 export function checkPicture(p: unknown, name: string): Picture {
   const pic = p as Picture;
+  if (!pic || typeof pic !== 'object') throw new Error(`${name}: a picture has a size`);
   if (!pic || !finite(pic.width) || !finite(pic.height) || pic.width <= 0 || pic.height <= 0) throw new Error(`${name}: a picture has a size`);
   if (!Array.isArray(pic.shapes) || pic.shapes.length > MOST_SHAPES) throw new Error(`${name}: a picture holds at most ${MOST_SHAPES} shapes`);
   if (!Array.isArray(pic.clips)) throw new Error(`${name}: a picture's clips are a list`);
@@ -84,35 +87,44 @@ export function checkPicture(p: unknown, name: string): Picture {
   return pic;
 }
 
-/** What a shape is, but for its colour: two pictures turn into each other only where these are the same. */
-const form = (s: Shape) => JSON.stringify([s.k, s.d, s.w, s.j, s.cap, s.a, s.clip, s.m, s.s, s.font, s.align, s.base, s.sp]);
+/** A baking as the frame sends it: one drawing's outlines, and each look's colours for them, in the order they turn. */
+export interface Baking extends Picture {
+  looks: Record<string, string[]>;
+  timing?: Partial<Timing>;
+}
 
 /**
- * The pictures of one baking as one: every picture must hold the same shapes, in the same order, in their colours
- * alone; each shape's colours across the pictures are its slot, shapes that turn alike sharing one.
+ * A baking as one picture whose colours are slots: each shape's colours across the looks are its slot, and shapes that
+ * turn alike share one. Its outlines and every colour are checked first.
  */
-export function slotted(pictures: Record<string, unknown>, timing: Partial<Timing> = {}): Slotted {
-  const names = Object.keys(pictures);
-  if (!names.length) throw new Error('A baking holds at least one picture');
-  const pics = names.map((n) => checkPicture(pictures[n], n));
-  const [first] = pics;
-  for (const [i, p] of pics.entries()) {
-    if (p.width !== first.width || p.height !== first.height || p.shapes.length !== first.shapes.length || JSON.stringify(p.clips) !== JSON.stringify(first.clips)) throw new Error(`${names[i]} is not the same picture as ${names[0]} in other colours`);
-  }
-  const slotOf = new Map<string, number>();
-  const slots: string[][] = [];
-  const shapes = first.shapes.map((s, j) => {
-    const at = form(s);
-    const colours = pics.map((p, i) => {
-      if (form(p.shapes[j]) !== at) throw new Error(`${names[i]} differs from ${names[0]} at shape ${j + 1}: a baked picture turns its colours alone`);
-      return p.shapes[j].c;
+export function slotted(baking: unknown, lit?: unknown): Slotted {
+  const b = baking as Baking;
+  const pic = checkPicture(b, 'The drawing');
+  const names = b?.looks && typeof b.looks === 'object' ? Object.keys(b.looks).slice(0, 65) : [];
+  if (!names.length || names.length > 64) throw new Error('A baking holds from one to 64 looks');
+  const looksOf = (bk: Baking, where: string) =>
+    names.map((name) => {
+      const colours = bk.looks?.[name];
+      if (!Array.isArray(colours) || colours.length !== pic.shapes.length || !colours.every((c) => typeof c === 'string' && COLOUR.test(c))) throw new Error(`${where}${name.slice(0, 60)}: a look is a colour a canvas says for each shape`);
+      return colours;
     });
-    const key = colours.join(' ');
-    if (!slotOf.has(key)) (slotOf.set(key, slots.length), slots.push(colours));
+  const dark = looksOf(b, '');
+  // Baked again for a light page, it must be the same drawing in other colours: then each slot has its light colours too.
+  const l = lit as Baking | undefined;
+  const light = l ? (checkPicture(l, 'The light drawing'), JSON.stringify([l.width, l.height, l.clips, l.shapes.map(({ c: _c, ...rest }) => rest)]) === JSON.stringify([pic.width, pic.height, pic.clips, pic.shapes.map(({ c: _c, ...rest }) => rest)]) || bad('The light drawing is not the same drawing in other colours'), looksOf(l, 'Light, ')) : null;
+  const slotOf = new Map<string, number>();
+  const slots: string[][] = [], lights: string[][] = [];
+  const shapes = pic.shapes.map((s, j) => {
+    const colours = dark.map((c) => c[j]), lightColours = light?.map((c) => c[j]) ?? [];
+    const key = [...colours, ...lightColours].join(' ');
+    if (!slotOf.has(key)) (slotOf.set(key, slots.length), slots.push(colours), lights.push(lightColours));
     return { ...s, slot: slotOf.get(key)! };
   });
-  const every = Math.max(0.2, Math.min(60, Number(timing.every) || 1));
-  return { width: first.width, height: first.height, clips: first.clips, shapes, names, slots, timing: { every, fade: timing.fade === true } };
+  const every = Math.max(0.2, Math.min(60, Number(b.timing?.every) || 1));
+  return { width: pic.width, height: pic.height, clips: pic.clips, shapes, names, slots, ...(light && { light: lights }), timing: { every, fade: b.timing?.fade === true } };
+}
+function bad(said: string): never {
+  throw new Error(said);
 }
 
 // ---- the SVG, written from the checked shapes alone ----
@@ -142,7 +154,7 @@ const ANCHOR: Record<string, string> = { start: 'start', left: 'start', center: 
 const BASELINE: Record<string, string> = { top: 'hanging', hanging: 'hanging', middle: 'central', alphabetic: 'auto', ideographic: 'text-after-edge', bottom: 'text-after-edge' };
 
 /** Each slot's colour in turn: held for `every` seconds, and cut, or eased in over the last part of its time. */
-function turning(slots: string[][], { every, fade }: Timing): string {
+function turning(slots: string[][], { every, fade }: Timing, named = ''): string {
   const n = slots[0]?.length ?? 1;
   const total = every * n;
   const pc = (t: number) => `${Math.round((t / n) * 100000) / 1000}%`;
@@ -152,16 +164,21 @@ function turning(slots: string[][], { every, fade }: Timing): string {
     const still = n < 2 || colours.every((c) => c === colours[0]);
     for (const [cls, prop] of [['f', 'fill'], ['l', 'stroke']]) {
       if (still) {
-        rules.push(`.${cls}${i}{${prop}:${colours[0]}}`);
+        // Held where the page is light, a slot that turns where it is dark is stopped there.
+        rules.push(`.${cls}${i}{${prop}:${colours[0]}${named ? ';animation:none' : ''}}`);
         continue;
       }
       const frames = colours.map((c, j) => (fade ? `${pc(j)},${pc(j + 0.6)}{${prop}:${c}}` : `${pc(j)}{${prop}:${c}}`)).join('');
-      rules.push(`@keyframes ${cls}${i}{${frames}${fade ? `100%{${prop}:${colours[0]}}` : ''}}.${cls}${i}{${prop}:${colours[0]};animation:${cls}${i} ${how}}`);
+      rules.push(`@keyframes ${named}${cls}${i}{${frames}${fade ? `100%{${prop}:${colours[0]}}` : ''}}.${cls}${i}{${prop}:${colours[0]};animation:${named}${cls}${i} ${how}}`);
     }
   });
-  // Asked for less motion, the first picture holds.
-  rules.push('@media (prefers-reduced-motion:reduce){*{animation:none!important}}');
   return rules.join('');
+}
+
+/** The stylesheet: each slot turned through its colours, its light colours where the page is light, and still when asked for less motion. */
+function sheet(b: Slotted): string {
+  const light = b.light ? `@media (prefers-color-scheme:light){${turning(b.light, b.timing, 'w')}}` : '';
+  return `${turning(b.slots, b.timing)}${light}@media (prefers-reduced-motion:reduce){*{animation:none!important}}`;
 }
 
 /** The baked picture as one SVG: its clips, each shape in its slot's class, and the stylesheet that turns them. */
@@ -189,5 +206,5 @@ export function bakedSvg(b: Slotted): string {
     body.push(`<path class="${cls}" d="${pathData(s.d!)}"${s.k === 'stroke' ? ' fill="none"' : ''}${lineAttrs}${alpha(s.a, 'opacity')}${clip(s.clip)}/>`);
     if (both) i++;
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(b.width)} ${num(b.height)}"><style>${turning(b.slots, b.timing)}</style>${clips ? `<defs>${clips}</defs>` : ''}${body.join('')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${num(b.width)} ${num(b.height)}"><style>${sheet(b)}</style>${clips ? `<defs>${clips}</defs>` : ''}${body.join('')}</svg>`;
 }

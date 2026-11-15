@@ -40,6 +40,14 @@ function drawCoded(body, answer, style) {
   );
 }
 
+/**
+ * A layout kept on the map, baked as its document was published (packs/publish/kernel/published-baked.ts): its SVG,
+ * shown as an image, which turns its own colours and runs nothing here.
+ */
+function drawBaked(body, baked, title) {
+  body.replaceChildren(h('img', { class: 'baked', src: baked.src, width: baked.width, height: baked.height, alt: title ?? '', decoding: 'async' }));
+}
+
 /** Draw one frozen answer into host. `typeTitles` names each type the picture holds. `inApp`: drawn in the app's sheet, whose addresses are its own. `onItem`: a part opens there (a public view opens it in its sheet, ./frozen-chrome.js). */
 export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onItem = null } = {}) {
   for (const [id, title] of Object.entries(typeTitles)) if (!types.has(id)) types.set(id, { id, title });
@@ -49,7 +57,8 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onIte
   host.replaceChildren(body);
   dress(body, style);
   // Every picture has a drawing: packs/publish/kernel/published.ts gives one to a picture frozen without.
-  if (style.drawing?.coded) drawCoded(body, answer, style);
+  if (/^\/[^/]/.test(style.drawing?.baked?.src ?? '')) drawBaked(body, style.drawing.baked, answer.lens?.title);
+  else if (style.drawing?.coded) drawCoded(body, answer, style);
   else if (style.drawing) drawWith(body, answer, style, () => {});
   else body.replaceChildren(h('div', { class: 'empty' }, 'This view cannot be drawn here.'));
   // A link leaves out what is private; the page says so, rather than reading as a view with nothing in it.

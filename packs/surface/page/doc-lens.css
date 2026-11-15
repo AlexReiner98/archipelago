@@ -38,3 +38,5 @@ main:has(.doc-band) > :is(section, .doc-band) + div.text { max-width: calc(var(-
    says (numbers.frame_aspect, width over height), right on the page. */
 .doc-lens .code-stage > .lens-frame { display: block; width: 100%; height: var(--frame-most); border: 0; background: none; }
 .doc-lens .lens-view.shaped .code-stage > .lens-frame { height: auto; aspect-ratio: var(--ln-frame-aspect); }
+/* One baked as its document was published: its picture, the column's width, at the shape it was baked at. */
+.doc-lens .lens-view > img.baked { display: block; width: 100%; height: auto; }
