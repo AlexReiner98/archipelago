@@ -169,7 +169,9 @@ function pageAt(id, width) {
         const shown = [...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('footer')].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead) && el.getBoundingClientRect().height > 0).map(box);
         const above = shown.filter((b) => b.y + b.h <= heroFoot - (lead ? box(lead).h : 0) + 4), parts = shown.filter((b) => b.y >= heroFoot - 4);
         const x0 = Math.min(...parts.map((b) => b.x)), x1 = Math.max(...parts.map((b) => b.x + b.w)), y0 = Math.min(...parts.map((b) => b.y)), y1 = Math.max(...parts.map((b) => b.y + b.h));
-        resolve({ hero: lead && box(lead), above, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null });
+        // Words the page sets in its hero (its name as a heading) are its own: kept clear, and the drawing draws no name of its own.
+        const named = lead ? [...lead.querySelectorAll('h1, h2, .wordmark')].filter((el) => el.getBoundingClientRect().height > 0).map(box) : [];
+        resolve({ hero: lead && box(lead), above, named, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null });
       } catch (err) {
         reject(err);
       } finally {
@@ -199,9 +201,9 @@ function frameAt(layout, width, numbers = {}) {
   // The column is kept clear down to the foot, so what repeats between the top and the foot is the margins alone.
   const column = layout.column && grow(layout.column, pad);
   const kept = column ? [{ ...column, h: Math.max(column.h, foot - column.y) }] : [];
-  const clear = [...kept, ...(layout.above ?? []).map((b) => grow(b, 12)), ...channels];
+  const clear = [...kept, ...(layout.above ?? []).map((b) => grow(b, 12)), ...(layout.named ?? []).map((b) => grow(b, narrow ? 16 : 32)), ...channels];
   const nameAt = layout.hero ? layout.hero.y + layout.hero.h / 2 : top / 2;
-  return { top, period, foot, height: foot + band, page: { width, height: foot + band, clear, nameAt, inset: n('frame_inset', 0), edges: 0, every: n('frame_every', 5) } };
+  return { top, period, foot, height: foot + band, page: { width, height: foot + band, clear, nameAt, ...(layout.named?.length && { name: false }), inset: n('frame_inset', 0), edges: 0, every: n('frame_every', 5) } };
 }
 
 /** The widths a page's frame is baked at: a phone's, a tablet's and a wide screen's, each shown cut to the window's width. */
