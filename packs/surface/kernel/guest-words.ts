@@ -73,9 +73,9 @@ The answer's result.created.p is its id.
   ]}
   Say only what you saw; name things as the project does. Then go to step 3.
 
-3. Then stop, and tell your user in two short lines: the project and its setup plan are on the map in their browser; when they want to keep it, say so and you will run step 1 of the plan (signing in saves the map, which is otherwise deleted in a week). Run nothing else until they answer.
+3. Then stop, and tell your user in two short lines, in these words or close to them: "Your project and its open work are on the map. Ask me to add more, or press Sign up at the top of the page to save it." Run nothing else until they answer. Asked for more, draw it as in step 2, tied to what is there.
 
-4. When they say so: run the installer for your agent (step 1); its sign-in opens in the browser where they watch the map, and signing in there keeps it, starts their trial and connects you. Ask them to restart you, then, connected, tick the plan's steps through your Archipelago tools as its notes say.
+4. Once they have signed up and ask you to connect properly: run the installer for your agent from ${origin}/install.md; its sign-in opens in the browser where they watch the map, and connects you to it. Ask them to restart you; connected, you keep the map current through your Archipelago tools.
 
 If a change is refused, the answer says why in "error": fix that and send it again. The map is your user's to shape as they like (types, links, rules, views, styles, layouts: POST ${origin}/agent/query with {"name":"actions"} lists what each takes); only publishing and what reaches outside the map wait for them to sign in.
 `;
