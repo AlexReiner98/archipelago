@@ -9,7 +9,7 @@
 // address to a computer (e_hmmh2xta).
 // The host's: it enters a token, which no pack's code may do.
 
-import { enter, gate, gateRow, h, keepLanding, known, postJson, store } from './base.js';
+import { enter, gate, gateRow, h, hooks, keepLanding, known, postJson, store, workspaceOf } from './base.js';
 
 /**
  * What the canvas under the note shows: a query, as an address says one (packs/surface/page/query.js, readAddress). A new
@@ -22,6 +22,40 @@ const QUERY = `${['work', 'aim', 'question', 'record'].map((t) => `find=${encode
 let making = false;
 
 const TITLE = 'Try it with your agent';
+
+/**
+ * The first moments on a new guest map (e_afpvmy78): until its agent writes, the bar says the page waits for it (the
+ * listening mark, packs/surface/page/live.js); when the first item lands, the install note's sheet closes and the canvas,
+ * which always fits what it draws, has the whole page for the visitor's work. Kept for the map just made, across the
+ * reload that enters it, and dropped once its first item lands.
+ */
+const FIRST = 'pelago-guest-first';
+function keepFirst(first) {
+  try {
+    if (first) localStorage.setItem(FIRST, JSON.stringify(first));
+    else localStorage.removeItem(FIRST);
+  } catch {}
+}
+const firstNow = () => {
+  try {
+    return JSON.parse(localStorage.getItem(FIRST) ?? 'null');
+  } catch {
+    return null;
+  }
+};
+
+/** On each route: on the guest map just made, wait visibly for its agent, then make room for what it draws. */
+export function firstMoments() {
+  const first = firstNow();
+  if (!first || first.ws !== workspaceOf(store.token)) return void (hooks.awaiting = hooks.made = undefined);
+  hooks.awaiting = () => 'Waiting for your agent';
+  hooks.made = () => {
+    keepFirst(null);
+    hooks.awaiting = hooks.made = undefined;
+    // Only while the visitor is still on the note: one who has moved on is left where they are.
+    if (location.hash.startsWith(`#/e/${first.install}`)) location.hash = `#/v?${QUERY}`;
+  };
+}
 
 /** #/try: make a guest map and open it on its install note. */
 export async function tryPage(query = '') {
@@ -36,6 +70,7 @@ export async function tryPage(query = '') {
     if (!res.ok) throw new Error(body.error ?? 'That did not work.');
     const { workspace, install, page_token } = body.result;
     keepLanding(workspace.id, install ? `#/e/${install}?${QUERY}` : `#/v?${QUERY}`);
+    if (install) keepFirst({ ws: workspace.id, install });
     // The page token is this browser's sign-in, remembered as any workspace is: signing in to keep the map
     // (packs/identity/page/authorize.js, /oauth/authorize opened by the agent's installer) finds the guest by it.
     store.token = page_token;
