@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { codeDrawing, freezeQuery } from '../packs/publish/kernel/published-pictures.ts';
 import { layoutCode, pageData } from '../packs/publish/kernel/published-data.ts';
+// @ts-expect-error: a plain module of the pack, with no types of its own.
+import { page } from '../packs/publish/parts/doc/page.js';
 
 const code = 'export default function draw({ canvas }) { canvas.getContext("2d") }';
 
@@ -30,4 +32,12 @@ test('a published page fetches that code by its hash', () => {
   assert.equal(given.lenses.e_aaaaaaaa.style.drawing.src, `/p/default/e_bbbbbbbb/drawing/${hash}`);
   assert.equal(given.lenses.e_aaaaaaaa.style.drawing.coded, true);
   assert.deepEqual(layoutCode(doc as never, hash), { 'index.js': code });
+});
+
+test('a front page that opens on a view has no title over it and no note under it', () => {
+  const d = { path: 'home', title: 'Home', parts: [{ section: { id: 'e_aaaaaaaa', title: 'Created here', body: 'What it is.' } }, { text: 'The words.' }], lenses: { e_aaaaaaaa: {} } };
+  const said = JSON.stringify(page(d));
+  assert.ok(said.includes('"picture"'), 'its picture is drawn');
+  assert.ok(!said.includes('"size":6},"Created here') && !said.includes('What it is.'), 'with no title and no note');
+  assert.ok(JSON.stringify(page({ ...d, path: 'about' })).includes('"size":6},"Created here'), 'another page keeps its title');
 });
