@@ -37,8 +37,8 @@ body[data-gate] #sheet { background: var(--c-ground); }
 body[data-gate] .gate .muted { color: var(--c-muted); }
 
 /* The roles, each as the house gives it. */
-main:has(> nav.site-head), body[data-gate] .gate,
-main:has(> nav.site-head) :is(nav, footer, h3, h4) {
+:where(main:has(> nav.site-head)), body[data-gate] .gate,
+:where(main:has(> nav.site-head)) :is(nav, footer, h3, h4) {
   font-family: var(--type-voice-family);
   font-weight: var(--type-voice-weight);
   font-variation-settings: var(--type-voice-axes);
@@ -50,29 +50,27 @@ main > nav.site-head .site-name {
   text-transform: var(--type-wordmark-case);
   letter-spacing: var(--type-wordmark-track);
 }
-main:has(> nav.site-head) :is(h1, h2), body[data-gate] .gate h1 {
+:where(main:has(> nav.site-head)) :is(h1, h2), body[data-gate] .gate h1 {
   font-family: var(--type-heading-family);
   font-weight: var(--type-heading-weight);
   font-variation-settings: var(--type-heading-axes);
-  text-transform: none;
-  letter-spacing: 0;
   color: var(--c-ink);
 }
-main:has(> nav.site-head) :is(.site-pages a, th, li > strong:first-child, p.action > a),
+:where(main:has(> nav.site-head)) :is(.site-pages a, th, li > strong:first-child, p.action > a),
 body[data-gate] .gate :is(button, .primary, input) {
   font-family: var(--type-label-family);
   font-weight: var(--type-label-weight);
   font-variation-settings: var(--type-label-axes);
 }
 /* What an agent wrote is set in its monospace end: code, and a guest map being made. */
-main:has(> nav.site-head) :is(code, pre), body[data-gate] .gate-row > .muted.grow:only-child {
+:where(main:has(> nav.site-head)) :is(code, pre), body[data-gate] .gate-row > .muted.grow:only-child {
   font-family: var(--type-agent-family);
   font-weight: var(--type-agent-weight);
   font-variation-settings: var(--type-agent-axes);
 }
 
 /* Links are ink, underlined by a hairline. */
-main:has(> nav.site-head) :is(.text, section, footer) a, body[data-gate] .gate a:not(.primary) {
+:where(main:has(> nav.site-head)) :is(.text, section, footer) a, body[data-gate] .gate a:not(.primary) {
   color: var(--c-ink);
   text-decoration: underline;
   text-decoration-color: var(--c-edge);
@@ -80,12 +78,12 @@ main:has(> nav.site-head) :is(.text, section, footer) a, body[data-gate] .gate a
 }
 
 /* A section's title stands under a few fine lines that die away: the water between parts of the page. */
-main:has(> nav.site-head) section > h2 {
+:where(main:has(> nav.site-head)) section > h2 {
   position: relative;
   border-top: 0;
   padding-top: var(--space-10);
 }
-main:has(> nav.site-head) section > h2::before {
+:where(main:has(> nav.site-head)) section > h2::before {
   content: '';
   position: absolute;
   top: 0;
@@ -99,7 +97,7 @@ main:has(> nav.site-head) section > h2::before {
 
 /* The one way forward on a page: a link alone on its line on a site (p.action), and the gate's primary button. Ink, a
    heavier foot, no colour; it fills with ink when pointed at. */
-main:has(> nav.site-head) p.action > a,
+:where(main:has(> nav.site-head)) p.action > a,
 body[data-gate] .gate .primary {
   display: inline-flex;
   align-items: center;
@@ -115,7 +113,7 @@ body[data-gate] .gate .primary {
   text-align: center;
   max-width: 100%;
 }
-main:has(> nav.site-head) p.action > a:hover,
+:where(main:has(> nav.site-head)) p.action > a:hover,
 body[data-gate] .gate .primary:hover:not(:disabled) {
   background: var(--c-ink);
   color: var(--c-ground);
@@ -124,8 +122,8 @@ body[data-gate] .gate .primary:focus-visible { outline: var(--border-3) solid va
 
 /* The gate: a clearing with room, the form at reading size; fields square, their edge strong enough to see. */
 body[data-gate] .gate { gap: var(--space-8); }
-body[data-gate] .gate h1, main:has(> nav.site-head) section > h2 { font-size: var(--chart-title); line-height: 1.2; }
-body[data-gate] .gate, main:has(> nav.site-head) { font-size: var(--chart-text); }
+body[data-gate] .gate h1, :where(main:has(> nav.site-head)) section > h2 { font-size: var(--chart-title); line-height: 1.2; }
+body[data-gate] .gate, :where(main:has(> nav.site-head)) { font-size: var(--chart-text); }
 body[data-gate] .gate input { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }
 body[data-gate] .gate input:focus { border-color: var(--c-ink); outline: var(--border-2) solid var(--c-ink); outline-offset: var(--border-1); }
 body[data-gate] .gate button:not(.primary) { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }
