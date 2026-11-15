@@ -84,3 +84,18 @@ export async function editsResolved(reg: Registry, ops: Op[], read: (id: string)
   if (errors.length) throw new Error(`Change rejected:\n- ${errors.join('\n- ')}`);
   return { ops: out, edited };
 }
+
+/**
+ * The ops a held change keeps: each update that was sent as an edit kept as that edit, not the whole field it left
+ * when it was sent, so approving it finds and replaces in the field as it is then, and is refused where the passage
+ * has moved; never a stale whole field written over what was approved before it (e_a838f2aq). `ops` are the resolved
+ * ops (rewritten, with what followed after them), `sent` the ops as sent, one for one at their start.
+ */
+export function asSent(ops: Op[], sent: Op[]): Op[] {
+  return ops.map((op, i) => {
+    const was = sent[i] as UpdateOp | undefined;
+    if (op.op !== 'update' || !was || was.op !== 'update' || !was.edit || was.id !== op.id) return op;
+    const { [was.edit.field]: _whole, ...props } = (op as UpdateOp).props ?? {};
+    return { ...op, props, edit: was.edit } as Op;
+  });
+}

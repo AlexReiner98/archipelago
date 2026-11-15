@@ -53,21 +53,39 @@ test('with the owner’s allowance an agent publishes, and the log keeps on whos
   assert.match(rows[0].actor, /^agent:/);
   assert.deepEqual(rows[0].detail.authority, { of: 'human', basis, stated_by: rows[0].actor });
   await assert.rejects(callTool(l, agent, 'publish', { id: doc, authority: { of: 'human' } }), /say what they said and where/);
-  // Taking it down stays a human's.
-  await assert.rejects(callTool(l, agent, 'unpublish', { id: doc }), /for humans only/);
-  // And not only at the tool: a direct call, as a pack would make, is refused by core's rule agent_unpublish.
-  await assert.rejects(publishedPack.unpublish(kernelContext(l, 'publish'), agent, doc), /Taking a document down is the owner’s/);
-  assert.equal((await l.entity(doc))!.visibility, 'public', 'still published');
-  assert.equal((await l.db.query(`select 1 from published`)).rows.length, 1);
+  // The same allowance lets it take a document down (core's agent_unpublish, lifted by agent_publish).
+  assert.equal(((await callTool(l, agent, 'unpublish', { id: doc })) as { unpublished: string }).unpublished, doc);
+  assert.equal((await l.db.query(`select 1 from published`)).rows.length, 0);
+  await callTool(l, agent, 'publish', { id: doc, authority: { of: 'human', basis } });
   assert.equal((await publishedPack.unpublish(kernelContext(l, 'publish'), owner, doc)).unpublished, doc, 'the owner takes it down');
   assert.equal((await l.db.query(`select 1 from published`)).rows.length, 0);
   await callTool(l, agent, 'publish', { id: doc, authority: { of: 'human', basis } });
   // A token that may only propose is refused even so: publishing is never held, so it asks instead.
   await assert.rejects(callTool(l, { ...agent, may: 'propose' }, 'publish', { id: doc }), /may only propose/);
   await assert.rejects(callTool(l, { ...agent, may: 'propose' }, 'publish_all', { within: doc }), /may only propose/);
-  // The owner takes the allowance back, and the agent is refused again.
+  // The owner takes the allowance back, and the agent is refused again: taking down too.
   await callTool(l, owner, 'workspace_set', { agent_publish: false });
   await assert.rejects(callTool(l, agent, 'publish', { id: doc }), /Publishing is the owner’s here/);
+  await assert.rejects(publishedPack.unpublish(kernelContext(l, 'publish'), agent, doc), /Taking a document down is the owner’s/);
+  assert.equal((await l.db.query(`select 1 from published`)).rows.length, 1, 'still published');
+});
+
+test('with holds off an agent publishes, shares and takes down at once, and each answer names the stakes', async () => {
+  const { l, doc } = await withDocument();
+  await callTool(l, owner, 'workspace_set', { holds_off: true });
+  const published = (await callTool(l, agent, 'publish', { id: doc })) as { published: string; stakes: string[] };
+  assert.equal(published.published, doc);
+  assert.match(published.stakes[0], /"Landing" is public now, at \/p\/.+: anyone on the internet reads it/);
+  assert.ok(published.stakes.includes('Published: anyone with the address can read it, now.'), 'core’s agent_publish says its stake');
+  assert.match(published.stakes.at(-1)!, /unpublish takes it down/);
+  const down = (await callTool(l, agent, 'unpublish', { id: doc })) as { unpublished: string; stakes: string[] };
+  assert.deepEqual([down.unpublished, down.stakes], [doc, ['Taken down: whoever had the address can no longer read it.']]);
+  const shared = (await callTool(l, agent, 'share_create', { id: doc })) as { shared: string; stakes: string[] };
+  assert.equal(shared.shared, doc);
+  assert.match(shared.stakes[0], /^Public now at .+: anyone on the internet can read it/);
+  assert.ok(((await callTool(l, agent, 'share_revoke', { id: doc })) as { unshared: string }).unshared);
+  // A person's own act says no stakes: they are what an agent is told.
+  assert.equal(((await callTool(l, owner, 'publish', { id: doc })) as { stakes?: string[] }).stakes, undefined);
 });
 
 test('only a human admin turns agent publishing on, and the database refuses anyone else', async () => {

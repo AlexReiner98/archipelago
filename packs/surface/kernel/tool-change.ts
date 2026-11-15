@@ -60,8 +60,8 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       'Change part of a note with append or replace, of code with edit, not the whole. An update of only the id says it is still true. ' +
       'A plan or findings are items with a view, not one note. ' +
       'A published finding (type finding) is one line: its title the claim as a sentence, value the fact with its unit, confidence, as_of; its note how it was found, three lines at most. ' +
-      'Checked as a whole, then applied or held as a proposal for a human, by policy. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. ' +
-      'Closing a decision or hypothesis is held for the human, unless the workspace applies agents\u2019 changes: then a decision must carry props.outcome and props.rationale, and is put to the owner later (attention, to_confirm).',
+      'Checked as a whole, then applied or held as a proposal for a human, by policy. ' +
+      'With holds off it applies at once: public reaches anyone, code runs for all who open it, forget is for good; stakes say what it reached. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. A settled decision is put to the owner later (attention, to_confirm).',
     input: {
       ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
       reason: z.string().min(1).optional().describe('Why, as the activity log shows it. Needed, except with retry.'),
@@ -185,6 +185,11 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       // A structure put in as one long note (a plan, findings, options) is said back, so its pieces are laid out as items (packs/surface/kernel/plan-note.ts).
       const structure = structureAsText(noted);
       if (structure) result = { ...result, structure };
+      // What is at stake now it applied (the stakes of the rules it passed) ends with how it is taken back, or that it cannot be.
+      if ('stakes' in result && result.stakes?.length && 'changeset' in result) {
+        const forgot = (input.ops as { op: string }[]).some((o) => o.op === 'forget');
+        result = { ...result, stakes: [...result.stakes, forgot ? 'What was forgotten cannot be undone; the rest of this change can: undo with its changeset.' : `It can be undone: undo with changeset ${result.changeset}.`] };
+      }
       if (actor.kind === 'agent' && result.status !== 'proposed' && (await holdsOff(l.db))) return { ...result, holds: 'off' };
       return result;
     },

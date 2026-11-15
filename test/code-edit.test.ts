@@ -66,7 +66,7 @@ test('two edits of one field in one change each see the text the one before left
   assert.equal((await l.entity(s))!.props.code, CODE.replace('"red"', '"teal"'));
 });
 
-test('an agent\'s edit of code waits under code_runs, holds the whole field, and applies it when approved', async () => {
+test('an agent\'s edit of code waits under code_runs, holds the edit, and applies it when approved', async () => {
   const l = await fresh();
   const { s } = await make(l, [{ op: 'create', ref: 's', type: 'layout', title: 'Field', props: { code: CODE } }]);
   await callTool(l, owner, 'workspace_set', { agent_changes: 'apply' });
@@ -74,8 +74,8 @@ test('an agent\'s edit of code waits under code_runs, holds the whole field, and
   assert.deepEqual([held.status, held.held_by.rule], ['proposed', 'code_runs']);
   assert.equal((await l.entity(s))!.props.code, CODE, 'nothing has changed yet');
   const { rows } = await l.db.query<{ ops: { props?: { code?: string }; edit?: unknown }[] }>(`select ops from proposal where id = $1`, [held.proposal]);
-  assert.equal(rows[0].ops[0].edit, undefined, 'the held change holds the whole field, not the edit');
-  assert.equal(rows[0].ops[0].props?.code, CODE.replace('"red"', '"blue"'));
+  assert.deepEqual(rows[0].ops[0].edit, { field: 'code', find: '"red"', with: '"blue"' }, 'the held change holds the edit, not the whole field it left');
+  assert.equal(rows[0].ops[0].props?.code, undefined);
   await l.decide(owner, { proposal: held.proposal, approve: true } as never);
   assert.equal((await l.entity(s))!.props.code, CODE.replace('"red"', '"blue"'));
   // Where the owner lets agents change code, it applies as made, and says what let it through.
@@ -83,4 +83,30 @@ test('an agent\'s edit of code waits under code_runs, holds the whole field, and
   const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: s, edit: { field: 'code', find: '"blue"', with: '"teal"' } }] })) as { status: string; let_through?: { rule: string }[] };
   assert.equal(made.status, 'applied');
   assert.ok(made.let_through?.some((r) => r.rule === 'code_runs'));
+});
+
+test('two held edits of one field, approved one after the other, both land: the second finds its passage in the text then (e_a838f2aq)', async () => {
+  const l = await fresh();
+  const { s } = await make(l, [{ op: 'create', ref: 's', type: 'layout', title: 'Field', props: { code: CODE } }]);
+  await callTool(l, owner, 'workspace_set', { agent_changes: 'apply' });
+  const first = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: s, edit: { field: 'code', find: '"red"', with: '"blue"' } }] })) as { proposal: string };
+  const second = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: s, edit: { field: 'code', find: '10, 10', with: '20, 20' } }] })) as { proposal: string };
+  await l.decide(owner, { proposal: first.proposal, approve: true } as never);
+  await l.decide(owner, { proposal: second.proposal, approve: true } as never);
+  assert.equal((await l.entity(s))!.props.code, CODE.replace('"red"', '"blue"').replace('10, 10', '20, 20'), 'the first edit is not written over');
+  // One whose passage the first took away is refused at approval, saying so, and nothing moves.
+  const stale = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: s, edit: { field: 'code', find: '"blue"', with: '"teal"' } }] })) as { proposal: string };
+  await l.change(human, { reason: 'test', ops: [{ op: 'update', id: s, edit: { field: 'code', find: '"blue"', with: '"green"' } }] });
+  await refused(l.decide(owner, { proposal: stale.proposal, approve: true } as never), /exactly once, and is there not at all/);
+  assert.match(String((await l.entity(s))!.props.code), /"green"/);
+});
+
+test('with holds off an agent\'s code applies at once, and its answer says where it runs and how to undo it', async () => {
+  const l = await fresh();
+  const { s } = await make(l, [{ op: 'create', ref: 's', type: 'layout', title: 'Field', props: { code: CODE } }]);
+  await callTool(l, owner, 'workspace_set', { holds_off: true });
+  const made = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id: s, edit: { field: 'code', find: '"red"', with: '"blue"' } }] })) as { status: string; changeset: string; holds: string; stakes: string[] };
+  assert.deepEqual([made.status, made.holds], ['applied', 'off']);
+  assert.match(made.stakes[0], /^Code in "Field" now runs in the browser of everyone who opens a page that uses it/);
+  assert.equal(made.stakes.at(-1), `It can be undone: undo with changeset ${made.changeset}.`);
 });

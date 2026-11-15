@@ -893,6 +893,7 @@
       "id": "pack_code",
       "when": { "actor": "agent", "op": ["create", "update"], "type": "pack", "fields": ["code"] },
       "then": "hold",
+      "stake": "Code in \"{title}\" now runs on the server, on every island that runs this version.",
       "say": "Code a version of a pack runs on its island is code that runs on the server: the owner allows it."
     },
     {
@@ -906,6 +907,7 @@
       "id": "version_spread",
       "when": { "actor": "agent", "op": ["create", "update"], "type": "island", "spreads": true },
       "then": "hold",
+      "stake": "Code of a version now runs on another island too: \"{title}\" runs it for everyone who works there.",
       "say": "\"{title}\" would run a version's code another island already tries: spreading it is the owner's to allow."
     },
     {
@@ -913,30 +915,35 @@
       "when": { "actor": "agent", "op": ["create", "update"], "fields": ["code", "modules", "page_css", "writes"] },
       "then": "hold",
       "lifted": "agent_code",
+      "stake": "Code in \"{title}\" now runs in the browser of everyone who opens a page that uses it, the live site included where it is published.",
       "say": "Code that runs in the browser of whoever looks is the human's to allow."
     },
     {
       "id": "drawing_reach",
       "when": { "drawing": true, "reach": "outside" },
       "then": "hold",
+      "stake": "A drawing changed a {type} its layout does not say it writes.",
       "say": "A drawing asked to change a {type}, which its layout does not say it writes: you look first."
     },
     {
       "id": "drawing_code",
       "when": { "drawing": true, "fields": ["code", "modules", "page_css", "writes"] },
       "then": "hold",
+      "stake": "A drawing changed code that runs, or what a drawing may write.",
       "say": "A drawing asked to change code that runs, or what a drawing may write: you look first."
     },
     {
       "id": "drawing_public",
       "when": { "drawing": true, "visibility": "public" },
       "then": "hold",
+      "stake": "A drawing made \"{title}\" public: anyone on the internet can read it.",
       "say": "A drawing asked to make \"{title}\" public: you decide that."
     },
     {
       "id": "screens_human",
       "when": { "actor": "agent", "type": "screen" },
       "then": "hold",
+      "stake": "What a screen shows, and where, changed for everyone in this workspace.",
       "say": "What a screen shows, and where, is the human's to change."
     },
     {
@@ -944,24 +951,28 @@
       "when": { "actor": "agent", "op": "merge", "type": ["style", "layout"] },
       "then": "hold",
       "lifted": "agent_code",
+      "stake": "Two styles or layouts are one now, the dropped one's code included.",
       "say": "Folding one style or layout into another can bring its code along: the human's to allow."
     },
     {
       "id": "people_merge",
       "when": { "actor": "agent", "op": "merge", "type": ["person", "agent"] },
       "then": "hold",
+      "stake": "\"{title}\" is one with another person: what is private to them, their sign-ins and tokens moved with it.",
       "say": "Making \"{title}\" one with another moves what is private to them, and their sign-ins and tokens: the owner's to allow."
     },
     {
       "id": "public",
       "when": { "actor": "agent", "op": ["create", "update"], "visibility": "public" },
       "then": "hold",
+      "stake": "\"{title}\" is public: anyone on the internet can read it, and a search engine may keep a copy.",
       "say": "What anyone can see is the human's to decide."
     },
     {
       "id": "dormant",
       "when": { "actor": "agent", "dormant": true },
       "then": "hold",
+      "stake": "Written to a type whose pack is gone: no rule of that pack checked it.",
       "say": "Its pack is gone, and its rules with it: a person looks at what is written to it."
     },
     {
@@ -976,6 +987,7 @@
       "then": "hold",
       "lifted": "agent_changes",
       "readings": true,
+      "stake": "\"{title}\" is settled on this answer: it is put to the owner to confirm later.",
       "say": "Settling \"{title}\" is the owner's: the agent proposes the answer, and they confirm it."
     },
     {
@@ -998,6 +1010,7 @@
         "op": "forget"
       },
       "then": "hold",
+      "stake": "\"{title}\" is forgotten for good: its words leave the log and every backup, and undo cannot bring it back.",
       "say": "Forgetting \"{title}\" is the owner's: it is for good, and cannot be undone."
     },
     {
@@ -1039,21 +1052,25 @@
     {
       "id": "agent_publish",
       "when": { "actor": "agent", "op": "publish" },
-      "then": "refuse",
+      "then": "hold",
       "lifted": "agent_publish",
+      "stake": "Published: anyone with the address can read it, now.",
       "say": "Publishing is the owner’s here: they allow agents in Settings, under Agents. Ask them with publish_ask."
     },
     {
       "id": "agent_unpublish",
       "when": { "actor": "agent", "op": "unpublish" },
-      "then": "refuse",
+      "then": "hold",
+      "lifted": "agent_publish",
+      "stake": "Taken down: whoever had the address can no longer read it.",
       "say": "Taking a document down is the owner’s: ask them to unpublish it."
     },
     {
       "id": "agent_backups",
       "when": { "actor": "agent", "op": "backup_download" },
-      "then": "refuse",
+      "then": "hold",
       "lifted": "agent_backups",
+      "stake": "A backup of this whole workspace, private items included, leaves the server for five minutes.",
       "say": "Agents may not download this workspace’s backups: the owner allows it in Settings, under Agents."
     },
     {
