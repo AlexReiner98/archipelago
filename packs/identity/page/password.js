@@ -1,7 +1,7 @@
 // A person's password, kept for their address beside the emailed link (packs/identity/kernel/passwords.ts): set, changed or taken away.
 // Reached from the menu under the workspace's name; a forgotten one is replaced after signing in by email.
 
-import { authHeaders, gate, gateRow, h, postJson, route, ungate } from './base.js';
+import { authHeaders, gate, gateRow, h, postJson, route, showOf, ungate } from './base.js';
 
 const ask = async (password) => {
   const res = await postJson('/connect/password/set', password === undefined ? {} : { password }, authHeaders());
@@ -40,7 +40,7 @@ export async function passwordPage() {
   gate(
     'Password',
     gateRow(h('span', { class: 'muted grow gist', title: now?.set ? `${now.email} has a password, set ${since}; the emailed link works too` : `${now?.email ?? 'You'} signs in by email alone; a password works beside it` }, now?.email ?? ''), now?.set ? h('span', { class: 'muted small' }, `Set ${since}`) : '', now?.set ? remove : ''),
-    gateRow(fresh, save),
+    gateRow(fresh, showOf(fresh), save),
     error,
     gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), back()) }, 'Back')),
   );
