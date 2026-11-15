@@ -12,12 +12,16 @@ const NAME = /^[a-z][a-z0-9_]*$/;
 const LENGTH = /^\d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?( \d+(\.\d+)?(px|ch|em|rem|vh|vw|%)?)*$/;
 const FACE = /^[A-Za-z0-9 ,'"-]+$/;
 const TRACK = /^-?\d+(\.\d+)?em$/;
+/** A role's weight: 100 to 900, in steps of 50; else the plain 400. */
+const weightOf = (w) => (Number.isInteger(w) && w >= 100 && w <= 900 && w % 50 === 0 ? String(w) : '400');
+/** A role's settings of a variable face (axes: { CASL: 0.6, MONO: 1 }): four-letter tags and plain numbers, else none. */
+const axesOf = (a) => (a && typeof a === 'object' ? Object.entries(a).filter(([k, v]) => /^[A-Za-z]{4}$/.test(k) && Number.isFinite(v) && Math.abs(v) <= 1000).map(([k, v]) => `'${k}' ${v}`).join(', ') : '') || 'normal';
 const asLength = (v) => (typeof v === 'number' && v >= 0 ? `${v}px` : typeof v === 'string' && LENGTH.test(v) ? v : null);
 
 /**
  * A style's faces and text roles as the variables every stylesheet reads, the page's and its drawings' alike: each face
- * as --face-<name>, and each role (region, water, wordmark...) as --type-<role>-family, -weight, -style, -case and
- * -track, its family one of the faces. What a role does not say is the plain text's.
+ * as --face-<name>, and each role (region, water, wordmark...) as --type-<role>-family, -weight, -style, -case, -track
+ * and -axes (its settings of a variable face), its family one of the faces. What a role does not say is the plain text's.
  */
 export function typeVars(type, faces) {
   const out = [];
@@ -27,7 +31,8 @@ export function typeVars(type, faces) {
     if (!NAME.test(role) || !t || typeof t !== 'object') continue;
     const at = `--type-${role.replaceAll('_', '-')}`;
     out.push([`${at}-family`, face(t.face)]);
-    out.push([`${at}-weight`, [400, 600].includes(t.weight) ? String(t.weight) : '400']);
+    out.push([`${at}-weight`, weightOf(t.weight)]);
+    out.push([`${at}-axes`, axesOf(t.axes)]);
     out.push([`${at}-style`, t.style === 'italic' ? 'italic' : 'normal']);
     out.push([`${at}-case`, t.case === 'upper' ? 'uppercase' : 'none']);
     out.push([`${at}-track`, typeof t.track === 'string' && TRACK.test(t.track) ? t.track : '0']);

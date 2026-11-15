@@ -49,7 +49,9 @@ export function publicHead(html, doc, canonical, site, image) {
 }
 
 /** JSON as it may stand inside a page's script element: nothing in it can close the element or open a comment. */
-const inPage = (value) => JSON.stringify(value).replace(/</g, '\\u003c');
+/** A paragraph that is one link alone is the page's way forward, as a published page draws it (p.action, packs/surface/page/chart.css). */
+const ACTION = /^\[[^\]\n]+\]\([^)\s]+\)$/;
+const inPage =(value) => JSON.stringify(value).replace(/</g, '\\u003c');
 
 /** A line's code, strong words and links as HTML, everything else escaped: a link only to the web, this site or mail. */
 const inline = (line) =>
@@ -68,7 +70,7 @@ export function wordsHtml(text) {
     if (fenced) out.push(`<pre>${escape(lines.slice(1, /^```/.test(lines.at(-1)) && lines.length > 1 ? -1 : undefined).join('\n'))}</pre>`);
     else if (lines.length === 1 && /^#{1,4} /.test(lines[0])) out.push(`<h2>${inline(lines[0].replace(/^#+ /, ''))}</h2>`);
     else if (lines.every((line) => /^\s*(-|\*|\d+\.)\s/.test(line))) out.push(`<ul>${lines.map((line) => `<li>${inline(line.replace(/^\s*(-|\*|\d+\.)\s+/, ''))}</li>`).join('')}</ul>`);
-    else out.push(`<p>${lines.map(inline).join('<br>')}</p>`);
+    else out.push(`<p${lines.length === 1 && ACTION.test(lines[0].trim()) ? ' class="action"' : ''}>${lines.map(inline).join('<br>')}</p>`);
   }
   return out.join('\n');
 }

@@ -76,11 +76,14 @@ function drawTable(t, cell) {
   return h('table', { class: 'text-table' }, t.head.some(Boolean) && h('thead', {}, h('tr', {}, t.head.map((c, i) => td('th', c, i)))), h('tbody', {}, t.rows.map((row) => h('tr', {}, t.aligns.map((_, i) => td('td', row[i] ?? '', i))))));
 }
 
+/** A paragraph that is one link alone is the page's way forward (p.action, packs/surface/page/chart.css). */
+export const ACTION = /^\[[^\]\n]+\]\([^)\s]+\)$/;
+
 /** Words as blocks: a title is a heading at `depth`, deeper for each further #. */
 export function blocks(text, ways, depth) {
   const draw = (list) =>
     list.map((b) => {
-      if (b.kind === 'para') return h('p', {}, inline(b.text, ways));
+      if (b.kind === 'para') return h('p', ACTION.test(b.text.trim()) ? { class: 'action' } : {}, inline(b.text, ways));
       if (b.kind === 'title') return h(`h${Math.min(depth + (b.level || 2) - 1, 4)}`, {}, inline(b.text, ways));
       if (b.kind === 'table') return drawTable(b, (t) => inline(t, ways));
       if (b.kind === 'code') return codeBlock(b.text);

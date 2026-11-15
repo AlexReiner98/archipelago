@@ -73,7 +73,7 @@ async function readBody(req: IncomingMessage, most = BODY_MAX): Promise<Buffer> 
 const bodies = new WeakMap<IncomingMessage, Promise<unknown>>(); // read once: a person token's call is routed by what its body names
 const readJson = (req: IncomingMessage, most = BODY_MAX): Promise<unknown> => bodies.get(req) ?? (bodies.set(req, readBody(req, most).then((b) => { const text = b.toString('utf8'); try { return text ? JSON.parse(text) : undefined; } catch { throw new Refused(400, 'The body is not JSON.'); } })), bodies.get(req)!);
 
-const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css' };
+const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css', woff2: 'font/woff2' };
 
 class Refused extends Error {
   readonly status: number;
@@ -267,8 +267,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         // The page loads its own script and stylesheet and talks to this server: nothing else, from anywhere, and it is not framed.
         // A file named by the UI's current version is kept for good (packs/surface/kernel/ui-files.ts); the pages, and the rest, never. The drawing frame has its scripts written in (drawPage).
         res.writeHead(200, {
-          'content-type': `${MIME[file.split('.').pop()!]}; charset=utf-8`,
-          'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' || file === 'codemirror.min.js' ? 'public, max-age=604800' : 'no-store',
+          'content-type': file.endsWith('.woff2') ? MIME.woff2 : `${MIME[file.split('.').pop()!]}; charset=utf-8`,
+          'cache-control': served?.keep ? 'public, max-age=31536000, immutable' : file === 'three.module.min.js' || file === 'codemirror.min.js' || file.endsWith('.woff2') ? 'public, max-age=604800' : 'no-store',
           ...GUARD,
           ...(file === 'index.html' && { 'content-security-policy': PAGE_POLICY }),
           ...(file === 'draw.html' ? { 'content-security-policy': drawPolicy(open, Boolean(options.unsandboxed), frame!.hashes, framedBy) } : {}),

@@ -20,6 +20,10 @@ export const UI_FILES: Record<string, string> = {
   '/style.css': 'style.css',
   '/shell.css': 'shell.css',
   '/gate.css': 'gate.css',
+  // The first-run pages (a site's and the gate's) in the house's map face, roles, colours and marks.
+  '/chart.css': 'chart.css',
+  // The house's map face: Recursive (SIL OFL 1.1, recursive-OFL.txt beside it), Latin, every axis.
+  '/recursive.woff2': 'recursive.woff2',
   '/flow.css': 'flow.css',
   
   '/notes.css': 'notes.css',
@@ -56,6 +60,8 @@ export const UI_FILES: Record<string, string> = {
 };
 /** Files kept as their authors build them: served as they are, never rewritten, and loaded only when asked for. */
 const VENDORED = new Set(['three.module.min.js', 'codemirror.min.js']);
+/** Files of the UI that are not text: served as their bytes. */
+export const BINARY = /\.woff2$/;
 
 const PACKS = join(import.meta.dirname, '..', '..');
 /**
@@ -91,8 +97,9 @@ async function current() {
   const stats = await Promise.all(files.map((f) => stat(pathOf(f)).then((s) => `${f}:${s.size}:${s.mtimeMs}`)));
   const key = stats.join('|');
   if (held?.key === key) return held;
-  const raw = new Map(await Promise.all(files.map(async (f) => [f, await readText(f)] as const)));
-  const hash = createHash('sha256');
+  // A binary file (a font) is never read as text: it is served from disk as it is, and moves the version by its size and time.
+  const raw = new Map(await Promise.all(files.filter((f) => !BINARY.test(f)).map(async (f) => [f, await readText(f)] as const)));
+  const hash = createHash('sha256').update(stats.filter((s) => BINARY.test(s.split(':')[0])).join('|'));
   for (const [f, text] of raw) hash.update(f).update('\0').update(text).update('\0');
   const version = hash.digest('hex').slice(0, 12);
   const at = (path: string) => `${path}?v=${version}`;
