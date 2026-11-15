@@ -79,7 +79,7 @@ function drawBaked(body, baked, title) {
  * many periods of its margins as the page is long repeat below that, each cut on a channel of water, and its foot band
  * stands at the page's foot, which is given room for it. Images only: nothing runs.
  */
-function drawFrame(body, page) {
+function drawFrame(body, page, numbers) {
   const widths = page.filter((w) => w.src?.top && w.src.strip && w.src.foot).sort((a, b) => a.width - b.width);
   if (!widths.length) return;
   body.replaceChildren();
@@ -87,30 +87,46 @@ function drawFrame(body, page) {
   document.querySelector('.page-land')?.remove();
   const land = h('div', { class: 'page-land', 'aria-hidden': 'true' });
   const top = h('img', { class: 'land-top', alt: '', decoding: 'async' }), strip = h('div', { class: 'land-strip' }), foot = h('img', { class: 'land-foot', alt: '', decoding: 'async' });
-  land.append(top, strip, foot);
+  // The baked top's lower half, raised to meet the words where the hero is kept lower than it was baked (numbers.frame_room).
+  const raised = h('div', { class: 'land-raised' }, h('img', { alt: '', decoding: 'async' }));
+  land.append(top, raised, strip, foot);
   document.body.prepend(land);
-  let laid = '';
+  let laid = '', wide = 0, tall = 0;
   const lay = () => {
     const room = document.documentElement.clientWidth;
+    // The window's height as the page was opened at this width: a phone's bar coming and going moves nothing.
+    if (room !== wide) ((wide = room), (tall = innerHeight));
     const w = widths.find((x) => x.width >= room) ?? widths.at(-1);
     const band = w.height - w.foot, left = Math.round((room - w.width) / 2);
-    // The hero is as high as it was when the page was baked, and the page's foot leaves room for the band.
+    // The hero is as high as it was when the page was baked, or as a share of the window as the view says
+    // (numbers.frame_room), so the page's words open in sight; the page's foot leaves room for the band.
     const heroTop = body.getBoundingClientRect().top + scrollY;
-    body.style.height = `${Math.max(0, w.top - heroTop)}px`;
+    const baked = Math.max(0, w.top - heroTop), share = Number(numbers.frame_room);
+    const kept = share > 0 ? Math.min(baked, Math.round(share * tall)) : baked;
+    const cut = baked - kept, start = w.top - cut;
+    body.style.height = `${kept}px`;
     document.body.style.paddingBottom = `${band}px`;
     // How long the page is without its land: where the last of the rest ends, and the band's room below it.
     const ends = [...document.body.children].filter((el) => el !== land).map((el) => el.getBoundingClientRect().bottom + scrollY);
     const high = Math.ceil(Math.max(0, ...ends)) + band;
-    const periods = Math.max(0, Math.floor((high - band - w.top) / w.period));
-    const key = [w.width, room, high].join(' ');
+    const periods = Math.max(0, Math.floor((high - band - start) / w.period));
+    const key = [w.width, room, high, kept].join(' ');
     if (key === laid) return;
     laid = key;
     land.style.height = `${high}px`;
+    // The top as baked, down to the middle of the hero kept; below that, its own foot raised by what was cut, fading in
+    // over as much of the top as it covers, so the name, the nav and the column each keep the clearing baked for them.
+    const half = Math.round(heroTop + kept / 2), over = Math.min(cut, Math.round(kept / 2)), from = half - over;
     Object.assign(top, { src: w.src.top, width: w.width, height: w.top });
-    Object.assign(top.style, { left: `${left}px`, width: `${w.width}px`, height: `${w.top}px` });
+    Object.assign(top.style, { left: `${left}px`, width: `${w.width}px`, height: `${w.top}px`, clipPath: cut ? `inset(0 0 ${w.top - half}px 0)` : '' });
+    raised.hidden = !cut;
+    Object.assign(raised.firstChild, { src: w.src.top, width: w.width, height: w.top });
+    Object.assign(raised.firstChild.style, { top: `${-(from + cut)}px`, width: `${w.width}px`, height: `${w.top}px` });
+    Object.assign(raised.style, { left: `${left}px`, top: `${from}px`, width: `${w.width}px`, height: `${start - from}px`, maskImage: `linear-gradient(transparent, black ${over}px)` });
+    raised.style.webkitMaskImage = raised.style.maskImage;
     // The margins as many times over as the page is long, each the strip baked between the top and the foot, cut on a channel.
     const each = w.foot - w.top;
-    Object.assign(strip.style, { left: `${left}px`, top: `${w.top}px`, width: `${w.width}px`, height: `${periods * w.period}px` });
+    Object.assign(strip.style, { left: `${left}px`, top: `${start}px`, width: `${w.width}px`, height: `${periods * w.period}px` });
     strip.replaceChildren(...Array.from({ length: Math.ceil((periods * w.period) / each) }, (_, i) => {
       const piece = h('img', { alt: '', decoding: 'async', src: w.src.strip, width: w.width, height: each });
       Object.assign(piece.style, { top: `${i * each}px`, width: `${w.width}px`, height: `${each}px` });
@@ -139,7 +155,7 @@ export function drawFrozen(host, answer, typeTitles = {}, { inApp = false, onIte
   const backdrop = !inApp && Number(style.numbers?.page_backdrop) > 0 && style.drawing?.coded;
   if (backdrop) drawBackdrop(body, answer, style);
   // Every picture has a drawing: packs/publish/kernel/published.ts gives one to a picture frozen without.
-  if (Array.isArray(style.drawing?.baked?.page)) drawFrame(body, style.drawing.baked.page);
+  if (Array.isArray(style.drawing?.baked?.page)) drawFrame(body, style.drawing.baked.page, style.numbers ?? {});
   else if (backdrop) tookAway(host);
   else if (/^\/[^/]/.test(style.drawing?.baked?.src ?? '')) drawBaked(body, style.drawing.baked, answer.lens?.title);
   else if (style.drawing?.coded) drawCoded(body, answer, style);

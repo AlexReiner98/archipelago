@@ -51,5 +51,6 @@ body > iframe.page-backdrop.drew { opacity: 1; }
 .page-land.under { opacity: 0; }
 .page-land { position: absolute; inset: 0 0 auto 0; overflow: hidden; pointer-events: none; z-index: 0; }
 .page-land > * { position: absolute; display: block; }
-.page-land > .land-strip { overflow: hidden; }
-.page-land > .land-strip > img { position: absolute; left: 0; display: block; }
+.page-land > :is(.land-strip, .land-raised) { overflow: hidden; }
+.page-land > :is(.land-strip, .land-raised) > img { position: absolute; left: 0; display: block; }
+.page-land > .land-raised[hidden] { display: none; }
