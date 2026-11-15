@@ -49,6 +49,8 @@ export const UI_FILES: Record<string, string> = {
   '/draw-inside.js': 'draw-inside.js',
   // The canvas a layout's code paints on when its picture is baked: written in front of draw.js.
   '/draw-record.js': 'draw-record.js',
+  // What the page around a backdrop says, and the pictures of one that scrolls with it: written in front of draw.js.
+  '/draw-scroll.js': 'draw-scroll.js',
   // The projector's pure part, which the page runs on the facts it reads (packs/surface/page/replica.js): served from the log pack's own file.
   '/project.js': 'project.js',
   // What a stylesheet from the map may say, which the page checks a sheet by and the server checks page_css by on write.
@@ -113,8 +115,9 @@ async function current() {
   }
   // The frame's script is two files: what runs in a worker (draw-inside.js, handed to the worker as its text) and the frame's own.
   text.set('draw-marks.js', `${text.get('draw-inside.js')}\n${text.get('draw-marks.js')}`);
-  // And a layout's code is handed a canvas that keeps shapes when its picture is baked (draw-record.js), in front of draw.js.
-  text.set('draw.js', `${text.get('draw-record.js')}\n${text.get('draw.js')}`);
+  // And a layout's code is handed a canvas that keeps shapes when its picture is baked (draw-record.js), and what a
+  // backdrop's page says and the pictures of one that scrolls with it (draw-scroll.js), in front of draw.js.
+  text.set('draw.js', `${text.get('draw-record.js')}\n${text.get('draw-scroll.js')}\n${text.get('draw.js')}`);
   held = { key, version, text };
   return held;
 }
