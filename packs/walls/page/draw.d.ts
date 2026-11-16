@@ -141,6 +141,45 @@ export interface DrawEvents {
   field: FieldEvent;
   /** The query answered again as the map changed. Code that does not listen is started again in a new frame. */
   answer: Answer;
+  /** Run as a page's backdrop: the page scrolled, changed or was hidden. */
+  page: BackdropPage;
+}
+
+/** A box on the page, in the page's own coordinates (from its top left). */
+export interface PageBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** What a backdrop is told of the page it runs behind (packs/walls/page/backdrop.js): numbers and boxes, never the page. */
+export type BackdropPage =
+  | {
+      visible: true;
+      reducedMotion: boolean;
+      /** The page's width and its whole height. */
+      width: number;
+      height: number;
+      scroll: number;
+      /** How far above and below the window to draw, for code that says where it drew (drawn). */
+      margin: number;
+      /** The window, less its scrollbar. */
+      view: { width: number; height: number };
+      /** A box for each block of its words: the nav, the title, each paragraph, list and figure, the foot. */
+      clear: PageBox[];
+      /** Its call to action (the link of its first p.action), or null. */
+      focus: PageBox | null;
+    }
+  | { visible: false; reducedMotion: boolean };
+
+/** A look a backdrop tells its page: hex colours (#rgb, #rrggbb or #rrggbbaa), worn as --backdrop-<name> on its root. */
+export interface BackdropLook {
+  ink?: string;
+  light?: string;
+  land?: string;
+  water?: string;
+  accent?: string;
 }
 
 export type DrawEventName = keyof DrawEvents;
@@ -222,6 +261,18 @@ export interface DrawInput {
   field(key: string, at: FieldAt | null): void;
   /** Asks the page to send ops as the person looking: applied where it writes only the layout's `writes`, held for them otherwise. */
   change(ops: Op[], reason?: string): Promise<ChangeResult>;
+  /** Run as a page's backdrop, the page as it started; otherwise null. on('page') hears it change. */
+  page: BackdropPage | null;
+  /** Whether the reader asks for less motion. */
+  reducedMotion: boolean;
+  /** A backdrop that draws `page.margin` above and below the window says, after each frame, the page height its canvas's top stands at (scroll - margin): the frame is shown there and scrolls with the words. */
+  drawn(top: number): void;
+  /**
+   * A backdrop tells its page its look: the page wears each colour as `--backdrop-<name>` on its root, and takes away
+   * those left out ({} or null takes all away). Anything but these names as hex colours is dropped. Say it when it
+   * changes, not every frame. Not a backdrop, nothing.
+   */
+  look(colours: BackdropLook | null): void;
 }
 
 /** A layout's code: index.js's default export. */
