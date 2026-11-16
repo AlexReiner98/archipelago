@@ -440,7 +440,8 @@ e_3yz459ez) removed every shim and rewrote every importer.
 ### Plumbing, kept in `src/`
 
 env, ids, hashes, jcs, logged, text-widths, workspace-id, item-address,
-phases: pure, no state, no map. Any tier may import them.
+phases, timing: pure, no state, no map (timing keeps one request's times while
+it runs, and nothing after). Any tier may import them.
 
 Beside them, `boot.ts` (the stub) and four entries run by path, each of which
 only runs its module: `server.ts` (`node src/server.ts`, the hosted image's

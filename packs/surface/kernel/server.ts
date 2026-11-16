@@ -35,7 +35,7 @@ import { bearer, createToken, hashSecret, verifyToken, workspaceOf } from '../..
 import { dutyOf, mailing, onMap, onServer, openRoutes, published, type Backups, type Walked } from './above.ts'; import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { parseBackup, parseVault } from '../../log/kernel/backup.ts'; import { adminEmails, admitMember, configureMembers, ownerEmail } from '../../identity/kernel/members.ts'; import { requestWait, standingOf } from '../../identity/kernel/standing.ts'; import { dueForDeletion, standingGate } from './server-gates.ts'; import { askedAs, configureUse, slowTokensAt, storageBytes } from './workspace-use.ts';
 import { loadConfig, RESTART_EXIT, startedFrom } from '../../database/kernel/config.ts'; import { env } from '../../../src/env.ts'; import type { Booted } from '../../../src/boot.ts';
-import { SHORT, serveConnect } from './connect-routes.ts'; import { challenge, mcpAddress } from '../../identity/kernel/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts';
+import { SHORT, serveConnect } from './connect-routes.ts'; import { challenge, mcpAddress } from '../../identity/kernel/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts'; import { timedAnswer } from '../../../src/timing.ts';
 import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
 import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
 import { LOOK_READS, passWorkspace, readPass } from '../../walls/kernel/look-pass.ts'; import { pageMay } from './may.ts';
@@ -206,7 +206,7 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
   const local = (req: IncomingMessage, needJson = true) =>
     !(req.headers.origin && !origins.includes(req.headers.origin)) && hosts.includes(req.headers.host ?? '') && (!needJson || Boolean(req.headers['content-type']?.startsWith('application/json')));
 
-  return createServer(async (req, res) => {
+  const handle = async (req: IncomingMessage, res: ServerResponse) => {
     try {
       const url = new URL(req.url ?? '/', 'http://localhost'), host = (req.headers.host ?? '').toLowerCase(), site = req.method === 'GET' ? sites[host] : undefined; const toItem = req.method === 'GET' && !site ? itemAddress(url.pathname) : undefined; if (toItem !== undefined) return toItem ? void res.writeHead(302, { location: toItem, 'cache-control': 'no-store' }).end() : send(res, 404, { error: 'Not found' }); // an item named outside the app (src/item-address.ts)
       if (drawing.only(host) && !(req.method === 'GET' && drawHostServes(url.pathname))) return send(res, 404, { error: 'Not found' }); // the drawing host serves drawings only
@@ -389,7 +389,8 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
       console.error(`${req.method} ${req.url?.split('?')[0]}: ${(err as Error).stack ?? err}`);
       send(res, 500, { error: 'Something went wrong on the server. Try again; if it goes on, tell its operator.' });
     }
-  });
+  };
+  return createServer((req, res) => (/^\/(api|agent)\//.test(req.url ?? '') ? timedAnswer(res, () => handle(req, res)) : handle(req, res))); // each answer says where its time went (src/timing.ts)
 }
 
 // Started through the boot stub (src/boot.ts, `npm start`), which checks and starts the root packs first and hands this

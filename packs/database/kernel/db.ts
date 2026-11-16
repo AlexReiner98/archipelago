@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { prepare, schemaKey } from './migrate.ts';
 import { openPg, scratchPg } from './pg.ts';
 import { keepStatistics } from './stats.ts';
+import { back, sent, statement, timing } from '../../../src/timing.ts';
 
 /** Anything that can run a query: the database or a transaction on it. */
 export interface Q {
@@ -32,11 +33,47 @@ export const isServer = (where: string) => /^postgres(ql)?:\/\//.test(where);
 
 /** Open the database at a folder or on a server (a postgres:// address), or in memory when neither is given. */
 export async function openDb(where?: string): Promise<Database> {
-  if (!where) return inMemory();
-  if (isServer(where)) return keepStatistics(await openPg(where, (db) => prepared(db, true)), true);
+  if (!where) return timedDb(await inMemory());
+  if (isServer(where)) return timedDb(await keepStatistics(await openPg(where, (db) => prepared(db, true)), true));
   mkdirSync(where, { recursive: true });
   const image = process.env.PELAGO_TEST_IMAGE && !existsSync(join(where, 'PG_VERSION')) ? await (blank ??= blankImage()) : undefined;
-  return keepStatistics(await prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm }, startParams: [...PGlite.defaultStartParams, ...WAL_KEPT] })), false);
+  return timedDb(await keepStatistics(await prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm }, startParams: [...PGlite.defaultStartParams, ...WAL_KEPT] })), false));
+}
+
+/**
+ * The same database, its statements and its waits for a transaction timed for the request they run in (src/timing.ts).
+ * A wait is from asking for a transaction to its first chance to run a statement: a pool's connection or PGlite's
+ * lock, and the begin. Everything else is the database's own, bound to it.
+ */
+function timedDb<D extends Database>(db: D): D {
+  const query = <T>(sql: string, params?: unknown[]) => statement(() => db.query<T>(sql, params));
+  const transaction = <T>(fn: (tx: Q) => Promise<T>) => {
+    const t = timing();
+    if (!t) return db.transaction(fn);
+    const asked = sent(t);
+    let out = true;
+    return db
+      .transaction((tx) => {
+        t.waits++;
+        t.wait += back(t) - asked;
+        out = false;
+        return fn({ query: <R>(sql: string, params?: unknown[]) => statement(() => tx.query<R>(sql, params)) }).finally(() => {
+          sent(t); // the commit or rollback
+          out = true;
+        });
+      })
+      .finally(() => {
+        if (out) back(t);
+      });
+  };
+  return new Proxy(db, {
+    get(target, key) {
+      if (key === 'query') return query;
+      if (key === 'transaction') return transaction;
+      const value = Reflect.get(target, key, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
 }
 
 /**
