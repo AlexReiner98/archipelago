@@ -99,7 +99,7 @@ function measured({ g, number }) {
  * style's, which say how much work threading and mending may count.
  */
 export function embedding(m, { headless = [], islandOf = () => null, trunks: joinTrunks = true, oneWay = true, down = 'all', sizes } = {}) {
-  for (const name of ['planarize_repair_rounds', 'planarize_repair_step', 'planarize_repair_work', 'planarize_starts_work', 'planarize_starts_most', 'planarize_order_rounds']) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/canvas/pack.json) names every one planarize uses`);
+  for (const name of ['planarize_repair_rounds', 'planarize_repair_step', 'planarize_repair_work', 'planarize_starts_work', 'planarize_starts_most', 'planarize_starts_idle', 'planarize_order_rounds']) if (typeof sizes?.[name] !== 'number') throw new Error(`The style names no size "${name}": the house style (packs/canvas/pack.json) names every one planarize uses`);
   const made = (id) => m.nodes.get(id)?.made ?? Infinity, steps = [...m.nodes.keys()];
   const { wires: ways } = directed(joined(m, headless), steps, made);
   const joinedUp = joinTrunks ? withTrunks(ways, made, islandOf) : { wires: ways, junctions: [], trunks: 0 }, { junctions, trunks } = joinedUp;
@@ -110,14 +110,15 @@ export function embedding(m, { headless = [], islandOf = () => null, trunks: joi
   const islands = [...new Set([...where.values()].filter((i) => i !== null))], ids = [...where.keys()];
   // The first start, mended, is the picture unless another does better (task e_wayfga4d). Then further starts, each
   // its line leaning its own way, while the work they count stays within planarize_starts_work and they number no more
-  // than planarize_starts_most, or until one has no
-  // crossing: never timed, so a picture is the same each time. Of them, the fewest wires against their way is kept, then
+  // than planarize_starts_most, until one has no crossing or planarize_starts_idle in a row have done no better than the
+  // best (task e_nautydpg): counted, never timed, so a picture is the same each time. Of them, the fewest wires against
+  // their way is kept, then
   // the fewest crossings: crossings are never traded for the rules. The first start may count no more than
   // planarize_most_work to thread, where the style says it: past that it throws (tooMuch).
   const mend = { rounds: sizes.planarize_repair_rounds, step: sizes.planarize_repair_step, work: sizes.planarize_repair_work };
   const less = (a, b) => { for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] < b[k]; return false; };
   let best = null, spent = 0, starts = 0;
-  for (let k = 0; !best || (best.score.some(Boolean) && k < sizes.planarize_starts_most && spent + best.work <= sizes.planarize_starts_work); k++) {
+  for (let k = 0; !best || (best.score.some(Boolean) && k < sizes.planarize_starts_most && k - best.k <= sizes.planarize_starts_idle && spent + best.work <= sizes.planarize_starts_work); k++) {
     const most = !k && typeof sizes.planarize_most_work === 'number' ? sizes.planarize_most_work : Infinity;
     const tried = attempt({ ids, wires, placeOf, made: (id) => madeOf.get(id), islands, mend, most, order: sizes.planarize_order_rounds }, k, oneWay), seen = measured(tried);
     const score = [seen.twice, tried.lost, seen.up.length, seen.crossings.length];
