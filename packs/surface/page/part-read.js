@@ -3,6 +3,7 @@
 // so it never gets what they may not see; only a read it declared, a few at a time, and its words checked here.
 
 import { api } from './base.js';
+import { hear } from './narrow.js';
 
 /** The kernel's reads a part may declare live without a pack answering them: search, by words, as anyone signed in may. */
 const KERNEL_READS = { search: (params) => api('search', params) };
@@ -25,7 +26,10 @@ export async function readFor(m, said, answer) {
   out.push(once);
   if (out.length > outstandingMost) out[0](null);
   try {
-    once(await (KERNEL_READS[name] ? KERNEL_READS[name](params) : api('view', { name, params })));
+    const value = await (KERNEL_READS[name] ? KERNEL_READS[name](params) : api('view', { name, params }));
+    // What a term offered would leave out, kept so the canvas can draw it at once when it is taken (./narrow.js).
+    if (name === 'flat' && params.preview) hear(params, value);
+    once(value);
   } catch {
     once(null);
   }
