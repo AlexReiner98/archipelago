@@ -49,6 +49,15 @@
         },
         "run": "answers.ts#flatCheck"
       },
+      "answer.flat_checks": {
+        "in": {
+          "lenses": "any"
+        },
+        "out": {
+          "problems": "any"
+        },
+        "run": "answers.ts#flatChecks"
+      },
       "answer.flat_lens": {
         "in": {},
         "out": "any",

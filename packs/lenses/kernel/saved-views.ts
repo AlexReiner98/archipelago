@@ -3,7 +3,7 @@
 // it is drawn in comes from the style or layout it names, else one kept about it. The kept first, then the newest. A working view lives as long as what it is about: once all of that has closed, it is retired with
 // it, and left out (task e_gkv58kqb); so is one nobody has touched for WORKING_DAYS (the owner, 9 Nov 2026: views
 // were piling up). Read through the lenses pack's context, as the asker; whether a view's query can be read at all is
-// the query pack's (answer.flat_check).
+// the query pack's (answer.flat_checks).
 
 import type { KernelContext } from '#pelago/kernel';
 import { keptOf } from './query-kept.ts';
@@ -68,13 +68,15 @@ export async function savedViews(ctx: KernelContext, input: { limit?: number; pi
   const asked = [...new Set(lenses.map((x) => (x.props.style as Record<string, unknown> | undefined)?.style).filter((s): s is string => typeof s === 'string'))];
   const there = asked.length ? ((await ctx.reads({ ids: asked })) as Row[]).filter((r) => r.archived_at == null) : [];
   const layouts = new Set(there.map((r) => r.id));
-  const cannotOf = async (props: Record<string, unknown>): Promise<string | undefined> => {
+  // Why each view cannot draw: a layout gone, else its query refused. Every query is checked in one call (answer.flat_checks).
+  const layoutGone = (props: Record<string, unknown>) => {
     const style = (props.style as Record<string, unknown> | undefined)?.style;
-    if (typeof style === 'string' && !layouts.has(style)) return `its layout ${style} is not on this map`;
-    if (typeof props.view === 'string') return undefined;
-    return (await ctx.call<Record<string, unknown>, { problem?: string }>('answer.flat_check', viewQuery(props))).problem;
+    return typeof style === 'string' && !layouts.has(style) ? `its layout ${style} is not on this map` : undefined;
   };
-  const cannot = new Map(await Promise.all(lenses.map(async (x) => [x.id, await cannotOf(x.props)] as const)));
+  const checked = lenses.filter((x) => !layoutGone(x.props) && typeof x.props.view !== 'string');
+  const { problems } = checked.length ? await ctx.call<{ lenses: Record<string, unknown>[] }, { problems: (string | null)[] }>('answer.flat_checks', { lenses: checked.map((x) => viewQuery(x.props)) }) : { problems: [] };
+  const refused = new Map(checked.map((x, i) => [x.id, problems[i] ?? undefined]));
+  const cannot = new Map(lenses.map((x) => [x.id, layoutGone(x.props) ?? refused.get(x.id)] as const));
   const projectOf = await projects(ctx, ofIds);
   const held = lenses.length ? ((await ctx.reads({ mentioned: { to: lenses.map((x) => x.id), types: bringersIn(ctx), order: 'id' } })) as { to: string; id: string; title: string }[]) : [];
   const documents = new Map(held.map((r) => [r.to, { id: r.id, title: r.title }]));

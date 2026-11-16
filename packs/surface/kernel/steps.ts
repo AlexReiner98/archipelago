@@ -4,6 +4,7 @@
 import type { StepPart } from '../../database/kernel/migrate.ts';
 import { TRANSIENT } from '../../database/kernel/transient.ts';
 import { SEARCH_ANY, SEARCH_INDEX } from './search.ts';
+import { ACTION_OPS } from './action-ops.ts';
 import { SESSION_READS } from './session-indexes.ts';
 
 export const STEPS: StepPart[] = [
@@ -11,4 +12,5 @@ export const STEPS: StepPart[] = [
   { version: 17, name: 'titles and notes indexed for search', sql: SEARCH_INDEX },
   { version: 30, name: 'search finds an item with any of the words', sql: SEARCH_ANY },
   { version: 48, name: 'a run found by its session, and its events by their run, each by an index under the row policy', sql: SESSION_READS },
+  { version: 49, name: 'the ops said under an action found by their index under the row policy', sql: ACTION_OPS },
 ];
