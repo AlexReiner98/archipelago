@@ -84,6 +84,22 @@ export async function sessionEvents(ctx: KernelContext, run: string): Promise<Se
   return events[run] ?? [];
 }
 
+/**
+ * How far before a batch's earliest event a copy of one of its events may have been kept. An event's `at` is the
+ * source's clock and its entry's is the server's: a copy was kept when the server took it, after it happened, unless
+ * the source's clock runs ahead of the server's. A synced clock is off by seconds; ten minutes leaves a hundredfold
+ * room for one that is not, and keeps the read to ten minutes of one run's events: under 2 ms on islands' longest run,
+ * where an hour read 76 events in 3.6 ms (Alex, 16 Nov 2026, task e_8dhwaja8: bound by batch time).
+ */
+export const CLOCK_SKEW_MS = 10 * 60_000;
+
+/** Where the check for events a run already has starts: ten minutes before the batch's earliest, never before the run; with no events, now. */
+export function sameFrom(created: string | Date, batch: SessionEvent[]): string {
+  const start = new Date(created).getTime();
+  const earliest = Math.min(...batch.map((e) => Date.parse(e.at)));
+  return new Date(Math.max(start, Number.isFinite(earliest) ? earliest - CLOCK_SKEW_MS : Date.now())).toISOString();
+}
+
 export interface EventsBody {
   session_id?: string;
   source?: unknown;
@@ -108,6 +124,6 @@ export async function takeEvents(ctx: KernelContext, body: EventsBody) {
     else good.push(checked.event);
   });
   // One batch of a run at a time, those it has already dropped, in one entry: the write path's, under its lock (root.bookkeep).
-  const kept = (await ctx.call('root.bookkeep', { events: { run: run.id, since: new Date(run.created_at).toISOString(), actor: actorId({ kind: 'agent', name: source }), field: EVENT_FIELD, values: good, same: SAME } })) as number;
+  const kept = (await ctx.call('root.bookkeep', { events: { run: run.id, since: sameFrom(run.created_at, good), actor: actorId({ kind: 'agent', name: source }), field: EVENT_FIELD, values: good, same: SAME } })) as number;
   return { run: run.id, kept, dropped: good.length - kept, ...(refused.length && { refused }) };
 }

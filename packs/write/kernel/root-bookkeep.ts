@@ -84,8 +84,10 @@ export async function bookkeep(at: RootCall, ask: BookkeepAsk): Promise<unknown>
       await tx.query(`select pg_advisory_xact_lock(hashtext('pelago.session_events'), hashtext($1))`, [run]);
       type Row = { stream: Light['stream']; pos: number; at: Date; head: Omit<Light, 'stream' | 'pos' | 'at' | 'facts'>; facts: OpFact[] };
       const { rows } = await tx.query<Row>(
-        `select stream, pos::int as pos, at, head, facts from log_op where stream = 'sessions' and at >= $1 and facts @> $2::jsonb order by at, pos`,
-        [new Date(since).toISOString(), JSON.stringify([['+', run, field]])],
+        // Found by position through the run's index (pelago_session_ops, packs/surface/kernel/session-indexes.ts), not by every op since.
+        `select stream, pos::int as pos, at, head, facts from log_op where stream = 'sessions' and pos = any(array(select pelago_session_ops(array[$3::text], $4, $1::timestamptz)))
+           and at >= $1 and facts @> $2::jsonb order by at, pos -- index log_op_session_run`,
+        [new Date(since).toISOString(), JSON.stringify([['+', run, field]]), run, field],
       );
       const opened = await openOps(tx, rows.map((r): Light => ({ ...r.head, stream: r.stream, pos: r.pos, at: new Date(r.at).toISOString(), facts: r.facts })));
       // A value whose key is gone (its run forgotten) reads as a digest, and is none any more.
