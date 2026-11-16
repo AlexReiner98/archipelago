@@ -37,7 +37,7 @@ import { parseBackup, parseVault } from '../../log/kernel/backup.ts'; import { a
 import { loadConfig, RESTART_EXIT, startedFrom } from '../../database/kernel/config.ts'; import { env } from '../../../src/env.ts'; import type { Booted } from '../../../src/boot.ts';
 import { SHORT, serveConnect } from './connect-routes.ts'; import { challenge, mcpAddress } from '../../identity/kernel/oauth.ts'; import { itemAddress } from '../../../src/item-address.ts'; import { timedAnswer } from '../../../src/timing.ts';
 import { stopAllLaunched } from './launcher.ts'; import { configureLaunch } from './server-launch.ts';
-import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts';
+import { serveHook } from './hooks.ts'; import { serveMcp } from './mcp.ts'; import { readsTogether } from './reads.ts';
 import { LOOK_READS, passWorkspace, readPass } from '../../walls/kernel/look-pass.ts'; import { pageMay } from './may.ts';
 import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { configureOutbox } from '../../identity/kernel/outbox.ts'; import { configureIndex, tokenKnown, unindexToken } from '../../identity/kernel/control-index.ts'; import { isPersonToken, personAt } from '../../identity/kernel/person-tokens.ts';
@@ -301,9 +301,11 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
         if (!local(req)) return send(res, 403, { error: 'The API accepts only local JSON requests from the CLI, hooks or the pelago UI.' });
         const { pelago, actor, look } = await resolve(req, res, surface === 'api' ? 'human' : 'agent');
         const name = url.pathname.slice(surface.length + 2);
-        if (look && !LOOK_READS.has(name)) return send(res, 403, { error: `A look reads; it does not call ${name}.` });
+        if (look && name !== 'reads' && !LOOK_READS.has(name)) return send(res, 403, { error: `A look reads; it does not call ${name}.` });
         try {
           const body = ((await readJson(req)) ?? {}) as Record<string, unknown>;
+          // The page's reads asked together, each answered as alone (./reads.ts).
+          if (surface === 'api' && name === 'reads') return send(res, 200, { result: await readsTogether(pelago, actor, body, Boolean(look)) });
           if (surface === 'api') return send(res, 200, { result: await callTool(pelago, actor(), name, body) });
           // Scripts say which one they are in the body, as MCP callers do in their arguments.
           const { actor: label, ...input } = body;
