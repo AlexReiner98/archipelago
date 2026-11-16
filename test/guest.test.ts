@@ -25,7 +25,7 @@ test('one click makes a guest map its agent writes to at once, with the key alon
   assert.equal(read.status, 200);
   assert.match(read.headers.get('content-type') ?? '', /^text\/plain/);
   const words = await read.text();
-  for (const part of [`${base}/agent/change`, key, '"type":"work"', '"Setup plan"', 'waits_on']) assert.ok(words.includes(part), part);
+  for (const part of [`${base}/agent/change`, key, '"type":"work"', '"The work"', '"type":"task"', 'depends_on', 'waits_on']) assert.ok(words.includes(part), part);
 
   // The map starts with its install note, which the visitor reads as it opens: the sentence to paste, in a block to
   // copy. The agent is told it is there, and ties its project to it rather than writing another (the owner, 14 Nov 2026).
@@ -42,8 +42,8 @@ test('one click makes a guest map its agent writes to at once, with the key alon
   // The agent's first item, then its plan, each applied as sent: a guest approves nothing.
   const first = await call('/agent/change', key, { reason: 'The project', ops: [{ op: 'create', ref: 'p', type: 'work', title: 'Lantern', body: 'A lamp app.' }, { op: 'link', type: 'about', from: install, to: 'p' }] });
   assert.equal(first.result?.status, 'applied', first.error);
-  // The map belongs to a person, You, whom the steps only the guest can do wait on.
-  const owner = /"to":"(e_[a-z0-9]{8})","props":{"for":"sign in"}/.exec(words)?.[1];
+  // The map belongs to a person, You, whom what only the guest can decide waits on.
+  const owner = /"to":"(e_[a-z0-9]{8})","props":{"for":"<what they decide>"}/.exec(words)?.[1];
   assert.equal((await call('/agent/query', key, { name: 'get', params: { id: owner } })).result?.entity?.title, 'You');
   const plan = await call('/agent/change', key, { reason: 'Setup plan', ops: [
     { op: 'create', ref: 's1', type: 'task', title: 'Sign in to keep this map' },

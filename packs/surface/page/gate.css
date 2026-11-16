@@ -32,3 +32,23 @@ body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
 .gate-error { color: var(--bad); text-align: center; }
 .gate-error:empty { display: none; }
 .gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
+
+/* The first moments on a new guest map (packs/identity/page/guest.js, firstMoments): until the agent has drawn the work,
+   one card in the middle, and nothing of the app; then the map, with Sign up, the
+   menu and find around it and none of the view's tools or legend, until the map is saved. */
+body[data-first] #query, body[data-first] #tabs, body[data-first] #canvas .lf-legend, body[data-first] #canvas .lf-island-key, body[data-first] #canvas .lf-island-name { display: none; }
+body[data-first="wait"] #find, body[data-first="wait"] #more, body[data-first="wait"] #nav > :not(.brand):not(.grow) { display: none; }
+body[data-first="wait"] #canvas, body[data-first="wait"] #sheet { visibility: hidden; }
+.first { transition: opacity 0.6s ease; }
+.first.first-gone { opacity: 0; pointer-events: none; }
+.first { position: fixed; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; padding: var(--space-9); background: var(--bg); overflow: auto; }
+.first-card { position: relative; box-sizing: border-box; width: 100%; max-width: var(--sheet); padding: var(--space-13) var(--space-12); display: flex; flex-direction: column; gap: var(--space-9); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); box-shadow: 0 var(--space-9) var(--space-14) var(--bg); }
+.first-card h1 { margin: 0; font-size: var(--text-9); line-height: 1.2; }
+.first-promise { margin: 0; color: var(--muted); font-size: var(--text-6); line-height: 1.5; }
+.first-prompt { padding: var(--space-7) var(--space-8); border-left: var(--border-3) solid var(--accent); background: var(--bg); font-size: var(--text-5); line-height: 1.5; }
+.first-copy { align-self: stretch; padding: var(--space-7); font-size: var(--text-7); }
+.first-steps { margin: 0; padding-left: var(--space-11); display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--text-5); }
+.first-steps li::marker { color: var(--muted); }
+.first-status { display: flex; align-items: center; gap: var(--space-6); padding-top: var(--space-8); border-top: var(--border-1) solid var(--line); color: var(--ok); font-size: var(--text-5); }
+.first-status::before { content: ''; flex: none; width: var(--box-3); height: var(--box-3); border-radius: 50%; background: currentColor; animation: first-beat 1.6s ease-in-out infinite; }
+@keyframes first-beat { 50% { opacity: 0.25; } }

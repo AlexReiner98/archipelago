@@ -2,7 +2,8 @@
 // It is OAuth with PKCE and a redirect to this machine, as an MCP client does it (packs/identity/kernel/oauth.ts): the hook (pelago-hook.mjs)
 // asks for the sign-in when the server answers 401 and no token is set, this file run on its own waits for the browser
 // to come back, and the token it is given is kept in a file of this person's (the plugin's data folder, else
-// ~/.pelago), never printed, and refreshed before it runs out. PELAGO_AGENT_TOKEN, where it is set, still wins.
+// ~/.pelago), never printed, and refreshed before it runs out. A sign-in made here wins over PELAGO_AGENT_TOKEN, which
+// serves only where there is none: a person who signs in to a new map in the browser means that map (the owner, 15 Nov 2026).
 //
 //   node pelago-login.mjs sign-in [<origin>]          sign in, waiting for the browser (the installer runs it)
 //   node pelago-login.mjs headers                     the sign-in as headers, for Claude Code's headersHelper
@@ -213,26 +214,58 @@ const originNamed = (env = process.env) => {
   } catch { /* not an address: the next says */ }
   return (env.PELAGO_URL || DEFAULT).replace(/\/$/, '');
 };
-const tokenFor = async (origin) => process.env.PELAGO_AGENT_TOKEN || (await accessToken(origin).catch(() => undefined));
+const tokenFor = async (origin) => (await accessToken(origin).catch(() => undefined)) || process.env.PELAGO_AGENT_TOKEN;
 
-/** Call one of the map's tools as plain JSON with this machine's sign-in: what an agent uses before its tools load. */
-export async function call(origin, tool, input) {
-  const token = await tokenFor(origin);
+/**
+ * Call one of the map's tools as plain JSON with this machine's sign-in: what an agent uses before its tools load.
+ * `token`: another to call with ('' for none).
+ */
+export async function call(origin, tool, input, token) {
+  token ??= await tokenFor(origin);
   const res = await fetch(`${origin}/agent/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: JSON.stringify(input ?? {}), signal: AbortSignal.timeout(30_000) });
   return { status: res.status, text: await res.text() };
 }
 
+/**
+ * A tool's input from name=value words (a word alone is true, a number a number): for a verb (query by its name, the
+ * others by their action) every word but name, action and actor is one of its params, as the tool takes them, so
+ * `call query name=brief task=e_x` is `{ name: "brief", params: { task: "e_x" } }`. change and undo take theirs as they are.
+ */
+export function asWords(tool, words) {
+  const value = (v) => (/^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : v);
+  const flat = Object.fromEntries(words.map((w) => (w.includes('=') ? [w.slice(0, w.indexOf('=')), value(w.slice(w.indexOf('=') + 1))] : [w, true])));
+  if (tool === 'change' || tool === 'undo' || (flat.name === undefined && flat.action === undefined)) return flat;
+  const HEAD = ['name', 'action', 'actor'];
+  const params = Object.fromEntries(Object.entries(flat).filter(([k]) => !HEAD.includes(k)));
+  return { ...Object.fromEntries(Object.entries(flat).filter(([k]) => HEAD.includes(k))), ...(Object.keys(params).length && { params }) };
+}
+
+/** The map a sign-in reaches, as a person reads it: its name and id, and the server. */
+export async function mapOf(origin, token) {
+  token ??= await tokenFor(origin);
+  const host = new URL(origin).host;
+  try {
+    const res = await fetch(`${origin}/whoami`, { headers: token ? { authorization: `Bearer ${token}` } : {}, signal: AbortSignal.timeout(10_000) });
+    const { workspace } = await res.json();
+    return workspace?.id ? `“${workspace.name}” (${workspace.id}${workspace.guest ? ', a guest map' : ''}) at ${host}` : host;
+  } catch {
+    return host;
+  }
+}
+
 /** Sign in, waiting here until the browser comes back: what the installer runs. True once signed in. */
 export async function signInHere(origin, say = console.log) {
-  // Signed in already, or a server that signs nobody in: nothing to ask.
-  const token = await tokenFor(origin);
-  if ((await call(origin, 'query', {})).status === 200) return say(token ? `Already signed in to ${origin}.` : `${origin} needs no sign-in.`), true;
+  // Signed in here already, or a server that signs nobody in: nothing to ask. A token from the environment is not a
+  // sign-in made here: it may reach another map than the one the person is connecting.
+  const kept = await accessToken(origin).catch(() => undefined);
+  if (kept && (await call(origin, 'query', {}, kept)).status === 200) return say(`Already signed in to ${await mapOf(origin, kept)}.`), true;
+  if (!kept && (await call(origin, 'query', {}, '')).status === 200) return say(`${origin} needs no sign-in.`), true;
   forget(origin);
   const { url, waiting } = await signIn(origin, folderOf(), { open: true });
   if (waiting) openBrowser(url);
   say(`A browser window is open to sign in to ${origin}: say Allow there.\nIf no window opened, open this address:\n${url}`);
   for (const until = Date.now() + WAIT_MS; Date.now() < until; await new Promise((r) => setTimeout(r, 1000))) {
-    if (readJson(fileOf(folderOf(), origin, 'signed-in'))?.access) return say('Signed in.'), true;
+    if (readJson(fileOf(folderOf(), origin, 'signed-in'))?.access) return say(`Signed in to ${await mapOf(origin)}.`), true;
     const pending = readJson(fileOf(folderOf(), origin, 'signing-in'));
     if (!pending || !alive(pending.pid)) break;
   }
@@ -252,7 +285,7 @@ if (process.argv[1] && existsSync(process.argv[1]) && same(fileURLToPath(import.
     // node pelago-login.mjs call <tool> '<json>', or name=value words with no quotes to survive a shell (PowerShell
     // drops the quotes inside an argument): the answer, never the token.
     const words = rest.slice(1);
-    const input = !words.length ? {} : words[0].trim().startsWith('{') ? JSON.parse(words[0]) : Object.fromEntries(words.map((w) => (w.includes('=') ? [w.slice(0, w.indexOf('=')), w.slice(w.indexOf('=') + 1)] : [w, true])));
+    const input = !words.length ? {} : words[0].trim().startsWith('{') ? JSON.parse(words[0]) : asWords(rest[0], words);
     const { status, text } = await call(originNamed(), rest[0], input);
     process.stdout.write(text + '\n');
     process.exit(status < 300 ? 0 : 1);

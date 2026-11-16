@@ -136,7 +136,7 @@ It installs the Archipelago plugin (\`claude plugin install archipelago --market
 
     node ~/.pelago/bin/pelago-login.mjs call query name=frontier
 
-(any tool and its input: \`call <tool> name=value\`, or the input as JSON). If it reports an older \`pelago\` server in ~/.mcp.json, ask the person whether to remove it, and if yes run the same command with \`--remove-old\`.
+(any tool and its input as words: \`call query name=brief task=<id>\`, \`call report action=tell run=<id> said=...\`, each word but name and action one of its params; or the input as JSON). It ends by naming the map it reached: tell the person which. An older \`pelago\` server in ~/.mcp.json, which would sit beside the plugin's, is taken out (a copy kept as ~/.mcp.json.pelago-old): tell the person it was, and that \`--keep-old\` leaves it.
 
 ### Codex
 

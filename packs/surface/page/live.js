@@ -306,12 +306,15 @@ export async function checkTail() {
     }
     uiFiles ??= beat.ui;
     // Whether an agent will hear what is done here the moment it is done.
+    // Or, on a guest map, that the page waits for the visitor's agent to write (packs/identity/page/guest.js).
+    const awaiting = !beat.listening && hooks.awaiting?.();
     const ear = document.getElementById('listening');
-    ear.hidden = !beat.listening;
-    ear.textContent = beat.listening > 1 ? `${beat.listening} agents are listening` : 'An agent is listening';
+    ear.hidden = !beat.listening && !awaiting;
+    ear.textContent = awaiting || (beat.listening > 1 ? `${beat.listening} agents are listening` : 'An agent is listening');
     follow(beat.steps);
     // What changes touched, for whoever follows items as they are tied (ui/canvas.js).
     if (touched) hooks.touched?.(touched);
+    if (touched?.made) hooks.made?.(touched);
   } catch {
     return;
   }

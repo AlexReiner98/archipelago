@@ -3,6 +3,7 @@
 //                      copy of a shared map (./guest-copy.ts), and answers with the link for the visitor's agent, the
 //                      sentence to paste into it, and the token the page acts as the map's owner with
 //   GET  /g/<key>      what the agent reads first: a few plain lines on what to write, and how (./guest-words.ts)
+//   GET  /guest/read   for the visitor's page, while it waits: whether the agent has read its link yet (linkRead)
 //   GET  /guest/counts  for the operator: how many guest maps reached a first item, and how fast (e_neesnubg)
 // The key is an agent token of that map alone, so the agent writes as any agent does, POST /agent/change with the key
 // as its bearer: there is no second write path. Its changes apply at once, whatever they are: a guest map has holds off
@@ -140,7 +141,31 @@ export const guestLink: RouteFilling = {
     if (!who || who.actor.kind !== 'agent' || who.actor.may === 'read') return gone();
     const ended = guestStanding(await guestOf(await workspaces.control(), id))?.ended;
     if (ended) return text(res, 410, `This guest map ended on ${ended.since.slice(0, 10)} and takes no more writes. Tell your user: signing in keeps a map; this one is deleted on ${ended.delete_at.slice(0, 10)}.\n`);
+    linkRead.set(id, Date.now());
     return text(res, 200, guestWords(originOf(req), key, id, (await ws.pelago.setting<string>('me')) ?? '', await ws.pelago.setting<string>(INSTALL)));
+  },
+};
+
+/**
+ * When each guest map's agent last read its link, in this process: the visitor's page, waiting, says the agent is at
+ * work before its first item lands (packs/identity/page/guest.js). Lost with a restart, which only leaves the page
+ * saying it waits; kept for a map's first minutes, and dropped once read by its page or after them.
+ */
+const linkRead = new Map<string, number>();
+const READ_KEPT_MS = 30 * 60_000;
+
+/** GET /guest/read, with the page's token: `read` is when the map's agent read its link, or null. */
+export const guestRead: RouteFilling = {
+  method: 'GET',
+  path: /^\/guest\/read$/,
+  serve: async (req, res, _match, { workspaces, tooOften }) => {
+    if (tooOften('open')) return;
+    const key = bearer(req.headers.authorization), id = key && workspaceOf(key);
+    if (!id || !isGuestId(id) || !(await workspaces.has(id))) return json(res, 404, { error: 'No such guest map.' }, PRIVATE);
+    const ws = await workspaces.get(id), who = await verifyToken(ws.pelago.db, key);
+    if (!who || who.actor.kind === 'agent') return json(res, 404, { error: 'No such guest map.' }, PRIVATE);
+    for (const [map, at] of linkRead) if (Date.now() - at > READ_KEPT_MS) linkRead.delete(map);
+    return json(res, 200, { read: linkRead.get(id) ?? null }, PRIVATE);
   },
 };
 
