@@ -11,6 +11,8 @@ body {
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
+/* A link in running words is ink underlined by a hairline (rule e_n7brkcf5: ink is the way forward, colour is meaning). */
+:is(p, li, td, blockquote) > a { text-decoration: underline; text-decoration-thickness: var(--border-1); }
 /* Names in the emblem's face (the house style's heading role, decision e_57shnsa9); the small text stays the plain face. */
 h1, h2 { font-family: var(--type-heading-family, inherit); font-weight: var(--type-heading-weight, bold); }
 h1 { font-size: var(--text-8); margin: 0 0 var(--space-3); }
