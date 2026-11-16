@@ -138,3 +138,17 @@ test('a refresh by the runtime keeps what the frame told of the page', async () 
   const again = JSON.stringify(p.update({ item: { id: task.id, type: 'task', title: 'Old', status: 'todo' }, words, views: {}, told: { name: 'scrolled' } }));
   assert.ok(again.includes('Try it') && again.includes('doing') && again.includes('Walk from it'));
 });
+
+test('the note is marked in its author\'s voice, a person\'s or an agent\'s, and checked as marks (rule e_t9t7ag3d)', () => {
+  const noteOf = (voice?: string) => {
+    const marks = pageMarks({ item: task, words, views: { item: { outgoing: [], ...(voice && { voice }) } } }, { draft: { fields: {} }, open: new Set() });
+    assert.doesNotThrow(() => checkMarks(noSlots(marks), { kinds }));
+    const find = (m: unknown): unknown[] | undefined => (Array.isArray(m) ? (m[0] === 'note' ? m : m.map(find).find(Boolean)) : undefined);
+    return (find(marks)?.[1] as { voice?: string }).voice;
+  };
+  assert.equal(noteOf('human'), 'human');
+  assert.equal(noteOf('agent'), 'agent');
+  assert.equal(noteOf(), undefined, 'with no author known, the plain face');
+  assert.equal(noteOf('system'), undefined);
+  assert.throws(() => checkMarks(['note', { voice: 'loud' }, 'x'], { kinds }), 'a voice is a person\'s or an agent\'s');
+});

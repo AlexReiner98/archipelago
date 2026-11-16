@@ -304,6 +304,9 @@ function update(el, node, ctx, fresh = false) {
   // Drawn once it is in the page, where its width is known, and again only for another item.
   if (node.mark === 'picture' && (fresh || was.item !== node.item)) queueMicrotask(() => el.isConnected && (el.replaceChildren(), ctx.picture(node.item, el)));
   if (node.mark === 'note') {
+    // Whose words they are, a person's or an agent's: the face is the style's (--type-voice-*, --type-agent-*).
+    if (at.voice) el.dataset.voice = at.voice;
+    else delete el.dataset.voice;
     // Drawn again only when its words, whether it ticks, or the style changed: a section the reader opened stays open.
     if (fresh || was.words !== node.words || was.at.tick !== at.tick || el.drawnUnder !== ctx.style) {
       const tick = at.tick ? (line, done) => ctx.tell({ key: drawnFrom.get(el).key, name: 'tick', value: { line, done } }) : undefined;

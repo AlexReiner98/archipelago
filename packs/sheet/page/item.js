@@ -53,6 +53,9 @@ const diffsOf = (detail) => {
 };
 
 /** What the page part is told of the page, as data: the item, its links, source, owner and history, its note's count. */
+/** Whose voice a note is in, by who last wrote it (get's note_by, an actor): a person's or an agent's; none for the system. */
+const voiceOf = (actor) => (typeof actor !== 'string' ? null : actor.startsWith('human:') ? 'human' : actor.startsWith('agent:') ? 'agent' : null);
+
 /** The parts of an item's page its style may fold a click away. */
 const FOLDS = ['head', 'fields', 'source', 'history'];
 
@@ -65,7 +68,7 @@ function told(data, past, owner, count, named, folds) {
     name: 'page',
     item: Object.fromEntries(['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'].filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),
     views: {
-      item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(tie), titles: named, ...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
+      item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(tie), titles: named, ...(voiceOf(data.note_by) && { voice: voiceOf(data.note_by) }),...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
       history: { events: past.map(({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail }) => ({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail: { ...(detail?.undone_by && { undone_by: detail.undone_by }), ...(detail?.forgot && { forgot: true }), ...diffsOf(detail) } })), names },
     },
     ...(count && { count }),

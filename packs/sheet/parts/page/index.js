@@ -64,7 +64,7 @@ export function pageMarks(input, s) {
     s.archiving && ['box', { look: 'sunk', flow: 'row', gap: 2, pad: 2 }, ['text', {}, `Archive "${item.title}"? It leaves every view but stays in the history.`], ['button', { key: 'archive-yes', look: 'main', tone: 'bad' }, 'Archive'], ['button', { key: 'archive-no', look: 'quiet' }, 'Cancel']],
     ['slot', { key: 'slot-bands', name: 'sheet.bands' }],
     fold('head', 'Head', 'Type, status, owner, who may see it, when made', () => headMarks({ ...item, owner_title: view.owner?.title }, type, { writes })),
-    section('note', 'Note', 0, noteMarks(item, s.draft, { writes, writing: s.writing, count })),
+    section('note', 'Note', 0, noteMarks(item, s.draft, { writes, writing: s.writing, count, voice: view.voice })),
     c && choicesMarks(item, c, { writes, asking: s.asking }),
     fold('fields', 'Fields', 'Its fields', () => section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : [])], titles: view.titles ?? {}, files: s.files }) ?? ['text', { look: 'muted' }, 'None'])),
     fold('source', 'Source', 'Where its facts came from', () => sourceMarks(view.source)),
