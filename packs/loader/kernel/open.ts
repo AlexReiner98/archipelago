@@ -15,6 +15,7 @@ import { packsFor } from './pack-allow.ts';
 import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
 import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
+import { ISLANDS } from './islands.ts';
 import { takeTypeItems } from './type-items.ts';
 import { syncTypes } from './typetable.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
@@ -54,11 +55,29 @@ export const OPEN: RootOpen = {
   ],
 };
 
+/**
+ * Where what the follow reads last stood, in one cheap read: the head of the facts log (type items and pack facts are
+ * written there), the islands setting and the workspace's own types. Nothing it follows moves without moving this.
+ */
+export async function followMark(l: Archipelago): Promise<string> {
+  const { rows } = await l.db.query<{ mark: string }>(
+    `select concat_ws('|', (select pos::text || ':' || encode(hash, 'hex') from log_entry where stream = 'facts' order by at desc, pos desc limit 1), (select value::text from setting where key = $1), (select count(*) || ':' || coalesce(max(n), 0) from local_type)) as mark`,
+    [ISLANDS],
+  );
+  return rows[0].mark;
+}
+
+/** The mark each open map was last followed at: an idle map costs one read every beat. */
+const followed = new WeakMap<Archipelago, string>();
+
 export const FOLLOW: RootFollow = [
   async (ws) => {
+    const mark = await followMark(ws.pelago); // read before what it guards, so a change in between is followed next beat
+    if (followed.get(ws.pelago) === mark) return;
     if (ws.pelago.registry.followLocal(await localTypes<TypeDef>(ws.pelago.db))) await syncTypes(ws.pelago);
     if (await takeTypeItems(ws.pelago)) await syncTypes(ws.pelago);
     await followPacks(ws.pelago);
+    followed.set(ws.pelago, mark);
   },
 ];
 
