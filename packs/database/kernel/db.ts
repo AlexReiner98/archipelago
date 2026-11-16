@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import { prepare, schemaKey } from './migrate.ts';
 import { openPg, scratchPg } from './pg.ts';
 import { keepStatistics } from './stats.ts';
+import { back, sent, statement, timing } from '../../../src/timing.ts';
+import { heldQuery, yieldHeld } from './held.ts';
 
 /** Anything that can run a query: the database or a transaction on it. */
 export interface Q {
@@ -32,11 +34,58 @@ export const isServer = (where: string) => /^postgres(ql)?:\/\//.test(where);
 
 /** Open the database at a folder or on a server (a postgres:// address), or in memory when neither is given. */
 export async function openDb(where?: string): Promise<Database> {
-  if (!where) return inMemory();
-  if (isServer(where)) return keepStatistics(await openPg(where, (db) => prepared(db, true)), true);
+  if (!where) return timedDb(await inMemory());
+  if (isServer(where)) return timedDb(await keepStatistics(await openPg(where, (db) => prepared(db, true)), true));
   mkdirSync(where, { recursive: true });
   const image = process.env.PELAGO_TEST_IMAGE && !existsSync(join(where, 'PG_VERSION')) ? await (blank ??= blankImage()) : undefined;
-  return keepStatistics(await prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm }, startParams: [...PGlite.defaultStartParams, ...WAL_KEPT] })), false);
+  return timedDb(await keepStatistics(await prepared(new PGlite(where, { loadDataDir: image, extensions: { pg_trgm }, startParams: [...PGlite.defaultStartParams, ...WAL_KEPT] })), false));
+}
+
+/**
+ * The same database, its statements and its waits for a transaction timed for the request they run in (src/timing.ts).
+ * A wait is from asking for a transaction to its first chance to run a statement: a pool's connection or PGlite's
+ * lock, and the begin. Everything else is the database's own, bound to it.
+ */
+function timedDb<D extends Database>(db: D): D {
+  const query = <T>(sql: string, params?: unknown[]) => {
+    yieldHeld();
+    return statement(() => db.query<T>(sql, params));
+  };
+  const transaction = <T>(fn: (tx: Q) => Promise<T>) => {
+    yieldHeld(); // a request's own held reads (held.ts) make way, unless this is one being begun
+    const t = timing();
+    if (!t) return db.transaction(fn);
+    const asked = sent(t);
+    let out = true;
+    return db
+      .transaction((tx) => {
+        t.waits++;
+        t.wait += back(t) - asked;
+        out = false;
+        return fn({ query: <R>(sql: string, params?: unknown[]) => statement(() => tx.query<R>(sql, params)) }).finally(() => {
+          sent(t); // the commit or rollback
+          out = true;
+        });
+      })
+      .finally(() => {
+        if (out) back(t);
+      });
+  };
+  // query and transaction are the wrapper's own: one set on it (a test counting what is sent) replaces the wrapper's,
+  // as on a plain object, and never the database's beneath, which the wrapper itself calls.
+  const own: Record<'query' | 'transaction', unknown> = { query, transaction };
+  return new Proxy(db, {
+    get(target, key) {
+      if (key === 'query' || key === 'transaction') return own[key];
+      const value = Reflect.get(target, key, target);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+    set(target, key, value) {
+      if (key === 'query' || key === 'transaction') own[key] = value;
+      else Reflect.set(target, key, value, target);
+      return true;
+    },
+  });
 }
 
 /**
@@ -122,7 +171,8 @@ function pgliteVersion() {
  * transaction that first drops to the member role and names the viewer (and
  * whether they are an admin of the workspace), so neither can leak between
  * requests sharing the connection. A member who only reads (packs/identity/kernel/members.ts) runs in a read-only transaction besides:
- * the database refuses every write in it, and once it has read, refuses to be made to write again.
+ * the database refuses every write in it, and once it has read, refuses to be made to write again. Within a request,
+ * its plain reads share one such transaction, entered once (held.ts); anything else has its own.
  */
 export function scoped(db: Db, viewer: string, admin = false, readOnly = false): Db {
   const enter = async (tx: Q) => {
@@ -130,8 +180,10 @@ export function scoped(db: Db, viewer: string, admin = false, readOnly = false):
     await tx.query(`set local role pelago_member`);
     if (readOnly) await tx.query(`set transaction read only`);
   };
+  const scope = `viewer ${admin ? 'admin' : ''} ${readOnly ? 'read' : ''} ${viewer}`;
   return {
     query: <T>(sql: string, params?: unknown[]) =>
+      heldQuery<T>(db, scope, enter, sql, params) ??
       db.transaction(async (tx) => {
         await enter(tx);
         return tx.query<T>(sql, params);
@@ -151,6 +203,7 @@ export function anyone(db: Db): Db {
   const enter = (tx: Q) => tx.query(`set local role pelago_public`);
   return {
     query: <T>(sql: string, params?: unknown[]) =>
+      heldQuery<T>(db, 'anyone', enter, sql, params) ??
       db.transaction(async (tx) => {
         await enter(tx);
         return tx.query<T>(sql, params);

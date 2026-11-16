@@ -17,7 +17,7 @@ export async function hidden(l: Archipelago, id: string): Promise<boolean> {
 }
 
 /** An item, what it is tied to and what holds it: what get answers, but its recent events (asked of the activity log by the caller). */
-export async function getItem(l: Archipelago, id: string) {
+export async function getItem(l: Archipelago, id: string, bare = false) {
   const entity = await l.entity(id);
   // One the reader may not see is said to be hidden, not missing: an agent can tell a private item from a wrong id.
   if (!entity) throw new Error((await hidden(l, id)) ? `Item "${id}" is private to someone else: you cannot read it` : `No item "${id}"`);
@@ -27,7 +27,7 @@ export async function getItem(l: Archipelago, id: string) {
     l.db.query(`select ${rel} from relation r join entity e on e.id = r.to_id where r.from_id = $1 and r.valid_to is null`, [id]),
     l.db.query(`select ${rel} from relation r join entity e on e.id = r.from_id where r.to_id = $1 and r.valid_to is null`, [id]),
     entity.source_id ? l.entity(entity.source_id) : undefined,
-    trail(l, id),
+    bare ? [] : trail(l, id),
     l.mentionedIn(id), // the way back for a link written as an id, kept on the class (it names a pack's style)
   ]);
   return {

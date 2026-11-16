@@ -83,13 +83,21 @@ function unwrap(ws: string, id: string, version: number, wrapped: Buffer, kek?: 
 
 /** Every version of the keys of these ids that the vault holds. */
 export async function keysOf(q: Q, ids: string[]): Promise<Map<string, Key[]>> {
+  if (!ids.length) return new Map();
+  const { rows } = await q.query<Wrapped>(KEYS_OF, [ids]);
+  return ringOf(rows);
+}
+
+/** The vault's rows of some ids ($1): what keysOf reads, for a statement that reads them with more. */
+export const KEYS_OF = `select ws, id, version, wrapped from vault_key where id = any($1::text[]) order by id, version`;
+/** A row KEYS_OF reads. */
+export type Wrapped = { ws: string; id: string; version: number; wrapped: Uint8Array };
+
+/** The keys the vault's rows hold, each opened with this server's sealing key, of only some ids if given. */
+export function ringOf(rows: Wrapped[], only?: Set<string>): Map<string, Key[]> {
   const out = new Map<string, Key[]>();
-  if (!ids.length) return out;
-  const { rows } = await q.query<{ ws: string; id: string; version: number; wrapped: Uint8Array }>(
-    `select ws, id, version, wrapped from vault_key where id = any($1::text[]) order by id, version`,
-    [ids],
-  );
   for (const r of rows) {
+    if (only && !only.has(r.id)) continue;
     const key = unwrap(r.ws, r.id, r.version, Buffer.from(r.wrapped));
     if (!key) continue;
     out.set(r.id, [...(out.get(r.id) ?? []), { ws: r.ws, id: r.id, version: r.version, key }]);

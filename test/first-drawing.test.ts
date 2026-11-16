@@ -13,9 +13,12 @@ const browser = chrome();
 /** Each call the page makes to /api, in order: what it asked and when it was sent and answered. */
 const RECORD = `{ window.reads = []; const was = window.fetch; window.fetch = (url, init) => {
   const body = (() => { try { return JSON.parse(init?.body ?? 'null'); } catch { return null; } })();
-  const read = { path: String(url), name: body?.name, type: body?.type, walk: body?.params?.walk?.over, sent: performance.now() };
-  if (String(url).startsWith('/api/')) window.reads.push(read);
-  return was(url, init).then((res) => ((read.back = performance.now()), res));
+  // Reads asked together go as one /api/reads (packs/kit/page/reads.js): each is recorded as the read it is.
+  const asked = String(url) === '/api/reads' ? (body?.calls ?? []).map((c) => ({ path: '/api/' + c.tool, body: c.input })) : [{ path: String(url), body }];
+  const sent = performance.now();
+  const reads = asked.map(({ path, body }) => ({ path, name: body?.name, type: body?.type, walk: body?.params?.walk?.over, sent }));
+  if (String(url).startsWith('/api/')) window.reads.push(...reads);
+  return was(url, init).then((res) => (reads.forEach((r) => (r.back = performance.now())), res));
 }; }`;
 
 test('in a browser, a view is read and drawn before what the drawing does not need', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {

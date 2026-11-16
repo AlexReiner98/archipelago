@@ -14,6 +14,7 @@ import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
 import { followPacks, setPack } from '../packs/loader/kernel/packstate.ts';
 import { freshWith, human, PACKS } from './map.ts';
 import { orderPacks } from '../packs/loader/kernel/packorder.ts';
+import { FOLLOW } from '../packs/loader/kernel/open.ts';
 import { createHttpServer } from '../packs/surface/kernel/server.ts';
 import { Workspaces } from '../packs/identity/kernel/workspaces.ts';
 
@@ -135,6 +136,31 @@ test('a pack turned off on one server is followed by another on the same databas
   assert.equal(await followPacks(other), false, 'no reload when nothing changed');
   await setPack(one, human, { pack: 'tally', on: true });
   assert.equal(await followPacks(other), true);
+  assert.equal(other.registry.states.get('tally')!.state, 'active');
+});
+
+test("the follow reads one mark while nothing moved, and still catches a pack another server switched", async () => {
+  const one = await fresh();
+  const other = new Archipelago(one.db, new Registry(one.registry.dir));
+  const ws = { id: 'w', name: 'w', pelago: other } as unknown as Parameters<(typeof FOLLOW)[number]>[0];
+  const sent: string[] = [];
+  // The two share one database: what it is sent is counted only while the other follows.
+  const db = other.db as unknown as { query: (...a: unknown[]) => unknown };
+  const query = db.query.bind(db);
+  let counting = false;
+  db.query = (sql, ...rest) => (counting && sent.push(String(sql)), query(sql, ...rest));
+  const beat = async () => { sent.length = 0; counting = true; try { for (const f of FOLLOW) await f(ws); } finally { counting = false; } return [...sent]; };
+  await beat();
+  const idle = await beat();
+  assert.equal(idle.length, 1, `an idle beat is one read: ${idle.join('\n')}`);
+  assert.doesNotMatch(idle[0], /log_fact/, 'and no pack fact is read');
+  await setPack(one, human, { pack: 'tally', on: false });
+  const moved = await beat();
+  assert.equal(other.registry.states.get('tally')!.state, 'off', 'the pack switched elsewhere is followed');
+  assert.ok(!moved.some((s) => /value - 'text'/.test(s) && !/unnest/.test(s)), 'only the value of a fact not read before is read');
+  assert.equal((await beat()).length, 1, 'and then idle again');
+  await setPack(one, human, { pack: 'tally', on: true });
+  await beat();
   assert.equal(other.registry.states.get('tally')!.state, 'active');
 });
 

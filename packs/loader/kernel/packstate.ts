@@ -41,10 +41,24 @@ export const packFact = (pack: string) => `pack:${pack}`;
 
 type Said = { id: string; op: '+' | '-'; value: { version?: string; manifest?: string; code?: string } | null };
 
-/** The last fact said of each pack here. */
+/** The last fact said of each pack, as last read for each map, by where it stands on the log (pos, n, at). */
+const saidRead = new WeakMap<Archipelago, Map<string, Said & { at: string }>>();
+
+/**
+ * The last fact said of each pack here. Where each last fact stands is read without its value, and only a value not
+ * read before is read: a pack fact may carry its texts (megabytes), and reading the value at all brings them in.
+ */
 async function packFacts(l: Archipelago): Promise<Map<string, Said>> {
-  const { rows } = await l.db.query<Said>(`select distinct on (id) id, op, value - 'text' - 'texts' - 'files' as value from log_fact where stream = 'facts' and field = 'pack' and id like 'pack:%' order by id, pos desc, n desc -- index log_fact_kept`);
-  return new Map(rows.map((r) => [r.id.slice('pack:'.length), r]));
+  const { rows: last } = await l.db.query<{ id: string; at: string }>(`select distinct on (id) id, pos::text || ':' || n || ':' || at::text as at from log_fact where stream = 'facts' and field = 'pack' and id like 'pack:%' order by id, pos desc, n desc -- index log_fact_kept`);
+  const was = saidRead.get(l) ?? new Map<string, Said & { at: string }>();
+  const unread = last.filter((r) => was.get(r.id)?.at !== r.at);
+  const { rows: read } = unread.length
+    ? await l.db.query<Said & { at: string }>(`select id, op, value - 'text' - 'texts' - 'files' as value, pos::text || ':' || n || ':' || at::text as at from log_fact where stream = 'facts' and field = 'pack' and (id, pos::text || ':' || n || ':' || at::text) in (select * from unnest($1::text[], $2::text[])) -- index log_fact_kept`, [unread.map((r) => r.id), unread.map((r) => r.at)])
+    : { rows: [] };
+  const fresh = new Map(read.map((r) => [r.id, r]));
+  const now = new Map(last.flatMap((r) => { const s = fresh.get(r.id) ?? was.get(r.id); return s ? [[r.id, s] as const] : []; }));
+  saidRead.set(l, now);
+  return new Map([...now].map(([id, s]) => [id.slice('pack:'.length), s]));
 }
 
 /** Told when a workspace's tools change, so the server can tell the agents connected to it. */

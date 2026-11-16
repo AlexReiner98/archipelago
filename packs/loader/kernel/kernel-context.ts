@@ -10,6 +10,7 @@
 
 import { isAbsolute, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { packCall } from '../../../src/timing.ts';
 import { isInternal, type Manifest, type ModuleRef } from './manifest.ts';
 import { codeFolder } from './code-folder.ts';
 import { readsAnswer } from './packhost.ts';
@@ -98,7 +99,7 @@ export class KernelHost {
     if (!this.modules.has(path)) this.modules.set(path, import(pathToFileURL(path).href) as Promise<Record<string, unknown>>);
     const f = (await this.modules.get(path)!)[name];
     if (typeof f !== 'function') throw new Error(`The ${pack.id} pack names ${ref}, which ${join(pack.kernel?.modules ?? 'kernel/', file)} does not export as a function`);
-    return f as Fn;
+    return (ctx, ...args) => packCall(async () => (f as Fn)(ctx, ...args)); // timed for the request it runs in (src/timing.ts)
   }
 
   /** What fills a hook point or slot, in pack order and each pack's own order: each called with its pack's context. */

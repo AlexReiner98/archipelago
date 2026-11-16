@@ -8,6 +8,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { parts } from './manifest.ts';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { packCall } from '../../../src/timing.ts';
 import { createInterface } from 'node:readline';
 import { mailHeard, type NotificationMail } from '../../walls/kernel/notify-mail.ts';
 import { handleRequests, type OutsideRequest } from './outside.ts';
@@ -218,7 +219,7 @@ export class Sandbox {
         timer.run();
       });
     };
-    const result = this.queue.then(run, run);
+    const result = packCall(() => this.queue.then(run, run)); // timed with its wait for the pack's queue (src/timing.ts)
     this.queue = result.catch(() => undefined);
     return result;
   }

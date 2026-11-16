@@ -156,21 +156,30 @@ export async function confirmQuestions(l: Archipelago, q: { limit?: number }) {
  * an agent closed, with what was chosen and on what it rests (what the attention pack puts to the owner: its confirm.ts).
  */
 export async function settledUnconfirmed(l: Archipelago, limit: number) {
-  // Each mark is in the settings stream; one made before that stream was numbered is an activity entry carried in.
-  const { rows: marks } = await l.db.query<{ upto: number | null }>(
-    `select max(case when o.stream = 'settings' then (o.facts->0->>3)::int else (o.facts->0->3->'detail'->>'upto')::int end) as upto from log_op o
-     where o.seq is not null and o.facts->0->>2 in ('changes.seen', 'questions.confirmed') and o.stream in ('settings', 'activity') -- index log_op_action`,
-  );
+  const { rows: marks } = await l.db.query<{ upto: number | null }>(CONFIRMED_UPTO);
   const since = marks[0]?.upto ?? 0;
-  const { rows } = await l.db.query<{ id: string; type: string; title: string; status: string; outcome: string | null; seq: number; ts: Date; actor: string; changeset: string; authority: { of?: string; basis?: unknown } | null }>(
-    // Read from the log: each status an agent set, on its own say or a human's word it reported, that the item still has.
-    `select distinct on (e.id) e.id, e.type, e.title, e.status, e.props->>'outcome' as outcome, f.seq::int as seq, le.at as ts, le.head->'actor'->>'id' as actor, le.head->'authority' as authority, le.id as changeset
+  const { rows } = await l.db.query<SettledRow>(SETTLED_SINCE, [since, settlingTypes(l)]);
+  return settledFrom(l, rows, since, limit);
+}
+
+/** Up to where the owner last looked or answered. Each mark is in the settings stream; one made before that stream was numbered is an activity entry carried in. */
+export const CONFIRMED_UPTO = `select max(case when o.stream = 'settings' then (o.facts->0->>3)::int else (o.facts->0->3->'detail'->>'upto')::int end) as upto from log_op o
+     where o.seq is not null and o.facts->0->>2 in ('changes.seen', 'questions.confirmed') and o.stream in ('settings', 'activity') -- index log_op_action`;
+/** Read from the log: each status an agent set after a mark ($1), on its own say or a human's word it reported, that the item (of a type that settles, $2) still has. */
+export const SETTLED_SINCE = `select distinct on (e.id) e.id, e.type, e.title, e.status, e.props->>'outcome' as outcome, f.seq::int as seq, le.at as ts, le.head->'actor'->>'id' as actor, le.head->'authority' as authority, le.id as changeset
      from log_fact f join log_entry le on le.stream = f.stream and le.at = f.at and le.pos = f.pos join entity e on e.id = f.id
      where f.stream = 'facts' and f.seq > $1 and f.field = 'status' and f.op = '+' and le.head->'actor'->>'id' not like 'human:%' and coalesce(le.head->'authority'->>'who', '') not like 'human:%'
        and e.type = any($2::text[]) and not e.is_open and e.archived_at is null and f.value = to_jsonb(e.status)
-     order by e.id, f.seq desc`,
-    [since, [...l.registry.types.values()].filter((t) => t.capabilities.settles !== undefined).map((t) => t.id)], // the types that settle (registry.having)
-  );
+     order by e.id, f.seq desc`;
+/** The types that settle (registry.having), as SETTLED_SINCE takes them. */
+export const settlingTypes = (l: Pick<Archipelago, 'registry'>) => [...l.registry.types.values()].filter((t) => t.capabilities.settles !== undefined).map((t) => t.id);
+/** What opens sealed values read from the log (openSaid, or one that opens several reads' at once). */
+export type Opener = <T extends { id: string; field: string; value: unknown }>(said: T[]) => Promise<T[]>;
+/** A row SETTLED_SINCE reads. */
+export type SettledRow = { id: string; type: string; title: string; status: string; outcome: string | null; seq: number; ts: Date; actor: string; changeset: string; authority: { of?: string; basis?: unknown } | null };
+
+/** The questions settled, from the rows SETTLED_SINCE read after the mark `since`: the first `limit` listed, their bases opened. */
+export async function settledFrom(l: Archipelago, rows: SettledRow[], since: number, limit: number, open: Opener = (said) => openSaid(l.db, said)) {
   // What an agent settled on its own judgment is what the owner has not seen; what it settled on their word they
   // chose themselves, in chat. The first are listed first, and counted apart.
   const own = (q: { authority: { of?: string } | null }) => q.authority?.of !== 'human';
@@ -178,7 +187,7 @@ export async function settledUnconfirmed(l: Archipelago, limit: number) {
   // The basis is the change set's words, sealed in the log with its key (packs/seal/kernel/seal.ts): opened only for those listed,
   // since each takes its key from the vault (a map with hundreds settled spent most of the read on the rest).
   const listed = newest.slice(0, limit);
-  const bases = await openSaid(l.db, listed.map((r, i) => ({ id: r.changeset, field: 'basis', value: r.authority?.basis, i })));
+  const bases = await open(listed.map((r, i) => ({ id: r.changeset, field: 'basis', value: r.authority?.basis, i })));
   for (const b of bases) if (b.value !== undefined) listed[b.i].authority = { ...listed[b.i].authority, basis: b.value };
   const short = (s: string | undefined) => (s && s.length > 240 ? `${s.slice(0, 240)}…` : s);
   return {
