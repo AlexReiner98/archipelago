@@ -32,3 +32,30 @@ body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
 .gate-error { color: var(--bad); text-align: center; }
 .gate-error:empty { display: none; }
 .gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
+
+/* The first moments on a new guest map (packs/identity/page/guest.js, firstMoments): while it waits for the agent, one
+   card in the middle over a faint picture of what is coming, and nothing of the app; while the agent draws, the canvas
+   with only the brand and the word on what it is doing. */
+body[data-first] #query, body[data-first] #find, body[data-first] #tabs, body[data-first] #more, body[data-first] #nav > :not(.brand):not(#listening):not(.grow) { display: none; }
+body[data-first="wait"] #canvas, body[data-first="wait"] #sheet, body[data-first="wait"] #listening { visibility: hidden; }
+body[data-first="drawing"] #listening { font-size: var(--text-5); }
+.first { position: fixed; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; padding: var(--space-9); background: var(--bg); overflow: auto; }
+.first-sketch { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0.22; pointer-events: none; }
+.first-node { fill: var(--panel); stroke: var(--line); stroke-width: 1.5; }
+.first-line { fill: var(--muted); opacity: 0.5; }
+.first-wire { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+.first-mark { stroke: none; }
+.first-done { fill: var(--ok); }
+.first-doing { fill: var(--accent); }
+.first-todo { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+.first-ask { fill: var(--warn); }
+.first-card { position: relative; box-sizing: border-box; width: 100%; max-width: var(--card-most, var(--dialog)); padding: var(--space-13) var(--space-12); display: flex; flex-direction: column; gap: var(--space-9); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); box-shadow: 0 var(--space-9) var(--space-14) var(--bg); }
+.first-card h1 { margin: 0; font-size: var(--text-9); line-height: 1.2; }
+.first-promise { margin: 0; color: var(--muted); font-size: var(--text-6); line-height: 1.5; }
+.first-prompt { padding: var(--space-7) var(--space-8); border-left: var(--border-3) solid var(--accent); background: var(--bg); font-size: var(--text-5); line-height: 1.5; }
+.first-copy { align-self: stretch; padding: var(--space-7); font-size: var(--text-7); }
+.first-steps { margin: 0; padding-left: var(--space-11); display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--text-5); }
+.first-steps li::marker { color: var(--muted); }
+.first-status { display: flex; align-items: center; gap: var(--space-6); padding-top: var(--space-8); border-top: var(--border-1) solid var(--line); color: var(--ok); font-size: var(--text-5); }
+.first-status::before { content: ''; flex: none; width: var(--box-3); height: var(--box-3); border-radius: 50%; background: currentColor; animation: first-beat 1.6s ease-in-out infinite; }
+@keyframes first-beat { 50% { opacity: 0.25; } }
