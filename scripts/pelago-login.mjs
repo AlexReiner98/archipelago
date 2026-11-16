@@ -15,7 +15,7 @@ import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { homedir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -126,6 +126,44 @@ export function machineOf(folder = folderOf()) {
   mkdirSync(folder, { recursive: true });
   writeFileSync(file, made, { mode: 0o600 });
   return made;
+}
+
+// A link to a guest map, as the sentence its visitor pastes carries it (Read <origin>/g/<key> and do what it says,
+// packs/surface/kernel/guest-words.ts): the key is an agent token of that map alone, which names it.
+const GUEST_LINK = /(https?:\/\/[^\s/'"<>]+)\/g\/pel_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}\b/;
+const mapOfToken = (token) => /^pel_([a-z0-9][a-z0-9-]{0,39})_[a-f0-9]{40}$/.exec(token ?? '')?.[1];
+const awayFile = (id) => (typeof id === 'string' && /^[\w-]+$/.test(id) ? join(tmpdir(), 'pelago-elsewhere', id) : null);
+
+/**
+ * Whether the hooks say nothing for this session: one whose prompt points it at another map's guest link works there,
+ * by that link's key. Registered on the map this computer's hooks reach, its turns' ends would ask it to report to a
+ * run its key cannot reach, and it would spend half a minute failing to (e_n8prewuq). So at that prompt its run here is
+ * ended, the agent is told the start was not for it, and every hook after is silent until the session ends. A link to
+ * the very map the hooks reach changes nothing. `runFile` names the file the session's run is kept in (the hook's).
+ */
+export async function elsewhere(event, input, { base, token, setup, runFile }, folder = folderOf()) {
+  let said = {};
+  try {
+    said = JSON.parse(input || '{}');
+  } catch { /* not JSON: nothing to go by */ }
+  const away = awayFile(said.session_id);
+  if (!away) return false;
+  if (existsSync(away)) return event === 'session-end' && rmSync(away, { force: true }), true;
+  const link = event === 'prompt' && typeof said.prompt === 'string' ? GUEST_LINK.exec(said.prompt) : null;
+  if (!link || (link[1] === base && link[2] === mapOfToken(token))) return false;
+  keep(away, link[1]);
+  // Its run here ends now, and what was kept for it goes: a start held for a sign-in is not sent after all.
+  await fetch(`${base}/hooks/session-end`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) },
+    body: JSON.stringify({ session_id: said.session_id, cwd: said.cwd, reason: 'other map', setup }),
+    signal: AbortSignal.timeout(5_000),
+  }).catch(() => null);
+  const file = runFile?.(said);
+  for (const kept of [...(file ? [file, `${file}.said`, `${file}.pid`] : []), join(folder, 'late', said.session_id)]) rmSync(kept, { force: true });
+  const additionalContext = "This session works on the map its prompt links to, by that link's words alone. This computer's Archipelago hooks reach another map: they are off for this session, and what they said at its start (a run, working rules, open work) is not for it. Do not report to that run or end it.";
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext } }));
+  return true;
 }
 
 /** Forget the sign-in kept for this server (the server refused it). */

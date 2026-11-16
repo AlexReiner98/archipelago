@@ -46,7 +46,8 @@
 // It never fails the session: if the server is away or refuses it, it says so in the session once (a message the
 // person sees) and answers nothing more. With no token, a server that asks for one is signed in to in the browser
 // (pelago-login.mjs): the session that asked is registered at its next prompt. Run by the plugin (--plugin), that
-// sign-in wins over PELAGO_AGENT_TOKEN, and the working rules (../pelago.md) are said at the start.
+// sign-in wins over PELAGO_AGENT_TOKEN, and the working rules (../pelago.md) are said at the start. A session a guest
+// link points at another map is that map's: the hooks say nothing for it (elsewhere, in pelago-login.mjs).
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -56,8 +57,7 @@ import { dirname, resolve } from 'node:path';
 // Which hand-out of Archipelago's files this project has: the setup writes it in, and the server says when it is behind.
 const SETUP = '';
 
-const name = process.argv[2];
-const base = (process.env.PELAGO_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
+const name = process.argv[2], base = (process.env.PELAGO_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
 const login = await import('./pelago-login.mjs').catch(() => null);
 const kept = await login?.accessToken(base).catch(() => undefined), env = process.env.PELAGO_AGENT_TOKEN;
 let token = process.argv.includes('--plugin') ? kept || env : env || kept;
@@ -262,6 +262,7 @@ async function sendEvents(said, events) {
   }).catch(() => null);
 }
 
+if (await login?.elsewhere?.(name, input, { base, token, setup: SETUP, runFile })) process.exit(0);
 // The hooks that only tell events: a wait begun or answered, a turn that ended in an error.
 if (name === 'notification' || name === 'tool-used' || name === 'stop-failure') {
   try {
