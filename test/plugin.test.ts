@@ -49,11 +49,20 @@ test('a machine with no token is connected through the browser, and the session 
       child.stdin.end(JSON.stringify(input));
     });
 
-  const asked = await hook('session-start', { session_id: 'stranger-1', cwd: data });
-  assert.match(asked.out.systemMessage, /Archipelago: .*connect this computer.*\/oauth\/authorize\?/, 'the person is told, in the session, where to sign in');
+  const started = await hook('session-start', { session_id: 'stranger-1', cwd: data });
+  assert.equal(started.out?.systemMessage, undefined, 'nothing is asked at the start: the first prompt may point at a guest map');
+  assert.equal(existsSync(join(tmpdir(), 'pelago-signing-in')) || existsSync(join(data, `signing-in-${new URL(base).host.replace(/[^\w.-]/g, '_')}.json`)), false, 'and no sign-in is begun');
+  const asked = await hook('prompt', { session_id: 'stranger-1', cwd: data, prompt: 'hi' });
+  assert.match(asked.out.systemMessage, /Archipelago: .*connect this computer.*\/oauth\/authorize\?/, 'the person is told, at their first message, where to sign in');
   assert.match(asked.out.hookSpecificOutput.additionalContext, /not on the Archipelago map yet/);
-  const again = await hook('session-start', { session_id: 'stranger-2', cwd: data });
+  await hook('session-start', { session_id: 'stranger-2', cwd: data });
+  const again = await hook('prompt', { session_id: 'stranger-2', cwd: data, prompt: 'hi' });
   assert.equal(again.out.systemMessage.match(/http\S+/)[0], asked.out.systemMessage.match(/http\S+/)[0], 'a second session meanwhile is given the same sign-in');
+  await hook('session-start', { session_id: 'visitor-1', cwd: data });
+  const visitor = await hook('prompt', { session_id: 'visitor-1', cwd: data, prompt: `Read https://elsewhere.example/g/pel_guest-0123abcd_${'b'.repeat(40)} and do what it says` });
+  assert.equal(visitor.out.systemMessage, undefined, 'a session sent to a guest map is never asked to sign in here');
+  assert.match(visitor.out.hookSpecificOutput.additionalContext, /off for this session/);
+  assert.equal(existsSync(join(data, 'late', 'visitor-1')), false, 'and its start is not sent after a sign-in');
 
   // The person says Allow in the page; the browser goes back to this machine, where the hook's sign-in is waiting.
   const at = new URL(asked.out.systemMessage.match(/http\S+/)[0]);
@@ -63,6 +72,10 @@ test('a machine with no token is connected through the browser, and the session 
   const kept = join(data, `signed-in-${new URL(base).host.replace(/[^\w.-]/g, '_')}.json`);
   for (let i = 0; i < 50 && !existsSync(kept); i++) await new Promise((r) => setTimeout(r, 100));
   assert.ok(readFileSync(kept, 'utf8').includes('"access"'), 'the token is kept in the machine\u2019s one place for it');
+  // Both sessions that waited are on the map the moment the person said Allow, before either's next message.
+  const opened = async () => (await call('/agent/view', owner, { name: 'sessions' })).result.open.length;
+  for (let i = 0; i < 50 && (await opened()) < 2; i++) await new Promise((r) => setTimeout(r, 100));
+  assert.equal(await opened(), 2, 'registered at Allow');
   // The plugin's tools ask the same file for their headers: one Allow serves the hooks and the tools.
   const headers = spawnSync(process.execPath, [join(ROOT, FOLDER, 'scripts', 'pelago-login.mjs'), 'headers'], { env: { ...process.env, PELAGO_HOME: data, PELAGO_AGENT_TOKEN: '', CLAUDE_CODE_MCP_SERVER_URL: `${base}/mcp` }, encoding: 'utf8' });
   assert.match(JSON.parse(headers.stdout).Authorization, /^Bearer \S+/);
@@ -83,8 +96,8 @@ test('a machine with no token is connected through the browser, and the session 
   assert.match(prompted.out.hookSpecificOutput.additionalContext, /registered in Archipelago[\s\S]*# Working with Archipelago/, 'registered now, with the working rules a plugin cannot put in CLAUDE.md');
   assert.doesNotMatch(prompted.out.hookSpecificOutput.additionalContext, /older than the server/, 'a plugin is not told to run the setup');
   const open = (await call('/agent/view', owner, { name: 'sessions' })).result.open;
-  assert.equal(open.length, 1, 'the session that asked is on the map');
-  assert.equal(open[0].title, 'hello', 'named by what was asked, not by its folder, until its chat has a title');
+  assert.equal(open.length, 2, 'registered once: its next message added no second run');
+  assert.ok(open.some((o: { title: string }) => o.title === 'hello'), `named by what was asked, not by its folder, until its chat has a title: ${open.map((o: { title: string }) => o.title)}`);
 
   // A server that is away is said in the session, once, not only to stderr.
   const gone = `away-${process.pid}-${Date.now()}`;
@@ -132,4 +145,42 @@ test('the plugin names every link the directory lists, from listing.json', () =>
     [manifest.privacyPolicyUrl, manifest.termsOfServiceUrl, manifest.supportUrl, manifest.documentationUrl, manifest.homepage, manifest.repository],
     [LISTING.urls.privacy, LISTING.urls.terms, LISTING.urls.support, LISTING.urls.docs, LISTING.urls.app, LISTING.urls.repository],
   );
+});
+
+test('a session pointed at a guest map of another map ends its run here, and the hooks say nothing more for it', async () => {
+  const { workspaces, base, call } = await serve('tokens');
+  const pelago = (await workspaces.get('default')).pelago;
+  await pelago.init({ kind: 'human', name: 'alex' }, { name: 'Alex' });
+  const owner = (await createToken(pelago.db, 'default', { kind: 'human', name: 'alex', admin: true, entity: await pelago.setting<string>('me') })).token;
+  const agent = (await createToken(pelago.db, 'default', { kind: 'agent', name: 'hooks' })).token;
+  const data = mkdtempSync(join(tmpdir(), 'pelago-away-'));
+  const hook = (name: string, input: unknown) =>
+    new Promise<any>((done) => {
+      const child = spawn(process.execPath, [join(ROOT, FOLDER, 'scripts', 'pelago-hook.mjs'), name, '--plugin'], { env: { ...process.env, PELAGO_URL: base, PELAGO_AGENT_TOKEN: agent, PELAGO_HOME: data, PELAGO_LOGIN_QUIET: '1' } });
+      let out = '';
+      child.stdout.on('data', (d) => (out += d));
+      child.on('close', () => done(out ? JSON.parse(out) : null));
+      child.stdin.end(JSON.stringify(input));
+    });
+  const open = async () => (await call('/agent/view', owner, { name: 'sessions' })).result.open.length;
+  const hex = 'a'.repeat(40);
+
+  // A link to the map the hooks reach is that map's own work: the session stays on it.
+  const id = `here-${process.pid}-${Date.now()}`;
+  await hook('session-start', { session_id: id, cwd: data });
+  const here = await hook('prompt', { session_id: id, cwd: data, prompt: `Read ${base}/g/${agent} and do what it says` });
+  assert.doesNotMatch(here.hookSpecificOutput?.additionalContext ?? '', /off for this session/);
+  assert.equal(await open(), 1);
+  await hook('session-end', { session_id: id, cwd: data });
+
+  const away = `away-${process.pid}-${Date.now()}`;
+  await hook('session-start', { session_id: away, cwd: data });
+  assert.equal(await open(), 1, 'registered at its start, before anything says where its work goes');
+  const told = await hook('prompt', { session_id: away, cwd: data, prompt: `Read https://elsewhere.example/g/pel_guest-0123abcd_${hex} and do what it says: it puts this project on a map I can watch.` });
+  assert.match(told.hookSpecificOutput.additionalContext, /off for this session/, 'the agent is told the start was not for it');
+  assert.equal(await open(), 0, 'its run here is ended');
+  assert.equal(await hook('stop', { session_id: away, cwd: data }), null, 'a turn ends with nothing asked of it');
+  assert.equal(await hook('prompt', { session_id: away, cwd: data, prompt: 'go on' }), null);
+  assert.equal(await hook('session-end', { session_id: away, cwd: data }), null);
+  assert.equal(existsSync(join(tmpdir(), 'pelago-elsewhere', away)), false, 'nothing is left behind it');
 });
