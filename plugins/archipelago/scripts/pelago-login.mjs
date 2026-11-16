@@ -391,9 +391,13 @@ export function plugin(session, hookUrl, folder = folderOf()) {
         return null;
       }
     },
-    /** Ask the person to sign in; a start is kept to be sent once they have. */
+    /**
+     * Ask the person to sign in; a start is kept to be sent once they have. At the start itself nothing is asked yet:
+     * the first prompt may point the session at another map's guest link (elsewhere), where a sign-in window would
+     * only get in a visitor's way. It is asked at that prompt.
+     */
     askSignIn: async (origin, startBody) => {
-      if (late && startBody) keep(late, JSON.parse(startBody));
+      if (startBody) return late && keep(late, JSON.parse(startBody)), { notice: '', context: '' };
       try {
         const { url, waiting } = await signIn(origin, folder);
         return {

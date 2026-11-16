@@ -49,11 +49,20 @@ test('a machine with no token is connected through the browser, and the session 
       child.stdin.end(JSON.stringify(input));
     });
 
-  const asked = await hook('session-start', { session_id: 'stranger-1', cwd: data });
-  assert.match(asked.out.systemMessage, /Archipelago: .*connect this computer.*\/oauth\/authorize\?/, 'the person is told, in the session, where to sign in');
+  const started = await hook('session-start', { session_id: 'stranger-1', cwd: data });
+  assert.equal(started.out?.systemMessage, undefined, 'nothing is asked at the start: the first prompt may point at a guest map');
+  assert.equal(existsSync(join(tmpdir(), 'pelago-signing-in')) || existsSync(join(data, `signing-in-${new URL(base).host.replace(/[^\w.-]/g, '_')}.json`)), false, 'and no sign-in is begun');
+  const asked = await hook('prompt', { session_id: 'stranger-1', cwd: data, prompt: 'hi' });
+  assert.match(asked.out.systemMessage, /Archipelago: .*connect this computer.*\/oauth\/authorize\?/, 'the person is told, at their first message, where to sign in');
   assert.match(asked.out.hookSpecificOutput.additionalContext, /not on the Archipelago map yet/);
-  const again = await hook('session-start', { session_id: 'stranger-2', cwd: data });
+  await hook('session-start', { session_id: 'stranger-2', cwd: data });
+  const again = await hook('prompt', { session_id: 'stranger-2', cwd: data, prompt: 'hi' });
   assert.equal(again.out.systemMessage.match(/http\S+/)[0], asked.out.systemMessage.match(/http\S+/)[0], 'a second session meanwhile is given the same sign-in');
+  await hook('session-start', { session_id: 'visitor-1', cwd: data });
+  const visitor = await hook('prompt', { session_id: 'visitor-1', cwd: data, prompt: `Read https://elsewhere.example/g/pel_guest-0123abcd_${'b'.repeat(40)} and do what it says` });
+  assert.equal(visitor.out.systemMessage, undefined, 'a session sent to a guest map is never asked to sign in here');
+  assert.match(visitor.out.hookSpecificOutput.additionalContext, /off for this session/);
+  assert.equal(existsSync(join(data, 'late', 'visitor-1')), false, 'and its start is not sent after a sign-in');
 
   // The person says Allow in the page; the browser goes back to this machine, where the hook's sign-in is waiting.
   const at = new URL(asked.out.systemMessage.match(/http\S+/)[0]);
