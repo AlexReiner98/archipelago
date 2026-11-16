@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { fresh, make } from './map.ts';
 import { answerHook } from './claude-hook.ts';
-import { checkEvent } from '../packs/sessions/kernel/session-events.ts';
+import { checkEvent, sameFrom } from '../packs/sessions/kernel/session-events.ts';
 import * as sessionEventsPack from '../packs/sessions/kernel/session-events.ts';
 import { opEntries } from '../packs/log/kernel/streams.ts';
 import { kept } from '../packs/log/kernel/retention.ts';
@@ -99,4 +99,23 @@ test('a run and its events are found by their indexes, and only by one who may s
   const someone = l.as('someone else');
   assert.equal(await runsRead(someone, { run_of: { key: 's3' } }), null);
   assert.deepEqual(((await runsRead(someone, { run_events: { runs: [run], since } })) as Record<string, unknown[]>)[run], []);
+});
+
+test('a batch is checked for events the run has from ten minutes before its earliest, not from the run\'s start', async () => {
+  const l = await fresh();
+  const { run } = await make(l, [{ op: 'create', ref: 'run', type: 'run', title: 'A session', props: { session_id: 's5' } }]);
+  const created = '2026-11-16T10:00:00.000Z';
+  assert.equal(sameFrom(created, [{ at: '2026-11-16T09:00:00.000Z', kind: 'turn.start' }]), created, 'never before the run');
+  assert.equal(sameFrom(created, [{ at: '2026-11-16T14:00:00.000Z', kind: 'turn.start' }, { at: '2026-11-16T12:30:00.000Z', kind: 'turn.start' }]), '2026-11-16T12:20:00.000Z');
+  assert.ok(Date.parse(sameFrom(created, [])) >= Date.now() - 1000, 'an empty batch reads nothing back');
+
+  // A source whose clock runs five minutes ahead: what it sends again is still found and dropped.
+  const ahead = (ms: number) => new Date(Date.now() + ms).toISOString();
+  const soon = { at: ahead(5 * 60_000), kind: 'turn.start', turn: 'a', by: 'person' };
+  assert.equal((await hook(l, { session_id: 's5', source: 'claude-code', events: [soon] })).kept, 1);
+  assert.deepEqual(await hook(l, { session_id: 's5', source: 'claude-code', events: [soon] }), { run, kept: 0, dropped: 1 });
+  // Half an hour ahead, past the margin: the copy is kept before where the check starts, and the event is kept twice.
+  const far = { at: ahead(30 * 60_000), kind: 'turn.start', turn: 'b', by: 'person' };
+  assert.equal((await hook(l, { session_id: 's5', source: 'claude-code', events: [far] })).kept, 1);
+  assert.equal((await hook(l, { session_id: 's5', source: 'claude-code', events: [far] })).kept, 1, 'a clock more than ten minutes ahead is not covered');
 });
