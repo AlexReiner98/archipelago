@@ -56,12 +56,14 @@ export function titleMarks(item, draft, { writes = false } = {}) {
 }
 
 /** The note: as it reads (ticks go back), or open as words to write, with its count under it. */
-export function noteMarks(item, draft, { writes = false, writing = false, count } = {}) {
+export function noteMarks(item, draft, { writes = false, writing = false, count, voice } = {}) {
   const body = draft.body ?? item.body ?? '';
-  if (!writes || item.archived_at) return body.trim() ? ['note', {}, body] : ['text', { look: 'muted' }, 'No note'];
+  // Set in its author's voice, a person's or an agent's (rule e_t9t7ag3d), as the host read who last wrote it.
+  const said = voice === 'human' || voice === 'agent' ? { voice } : {};
+  if (!writes || item.archived_at) return body.trim() ? ['note', said, body] : ['text', { look: 'muted' }, 'No note'];
   if (!writing && draft.body === undefined) {
     return ['box', { flow: 'column', gap: 1 },
-      body.trim() ? ['note', { key: 'draft:tick', tick: true }, body] : ['text', { look: 'muted' }, 'No note'],
+      body.trim() ? ['note', { key: 'draft:tick', tick: true, ...said }, body] : ['text', { look: 'muted' }, 'No note'],
       ['button', { key: 'draft:write', look: 'quiet', tip: 'Write in its note' }, '✎']];
   }
   return ['box', { flow: 'column', gap: 1 },
