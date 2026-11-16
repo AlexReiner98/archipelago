@@ -47,8 +47,46 @@ function keepDrawing(hash, modules) {
   }
 }
 const sheets = new Map();
-/** The scenes drawn lately, by the drawing and all it was given: drawn again from the same, a picture is mounted at once. */
+/**
+ * The pictures drawn lately: each scene a drawing answered, by a name of all it was drawn from (`pictureKey`). A picture
+ * is its answer, style, code and room alone, so one asked again from the same (a canvas gone back to, a view switched
+ * back) is mounted from what was kept, and its drawing is not run until the picture needs it (`begin`, below). Kept in
+ * this page alone: at most `keeping.most` of them, weighing at most `keeping.weight` characters of what they were drawn from.
+ */
 const scenes = new Map();
+const keeping = { most: 24, weight: 2 ** 25, held: 0 };
+function keepScene(key, scene, weight) {
+  if (scenes.has(key)) keeping.held -= scenes.get(key).weight;
+  scenes.delete(key);
+  scenes.set(key, { scene, weight });
+  keeping.held += weight;
+  for (const [old, one] of scenes) {
+    if (scenes.size <= keeping.most && keeping.held <= keeping.weight) break;
+    scenes.delete(old);
+    keeping.held -= one.weight;
+  }
+}
+/** A long text's name: two 32-bit hashes of it (cyrb53's mixing) and its length. Not for secrets: for telling pictures apart. */
+function nameOf(text) {
+  let a = 0x9e3779b9 ^ text.length, b = 0x85ebca6b ^ text.length;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    a = Math.imul(a ^ c, 2654435761);
+    b = Math.imul(b ^ c, 1597334677);
+  }
+  a = Math.imul(a ^ (a >>> 16), 2246822507) ^ Math.imul(b ^ (b >>> 13), 3266489909);
+  b = Math.imul(b ^ (b >>> 16), 2246822507) ^ Math.imul(a ^ (a >>> 13), 3266489909);
+  return `${(b >>> 0).toString(16)}${(a >>> 0).toString(16)}:${text.length}`;
+}
+/**
+ * What a picture was drawn from, named: the drawing's code (its hash) and all it is handed, but the log position its
+ * answer was read at (`pos`), which says when, not what: no drawing reads it.
+ */
+function pictureKey(hash, input) {
+  const { pos: _pos, ...answer } = input.answer ?? {};
+  const text = JSON.stringify({ ...input, answer });
+  return { key: `${hash}|${nameOf(text)}`, weight: text.length };
+}
 let sandbox;
 /** What the frame says, heard by one listener for the page, about the frame started last. */
 let hearing = false;
@@ -136,11 +174,24 @@ function colours(host, style) {
 
 /** Draw the answer in host with the drawing its style names. The same call as any of the kernel's shapes. */
 export function drawWith(host, answer, style, keep) {
-  host.endDrawing?.();
   const { drawing } = style;
   // One that says it is laid out by the page has its box now, before it is measured: drawn once, at the size it will have.
   if (drawing?.flat) host.classList.add('laid-out');
-  const failed = (message) => (host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`)), saidDrawn(host, 'error', message));
+  const { style: _sent, first: opening, ...shown } = answer;
+  const { drawing: _code, code: _canvas, ...fields } = style;
+  // The titles of the types the picture holds, as this page knows them: a drawing has no registry of its own.
+  const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
+  // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
+  const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
+  // What the session may do (packs/kit/page/base.js may): a drawing that opts into gestures draws no handle where it may not write.
+  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, may: [...(state.may ?? [])] };
+  const named = drawing?.hash ? pictureKey(drawing.hash, input) : null;
+  // The picture this host shows, asked for again (an answer read again that moved nothing, the server agreeing with what
+  // the page drew first) is left as it is: nothing is drawn, and the view stays where the reader left it.
+  if (named && host.drawn === named.key && host.drawnLive?.()) return;
+  host.endDrawing?.();
+  let broken = false;
+  const failed = (message) => ((broken = true), host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`)), saidDrawn(host, 'error', message));
   // Its code: sent with the answer, kept by this browser, or fetched from this server by its hash (a published page's).
   const sent = drawing?.modules ?? layouts.get(drawing?.hash);
   const code = sent ? Promise.resolve(sent) : /^\/[^/]/.test(drawing?.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : null;
@@ -175,9 +226,37 @@ export function drawWith(host, answer, style, keep) {
     });
     reshape.observe(host);
   };
-  const end = () => ((ended = true), reshape?.disconnect(), host.moves?.stop(), surface?.end(), port.postMessage({ type: 'end' }), port.close());
+  // The drawing is started when the picture needs it: at once, unless the picture is mounted from what was kept
+  // (`given`); then only once something is asked of it (a mark hovered or pressed, a restyle), so a picture
+  // given back runs no layout. What is in view is told it once it is started, the latest only.
+  let begun = false, view = null;
+  const begin = () => {
+    if (begun || ended) return;
+    begun = true;
+    performance.mark('drawing-begun', { detail: drawing.id });
+    // Told what to draw before anything else, so what happens on the page waits behind it: the channel keeps it until the worker has the other end.
+    port.postMessage({ type: 'start', input });
+    if (view) port.postMessage({ type: 'viewport', view });
+    code.then((modules) => {
+      if (layouts.get(drawing.hash) !== modules || [...layouts.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
+      return loaded(drawing.hash, modules, ended ? undefined : channel.port2);
+    }).then(
+      () => {
+        if (ended) return;
+        const load = sandbox.loads.get(drawing.hash);
+        if (load) load.stopped = () => !ended && (end(), failed('It did not answer for 12 seconds and was stopped.'));
+      },
+      (err) => !ended && failed(err.message),
+    );
+  };
+  const toDrawing = (message) => !ended && (begin(), port.postMessage(message));
+  const end = () => ((ended = true), reshape?.disconnect(), host.moves?.stop(), surface?.end(), begun && port.postMessage({ type: 'end' }), port.close());
   host.endDrawing = end;
-  const send = (event) => !ended && port.postMessage({ type: 'event', event });
+  // What this host shows, while it shows it: what the picture is drawn from, and the marks it mounted (null until then).
+  let showing = null;
+  host.drawn = named.key;
+  host.drawnLive = () => !ended && !broken && (!showing || (showing.length > 0 && showing.every((n) => n.parentNode === host)));
+  const send = (event) => toDrawing({ type: 'event', event });
   // Every event is told as it is. A click on a mark keyed for a held change (`held:<proposal>…`, HELD) also asks the page to put that change to
   // the person, where it is drawn (`drawing-held` on the host): the drawing only says where; the page says what it is.
   // A drop says which mark it came from (`from`).
@@ -208,26 +287,23 @@ export function drawWith(host, answer, style, keep) {
     else ((host.hovered = null), tip.hide());
   });
   // A surface has no marks for the page to light: its drawing is told what is lit, and paints it.
-  host.lightSurface = (ids) => surface && port.postMessage({ type: 'event', event: { name: 'light', ids } });
+  host.lightSurface = (ids) => surface && toDrawing({ type: 'event', event: { name: 'light', ids } });
   port.onmessage = (ev) => {
     const said = ev.data ?? {};
     // A picture taken off the page is ended: its worker forgets it.
     if (!host.isConnected && mounted) return end();
     try {
       // A scene already mounted from what was kept is the same scene: the worker's is for what comes after (hovering, lighting).
-      if (said.type === 'scene' && kept) return;
+      if (said.type === 'scene' && given) return;
       if (said.type === 'scene') {
         const got = performance.now();
         mounted = true;
-        mount(said.scene ?? {});
-        hovered();
+        put(said.scene ?? {});
         // Drawn once its marks are mounted, and a surface over them has shown its first frame.
         (surface ? surface.first : Promise.resolve()).then(() => saidDrawn(host, 'drawn'));
         for (const list of early.splice(0)) apply(list);
         if (moving.size) requestAnimationFrame(run);
-        scenes.delete(seen);
-        scenes.set(seen, said.scene ?? {});
-        if (scenes.size > 24) scenes.delete(scenes.keys().next().value);
+        keepScene(named.key, said.scene ?? {}, named.weight);
         performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got) } });
       }
       else if (said.type === 'patch' && !mounted) early.push(said.list);
@@ -253,23 +329,27 @@ export function drawWith(host, answer, style, keep) {
       failed(err.message);
     }
   };
-  const { style: _sent, first: opening, ...shown } = answer;
-  const { drawing: _code, code: _canvas, ...fields } = style;
-  // The titles of the types the picture holds, as this page knows them: a drawing has no registry of its own.
-  const types = Object.fromEntries([...new Set((shown.items ?? []).flatMap((i) => [i.type, i.root]).filter(Boolean))].map((t) => [t, typeTitle(t)]));
-  // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
-  const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
-  // What the session may do (packs/kit/page/base.js may): a drawing that opts into gestures draws no handle where it may not write.
-  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, may: [...(state.may ?? [])] };
-  const seen = `${drawing.hash}
-${JSON.stringify(input)}`;
-  const kept = scenes.get(seen);
-  // Told what to draw before anything else, so what happens on the page waits behind it: the channel keeps it until the worker has the other end.
-  port.postMessage({ type: 'start', input });
+  /** A scene mounted, and the marks it put on the host remembered, so the same asked again finds them there. */
+  function put(scene) {
+    mount(scene);
+    hovered();
+    showing = [...host.childNodes];
+  }
+  // A picture drawn before from the same is mounted now, and its drawing not run (above, `begin`); measured as a
+  // drawing that took nothing. One with a surface is painted by its drawing, so it is drawn again.
+  const given = scenes.get(named.key)?.scene;
+  if (given && !given.surface) {
+    const got = performance.now();
+    keepScene(named.key, given, named.weight);
+    mounted = true;
+    put(given);
+    saidDrawn(host, 'drawn');
+    performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: 0, mount: Math.round(performance.now() - got), kept: true } });
+    return;
+  }
   // A picture published with its first frame (packs/publish/kernel/published-frames.ts) has it on screen now; the drawing's own scene
   // takes its place when it answers.
-  if (kept) ((mounted = true), mount(kept), hovered(), saidDrawn(host, 'drawn'));
-  else if (opening) {
+  if (opening) {
     // Checked as any scene is: one that says what a drawing may not is not drawn, and the drawing draws the picture.
     try {
       mount(opening);
@@ -279,17 +359,7 @@ ${JSON.stringify(input)}`;
       host.replaceChildren();
     }
   }
-  code.then((modules) => {
-    if (layouts.get(drawing.hash) !== modules || [...layouts.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
-    return loaded(drawing.hash, modules, ended ? undefined : channel.port2);
-  }).then(
-    () => {
-      if (ended) return;
-      const load = sandbox.loads.get(drawing.hash);
-      if (load) load.stopped = () => !ended && (end(), failed('It did not answer for 12 seconds and was stopped.'));
-    },
-    (err) => !ended && failed(err.message),
-  );
+  begin();
 
   /**
    * The key, in the frame every key has: a scene says what its marks mean (`key`: each { glyph, label, item }, a glyph
@@ -309,7 +379,7 @@ ${JSON.stringify(input)}`;
   function mount(scene) {
     transition(host, keys, style);
     if (scene.message) return host.replaceChildren(h('div', { class: 'empty' }, String(scene.message)));
-    const redraw = () => !ended && port.postMessage({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
+    const redraw = () => toDrawing({ type: 'restyle', style: plain({ ...style, drawing: undefined, code: undefined }) });
     host.redraw = redraw;
     if (stillReading(host, scene, keys)) return redraw();
     // What a look hands on as marks (ui/look-marks.js): the scene the sandbox answered with, as it answered.
@@ -366,7 +436,7 @@ ${JSON.stringify(input)}`;
     const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, over, legend);
     host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
     if (input.height > 0) followShape(scene);
-    const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, beside: sheetAside, told: (view) => !ended && port.postMessage({ type: 'viewport', view }) }));
+    const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, beside: sheetAside, told: (now) => (begun ? toDrawing({ type: 'viewport', view: now }) : (view = now)) }));
     const zoom = h(
       'span',
       { class: 'switch' },
