@@ -3,7 +3,7 @@
 .beat summary { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-4) var(--space-8); cursor: pointer; list-style: none; white-space: nowrap; }
 .beat summary::-webkit-details-marker { display: none; }
 .beat summary .n { flex: none; min-width: var(--rhythm-8); color: var(--muted); font-size: var(--text-2); text-align: right; }
-.beat summary .said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.beat summary .said { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-family: var(--type-agent-family, inherit); font-weight: var(--type-agent-weight, normal); }
 .beat summary .ago { flex: none; }
 .beat:hover summary, .beat summary:focus-visible { background: var(--accent-soft); }
 .beat.found summary .said { font-weight: 600; }
