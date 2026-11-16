@@ -18,6 +18,8 @@ import { saidDrawn } from './look.js';
 import { relations, types as registry, typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
 import { transition } from './transition.js';
+import { pictureKey } from './picture-name.js';
+import { keepScene, keptPictures, scenes } from './pictures-kept.js';
 
 /** A held change's id, as a drawing names it in the key of the mark that decides it: `held:<id>`. */
 export const HELD = /^held:(p_[a-z0-9]+)/;
@@ -47,46 +49,10 @@ function keepDrawing(hash, modules) {
   }
 }
 const sheets = new Map();
-/**
- * The pictures drawn lately: each scene a drawing answered, by a name of all it was drawn from (`pictureKey`). A picture
- * is its answer, style, code and room alone, so one asked again from the same (a canvas gone back to, a view switched
- * back) is mounted from what was kept, and its drawing is not run until the picture needs it (`begin`, below). Kept in
- * this page alone: at most `keeping.most` of them, weighing at most `keeping.weight` characters of what they were drawn from.
- */
-const scenes = new Map();
-const keeping = { most: 24, weight: 2 ** 25, held: 0 };
-function keepScene(key, scene, weight) {
-  if (scenes.has(key)) keeping.held -= scenes.get(key).weight;
-  scenes.delete(key);
-  scenes.set(key, { scene, weight });
-  keeping.held += weight;
-  for (const [old, one] of scenes) {
-    if (scenes.size <= keeping.most && keeping.held <= keeping.weight) break;
-    scenes.delete(old);
-    keeping.held -= one.weight;
-  }
-}
-/** A long text's name: two 32-bit hashes of it (cyrb53's mixing) and its length. Not for secrets: for telling pictures apart. */
-function nameOf(text) {
-  let a = 0x9e3779b9 ^ text.length, b = 0x85ebca6b ^ text.length;
-  for (let i = 0; i < text.length; i++) {
-    const c = text.charCodeAt(i);
-    a = Math.imul(a ^ c, 2654435761);
-    b = Math.imul(b ^ c, 1597334677);
-  }
-  a = Math.imul(a ^ (a >>> 16), 2246822507) ^ Math.imul(b ^ (b >>> 13), 3266489909);
-  b = Math.imul(b ^ (b >>> 16), 2246822507) ^ Math.imul(a ^ (a >>> 13), 3266489909);
-  return `${(b >>> 0).toString(16)}${(a >>> 0).toString(16)}:${text.length}`;
-}
-/**
- * What a picture was drawn from, named: the drawing's code (its hash) and all it is handed, but the log position its
- * answer was read at (`pos`), which says when, not what: no drawing reads it.
- */
-function pictureKey(hash, input) {
-  const { pos: _pos, ...answer } = input.answer ?? {};
-  const text = JSON.stringify({ ...input, answer });
-  return { key: `${hash}|${nameOf(text)}`, weight: text.length };
-}
+/** What this browser keeps across reloads, apart for each person in each workspace: read when the frame is started. */
+let stored;
+const scopeOf = (w) => (w?.workspace?.id ? `${w.workspace.id}|${w.actor?.id ?? w.actor?.name ?? ''}` : null);
+const kept = () => (stored ??= keptPictures(whoami().then(scopeOf, () => null)));
 let sandbox;
 /** What the frame says, heard by one listener for the page, about the frame started last. */
 let hearing = false;
@@ -121,7 +87,8 @@ export function warmLayouts() {
   if (frame !== given) document.documentElement.append(frame);
   // Started before this listened, it may have said it was ready already: it is asked.
   else frame.contentWindow?.postMessage({ type: 'ready?' }, '*');
-  // What this browser drew last is loaded now, before an answer asks for it.
+  // What this browser drew last is loaded now, before an answer asks for it, and the names of the pictures it kept read.
+  kept();
   for (const [hash, modules] of layouts) loaded(hash, modules).catch(() => {});
   return sandbox;
 }
@@ -184,8 +151,12 @@ export function drawWith(host, answer, style, keep) {
   // A picture that is panned is laid out for its pane with the sheet shut, so the sheet opening never changes its shape; one drawn to the page's width takes the room there is.
   const across = drawing?.flat ? host.clientWidth : host.clientWidth / (1 - sheetAside());
   // What the session may do (packs/kit/page/base.js may): a drawing that opts into gestures draws no handle where it may not write.
-  const input = { answer: shown, style: plain(fields), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, may: [...(state.may ?? [])] };
-  const named = drawing?.hash ? pictureKey(drawing.hash, input) : null;
+  // The style is said once: handed to the drawing as that text read back, and named by it (./picture-name.js).
+  const styleText = JSON.stringify(fields);
+  const input = { answer: shown, style: JSON.parse(styleText), types, ...typeWords(shown), width: across, height: host.clientHeight, reduced: matchMedia('(prefers-reduced-motion: reduce)').matches, may: [...(state.may ?? [])] };
+  const naming = performance.now();
+  const named = drawing?.hash ? pictureKey(drawing.hash, input, styleText) : null;
+  performance.measure('picture-named', { start: naming, detail: drawing?.id });
   // The picture this host shows, asked for again (an answer read again that moved nothing, the server agreeing with what
   // the page drew first) is left as it is: nothing is drawn, and the view stays where the reader left it.
   if (named && host.drawn === named.key && host.drawnLive?.()) return;
@@ -304,6 +275,7 @@ export function drawWith(host, answer, style, keep) {
         for (const list of early.splice(0)) apply(list);
         if (moving.size) requestAnimationFrame(run);
         keepScene(named.key, said.scene ?? {}, named.weight);
+        if (!said.scene?.surface) kept().keep(named.key, said.scene ?? {}, drawing.id, drawing.hash);
         performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got) } });
       }
       else if (said.type === 'patch' && !mounted) early.push(said.list);
@@ -335,31 +307,46 @@ export function drawWith(host, answer, style, keep) {
     hovered();
     showing = [...host.childNodes];
   }
-  // A picture drawn before from the same is mounted now, and its drawing not run (above, `begin`); measured as a
-  // drawing that took nothing. One with a surface is painted by its drawing, so it is drawn again.
-  const given = scenes.get(named.key)?.scene;
-  if (given && !given.surface) {
+  // A picture drawn before from the same, on this page or kept by this browser (./pictures-kept.js), is mounted now,
+  // and its drawing not run (above, `begin`); measured as a drawing that took nothing. One with a surface is painted by
+  // its drawing, so it is drawn again. One from storage is checked as every scene is: failing, it is laid out.
+  let given = null;
+  const mountKept = (scene, stored) => {
+    if (!scene || scene.surface) return false;
     const got = performance.now();
-    keepScene(named.key, given, named.weight);
-    mounted = true;
-    put(given);
-    saidDrawn(host, 'drawn');
-    performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: 0, mount: Math.round(performance.now() - got), kept: true } });
-    return;
-  }
-  // A picture published with its first frame (packs/publish/kernel/published-frames.ts) has it on screen now; the drawing's own scene
-  // takes its place when it answers.
-  if (opening) {
-    // Checked as any scene is: one that says what a drawing may not is not drawn, and the drawing draws the picture.
     try {
-      mount(opening);
-      hovered();
-      mounted = true;
+      put(scene);
     } catch {
       host.replaceChildren();
+      return false;
     }
-  }
-  begin();
+    given = scene;
+    mounted = true;
+    keepScene(named.key, scene, named.weight);
+    saidDrawn(host, 'drawn');
+    performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: 0, mount: Math.round(performance.now() - got), kept: true, ...(stored && { stored: true }) } });
+    return true;
+  };
+  // Else it is drawn. A picture published with its first frame (packs/publish/kernel/published-frames.ts) has it on
+  // screen now; the drawing's own scene takes its place when it answers.
+  const drawn = () => {
+    if (opening) {
+      // Checked as any scene is: one that says what a drawing may not is not drawn, and the drawing draws the picture.
+      try {
+        mount(opening);
+        hovered();
+        mounted = true;
+      } catch {
+        host.replaceChildren();
+      }
+    }
+    begin();
+  };
+  if (mountKept(scenes.get(named.key)?.scene, false)) return;
+  // Asked of storage only where it may hold it: one it does not hold is known at once, and laid out with no wait.
+  const asking = kept().find(named.key);
+  if (asking) asking.then((scene) => !ended && !mounted && !mountKept(scene, true) && drawn());
+  else drawn();
 
   /**
    * The key, in the frame every key has: a scene says what its marks mean (`key`: each { glyph, label, item }, a glyph
