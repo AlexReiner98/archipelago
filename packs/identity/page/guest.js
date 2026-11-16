@@ -27,8 +27,8 @@ const TITLE = 'Try it with your agent';
 const FIRST_QUERY = `${['work', 'aim', 'question'].map((t) => `find=${encodeURIComponent(`type ${t}`)}`).join('&')}&over=waits_on&steps=1`;
 
 /**
- * The first moments on a new guest map (e_afpvmy78, critiqued with the owner 16 Nov 2026): one card in the middle, over
- * a faint picture of what is coming, and nothing of the app around it, since nothing there is any use yet. It says what
+ * The first moments on a new guest map (e_afpvmy78, critiqued with the owner 16 Nov 2026): one card in the middle, and
+ * nothing of the app around it, since nothing there is any use yet. It says what
  * the visitor gets, gives them the one thing to do (Copy), and says where the wait stands: waiting, the agent reading
  * their project (it has read its link: GET /guest/read), then drawing. The first item lands and the card gives way to
  * the canvas, still quiet, while the agent draws the work; the next change brings the app back. Kept for the map just
@@ -78,31 +78,6 @@ function stage(first, now) {
 /** The project the agent named, as the replica holds it (packs/surface/page/live.js), among what a change touched. */
 const projectOf = (touched) => (touched?.ids ?? []).map((id) => hooks.store?.()?.items?.get(id)).find((r) => r?.title && !r.archived_at)?.title;
 
-/**
- * A faint map behind the card: a project, its parts and their work, marked done, under way and next, and a question
- * waiting on the visitor. Shapes only: their own words replace it.
- */
-function sketch() {
-  const ns = 'http://www.w3.org/2000/svg';
-  const el = (tag, attrs) => Object.entries(attrs).reduce((n, [k, v]) => (n.setAttribute(k, v), n), document.createElementNS(ns, tag));
-  const svg = el('svg', { class: 'first-sketch', viewBox: '0 0 1000 600', preserveAspectRatio: 'xMidYMid meet', 'aria-hidden': 'true' });
-  const wire = (x1, y1, x2, y2) => svg.append(el('path', { class: 'first-wire', d: `M${x1} ${y1} V${(y1 + y2) / 2} H${x2} V${y2}` }));
-  const node = (x, y, w, mark) => {
-    svg.append(el('rect', { class: 'first-node', x, y, width: w, height: 34, rx: 4 }), el('rect', { class: 'first-line', x: x + 26, y: y + 14, width: w * 0.55, height: 6, rx: 3 }));
-    if (mark) svg.append(el('circle', { class: `first-mark first-${mark}`, cx: x + 13, cy: y + 17, r: 5 }));
-  };
-  const parts = [[120, 'done', 'doing', 'todo'], [420, 'done', 'done', 'doing'], [720, 'doing', 'todo', 'todo']];
-  for (const [x] of parts) wire(500, 94, x + 80, 170);
-  wire(500, 94, 500, 500);
-  node(420, 60, 160);
-  for (const [x, ...work] of parts) {
-    node(x, 170, 160);
-    work.forEach((m, i) => (wire(x + 80, 204 + i * 54, x + 80, 250 + i * 54), node(x + 10, 250 + i * 54, 140, m)));
-  }
-  node(400, 500, 200, 'ask');
-  return svg;
-}
-
 /** The card: what they get, Copy, three steps, and where the wait stands. */
 function drawCard(first) {
   if (card) return;
@@ -121,7 +96,6 @@ function drawCard(first) {
   card = h(
     'div',
     { class: 'first' },
-    sketch(),
     h(
       'div',
       { class: 'first-card' },
