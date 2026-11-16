@@ -19,7 +19,7 @@ import { relations, types as registry, typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
 import { transition } from './transition.js';
 import { pictureKey } from './picture-name.js';
-import { keepScene, keptPictures, scenes } from './pictures-kept.js';
+import { keepScene, keptHere, scenes } from './pictures-kept.js';
 
 /** A held change's id, as a drawing names it in the key of the mark that decides it: `held:<id>`. */
 export const HELD = /^held:(p_[a-z0-9]+)/;
@@ -50,9 +50,8 @@ function keepDrawing(hash, modules) {
 }
 const sheets = new Map();
 /** What this browser keeps across reloads, apart for each person in each workspace: read when the frame is started. */
-let stored;
-const scopeOf = (w) => (w?.workspace?.id ? `${w.workspace.id}|${w.actor?.id ?? w.actor?.name ?? ''}` : null);
-const kept = () => (stored ??= keptPictures(whoami().then(scopeOf, () => null)));
+const scopeOf = (w) => (w?.workspace?.id ? `${w.workspace.id}|${w.actor?.person ?? w.actor?.token ?? w.actor?.name ?? ''}` : null);
+const kept = () => keptHere(() => whoami().then(scopeOf, () => null));
 let sandbox;
 /** What the frame says, heard by one listener for the page, about the frame started last. */
 let hearing = false;

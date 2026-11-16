@@ -4,7 +4,10 @@
 // back is trusted no more than a drawing: it is mounted through the same checks as every scene (./marks.js), and
 // one that fails them is laid out instead. Bounded in count and characters for each scope; a drawing whose code
 // changed has its pictures dropped. Storage refused (a private window, blocked site data) keeps nothing, and the
-// page draws as it would without it.
+// page draws as it would without it. Signed out, or signed in as another, all of it is let go (packs/kit/page/base.js):
+// what one person was shown is never drawn for the next.
+
+import { PICTURES_KEPT, SIGNED_IN } from './signed-in.js';
 
 /**
  * The pictures this page drew lately: each scene a drawing answered, by a name of all it was drawn from
@@ -27,24 +30,29 @@ export function keepScene(key, scene, weight) {
   }
 }
 
-const DB = 'pelago-pictures';
 const NAMES = 'names', SCENES = 'scenes';
 /** How many pictures a scope keeps, and how many characters of scene in all. */
 export const storing = { most: 48, weight: 2 ** 24 };
 
-let opened;
+let opened, open = null, current = null;
 /** The database, or null where storage is refused. */
 function db() {
   opened ??= new Promise((resolve) => {
     try {
-      const asked = indexedDB.open(DB, 1);
+      const asked = indexedDB.open(PICTURES_KEPT, 1);
       asked.onupgradeneeded = () => {
         const made = asked.result;
         made.createObjectStore(NAMES, { keyPath: 'id' }).createIndex('scope', 'scope');
         made.createObjectStore(SCENES, { keyPath: 'id' });
       };
       // One made by something else under this name, without the stores, is not used.
-      asked.onsuccess = () => (asked.result.objectStoreNames.contains(NAMES) && asked.result.objectStoreNames.contains(SCENES) ? resolve(asked.result) : (asked.result.close(), resolve(null)));
+      asked.onsuccess = () => {
+        const got = asked.result;
+        if (!got.objectStoreNames.contains(NAMES) || !got.objectStoreNames.contains(SCENES)) return (got.close(), resolve(null));
+        // Deleted (a sign-out, here or in another tab): let go at once, so the deleting is not held up.
+        got.onversionchange = () => got.close();
+        resolve((open = got));
+      };
       asked.onerror = asked.onblocked = () => resolve(null);
     } catch {
       resolve(null);
@@ -57,16 +65,34 @@ const done = (req) => new Promise((resolve, reject) => ((req.onsuccess = () => r
 const ended = (tx) => new Promise((resolve, reject) => ((tx.oncomplete = resolve), (tx.onerror = tx.onabort = () => reject(tx.error))));
 
 /**
+ * What this browser keeps for whoever is signed in (`scope`, a function giving the promise `keptPictures` takes), asked
+ * once until they sign out or another signs in.
+ */
+export const keptHere = (scope) => (current ??= keptPictures(scope()));
+
+// Signed out or in as another: the pictures this page holds go, and the store is closed for the deleting.
+addEventListener(SIGNED_IN, () => {
+  scenes.clear();
+  keeping.held = 0;
+  current?.forget();
+  current = null;
+  open?.close();
+  open = null;
+  opened = undefined;
+});
+
+/**
  * What this browser keeps for one scope (`scope`: a promise of the person and workspace, or of null where the page is
  * not signed in): the names it holds are read once, so a picture it does not hold is known at once and laid out
  * with no wait.
  */
 export function keptPictures(scope) {
-  let names = null;
+  let names = null, gone = false;
   const read = Promise.resolve(scope).then(async (who) => {
     const base = who && (await db());
     if (!base) return null;
     const rows = await done(base.transaction(NAMES).objectStore(NAMES).index('scope').getAll(who));
+    if (gone) return null;
     names = new Map(rows.map((r) => [r.name, r]));
     return { base, who };
   }).catch(() => null).then((at) => {
@@ -82,7 +108,7 @@ export function keptPictures(scope) {
   const find = (name) => {
     if (names && !names.has(name)) return null;
     return read.then(async (at) => {
-      const row = at && names?.get(name);
+      const row = at && !gone && names?.get(name);
       if (!row) return null;
       const got = await done(at.base.transaction(SCENES).objectStore(SCENES).get(row.id));
       const scene = got?.scene;
@@ -98,7 +124,7 @@ export function keptPictures(scope) {
   const keep = (name, scene, drawing, hash) => {
     const idle = globalThis.requestIdleCallback ?? ((fn) => setTimeout(fn, 200));
     idle(() => void read.then(async (at) => {
-      if (!at || !names) return;
+      if (!at || !names || gone) return;
       let weight;
       try {
         weight = JSON.stringify(scene).length;
@@ -128,5 +154,11 @@ export function keptPictures(scope) {
     }).catch(() => {}));
   };
 
-  return { find, keep };
+  /** Let go: nothing more is found or kept by this one. */
+  const forget = () => {
+    names = new Map();
+    gone = true;
+  };
+
+  return { find, keep, forget };
 }
