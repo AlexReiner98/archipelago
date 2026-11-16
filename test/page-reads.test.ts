@@ -1,6 +1,6 @@
 // How the page reads the server (task e_bmh2braj): the same read is never sent twice at once, reads asked together go
 // as one request (packs/kit/page/reads.js) and are answered there each as alone (packs/surface/kernel/reads.ts), what
-// does not change between clicks is kept until the map moves, and the page's get leaves out what no page draws.
+// moves only with the map is kept with where the map stood and asked again with it (task e_mvuvfba7), and the page's get leaves out what no page draws.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -16,7 +16,7 @@ function counted() {
   const sent: (Call | Call[])[] = [];
   const one = async (tool: string, input: Record<string, unknown>) => (sent.push({ tool, input }), { tool, input });
   const many = async (calls: Call[]) => (sent.push(calls), calls.map((c) => (c.tool === 'events' ? { error: 'no' } : { result: { tool: c.tool, input: c.input } })));
-  return { sent, ...(reader(one, many, (tool: string) => tool === 'pack_rows') as { api: (tool: string, input?: unknown) => Promise<{ tool: string; input: Record<string, unknown> }>; forget: () => void }) };
+  return { sent, ...(reader(one, many, (tool: string) => tool === 'pack_rows') as { api: (tool: string, input?: unknown) => Promise<{ tool: string; input: Record<string, unknown> }> }) };
 }
 
 test('reads asked together go as one request, the same read once, and each asker has its own answer', async () => {
@@ -31,23 +31,51 @@ test('reads asked together go as one request, the same read once, and each asker
   await assert.rejects(Promise.all([api('events', { target: 'e_aaaaaaaa' }), api('search', { q: 'x' })]), /no/, 'one read refused is said to its asker');
 });
 
-test('a lone read goes under its own name, and what is kept is asked again once the map moves or the page writes', async () => {
-  const { sent, api, forget } = counted();
-  await api('view', { name: 'shared', params: {} });
-  assert.deepEqual(sent, [{ tool: 'view', input: { name: 'shared', params: {} } }]);
-  await api('view', { name: 'shared', params: {} });
+test('a lone read goes under its own name; what moves with the map is kept with where it stood and asked again with it', async () => {
+  const sent: unknown[] = [];
+  let stands = 'a', reads = 0;
+  const one = async (tool: string, input: Record<string, unknown>) => (sent.push({ tool, input }), { tool, input });
+  // A fake server: a kept read answered with where the map stands, unchanged when asked with it.
+  const many = async (calls: (Call & { since?: string })[]) => (
+    sent.push(calls),
+    calls.map((c) => (c.since === stands ? { unchanged: true } : c.tool === 'view' || c.tool === 'proposals' ? { result: { n: ++reads }, at: stands } : { result: { tool: c.tool } }))
+  );
+  const { api } = reader(one, many) as { api: (tool: string, input?: unknown) => Promise<Record<string, unknown>> };
   await api('get', { id: 'e_aaaaaaaa' });
-  await api('get', { id: 'e_aaaaaaaa' });
-  assert.equal(sent.length, 3, 'what is shared kept; an item asked again once its first answer is in');
-  await api('tail', {});
-  await api('view', { name: 'shared', params: {} });
-  assert.equal(sent.length, 4, 'following the log lets go of nothing');
-  forget();
-  await api('view', { name: 'shared', params: {} });
-  assert.equal(sent.length, 5, 'the map moved: asked again');
+  assert.deepEqual(sent.pop(), { tool: 'get', input: { id: 'e_aaaaaaaa', bare: true } }, 'a lone read that is not kept goes under its own name');
+  const first = await api('view', { name: 'saved_views', params: {} });
+  assert.deepEqual(sent.pop(), [{ tool: 'view', input: { name: 'saved_views', params: {} } }], 'a kept read goes among reads, alone or not');
+  const again = await api('view', { name: 'saved_views', params: {} });
+  assert.deepEqual(sent.pop(), [{ tool: 'view', input: { name: 'saved_views', params: {} }, since: 'a' }], 'asked again with where the map stood');
+  assert.deepEqual(again, first, 'unchanged: the kept answer is handed out');
+  assert.notEqual(again, first, 'as a copy');
   await api('change', { ops: [] });
-  await api('view', { name: 'shared', params: {} });
-  assert.equal(sent.length, 7, 'a write lets go of what was kept');
+  stands = 'b';
+  const moved = await api('view', { name: 'saved_views', params: {} });
+  assert.equal(moved.n, 2, 'the map moved: the new answer, with no letting go');
+  await Promise.all([api('proposals'), api('search', { q: 'x' })]);
+  assert.deepEqual((sent.pop() as Call[]).map((c) => c.tool), ['proposals', 'search']);
+  await api('proposals');
+  assert.equal((sent.pop() as { since?: string }[])[0].since, 'b');
+});
+
+test('the server answers a kept read unchanged while the map stands, and anew once anything it shows moves', async () => {
+  const { call } = await serve('off');
+  const views = { tool: 'view', input: { name: 'saved_views', params: {} } };
+  const ask = async (...calls: object[]) => (await call('/api/reads', undefined, { calls })) as { result: { result?: unknown; at?: string; unchanged?: true; error?: string }[]; headers?: Headers };
+  const [first, held] = (await ask(views, { tool: 'proposals', input: {} })).result;
+  assert.ok(typeof first.at === 'string' && first.at === held.at, 'each kept read says where the map stood');
+  const [same, plain] = (await ask({ ...views, since: first.at }, { tool: 'search', input: { q: 'x' } })).result;
+  assert.deepEqual(same, { unchanged: true }, 'nothing moved: unchanged, not read');
+  assert.equal(plain.at, undefined, 'a read not kept carries no position');
+  assert.ok(Array.isArray(plain.result));
+  // A view saved anywhere moves where the map stands: the next ask has it.
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'lens', title: 'Saved just now', props: { filter: { find: ['type task'] }, walk: { over: [], steps: 0 } } }] });
+  const [after] = (await ask({ ...views, since: first.at })).result;
+  assert.notEqual(after.at, first.at);
+  assert.ok((after.result as { pictures: { title: string }[] }).pictures.some((p) => p.title === 'Saved just now'), 'the view saved is in the new answer');
+  const [stale] = (await ask({ ...views, since: 'somewhere else' })).result;
+  assert.ok(stale.result && stale.at === after.at, 'a position not where the map stands is answered whole');
 });
 
 test('more reads than one request carries go in turn', async () => {

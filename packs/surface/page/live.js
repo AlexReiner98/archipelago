@@ -1,4 +1,4 @@
-import { api, forgetReads, h, hooks, main, route, state, whoami } from './base.js';
+import { api, h, hooks, main, route, state, whoami } from './base.js';
 import { project } from './project.js';
 import { beatRows, missedRows } from './beat-rows.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
@@ -323,8 +323,8 @@ export async function checkTail() {
   state.stamp = now;
   if (more) setTimeout(checkTail);
   if (!moved) return;
-  // The map moved: what the page kept of it between clicks (the parts, saved views, styles) is asked again.
-  forgetReads();
+  // The map moved. What the page keeps of it between clicks (the parts, saved views, styles) needs no letting go: it is
+  // kept with where the map stood, and the next ask of it has the new answer (packs/kit/page/reads.js).
   if (state.selfDrawn) return void (state.selfDrawn = false);
   // Only the map moved, and nothing of it is on the sheet: it stays as it is, and the canvas asks again if
   // it is on it (drawn again only where its answer changed).
