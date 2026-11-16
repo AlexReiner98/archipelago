@@ -40,12 +40,9 @@ const SHARED = `,
   (select count(*)::text || '.' || coalesce(sum(xmin::text::bigint), 0)::text from share) as sh,
   (select count(*)::text || '.' || coalesce(sum(xmin::text::bigint), 0)::text from public_view) as pv`;
 
-/** And what a read of the work weighs. */
+/** And what a read of the work weighs, counted past the row policies by the function of step 50 (./work-stands.ts). */
 const WORK = `,
-  (select max(pos)::text from log_op where stream = 'sessions') as se, -- index log_op_pos
-  (select max(pos)::text from log_op where stream = 'claims') as cl, -- index log_op_pos
-  (select md5(coalesce(string_agg(key || '=' || value::text, ',' order by key), '')) from setting) as st,
-  (select md5(coalesce(string_agg(key || '@' || until::text, ',' order by key), '')) from transient where key like 'touched:%') as tc`;
+  pelago_work_stands() as w`;
 
 /** Where the map stands: `map` for a read of the map, `shared` (when asked) for a read of what is shared too. */
 export interface Stands {
@@ -58,18 +55,18 @@ export interface Stands {
  * asks (their kind, person, and token), read through `db` as they see the map; `shared` reads what is shared too.
  */
 export async function standsAt(db: Q, reader: string, shared = false, work = false): Promise<Stands> {
-  type Row = { f: string | null; p: string | null; s: string | null; sh?: string; pv?: string; se?: string | null; cl?: string | null; st?: string; tc?: string };
+  type Row = { f: string | null; p: string | null; s: string | null; sh?: string; pv?: string; w?: string };
   const { rows } = await db.query<Row>(HEADS + (shared ? SHARED : '') + (work ? WORK : ''));
   const r = rows[0];
-  const worked = work ? [r.se ?? 0, r.cl ?? 0, r.st!.slice(0, 12), r.tc!.slice(0, 12)] : [];
+  const worked = work ? [r.w] : [];
   const map = [STARTED, new Date().toISOString().slice(0, 10), r.f ?? 0, r.p ?? 0, r.s ?? 0, ...worked, reader].join(':');
   return { map, ...(shared && { shared: [map, r.sh, r.pv].join(':') }) };
 }
 
 /**
- * Where the map stands for a read of the work, as one value: what a server keeps an answer under (packs/loader/kernel/kept.ts),
- * whoever reads. Read as the whole database, past row-level security: what moved is not anyone's to see, only that it did.
+ * Where the map stands for a read of the work, as one value: what a server keeps an answer under (packs/loader/kernel/kept.ts).
+ * Read through the reader's own database: what the reader may not see is only counted, by step 50's function.
  */
-export async function mapClock(whole: Q): Promise<string> {
-  return (await standsAt(whole, '', false, true)).map;
+export async function mapClock(db: Q): Promise<string> {
+  return (await standsAt(db, '', false, true)).map;
 }

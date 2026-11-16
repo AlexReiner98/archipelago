@@ -11,6 +11,7 @@ import { makePartitions, PARTITION } from './partitions.ts';
 import { SNAPSHOT } from './snapshot.ts';
 import { CLOSURE } from './closure.ts';
 import { ITEM_BYTES } from './bytes.ts';
+import { WORK_STANDS } from './work-stands.ts';
 
 export const STEPS: StepPart[] = [
   { version: 18, name: 'the log: change sets appended, hash-chained', sql: LOG },
@@ -27,6 +28,7 @@ export const STEPS: StepPart[] = [
   // What a forget reaches of the stores follows, the write root's (packs/write/kernel/steps.ts).
   { version: 34, name: 'the event table, carried into the activity stream and gone', sql: EVENT_GONE, before: carryEventTable },
   { version: 38, name: 'what the compacted streams say about an item, found by its index under the row policy', sql: OP_ABOUT },
+  { version: 50, name: 'where a read of the work stands, counted past the row policies and only counted', sql: WORK_STANDS },
 ];
 
 /** Each time a database is opened, once its steps are in: the log's partitions, made ahead of need (packs/log/kernel/partitions.ts). */

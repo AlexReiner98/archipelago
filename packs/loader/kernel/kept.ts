@@ -4,7 +4,7 @@
 // (packs/log/kernel/position.ts, mapClock) and given again while the map stands there: a canvas whose filter changed one term
 // asks the frontier, the views and the style again, and only the term that changed is read.
 //
-// Kept per database and per reader, never across: the key is the database the map is of, the registry it is read
+// Kept per map and per reader, never across: the key is the registry the map is read
 // through, the reader's scope (packs/database/kernel/db.ts: the viewer, whether an admin, whether they only read),
 // the service and its input. A reader of no known scope (anyone with no login, a handle that names none) is never
 // kept for. What a read weighs by the clock (what is due, how far back is recent) may lag by AGE_MS at most: an answer
@@ -12,7 +12,6 @@
 // asked dropped first, and none whose input is over INPUT_MOST.
 
 import type { Archipelago } from '../../write/kernel/pelago.ts';
-import type { Db } from '../../database/kernel/db.ts';
 import { mapClock } from '../../log/kernel/position.ts';
 import { keptCall } from '../../../src/timing.ts';
 
@@ -25,8 +24,8 @@ const INPUT_MOST = 8_000;
 
 type Kept = { clock: string; at: number; answer: Promise<unknown> };
 
-/** The answers kept, by the database they were read from. */
-const stores = new WeakMap<Db, Map<string, Kept>>();
+/** The answers kept, by the registry the map is read through: one store for every reader of a workspace (each answer still the reader's own, by its key). Two databases that share a registry (a map rebuilt from the same log) stand at the same place only when their logs do, and then answer the same. */
+const stores = new WeakMap<object, Map<string, Kept>>();
 /** Each registry as a number, for a key: a map read through another registry (an island's) reads otherwise. */
 const registries = new WeakMap<object, number>();
 let registryCount = 0;
@@ -36,7 +35,8 @@ function readerOf(l: Archipelago): string | undefined {
   const scope = l.db.scope;
   if (scope === 'anyone') return undefined;
   if (scope !== undefined) return `${scope}|${l.props}`;
-  return l.viewer === undefined && l.db.whole === undefined ? `whole|${l.props}` : undefined;
+  // No scope and no viewer: the database itself, read as the system reads it.
+  return l.viewer === undefined ? `whole|${l.props}` : undefined;
 }
 
 /** A copy for each asker: what one does with an answer never reaches another's. */
@@ -50,13 +50,13 @@ export async function keptAnswer<T>(l: Archipelago, name: string, input: unknown
     keptCall(false);
     return read();
   }
-  const whole = l.db.whole ?? l.db;
-  let store = stores.get(whole);
-  if (!store) stores.set(whole, (store = new Map()));
+  let store = stores.get(l.registry);
+  if (!store) stores.set(l.registry, (store = new Map()));
   if (!registries.has(l.registry)) registries.set(l.registry, ++registryCount);
   const key = `${l.workspace}|${registries.get(l.registry)}|${reader}|${name}|${said}`;
-  // Where the map stands, read before the answer: the answer is never older than the clock it is kept under.
-  const clock = await mapClock(whole);
+  // Where the map stands, read before the answer, as the reader (what they may not see is only counted, by step 50):
+  // the answer is never older than the clock it is kept under.
+  const clock = await mapClock(l.db);
   const now = Date.now();
   const had = store.get(key);
   if (had && had.clock === clock && now - had.at < AGE_MS) {
@@ -75,5 +75,5 @@ export async function keptAnswer<T>(l: Archipelago, name: string, input: unknown
   return copy(await answer);
 }
 
-/** How many answers are kept for a map's database: for the tests. */
-export const keptCount = (l: Archipelago): number => stores.get(l.db.whole ?? l.db)?.size ?? 0;
+/** How many answers are kept for a map: for the tests. */
+export const keptCount = (l: Archipelago): number => stores.get(l.registry)?.size ?? 0;
