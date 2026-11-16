@@ -71,12 +71,19 @@ function timedDb<D extends Database>(db: D): D {
         if (out) back(t);
       });
   };
+  // query and transaction are the wrapper's own: one set on it (a test counting what is sent) replaces the wrapper's,
+  // as on a plain object, and never the database's beneath, which the wrapper itself calls.
+  const own: Record<'query' | 'transaction', unknown> = { query, transaction };
   return new Proxy(db, {
     get(target, key) {
-      if (key === 'query') return query;
-      if (key === 'transaction') return transaction;
+      if (key === 'query' || key === 'transaction') return own[key];
       const value = Reflect.get(target, key, target);
       return typeof value === 'function' ? value.bind(target) : value;
+    },
+    set(target, key, value) {
+      if (key === 'query' || key === 'transaction') own[key] = value;
+      else Reflect.set(target, key, value, target);
+      return true;
     },
   });
 }
