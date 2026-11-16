@@ -6,7 +6,8 @@
 // picture as it is scrolled reads (packs/reader/public/rails.js). Each item's mark says its item (`item`), for that
 // page to light the stop it stands at. Layer: marks. Its lengths are the style's: rails_stop_span, rails_stop_room.
 
-import { picture as map } from './map.js';
+import { draw as map } from './map.js';
+import { spreading } from './spread.js';
 import { readingOrder } from './walk.js';
 
 /** A note's first paragraph, plain, for a stop's words. */
@@ -21,7 +22,7 @@ function said(mark) {
 }
 
 /** The picture: the map's, with its stops. */
-export function picture(args, tools) {
+function draw(args, tools) {
   const drawn = map(args, tools), scene = drawn.scene;
   if (!scene?.places?.length) return drawn;
   const { sizes = {} } = args.style, at = new Map(scene.places.map((p) => [p.id, p]));
@@ -35,3 +36,7 @@ export function picture(args, tools) {
   });
   return { ...drawn, scene: { ...scene, svg: said(scene.svg), stops, whole: { x: width / 2, y: height / 2, span: width, zoom: 1 } } };
 }
+
+/** Its starts spread as the map's are (./spread.js). */
+export const picture = spreading(draw);
+export { helpers } from './spread.js';

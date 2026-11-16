@@ -28,6 +28,9 @@ import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
+import { spreading } from './spread.js';
+
+export { helpers } from './spread.js';
 import { carried } from './carried.js';
 import { shapedBy } from './steps.js';
 import { play } from './play.js';
@@ -78,7 +81,8 @@ function outline(shape, x, y, w, hgt, rx, cut = 0) {
  * The graph: its steps, the wires and ties between them and what each choice is. `input` is what the page gives every
  * drawing (the answer, the style); `tools.measure(text, px, font, role)` is how wide a text is drawn, as one of the style's text roles when one is given.
  */
-export function picture({ answer: given, style, reduced, width, height }, tools) {
+/** The picture, drawn here alone: `picture` spreads the search's starts over helpers where it has them (./spread.js). */
+export function draw({ answer: given, style, reduced, width, height }, tools) {
   let answer = shownOnly(given);
   // A story lays out what its steps bring in, all of it, each mark hidden until a step shows it.
   const story = Array.isArray(answer.steps) && answer.steps.length > 0;
@@ -472,3 +476,5 @@ export function picture({ answer: given, style, reduced, width, height }, tools)
     },
   };
 }
+
+export const picture = spreading(draw);

@@ -124,3 +124,37 @@ test('in a browser, a drawing that asks for a surface paints pixels over its pic
     await page.close();
   }
 });
+
+test('in a browser, the helpers of a drawing reach nothing more than it does, and one stuck stops it', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base } = await serve('off');
+  const page = await open(`${base}/`);
+  try {
+    // Its helpers say what they can reach; a picture asks one, once the frame has started them (the first may have none).
+    const reach = `export const helpers = {
+      reach: async () => { let reached = 'blocked'; try { await fetch(${JSON.stringify(`${base}/api/view`)}, { method: 'POST' }); reached = 'reached'; } catch {} return [typeof document, typeof parent, typeof localStorage, reached].join(' '); },
+      stuck: () => { for (;;) {} },
+    };
+    export async function picture(input, tools) {
+      if (!tools.helpers?.size) return { scene: { message: 'none' } };
+      return { scene: { message: 'helper ' + (await tools.helpers.run(input.answer.lens.ask, null, tools.helpers.size - 1)) } };
+    }`;
+    const said = (ask: string, wait: number) => page.evaluate(`(async () => {
+      const { drawWith } = await import('/layout.js');
+      for (let tries = 0; tries < 80; tries++) {
+        const host = document.createElement('div');
+        document.body.append(host);
+        // Each try a picture of its own, so none is a picture kept from the one before.
+        drawWith(host, { items: [], links: [], lens: { ask: ${JSON.stringify(ask)}, tries } }, { numbers: ${numbers}, drawing: { hash: ${JSON.stringify(ask)}.padEnd(64, '0'), modules: { 'index.js': ${JSON.stringify(reach)} } } }, () => {});
+        for (let n = 0; n < ${wait} && !host.textContent; n++) await new Promise((r) => setTimeout(r, 25));
+        if (host.textContent !== 'none') return host.textContent;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      return 'no helper was started';
+    })()`);
+    assert.match(String(await said('reach', 200)), /^helper undefined undefined undefined blocked$/);
+    // A helper that never answers stops the drawing, as the drawing itself would be.
+    assert.match(String(await said('stuck', 800)), /did not answer for 12 seconds/);
+  } finally {
+    await page.close();
+  }
+});
