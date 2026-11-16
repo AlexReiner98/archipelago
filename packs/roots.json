@@ -10,7 +10,7 @@
     },
     {
       "id": "seal",
-      "hash": "50ed119de4beec65b47a485146457a15cef348938503c46f49cb9c46e0bebdc6"
+      "hash": "0f7a02a1b79c81cd5e217206531b76eaa6d892587658a64b78348cc1e8e64528"
     },
     {
       "id": "log",
@@ -30,7 +30,7 @@
     },
     {
       "id": "loader",
-      "hash": "6eccc946f3d5e79f5b1430f65cd8343511503dec904f82aeb2325c56867c0f36"
+      "hash": "4efacb6d71948ef46b875c0f6834e6adeec521a1f716860f91dc94222d047df9"
     },
     {
       "id": "rules",
@@ -38,11 +38,11 @@
     },
     {
       "id": "write",
-      "hash": "50bd075ee7f27a453e85ab725004800cf0f96ccc844e0fa2355b79ca206cdcf6"
+      "hash": "c3b28dfa592225b15fb1ff3a61fb5ce96ca51015dc952945cb9fbdabe904da9c"
     },
     {
       "id": "surface",
-      "hash": "dacb99f57b020dba95c5a9c32bb6c0bc72f6778ccef48dac905293cab0a77551"
+      "hash": "f8c8ae5794f6044f6fce18a0401343c1029ed21491228f158032628c6a2711f2"
     },
     {
       "id": "panes",
