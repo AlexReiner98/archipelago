@@ -154,7 +154,7 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: var(--space-3); }
 .ops td.check { width: var(--box-7); }
 .ops td.kind { width: var(--label-col); white-space: nowrap; }
 .ops td.status { width: var(--row-select); }
-.ops input[type="text"] { width: 100%; border-color: transparent; background: transparent; padding: var(--space-2) var(--space-3); font-weight: 500; }
+.ops input[type="text"] { width: 100%; border-color: transparent; background: transparent; padding: var(--space-2) var(--space-3); font-weight: 400; }
 .ops input[type="text"]:hover, .ops input[type="text"]:focus { border-color: var(--line); background: var(--panel); }
 .ops select { padding: var(--space-2) var(--space-3); max-width: var(--row-select); }
 .ops .edited { box-shadow: inset var(--border-3) 0 0 var(--warn); }
@@ -214,7 +214,7 @@ details.change.quiet > summary { opacity: 0.6; }
 .change.line.fresh { box-shadow: inset var(--border-4) 0 0 var(--accent); }
 /* A change the owner has been told about, until it is opened. */
 details.change.attn > summary, .change.line.attn { background: var(--accent-soft); box-shadow: inset var(--border-4) 0 0 var(--accent); }
-details.change .reason { margin: 0; padding: var(--space-6) var(--space-8) 0; max-width: var(--measure); line-height: 1.5; }
+details.change .reason { margin: 0; padding: var(--space-6) var(--space-8) 0; max-width: var(--measure); line-height: 1.45; }
 details.change .reason + table, details.change .reason + .reason { margin-top: 0; }
 details.change .inner > table { margin-top: var(--space-5); }
 details.folded > summary { padding: var(--space-6) var(--space-8); cursor: pointer; color: var(--muted); font-size: var(--text-3); list-style: none; }
@@ -271,7 +271,7 @@ textarea { resize: vertical; }
 .legend .stroke.blocking { border-top: var(--border-3) solid var(--edge-strong); }
 
 .secret { margin: 0 0 var(--space-8); padding: var(--space-7) var(--space-8); border: var(--border-1) solid var(--warn); background: var(--warn-soft); border-radius: var(--radius-4); display: grid; gap: var(--space-5); }
-.secret code { font: var(--text-4)/1.4 var(--face-mono); overflow-wrap: anywhere; user-select: all; }
+.secret code { font: var(--text-4)/1.45 var(--face-mono); overflow-wrap: anywhere; user-select: all; }
 .legend .swatch.rm-active { border: var(--border-3) solid var(--warn); border-radius: var(--radius-1); }
 .legend .swatch.rm-closed { background: var(--ok-soft); border: var(--border-2) solid var(--ok); border-radius: var(--radius-1); }
 .legend .swatch.rm-blocked { background: var(--g-blocked); }
@@ -292,12 +292,12 @@ button.quiet:hover { color: var(--accent); text-decoration: underline; }
 /* The item page: facts to glance at in one row, the note as a page at a readable width, rare actions in a menu. */
 .toolbar.facts { margin-bottom: var(--space-8); gap: var(--space-6); }
 .fact { font-size: var(--text-3); white-space: nowrap; }
-.body-text { white-space: normal; max-width: var(--measure); line-height: 1.55; border-top: 0; }
+.body-text { white-space: normal; max-width: var(--measure); line-height: 1.6; border-top: 0; }
 .body-text p { margin: 0 0 var(--space-6); }
 .body-text ul { margin: 0 0 var(--space-6); padding-left: var(--space-3); list-style: none; }
 .body-text li { margin: var(--space-3) 0; }
 .body-text details.section { border-top: var(--border-1) solid var(--line); padding: var(--space-5) 0 var(--space-2); }
-.body-text details.section > summary { cursor: pointer; font-weight: 600; list-style: none; margin-bottom: var(--space-4); }
+.body-text details.section > summary { cursor: pointer; font-family: var(--type-heading-family, inherit); font-weight: var(--type-heading-weight, 600); list-style: none; margin-bottom: var(--space-4); }
 .body-text details.section > summary::-webkit-details-marker { display: none; }
 .body-text details.section > summary::before { content: "\25B8  "; color: var(--muted); }
 .body-text details.section[open] > summary::before { content: "\25BE  "; }
@@ -366,7 +366,7 @@ details.menu.ok > summary { font-size: var(--text-2); color: var(--warn); }
 .card > header.bar details.menu > .menu-items { font-weight: 400; }
 
 /* A session's story: what it found, over a picture of that; how it got there, folded. */
-.story .finding { margin: var(--space-3) var(--space-8) var(--space-7); max-width: var(--measure); font-size: var(--text-6); line-height: 1.5; }
+.story .finding { margin: var(--space-3) var(--space-8) var(--space-7); max-width: var(--measure); font-size: var(--text-6); line-height: 1.45; }
 .story-picture { min-width: 0; border-top: var(--border-1) solid var(--line); }
 
 .body-text .align-left { text-align: left; }
@@ -382,7 +382,7 @@ details.menu.ok > summary { font-size: var(--text-2); color: var(--warn); }
 
 /* A held change on the sheet it touches: a thing to act on, set apart by its tone and room (Alex, 11 Nov 2026; packs/write/page/item-held.js). */
 /* A change to code, as its line diff (packs/write/page/diff-view.js): a line each, never wrapped, scrolling in its box. */
-.line-diff { margin-top: var(--space-4); padding: var(--space-3) 0; font: var(--text-3)/1.5 var(--face-mono); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); max-height: var(--code-open); overflow: auto; contain: inline-size; }
+.line-diff { margin-top: var(--space-4); padding: var(--space-3) 0; font: var(--text-3)/1.45 var(--face-mono); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); max-height: var(--code-open); overflow: auto; contain: inline-size; }
 .line-diff .ld-line, .line-diff .ld-hunk, .line-diff .ld-file { white-space: pre; overflow: hidden; text-overflow: ellipsis; padding: 0 var(--space-5); }
 .line-diff .ld-add { background: var(--ok-soft); }
 .line-diff .ld-del { background: var(--bad-soft); }

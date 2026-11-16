@@ -122,7 +122,7 @@ body[data-gate] .gate .primary:focus-visible { outline: var(--border-3) solid va
 
 /* The gate: a clearing with room, the form at reading size; fields square, their edge strong enough to see. */
 body[data-gate] .gate { gap: var(--space-8); }
-body[data-gate] .gate h1, :where(main:has(> nav.site-head)) section > h2 { font-size: var(--chart-title); line-height: 1.2; }
+body[data-gate] .gate h1, :where(main:has(> nav.site-head)) section > h2 { font-size: var(--chart-title); line-height: 1.25; }
 body[data-gate] .gate, :where(main:has(> nav.site-head)) { font-size: var(--chart-text); }
 body[data-gate] .gate input { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }
 body[data-gate] .gate input:focus { border-color: var(--c-ink); outline: var(--border-2) solid var(--c-ink); outline-offset: var(--border-1); }
