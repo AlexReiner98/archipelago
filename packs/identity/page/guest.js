@@ -23,6 +23,9 @@ let making = false;
 
 const TITLE = 'Try it with your agent';
 
+/** A new map's: its install note, the one record on it, is not drawn: the card said it, and the map is the visitor's work. */
+const FIRST_QUERY = `${['work', 'aim', 'question'].map((t) => `find=${encodeURIComponent(`type ${t}`)}`).join('&')}&over=waits_on&steps=1`;
+
 /**
  * The first moments on a new guest map (e_afpvmy78, critiqued with the owner 16 Nov 2026): one card in the middle, over
  * a faint picture of what is coming, and nothing of the app around it, since nothing there is any use yet. It says what
@@ -49,26 +52,31 @@ const firstNow = () => {
 const phone = () => matchMedia('(hover: none) and (pointer: coarse)').matches;
 
 let card, status, asking;
-const SAY = { wait: 'Waiting for your agent', read: 'Your agent is reading your project', drawing: 'Your agent is drawing your work' };
+const SAY = { wait: 'Waiting for your agent', read: 'Your agent is reading your project', drawing: 'Your agent found your project and is drawing its work' };
+const sayOf = (first) => (first.stage === 'drawing' && first.name ? `Found ${first.name}: drawing its work` : SAY[first.stage] ?? SAY.wait);
+/** How long the card waits for the work after the project lands, before it shows what there is. */
+const drawingMost = 90_000;
+let reveal;
 
-/** The stage the visitor sees: on the body (the CSS quiets the app by it) and in words. */
+/**
+ * The stage the visitor sees, on the body (the CSS quiets the app by it) and in words: wait, read and drawing under the
+ * card; shown, the map revealed with only Sign up, the menu and find around it, until the map is saved.
+ */
 function stage(first, now) {
-  if (first.stage !== now) keepFirst({ ...first, stage: now });
   first.stage = now;
-  document.body.dataset.first = now === 'drawing' ? 'drawing' : 'wait';
-  if (status) status.textContent = SAY[now];
-  if (now === 'drawing') card?.remove(), (card = status = undefined);
-}
-
-/** Done: the work is drawn, and the app is back. */
-function done() {
-  keepFirst(null);
-  delete document.body.dataset.first;
-  card?.remove();
-  card = status = undefined;
+  keepFirst(first);
+  document.body.dataset.first = now === 'shown' ? 'shown' : 'wait';
+  if (status) status.textContent = sayOf(first);
+  if (now !== 'shown') return;
+  clearTimeout(reveal);
   clearInterval(asking);
+  card?.classList.add('first-gone');
+  setTimeout(() => (card?.remove(), (card = status = undefined)), 600);
   hooks.awaiting = hooks.made = undefined;
 }
+
+/** The project the agent named, as the replica holds it (packs/surface/page/live.js), among what a change touched. */
+const projectOf = (touched) => (touched?.ids ?? []).map((id) => hooks.store?.()?.items?.get(id)).find((r) => r?.title && !r.archived_at)?.title;
 
 /**
  * A faint map behind the card: a project, its parts and their work, marked done, under way and next, and a question
@@ -77,7 +85,7 @@ function done() {
 function sketch() {
   const ns = 'http://www.w3.org/2000/svg';
   const el = (tag, attrs) => Object.entries(attrs).reduce((n, [k, v]) => (n.setAttribute(k, v), n), document.createElementNS(ns, tag));
-  const svg = el('svg', { class: 'first-sketch', viewBox: '0 0 1000 600', preserveAspectRatio: 'xMidYMid slice', 'aria-hidden': 'true' });
+  const svg = el('svg', { class: 'first-sketch', viewBox: '0 0 1000 600', preserveAspectRatio: 'xMidYMid meet', 'aria-hidden': 'true' });
   const wire = (x1, y1, x2, y2) => svg.append(el('path', { class: 'first-wire', d: `M${x1} ${y1} V${(y1 + y2) / 2} H${x2} V${y2}` }));
   const node = (x, y, w, mark) => {
     svg.append(el('rect', { class: 'first-node', x, y, width: w, height: 34, rx: 4 }), el('rect', { class: 'first-line', x: x + 26, y: y + 14, width: w * 0.55, height: 6, rx: 3 }));
@@ -106,7 +114,7 @@ function drawCard(first) {
     if (phone()) return void navigator.share?.({ text: `${location.origin}/#/try` }).catch(() => undefined);
     navigator.clipboard.writeText(said).then(() => ((copy.textContent = 'Copied: now paste it into your agent'), setTimeout(() => (copy.textContent = label), 4000)), () => undefined);
   });
-  status = h('div', { class: 'first-status' }, SAY[first.stage ?? 'wait']);
+  status = h('div', { class: 'first-status' }, sayOf(first));
   const steps = phone()
     ? [h('li', {}, 'No agent runs on a phone: send this to your computer and open it there.')]
     : [h('li', {}, 'Copy the prompt'), h('li', {}, "Paste it into your agent (Claude Code, Codex or Cursor) in your project's folder"), h('li', {}, 'Watch your work appear here')];
@@ -128,15 +136,26 @@ function drawCard(first) {
   document.body.append(card);
 }
 
-/** On each route: on the guest map just made, the card until the agent writes, then a quiet canvas while it draws. */
+/** On each route: on the guest map just made, the card until the agent has drawn the work, then the map, quiet. */
 export function firstMoments() {
   const first = firstNow();
   if (!first || first.ws !== workspaceOf(store.token)) return void (hooks.awaiting = hooks.made = undefined);
   first.stage ??= 'wait';
-  if (first.stage !== 'drawing') drawCard(first);
-  stage(first, first.stage);
-  hooks.awaiting = () => SAY[first.stage] ?? SAY.wait;
-  hooks.made = () => (first.stage === 'drawing' ? done() : stage(first, 'drawing'));
+  document.body.dataset.first = first.stage === 'shown' ? 'shown' : 'wait';
+  if (first.stage === 'shown') return void (hooks.awaiting = hooks.made = undefined);
+  drawCard(first);
+  status.textContent = sayOf(first);
+  hooks.awaiting = () => sayOf(first);
+  // The project lands first, then the work: the card stays until the work is there (a change that makes several items),
+  // or for drawingMost, so the visitor never looks at a lone box.
+  hooks.made = (touched) => {
+    if (first.stage !== 'drawing') {
+      first.name ??= projectOf(touched);
+      stage(first, (touched?.made ?? 0) > 2 ? 'shown' : 'drawing');
+      clearTimeout(reveal);
+      reveal = setTimeout(() => stage(first, 'shown'), drawingMost);
+    } else stage(first, 'shown');
+  };
   // Whether the agent has read its link yet, every two seconds while the card waits: only on this map, only now.
   clearInterval(asking);
   if (first.stage === 'wait')
@@ -160,7 +179,7 @@ export async function tryPage(query = '') {
     if (!res.ok) throw new Error(body.error ?? 'That did not work.');
     const { workspace, page_token } = body.result;
     // A new map opens on the card (firstMoments), over the canvas the agent draws on; a copy, on the copy.
-    keepLanding(workspace.id, `#/v?${QUERY}`);
+    keepLanding(workspace.id, `#/v?${from ? QUERY : FIRST_QUERY}`);
     if (!from) keepFirst({ ws: workspace.id, prompt: body.result.prompt, stage: 'wait' });
     // The page token is this browser's sign-in, remembered as any workspace is: signing in to keep the map
     // (packs/identity/page/authorize.js, /oauth/authorize opened by the agent's installer) finds the guest by it.
