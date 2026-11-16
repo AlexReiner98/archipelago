@@ -130,7 +130,9 @@ export default function find(first, tools) {
     if (!ids || lens.view) return;
     const here = new Set(ids);
     const part = mode.toLowerCase();
-    const offered = all.filter((c) => c.term?.[part]).slice(0, num(input, part === 'find' ? 'find_count_most' : 'find_check_most', 12));
+    // The words themselves are asked first, wherever they are offered: the canvas draws them at once when taken.
+    const terms = all.filter((c) => c.term?.[part]);
+    const offered = [...terms.filter((c) => c.kind === 'Words'), ...terms.filter((c) => c.kind !== 'Words')].slice(0, num(input, part === 'find' ? 'find_count_most' : 'find_check_most', 12));
     if (!offered.length) return;
     const told = await read('flat', { filter: lens.filter ?? {}, preview: { part, terms: offered.map((c) => c.term[part]), ids } });
     if (!told?.preview || mine !== asked) return;
