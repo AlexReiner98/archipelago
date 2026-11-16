@@ -61,11 +61,8 @@ test('the frontier: what earlier sessions here worked on, each with why it needs
     {
       places_of: [],
       runs_lately: [run],
-      worked_on: ['t1', 't2'],
-      part_around: (ids: string[]) => [...ids, 't3'],
-      run_items: [item('t1', 'doing'), item('t2', 'open', { seen_working: false, to_see: 'the page' }), item('t3', 'open')],
-      corrections: [],
-      hubs_among: [],
+      // What the sessions worked on, one step along part_of, those items, who corrected them, the hubs, and what attention reads: one read.
+      frontier_state: { items: [item('t1', 'doing'), item('t2', 'open', { seen_working: false, to_see: 'the page' }), item('t3', 'open')], corrections: [], hubs: [], attention: {} },
     },
     { 'answer.attention': { items: [{ id: 't3', type: 'task', title: 'T3', status: 'open', reasons: [{ why: 'waits_on', who: 'Alex' }] }] } },
   );
@@ -75,7 +72,7 @@ test('the frontier: what earlier sessions here worked on, each with why it needs
   assert.deepEqual(why, { t3: ['waits_on'], t1: ['left'], t2: ['unseen'] });
   assert.equal(f.items[0].reasons[0].said, 'waits on Alex');
   assert.ok(f.lines?.[1].includes('T3 (t3)'));
-  assert.ok(ctx.asked.includes('corrections'), 'what the owner corrected is read');
+  assert.deepEqual(ctx.asked.filter((k) => k !== 'places_of'), ['runs_lately', 'frontier_state'], 'what they worked on is read at once, what the owner corrected with it');
 });
 
 test("runs' marks by run, and the order they ask for attention in", async () => {

@@ -15,6 +15,7 @@
           "among?": [
             "id"
           ],
+          "state?": "any",
           "reasons?": [
             "string"
           ],

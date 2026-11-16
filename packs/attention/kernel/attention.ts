@@ -7,10 +7,10 @@
 // A pack adds reasons of its own as data (a view of form "attention"): items of a type whose fields hold some values.
 
 import type { KernelContext } from '#pelago/kernel';
-import { pastBounds } from './bounds.ts';
 import { BlockGraph, type Edge } from './blocks.ts';
-import { toConfirm } from './confirm.ts';
-import { movedReadings, readersOf } from './moved.ts';
+import { HOW } from './confirm.ts';
+import { readersOf } from './moved.ts';
+import { apart, atOnce, type Reader, type State } from './reader.ts';
 import { asText, byId, contains, type Item, type Link } from './rows.ts';
 
 export const REASONS = ['waits_on', 'to_confirm', 'holding_up', 'due', 'moved', 'unsettled', 'blocked', 'stale', 'under_way', 'ready'] as const;
@@ -52,6 +52,8 @@ export interface Input {
   within?: string;
   /** Only these items: a set another read found (the frontier's), weighed as within weighs a scope. */
   among?: string[];
+  /** With among: what is read of them, already read at once (the read attention_state, as the frontier reads it with its own); false asks each read by itself. */
+  state?: State | false;
   /** Only these reasons, the kernel's or a pack's. All of them when left out. */
   reasons?: string[];
   /** What is due within this many days counts as due: 7 unless given. */
@@ -84,7 +86,11 @@ export async function attention(ctx: KernelContext, input: Input, read?: Read) {
   for (const r of wanted) if (!known.includes(r)) throw new Error(`"${r}" is not a reason: one of ${known.join(', ')}`);
   const weighed = declared.filter((d) => wanted.has(d.reason) || wanted.has(d.joins));
   for (const d of weighed) wanted.add(d.reason);
-  const owner = (await ctx.reads({ owner: true })) as string | null;
+  // Weighing some items handed in (among), all that is read of them is read at once, or was (state); state false asks each read by itself.
+  const r = input.among && !input.within && !read && input.state !== false
+    ? atOnce(ctx, input.state || ((await ctx.reads({ attention_state: { among: input.among, days: input.days ?? 7 } })) as State))
+    : apart(ctx);
+  const owner = await r.owner();
   // "me" is who is asking, else the workspace's owner (the read me).
   const me = input.person === undefined ? null : input.person === 'me' ? ((await ctx.reads({ me: true })) as string | null) : input.person;
   if (input.person !== undefined && !me) throw new Error('No person: give an id, or set the workspace owner (pelago init "Your Name").');
@@ -93,7 +99,7 @@ export async function attention(ctx: KernelContext, input: Input, read?: Read) {
 
   const rows: Row[] = read
     ? read.entities.filter((e) => e.is_open).map(({ id, type, title, status, owner, is_open, props, updated_at }) => ({ id, type, title, status, owner, is_open, due: typeof props.due === 'string' ? props.due : props.due == null ? null : String(props.due), updated_at }))
-    : await rowsFor(ctx, me, me !== null && me === owner, scope, wanted, weighed.flatMap((d) => ctx.registry.family(d.of)));
+    : await rowsFor(ctx, r, me, me !== null && me === owner, scope, wanted, weighed.flatMap((d) => ctx.registry.family(d.of)));
   const reg = ctx.registry;
   // Only what is work or a question to someone: not people, places, records of the past, or the system's own.
   const live = new Map(rows.filter((e) => !isKernel(ctx, e.type) && (!scope || scope.has(e.id))).map((e) => [e.id, e]));
@@ -106,19 +112,19 @@ export async function attention(ctx: KernelContext, input: Input, read?: Read) {
     at.reasons.push({ why, ...more });
     found.set(e.id, at);
   };
-  const titles = async (ids: string[]) => new Map([...(await byId(ctx, ids)).values()].map((r) => [r.id, r.title]));
+  const titles = async (ids: string[]) => new Map([...(await r.byId(ids)).values()].map((e) => [e.id, e.title]));
 
   // Waiting on someone to answer or act.
   const waitsOn = reg.relationFamily('waits_on');
   const waits = read
     ? read.relations.filter((r) => waitsOn.includes(r.type))
-    : ((await ctx.reads({ links: { from: rows.map((r) => r.id), types: waitsOn } })) as Link[]).map((r) => ({ from_id: r.from_id, to_id: r.to_id, for: asText(r.props?.for) }));
+    : (await r.waits(rows.map((e) => e.id), waitsOn)).map((l) => ({ from_id: l.from_id, to_id: l.to_id, for: asText(l.props?.for) }));
   const who = await titles([...new Set(waits.map((w) => w.to_id))]);
   for (const w of waits) if (me === null || w.to_id === me) add(live.get(w.from_id), 'waits_on', { who: who.get(w.to_id) ?? w.to_id, ...(w.for && { for: w.for }) });
 
   // Blocked, and what holds others up: the roots every chain of blocking ends at.
   const blocking = ['blocked', 'holding_up', 'ready'].some((r) => wanted.has(r as Reason));
-  const graph = read?.graph ?? new BlockGraph(blocking ? ((await ctx.reads({ blocks: [...live.keys()] })) as Edge[]) : []);
+  const graph = read?.graph ?? new BlockGraph(blocking ? await r.blocks([...live.keys()]) : []);
   const blockedIds = [...graph.direct.keys()].filter((id) => live.has(id));
   const rootsOf = new Map(blockedIds.map((id) => [id, graph.roots(id)]));
   const rootTitles = await titles([...new Set([...rootsOf.values()].flat())]);
@@ -128,7 +134,7 @@ export async function attention(ctx: KernelContext, input: Input, read?: Read) {
   const actionable = (e: Row) => Boolean(reg.type(e.type)?.capabilities.actionable);
   for (const [id, n] of holding) if (live.get(id) && theirs(live.get(id)!) && actionable(live.get(id)!)) add(live.get(id), 'holding_up', { count: n });
   // A resource held by others says who holds it (as the asker may see them: a private session is not named).
-  const holders = blockedIds.length ? ((await ctx.reads({ holds: true })) as { resource: string; held_by_title: string }[]) : [];
+  const holders = blockedIds.length ? await r.holds() : [];
   for (const id of blockedIds) {
     if (!theirs(live.get(id)!)) continue;
     const held = graph.direct.get(id)!.filter((e) => e.why === 'resource_held').flatMap((e) => holders.filter((h) => h.resource === e.y).map((h) => h.held_by_title));
@@ -136,13 +142,13 @@ export async function attention(ctx: KernelContext, input: Input, read?: Read) {
   }
 
   // Due, or past a limit, by the bound its type declares.
-  const { due, under } = await pastBounds(ctx, input.days ?? 7, [...live.keys()]);
+  const { due, under } = await r.bounds(input.days ?? 7, [...live.keys()]);
   for (const d of due) if (live.get(d.id) && theirs(live.get(d.id)!)) add(live.get(d.id), 'due', { on: d.due, overdue: d.overdue });
   for (const u of under) if (live.get(u.id) && theirs(live.get(u.id)!)) add(live.get(u.id), 'due', { value: u.value, limit: u.limit });
 
   // Moved: what it reads has changed since it was last changed or said still true, until whoever tends it does either.
   if (wanted.has('moved')) {
-    const moved = await movedReadings(ctx, [...live.values()].filter(theirs).map((e) => e.id));
+    const moved = await r.moved([...live.values()].filter(theirs).map((e) => e.id));
     for (const [id, readings] of moved) for (const m of readings) add(live.get(id), 'moved', { ...m });
   }
 
@@ -155,8 +161,8 @@ export async function attention(ctx: KernelContext, input: Input, read?: Read) {
   }
 
   // Under way: a session at work on it.
-  const works = (await ctx.reads({ links: { to: [...live.keys()], types: ['works_on'] } })) as Link[];
-  const sessions = await byId(ctx, [...new Set(works.map((w) => w.from_id))]);
+  const works = await r.works([...live.keys()]);
+  const sessions = await r.byId([...new Set(works.map((w) => w.from_id))]);
   const at = new Map<string, number>();
   for (const w of works) if (sessions.get(w.from_id)?.is_open && !sessions.get(w.from_id)!.archived_at) at.set(w.to_id, (at.get(w.to_id) ?? 0) + 1);
   for (const [target, n] of at) if (live.get(target) && theirs(live.get(target)!)) add(live.get(target), 'under_way', { sessions: n });
@@ -176,16 +182,16 @@ export async function attention(ctx: KernelContext, input: Input, read?: Read) {
     const types = reg.family(d.of);
     const ids = [...live.values()].filter((e) => types.includes(e.type) && theirs(e)).map((e) => e.id);
     if (!ids.length) continue;
-    const props = new Map([...(await byId(ctx, ids)).values()].map((e) => [e.id, e.props]));
+    const props = new Map([...(await r.byId(ids)).values()].map((e) => [e.id, e.props]));
     for (const id of ids) if (contains(props.get(id), d.where)) add(live.get(id), d.reason, { mark: d.mark ?? d.reason, tip: d.description, ...(d.ask ? { ask: d.ask } : {}) });
   }
 
   // What agents settled and the owner has not confirmed: the owner's to look at, closed though it is.
-  const confirm = wanted.has('to_confirm') && (me === null || me === owner) ? await toConfirm(ctx, { limit: 40 }) : undefined;
+  const confirm = wanted.has('to_confirm') && (me === null || me === owner) ? { ...(await r.confirm()), how: HOW } : undefined;
   // What was settled is closed: whether it is within is asked of the whole scope, for those few.
   const settledWithin = confirm && input.within ? new Set((await ctx.reads({ within: { id: input.within, among: confirm.questions.map((q) => q.id) } })) as string[]) : confirm && input.among ? new Set(input.among) : null;
   // The items settled, read at once: one read for them all, not one each.
-  const settledRows = confirm?.questions.length ? new Map([...(await byId(ctx, confirm.questions.map((q) => q.id))).values()].map((e) => [e.id, rowOf(e)])) : new Map<string, Row>();
+  const settledRows = confirm?.questions.length ? new Map([...(await r.byId(confirm.questions.map((q) => q.id))).values()].map((e) => [e.id, rowOf(e)])) : new Map<string, Row>();
   for (const q of confirm?.questions ?? []) {
     const row = { id: q.id, type: '', title: q.title, status: '', owner: null, is_open: false, due: null, updated_at: q.settled } as Row;
     if (!settledWithin || settledWithin.has(q.id)) add(settledRows.get(q.id) ?? row, 'to_confirm', { answer: q.answer, on: q.on, seq: q.seq, settled: q.settled, by: q.by, ...(q.basis && { basis: q.basis }) });
@@ -204,7 +210,7 @@ export async function attention(ctx: KernelContext, input: Input, read?: Read) {
   const counts = Object.fromEntries([...wanted].map((r) => [r, items.filter((i) => i.reasons.some((x) => x.why === r)).length]));
   const limit = input.limit ?? 100;
   // What each sits in at the top, for those sent: the outermost thing it is part of, for a page that groups by it.
-  const tops = await topsOf(ctx, items.slice(0, limit).map((i) => i.id));
+  const tops = await topsOf(r, items.slice(0, limit).map((i) => i.id));
   return {
     person: me,
     within: input.within ?? null,
@@ -224,11 +230,11 @@ const EVERYONE = ['to_confirm'];
  * (within); else what is a person's (owned by them, or by nobody when they are the workspace's owner) and what waits
  * on them. For everyone across the map, only reasons the log answers: weighing every open item would read them all.
  */
-async function rowsFor(ctx: KernelContext, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<string>, declared: string[]): Promise<Row[]> {
+async function rowsFor(ctx: KernelContext, r: Reader, me: string | null, isOwner: boolean, scope: Set<string> | null, wanted: Set<string>, declared: string[]): Promise<Row[]> {
   const reg = ctx.registry;
   const notSystem = (e: Item) => !isKernel(ctx, e.type);
   const live = (e: Item | undefined): e is Item => !!e && e.is_open && !e.archived_at;
-  if (scope) return [...(await byId(ctx, [...scope])).values()].filter((e) => live(e) && notSystem(e)).map(rowOf);
+  if (scope) return (r.among ?? [...(await r.byId([...scope])).values()]).filter((e) => live(e) && notSystem(e)).map(rowOf);
   if (me !== null) {
     // What nobody owns is the owner's: of it, only what a reason asked for can be (what is actionable; for what is
     // due, unsettled or waits on them alone, only what has a bound or settles), never every open item.
@@ -260,8 +266,8 @@ async function rowsFor(ctx: KernelContext, me: string | null, isOwner: boolean, 
 }
 
 /** The outermost thing each item is part of, from the part_of closure: the ancestor that is part of nothing. */
-async function topsOf(ctx: KernelContext, ids: string[]): Promise<Map<string, { id: string; title: string }>> {
-  const rows = (await ctx.reads({ tops: ids })) as { id: string; top: string; title: string }[];
+async function topsOf(r: Reader, ids: string[]): Promise<Map<string, { id: string; title: string }>> {
+  const rows = await r.tops(ids);
   return new Map(rows.map((r) => [r.id, { id: r.top, title: r.title }]));
 }
 

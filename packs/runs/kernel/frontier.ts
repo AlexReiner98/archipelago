@@ -79,12 +79,13 @@ async function around(ctx: KernelContext, ids: string[]): Promise<string[]> {
   return (await ctx.reads({ part_around: ids })) as string[];
 }
 
-/** What a person changed after an agent last did, item by item: who, when, and which fields. An item a person made inside an agent's work counts too. */
-async function corrections(ctx: KernelContext, ids: string[]) {
-  // Only the facts a person said after the last an agent (or anyone not a person) said of the item are sent: the
-  // rest of each item's history is weighed where it lies, not read back whole (a busy map's thousand items are
-  // some ten thousand facts).
-  const rows = (await ctx.reads({ corrections: ids })) as { id: string; field: string; actor: string; at: Date; added: boolean }[];
+/**
+ * What a person changed after an agent last did, item by item: who, when, and which fields. An item a person made
+ * inside an agent's work counts too. Only the facts a person said after the last an agent (or anyone not a person)
+ * said of the item are read: the rest of each item's history is weighed where it lies, not read back whole (a busy
+ * map's thousand items are some ten thousand facts).
+ */
+function corrected(rows: { id: string; field: string; actor: string; at: Date; added: boolean }[]) {
   const out = new Map<string, { by: string; at: Date; fields: string[]; added: boolean }>();
   for (const [id, after] of Map.groupBy(rows, (r) => r.id)) {
     const last = after.at(-1)!;
@@ -93,13 +94,37 @@ async function corrections(ctx: KernelContext, ids: string[]) {
   return out;
 }
 
-/** Where a session stands, and the open items there with why each needs attention now, the strongest first. */
-export async function frontier(ctx: KernelContext, input: FrontierInput) {
+type Item = { id: string; type: string; title: string; status: string; is_open: boolean; props: Record<string, unknown> };
+type Correction = { id: string; field: string; actor: string; at: Date; added: boolean };
+
+/**
+ * What the frontier reads of its sessions' work: what they worked on and one step along part_of, those items, who
+ * corrected them, which are hubs, and what attention reads of the open ones. Read at once, in one statement (the read
+ * frontier_state); apart, each read by itself, as a check that both read the same (test/frontier-once.test.ts).
+ */
+async function workOf(ctx: KernelContext, runs: string[], apart?: boolean) {
+  const nobodys = (e: Item) => ctx.registry.types.get(e.type)?.system === true;
+  if (!apart) {
+    const got = (await ctx.reads({ frontier_state: { runs, since: since(ctx) } })) as { items: Item[]; corrections: Correction[]; hubs: string[]; attention: unknown };
+    return { rows: got.items, corrections: () => Promise.resolve(got.corrections), hubs: () => Promise.resolve(got.hubs), state: got.attention };
+  }
+  const rows = (await ctx.reads({ run_items: await around(ctx, await workedOn(ctx, runs)) })) as Item[];
+  const mine = rows.filter((e) => !nobodys(e)).map((e) => e.id);
+  const live = rows.filter((e) => !nobodys(e) && e.is_open).map((e) => e.id);
+  return {
+    rows,
+    corrections: async () => (mine.length ? ((await ctx.reads({ corrections: mine })) as Correction[]) : []),
+    hubs: async () => (await ctx.reads({ hubs_among: live })) as string[],
+    state: false as const,
+  };
+}
+
+/** Where a session stands, and the open items there with why each needs attention now, the strongest first. apart: each read asked by itself. */
+export async function frontier(ctx: KernelContext, input: FrontierInput, apart?: boolean) {
   const { repo, folder, runs } = await placed(ctx, input);
   const reg = ctx.registry;
-  const worked = await workedOn(ctx, runs.map((r) => r.id));
-  const scope = await around(ctx, worked);
-  const rows = (await ctx.reads({ run_items: scope })) as { id: string; type: string; title: string; status: string; is_open: boolean; props: Record<string, unknown> }[];
+  const work = await workOf(ctx, runs.map((r) => r.id), apart);
+  const rows = work.rows;
   // What the system keeps (a type the system's) is nobody's work.
   const mine = rows.filter((e) => reg.types.get(e.type)?.system !== true);
   const live = new Map(mine.filter((e) => e.is_open).map((e) => [e.id, e]));
@@ -119,11 +144,11 @@ export async function frontier(ctx: KernelContext, input: FrontierInput) {
   const all = new Map(mine.map((e) => [e.id, e]));
   // A closed one only while it is news: changed since the last session here began.
   const since = runs[0] ? new Date(runs[0].created_at).getTime() : 0;
-  for (const [id, c] of all.size ? await corrections(ctx, [...all.keys()]) : [])
+  for (const [id, c] of all.size ? corrected(await work.corrections()) : [])
     if (live.has(id) || new Date(c.at).getTime() > since) add(id, 'corrected', { by: c.by.slice('human:'.length), at: c.at, fields: c.fields, ...(c.added && { added: true }) }, all.get(id));
 
   // Attention's reasons, read among these items alone.
-  const weighed = await ctx.call<unknown, Weighed>('answer.attention', { among: [...live.keys()], reasons: ['waits_on', 'to_confirm', 'unsettled', 'under_way', 'holding_up', 'blocked', 'moved', 'due', 'ready'], limit: 500 });
+  const weighed = await ctx.call<unknown, Weighed>('answer.attention', { among: [...live.keys()], reasons: ['waits_on', 'to_confirm', 'unsettled', 'under_way', 'holding_up', 'blocked', 'moved', 'due', 'ready'], limit: 500, state: work.state });
   const blocked = new Set<string>();
   for (const item of weighed.items)
     for (const r of item.reasons) {
@@ -134,7 +159,7 @@ export async function frontier(ctx: KernelContext, input: FrontierInput) {
     }
   const busy = new Set(weighed.items.filter((i) => i.reasons.some((r) => r.why === 'under_way')).map((i) => i.id));
   // A hub with open parts is not itself next: its parts are.
-  const hub = new Set((await ctx.reads({ hubs_among: [...live.keys()] })) as string[]);
+  const hub = new Set(await work.hubs());
 
   for (const e of live.values()) {
     const type = reg.type(e.type);
