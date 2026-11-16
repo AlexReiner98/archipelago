@@ -36,7 +36,8 @@
             }
           ]
         },
-        "run": "attention.ts#answer"
+        "run": "attention.ts#answer",
+        "kept": true
       },
       "answer.moved": {
         "in": {},
@@ -45,7 +46,8 @@
             "id"
           ]
         },
-        "run": "query-answers.ts#moved"
+        "run": "query-answers.ts#moved",
+        "kept": true
       },
       "answer.to_confirm": {
         "in": {

@@ -28,6 +28,12 @@ export interface Timing {
   pack: number;
   /** Pack calls open now: a call inside another is counted, its time is not counted twice. */
   packDepth: number;
+  /** Answers that may be kept until the map moves (packs/loader/kernel/kept.ts): asked, and of those, given as kept. */
+  keepable: number;
+  kept: number;
+  /** Reading where the map stands, for reads kept by it (packs/log/kernel/position.ts), and how many were answered unchanged; undefined when not read. */
+  stand?: number;
+  unchanged: number;
 }
 
 const store = new AsyncLocalStorage<Timing>();
@@ -37,7 +43,7 @@ export const timing = (): Timing | undefined => store.getStore();
 
 /** Run `fn` as one request, timed. */
 export function timed<T>(fn: () => T): T {
-  return store.run({ start: performance.now(), statements: 0, summed: 0, db: 0, out: 0, outSince: 0, waits: 0, wait: 0, packCalls: 0, pack: 0, packDepth: 0 }, fn);
+  return store.run({ start: performance.now(), statements: 0, summed: 0, db: 0, out: 0, outSince: 0, waits: 0, wait: 0, packCalls: 0, pack: 0, packDepth: 0, keepable: 0, kept: 0, unchanged: 0 }, fn);
 }
 
 /** Something is out at the database from now. */
@@ -88,6 +94,30 @@ export async function packCall<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Count an answer that may be kept, if in a request: whether it was given as kept. */
+export function keptCall(kept: boolean): void {
+  const t = store.getStore();
+  if (!t) return;
+  t.keepable++;
+  if (kept) t.kept++;
+}
+
+/** Time reading where the map stands, if in a request. */
+export async function stood<T>(run: () => Promise<T>): Promise<T> {
+  const t = store.getStore(), from = performance.now();
+  try {
+    return await run();
+  } finally {
+    if (t) t.stand = (t.stand ?? 0) + performance.now() - from;
+  }
+}
+
+/** A kept read answered unchanged, without being read. */
+export function unchanged(): void {
+  const t = store.getStore();
+  if (t) t.unchanged++;
+}
+
 /** Answer a request timed: its head carries Server-Timing as it is written, however it is written. */
 export function timedAnswer<T>(res: ServerResponse, fn: () => T): T {
   return timed(() => {
@@ -107,7 +137,7 @@ const ms = (n: number) => n.toFixed(1);
  * The Server-Timing header of a request so far: db (the wall time with anything out at the database; its statements
  * and their times summed), wait (for a connection or the database's lock, with the begin; summed, so transactions
  * asked side by side can add up past the whole: within db's wall time, it is the queue), pack (calls
- * into pack code, which hold some of the db time), app (the whole less db: what Node did) and total.
+ * into pack code, which hold some of the db time), stand (reading where the map stands, within db, and how many kept reads it answered unchanged), app (the whole less db: what Node did) and total.
  */
 export function serverTiming(t: Timing): string {
   const now = performance.now(), total = now - t.start, db = t.db + (t.out > 0 ? now - t.outSince : 0);
@@ -115,7 +145,9 @@ export function serverTiming(t: Timing): string {
     `db;dur=${ms(db)};desc="${t.statements} statements, ${Math.round(t.summed)} ms summed"`,
     `wait;dur=${ms(t.wait)};desc="${t.waits} transactions"`,
     `pack;dur=${ms(t.pack)};desc="${t.packCalls} calls"`,
+    ...(t.keepable ? [`kept;desc="${t.kept} of ${t.keepable} answers kept"`] : []),
     `app;dur=${ms(Math.max(0, total - db))}`,
+    ...(t.stand !== undefined ? [`stand;dur=${ms(t.stand)};desc="${t.unchanged} answered unchanged"`] : []),
     `total;dur=${ms(total)}`,
   ].join(', ');
 }

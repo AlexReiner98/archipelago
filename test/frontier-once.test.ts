@@ -70,7 +70,8 @@ test('the frontier read at once answers as it does read by read, every reason al
     const apart = await asked(() => frontierPack.frontier(ctx, { ...input, limit: 100 }, true));
     const once = await asked(() => frontierPack.frontier(ctx, { ...input, limit: 100 }));
     assert.deepEqual(once.answer, apart.answer, `the frontier of ${JSON.stringify(input)} is the same read either way`);
-    if (input.cwd) continue;
+    // Counted the first time alone: after it, read by read is given attention's answer as kept (packs/loader/kernel/kept.ts).
+    if (input !== undefined && Object.keys(input).length) continue;
     assert.ok(once.statements <= 4 && apart.statements > 15, `at once it asks a few statements (${once.statements}), read by read many (${apart.statements})`);
   }
 

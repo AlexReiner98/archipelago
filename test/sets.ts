@@ -46,6 +46,7 @@ export const SLOW: Record<string, string> = {
   'test/looks.test.ts': 'browser',
   'test/mcp-view-host.test.ts': 'browser',
   'test/narrow-bar.test.ts': 'browser',
+  'test/narrow-first.test.ts': 'browser',
   'test/panes.test.ts': 'browser',
   'test/published-frames.test.ts': 'browser',
   'test/query-line.test.ts': 'browser',

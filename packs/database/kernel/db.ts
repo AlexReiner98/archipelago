@@ -23,6 +23,8 @@ export interface Db extends Q {
   close(): Promise<void>;
   /** The database a person's view was made of (scoped), for the system's own tables, such as the type table. */
   whole?: Db;
+  /** Who reads through it, as one value: the viewer, whether an admin and whether they only read, or anyone with no login. Two handles of one scope read alike. */
+  scope?: string;
 }
 
 /** The database itself, PGlite's or a server's: a Db that can also run several statements at once. */
@@ -195,6 +197,7 @@ export function scoped(db: Db, viewer: string, admin = false, readOnly = false):
       }),
     close: () => db.close(),
     whole: db.whole ?? db,
+    scope,
   };
 }
 
@@ -214,7 +217,9 @@ export function anyone(db: Db): Db {
         return fn(tx);
       }),
     close: () => db.close(),
+    scope: 'anyone',
   };
 }
 
 export { newId } from '../../../src/ids.ts';
+export { PLAN_ONCE } from './pg.ts';

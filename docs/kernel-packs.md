@@ -165,6 +165,13 @@ with `ctx.call`.
   shape is a JSON sketch: `"string"`, `"number"`, `"boolean"`, `"id"`,
   `"any"`, `[shape]`, `{ "key": shape, "key?": shape }`. A caller whose need
   the provider does not meet waits, saying which field.
+- **Kept until the map moves.** A provider whose answer is a read of the map
+  alone (no write, nothing outside the map) says `"kept": true`. Its answer is
+  then kept per database, reader and input, under where the map stands
+  (`mapClock` in `packs/log/kernel/position.ts`, the one definition of where the map stands: the fact and held streams, the sessions and
+  claims streams, the settings, what sessions touched), and given again until
+  that moves or a minute passes (`packs/loader/kernel/kept.ts`). Server-Timing
+  says how many were kept (`kept`).
 - **A family per closed list.** Each closed list in the kernel opens as a
   family, its entries provided by packs:
 

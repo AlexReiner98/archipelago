@@ -89,8 +89,23 @@ hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: cur
 hooks.homeLens = () => home();
 /** The lens the canvas in focus draws now. */
 export const queryNow = () => current?.lens ?? null;
-/** Draw this lens in the canvas in focus. */
-export const goQuery = (lens) => current?.pane.go(lens);
+/**
+ * Draw this lens in the canvas in focus. What that canvas holds now goes with it, so the canvas drawn for the lens can
+ * answer a narrowing at once (./narrow.js), whichever pane draws it.
+ */
+export const goQuery = (lens) => {
+  const from = current?.view?.snapshot?.();
+  handed = from && lens ? { from, address: addressOf(lens) } : null;
+  performance.mark('lens-edit');
+  return current?.pane.go(lens);
+};
+/** What the canvas a query was edited on held then, for the canvas that draws that query next, once. */
+let handed = null;
+const handedOn = (lens) => {
+  const was = handed;
+  handed = null;
+  return was && addressOf(lens) === was.address ? was.from : undefined;
+};
 /** Open an address in the canvas in focus: a saved canvas, or a lens in a style, as the bar's switches do. */
 export const openHere = (href) => current?.pane.open(href);
 /** The style the canvas in focus was asked for (a shape, a style kept by id, the saved canvas up). */
@@ -267,7 +282,7 @@ export function canvasIn(host, pane) {
     draw() {
       const of = idsOf(at.lens.filter)[0];
       // A kept view up plays its steps, if it keeps any (from the map as it is, when Play is pressed: style.play).
-      const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.asked)}`, played: at.style.canvas });
+      const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.asked)}`, played: at.style.canvas, before: handedOn(at.lens) });
       // The picture it replaces stops being kept current from the log.
       if (at.view?.store) unfollow(at.view.store);
       at.view = view;

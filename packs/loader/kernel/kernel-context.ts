@@ -18,6 +18,7 @@ import type { Read } from '../../surface/kernel/packreads.ts';
 import { guardedFetch } from '../../walls/kernel/outbound.ts';
 import { fillServices, serviceName, serviceOf, servicesOf, type Family } from './services.ts';
 import { islandRegistry } from './island-pin.ts';
+import { keptAnswer } from './kept.ts';
 import { callRoot, declares, isRootName, ownManifest, type RootCall } from './root-calls.ts';
 import { fillOpen } from '../../identity/kernel/lifecycle.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
@@ -142,7 +143,10 @@ export class KernelHost {
       if (!filled) throw new Error(`No pack here provides service:${name}`);
       return (await filled(input)) as O;
     }
-    return (await (await this.fn(pack, pack.kernel!.provides![name].run))(contextFor(l, pack, this), input, ...(caller ? [caller] : []))) as O;
+    const provided = pack.kernel!.provides![name];
+    const run = async () => (await (await this.fn(pack, provided.run))(contextFor(l, pack, this), input, ...(caller ? [caller] : []))) as O;
+    // A read of the map alone, kept until the map moves (./kept.ts); an act's call, made for a caller, never is.
+    return provided.kept === true && !caller ? keptAnswer(l, name, input, run) : run();
   }
 
   /** The clocks the internal packs declare, each ready to fire with its pack's context: started by whoever leads. */

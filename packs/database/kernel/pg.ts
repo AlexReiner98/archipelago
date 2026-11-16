@@ -16,23 +16,71 @@ const PARSERS: Record<number, (value: string) => unknown> = {
 };
 const types = { getTypeParser: (oid: number, format?: 'text' | 'binary') => PARSERS[oid] ?? pg.types.getTypeParser(oid, format) } as pg.CustomTypesConfig;
 
-const rowsOf = async <T>(client: pg.Pool | pg.PoolClient, sql: string, params?: unknown[]) => ({ rows: (await client.query(sql, params)).rows as T[] });
+/**
+ * A statement that ends in this is planned once per connection and kept (task e_d9ysqwab): a big read whose text is the
+ * same each time, such as the frontier's (packs/surface/kernel/packreads-frontier.ts). Postgres plans every unnamed
+ * statement anew, 30 to 90 ms for the frontier's on the live server; named, its plan is kept on the connection. And it
+ * is kept generic: under `auto`, Postgres plans that statement for its values every time (it never found the generic
+ * plan cheap enough, eight runs of eight on islands), where the generic one runs as fast, its planning 0.2 to 0.4 ms.
+ * So `plan_cache_mode` is forced generic for that statement alone, set just before it and back just after, never for
+ * the connection: the app's other statements keep the plans their values give.
+ *
+ * Row security stays right: a plan made under row security is made again when the role it was made under changes (the
+ * plan cache checks it), and who is viewing is `current_setting('pelago.viewer')` in each policy, read as it runs.
+ * PGlite reads the marker as a comment.
+ */
+export const PLAN_ONCE = '\n-- planned once (pg.ts)';
+/** The most texts kept planned: past it, a marked statement is sent unnamed, so a text built afresh each time cannot fill a connection with plans. */
+const MOST_PLANNED = 32;
+const planned = new Set<string>();
+const nameOf = (sql: string) => `pelago_${createHash('sha256').update(sql).digest('hex').slice(0, 24)}`;
+const plansOnce = (sql: string, params?: unknown[]) => Boolean(params?.length) && sql.endsWith(PLAN_ONCE) && (planned.has(sql) || (planned.size < MOST_PLANNED && Boolean(planned.add(sql))));
+
+const GENERIC = 'set local plan_cache_mode = force_generic_plan';
+const AS_BEFORE = 'set local plan_cache_mode to default';
+
+/** A statement on a connection inside a transaction. A marked one runs named, generic for itself alone: the three are queued at once, so no other read of the transaction comes between them. */
+async function onClient<T>(client: pg.PoolClient, sql: string, params?: unknown[]): Promise<{ rows: T[] }> {
+  if (!plansOnce(sql, params)) return { rows: (await client.query(sql, params)).rows as T[] };
+  const [, got, after] = await Promise.allSettled([client.query(GENERIC), client.query({ name: nameOf(sql), text: sql, values: params }), client.query(AS_BEFORE)]);
+  if (got.status === 'rejected') throw got.reason; // the transaction is aborted: its rollback undoes the setting
+  if (after.status === 'rejected') throw after.reason;
+  return { rows: got.value.rows as T[] };
+}
+
+/** A statement on the pool, outside a transaction: a marked one in a transaction of its own, for the setting to be local to it. */
+async function onPool<T>(pool: pg.Pool, sql: string, params?: unknown[]): Promise<{ rows: T[] }> {
+  if (!plansOnce(sql, params)) return { rows: (await pool.query(sql, params)).rows as T[] };
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const done = await onClient<T>(client, sql, params);
+    await client.query('commit');
+    return done;
+  } catch (err) {
+    await client.query('rollback').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 /** One database on a server, as a Database. Brings its schema up to date with `prepare` under a lock, one opener at a time. */
 export async function openPg(url: string, prepare: (db: Database) => Promise<unknown>): Promise<Database> {
   // A request's reads hold one connection while they come (held.ts), up to a quarter second, where each read once took
-  // one for its own moment: ten, so a few slow requests do not queue the rest. An idle connection closes after ten
-  // seconds (pg's default), so a workspace nobody uses holds none.
-  const pool = new pg.Pool({ connectionString: url, max: 10, types });
+  // one for its own moment: ten, so a few slow requests do not queue the rest. An idle connection closes after a
+  // minute, so a workspace nobody uses holds none, and one a person is clicking through keeps the plans it made
+  // (PLAN_ONCE): the pool hands out the connection last given back, so one person's requests mostly find the same.
+  const pool = new pg.Pool({ connectionString: url, max: 10, idleTimeoutMillis: 60_000, types });
   pool.on('error', () => {}); // an idle connection that drops is replaced on the next query
   const db: Database = {
-    query: <T>(sql: string, params?: unknown[]) => rowsOf<T>(pool, sql, params),
+    query: <T>(sql: string, params?: unknown[]) => onPool<T>(pool, sql, params),
     exec: (sql: string) => pool.query(sql),
     transaction: async <T>(fn: (tx: Q) => Promise<T>) => {
       const client = await pool.connect();
       try {
         await client.query('begin');
-        const done = await fn({ query: <R>(sql: string, params?: unknown[]) => rowsOf<R>(client, sql, params) });
+        const done = await fn({ query: <R>(sql: string, params?: unknown[]) => onClient<R>(client, sql, params) });
         await client.query('commit transaction');
         return done;
       } catch (err) {
@@ -48,7 +96,7 @@ export async function openPg(url: string, prepare: (db: Database) => Promise<unk
   const client = await pool.connect();
   try {
     await client.query(`select pg_advisory_lock(hashtext('pelago.schema'))`);
-    await prepare({ ...db, query: <T>(sql: string, params?: unknown[]) => rowsOf<T>(client, sql, params), exec: (sql: string) => client.query(sql) });
+    await prepare({ ...db, query: async <T>(sql: string, params?: unknown[]) => ({ rows: (await client.query(sql, params)).rows as T[] }), exec: (sql: string) => client.query(sql) });
     // The login role switches to these per request (set local role): unless it is a superuser it must be a member.
     await client.query(`do $$ begin
       if not (select rolsuper from pg_roles where rolname = current_user) then execute format('grant pelago_member, pelago_public to %I', current_user); end if;

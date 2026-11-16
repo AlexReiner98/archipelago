@@ -88,7 +88,8 @@
             "id"
           ]
         },
-        "run": "query-answers.ts#saved"
+        "run": "query-answers.ts#saved",
+        "kept": true
       },
       "answer.picture_of": {
         "in": {

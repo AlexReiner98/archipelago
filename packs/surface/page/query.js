@@ -6,7 +6,8 @@ import { dress, layered } from './query-base.js';
 import { coded as hasCode, drawCode } from './style-code.js';
 import { markTry, onTries, triedOn, tryOn } from './preview.js';
 import { saidDrawn } from './look.js';
-import { ago, idsAsLinks, isA, titles } from './words.js';
+import { ago, idsAsLinks, isA, titles, types } from './words.js';
+import { drawnKey, narrowed as narrowedFrom, unheard } from './narrow.js';
 
 // Where a held change would land on a canvas is the decision of the part on `ghosts` (the write pack's).
 ghostAsker.ask = (input) => askSlot('ghosts', input);
@@ -212,7 +213,7 @@ const whole = new Set();
  * is nothing to draw. `refresh` asks again and draws
  * again only when the answer differs; `mark` lights the item whose page is open.
  */
-export function flatView({ lens, style = {}, of, key, only, nest = false, extra, played, quiet = false }) {
+export function flatView({ lens, style = {}, of, key, only, nest = false, extra, played, quiet = false, before }) {
   const chosen = {};
   const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
   const host = h('div', { class: 'lens-wrap' }, body);
@@ -235,6 +236,16 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     if (nest) shown = nested(shown, typeof nest === 'string' ? nest : undefined);
     const said = JSON.stringify(shown);
     if (refreshing && said === host.said) return;
+    // The server's answer to a query this page answered itself first (./narrow.js): drawn again only where it differs.
+    const early = host.early;
+    host.early = undefined;
+    if (host.drawingEarly) (host.drawingEarly = false), (host.early = drawnKey(shown));
+    if (early !== undefined && drawnKey(shown) === early) {
+      Object.assign(host, { said, answer, failed: null });
+      for (const item of answer.items) titles.set(item.id, item.title);
+      performance.mark('lens-confirmed');
+      return void host.dispatchEvent(new CustomEvent('lens-answer'));
+    }
     host.said = said;
     host.answer = answer;
     host.failed = null;
@@ -306,6 +317,8 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     store.on((changed) => {
       if (host.store !== store) return;
       if (!host.isConnected) return unfollow(store);
+      // What find heard of the terms it offered was of the map before this moved it.
+      if (!changed.held) unheard();
       // What draws it changed (its layout's code kept, its style's settings): read again and drawn with what it holds now.
       if (changed.restyle) return void ((host.said = undefined), load(true));
       // What the query finds may have moved (packs/surface/page/membership.js), or on a time axis an item changed may fall elsewhere:
@@ -316,6 +329,28 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     });
     draw({ ...raw, ...store.answer() }, { ...raw, ...store.drawn() }, refreshing);
   };
+  // An edit that only narrows what the view before it held is drawn at once from that (./narrow.js), drawn as that one
+  // was; the server's answer then lands on it, and is drawn only where it differs.
+  function firstFrom(was) {
+    if (!was || was.made !== host.made) return;
+    const { answer } = was;
+    const ctx = { viewer: answer.viewer, typeKnown: (t) => types.has(t), systemType: (t) => Boolean(types.get(t)?.system) };
+    const first = narrowedFrom(was.lens, lens, answer, was.raw.lens, ctx);
+    if (!first) return;
+    const held = new Set(answer.items.map((i) => i.id));
+    // What is held for the owner stays drawn where it would land; the server's answer says it again.
+    const old = was.shown;
+    const flagged = new Map(old.items.map(({ found: _f, terms: _t, step: _s, reasons: _r, ...i }) => [i.id, i]));
+    const items = [...first.items.map((i) => ({ ...flagged.get(i.id), ...i })), ...old.items.filter((i) => !held.has(i.id))];
+    const ids = new Set(items.map((i) => i.id));
+    const shown = { ...old, lens: first.lens, items, links: old.links.filter((l) => ids.has(l.from) && ids.has(l.to)), ...(first.islands && { islands: first.islands }) };
+    look = was.look;
+    raw = { ...was.raw, lens: first.lens };
+    delete raw.matched;
+    performance.mark('lens-narrowed');
+    host.drawingEarly = true;
+    draw(first, shown);
+  }
   // A lens that names a view: its answer, asked as an agent asks it, is drawn as it comes. It is not a replica of the
   // log (what it measures is not all facts), so it is asked again when the canvas is drawn again or refreshed.
   const loadView = async (refreshing) => {
@@ -333,6 +368,12 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     draw(raw, raw, refreshing);
   };
   warmLayouts();
+  // What it was asked to draw, so the view drawn after it can tell whether it draws alike (`firstFrom`).
+  host.made = JSON.stringify([of, style, key, only, nest, played ?? null, extra ?? null]);
+  host.lens = lens;
+  // What it holds now, settled on the server's answer, for the view drawn after it (`firstFrom`).
+  host.snapshot = () => (host.store && host.early === undefined && look && raw?.lens ? { lens, made: host.made, look, raw, answer: host.store.answer(), shown: host.store.drawn() } : null);
+  firstFrom(before);
   host.ready = load();
   host.refresh = () => load(true);
   // A drawing that made something asks for the lens again: a new item is not among those the store follows.

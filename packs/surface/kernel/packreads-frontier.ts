@@ -6,6 +6,7 @@
 // packs': attention (packs/attention) and the runs pack's frontier take these answers in place of their reads.
 
 import type { Archipelago } from '../../write/kernel/pelago.ts';
+import { PLAN_ONCE } from '../../database/kernel/db.ts';
 import { openSaidWith } from '../../seal/kernel/seal.ts';
 import { KEYS_OF, type Wrapped } from '../../seal/kernel/vault.ts';
 import { shapes } from './packreads-rows.ts';
@@ -127,7 +128,8 @@ function attentionParts(l: Archipelago, p: Params, among: string, ask: Attention
 
 /** One statement of parts and the JSON object of their answers, run as the asker. */
 async function once(l: Archipelago, p: Params, ctes: string[], fields: string[]): Promise<Record<string, unknown>> {
-  const sql = `with recursive ${ctes.join(',\n')}\nselect json_build_object(${fields.join(',\n')}) as state`;
+  // Its text is the same for every ask of the same shape (its ids and times are parameters): planned once per connection.
+  const sql = `with recursive ${ctes.join(',\n')}\nselect json_build_object(${fields.join(',\n')}) as state${PLAN_ONCE}`;
   const { rows: [row] } = await l.db.query<{ state: Record<string, unknown> | string }>(sql, p.values);
   return typeof row.state === 'string' ? JSON.parse(row.state) : row.state;
 }
