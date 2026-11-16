@@ -34,6 +34,7 @@ const shipped = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs',
 
 test('a picture is sent the drawing its shape is drawn by, once, and the owner’s version stands in module by module', async () => {
   const { call } = await serve('off');
+  await call('/api/workspace_set', undefined, { holds_off: false }); // what it checks is what waits
   const { s } = await system(call);
   const first = (await call('/api/view', undefined, { name: 'style', params: { style: s, have: [] } })).result.style.drawing;
   assert.equal(first.id, 'core.map');

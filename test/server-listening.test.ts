@@ -9,7 +9,7 @@ import { until } from './wait.ts';
 
 test('an agent can point the human\'s screen, and its changes point it too', async () => {
   const { call } = await serve('off');
-  await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
+  await call('/api/workspace_set', undefined, { agent_changes: 'hold', holds_off: false });
   assert.match((await call('/agent/show', undefined, {})).error, /needs "entity", "screen" or "lens"/);
 
   // What the canvas draws: a flat lens and the style go in the address, as the page reads them, and a lens that could not be drawn is refused here.

@@ -187,7 +187,7 @@ test('a document brings items in by id, read whole by its author with what she m
     ['# Funding', 'IRAP', 'Between them, ' + hers.mine + ' comes first.', 'SR&ED', his.n, 'e_nothing1'],
   );
   // An agent may read it, but only a person makes it public (test/public-view.test.ts says what goes out).
-  await assert.rejects(callTool(ann, { kind: 'agent', name: 'a', person: people.ann }, 'share_create', { id: doc }), /humans only/);
+  await assert.rejects(callTool(ann, { kind: 'agent', name: 'a', person: people.ann }, 'share_create', { id: doc }), /Publishing is the owner’s here/);
 });
 
 test('what is made for a reader is marked deliverable by its type, and a document names the sections kept outside it', async () => {

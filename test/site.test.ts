@@ -75,6 +75,7 @@ test('a domain serves a workspace’s published pages at their address words, th
 
 test('everything a project holds is published with one click, an agent may only ask for it', async () => {
   const { call, base } = await serve('off', undefined, undefined, PAGES);
+  await call('/api/workspace_set', undefined, { holds_off: false }); // where holds are on, an agent asks
   const made = (
     await call('/api/change', undefined, {
       reason: 'test',
@@ -105,7 +106,7 @@ test('everything a project holds is published with one click, an agent may only 
   // An agent asks: the person is told, and nothing is published.
   const asked = (await call('/agent/publish_ask', undefined, { within: P, reason: 'The docs are ready.' })).result;
   assert.deepEqual([asked.asked, asked.to_publish], [true, 5]);
-  assert.notEqual((await call('/agent/publish_all', undefined, { within: P })).status, 200, 'only a person publishes');
+  assert.notEqual((await call('/agent/publish_all', undefined, { within: P })).status, 200, 'where holds are on, an agent asks to publish');
   assert.equal((await fetch(`${base}/p/default/${a}/data`)).status, 404);
 
   // One click: all of it, each linking to the others; the one whose path is taken is named, the rest go ahead.

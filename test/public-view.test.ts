@@ -46,7 +46,7 @@ test('a view shared is frozen without its private items, and the plan says what 
   assert.equal(plan.shared, false);
 
   // Only a person shares: an agent asks.
-  await assert.rejects(callTool(mine, { kind: 'agent', name: 'a', person: owner.person }, 'share_create', { id: made.lens }), /humans only/);
+  await assert.rejects(callTool(mine, { kind: 'agent', name: 'a', person: owner.person }, 'share_create', { id: made.lens }), /Publishing is the owner’s here/);
   const asked = (await callTool(mine, { kind: 'agent', name: 'a', person: owner.person }, 'share_ask', { id: made.lens, reason: 'For the post.' })) as { asked: boolean };
   assert.equal(asked.asked, true);
 

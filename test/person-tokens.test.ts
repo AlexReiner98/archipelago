@@ -50,7 +50,7 @@ test('a person token reaches every workspace its person is a member of, as them,
   assert.match((await call('/api/member_list', pep)).error ?? '', /./, 'it is no admin, and no human');
 
   // What it changes is an agent's in that workspace, under that workspace's rules.
-  await call('/api/workspace_set', acme, { agent_changes: 'hold' });
+  await call('/api/workspace_set', acme, { agent_changes: 'hold', holds_off: false });
   await call('/api/workspace_set', home, { agent_changes: 'apply' });
   const change = (ws: string, id: string) => fetch(`${base}/agent/change`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${pep}`, 'x-pelago-workspace': ws }, body: JSON.stringify({ reason: 'test', ops: [{ op: 'update', id, status: 'doing' }] }) }).then((r) => r.json());
   assert.equal((await change('acme', samsAcme)).result.status, 'proposed');

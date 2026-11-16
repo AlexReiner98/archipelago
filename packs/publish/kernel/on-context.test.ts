@@ -58,10 +58,13 @@ test('taking a document down asks the rules, then takes its rows, then shares it
   assert.deepEqual(calls.map((c) => [c.name, (c.input as { act: string }).act]), [['root.may', 'unpublish'], ['root.publish', 'unpublish'], ['root.publish', 'visibility']]);
 });
 
-test('only a person shares a view; one with no public view says so', async () => {
+test('an agent shares a view only where the rules let it, a token that may only propose never; one with no public view says so', async () => {
   const calls: Call[] = [];
-  await assert.rejects(share(fake({}, {}, calls), agent, 'e_aaaaaaaa'), /Only a person makes a view public/);
+  await assert.rejects(share(fake({}, {}, calls), { ...agent, may: 'propose' }, 'e_aaaaaaaa'), /may only propose/);
   assert.deepEqual(calls, []);
+  const refused = () => { throw new Error('Publishing is the owner’s here'); };
+  await assert.rejects(share(fake({}, { 'root.may': refused }, calls), agent, 'e_aaaaaaaa'), /the owner’s here/);
+  assert.deepEqual(calls.map((c) => c.name), ['root.may'], 'the rules are asked first, and nothing is frozen');
   await assert.rejects(unshare(fake({}, { 'root.publish': false }), person, 'e_aaaaaaaa'), /has no public view/);
 });
 

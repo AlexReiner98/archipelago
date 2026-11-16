@@ -24,6 +24,7 @@ const CODE = `export default function draw({ field, change, on }) {
 
 test('in a browser, a drawing gets a text field and asks for changes, which the page sends as the person', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
+  await call('/api/workspace_set', undefined, { holds_off: false }); // what it checks is what waits
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [

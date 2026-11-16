@@ -49,6 +49,7 @@ test('a pack removed under live items leaves them dormant: editable by a person,
   const dirs = [PACKS, grants];
   const db = await openDb();
   const all = new Archipelago(db, new Registry(dirs));
+  await db.query(`insert into setting (key, value) values ('holds_off', 'false') on conflict (key) do update set value = excluded.value`); // what it checks is what waits
   assert.deepEqual(await syncTypes(all), { activated: [], dormant: [], changed: {}, moved: {} }, 'the first sync only records');
   const soon = new Date(Date.now() + 4 * 86_400_000).toISOString().slice(0, 10);
   const made = (await all.change(human, {

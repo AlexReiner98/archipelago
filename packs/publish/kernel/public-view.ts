@@ -38,6 +38,7 @@ export async function share(ctx: KernelContext, actor: Actor, id: string) {
 
 /** What the rules say of this actor publishing or taking down (root.may): refused, or the stakes of the rules that let it through. */
 async function mayPublic(ctx: KernelContext, actor: Actor, act: 'publish' | 'unpublish'): Promise<string[]> {
+  if (actor.may && actor.may !== 'change') throw new Error('This token may only propose: ask for it to be made public (ask, action share_ask).');
   const said = await ctx.call<unknown, unknown>('root.may', { act, human: actor.kind === 'human' });
   return Array.isArray(said) ? (said as string[]) : [];
 }
