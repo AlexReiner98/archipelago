@@ -1,7 +1,7 @@
 /* The first-run pages (decision e_y76ysk7n, typeface e_sgzzhfba): a published site's pages and the gate's (sign in, sign up, a
-   guest map being made) in the house's map face, roles, colours and marks; every value is the house style's. The face is
-   Recursive: a person's words in its casual end (voice), an agent's in its monospace end (agent), names and controls in its
-   plain sans (wordmark, heading, label). The colours are chart_*, light and dark, and held is the one accent: something
+   guest map being made) in the house's faces, roles, colours and marks; every value is the house style's. Since 16 Nov 2026
+   (decision e_57shnsa9) the names and a person's words (wordmark, heading, voice) are the emblem's face, an agent's words
+   mono (agent), controls the plain face (label). The colours are chart_*, light and dark, and held is the one accent: something
    proposed, waiting for you. The one way forward on a page is ink with a heavier foot (lengths action_rule, action_foot). */
 
 @font-face {
@@ -122,7 +122,7 @@ body[data-gate] .gate .primary:focus-visible { outline: var(--border-3) solid va
 
 /* The gate: a clearing with room, the form at reading size; fields square, their edge strong enough to see. */
 body[data-gate] .gate { gap: var(--space-8); }
-body[data-gate] .gate h1, :where(main:has(> nav.site-head)) section > h2 { font-size: var(--chart-title); line-height: 1.2; }
+body[data-gate] .gate h1, :where(main:has(> nav.site-head)) section > h2 { font-size: var(--chart-title); line-height: 1.25; }
 body[data-gate] .gate, :where(main:has(> nav.site-head)) { font-size: var(--chart-text); }
 body[data-gate] .gate input { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }
 body[data-gate] .gate input:focus { border-color: var(--c-ink); outline: var(--border-2) solid var(--c-ink); outline-offset: var(--border-1); }

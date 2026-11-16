@@ -34,7 +34,7 @@ footer,
 }
 h1 {
   font-size: var(--reader-h1);
-  line-height: 1.2;
+  line-height: 1.25;
   margin: 0 0 var(--space-3);
 }
 h2 {
@@ -236,7 +236,7 @@ body.invoice main {
 }
 .invoice-total {
   font-size: var(--reader-h2);
-  font-weight: 700;
+  font-weight: 600;
 }
 .stamp {
   position: absolute;
@@ -246,7 +246,7 @@ body.invoice main {
   border: var(--border-4) solid var(--reader-paid);
   border-radius: var(--radius-2);
   color: var(--reader-paid);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: var(--track-3);
   text-transform: uppercase;
   transform: rotate(-8deg);
