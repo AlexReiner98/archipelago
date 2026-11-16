@@ -16,6 +16,7 @@ const PIXEL = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQD
 
 test('a document a human makes public is read by anyone at its own address, with what it holds and nothing private', async () => {
   const { call, base, workspaces } = await serve('off');
+  await call('/api/workspace_set', undefined, { holds_off: false }); // what it checks is what waits
   const made = (
     await call('/api/change', undefined, {
       reason: 'test',

@@ -137,7 +137,7 @@ other; nothing in code skips the rules.
 - Core's rule `system_reach` refuses a system change outside the pack's
   reach (as `pack_reach` does for a plain pack's action).
 - A system change never settles a question, never forgets, and never touches
-  a root pack's items (`settle_said`, `forget`, `root`).
+  a root pack's items (`settle`, `forget`, `root`).
 - Core's `agent_changes` does not hold it. A pack that wants its own
   bookkeeping held, or spared another hold, declares the rule. As built
   (wave 6b, e_rr96yyj3): sessions' writes are the rule

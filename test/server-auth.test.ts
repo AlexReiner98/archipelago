@@ -14,7 +14,7 @@ test('with auth off, one workspace and the surface decides who is calling', asyn
   // What the agents of a new workspace change takes effect as they make it, owner or no owner.
   const applied = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'record', title: 'M' }] });
   assert.equal(applied.result.status, 'applied', 'a new workspace applies what agents change');
-  await call('/api/workspace_set', undefined, { agent_changes: 'hold' });
+  await call('/api/workspace_set', undefined, { agent_changes: 'hold', holds_off: false });
   const proposed = await call('/agent/change', undefined, { actor: 'script-a', reason: 'x', ops: [{ op: 'create', type: 'record', title: 'N' }] });
   assert.equal(proposed.result.status, 'proposed', '/agent is an agent');
   await call('/api/init', undefined, { name: 'Alex' });
@@ -44,7 +44,7 @@ test('a token fixes identity and authority, whichever surface is used', async ()
   const { workspaces, call, base } = await serve('tokens');
   const db = (await workspaces.get('default')).pelago.db;
   const owner = (await createToken(db, 'default', { kind: 'human', name: 'alex', admin: true })).token;
-  await call('/api/workspace_set', owner, { agent_changes: 'hold' });
+  await call('/api/workspace_set', owner, { agent_changes: 'hold', holds_off: false });
 
   const who = await call('/whoami', owner, undefined, 'GET');
   assert.deepEqual([who.auth, who.actor.kind, who.actor.name], ['tokens', 'human', 'alex']);
@@ -193,7 +193,7 @@ test('inside a workspace, private things are hidden from other members by the da
   assert.deepEqual(await titles(sam), ['Sam private', 'Shared task']);
 
   // Someone's agent acts for them: it sees what they see and proposes to them alone.
-  await api(alex, 'workspace_set', { agent_changes: 'hold' });
+  await api(alex, 'workspace_set', { agent_changes: 'hold', holds_off: false });
   const samAgent = (await api(sam, 'token_create', { kind: 'agent', name: 'sam-claude' })).token as string;
   assert.deepEqual(await titles(samAgent), ['Sam private', 'Shared task']);
   const proposed = await api(samAgent, 'change', { reason: 'From Sam\'s inbox', ops: [{ op: 'create', type: 'task', title: 'Reply to the client' }] });
@@ -292,7 +292,7 @@ test('nothing passes between workspaces: notifications and shares by workspace a
 
   const set = await call('/api/workspace_set', theirs, { default_visibility: 'shared' });
   const { reply_rules, ...settings } = set.result;
-  assert.deepEqual(settings, { id: 'acme', default_visibility: 'shared', agent_changes: 'apply', agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: true, holds_off: false, lifted: { reply_draw_answers: false, reply_record_findings: false } });
+  assert.deepEqual(settings, { id: 'acme', default_visibility: 'shared', agent_changes: 'apply', agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: true, holds_off: true, lifted: { reply_draw_answers: false, reply_record_findings: false } });
   assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['practice.draw_answers', false], ['practice.record_findings', false]]);
 });
 

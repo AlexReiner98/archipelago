@@ -12,7 +12,7 @@ import { layoutOf } from '../../rules/kernel/layout-changes.ts';
 import { append, headOf, type Fact } from '../../log/kernel/log.ts'; import { projectDecision, projectFacts, stamp } from '../../log/kernel/replay.ts'; import { linkFacts } from '../../log/kernel/facts.ts';
 import { decideProposal } from './proposals.ts'; import { needHuman } from '../../identity/kernel/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { planChange } from './change-plan.ts'; import { editsResolved } from './edit.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
+import { planChange } from './change-plan.ts'; import { asSent, editsResolved } from './edit.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
 
 export * from './pelago-types.ts';
 export type { Level, OpKind, Policy } from '../../rules/kernel/rules.ts';
@@ -54,7 +54,7 @@ export class Archipelago {
   }
 
   /** Whether this actor may do an act that is not a change (pack_off, publish): refused with the rule's reason when a rule refuses it. */
-  may(actor: Actor, act: string, props?: Record<string, unknown>): Promise<void> { return mayDo(this.db, this.registry, actor.kind === 'human', act, props); }
+  may(actor: Actor, act: string, props?: Record<string, unknown>): Promise<string[]> { return mayDo(this.db, this.registry, actor.kind === 'human', act, props); }
 
   /** This map as anyone sees it with no login: only what is public. Ask it of the whole map, not of one person's view. */
   forAnyone(): Archipelago {
@@ -110,6 +110,7 @@ export class Archipelago {
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
     // An edit of a code field is the whole field it leaves from here on: judged, held and logged as any update (packs/write/kernel/edit.ts).
+    const sent = input.ops;
     const { ops: whole, edited } = await editsResolved(this.registry, input.ops, async (id) => (await this.entity(id)) ?? null);
     input = { ...input, ops: whole };
     const said = edited.length ? { edited } : {};
@@ -150,7 +151,7 @@ export class Archipelago {
       const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say, ...(verdict.by.version && { version: verdict.by.version }) };
       // The queue is a projection of the pending stream: the record makes its row (packs/log/kernel/replay.ts).
       await this.db.transaction(async (tx) =>
-        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), base, ops: input.ops, warnings, ids, private_to: this.viewer || null }, facts, codeFields(this.registry))),
+        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), base, ops: asSent(input.ops, sent), warnings, ids, private_to: this.viewer || null }, facts, codeFields(this.registry))),
       );
       return {
         status: 'proposed' as const,

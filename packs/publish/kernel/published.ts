@@ -24,14 +24,15 @@ export { freezeDocument, PATH, pathOf, publishedState, publishPlan, wouldPublish
  * Whether this actor may publish here: a human always, an agent where no rule refuses it (core's agent_publish, lifted
  * by the owner). A token that may only propose never does: publishing is not held, and it asks with publish_ask.
  */
-async function mayPublish(ctx: KernelContext, actor: Actor) {
+async function mayPublish(ctx: KernelContext, actor: Actor): Promise<string[]> {
   if (actor.may && actor.may !== 'change') throw new Error('This token may only propose: ask for the document to be published (ask, action publish_ask).');
-  await ctx.call('root.may', { act: 'publish', human: actor.kind === 'human' });
+  const said = await ctx.call<unknown, unknown>('root.may', { act: 'publish', human: actor.kind === 'human' });
+  return Array.isArray(said) ? (said as string[]) : [];
 }
 
 /** Publish a document as it stands: it becomes public, and what anyone reads of it is this, until it is published again. */
 export async function publish(ctx: KernelContext, actor: Actor, id: string, said?: Said) {
-  await mayPublish(ctx, actor);
+  const stakes = await mayPublish(ctx, actor);
   const authority = authorityOf(actor.kind === 'human', actorId(actor), said);
   const doc = ID.test(id) ? await itemOf(ctx, id) : null;
   if (!doc || !(await publishable(ctx)).types.includes(doc.type)) throw new Error(`"${id}" is not a document that can be public.`);
@@ -49,17 +50,18 @@ export async function publish(ctx: KernelContext, actor: Actor, id: string, said
   await ctx.call('root.publish', { act: 'publish', id, actor: actorId(actor), by, given, detail: { sections: given.sections.length, lenses: Object.keys(given.lenses).length, authority } });
   // A page open on it with ?live draws it anew.
   republished(ctx.workspace, id);
-  return { published: id, sections: given.sections.length, lenses: Object.keys(given.lenses).length, ...(given.path && { path: given.path }) };
+  return { published: id, sections: given.sections.length, lenses: Object.keys(given.lenses).length, ...(given.path && { path: given.path }), ...(stakes.length && { stakes: [`"${doc.title}" is public now, at /p/${ctx.workspace}/${id}${given.path ? ` and ${given.path} on its site` : ''}: anyone on the internet reads it, and search engines may keep a copy.`, ...stakes, 'unpublish takes it down; a copy already read or indexed stays out of reach.'] }) };
 }
 
-/** Take a document down: it is shared again, and its address answers nothing. Only a human may (core's agent_unpublish). */
+/** Take a document down: it is shared again, and its address answers nothing. An agent where the rules let it (core's agent_unpublish). */
 export async function unpublish(ctx: KernelContext, actor: Actor, id: string) {
-  await ctx.call('root.may', { act: 'unpublish', human: actor.kind === 'human' });
+  const said = await ctx.call<unknown, unknown>('root.may', { act: 'unpublish', human: actor.kind === 'human' });
+  const stakes = Array.isArray(said) ? (said as string[]) : [];
   const doc = await itemOf(ctx, id);
   if (!doc) throw new Error(`No item "${id}".`);
   await ctx.call('root.publish', { act: 'unpublish', id, actor: actorId(actor) });
   if (doc.visibility === 'public') await ctx.call('root.publish', { act: 'visibility', id, actor: actorId(actor), visibility: 'shared' });
-  return { unpublished: id };
+  return { unpublished: id, ...(stakes.length && { stakes }) };
 }
 
 /** A published document as anyone reads it, or null. Read through one narrow function: nothing of the map as it is now. */

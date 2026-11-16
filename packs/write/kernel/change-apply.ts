@@ -200,10 +200,14 @@ function refsIn<T>(value: T, named: (text: string) => string): T {
   return value;
 }
 
-/** Of an applied change, what let it through: each rule that would have held it, and the setting, policy or holds off that did not let it. */
-export function letThrough(spared: Verdict['spared']): { let_through?: { rule: string; pack: string; by: string }[] } {
+/**
+ * Of an applied change, what let it through: each rule that would have held it, and the setting, policy or holds off
+ * that did not let it; and what is at stake now it applied (stakes): each such rule's stake, said of its item, once.
+ */
+export function letThrough(spared: Verdict['spared']): { let_through?: { rule: string; pack: string; by: string }[]; stakes?: string[] } {
   const each = new Map(spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack, by: r.lifted_by ?? 'setting' }]));
-  return each.size ? { let_through: [...each.values()] } : {};
+  const stakes = [...new Set(spared.flat().flatMap((r) => (r.stake ? [r.stake] : [])))];
+  return { ...(each.size && { let_through: [...each.values()] }), ...(stakes.length && { stakes }) };
 }
 
 /** What an op sets of an item's operational state (packs/log/kernel/operational.ts) is not a fact: it is written beside them, never logged. */

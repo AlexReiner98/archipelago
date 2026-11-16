@@ -18,11 +18,12 @@ import { takeBaked, withBaked } from './published-baked.ts';
 export { freeze, sharedState, sharedViews, sharePlan } from './public-view-freeze.ts';
 
 /**
- * Make `id` public as it stands, in place of any public view of it before: frozen now, kept at its address. A person's
- * alone (the tool is human only): an agent asks with share_ask.
+ * Make `id` public as it stands, in place of any public view of it before: frozen now, kept at its address. A person
+ * always; an agent where the rules let it publish (root.may, core's agent_publish: with holds off, at once), its answer
+ * saying the stakes.
  */
 export async function share(ctx: KernelContext, actor: Actor, id: string) {
-  if (actor.kind !== 'human') throw new Error('Only a person makes a view public: ask them (ask, action share_ask).');
+  const stakes = await mayPublic(ctx, actor, 'publish');
   // With each layout kept on the map that the page baked just before (./published-baked.ts), as its SVG.
   const frozen = withBaked(await freeze(ctx, id), takeBaked(ctx.workspace, id));
   const look = await ctx.call<unknown, Record<string, unknown>>('page.look', { ...frozen, id });
@@ -31,13 +32,22 @@ export async function share(ctx: KernelContext, actor: Actor, id: string) {
   const by = actor.person ?? actorId(actor);
   await ctx.call('root.publish', { act: 'share', id, actor: actorId(actor), by, given, detail: { shows: shownIn(frozen).length } });
   republished(ctx.workspace, id);
-  return { shared: id, address: publicPath(ctx.workspace, id), shows: shownIn(frozen).length, ...(given.path && { path: given.path }) };
+  const address = publicPath(ctx.workspace, id);
+  return { shared: id, address, shows: shownIn(frozen).length, ...(given.path && { path: given.path }), ...(stakes.length && { stakes: [`Public now at ${address}: anyone on the internet can read it, and search engines may keep a copy.`, ...stakes, 'share_revoke takes it down; a copy already read or indexed stays out of reach.'] }) };
+}
+
+/** What the rules say of this actor publishing or taking down (root.may): refused, or the stakes of the rules that let it through. */
+async function mayPublic(ctx: KernelContext, actor: Actor, act: 'publish' | 'unpublish'): Promise<string[]> {
+  if (actor.may && actor.may !== 'change') throw new Error('This token may only propose: ask for it to be made public (ask, action share_ask).');
+  const said = await ctx.call<unknown, unknown>('root.may', { act, human: actor.kind === 'human' });
+  return Array.isArray(said) ? (said as string[]) : [];
 }
 
 /** Take a public view down: its address answers nothing. The item itself is left as it is. */
 export async function unshare(ctx: KernelContext, actor: Actor, id: string) {
+  const stakes = await mayPublic(ctx, actor, 'unpublish');
   const gone = await ctx.call<unknown, boolean>('root.publish', { act: 'unshare', id, actor: actorId(actor) });
   if (!gone) throw new Error(`"${id}" has no public view.`);
   republished(ctx.workspace, id);
-  return { unshared: id };
+  return { unshared: id, ...(stakes.length && { stakes }) };
 }

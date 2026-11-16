@@ -93,8 +93,7 @@ export const SHARE_TOOLS: Record<string, ShareTool> = {
     run: async (ctx, _actor, input: { id: string; drawn?: boolean; page?: boolean }) => (input.drawn && input.page ? readPage(ctx, input) : input.drawn ? reading(ctx, input) : readDocument(ctx, input.id)),
   },
   share_create: {
-    description: 'Make a view, a document or any item public as it stands now, frozen, at /p/<workspace>/<id> for anyone and for search engines (and at its path on its site, when it has one). What is private is left out; share_plan says what goes out first. Sharing it again replaces what is public. Only a person shares: an agent asks with the ask verb, action share_ask.',
-    humanOnly: true,
+    description: 'Make a view, a document or any item public as it stands now, frozen, at /p/<workspace>/<id> for anyone and for search engines (and at its path on its site, when it has one). What is private is left out; share_plan says what goes out first. Sharing it again replaces what is public. An agent shares where it may publish; else it asks (ask, action share_ask).',
     input: { id: 'string' },
     says: { id: ITEM },
     run: async (ctx, actor, input: { id: string }) => share(ctx, actor, input.id),
@@ -113,7 +112,6 @@ export const SHARE_TOOLS: Record<string, ShareTool> = {
   },
   share_revoke: {
     description: 'Take a public view down, at once: its address answers nothing, and the item itself is left as it is.',
-    humanOnly: true,
     input: { id: 'string' },
     says: { id: 'The item whose public view to take down.' },
     run: async (ctx, actor, input: { id: string }) => unshare(ctx, actor, input.id),
@@ -125,20 +123,19 @@ export const SHARE_TOOLS: Record<string, ShareTool> = {
     run: async (ctx, actor, input: { id: string; reason?: string }) => shareAsk(ctx, actor, input.id, input.reason),
   },
   publish: {
-    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent may publish only where the owner allows it (agent_publish); elsewhere ask with the ask verb, action publish_ask.',
+    description: 'Publish a document as it stands: it becomes public, and what anyone reads at its address (/p/<workspace>/<id>) is this, frozen, until it is published again. Its lenses are kept as views a reader can explore. An agent publishes where the rules let it (holds off, or agent_publish); elsewhere ask with the ask verb, action publish_ask.',
     input: { id: 'string', ...AUTHORITY },
     says: { id: DOCUMENT, ...AUTHORITY_SAYS },
     run: async (ctx, actor, input: { id: string; authority?: Said }) => publish(ctx, actor, input.id, input.authority),
   },
   unpublish: {
     description: 'Take a published document down: its address answers nothing, and it is shared with the workspace again.',
-    humanOnly: true,
     input: { id: 'string' },
     says: { id: DOCUMENT },
     run: async (ctx, actor, input: { id: string }) => unpublish(ctx, actor, input.id),
   },
   publish_all: {
-    description: 'Publish every open document an item holds (part_of, at any depth), then publish them again so each links to the others at their addresses. One whose path is taken is named, and the rest go ahead. An agent may only where the owner allows it, as with publish.',
+    description: 'Publish every open document an item holds (part_of, at any depth), then publish them again so each links to the others at their addresses. One whose path is taken is named, and the rest go ahead. An agent may where it may publish.',
     input: { within: 'string', ...AUTHORITY },
     says: { within: 'The item that holds the documents, such as a site’s project.', ...AUTHORITY_SAYS },
     run: async (ctx, actor, input: { within: string; authority?: Said }) => publishAll(ctx, actor, input.within, input.authority),

@@ -25,6 +25,7 @@ async function setup(agents: 'apply' | 'hold') {
   const l = await fresh();
   const me = ((await callTool(l, human, 'init', { name: 'Alex' })) as { me: string }).me;
   await l.db.query(`insert into setting (key, value) values ('agent_changes', $1) on conflict (key) do update set value = excluded.value`, [JSON.stringify(agents)]);
+  await l.db.query(`insert into setting (key, value) values ('holds_off', 'false') on conflict (key) do update set value = excluded.value`);
   const made = await make(l, [
     { op: 'create', ref: 'ben', type: 'person', title: 'Ben' },
     { op: 'create', ref: 't', type: 'task', title: 'Pick the fonts' },

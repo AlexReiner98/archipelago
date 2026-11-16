@@ -133,6 +133,7 @@ test('refused tokens are counted by address, a backup unpacks only so far, and t
 test('a writing shared is public at its address with no login, until it is taken down', async () => {
   // A test pack's writing is what can be read whole (test/packs/reader).
   const { call, base } = await serve('off', undefined, undefined, packsWith('reader'));
+  await call('/api/workspace_set', undefined, { holds_off: false }); // where holds are on, an agent asks
   const made = await call('/api/change', undefined, {
     reason: 'test',
     ops: [
@@ -142,7 +143,7 @@ test('a writing shared is public at its address with no login, until it is taken
     ],
   });
   const { d, n } = made.result.created;
-  assert.match((await call('/agent/share_create', undefined, { id: d })).error, /humans only/);
+  assert.match((await call('/agent/share_create', undefined, { id: d })).error, /Publishing is the owner’s here/);
   // A section's figure is kept with it when it is shared; a figure of anything it does not bring in is not.
   const png = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex').toString('base64');
   const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'o', type: 'clipping', title: 'Not in it' }] })).result.created.o;

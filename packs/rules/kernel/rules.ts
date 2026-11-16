@@ -97,6 +97,8 @@ export interface RuleDef {
   type?: string;
   /** What a refusal says, and why a held change waits. {title} is the item's. */
   say?: string;
+  /** What letting it through means, said in the answer of a change it did not hold (holds off, a lift): who sees it, what runs where, whether it can be undone. {title} as in say. */
+  stake?: string;
   /** A workspace setting (agent_...) by which its owner lifts this rule there: while it is on, the rule does not apply. */
   lifted?: string;
   /** Where the workspace has not set lifted, the server's policy for the op lifts it (auto) or not. */
@@ -117,6 +119,8 @@ export interface Ruled {
   rule: string;
   pack: string;
   say: string;
+  /** What letting it through means (the rule's stake), where the rule names one. */
+  stake?: string;
   /** Of a rule that did not hold it: what let it through, a setting (agent_code), the server's policy (server) or holds being off (holds_off). */
   lifted_by?: string;
   /** The version of its pack the rule is of (its pack item), where an island runs one (packs/loader/kernel/island-pin.ts). */
@@ -292,7 +296,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
   const said = (rule: Rule, fallback: string) =>
     (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
-  const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`) });
+  const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`), ...(rule.stake && { stake: said({ ...rule, say: rule.stake }, rule.stake) }) });
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
   // A pack's bookkeeping its own rule lets through is spared every other rule, each named as spared by it, it first.
@@ -366,12 +370,15 @@ async function liftsOf(q: Q, rules: Rule[], policy: Partial<Policy>): Promise<Li
 
 /**
  * A workspace begins: what its agents change takes effect as they make it, until the owner says otherwise (the owner,
- * 21 Oct and 1 Nov 2026). Only for one that has held nothing, or has no owner yet: one that never chose stays held.
- * Answers the fact to put on the settings stream, if it was set here.
+ * 21 Oct and 1 Nov 2026), and with holds off, so nothing an agent does waits for a person: code, what is public,
+ * publishing, settling, forget (the owner, 15 Nov 2026: "completely remove all approvals for now ... everything on by
+ * default"). Each change's answer names its stakes instead (Ruled.stake). Only for one that has held nothing, or has
+ * no owner yet: one that already chose keeps its choice. Answers the facts to put on the settings stream, for what was set here.
  */
 export async function beginApplying(q: Q): Promise<['+', string, string, unknown][]> {
-  const { rows } = await q.query(`insert into setting (key, value) values ($1, '"apply"'::jsonb) on conflict (key) do nothing returning key`, [AGENT_CHANGES]);
-  return rows.length ? [['+', 'setting', AGENT_CHANGES, 'apply']] : [];
+  const set = async (key: string, value: unknown): Promise<['+', string, string, unknown][]> =>
+    (await q.query(`insert into setting (key, value) values ($1, $2::jsonb) on conflict (key) do nothing returning key`, [key, JSON.stringify(value)])).rows.length ? [['+', 'setting', key, value]] : [];
+  return [...(await set(AGENT_CHANGES, 'apply')), ...(await set(HOLDS_OFF, true))];
 }
 
 /** What a workspace's agent_changes comes to: its own choice, or what the server's policy does with an agent's change. */
@@ -463,8 +470,19 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   return { outcome: refused.length ? 'refuse' : held.length ? 'hold' : 'apply', by, held, refused, refusers: judged.flatMap((j) => j.refusers), spared: judged.map((j) => j.spared), ...(passed && { holds_off: true as const }) };
 }
 
-/** Whether this actor may do an act that is not a change: refused, with the rule's reason, when a rule refuses it. `props` is what the act names (pack_off: its pack). */
-export async function mayDo(q: Q, reg: Registry, human: boolean, act: string, props?: Record<string, unknown>): Promise<void> {
+/**
+ * Whether this actor may do an act that is not a change: refused, with the rule's reason, when a rule refuses it or
+ * holds it (an act cannot wait for a person: with holds on, what a rule holds is refused). `props` is what the act
+ * names (pack_off: its pack). Answers the stakes of the rules that let it through, for the act's answer to say.
+ */
+export async function mayDo(q: Q, reg: Registry, human: boolean, act: string, props?: Record<string, unknown>): Promise<string[]> {
   const verdict = await decide(q, reg, { human }, [{ op: act, ...(props && { props }) }]);
   if (verdict.refused.length) throw new Error(verdict.refused.join('\n'));
+  if (verdict.held.length) throw new Error(verdict.held.map((r) => r.say).join('\n'));
+  return stakesOf(verdict.spared);
+}
+
+/** The stakes of what a verdict let through: each spared rule's that names one, once. */
+export function stakesOf(spared: Verdict['spared']): string[] {
+  return [...new Set(spared.flat().flatMap((r) => (r.stake ? [r.stake] : [])))];
 }

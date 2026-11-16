@@ -58,12 +58,12 @@ export const BACKUP_TOOLS: Record<string, Tool> = {
     description:
       'This workspace as a backup file (.json.gz), as it stands now: answers with a path on this server that gives the file once, within five minutes, with no token (GET it and save it; do not read it into the conversation). ' +
       'Its rows are sealed: vault_path gives the keys the same way, wrapped under vault_key, which only this answer holds. ' +
-      'Everything is in it, private items included, so an agent may call this only when the owner allows it in Settings. To rehearse a change on it: node src/backup.ts restore <file> <new data folder>, then a throwaway server on that folder.',
+      'Everything is in it, private items included, so an agent may call this only when the owner allows it in Settings, or holds are off; the answer’s stakes say what left the server. To rehearse a change on it: node src/backup.ts restore <file> <new data folder>, then a throwaway server on that folder.',
     input: {},
     run: async (l, actor) => {
       const whole = await bypassingRls(l);
       if (!(await actsForAdmin(whole.db, actor))) throw new Error('Only a workspace admin can download its backup.');
-      await mayDo(l.db, l.registry, actor.kind === 'human', 'backup_download');
+      const stakes = await mayDo(l.db, l.registry, actor.kind === 'human', 'backup_download');
       const taken = await dump(whole.db, { id: l.workspace, name: l.workspace }, localPackOf(whole.registry));
       const key = randomBytes(24).toString('base64url');
       const name = `archipelago-${l.workspace}-${taken.taken.replaceAll(':', '-')}.json.gz`;
@@ -74,7 +74,7 @@ export const BACKUP_TOOLS: Record<string, Tool> = {
       const [vault, transport] = [randomBytes(24).toString('base64url'), randomBytes(32)];
       await keep(whole.db, linkKey(vault), { name: name.replace('.json.gz', '.vault.json.gz') }, LINK_MINUTES * 60_000, gzipSync(JSON.stringify(rewrap(await dumpVault(whole.db), undefined, transport))));
       await l.record('access', actorId(actor), [['+', actorId(actor), 'backup_download', { bytes: file.length, taken: taken.taken }]]);
-      return { path: `/backup-file/${l.workspace}/${key}`, vault_path: `/backup-file/${l.workspace}/${vault}`, vault_key: transport.toString('base64url'), name, bytes: file.length, taken: taken.taken, rows: Object.values(taken.tables).reduce((n, rows) => n + rows.length, 0), expires_in_minutes: LINK_MINUTES };
+      return { path: `/backup-file/${l.workspace}/${key}`, vault_path: `/backup-file/${l.workspace}/${vault}`, vault_key: transport.toString('base64url'), name, bytes: file.length, taken: taken.taken, rows: Object.values(taken.tables).reduce((n, rows) => n + rows.length, 0), expires_in_minutes: LINK_MINUTES, ...(stakes.length && { stakes }) };
     },
   },
 };

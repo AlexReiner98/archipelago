@@ -29,7 +29,7 @@ export interface Picture {
   cannot?: string;
   /** Its note's first line: what it shows. */
   note?: string;
-  /** Its life: working (an agent's, until the owner keeps it) or kept (on the owner's word). */
+  /** Its life: working (an agent's, until the owner keeps it) or kept. */
   life: 'working' | 'kept';
   /** Asked for a person to pick from (`pick`): when it last changed, and what its query finds and walks, for its words. */
   updated_at?: string;

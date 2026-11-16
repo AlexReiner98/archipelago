@@ -34,7 +34,7 @@ test('what was read is made, changed when the code is, left when it is not, and 
 test('this checkout reads in core’s rules, the kernel’s actions and its own tests', async () => {
   const read = await readHere(join(import.meta.dirname, '..'));
   const keys = new Set(read.map((r) => r.key));
-  for (const key of ['core/forget', 'core/settle_said', 'report/tell', 'capture/session_start', 'test/principles.test.ts: this checkout reads in core’s rules, the kernel’s actions and its own tests']) assert.ok(keys.has(key), key);
+  for (const key of ['core/forget', 'core/settle', 'report/tell', 'capture/session_start', 'test/principles.test.ts: this checkout reads in core’s rules, the kernel’s actions and its own tests']) assert.ok(keys.has(key), key);
   assert.equal(keys.size, read.length, 'every key is read once');
   const titles = read.map((r) => r.title);
   assert.deepEqual(titles.filter((t, i) => titles.indexOf(t) !== i), [], 'no title is said twice');

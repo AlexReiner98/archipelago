@@ -1,5 +1,5 @@
-// Views and layouts have a life (task e_gkv58kqb): working (an agent's, about its task), kept (only on the owner's
-// word) and retired. Before it, both were current or retired. A migration, run when a workspace opens, after the
+// Views and layouts have a life (task e_gkv58kqb): working (an agent's, about its task), kept (the owner's, or an
+// agent's that keeps it) and retired. Before it, both were current or retired. A migration, run when a workspace opens, after the
 // layouts have moved (packs/styles, layout-move.ts), sorts each one still current once, as the owner agreed (7 Nov
 // 2026): a pinned view is kept, one about an item already closed is retired, any other view is working; a layout is
 // kept, since its code ran only once the owner let it. One change set the system appends (ctx.move), so the log keeps

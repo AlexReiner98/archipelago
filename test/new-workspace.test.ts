@@ -1,5 +1,7 @@
 // What a workspace begins with (the owner, 21 Oct and 1 Nov 2026): a new one applies what its agents change, from the
-// moment it is made, on every way of making one; one that exists and never chose stays held; what stays the owner's stays so.
+// moment it is made, on every way of making one; one that exists and never chose stays held. Since 15 Nov 2026 a new
+// one begins with holds off too ("completely remove all approvals for now"): what the core rules kept applies, its
+// answer saying the stakes, and with holds on again what stays the owner's stays so.
 import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -79,7 +81,7 @@ test('a workspace that exists and never chose is left held by an upgrade, and by
   const one = new Workspaces(config);
   const { pelago: was } = await one.create('old', 'Old');
   await was.init(person, { name: 'Alex' });
-  await was.db.query(`delete from setting where key = 'agent_changes'`); // as one made before 21 Oct 2026 is
+  await was.db.query(`delete from setting where key in ('agent_changes', 'holds_off')`); // as one made before 21 Oct 2026 is
   await one.closeAll();
 
   const two = new Workspaces(config);
@@ -101,10 +103,28 @@ test('a map brought in from a backup keeps what it was set to, or that it never 
   await at.closeAll();
 });
 
-test('a new workspace still keeps from its agents what the core rules keep', async () => {
+test('a new workspace lets its agents do what the core rules kept, and each answer names the stakes', async () => {
   const at = new Workspaces({ ...servers(), dataDir: null });
   const { pelago: l } = await at.create('acme', 'Acme');
   await setIslands(l, 'system', false); // the test pack's types live on no core island; this is about the core rules
+  assert.equal(await l.setting('holds_off'), true);
+  const made = async (ops: Op[]) => (await l.change(agent, { ops, reason: 'the core rules' })) as { status: string; stakes?: string[] };
+  const pub = await made([{ op: 'create', type: 'writing', title: 'Guide', visibility: 'public' }]);
+  assert.deepEqual([pub.status, pub.stakes], ['applied', ['"Guide" is public: anyone on the internet can read it, and a search engine may keep a copy.']]);
+  const code = await made([{ op: 'create', type: 'layout', title: 'Loud', props: { code: 'export default () => []' } }]);
+  assert.equal(code.status, 'applied');
+  assert.match(code.stakes![0], /^Code in "Loud" now runs in the browser of everyone/);
+  assert.equal((await made([{ op: 'create', type: 'screen', title: 'Board' }])).status, 'applied', 'screens');
+  assert.deepEqual(await mayDo(l.db, l.registry, false, 'publish'), ['Published: anyone with the address can read it, now.']);
+  assert.ok((await mayDo(l.db, l.registry, false, 'backup_download'))[0].startsWith('A backup of this whole workspace'));
+  await at.closeAll();
+});
+
+test('with holds on again, a new workspace keeps from its agents what the core rules keep', async () => {
+  const at = new Workspaces({ ...servers(), dataDir: null });
+  const { pelago: l } = await at.create('acme', 'Acme');
+  await setIslands(l, 'system', false); // the test pack's types live on no core island; this is about the core rules
+  await l.db.query(`update setting set value = 'false' where key = 'holds_off'`); // as the Agents card's "Take effect" sets it
   const made = async (ops: Op[]) => (await l.change(agent, { ops, reason: 'the core rules' })).status;
   assert.equal(await made([{ op: 'create', type: 'writing', title: 'Guide', visibility: 'public' }]), 'proposed', 'what is public');
   assert.equal(await made([{ op: 'create', type: 'layout', title: 'Loud', props: { code: 'export default () => []' } }]), 'proposed', 'code that runs');
@@ -119,6 +139,7 @@ test('a settle waits for the owner wherever changes wait, and where they apply i
   const at = new Workspaces({ ...servers(), dataDir: null });
   const { pelago: l } = await at.create('acme', 'Acme');
   await l.init(person, { name: 'Alex' });
+  await l.db.query(`update setting set value = 'false' where key = 'holds_off'`); // holds on: this is about what a settle waits for
   const { d } = ((await l.change(person, { ops: [{ op: 'create', ref: 'd', type: 'decision', title: 'Which way?' }], reason: 'a question' })) as { created: Record<string, string> }).created;
   const settle = { op: 'update', id: d, status: 'decided', props: { outcome: 'this', rationale: 'that' } } as const;
   const said = { of: 'agent', basis: 'the test' } as const;
@@ -132,7 +153,6 @@ test('a settle waits for the owner wherever changes wait, and where they apply i
 
   await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"')`);
   await assert.rejects(l.change(agent, { ops: [{ op: 'update', id: d, status: 'decided' }], reason: 'bare', authority: said }), /what was chosen/);
-  await assert.rejects(l.change(agent, { ops: [settle], reason: 'unsaid' }), /on whose authority/);
   assert.equal((await l.change(agent, { ops: [settle], reason: 'settle it', authority: said })).status, 'applied');
   const asked = (await callTool(l, person, 'view', { name: 'attention', params: { person: 'me', reasons: ['to_confirm'] } })) as { items: { id: string }[] };
   assert.deepEqual(asked.items.map((i) => i.id), [d], 'and the owner is asked to confirm it');

@@ -12,13 +12,12 @@ import { roomToStore } from '../../identity/kernel/standing.ts';
 /** The acts root.may answers: publishing's, and no more. */
 const ACTS = ['publish', 'unpublish'];
 
-/** root.may: refused, saying why, unless a rule lets this kind of actor do the act here. */
-export async function may(call: RootCall, input: { act: string; human: boolean }): Promise<true> {
+/** root.may: refused, saying why, unless a rule lets this kind of actor do the act here; else the stakes of the rules that let it through (empty for a person). */
+export async function may(call: RootCall, input: { act: string; human: boolean }): Promise<string[]> {
   const l = call.map;
   if (!l) throw new Error('root.may asks of a map: a server duty has none');
   if (!ACTS.includes(input?.act)) throw new Error(`root.may answers ${ACTS.join(' and ')}, not ${String(input?.act)}`);
-  await mayDo(l.db, l.registry, input.human === true, input.act);
-  return true;
+  return mayDo(l.db, l.registry, input.human === true, input.act);
 }
 
 /** root.picture: keep the picture for an item, in place of any before it, as `actor` sent it. The type and size are the caller's to check first. */
