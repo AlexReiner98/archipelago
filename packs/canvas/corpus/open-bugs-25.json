@@ -1,0 +1,39 @@
+{
+"about": "Open bugs and what they depend on or are part of, cut at 25",
+"picture": "dd2a99d2f055",
+"items": [
+{"id":"e_00000027","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"xxx xxx xxxxxx xxxxx xxxxxxx xx x xxxxxxx xxxxxx","island":"e_00000017"},
+{"id":"e_00000002","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"xxxxxxx xx xxxx xxxxxxxxx xxxxxx xxx xxxxxx xxxx","island":"e_00000017"},
+{"id":"e_00000001","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"x xxxxxxxx xxxxxxx xx xxx xxxxxxxxx xxxxxx xxx xxx","island":"e_00000026"},
+{"id":"e_00000009","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"xxx xxxxxxx xxxxx xxxxx xxxxx","island":"e_00000026"},
+{"id":"e_00000014","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"xxxxx xxxx xxxxxxx xxx xxxxxx xxx xxxx xxxxx","island":"e_00000026"},
+{"id":"e_00000024","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"xx xxxxxxxx xxxxxx xxxxxx xx xxx xxxx xxxxx xxxxxxxxxxxx","island":"e_00000026"},
+{"id":"e_00000004","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"x xxxxx xx xxx xxxxxx xxxxx x xx x xxxxxxx","island":"e_00000017"},
+{"id":"e_00000010","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"x xxxxxx xxxxxxxx xxxx xxxx xxxxxx xxx xxxxx","island":"e_00000026"},
+{"id":"e_00000000","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"xxx xxxxxxx xxxxxx xxxxx xxxx xxxxxxx x xxxxxxx","island":"e_00000026"},
+{"id":"e_00000007","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"xxx xxxxxxx xxxx xxxxx xxxx xxxxx xxxxxxxxxx","island":"e_00000026"},
+{"id":"e_00000021","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"xxx xxxxxxx xxxx xxxx xxxxxxx xx xxxxxxxx xxxx xxxxxxxx","island":"e_00000026"},
+{"id":"e_00000005","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"xxx xxxxx xxxxx xx x xxxx xxxx xxxxx xx xxxx xx xx","island":"e_00000026"},
+{"id":"e_00000006","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"xxx xxxxxxx xxxxx xxxxx xxxxxx xxx xxxxxxx xxxx","island":"e_00000026"},
+{"id":"e_00000011","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"xxx xxx xxxxx xx xxxx xxxxxx x xxxxxxxx xxxxxx xxxx","island":"e_00000026"},
+{"id":"e_00000016","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"xxxx xxxxxxx xx xx xxx xxxxxxx","island":"e_00000026"},
+{"id":"e_00000019","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"xxxxxxx xx xxx xxxxxxx xx xxxxx xx x xxxxxxx","island":"e_00000026"},
+{"id":"e_00000020","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"x xxxxx xxxxxx xxxxx xxx xxx xx xxxx","island":"e_00000026"},
+{"id":"e_00000028","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"xxx xxxx xxxxx x xxxxx xxxxxxx xxx x xxxxxxxxxxx xx xxxxxxx","island":"e_00000026"},
+{"id":"e_00000022","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"xxxxxxxxxxx xxxxxxxx xxx xxxxx xxxx xx xxxxxxx","island":"e_00000015"},
+{"id":"e_00000008","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"x xxxx xxx xxxxx xxxx xxxxx xxx xxx xxxxx xxx xxxxx xxxx","island":"e_00000026"},
+{"id":"e_00000012","type":"bug","is":["work"],"status":"mitigated","phase":"under_way","visibility":"private","title":"x xxxxx xxxxxxx xxxxxx xxx xxxxxxxx xxxx xxxxxx","island":"e_00000026"},
+{"id":"e_00000025","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"x xxxxxxxxx xxxxxxxxx xxxxx xxxxx xx xxxxxxxxx xxxxxxx","island":"e_00000026"},
+{"id":"e_00000003","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"xxxx xxxxx xx xxxxxxx xx xxxxxxxxxx xx xxx xx","island":"e_00000018"},
+{"id":"e_00000013","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"x xxxx xxxx xx xxxxxxx xxxx xxxxx xxxx xxx xxxx","island":"e_00000026"},
+{"id":"e_00000023","type":"bug","is":["work"],"status":"open","phase":"trouble","visibility":"private","title":"x xxxx xx xxxx xx xxxx xxxx xxxxxxx xxx xx xxxxxx","island":"e_00000018"}
+],
+"links": [
+{"id":"r_00000000","type":"depends_on","from":"e_00000016","to":"e_00000006"},
+{"id":"r_00000001","type":"depends_on","from":"e_00000019","to":"e_00000011"},
+{"id":"r_00000002","type":"part_of","from":"e_00000002","to":"e_00000004"},
+{"id":"r_00000003","type":"depends_on","from":"e_00000011","to":"e_00000020"},
+{"id":"r_00000004","type":"part_of","from":"e_00000027","to":"e_00000004"},
+{"id":"r_00000005","type":"depends_on","from":"e_00000028","to":"e_00000019"}
+]
+}
