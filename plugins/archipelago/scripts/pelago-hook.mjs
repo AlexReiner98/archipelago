@@ -44,10 +44,9 @@
 // remote has, files not committed), which the run keeps, so what a session left unpushed is known after it ends.
 //
 // It never fails the session: if the server is away or refuses it, it says so in the session once (a message the
-// person sees) and answers nothing more. With no token set, a server that asks for one is signed in to through the
-// browser (pelago-login.mjs, beside this in the plugin): the session that asked is registered at its first prompt
-// after. Run by the plugin (--plugin), the working rules beside it (../pelago.md) are said at the start, since a
-// plugin cannot add to CLAUDE.md.
+// person sees) and answers nothing more. With no token, a server that asks for one is signed in to in the browser
+// (pelago-login.mjs): the session that asked is registered at its next prompt. Run by the plugin (--plugin), that
+// sign-in wins over PELAGO_AGENT_TOKEN, and the working rules (../pelago.md) are said at the start.
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -60,7 +59,8 @@ const SETUP = '';
 const name = process.argv[2];
 const base = (process.env.PELAGO_URL || "https://app.archipelago.tools").replace(/\/$/, '');
 const login = await import('./pelago-login.mjs').catch(() => null);
-let token = process.env.PELAGO_AGENT_TOKEN || (await login?.accessToken(base).catch(() => undefined));
+const kept = await login?.accessToken(base).catch(() => undefined), env = process.env.PELAGO_AGENT_TOKEN;
+let token = process.argv.includes('--plugin') ? kept || env : env || kept;
 
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
@@ -414,7 +414,7 @@ try {
   }
   const res = await post(name, body);
   const answer = (answered = await res.text());
-  if (res.status === 401 && plugin && !process.env.PELAGO_AGENT_TOKEN) {
+  if (res.status === 401 && plugin && (!process.env.PELAGO_AGENT_TOKEN || (kept && token === kept))) {
     // No sign-in, or one the server no longer takes: the person is asked to sign in, in the browser.
     if (token) login.forget(base);
     if (name === 'session-start' || name === 'prompt') {
