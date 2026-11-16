@@ -72,6 +72,10 @@ test('a machine with no token is connected through the browser, and the session 
   const kept = join(data, `signed-in-${new URL(base).host.replace(/[^\w.-]/g, '_')}.json`);
   for (let i = 0; i < 50 && !existsSync(kept); i++) await new Promise((r) => setTimeout(r, 100));
   assert.ok(readFileSync(kept, 'utf8').includes('"access"'), 'the token is kept in the machine\u2019s one place for it');
+  // Both sessions that waited are on the map the moment the person said Allow, before either's next message.
+  const opened = async () => (await call('/agent/view', owner, { name: 'sessions' })).result.open.length;
+  for (let i = 0; i < 50 && (await opened()) < 2; i++) await new Promise((r) => setTimeout(r, 100));
+  assert.equal(await opened(), 2, 'registered at Allow');
   // The plugin's tools ask the same file for their headers: one Allow serves the hooks and the tools.
   const headers = spawnSync(process.execPath, [join(ROOT, FOLDER, 'scripts', 'pelago-login.mjs'), 'headers'], { env: { ...process.env, PELAGO_HOME: data, PELAGO_AGENT_TOKEN: '', CLAUDE_CODE_MCP_SERVER_URL: `${base}/mcp` }, encoding: 'utf8' });
   assert.match(JSON.parse(headers.stdout).Authorization, /^Bearer \S+/);
@@ -92,8 +96,8 @@ test('a machine with no token is connected through the browser, and the session 
   assert.match(prompted.out.hookSpecificOutput.additionalContext, /registered in Archipelago[\s\S]*# Working with Archipelago/, 'registered now, with the working rules a plugin cannot put in CLAUDE.md');
   assert.doesNotMatch(prompted.out.hookSpecificOutput.additionalContext, /older than the server/, 'a plugin is not told to run the setup');
   const open = (await call('/agent/view', owner, { name: 'sessions' })).result.open;
-  assert.equal(open.length, 1, 'the session that asked is on the map');
-  assert.equal(open[0].title, 'hello', 'named by what was asked, not by its folder, until its chat has a title');
+  assert.equal(open.length, 2, 'registered once: its next message added no second run');
+  assert.ok(open.some((o: { title: string }) => o.title === 'hello'), `named by what was asked, not by its folder, until its chat has a title: ${open.map((o: { title: string }) => o.title)}`);
 
   // A server that is away is said in the session, once, not only to stderr.
   const gone = `away-${process.pid}-${Date.now()}`;

@@ -45,7 +45,7 @@
 //
 // It never fails the session: if the server is away or refuses it, it says so in the session once (a message the
 // person sees) and answers nothing more. With no token, a server that asks for one is signed in to in the browser
-// (pelago-login.mjs): the session that asked is registered at its next prompt. Run by the plugin (--plugin), that
+// (pelago-login.mjs): the session that asked is registered when they allow it. Run by the plugin (--plugin), that
 // sign-in wins over PELAGO_AGENT_TOKEN, and the working rules (../pelago.md) are said at the start. A session a guest
 // link points at another map is that map's: the hooks say nothing for it (elsewhere, in pelago-login.mjs).
 
@@ -371,8 +371,7 @@ let answered = '';
 const post = (event, payload) =>
   fetch(`${base}/hooks/${event}`, { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: payload, signal: AbortSignal.timeout(10_000) });
 /** The run the server named for this session, kept for the commit-msg hook. */
-function keepRun(res, sent) {
-  const run = res.headers.get('x-pelago-run');
+function keepRun(run, sent) {
   if (!run || !/^[\w-]+$/.test(run)) return;
   try {
     const file = runFile(JSON.parse(sent));
@@ -407,12 +406,9 @@ let notice = '';
 let out = null;
 
 try {
-  // A session that started before its sign-in is registered at its first prompt after.
-  const late = name === 'prompt' && token ? plugin?.lateStart() : null;
-  if (late) {
-    const res = await post('session-start', late);
-    if (res.ok) context.push(plugin.fromServer(await res.text())?.hookSpecificOutput?.additionalContext, plugin.rules(), plugin.trailer(keepRun(res, late), said.cwd));
-  }
+  // A session that started before its sign-in: registered when the person said Allow, else now; told so at this prompt.
+  const late = name === 'prompt' && token ? await plugin?.lateStart(base, token) : null;
+  if (late) context.push(plugin.fromServer(late.answer)?.hookSpecificOutput?.additionalContext, plugin.rules(), plugin.trailer(keepRun(late.run, late.body), said.cwd));
   const res = await post(name, body);
   const answer = (answered = await res.text());
   if (res.status === 401 && plugin && (!process.env.PELAGO_AGENT_TOKEN || (kept && token === kept))) {
@@ -435,7 +431,7 @@ try {
   } else if (res.ok) {
     out = answer;
     if (name === 'session-start') {
-      const run = keepRun(res, body);
+      const run = keepRun(res.headers.get('x-pelago-run'), body);
       if (plugin) (out = plugin.fromServer(answer)), context.push(plugin.rules(), plugin.trailer(run, said.cwd));
     }
   } else notice = sayOnce(`status-${res.status}`, `Archipelago ${name} hook: ${base} answered ${res.status}${res.status === 401 || res.status === 403 ? `: this machine ${token ? 'has a token the server refused' : 'has no token for it'}, so this session is not on the map` : ''}.`);

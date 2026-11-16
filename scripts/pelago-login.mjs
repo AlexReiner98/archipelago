@@ -13,7 +13,7 @@
 
 import { execFile, execFileSync, spawn } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -211,6 +211,30 @@ function openBrowser(url) {
 
 const PAGE = (words) => `<!doctype html><meta charset="utf-8"><title>Archipelago</title><body style="font:16px system-ui;margin:4em auto;max-width:30em">${words}</body>`;
 
+/** A session's start, kept while this computer signed in, sent to the server: its answer and run, or null if refused. */
+async function sendStart(origin, token, body) {
+  const res = await fetch(`${origin}/hooks/session-start`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body, signal: AbortSignal.timeout(10_000) }).catch(() => null);
+  return res?.ok ? { body, answer: await res.text(), run: res.headers.get('x-pelago-run') ?? undefined } : null;
+}
+
+/**
+ * The starts kept for this server while it signed in, registered the moment the person says Allow, so each session is
+ * on the map before its next message. The answer is kept for that message's hook, the one way to tell the agent.
+ */
+async function registerKept(origin, folder, token) {
+  const dir = join(folder, 'late');
+  const names = existsSync(dir) ? readdirSync(dir) : [];
+  await Promise.all(
+    names.map(async (name) => {
+      const file = join(dir, name), start = readJson(file);
+      if (start?.origin !== origin || start.answer || typeof start.body !== 'string') return;
+      const sent = await sendStart(origin, token, start.body);
+      // Taken meanwhile (its next prompt, or a guest link): not kept again.
+      if (sent && existsSync(file)) keep(file, { ...start, ...sent });
+    }),
+  );
+}
+
 /** Run on its own: wait for the browser to come back with a code, trade it, keep the token. */
 async function waitForBrowser([origin, folder, port, verifier, state, client, open]) {
   const pending = fileOf(folder, origin, 'signing-in');
@@ -233,6 +257,7 @@ async function waitForBrowser([origin, folder, port, verifier, state, client, op
       const said = await tokenCall(origin, { grant_type: 'authorization_code', code: at.searchParams.get('code') ?? '', redirect_uri: redirect, client_id: client, code_verifier: verifier, resource: `${origin}/mcp` });
       keep(fileOf(folder, origin, 'signed-in'), kept(said, client));
       answer(200, 'Connected. Claude Code’s sessions on this computer now go on your map: you can close this tab.');
+      await registerKept(origin, folder, said.access_token).catch(() => {});
       server.close(() => done(0));
     } catch (err) {
       answer(400, `Not connected: ${err.message}. Start a new Claude Code session to try again.`);
@@ -381,15 +406,16 @@ export function plugin(session, hookUrl, folder = folderOf()) {
         return text;
       }
     },
-    /** A start that waited for the sign-in, taken to be sent now. */
-    lateStart: () => {
-      try {
-        const body = late && readFileSync(late, 'utf8');
-        if (body) rmSync(late, { force: true });
-        return body || null;
-      } catch {
-        return null;
-      }
+    /**
+     * A start that waited for the sign-in, taken: its server's answer and run, registered when the person said Allow
+     * (registerKept), else sent now. Null when there is none, or the server refused it.
+     */
+    lateStart: async (origin, token) => {
+      const kept = late && readJson(late);
+      if (!kept) return null;
+      rmSync(late, { force: true });
+      // One kept before starts were kept with their server is the start itself.
+      return kept.answer ? kept : sendStart(origin, token, typeof kept.body === 'string' ? kept.body : JSON.stringify(kept));
     },
     /**
      * Ask the person to sign in; a start is kept to be sent once they have. At the start itself nothing is asked yet:
@@ -397,12 +423,12 @@ export function plugin(session, hookUrl, folder = folderOf()) {
      * only get in a visitor's way. It is asked at that prompt.
      */
     askSignIn: async (origin, startBody) => {
-      if (startBody) return late && keep(late, JSON.parse(startBody)), { notice: '', context: '' };
+      if (startBody) return late && keep(late, { origin, body: startBody }), { notice: '', context: '' };
       try {
         const { url, waiting } = await signIn(origin, folder);
         return {
-          notice: `Archipelago: ${waiting ? 'sign in to connect this computer' : 'a browser window opened to connect this computer'}. Say Allow there, and this session goes on your map with your next message. If no window opened: ${url}`,
-          context: 'This session is not on the Archipelago map yet: the person is asked to sign in, in their browser, and it is registered with their next message. The map’s tools use the same sign-in from the next session. Say so in one line in your first reply.',
+          notice: `Archipelago: ${waiting ? 'sign in to connect this computer' : 'a browser window opened to connect this computer'}. Say Allow there, and this session goes on your map. If no window opened: ${url}`,
+          context: 'This session is not on the Archipelago map yet: the person is asked to sign in, in their browser, and it is registered on the map when they allow it; you hear of it with their next message. The map’s tools use the same sign-in from the next session. Say so in one line in your first reply.',
         };
       } catch (err) {
         return { notice: `Archipelago: could not ask for a sign-in at ${origin} (${err.message}). This session is not on the map.`, context: '' };
