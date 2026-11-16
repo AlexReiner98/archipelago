@@ -88,17 +88,62 @@
       }, reject).catch(reject);
     });
 
+  /** A drawing ended: its worker and its helpers. */
+  const drop = (hash) => {
+    const w = workers.get(hash);
+    workers.delete(hash);
+    w?.helpers?.forEach((h) => h.worker.terminate());
+    w?.worker?.terminate();
+  };
+
+  // Helpers (task e_bsp7jhrw): a drawing that exports `helpers` (its pong or its loaded says so) is given workers of
+  // its own code beside its own, started here as every drawing's worker is, so the same walls hold them, and stopped
+  // with it. Each picture handed to the drawing comes with a channel to each helper ready, which it may ask to run
+  // its `helpers` there (packs/walls/page/draw-inside.js): a search spread over them is done sooner. Helpers are
+  // pinged as the drawing is, and one that stops answering stops the drawing.
+  const helpersFor = (w) => {
+    if (w.helpers) return;
+    w.helpers = [];
+    const most = Math.min(6, Math.max(1, (navigator.hardwareConcurrency || 2) - 1));
+    for (let k = 0; k < most; k++)
+      start().then(
+        (worker) => {
+          if (!w.helpers) return void worker.terminate();
+          const h = { worker, ready: false, unanswered: 0 };
+          w.helpers.push(h);
+          const lost = () => (worker.terminate(), w.helpers && (w.helpers = w.helpers.filter((x) => x !== h)));
+          worker.onmessage = ({ data: said }) => {
+            h.unanswered = 0;
+            if (said?.type === 'loaded') h.ready = true;
+            else if (said?.type === 'error') lost();
+          };
+          worker.onerror = lost;
+          worker.postMessage({ type: 'load', modules: w.modules });
+        },
+        () => {},
+      );
+  };
+  /** A picture's channel, handed to the drawing with one to each of its helpers that is ready. */
+  const give = (w, port) => {
+    const ports = (w.helpers ?? []).filter((h) => h.ready).map((h) => {
+      const { port1, port2 } = new MessageChannel();
+      h.worker.postMessage({ type: 'help' }, [port1]);
+      return port2;
+    });
+    w.worker.postMessage({ type: 'picture' }, [port, ...ports]);
+  };
+
   const load = (hash, modules) => {
     if (workers.has(hash)) return;
-    const w = { unanswered: 0, worker: null, queue: [] };
+    const w = { unanswered: 0, worker: null, queue: [], modules, helpers: null };
     workers.set(hash, w);
     const t0 = performance.now();
     served(hash).then(
       (shim) => {
         w.worker = shim;
-        shim.onmessage = () => (w.unanswered = 0);
+        shim.onmessage = (ev) => ((w.unanswered = 0), ev?.data?.helps && helpersFor(w));
         say({ type: 'loaded', hash, took: performance.now() - t0 });
-        w.queue.splice(0).forEach((port) => shim.postMessage({ type: 'picture' }, [port]));
+        w.queue.splice(0).forEach((port) => give(w, port));
         w.queue = null;
       },
       () => dedicated(hash, modules, w),
@@ -113,10 +158,10 @@
         worker.onmessage = ({ data: said }) => {
           w.unanswered = 0;
           // Once loaded, it takes the pictures that waited, and every one after at once.
-          if (said?.type === 'loaded') (say({ type: 'loaded', hash, took: said.took }), w.queue.splice(0).forEach((port) => worker.postMessage({ type: 'picture' }, [port])), (w.queue = null));
-          else if (said?.type === 'error') (workers.delete(hash), worker.terminate(), say({ type: 'failed', hash, message: String(said.message).slice(0, 300) }));
+          if (said?.type === 'loaded') (say({ type: 'loaded', hash, took: said.took }), said.helps && helpersFor(w), w.queue.splice(0).forEach((port) => give(w, port)), (w.queue = null));
+          else if (said?.type === 'error') (drop(hash), say({ type: 'failed', hash, message: String(said.message).slice(0, 300) }));
         };
-        worker.onerror = (err) => (workers.delete(hash), worker.terminate(), say({ type: 'failed', hash, message: err.message || 'The drawing stopped.' }));
+        worker.onerror = (err) => (drop(hash), say({ type: 'failed', hash, message: err.message || 'The drawing stopped.' }));
         worker.postMessage({ type: 'load', modules });
       },
       (err) => (workers.delete(hash), say({ type: 'failed', hash, message: err.message })),
@@ -130,7 +175,7 @@
     else if (said.type === 'picture' && ev.ports[0]) {
       const w = workers.get(said.hash);
       if (!w) return;
-      if (w.worker && !w.queue) w.worker.postMessage({ type: 'picture' }, [ev.ports[0]]);
+      if (w.worker && !w.queue) give(w, ev.ports[0]);
       else w.queue.push(ev.ports[0]);
     }
   });
@@ -140,16 +185,19 @@
   setInterval(() => {
     for (const [hash, w] of workers) {
       if (!w.worker) continue;
+      const helpers = w.helpers ?? [];
       if (document.hidden) {
         w.unanswered = 0;
+        helpers.forEach((h) => (h.unanswered = 0));
         continue;
       }
-      if (w.unanswered++ < 6) {
+      // A helper that stops answering stops the drawing, as the drawing itself would.
+      if (w.unanswered++ < 6 && helpers.every((h) => h.unanswered < 6)) {
         w.worker.postMessage({ type: 'ping' });
+        helpers.forEach((h) => (h.unanswered++, h.worker.postMessage({ type: 'ping' })));
         continue;
       }
-      w.worker.terminate();
-      workers.delete(hash);
+      drop(hash);
       say({ type: 'stopped', hash, message: 'It did not answer for 12 seconds and was stopped.' });
     }
   }, 2000);

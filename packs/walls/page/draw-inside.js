@@ -61,8 +61,63 @@ function inside(home, given) {
     return { on: (key) => (writes && island(key) ? ['add'] : []), hear: () => false };
   };
 
-  /** One picture, over its own channel. */
-  function serve(port) {
+  /**
+   * The helpers a picture is given: ports to workers of the frame's running this same drawing, walled in as this one is
+   * (packs/walls/page/draw-marks.js). run(name, arg, at) asks helper `at` to run the drawing's own `helpers[name](arg)`
+   * there, and answers what it came to, copied as a message is.
+   */
+  const poolOf = (ports) => {
+    const waiting = new Map();
+    let asked = 0;
+    for (const p of ports)
+      p.onmessage = ({ data }) => {
+        const w = waiting.get(data?.n);
+        if (!w) return;
+        waiting.delete(data.n);
+        if (data.error !== undefined) w.reject(new Error(String(data.error)));
+        else w.resolve(data.value);
+      };
+    const run = (name, arg, at) =>
+      new Promise((resolve, reject) => {
+        const p = ports[at];
+        if (!p) return reject(new Error('There is no such helper'));
+        const n = ++asked;
+        waiting.set(n, { resolve, reject });
+        try {
+          p.postMessage({ n, name: String(name), arg });
+        } catch (err) {
+          waiting.delete(n);
+          reject(err);
+        }
+      });
+    const end = () => (ports.forEach((p) => p.close()), waiting.forEach((w) => w.reject(new Error('The drawing ended'))), waiting.clear());
+    return { size: ports.length, run, end };
+  };
+
+  /** A helper's side: each ask on `port` run by the drawing's own `helpers`, answered with its value or why not. */
+  const helping = (port) => {
+    port.onmessage = async ({ data }) => {
+      const { n, name, arg } = data ?? {};
+      let answer;
+      try {
+        const fn = made?.helpers?.[name];
+        if (typeof fn !== 'function') throw new Error(`The drawing has no helper "${String(name).slice(0, 60)}"`);
+        answer = { n, value: await fn(arg) };
+      } catch (err) {
+        answer = { n, error: text(err) };
+      }
+      try {
+        port.postMessage(answer);
+      } catch (err) {
+        port.postMessage({ n, error: text(err) });
+      }
+    };
+  };
+  /** Whether the drawing has helpers to run, for the frame to start workers for them. */
+  const helps = () => typeof made?.helpers === 'object' && made.helpers !== null;
+
+  /** One picture, over its own channel, with the helpers the frame gave it. */
+  function serve(port, helperPorts = []) {
     let drawn, ended = false, may = [];
     const waiting = [];
     const send = (message) => !ended && port.postMessage(message);
@@ -86,6 +141,8 @@ function inside(home, given) {
       // frame (show), its size as it changes, the page's colours and three.js. Null where there is none.
       surface: () => (surface ??= new Promise((resolve) => ((gotSurface = resolve), send({ type: 'surface?' })))),
     };
+    const helpers = helperPorts.length ? poolOf(helperPorts) : null;
+    if (helpers) tools.helpers = { size: helpers.size, run: helpers.run };
     let surface, gotSurface;
     const sized = [];
     // A canvas of its own here, the surface's size; each frame painted on it goes to the page as an image (show).
@@ -139,7 +196,7 @@ function inside(home, given) {
           } else if (said.type === 'frame') waiting.splice(0).forEach((resolve) => resolve(said.t));
           else if (said.type === 'surface') gotSurface?.(said.none ? null : paintable(said));
           else if (said.type === 'surface-size') sized.forEach((fn) => fn({ ...said.size }));
-          else if (said.type === 'end') (drawn?.end?.(), (ended = true), port.close());
+          else if (said.type === 'end') (drawn?.end?.(), (ended = true), port.close(), helpers?.end());
         } catch (err) {
           send({ type: 'error', message: text(err) });
         } finally {
@@ -153,15 +210,16 @@ function inside(home, given) {
 
   const heard = async (ev) => {
     const said = ev.data ?? {};
-    if (said.type === 'ping') return given ? ((control = ev.ports[0] ?? control), post({ type: 'pong' })) : post({ type: 'pong' });
+    if (said.type === 'ping') return given ? ((control = ev.ports[0] ?? control), post({ type: 'pong', helps: helps() })) : post({ type: 'pong', helps: helps() });
     if (said.type === 'warm') return void measure('Warm', 13);
-    if (said.type === 'picture') return made && serve(ev.ports[0]);
+    if (said.type === 'picture') return made && serve(ev.ports[0], [...ev.ports].slice(1));
+    if (said.type === 'help') return void (made && ev.ports[0] && helping(ev.ports[0]));
     if (said.type !== 'load' || made) return;
     const t0 = performance.now();
     try {
       made = await load(said.modules, blob).catch(() => load(said.modules, data));
       if (typeof made.picture !== 'function') throw new Error('A drawing must export a function `picture(input, tools)` that answers with { scene }');
-      post({ type: 'loaded', took: performance.now() - t0 });
+      post({ type: 'loaded', took: performance.now() - t0, helps: helps() });
     } catch (err) {
       made = undefined;
       post({ type: 'error', message: text(err) });

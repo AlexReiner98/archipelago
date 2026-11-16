@@ -31,14 +31,18 @@ export function borderArcs(island) {
  * first, and the wires with their ways set again: a wire between islands that would run against the islands' order is turned.
  */
 export function lineOf(ids, wires, placeOf, made, rounds = 0, noise = () => 0, within = true) {
-  const unit = (v) => (placeOf(v) === null ? v : `island ${placeOf(v)}`);
+  // What each step is one of, named once (task e_yztbb9s3: it was named again at each asking).
+  const unitOf = new Map(), unit = (v) => {
+    let u = unitOf.get(v);
+    if (u === undefined) unitOf.set(v, (u = placeOf(v) === null ? v : `island ${placeOf(v)}`));
+    return u;
+  };
   const units = [...new Set(ids.map(unit))], madeOf = new Map();
   for (const v of ids) madeOf.set(unit(v), Math.min(madeOf.get(unit(v)) ?? Infinity, made(v)));
   const between = wires.filter((w) => w.firm && unit(w.top) !== unit(w.foot)).map((w) => ({ w, u: unit(w.top), v: unit(w.foot), directed: true }));
   const { turned } = feedback(units, between, (u) => madeOf.get(u));
   const turnAgain = new Set([...turned].map((b) => b.w));
   const ways = wires.map((w) => (turnAgain.has(w) ? { ...w, top: w.foot, foot: w.top, turned: !w.turned, byIslands: true } : w));
-  const linked = (keep) => ways.filter((w) => keep(w)).map((w) => (w.firm ? [w.top, w.foot, true] : [w.u, w.v]));
   // The islands and the sea's steps in order, each island as one; then each island's own.
   const quotient = new Map();
   for (const w of ways) {
@@ -47,10 +51,18 @@ export function lineOf(ids, wires, placeOf, made, rounds = 0, noise = () => 0, w
   }
   const firm = [...quotient.values()].filter((q) => q[2]), ends = ways.map((w) => [w.u, w.v]), inner = ways.filter((w) => w.firm).map((w) => [w.top, w.foot]);
   const byMade = [...units].sort((p, q) => madeOf.get(p) - madeOf.get(q));
+  // Each island's steps, in the order of `ids`, and the ways with both ends among them, in the order of `ways`: read
+  // once for all islands, not once for each.
+  const stepsOn = new Map(), waysOn = new Map(), isStep = new Set(ids), place = (v) => placeOf(v);
+  for (const v of ids) if (place(v) !== null) (stepsOn.get(place(v)) ?? stepsOn.set(place(v), []).get(place(v))).push(v);
+  for (const w of ways) {
+    const p = isStep.has(w.u) && isStep.has(w.v) ? place(w.u) : null;
+    if (p !== null && p === place(w.v)) (waysOn.get(p) ?? waysOn.set(p, []).get(p)).push(w);
+  }
   const runOf = (u) => {
     if (!u.startsWith('island ')) return [u];
-    const island = u.slice('island '.length), own = ids.filter((v) => placeOf(v) === island).sort((p, q) => made(p) - made(q));
-    const set = new Set(own), inside = linked((w) => set.has(w.u) && set.has(w.v));
+    const island = u.slice('island '.length), own = [...(stepsOn.get(island) ?? [])].sort((p, q) => made(p) - made(q));
+    const inside = (waysOn.get(island) ?? []).map((w) => (w.firm ? [w.top, w.foot, true] : [w.u, w.v]));
     return [topOf(island), secondOf(island), ...lineUp(own, inside, noise), footOf(island)];
   };
   const runs = new Map(units.map((u) => [u, runOf(u)]));

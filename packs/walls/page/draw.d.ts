@@ -353,6 +353,12 @@ export interface PictureTools {
   frame(): Promise<number>;
   /** The surface the scene asked for, or null. */
   surface(): Promise<Surface | null>;
+  /**
+   * Workers running this same drawing beside it, walled in as it is, where the frame has started them (none at first,
+   * none in a service worker it has not been given them in): `run` asks helper `at` (0 to size - 1) for the drawing's
+   * own `helpers[name](arg)`, both copied as messages are.
+   */
+  helpers?: { size: number; run(name: string, arg: unknown, at: number): Promise<unknown> };
 }
 
 type Maybe<T> = T | Promise<T>;

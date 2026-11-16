@@ -1,0 +1,41 @@
+{
+"about": "Decisions and what bears on them, cut at 30",
+"picture": "863d59822501",
+"items": [
+{"id":"e_00000000","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"x xxx xxxxxx xxxxx xxx xxxxxx xxx x xxxxx","island":"e_00000019"},
+{"id":"e_00000011","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxx xxx xxxx xxx xxxx xx xxxxx x xxxx","island":"e_00000019"},
+{"id":"e_00000018","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxxxx xxxxx xx xxxxxxx xxxx xxxxx","island":"e_00000019"},
+{"id":"e_00000020","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxxx xxxx xx xxxx xx xxxxxx","island":"e_00000019"},
+{"id":"e_00000026","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxxxxxxx xxx xx xxxxxx xx x xxxxxx","island":"e_00000019"},
+{"id":"e_00000012","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxx xxxxxx xxxx xx xxxxx xx xxx xxxx","island":"e_00000019"},
+{"id":"e_00000022","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxxxxxxx xxxxxx xxxxxxxx","island":"e_00000019"},
+{"id":"e_00000030","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxxxxxxx xxxxx xx xxx xxx xxxxx","island":"e_00000019"},
+{"id":"e_00000002","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxx xx xxx xxxxx xxxxxxx xxxxxx xxx xxxxxxx","island":"e_00000027"},
+{"id":"e_00000023","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxxx xxxx xxxxx xxxxxxx xxx xxxx xxxxxxx","island":"e_00000014"},
+{"id":"e_00000032","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxx xxx xxx xxx xxxxx xxx xxxxx xx xxxxx xxx","island":"e_00000014"},
+{"id":"e_00000015","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"x xxxx xxx xxxx xxxxx xxxxx xxxxxxx x xxxx xxxx","island":"e_00000014"},
+{"id":"e_00000006","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"x xxxxxx xxxx xxxxx xxx xxxx xxxx xxxx xx xxxxx","island":"e_00000019"},
+{"id":"e_00000016","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"x xxxxx xxx xxxxxxxxx xxxxxxxxxx x xxxx xxx","island":"e_00000019"},
+{"id":"e_00000028","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxxxx xxx xxxxxxxxxxxx xxxx xxxxxxx","island":"e_00000014"},
+{"id":"e_00000024","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"x xxxx xxx xxxx xxxx xxxx xxx xxxx","island":"e_00000014"},
+{"id":"e_00000031","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxx xxx xx xxxxx xx xxx xxxxx xxxx","island":"e_00000014"},
+{"id":"e_00000001","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"x xxxxxxx xxxxx xxxxx xxxxxx xx xxxxxxx","island":"e_00000019"},
+{"id":"e_00000021","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xx xxxxxxxxx xxxxx xxx xxxxx xxx xxxxxxxx xxxxxxxx","island":"e_00000014"},
+{"id":"e_00000008","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxx xxxxxx xxxxxx xxxxx xxxx xx xxxx xxxx xxxxxx","island":"e_00000014"},
+{"id":"e_00000029","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxxx xxxxxxxx xxxxxxx xxxx x xxxx xxxx","island":"e_00000014"},
+{"id":"e_00000004","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxx xx xxxx xx xxx xxxxxxxx","island":"e_00000014"},
+{"id":"e_00000003","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxxx xxx xxx xxxx xxxxx xxxxxxxxx xxx","island":"e_00000014"},
+{"id":"e_00000013","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxx xxx xxxxxxx xxxx xxxx xxx xxxxx xxx xxxxx","island":"e_00000014"},
+{"id":"e_00000025","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"x xxxxx xx xxx xxx xxxxx xx xxxx xx xxxx xxxxx","island":"e_00000014"},
+{"id":"e_00000009","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxxx xxxxx xxxxx xx xxx xxxxxxx xxxxxx xxxx","island":"e_00000014"},
+{"id":"e_00000007","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxxx xxxxxx xxxxxxxxx xxxxx xx xxxxx xxx xxxxxxx","island":"e_00000014"},
+{"id":"e_00000010","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxxx xx xxx xxxxxxxx xxxx xxx xx xxx xxxxxx","island":"e_00000014"},
+{"id":"e_00000005","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxxxx xxx xxxxx xxxxxx xxxxx xx x xxxxx xxxx xxx","island":"e_00000014"},
+{"id":"e_00000017","type":"decision","is":["question"],"status":"decided","phase":"finished","visibility":"private","title":"xxx xxxx x xxxx xxxxx xxx xxxxxx xxxxxxxx","island":"e_00000014"}
+],
+"links": [
+{"id":"r_00000000","type":"part_of","from":"e_00000006","to":"e_00000001"},
+{"id":"r_00000001","type":"part_of","from":"e_00000016","to":"e_00000001"},
+{"id":"r_00000002","type":"bears_on","from":"e_00000015","to":"e_00000008"}
+]
+}
