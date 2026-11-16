@@ -20,7 +20,10 @@ const rowsOf = async <T>(client: pg.Pool | pg.PoolClient, sql: string, params?: 
 
 /** One database on a server, as a Database. Brings its schema up to date with `prepare` under a lock, one opener at a time. */
 export async function openPg(url: string, prepare: (db: Database) => Promise<unknown>): Promise<Database> {
-  const pool = new pg.Pool({ connectionString: url, max: 5, types });
+  // A request's reads hold one connection while they come (held.ts), up to a quarter second, where each read once took
+  // one for its own moment: ten, so a few slow requests do not queue the rest. An idle connection closes after ten
+  // seconds (pg's default), so a workspace nobody uses holds none.
+  const pool = new pg.Pool({ connectionString: url, max: 10, types });
   pool.on('error', () => {}); // an idle connection that drops is replaced on the next query
   const db: Database = {
     query: <T>(sql: string, params?: unknown[]) => rowsOf<T>(pool, sql, params),

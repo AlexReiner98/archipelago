@@ -10,6 +10,7 @@ import { prepare, schemaKey } from './migrate.ts';
 import { openPg, scratchPg } from './pg.ts';
 import { keepStatistics } from './stats.ts';
 import { back, sent, statement, timing } from '../../../src/timing.ts';
+import { heldQuery, yieldHeld } from './held.ts';
 
 /** Anything that can run a query: the database or a transaction on it. */
 export interface Q {
@@ -46,8 +47,12 @@ export async function openDb(where?: string): Promise<Database> {
  * lock, and the begin. Everything else is the database's own, bound to it.
  */
 function timedDb<D extends Database>(db: D): D {
-  const query = <T>(sql: string, params?: unknown[]) => statement(() => db.query<T>(sql, params));
+  const query = <T>(sql: string, params?: unknown[]) => {
+    yieldHeld();
+    return statement(() => db.query<T>(sql, params));
+  };
   const transaction = <T>(fn: (tx: Q) => Promise<T>) => {
+    yieldHeld(); // a request's own held reads (held.ts) make way, unless this is one being begun
     const t = timing();
     if (!t) return db.transaction(fn);
     const asked = sent(t);
@@ -159,7 +164,8 @@ function pgliteVersion() {
  * transaction that first drops to the member role and names the viewer (and
  * whether they are an admin of the workspace), so neither can leak between
  * requests sharing the connection. A member who only reads (packs/identity/kernel/members.ts) runs in a read-only transaction besides:
- * the database refuses every write in it, and once it has read, refuses to be made to write again.
+ * the database refuses every write in it, and once it has read, refuses to be made to write again. Within a request,
+ * its plain reads share one such transaction, entered once (held.ts); anything else has its own.
  */
 export function scoped(db: Db, viewer: string, admin = false, readOnly = false): Db {
   const enter = async (tx: Q) => {
@@ -167,8 +173,10 @@ export function scoped(db: Db, viewer: string, admin = false, readOnly = false):
     await tx.query(`set local role pelago_member`);
     if (readOnly) await tx.query(`set transaction read only`);
   };
+  const scope = `viewer ${admin ? 'admin' : ''} ${readOnly ? 'read' : ''} ${viewer}`;
   return {
     query: <T>(sql: string, params?: unknown[]) =>
+      heldQuery<T>(db, scope, enter, sql, params) ??
       db.transaction(async (tx) => {
         await enter(tx);
         return tx.query<T>(sql, params);
@@ -188,6 +196,7 @@ export function anyone(db: Db): Db {
   const enter = (tx: Q) => tx.query(`set local role pelago_public`);
   return {
     query: <T>(sql: string, params?: unknown[]) =>
+      heldQuery<T>(db, 'anyone', enter, sql, params) ??
       db.transaction(async (tx) => {
         await enter(tx);
         return tx.query<T>(sql, params);
