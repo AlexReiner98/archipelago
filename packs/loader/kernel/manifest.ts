@@ -96,7 +96,7 @@ export interface KernelSpec {
   /** The folder of its code under the pack's own, `kernel/` unless said. */
   modules?: string;
   /** The service names it provides (`<family>.<name>`; a root's are `root.<name>`, packs/loader/kernel/root-calls.ts), each with its shapes (packs/loader/kernel/services.ts) and the function that answers it. */
-  provides?: Record<string, { in?: unknown; out?: unknown; read?: string; run: ModuleRef }>;
+  provides?: Record<string, { in?: unknown; out?: unknown; read?: string; run: ModuleRef; kept?: boolean }>;
   /** The shapes it calls service names with: what it gives and reads, checked against the provider's (packs/loader/kernel/packorder.ts). */
   calls?: Record<string, { in?: unknown; out?: unknown }>;
   /** The hook points and slots it fills, each with its function (or several, in order). */
@@ -132,6 +132,8 @@ export function kernelProblems(k: unknown): string[] {
   if (s.modules !== undefined && (typeof s.modules !== 'string' || !/^[\w-]+\/?$/.test(s.modules))) problems.push(`kernel.modules is a folder of the pack's own, such as "kernel/"`);
   const ref = (where: string, r: unknown) => { if (typeof r !== 'string' || !MODULE_REF.test(r) || r.includes('..')) problems.push(`${where} names a function of the pack's modules, <file>.ts#<export>: ${JSON.stringify(r)}`); };
   for (const [name, p] of Object.entries((s.provides ?? {}) as Record<string, Raw>)) ref(`kernel.provides.${name}`, p?.run);
+  // kept: the answer is a read of the map alone, kept until the map moves (packs/loader/kernel/kept.ts).
+  for (const [name, p] of Object.entries((s.provides ?? {}) as Record<string, Raw>)) if (p?.kept !== undefined && p.kept !== true) problems.push(`kernel.provides.${name}.kept is true, or absent for a service whose answer is not kept`);
   for (const [point, r] of Object.entries((s.hooks ?? {}) as Record<string, unknown>)) for (const one of [r].flat()) ref(`kernel.hooks.${point}`, one);
   if (s.fills !== undefined && (!Array.isArray(s.fills) || s.fills.some((f) => typeof f !== 'string' || !f))) problems.push('kernel.fills is a list of the fields its rewrite may set');
   for (const [i, t] of arr<Raw>(s.timers).entries()) { ref(`kernel.timers[${i}]`, t.run); if (typeof t.every_ms !== 'number' || t.every_ms < 1000) problems.push(`kernel.timers[${i}].every_ms is a number of milliseconds, 1000 or more`); }

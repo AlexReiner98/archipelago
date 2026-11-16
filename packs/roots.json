@@ -6,7 +6,7 @@
     },
     {
       "id": "database",
-      "hash": "b149721ecd22b06b197b363576616773d24a69df6f994e8913d48fba5926b940"
+      "hash": "d4af77d8cef918c9b9954456c1cdc763163bf5b7b6868244fc884b32c09df515"
     },
     {
       "id": "seal",
@@ -14,7 +14,7 @@
     },
     {
       "id": "log",
-      "hash": "f09c9928f0a9f5264eb3cceaaed2c713403dfec4549d36813c0d7d647bbd4917"
+      "hash": "f3fe0c728505c0d43986969b05544363d9372bbcf34ae09a53c1ce22cdee88dd"
     },
     {
       "id": "kit",
@@ -30,7 +30,7 @@
     },
     {
       "id": "loader",
-      "hash": "4efacb6d71948ef46b875c0f6834e6adeec521a1f716860f91dc94222d047df9"
+      "hash": "60ff3c4c7aac14866c818f8ef0546596c47aded4a1121b902723608114f7c4ad"
     },
     {
       "id": "rules",

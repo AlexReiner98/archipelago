@@ -33,7 +33,8 @@
           "shape?": "any"
         },
         "out": "any",
-        "run": "query-answers.ts#pageStyleOf"
+        "run": "query-answers.ts#pageStyleOf",
+        "kept": true
       },
       "answer.schema_styled": {
         "in": {
