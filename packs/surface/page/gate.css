@@ -43,9 +43,9 @@ body[data-first="wait"] #canvas, body[data-first="wait"] #sheet { visibility: hi
 .first.first-gone { opacity: 0; pointer-events: none; }
 .first { position: fixed; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; padding: var(--space-9); background: var(--bg); overflow: auto; }
 .first-card { position: relative; box-sizing: border-box; width: 100%; max-width: var(--sheet); padding: var(--space-13) var(--space-12); display: flex; flex-direction: column; gap: var(--space-9); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); box-shadow: 0 var(--space-9) var(--space-14) var(--bg); }
-.first-card h1 { margin: 0; font-size: var(--text-9); line-height: 1.2; }
-.first-promise { margin: 0; color: var(--muted); font-size: var(--text-6); line-height: 1.5; }
-.first-prompt { padding: var(--space-7) var(--space-8); border-left: var(--border-3) solid var(--accent); background: var(--bg); font-size: var(--text-5); line-height: 1.5; }
+.first-card h1 { margin: 0; font-size: var(--text-9); line-height: 1.25; }
+.first-promise { margin: 0; color: var(--muted); font-size: var(--text-6); line-height: 1.45; }
+.first-prompt { padding: var(--space-7) var(--space-8); border-left: var(--border-3) solid var(--accent); background: var(--bg); font-size: var(--text-5); line-height: 1.45; }
 .first-copy { align-self: stretch; padding: var(--space-7); font-size: var(--text-7); }
 .first-steps { margin: 0; padding-left: var(--space-11); display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--text-5); }
 .first-steps li::marker { color: var(--muted); }

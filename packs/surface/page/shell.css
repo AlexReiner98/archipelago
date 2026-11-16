@@ -264,7 +264,7 @@ body[data-sheet="open"] #sheet { transform: none; visibility: visible; transitio
 /* The sheet reads as a document: a title, one quiet line of marks, the note, and what a pack adds as plain sections
    under small headings. No cards, no borders between parts: space and type set them apart. */
 #sheet .page-head { margin-bottom: var(--space-9); }
-#sheet .draft-title { font-size: var(--text-9); line-height: 1.2; margin: 0 0 var(--space-5); padding-right: var(--box-8); outline: none; overflow-wrap: anywhere; }
+#sheet .draft-title { font-size: var(--text-9); line-height: 1.25; margin: 0 0 var(--space-5); padding-right: var(--box-8); outline: none; overflow-wrap: anywhere; }
 #sheet .draft-title:empty::before { content: attr(data-placeholder); color: var(--muted); }
 /* Right-aligned on whichever line it lands, so the ⋯ menu, which opens leftward, stays inside the sheet under a long title. */
 #sheet .sheet-marks { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); color: var(--muted); font-size: var(--text-4); }
