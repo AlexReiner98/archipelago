@@ -3,14 +3,17 @@
 // - The same read is never sent twice at once: a second asker is handed the answer the first is waiting for.
 // - Reads asked in the same moment go as one request (`/api/reads`, packs/surface/kernel/reads.ts), each answered as
 //   it would be alone; a lone read goes as it always did, under its own name.
-// - What does not change between clicks (the parts, the saved views, what is shared, the workspace) is kept
+// - What does not change between clicks (the parts, what is shared, the workspace) is kept
 //   until the map moves: tail says so (`forgetReads`, packs/surface/page/live.js), and so does anything the page sends
 //   that is not a read, as it may have changed the map itself.
 
 /** The reads that may go together: none writes, and the server answers the same list (packs/surface/kernel/reads.ts). */
 const TOGETHER = new Set(['get', 'events', 'proposals', 'view', 'search', 'share_list', 'workspace_info', 'published', 'publish_plan', 'picture', 'schema', 'packs']);
-/** The views kept until the map moves, and the other reads kept so. */
-const KEPT_VIEWS = new Set(['parts', 'saved_views', 'shared']);
+/**
+ * The views kept until the map moves, and the other reads kept so. Not the saved views: anyone saving one changes
+ * them, and a canvas opened before tail says so would be named as new, not saved (test/saved-canvases-switch.test.ts).
+ */
+const KEPT_VIEWS = new Set(['parts', 'shared']);
 const KEPT = new Set(['workspace_info']);
 /** What the page sends that is neither a read nor a change: following the log changes nothing. */
 const FOLLOWS = new Set(['tail']);

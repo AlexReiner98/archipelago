@@ -33,20 +33,20 @@ test('reads asked together go as one request, the same read once, and each asker
 
 test('a lone read goes under its own name, and what is kept is asked again once the map moves or the page writes', async () => {
   const { sent, api, forget } = counted();
-  await api('view', { name: 'saved_views', params: {} });
-  assert.deepEqual(sent, [{ tool: 'view', input: { name: 'saved_views', params: {} } }]);
-  await api('view', { name: 'saved_views', params: {} });
+  await api('view', { name: 'shared', params: {} });
+  assert.deepEqual(sent, [{ tool: 'view', input: { name: 'shared', params: {} } }]);
+  await api('view', { name: 'shared', params: {} });
   await api('get', { id: 'e_aaaaaaaa' });
   await api('get', { id: 'e_aaaaaaaa' });
-  assert.equal(sent.length, 3, 'the saved views kept; an item asked again once its first answer is in');
+  assert.equal(sent.length, 3, 'what is shared kept; an item asked again once its first answer is in');
   await api('tail', {});
-  await api('view', { name: 'saved_views', params: {} });
+  await api('view', { name: 'shared', params: {} });
   assert.equal(sent.length, 4, 'following the log lets go of nothing');
   forget();
-  await api('view', { name: 'saved_views', params: {} });
+  await api('view', { name: 'shared', params: {} });
   assert.equal(sent.length, 5, 'the map moved: asked again');
   await api('change', { ops: [] });
-  await api('view', { name: 'saved_views', params: {} });
+  await api('view', { name: 'shared', params: {} });
   assert.equal(sent.length, 7, 'a write lets go of what was kept');
 });
 
