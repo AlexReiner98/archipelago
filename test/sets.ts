@@ -90,6 +90,8 @@ export const SLOW: Record<string, string> = {
   'packs/canvas/map-routing.test.ts': 'long',
   // Eighteen real canvases, up to 200 items, each drawn whole and its picture hashed: about 8 seconds.
   'packs/canvas/map-corpus.test.ts': 'long',
+  // The same canvases drawn again with their starts spread over helpers of one, three and six: about 22 seconds.
+  'packs/canvas/map-spread.test.ts': 'long',
   // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
   'test/sessions.test.ts': 'long',
   'test/new-workspace.test.ts': 'long',

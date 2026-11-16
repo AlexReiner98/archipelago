@@ -93,6 +93,40 @@ function measured({ g, number }) {
   return { up, crossings, ports, twice: [...shores.values()].filter((n) => n > 1).length };
 }
 
+/** What a start comes to, the least best: wires that cross a border twice, links lost, wires against their way, crossings. */
+const scoreOf = (tried, seen) => [seen.twice, tried.lost, seen.up.length, seen.crossings.length];
+/** Whether score `a` is less than `b`, the first that differs deciding. */
+export const less = (a, b) => { for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] < b[k]; return false; };
+/**
+ * Whether the `k`th start is run, `best` the best so far and `spent` the work of all before: the first always; then
+ * while the best has a fault, no more than `most` are run, fewer than `idle` in a row past the best, and the work stays
+ * within `work` (the best's work the guess at the next one's).
+ */
+export const goOn = (best, spent, k, rules) => !best || (best.score.some(Boolean) && k < rules.most && k - best.k <= rules.idle && spent + best.work <= rules.work);
+
+/** The `k`th start of what `embedding` prepared (`prep`, plain data a helper is sent), counting no more than `most` to thread. */
+export function startOf({ ids, wires, where, madeOf, islands, mend, order, oneWay }, k, most = Infinity) {
+  return attempt({ ids, wires, placeOf: (id) => where.get(id) ?? null, made: (id) => madeOf.get(id), islands, mend, most, order }, k, oneWay);
+}
+/** What a helper answers for the `k`th start: its score and work, the start kept (`tried`) for the winner. */
+export function startScored(prep, k) {
+  const tried = startOf(prep, k);
+  return { tried, score: scoreOf(tried, measured(tried)), work: tried.work };
+}
+
+/** Where the starts are spread (./spread.js, `within`): the results known by key, and each first start kept. */
+let plan = null;
+/** Run `fn` with the starts spread by `p`: { known, first }, each a Map by key. */
+export function within(p, fn) {
+  const was = plan;
+  plan = p;
+  try {
+    return fn();
+  } finally {
+    plan = was;
+  }
+}
+
 /**
  * The embedding of the kit's graph `m` (./model.js): `headless` the link types with no head, `islandOf(id)` where a
  * step lives (null at sea). Answers `wires` (each with its way, `turned`, `trunk` and its `path` through the points
@@ -111,25 +145,39 @@ export function embedding(m, { headless = [], islandOf = () => null, trunks: joi
   // Which wires must run down: every one with a way, or only the order's.
   const wires = joinedUp.wires.map((w) => ({ ...w, firm: w.directed && (down === 'all' || w.order) }));
   const where = new Map([...steps.map((id) => [id, islandOf(id) ?? null]), ...junctions.map((j) => [j.id, j.island])]);
-  const placeOf = (id) => where.get(id) ?? null, madeOf = new Map([...steps.map((id) => [id, made(id)]), ...junctions.map((j) => [j.id, made(j.end)])]);
+  const madeOf = new Map([...steps.map((id) => [id, made(id)]), ...junctions.map((j) => [j.id, made(j.end)])]);
   const islands = [...new Set([...where.values()].filter((i) => i !== null))], ids = [...where.keys()];
   // The first start, mended, is the picture unless another does better (task e_wayfga4d). Then further starts, each
   // its line leaning its own way, while the work they count stays within planarize_starts_work and they number no more
   // than planarize_starts_most, until one has no crossing or planarize_starts_idle in a row have done no better than the
   // best (task e_nautydpg): counted, never timed, so a picture is the same each time. Of them, the fewest wires against
-  // their way is kept, then
-  // the fewest crossings: crossings are never traded for the rules. The first start may count no more than
-  // planarize_most_work to thread, where the style says it: past that it throws (tooMuch).
+  // their way is kept, then the fewest crossings: crossings are never traded for the rules. The first start may count no
+  // more than planarize_most_work to thread, where the style says it: past that it throws (tooMuch). Where the drawing
+  // has helpers, the starts after the first run on them side by side (./spread.js, task e_bsp7jhrw), the same starts
+  // judged by the same rules in the same order, so the picture is the one this loop draws.
   const mend = { rounds: sizes.planarize_repair_rounds, step: sizes.planarize_repair_step, work: sizes.planarize_repair_work };
-  const less = (a, b) => { for (let k = 0; k < a.length; k++) if (a[k] !== b[k]) return a[k] < b[k]; return false; };
+  const most = typeof sizes.planarize_most_work === 'number' ? sizes.planarize_most_work : Infinity;
+  const prep = { ids, wires, where, madeOf, islands, mend, order: sizes.planarize_order_rounds, oneWay };
+  const rules = { most: sizes.planarize_starts_most, idle: sizes.planarize_starts_idle, work: sizes.planarize_starts_work };
+  // Spread over helpers (./spread.js): the starts after the first are run there, and this is asked again with their
+  // results, the winner's whole. Keyed by all a start reads, so a result is never taken for another graph's.
+  const key = plan && JSON.stringify([ids, wires, [...where], [...madeOf], islands, mend, prep.order, oneWay, most, rules]), known = key && plan.known.get(key);
   let best = null, spent = 0, starts = 0;
-  for (let k = 0; !best || (best.score.some(Boolean) && k < sizes.planarize_starts_most && k - best.k <= sizes.planarize_starts_idle && spent + best.work <= sizes.planarize_starts_work); k++) {
-    const most = !k && typeof sizes.planarize_most_work === 'number' ? sizes.planarize_most_work : Infinity;
-    const tried = attempt({ ids, wires, placeOf, made: (id) => madeOf.get(id), islands, mend, most, order: sizes.planarize_order_rounds }, k, oneWay), seen = measured(tried);
-    const score = [seen.twice, tried.lost, seen.up.length, seen.crossings.length];
-    (spent += tried.work), starts++;
-    if (!best || less(score, best.score)) best = { ...tried, ...seen, score, k };
-  }
+  if (known) {
+    const tried = known.k ? known.tried : plan.first.get(key);
+    best = { ...tried, ...measured(tried), score: known.score, k: known.k };
+    starts = known.starts;
+  } else
+    for (let k = 0; goOn(best, spent, k, rules); k++) {
+      const tried = startOf(prep, k, k ? Infinity : most), seen = measured(tried), score = scoreOf(tried, seen);
+      (spent += tried.work), starts++;
+      if (!best || less(score, best.score)) best = { ...tried, ...seen, score, k };
+      // The first start does not end it: the rest go to the helpers, and this is asked again once they have run.
+      if (plan && !k && goOn(best, spent, 1, rules)) {
+        plan.first.set(key, tried);
+        throw Object.assign(new Error('The starts are spread'), { spread: { key, prep, rules, first: { score, work: tried.work } } });
+      }
+    }
   const { g } = best, pathOf = new Map(g.wires.filter((w) => w.link?.wire).map((w) => [w.link.wire.id, w.path]));
   // Each island's border, every point in turn round it from its top, and its ports among them.
   const borders = new Map(islands.map((island) => [island, [0, 1, 2].flatMap((side) => {
