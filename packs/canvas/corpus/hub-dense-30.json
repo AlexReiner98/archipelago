@@ -1,6 +1,6 @@
 {
 "about": "A hub and its parts, densely linked, cut at 30",
-"picture": "09d73c4b9f38",
+"picture": "fb3dd203467d",
 "items": [
 {"id":"e_00000030","type":"task","is":["work"],"status":"doing","phase":"under_way","visibility":"private","found":["id"],"title":"xxxxx xxx xx xx xxxxx","island":"e_00000012"},
 {"id":"e_00000013","type":"task","is":["work"],"status":"todo","phase":"not_started","visibility":"private","found":["link"],"title":"xxx xxxxxx xxxxxx xxxxx","island":"e_00000012"},
