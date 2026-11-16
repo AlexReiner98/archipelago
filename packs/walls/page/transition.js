@@ -9,6 +9,9 @@
 // on the style (core's house style names them, `motion_*`). Past a few movers it cuts, as it does on less motion
 // asked for, on a picture of too many marks, and on one that shares no mark with what was there.
 //
+// A picture handed on narrowed (./narrow-picture.js) has had what left taken out already: the next scene is matched
+// against what stayed, which moves and grows from where it was, past the usual few movers.
+//
 // A mark may say it is a pulse (its `pulse`, words the page keeps on it, packs/walls/page/marks.js): unseen, it is never faded or
 // moved, and when its words change while its key stays, a dash of its own stroke runs along its line, start to end,
 // after what moves has moved (a finding's move carried to its readers, task e_fqhbp4yq). It runs even where the rest
@@ -16,6 +19,27 @@
 
 /** The keyed marks a host last mounted, by host: what the next scene there is matched against. */
 const lastKeys = new WeakMap();
+/**
+ * Marks already taken out of the picture on screen before its next scene came (./narrow-picture.js): not matched
+ * against that scene, so nothing waits for them to fade again.
+ */
+export const takenOut = new WeakSet();
+/** The style each host's marks were last mounted with. */
+const lastStyle = new WeakMap();
+/**
+ * The picture on one host handed to another, which mounts the next scene (a canvas drawn anew for an edited query):
+ * that scene is matched against these marks, as if mounted where they were. With `narrowed`, it moves as many marks
+ * as the style's motion_narrow_movers_most allows, since what stays is all that changes. The style they were drawn
+ * with, or null where nothing was mounted there.
+ */
+export function handOver(from, to, narrowed = false) {
+  const keys = lastKeys.get(from);
+  if (!keys || !lastStyle.get(from)) return null;
+  lastKeys.delete(from);
+  lastKeys.set(to, keys);
+  if (narrowed) to.narrowed = true;
+  return lastStyle.get(from);
+}
 /** What is playing on a host now: its animations and the marks kept on the page to fade, ended by the next scene. */
 const playing = new WeakMap();
 const SVG = 'http://www.w3.org/2000/svg';
@@ -27,7 +51,7 @@ const SVG = 'http://www.w3.org/2000/svg';
  * says why it cut (`cut`), or what leaves, moves (with its move on the screen), arrives and is drawn in, and when
  * each stage starts and how long it lasts. Pure: no page, so it is tested without one.
  */
-export function stagesOf(before, after, numbers, reduced = false, framed = true) {
+export function stagesOf(before, after, numbers, reduced = false, framed = true, narrowed = false) {
   const n = (name) => {
     const v = numbers?.[name];
     if (typeof v !== 'number') throw new Error(`The style names no number "${name}": the house style (core.house, packs/canvas/pack.json) names every one the page moves by`);
@@ -50,13 +74,22 @@ export function stagesOf(before, after, numbers, reduced = false, framed = true)
   // How far each mark that stays, of the same size, went on the screen. What most of them went by together is the
   // picture's frame moving (it was fitted or panned again around a picture of another size): the frame moves back
   // as one, and a mark moves only by what it went on its own.
-  const went = new Map();
+  const went = new Map(), grew = new Map();
+  // Narrowed, a mark that holds others (an item and its dot) moves whole, and what it holds with it (below); the
+  // picture's root, which holds everything, never moves.
+  const framing = (row) => row.holds && (!narrowed || row.top);
   for (const [key, now] of after) {
     const was = before.get(key);
-    if (!was || now.holds || now.wire) continue;
+    if (!was || framing(now) || now.wire) continue;
     const [x0, y0, w0, h0] = was.box, [x1, y1, w1, h1] = now.box;
-    // A mark of another size is another shape: it is put there as it is.
+    // A mark of another size is another shape: it is put there as it is. Narrowed, a picture fitted again is zoomed
+    // too: a mark grown alike both ways is the same shape, and moves and grows from where it was.
     if (near(w0, w1) && near(h0, h1)) went.set(key, [x0 - x1, y0 - y1]);
+    else if (narrowed && w1 > 0 && h1 > 0) {
+      // By the zoom of what it is drawn in, where both say it; else by its own width. Alike both ways, within the style's motion_narrow_shape.
+      const by = was.zoom > 0 && now.zoom > 0 ? was.zoom / now.zoom : w0 / w1, room = n('motion_narrow_shape');
+      if (Math.abs(w0 - w1 * by) <= within + room * w0 && Math.abs(h0 - h1 * by) <= within + room * h0) grew.set(key, by);
+    }
   }
   // Each way on its own: a picture grown taller moves down as one while its steps move across.
   const [fx, fy] = framed ? [mostOf([...went.values()].map((w) => w[0])), mostOf([...went.values()].map((w) => w[1]))] : [0, 0];
@@ -69,7 +102,7 @@ export function stagesOf(before, after, numbers, reduced = false, framed = true)
       continue;
     }
     // What holds other marks is a frame for them: they move, it does not.
-    if (now.holds) continue;
+    if (framing(now)) continue;
     const [x0, y0, w0, h0] = was.box, [x1, y1, w1, h1] = now.box;
     if (now.wire) {
       if (!(near(x0 - fx, x1) && near(y0 - fy, y1) && near(w0, w1) && near(h0, h1)) || was.path !== now.path) draw.push(key);
@@ -77,6 +110,10 @@ export function stagesOf(before, after, numbers, reduced = false, framed = true)
     }
     const by = went.get(key);
     if (by && !(near(by[0], fx) && near(by[1], fy))) move.push({ key, dx: by[0] - fx, dy: by[1] - fy });
+    // Its box's corner as it was (in the frame as it starts) and as it is, and how much bigger it was.
+    else if (grew.has(key)) move.push({ key, dx: x0 - fx - x1, dy: y0 - fy - y1, scale: grew.get(key), from: [x0 - fx, y0 - fy], to: [x1, y1] });
+    // Narrowed, one that changed its shape and its place comes in where it is now, with what arrives, rather than jump there.
+    else if (narrowed && !by && !(near(x0 - fx, x1) && near(y0 - fy, y1))) arrive.push(key);
   }
   for (const [key, was] of before) {
     if (after.has(key)) continue;
@@ -84,14 +121,24 @@ export function stagesOf(before, after, numbers, reduced = false, framed = true)
     if (was.within !== null && was.within !== undefined && !after.has(was.within)) continue;
     leave.push(key);
   }
+  // What a mark that moves holds moves with it.
+  if (narrowed) {
+    const moving = new Set(move.map((m) => m.key));
+    const carried = (key) => {
+      for (let up = after.get(key)?.within; up !== null && up !== undefined; up = after.get(up)?.within) if (moving.has(up)) return true;
+      return false;
+    };
+    move.splice(0, move.length, ...move.filter((m) => !carried(m.key)));
+  }
   // Cut, it still says what would have moved.
-  if (move.length > n('motion_movers_most')) return { ...none('many', pulse), move };
+  if (move.length > n(narrowed ? 'motion_narrow_movers_most' : 'motion_movers_most')) return { ...none('many', pulse), move };
   const shifted = !(near(fx, 0) && near(fy, 0)) ? { dx: fx, dy: fy } : null;
   if (!leave.length && !move.length && !arrive.length && !draw.length && !shifted) return none('still', pulse);
   // Each stage starts when the one before it has ended; a stage with nothing in it takes no time.
-  const out = leave.length ? n('motion_leave') : 0;
+  // Narrowed, what left has gone already: the wires still there, drawn again, fade as what stays moves.
+  const fades = leave.length ? n('motion_leave') : 0, out = narrowed ? 0 : fades;
   const moving = move.length || shifted ? n('motion_move') : 0;
-  const times = { leave: [0, out], move: [out, moving], arrive: [out + moving, n('motion_arrive')], pulse: [out + moving, n('motion_pulse')] };
+  const times = { leave: [0, fades], move: [out, moving], arrive: [out + moving, n('motion_arrive')], pulse: [out + moving, n('motion_pulse')] };
   return { cut: null, frame: shifted, leave, move, arrive, draw, pulse, times };
 }
 
@@ -116,14 +163,19 @@ const isWire = (el) => el instanceof SVGGeometryElement && el.tagName !== 'rect'
 /** The keyed marks connected in host, measured: key to { el, box, wire, path, holds, within }, and the elements. */
 function measured(host, keys) {
   const els = new Map();
-  for (const [key, el] of keys) if (el?.isConnected && host.contains(el) && el !== host) els.set(el, key);
+  const out = (el) => {
+    for (let up = el; up && up !== host; up = up.parentElement) if (takenOut.has(up)) return true;
+    return false;
+  };
+  for (const [key, el] of keys) if (el?.isConnected && host.contains(el) && el !== host && !out(el)) els.set(el, key);
   const rows = new Map();
   for (const [el, key] of els) {
     let up = el.parentElement;
     while (up && up !== host && !els.has(up)) up = up.parentElement;
     const within = up && up !== host ? els.get(up) : null;
     const r = el.getBoundingClientRect(), wire = isWire(el);
-    rows.set(key, { el, box: [r.x, r.y, r.width, r.height], wire, path: wire ? el.getAttribute('d') ?? el.getAttribute('points') : null, holds: false, within, pulse: el.dataset?.pulse ?? null });
+    const zoom = el instanceof SVGElement && el.parentNode instanceof SVGGraphicsElement ? el.parentNode.getScreenCTM?.()?.a : undefined;
+    rows.set(key, { el, box: [r.x, r.y, r.width, r.height], wire, path: wire ? el.getAttribute('d') ?? el.getAttribute('points') : null, holds: false, within, pulse: el.dataset?.pulse ?? null, zoom, top: el instanceof SVGSVGElement });
   }
   for (const row of rows.values()) if (row.within !== null && rows.has(row.within)) rows.get(row.within).holds = true;
   return rows;
@@ -145,6 +197,18 @@ function inUnits(el, dx, dy) {
 }
 
 /**
+ * A move that grows too, in the units its mark is drawn in: what puts its box's corner, now at `is` on the screen, back
+ * at `was`, `scale` times as big (about its units' origin, where an SVG mark's transform starts). For an HTML mark,
+ * or one with no units of its own, the screen's.
+ */
+function grownIn(el, was, is, scale) {
+  const ctm = el instanceof SVGElement && el.parentNode instanceof SVGGraphicsElement ? el.parentNode.getScreenCTM?.() : null;
+  const inv = ctm ? ctm.inverse() : new DOMMatrix();
+  const u0 = new DOMPoint(...was).matrixTransform(inv), u1 = new DOMPoint(...is).matrixTransform(inv);
+  return [u0.x - scale * u1.x, u0.y - scale * u1.y, ` scale(${scale})`];
+}
+
+/**
  * The hook where a scene is mounted (packs/walls/page/layout.js): called before the marks are replaced, with the Map that collects
  * the new scene's keyed marks. It measures the marks there were, and once the new ones are mounted, and the view put
  * back where the reader left it (ui/canvas.js, on the mutation), it plays what changed before the frame is painted.
@@ -154,6 +218,9 @@ export function transition(host, keys, style) {
   if (was) (playing.delete(host), was.end());
   const old = lastKeys.get(host);
   lastKeys.set(host, keys);
+  lastStyle.set(host, style);
+  const narrowed = Boolean(host.narrowed);
+  host.narrowed = false;
   // The first scene on a host, and less motion asked for, are drawn as they are: nothing is measured.
   if (!old || typeof Element.prototype.animate !== 'function') return;
   if (lessMotion(style)) return void (host.dataset.transition = 'reduced');
@@ -165,7 +232,7 @@ export function transition(host, keys, style) {
     if (!host.isConnected || lastKeys.get(host) !== keys) return;
     const after = measured(host, keys);
     const root = host.querySelector('svg');
-    const plan = stagesOf(before, after, style?.numbers, false, Boolean(root) && getComputedStyle(root).transform === 'none');
+    const plan = stagesOf(before, after, style?.numbers, false, Boolean(root) && getComputedStyle(root).transform === 'none', narrowed);
     host.dataset.transition = plan.cut ?? 'played';
     // What it found, for whoever looks at the page (a test, the console).
     host.transitionPlan = plan;
@@ -203,10 +270,11 @@ function play(host, plan, before, after, places) {
   // The frame, moved back as one from where it stood, and on with what moves.
   if (plan.frame && root) running.push(root.animate([{ transform: `translate(${fx}px, ${fy}px)` }, { transform: 'none' }], { duration: moveFor, delay: moveAt, easing: ease, fill: 'backwards' }));
   // What stays: drawn where it is now, and moved there from where it was.
-  for (const { key, dx, dy } of plan.move) {
+  for (const { key, dx, dy, scale, from: was, to: is } of plan.move) {
     const { el } = after.get(key);
-    const [ux, uy] = inUnits(el, dx, dy), own = ownTransform(el);
-    const from = `translate(${ux}px, ${uy}px)${own ? ` ${own}` : ''}`, to = own || 'none';
+    const own = ownTransform(el);
+    const [ux, uy, grown] = scale ? grownIn(el, was, is, scale) : [...inUnits(el, dx, dy), ''];
+    const from = `translate(${ux}px, ${uy}px)${grown}${own ? ` ${own}` : ''}`, to = own || 'none';
     running.push(el.animate([{ transform: from }, { transform: to }], { duration: moveFor, delay: moveAt, easing: ease, fill: 'backwards' }));
   }
   // What arrives: unseen until its stage, then faded in; a wire is drawn in along its length as it fades.

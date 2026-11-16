@@ -49,12 +49,15 @@ test('in a browser, Only a word draws at once, and the server\'s answer lands on
     await page.evaluate(`performance.clearMarks(); window.stages = 0; window.pressed = performance.now()`);
     assert.ok(await page.evaluate(F.press('Words', '“roof”')));
     assert.ok(await page.until(`!${has('Wall')} && ${has('Roof frame')} && ${has('Beam')}`, 1000), `drawn narrowed before the server answered: ${await page.evaluate(`JSON.stringify(${drawn})`)} ${page.logs().join('\n')}`);
-    assert.deepEqual(await page.evaluate(`${marks}.filter((m) => m.startsWith('lens-'))`), ['lens-edit', 'lens-narrowed'], 'the page drew it, and the server has not answered yet');
+    // The picture on screen narrowed first (packs/walls/page/narrow-picture.js), then laid out anew.
+    assert.deepEqual(await page.evaluate(`${marks}.filter((m) => m.startsWith('lens-'))`), ['lens-edit', 'lens-narrowed', 'lens-narrow-shown'], 'the page drew it, and the server has not answered yet');
     const took = await page.evaluate(`Math.round(performance.getEntriesByName('lens-narrowed')[0].startTime - performance.getEntriesByName('lens-edit')[0].startTime)`);
     assert.ok(Number(took) < 100, `the narrowed answer is worked out at once (${took} ms)`);
     // The server's answer agrees: it lands without the drawing being drawn again.
     assert.ok(await page.until(`${marks}.includes('lens-confirmed')`, 5000), `the server's answer lands: ${page.logs().join('\n')}`);
-    assert.equal(await page.evaluate('window.stages'), 1, 'drawn once, by the page');
+    // Two stages come: the picture there was, handed to the canvas drawn for the edit and narrowed, then the page's
+    // layout of its answer. The server's answer brings none.
+    assert.equal(await page.evaluate('window.stages'), 2, 'drawn once, by the page');
     assert.ok(await page.evaluate(`!${has('Wall')} && ${has('Roof frame')}`));
   } finally {
     await page.close();

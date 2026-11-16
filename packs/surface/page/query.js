@@ -8,6 +8,7 @@ import { markTry, onTries, triedOn, tryOn } from './preview.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles, types } from './words.js';
 import { drawnKey, narrowed as narrowedFrom, unheard } from './narrow.js';
+import { indexNow, indexWhenIdle, narrowPicture } from './narrow-picture.js';
 
 // Where a held change would land on a canvas is the decision of the part on `ghosts` (the write pack's).
 ghostAsker.ask = (input) => askSlot('ghosts', input);
@@ -219,6 +220,8 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   const host = h('div', { class: 'lens-wrap' }, body);
   const place = { opened: new Map(), ask: {} };
   const keep = (change) => Object.assign(chosen, change);
+  // What the picture holds and where, read while the page is idle, so an edit that narrows it measures nothing (packs/walls/page/narrow-picture.js).
+  indexWhenIdle(body, () => chosen);
   let look;
   let raw;
   // The lens as it is asked of the map: with what a kept view's steps name, where it plays them.
@@ -230,6 +233,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   // What is drawn is the answer with what is held for the owner and the links drawn here not yet answered for drawn
   // into it (`shown`, packs/surface/page/replica.js); what the canvas holds (`host.answer`) is the answer alone.
   const draw = (answer, shown, refreshing) => {
+    host.earlyDraw = null;
     host.drawnWith = [answer, shown];
     if (only) [answer, shown] = [answer, shown].map(narrowed(only));
     if (extra) [answer, shown] = [answer, shown].map((a) => ({ ...a, ...extra, ...(extra.steps && { steps: phased(extra.steps, a.items) }) }));
@@ -348,8 +352,12 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     raw = { ...was.raw, lens: first.lens };
     delete raw.matched;
     performance.mark('lens-narrowed');
-    host.drawingEarly = true;
-    draw(first, shown);
+    const early = () => ((host.drawingEarly = true), draw(first, shown));
+    // The picture on screen narrowed at once (packs/walls/page/narrow-picture.js), and the drawing asked to lay out the
+    // new answer once the frame that shows it is painted, unless the server's answer is drawn first.
+    if (!narrowPicture(body, was.body, new Set(old.items.map((i) => i.id).filter((id) => !ids.has(id))))) return early();
+    host.earlyDraw = early;
+    requestAnimationFrame(() => setTimeout(() => host.earlyDraw === early && early()));
   }
   // A lens that names a view: its answer, asked as an agent asks it, is drawn as it comes. It is not a replica of the
   // log (what it measures is not all facts), so it is asked again when the canvas is drawn again or refreshed.
@@ -372,7 +380,12 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   host.made = JSON.stringify([of, style, key, only, nest, played ?? null, extra ?? null]);
   host.lens = lens;
   // What it holds now, settled on the server's answer, for the view drawn after it (`firstFrom`).
-  host.snapshot = () => (host.store && host.early === undefined && look && raw?.lens ? { lens, made: host.made, look, raw, answer: host.store.answer(), shown: host.store.drawn() } : null);
+  host.snapshot = () => {
+    if (!(host.store && host.early === undefined && look && raw?.lens)) return null;
+    // Its picture indexed now if it is not yet, while it is on the page: the pane may be drawn anew before it is narrowed.
+    indexNow(body, chosen);
+    return { lens, made: host.made, look, raw, answer: host.store.answer(), shown: host.store.drawn(), body };
+  };
   firstFrom(before);
   host.ready = load();
   host.refresh = () => load(true);
