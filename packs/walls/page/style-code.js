@@ -148,10 +148,13 @@ export function bakeCode({ code, answer, style, theme, width, height }) {
 /**
  * Where a page's words stand, in the page's own coordinates: its hero (the section it opens on), what stands above it
  * (its nav, a title), its name where it shows one, and its column (everything else in its main, and its foot), as one
- * box. A page's frame is baked around them (pageAt), and a backdrop is told them (packs/walls/page/backdrop.js).
+ * box. A page's frame is baked around them (pageAt). A backdrop is told each block on its own instead (`blocks`: the
+ * nav, the title, each paragraph, list and figure, the foot) and the page's call to action (`focus`, the link of its
+ * first p.action), so its land may come between them (packs/walls/page/backdrop.js).
  */
 export function pageWords(doc, win) {
   const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top + win.scrollY, w: r.width, h: r.height }; };
+  const shows = (el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.width > 0; };
   // The section it opens on, of those shown (a backdrop's own is taken away).
   const seen = (el) => (el && el.getBoundingClientRect().height > 0 ? el : null);
   const lead = seen(doc.querySelector('main section.lead')) ?? [...doc.querySelectorAll('main section')].find(seen) ?? null;
@@ -161,8 +164,15 @@ export function pageWords(doc, win) {
   const above = shown.filter((b) => b.y + b.h <= heroFoot - (lead ? box(lead).h : 0) + 4), parts = shown.filter((b) => b.y >= heroFoot - 4);
   const x0 = Math.min(...parts.map((b) => b.x)), x1 = Math.max(...parts.map((b) => b.x + b.w)), y0 = Math.min(...parts.map((b) => b.y)), y1 = Math.max(...parts.map((b) => b.y + b.h));
   // The page's name, where it shows it (its title over the hero, or a heading in it): kept clear, and the drawing draws no name of its own.
-  const named = [...doc.querySelectorAll('main h1, main section.lead h2, main .wordmark')].filter((el) => el.getBoundingClientRect().height > 0).map(box);
-  return { hero: lead && box(lead), above, named, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null };
+  const namedEls = [...doc.querySelectorAll('main h1, main section.lead h2, main .wordmark')].filter((el) => el.getBoundingClientRect().height > 0);
+  const named = namedEls.map(box);
+  // Each block apart: what holds blocks (words, a band, a section) is opened, and a call to action is its link alone.
+  const into = (el) => (!shows(el) ? [] : el.matches('div.text, div.doc-band, div.band-pictures, section') ? [...el.children].flatMap(into) : el.matches('p.action') ? [el.querySelector('a') ?? el].filter(shows) : [el]);
+  const tops = new Set([...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('footer')]);
+  const blockEls = [...tops].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead)).flatMap(into);
+  const blocks = [...blockEls, ...namedEls.filter((el) => !blockEls.some((b) => b.contains(el)))].map(box);
+  const action = [...doc.querySelectorAll('main p.action a')].find(shows);
+  return { hero: lead && box(lead), above, named, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null, blocks, focus: action ? box(action) : null };
 }
 
 /**
