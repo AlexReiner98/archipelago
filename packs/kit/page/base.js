@@ -290,7 +290,7 @@ function early(name) {
 /** A tool's answer from the read packs/surface/page/early.js asked for it (`name`), else from `ask`; one that failed is asked again. */
 export const apiFirst = (name, ask) => (early(name)?.then(answerOf).catch(ask) ?? ask());
 // Each read once at a time, reads asked together sent together, and what does not change between clicks kept (./reads.js).
-export const { api, forget: forgetReads } = reader((tool, input) => call(`/api/${tool}`, input, authHeaders()), (calls) => call('/api/reads', { calls }, authHeaders()), (tool) => state.schema?.pack_tools?.some((t) => t.tool === tool && t.view) === true);
+export const { api } = reader((tool, input) => call(`/api/${tool}`, input, authHeaders()), (calls) => call('/api/reads', { calls }, authHeaders()), (tool) => state.schema?.pack_tools?.some((t) => t.tool === tool && t.view) === true);
 
 // Signed out, the style is not read with the rest: its colours are asked for on their own.
 const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
