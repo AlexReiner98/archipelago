@@ -4,7 +4,7 @@
 // workspace, a screen, what waits for you. This module routes between them; each part is its own module.
 
 import { authorizePage } from './authorize.js';
-import { tryPage } from './guest.js';
+import { firstMoments, tryPage } from './guest.js';
 import { otherWays, signInBack, signUpOffer, signUpPage } from './sign-up.js';
 import { SignInNeeded, api, tell, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
@@ -91,6 +91,7 @@ async function route(pulse = false) {
   drawFindSlot();
   drawNav();
   signUpOffer();
+  firstMoments();
   startTabs();
   const params = new URLSearchParams(query);
   // The canvas: the pane in focus draws the lens the address says (the bar pack's parts show it); an item's page with none
