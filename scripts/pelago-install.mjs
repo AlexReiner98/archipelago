@@ -13,8 +13,9 @@
 //
 //   node -e "fetch('<origin>/connect/install.mjs').then(r=>r.text()).then(t=>import('data:text/javascript,'+encodeURIComponent(t)))" -- [options]
 //     --client <claude|codex|cursor>   only these (repeat it, or a comma list); else every one found here
-//     --yes                            ask nothing (an agent runs it so); an old server is then only reported
+//     --yes                            ask nothing (an agent runs it so); an old server is then taken out, a copy kept
 //     --remove-old                     take an old `pelago` server out of ~/.mcp.json (a copy is kept)
+//     --keep-old                       leave it, with the plugin's beside it
 //     --dry-run                        say what it would do, and do nothing
 // PELAGO_MARKETPLACE installs the plugin from another marketplace (a path, to try a change before it is pushed).
 
@@ -29,7 +30,7 @@ import { pathToFileURL } from 'node:url';
 const HOSTED = 'https://app.archipelago.tools';
 const MARKETPLACE = process.env.PELAGO_MARKETPLACE || 'AlexReiner98/archipelago';
 const CLIENTS = ['claude', 'codex', 'cursor'];
-const OPTIONS = ['--client', '--yes', '--remove-old', '--dry-run'];
+const OPTIONS = ['--client', '--yes', '--remove-old', '--keep-old', '--dry-run'];
 
 const args = process.argv.slice(1).filter((a) => a !== '--' && a !== '-');
 const named = [];
@@ -44,6 +45,7 @@ for (let i = 0; i < args.length; i++) {
 const YES = args.includes('--yes');
 const DRY = args.includes('--dry-run');
 const REMOVE_OLD = args.includes('--remove-old');
+const KEEP_OLD = args.includes('--keep-old');
 const asked = named.map((c) => c.trim().toLowerCase()).filter(Boolean);
 const wrong = asked.filter((c) => !CLIENTS.includes(c));
 if (wrong.length) {
@@ -163,13 +165,15 @@ const old = join(HOME, '.mcp.json');
 const oldSaid = readJson(old);
 if (doing.includes('claude') && oldSaid?.mcpServers?.pelago) {
   step(`An older Archipelago setup is in ${old} (a server called pelago, with a token): with the plugin, Claude Code would have two.`);
-  if (REMOVE_OLD || (await confirm('  Take it out? A copy of the file is kept beside it.'))) {
+  // Asked by an agent (--yes), it goes: two connections, one to another map, are what the plugin replaces (the owner,
+  // 15 Nov 2026). The copy kept beside it puts it back.
+  if (!KEEP_OLD && (REMOVE_OLD || YES || (await confirm('  Take it out? A copy of the file is kept beside it.')))) {
     if (DRY) say(`  (would remove) mcpServers.pelago from ${old}`);
     else {
       copyFileSync(old, `${old}.pelago-old`);
       delete oldSaid.mcpServers.pelago;
       writeFileSync(old, JSON.stringify(oldSaid, null, 2) + '\n');
-      say(`  Taken out. The old file is ${old}.pelago-old.`);
+      say(`  Taken out. The old file is ${old}.pelago-old: copy it back over ${old} to put it back.`);
     }
   } else say(`  Left as it is. To take it out, run this again with --remove-old, or delete "pelago" from ${old}.`);
 }
@@ -177,7 +181,8 @@ if (doing.includes('claude') && oldSaid?.mcpServers?.pelago) {
 if (!DRY && done.includes('Claude Code')) {
   step('Checking: one call to your map');
   const { status } = await login.call(ORIGIN, 'query', {});
-  say(status === 200 ? '  Your map answered.' : `  Your map answered ${status}: the sign-in did not take. Run this again.`);
+  // Which map, by name: an install that reached another map than the one the person meant looks the same otherwise.
+  say(status === 200 ? `  Your map answered: ${await login.mapOf(ORIGIN)}.` : `  Your map answered ${status}: the sign-in did not take. Run this again.`);
   if (status !== 200) done.splice(done.indexOf('Claude Code'), 1);
 }
 
