@@ -28,6 +28,9 @@ export interface Timing {
   pack: number;
   /** Pack calls open now: a call inside another is counted, its time is not counted twice. */
   packDepth: number;
+  /** Answers that may be kept until the map moves (packs/loader/kernel/kept.ts): asked, and of those, given as kept. */
+  keepable: number;
+  kept: number;
 }
 
 const store = new AsyncLocalStorage<Timing>();
@@ -37,7 +40,7 @@ export const timing = (): Timing | undefined => store.getStore();
 
 /** Run `fn` as one request, timed. */
 export function timed<T>(fn: () => T): T {
-  return store.run({ start: performance.now(), statements: 0, summed: 0, db: 0, out: 0, outSince: 0, waits: 0, wait: 0, packCalls: 0, pack: 0, packDepth: 0 }, fn);
+  return store.run({ start: performance.now(), statements: 0, summed: 0, db: 0, out: 0, outSince: 0, waits: 0, wait: 0, packCalls: 0, pack: 0, packDepth: 0, keepable: 0, kept: 0 }, fn);
 }
 
 /** Something is out at the database from now. */
@@ -88,6 +91,14 @@ export async function packCall<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Count an answer that may be kept, if in a request: whether it was given as kept. */
+export function keptCall(kept: boolean): void {
+  const t = store.getStore();
+  if (!t) return;
+  t.keepable++;
+  if (kept) t.kept++;
+}
+
 /** Answer a request timed: its head carries Server-Timing as it is written, however it is written. */
 export function timedAnswer<T>(res: ServerResponse, fn: () => T): T {
   return timed(() => {
@@ -115,6 +126,7 @@ export function serverTiming(t: Timing): string {
     `db;dur=${ms(db)};desc="${t.statements} statements, ${Math.round(t.summed)} ms summed"`,
     `wait;dur=${ms(t.wait)};desc="${t.waits} transactions"`,
     `pack;dur=${ms(t.pack)};desc="${t.packCalls} calls"`,
+    ...(t.keepable ? [`kept;desc="${t.kept} of ${t.keepable} answers kept"`] : []),
     `app;dur=${ms(Math.max(0, total - db))}`,
     `total;dur=${ms(total)}`,
   ].join(', ');

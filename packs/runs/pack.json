@@ -19,7 +19,8 @@
           "more?": "string",
           "lines?": ["string"]
         },
-        "run": "answers.ts#frontier"
+        "run": "answers.ts#frontier",
+        "kept": true
       },
       "answer.worked_on": {
         "in": { "runs": ["id"] },
