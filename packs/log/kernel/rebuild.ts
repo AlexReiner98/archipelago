@@ -4,7 +4,7 @@
 // what is left is a last chunk, one transaction takes both streams' locks, projects the rest and swaps the result in
 // (packs/log/kernel/replay.ts, swapIn). The same walk, without the swap, takes a snapshot; with a stop, it answers a past position.
 
-import { setImmediate } from 'node:timers/promises';
+import { setImmediate, setTimeout as sleep } from 'node:timers/promises';
 import type { Db, Q } from '../../database/kernel/db.ts';
 import { headOf, stored, type Entry } from './log.ts';
 import { beforeTheLog, inOrder, type TypesRead, loadRows, projectEntry, projectedRows, PROJECTED, shadowTables, swapIn, SHADOW, type Rows } from './replay.ts';
@@ -34,6 +34,11 @@ export interface RebuildOptions {
   fromStart?: boolean;
   /** Told how far it has come, after each chunk. */
   progress?: (at: Positions, head: Positions) => void;
+  /**
+   * Rest after each background chunk for this many times as long as it took (1: the database is left idle half the
+   * time), so a walk kept in the background never starves the pages being served. 0, the default: no rest.
+   */
+  pace?: number;
 }
 
 export interface RebuildReport {
@@ -107,6 +112,7 @@ export async function catchUp(db: Db, reg: TypesRead, ws: string, swap: boolean,
     };
     // In the background: each chunk its own transaction, nothing locked, the live tables untouched.
     for (let head = await heads(db); behind(at, head) > chunk; head = await heads(db)) {
+      const began = performance.now();
       await db.transaction(async (tx) => {
         await inShadow(tx);
         const entries = await next(tx, at, chunk);
@@ -116,7 +122,8 @@ export async function catchUp(db: Db, reg: TypesRead, ws: string, swap: boolean,
       });
       report.chunks++;
       o.progress?.({ ...at }, head);
-      await setImmediate();
+      if (o.pace) await sleep(Math.round((performance.now() - began) * o.pace));
+      else await setImmediate();
     }
     // Caught up but for a last chunk: nothing can be appended to either stream until this commits.
     await db.transaction(async (tx) => {

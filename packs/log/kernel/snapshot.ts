@@ -170,6 +170,18 @@ export async function newestValid(q: Q, ws: string, upTo?: number, vault?: Vault
   return undefined;
 }
 
+/**
+ * The newest snapshot this code made, its header alone (its rows are neither read nor checked): when it was taken, and
+ * at what positions. What a restarted server asks before keeping the day again (packs/log/kernel/open.ts).
+ */
+export async function newestHead(q: Q): Promise<{ positions: Positions; taken_at: Date } | undefined> {
+  const { rows } = await q.query<{ positions: Positions; taken_at: Date }>(
+    `select positions, taken_at from log_snapshot where projection = $1 and projection_version = $2 and code = $3 order by fact_pos desc, (positions->>'pending')::bigint desc limit 1`,
+    [PROJECTION, PROJECTION_VERSION, CODE],
+  );
+  return rows[0] && { positions: rows[0].positions, taken_at: new Date(rows[0].taken_at) };
+}
+
 /** Keep the newest few snapshots this code can use and drop the rest: they can always be taken again. */
 export async function prune(q: Q, keep = 3): Promise<number> {
   const { rows } = await q.query(

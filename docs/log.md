@@ -931,7 +931,12 @@ never sees the log ahead of them.
 - **When.** Daily, by the leader: a snapshot at the head, walked from the
   newest one; where none fits the running code (a new projector, or none
   yet), the projections are rebuilt from the start in the background and
-  swapped in.
+  swapped in. Whether the day is done is asked of the database (a snapshot
+  this code took today), so a server restarted on the same code keeps
+  nothing, and a snapshot already at the head is not taken again. The
+  first ask waits a while after the server starts to lead
+  (`PELAGO_KEEP_AFTER_MS`, five minutes), the leader keeps one map at a
+  time, and the walk rests after each chunk as long as the chunk took.
 - **Older than the log.** A map from before 24 Oct 2026 holds items, links
   and held changes no entry made. A walk from the log's start begins with
   them as they stand today (`beforeTheLog`, `packs/log/kernel/replay.ts`), and what the
