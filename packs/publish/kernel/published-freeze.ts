@@ -82,8 +82,12 @@ export async function publishedState(ctx: KernelContext, id: string) {
   const now = await freezeDocument(ctx, id).catch((err: unknown) => (ctx.said(`published ${id}: its draft could not be frozen to compare, so it reads as changed: ${err instanceof Error ? err.message : String(err)}`), null));
   // What was kept beside the words (the look, the marks its part drew them with) is not the draft to compare.
   // Nor what was baked, which a draft never has.
-  const { style_at: _, look: _look, marks: _marks, marks_error: _error, ...given } = unbaked(row.given);
-  return { published: true, at: row.published_at, by: row.published_by, changed: !now || !same(now, given) };
+  const { style_at: _, look, marks: _marks, marks_error: _error, ...given } = unbaked(row.given) as Frozen & Record<'style_at' | 'look' | 'marks' | 'marks_error', unknown>;
+  const words = !now || !same(now, given);
+  // Nor is the look a draft, but a new house style (a face, a colour) reaches a reader only when it is published
+  // again: so a look that is not the one the map's styles give now is changed too, said apart (e_kajfr3yy).
+  const restyled = Boolean(now) && !same(await ctx.call<unknown, Record<string, unknown>>('page.look', { ...now, id }), look ?? null);
+  return { published: true, at: row.published_at, by: row.published_by, changed: words || restyled, ...(restyled && { restyled: true }) };
 }
 
 /** What publishing everything in an item would do: each document it holds, whether it is published, and whether its draft now says something else. */
@@ -94,7 +98,7 @@ export async function publishPlan(ctx: KernelContext, within: string) {
   // The open or finished documents it holds, at any depth, of the types that can be public: what Publish all publishes.
   for (const doc of (await ctx.reads({ held_documents: within })) as { id: string; title: string }[]) {
     const state = await publishedState(ctx, doc.id);
-    documents.push({ id: doc.id, title: doc.title, published: state.published, changed: state.published ? state.changed : true });
+    documents.push({ id: doc.id, title: doc.title, published: state.published, changed: 'changed' in state ? state.changed : true, ...('restyled' in state && state.restyled && { restyled: true }) });
   }
   return { within: { id: item.id, title: item.title }, documents, to_publish: documents.filter((d) => d.changed).length };
 }

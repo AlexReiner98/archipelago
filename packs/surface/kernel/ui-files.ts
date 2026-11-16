@@ -24,6 +24,10 @@ export const UI_FILES: Record<string, string> = {
   '/chart.css': 'chart.css',
   // The house's map face: Recursive (SIL OFL 1.1, recursive-OFL.txt beside it), Latin, every axis.
   '/recursive.woff2': 'recursive.woff2',
+  // The emblem's face where Georgia is missing (Linux, Android): Gelasio (SIL OFL 1.1, gelasio-OFL.txt beside it), Georgia's
+  // metrics, Latin, upright and italic, every weight. Fetched only by a page whose reader has no Georgia.
+  '/gelasio.woff2': 'gelasio.woff2',
+  '/gelasio-italic.woff2': 'gelasio-italic.woff2',
   '/flow.css': 'flow.css',
   
   '/notes.css': 'notes.css',

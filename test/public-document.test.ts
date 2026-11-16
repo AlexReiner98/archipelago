@@ -141,6 +141,17 @@ test('a published document reads as it was published until it is published again
   assert.equal((await read()).parts.find((p) => p.section?.id === s)!.section!.body, 'Rewritten.');
   assert.equal((await call('/api/published', undefined, { id: d })).result.changed, false);
 
+  // The house style changes (a new face): its words are the same, but what a reader is given is not the look the map
+  // gives now, so it reads as changed, said apart, until it is published again (e_kajfr3yy).
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'style', title: 'A new face', status: 'current', props: { faces: { chart: "'New Face', serif" } } }] });
+  const restyled = (await call('/api/published', undefined, { id: d })).result;
+  assert.equal(restyled.changed, true);
+  assert.equal(restyled.restyled, true);
+  await call('/api/publish', undefined, { id: d });
+  const again = (await call('/api/published', undefined, { id: d })).result;
+  assert.equal(again.changed, false);
+  assert.equal(again.restyled, undefined);
+
   // Unpublished, its address answers nothing and it is shared again.
   await call('/api/unpublish', undefined, { id: d });
   assert.equal((await fetch(`${base}/p/default/${d}/data`)).status, 404);

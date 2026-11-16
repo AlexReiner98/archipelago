@@ -12,6 +12,24 @@
   src: url(/recursive.woff2) format('woff2');
 }
 
+/* The emblem's face, Georgia, is the reader's own where they have it; where they do not (Linux, Android) the style's chart
+   face falls to Gelasio, drawn to Georgia's metrics, served here (task e_x9xa6jp6). Loaded on the app, the gate and a
+   published page alike, and fetched only when Georgia is missing. */
+@font-face {
+  font-family: 'Gelasio';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(/gelasio.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Gelasio';
+  font-style: italic;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(/gelasio-italic.woff2) format('woff2');
+}
+
 /* Where it holds: a site's page (it has the site's header) and the gate, each with the chart's colours as c-*. A page
    published before the house had chart_* keeps the look it was published in, so a site falls back to its reader colours
    until it is published again; the gate always reads the house as it stands. */
