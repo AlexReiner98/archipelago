@@ -11,12 +11,12 @@ import { stagesOf } from '../packs/walls/page/transition.js';
 const house = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'canvas', 'pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house');
 const numbers = house.props?.numbers ?? house.numbers;
 
-type Row = { box: number[]; wire?: boolean; path?: string | null; holds?: boolean; within?: string | null; pulse?: string };
+type Row = { box: number[]; wire?: boolean; path?: string | null; holds?: boolean; within?: string | null; pulse?: string; zoom?: number; top?: boolean };
 const marks = (rows: Record<string, Row>) => new Map(Object.entries(rows).map(([k, r]) => [k, { wire: false, path: null, holds: false, within: null, ...r }]));
 const box = (x: number, y: number, w = 100, h = 30) => [x, y, w, h];
 
 test('the house style names every number the page moves by', () => {
-  for (const name of ['motion_leave', 'motion_move', 'motion_arrive', 'motion_movers_most', 'motion_marks_most', 'motion_still_within', 'motion_pulse']) assert.equal(typeof numbers[name], 'number', name);
+  for (const name of ['motion_leave', 'motion_move', 'motion_arrive', 'motion_movers_most', 'motion_marks_most', 'motion_still_within', 'motion_pulse', 'motion_narrow', 'motion_narrow_movers_most', 'motion_narrow_wait', 'motion_narrow_shape']) assert.equal(typeof numbers[name], 'number', name);
 });
 
 test('what leaves, stays and arrives is matched by key, in three stages one after the other', () => {
@@ -110,4 +110,31 @@ test('a pulse runs when its words change, after what moves, and even where the r
   assert.deepEqual(moved.times.pulse, [moved.times.arrive[0], numbers.motion_pulse]);
   // Less motion asked for: nothing runs.
   assert.deepEqual(stagesOf(was, now('[450]'), numbers, true).pulse, []);
+});
+
+test('narrowed, the picture fitted again: what stays moves and grows from where it was, an item whole with what it holds', () => {
+  // The old picture at zoom 1, the new at 2 (fewer items, fitted bigger): each item twice as big, somewhere else.
+  const before = marks({ flow: { box: box(0, 0, 800, 600), holds: true, top: true }, 's:a': { box: box(10, 10), holds: true, within: 'flow', zoom: 1 }, 'd:a': { box: box(12, 12, 8, 8), within: 's:a', zoom: 1 }, 's:b': { box: box(300, 60), within: 'flow', zoom: 1 }, 's:wide': { box: box(500, 300, 100, 30), within: 'flow', zoom: 1 }, 'n:0': { box: box(60, 40, 2, 20), wire: true, path: 'M60 40V60', within: 'flow' } });
+  const after = marks({ flow: { box: box(0, 0, 800, 600), holds: true, top: true }, 's:a': { box: box(100, 100, 200, 60), holds: true, within: 'flow', zoom: 2 }, 'd:a': { box: box(104, 104, 16, 16), within: 's:a', zoom: 2 }, 's:b': { box: box(500, 300, 200, 60), within: 'flow', zoom: 2 }, 's:wide': { box: box(200, 400, 400, 60), within: 'flow', zoom: 2 } });
+  const plan = stagesOf(before, after, numbers, false, true, true);
+  assert.equal(plan.cut, null);
+  // The item moves whole, its dot with it; each from its corner as it was, half as big as it is now.
+  assert.deepEqual(plan.move.map((m: any) => [m.key, m.scale, m.from, m.to]), [['s:a', 0.5, [10, 10], [100, 100]], ['s:b', 0.5, [300, 60], [500, 300]]]);
+  // One that changed its shape comes in where it is; a wire there is no more of fades.
+  assert.deepEqual(plan.arrive, ['s:wide']);
+  assert.deepEqual(plan.leave, ['n:0']);
+  // What left has gone already: the wires fade as what stays moves, not before it.
+  assert.deepEqual(plan.times.move, [0, numbers.motion_move]);
+  assert.deepEqual(plan.times.leave, [0, numbers.motion_leave]);
+  // Not narrowed, the same is as it always was: an item that holds marks is a frame, and a mark of another size is put there.
+  const plain = stagesOf(before, after, numbers, false, true, false);
+  assert.ok(!plain.move.some((m: any) => m.key === 's:a' || m.scale));
+});
+
+test('narrowed, it moves as many marks as the style lets a narrowing move', () => {
+  const rows = (dx: number) => marks(Object.fromEntries(Array.from({ length: numbers.motion_movers_most + 3 }, (_, k) => [`s:${k}`, { box: box(k * 120 + dx * (k + 1), 0) }])));
+  assert.equal(stagesOf(rows(0), rows(7), numbers).cut, 'many');
+  const plan = stagesOf(rows(0), rows(7), numbers, false, false, true);
+  assert.equal(plan.cut, null);
+  assert.equal(plan.move.length, numbers.motion_movers_most + 3);
 });
