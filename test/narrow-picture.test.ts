@@ -58,7 +58,9 @@ test('in a browser, a narrowing edit takes what left out of the picture at once,
     // The new scene lands, and what stayed glides there.
     assert.ok(await page.until(`window.sceneAt !== null && ${drawn}.length === ${all - 3}`, 5000), 'the layout of the new answer lands');
     // What stayed is matched with where it was: moved (and grown, where the picture was fitted again) or left where it
-    // is, never cut to its place or brought in anew.
+    // is, never cut to its place or brought in anew. The plan is made in the frame after the scene is mounted
+    // (packs/walls/page/transition.js): on a busy machine that frame comes after the scene is seen.
+    assert.ok(await page.until(`document.querySelector('#canvas .lens-view').transitionPlan !== undefined`, 5000), 'the move to the new scene is planned');
     const plan = await page.evaluate<any>(`(({ cut, move, arrive }) => ({ cut, moved: move.map((m) => m.key), arrive }))(document.querySelector('#canvas .lens-view').transitionPlan)`);
     assert.ok(plan.cut === null || plan.cut === 'still', `it plays: ${JSON.stringify(plan)}`);
     assert.deepEqual(plan.arrive.filter((k: string) => k.startsWith('s:')), [], 'nothing that stayed comes in anew');
