@@ -1,7 +1,7 @@
 // Answers kept until the map moves (task e_unbw4gtp). A read a pack marks kept (its service's `kept` in kernel.provides)
 // answers from the map alone: asked again with the same input by the same reader, and nothing written since that it
 // may depend on, it answers the same. So its answer is kept under where the map stood before it was read
-// (packs/log/kernel/clock.ts) and given again while the map stands there: a canvas whose filter changed one term
+// (packs/log/kernel/position.ts, mapClock) and given again while the map stands there: a canvas whose filter changed one term
 // asks the frontier, the views and the style again, and only the term that changed is read.
 //
 // Kept per database and per reader, never across: the key is the database the map is of, the registry it is read
@@ -13,7 +13,7 @@
 
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Db } from '../../database/kernel/db.ts';
-import { mapClock } from '../../log/kernel/clock.ts';
+import { mapClock } from '../../log/kernel/position.ts';
 import { keptCall } from '../../../src/timing.ts';
 
 /** How long an answer is kept at most, the map moved or not: what is weighed by the clock lags by no more. */

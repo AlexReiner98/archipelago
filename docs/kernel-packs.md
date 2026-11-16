@@ -168,7 +168,7 @@ with `ctx.call`.
 - **Kept until the map moves.** A provider whose answer is a read of the map
   alone (no write, nothing outside the map) says `"kept": true`. Its answer is
   then kept per database, reader and input, under where the map stands
-  (`packs/log/kernel/clock.ts`: the fact and held streams, the sessions and
+  (`mapClock` in `packs/log/kernel/position.ts`, the one definition of where the map stands: the fact and held streams, the sessions and
   claims streams, the settings, what sessions touched), and given again until
   that moves or a minute passes (`packs/loader/kernel/kept.ts`). Server-Timing
   says how many were kept (`kept`).
