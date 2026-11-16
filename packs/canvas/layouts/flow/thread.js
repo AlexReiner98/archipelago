@@ -4,6 +4,7 @@
 
 import { blocks, faces, isPlanar, keptPlanar } from './planar.js';
 import { pair } from './polyline.js';
+import { nextSearch, queueOf, roundFace, searched, seatOf, seating } from './seating.js';
 
 
 /** What it costs to cross a hidden link: nothing to see, but it is a turn. */
@@ -20,109 +21,6 @@ const nextOf = (open, dist, reach) => {
   return open.splice(k, 1)[0];
 };
 
-/**
- * The faces waiting in a search, taken as `nextOf` takes them from a list: the least `dist`, then the least `reach`,
- * then the one put in first; a face put in again while it waits keeps its first place, and is taken once for each time
- * it was put in. A heap of the faces, each with the turns it was put in at (bug e_a9w5jeme: the list was searched whole
- * at every step). `entries` is how long that list would be.
- */
-function queueOf(dist, reach) {
-  const heap = [], at = new Map(), turns = new Map();
-  let made = 0, entries = 0;
-  const less = (f, g) => {
-    const df = dist.get(f), dg = dist.get(g);
-    if (df !== dg) return df < dg;
-    const rf = reach.get(f), rg = reach.get(g);
-    if (rf !== rg) return rf < rg;
-    return turns.get(f)[0] < turns.get(g)[0];
-  };
-  const place = (f, i) => ((heap[i] = f), at.set(f, i));
-  const up = (i) => {
-    while (i > 0) {
-      const p = (i - 1) >> 1;
-      if (!less(heap[i], heap[p])) break;
-      const f = heap[i];
-      (place(heap[p], i), place(f, p), (i = p));
-    }
-  };
-  const down = (i) => {
-    for (;;) {
-      const l = i * 2 + 1, r = l + 1;
-      let m = i;
-      if (l < heap.length && less(heap[l], heap[m])) m = l;
-      if (r < heap.length && less(heap[r], heap[m])) m = r;
-      if (m === i) return;
-      const f = heap[i];
-      (place(heap[m], i), place(f, m), (i = m));
-    }
-  };
-  return {
-    get size() { return heap.length; },
-    get entries() { return entries; },
-    push(f) {
-      entries++;
-      const list = turns.get(f);
-      if (list?.length) return void (list.push(made++), up(at.get(f)));
-      turns.set(f, [made++]);
-      place(f, heap.length);
-      up(heap.length - 1);
-    },
-    pop() {
-      const f = heap[0];
-      entries--;
-      turns.get(f).shift();
-      if (turns.get(f).length) down(0);
-      else {
-        const last = heap.pop();
-        at.delete(f);
-        if (heap.length) (place(last, 0), down(0));
-      }
-      return f;
-    },
-  };
-}
-
-/** The faces of `list` by stretch, kept true as they change. `name` is `pair`, remembered: it is asked for very often. */
-function seating(list) {
-  const names = new Map(), seat = new Map(), ends = new Map();
-  const name = (a, b) => {
-    const of = names.get(a) ?? names.set(a, new Map()).get(a);
-    let e = of.get(b);
-    if (e === undefined) {
-      of.set(b, (e = pair(a, b)));
-      if (!ends.has(e)) ends.set(e, e.split('|'));
-    }
-    return e;
-  };
-  // A face seated keeps its stretches' names (`names`, in turn round it) until it leaves.
-  const sit = (f) => {
-    f.names = f.map((a, k) => name(a, f[(k + 1) % f.length]));
-    for (const e of f.names) (seat.get(e) ?? seat.set(e, []).get(e)).push(f);
-  };
-  const leave = (f) => f.forEach((a, k) => { const s = seat.get(name(a, f[(k + 1) % f.length])); s.splice(s.indexOf(f), 1); });
-  list.forEach(sit);
-  return {
-    name,
-    /** A stretch's two points, as its name gives them: split once, not each time it is asked. */
-    ends: (e) => ends.get(e) ?? e.split('|'),
-    of: (e) => seat.get(e) ?? [],
-    /** `f` in `list` given way to `pieces`. */
-    swap(f, ...pieces) { leave(f); list.splice(list.indexOf(f), 1, ...pieces); pieces.forEach(sit); },
-    /** The point `d` on the stretch `a` to `b`, in each face it runs along. */
-    within(a, b, d) { for (const f of [...seat.get(name(a, b))]) { const k = f.findIndex((p, n) => name(p, f[(n + 1) % f.length]) === name(a, b)); leave(f); f.splice(k + 1, 0, d); sit(f); } },
-    /** The point `d` out of its faces, the stretch through it one again. */
-    without(d) { for (const f of list.filter((p) => p.includes(d))) { leave(f); f.splice(f.indexOf(d), 1); sit(f); } },
-    /** Every face of `list` seated afresh, once `list` has been put back as it was. */
-    reseat() { seat.clear(); list.forEach(sit); },
-  };
-}
-
-/** The way round `f` from `a` to `b`, away from the stretch that joins them. */
-const roundFace = (f, a, b) => {
-  const n = f.length, at = f.indexOf(a), step = f[(at + 1) % n] === b ? n - 1 : 1, out = [];
-  for (let k = at; f[k] !== b; k = (k + step) % n) out.push(f[k]);
-  return [...out, b];
-};
 
 /**
  * A threader over `list`, the faces: `through` threads each of `links`, a list of [u, v], through them; `nearest` finds the
@@ -181,8 +79,8 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
   /** How far on through the numbers a wire from `u` to `v` must already be to cross stretch `e`, or null when it cannot. */
   // A point's number is given once and never changed (points are named afresh), so each stretch keeps its two (`least`,
   // `most`) once asked.
-  const past = (e, h, u, v, atV) => {
-    const ends = seats.ends(e), [a, b] = ends;
+  const past = (ends, h, u, v, atV) => {
+    const [a, b] = ends;
     if (ends.most === undefined) ((ends.most = Math.max(at(a), at(b))), (ends.least = Math.min(at(a), at(b))));
     const lo = Math.max(h, ends.least);
     return a !== u && b !== u && a !== v && b !== v && lo < ends.most && lo < atV ? lo : null;
@@ -190,13 +88,30 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
 
   /** The faces from one holding `u` to one holding `v` and the stretches passed on the way, the fewest crossed, or null. */
   const wayOf = (u, v, strict) => {
-    const dist = new Map(), reach = new Map(), prev = new Map(), open = queueOf(dist, reach);
-    // The faces at u, through the stretches at it (not a search of every face's points), taken in the list's order.
-    const atU = new Set([...(around.get(u) ?? [])].flatMap((w) => seats.of(name(u, w))));
-    for (const f of list) if (atU.size ? atU.has(f) : f.includes(u)) (dist.set(f, 0), reach.set(f, strict ? at(u) : 0), open.push(f));
-    const nearer = (f, d, h) => !dist.has(f) || d < dist.get(f) || (d === dist.get(f) && h < reach.get(f));
+    const search = nextSearch(), open = queueOf(search);
+    /** `f` reached at `d`, `h` on, by the stretch `e` from `from` (none for where it starts). */
+    const reached = (f, d, h, from, e) => {
+      const known = searched(f, search);
+      (known.dist = d), (known.reach = h);
+      if (from) (known.from = from), (known.via = e);
+      open.push(f);
+    };
+    // The faces at u, through the stretches at it (not a search of every face's points), taken in the list's order:
+    // each marked with this search's number as at its `end`, answering whether there was one.
+    const markAt = (p, end, found) => {
+      for (const w of around.get(p) ?? []) for (const f of seats.of(name(p, w))) if (seatOf(f)[end] !== search) ((seatOf(f)[end] = search), found?.push(f));
+      return found;
+    };
+    // Those found, in the list's order: their places in it, not the whole list read.
+    const startU = markAt(u, 'atU', []), placed = startU.map((f) => [list.indexOf(f), f]).filter(([k]) => k >= 0).sort((p, q) => p[0] - q[0]);
+    if (startU.length) for (const [, f] of placed) reached(f, 0, strict ? at(u) : 0);
+    else for (const f of list) if (f.includes(u)) reached(f, 0, strict ? at(u) : 0);
+    const nearer = (f, d, h) => {
+      const known = seatOf(f);
+      return known.mark !== search || d < known.dist || (d === known.dist && h < known.reach);
+    };
     // The faces at v, found as those at u are: the search ends at the first of them it takes.
-    const atV = new Set([...(around.get(v) ?? [])].flatMap((w) => seats.of(name(v, w)))), numberV = at(v);
+    const anyV = markAt(v, 'atV', []).length > 0, numberV = at(v);
     tally.work += list.length;
     // Past `most`, the picture is too large to thread: the caller is told, and draws it another way.
     if (tally.work > most) throw Object.assign(new Error('Too many wires to thread'), { tooMuch: tally.work });
@@ -204,18 +119,20 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
       tally.work += open.entries;
       const f = open.pop();
       tally.work += f.length;
-      if (atV.size ? atV.has(f) : f.includes(v)) {
+      if (anyV ? seatOf(f).atV === search : f.includes(v)) {
         const steps = [], rooms = [f];
-        for (let i = f; prev.has(i); i = prev.get(i)[0]) (steps.unshift(prev.get(i)[1]), rooms.unshift(prev.get(i)[0]));
+        for (let i = f; seatOf(i).from; i = seatOf(i).from) (steps.unshift(seatOf(i).via), rooms.unshift(seatOf(i).from));
         return { steps, rooms };
       }
-      const d = dist.get(f), r = reach.get(f);
-      for (const e of f.names) {
-        const cost = d + price(owner.get(e));
+      const held = seatOf(f), d = held.dist, r = held.reach, mine = seats.mine(f);
+      for (let k = 0; k < f.names.length; k++) {
+        const e = f.names[k];
         if (e === keep) continue;
-        const h = strict ? past(e, r, u, v, numberV) : r;
+        const near = mine ? held.seats[k] : seats.of(e), h = strict ? past(near.ends ?? (near.ends = seats.ends(e)), r, u, v, numberV) : r;
         if (h === null) continue;
-        for (const n of seats.of(e)) if (n !== f && nearer(n, cost, h)) (dist.set(n, cost), reach.set(n, h), prev.set(n, [f, e]), open.push(n));
+        // What crossing it costs, asked only where a face lies past it: the price reads and changes nothing.
+        let cost;
+        for (const n of near) if (n !== f && nearer(n, (cost ??= d + price(owner.get(e))), h)) reached(n, cost, h, f, e);
       }
     }
     return null;
@@ -255,7 +172,8 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
     lay(turned ? [...path].reverse() : path, true, l);
     path.slice(1).forEach((q, i) => {
       const p = path[i], f = rooms[i], [m, n] = [f.indexOf(p), f.indexOf(q)].sort((x, y) => x - y);
-      seats.swap(f, f.slice(m, n + 1), [...f.slice(n), ...f.slice(0, m + 1)]);
+      if (m >= 0 && m < n) seats.split(f, m, n);
+      else seats.swap(f, f.slice(m, n + 1), [...f.slice(n), ...f.slice(0, m + 1)]);
     });
   } };
 
@@ -282,15 +200,18 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
   const take = (w) => {
     const { path } = w;
     path.slice(1).forEach((q, i) => {
-      const p = path[i], e = name(p, q), [f, g] = seats.of(e), joined = [...roundFace(f, q, p), ...roundFace(g, p, q).slice(1, -1)];
-      seats.swap(g);
-      seats.swap(f, joined);
+      const p = path[i], e = name(p, q), [f, g] = seats.of(e);
+      if (!seats.join(f, g, p, q)) {
+        const joined = [...roundFace(f, q, p), ...roundFace(g, p, q).slice(1, -1)];
+        seats.swap(g);
+        seats.swap(f, joined);
+      }
       owner.delete(e);
       untie(p, q);
     });
     for (const d of path.slice(1, -1)) {
       const [a, b] = around.get(d), x = owner.get(name(a, d));
-      seats.without(d);
+      seats.without(d, [a, b]);
       owner.delete(name(a, d));
       owner.delete(name(d, b));
       untie(a, d), untie(d, b), tie(a, b);
@@ -327,7 +248,18 @@ export function threader(list, owner, add, { number, keep, onward = () => false,
   };
 
   /** The seen wires `w` crosses, one for each point where it does. */
-  const crossed = (w) => w.path.slice(1, -1).map((d) => owner.get(name(d, others(d, w)[0]))).filter((x) => x?.visible);
+  const crossed = (w) => {
+    const out = [];
+    for (let i = 1; i < w.path.length - 1; i++) {
+      // The first of the point's neighbours another wire holds the stretch to, as `others` gives them.
+      const d = w.path[i];
+      let o;
+      for (const n of around.get(d)) if (owner.get(name(d, n)) !== w) { o = n; break; }
+      const x = owner.get(name(d, o));
+      if (x?.visible) out.push(x);
+    }
+    return out;
+  };
   /** What is threaded, kept to be put back: the faces, which wire holds each stretch, each wire's path, the numbers. */
   const save = () => ({
     faces: list.map((f) => [...f]), owner: [...owner], number: [...number],

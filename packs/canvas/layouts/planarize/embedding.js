@@ -61,7 +61,12 @@ function attempt({ ids, wires, placeOf, made, islands, mend, most, order }, k, o
   if (!failed.length) {
     strict.prune(all);
     strict.unbound();
-    const live = () => [...new Set(owner.values())].filter((w) => w.visible && w.link?.wire);
+    // The seen wires of links, each once, as they first come in `owner` (task e_yztbb9s3: no copy of it each pass).
+    const live = () => {
+      const seen = new Set(), out = [];
+      for (const w of owner.values()) if (w.visible && w.link?.wire && !seen.has(w)) (seen.add(w), out.push(w));
+      return out;
+    };
     moves = repair(strict, { live, dear, ...mend });
   }
   const live = [...new Set(owner.values())], work = strict.tally.work + (shortest?.tally.work ?? 0) + faces.length, kept = done();
