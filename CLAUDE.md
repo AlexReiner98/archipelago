@@ -50,7 +50,6 @@ reply ending) is `docs/agents.md`.
   with `basis` (what the owner said and where) when the owner told you to or
   decided it, `of: "agent"` when it is your own reading of the work. Do not
   claim the owner's word for your own judgment; the log keeps both apart.
-  Settling a question needs it said (the core rule `settle_said`).
 - **A rule decides what waits.** Whether a change applies, waits for a person
   or is refused is decided by rules as data alone (`rules` in a pack file,
   judged by `decide` in `packs/rules/kernel/rules.ts`), and a held change names the rule

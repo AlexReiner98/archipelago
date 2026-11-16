@@ -56,7 +56,7 @@ test('an agent\'s token can be limited to some repositories, and its owner hears
   assert.match((await call('/api/token_create', admin, { kind: 'human', name: 'x', may: 'report' })).error, /Only an agent/);
   const site = (await call('/api/token_create', admin, { kind: 'agent', name: 'site-machine', within: [made.r], expires_days: 90 })).result.token;
   const free = (await call('/api/token_create', admin, { kind: 'agent', name: 'everywhere' })).result.token;
-  await call('/api/workspace_set', admin, { agent_changes: 'hold' });
+  await call('/api/workspace_set', admin, { agent_changes: 'hold', holds_off: false });
   const listed = (await call('/api/token_list', admin)).result.find((t: any) => t.name === 'site-machine');
   assert.deepEqual([listed.within, listed.within_titles, listed.may, Math.round((Date.parse(listed.expires_at) - Date.now()) / 86_400_000)], [[made.r], ['Site repo'], 'change', 90]);
 
@@ -162,7 +162,7 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   ])).result.created;
 
   assert.equal((await call('/api/workspace_info', admin)).result.agent_changes, 'apply', 'a new workspace applies them as made');
-  assert.equal((await call('/api/workspace_set', admin, { agent_changes: 'hold' })).result.agent_changes, 'hold', 'until its admin says otherwise');
+  assert.equal((await call('/api/workspace_set', admin, { agent_changes: 'hold', holds_off: false })).result.agent_changes, 'hold', 'until its admin says otherwise');
   assert.equal((await change(robot, [{ op: 'create', type: 'record', title: 'One', visibility: 'shared' }])).result.status, 'proposed');
   assert.match((await call('/api/workspace_set', member, { agent_changes: 'apply' })).error, /admin/);
   assert.match((await call('/agent/workspace_set', robot, { agent_changes: 'apply' })).error, /humans only/, 'an agent cannot let itself through');
@@ -175,7 +175,6 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   // An agent can settle a question too, when the record stands on its own, and the human is told.
   assert.match((await change(robot, [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Green' } }])).error, /what was chosen \(props\.outcome\) and why \(props\.rationale\)/);
   const green = [{ op: 'update', id: made.d, status: 'decided', props: { outcome: 'Green', rationale: 'It is the paint we have.' } }];
-  assert.match((await change(robot, green)).error, /on whose authority/, 'and on whose authority');
   assert.match((await change(robot, green, { of: 'human' })).error, /what they said and where/, 'a human\u2019s word has to be quoted');
   const word = { of: 'human', basis: 'Alex, in chat on 8 Oct: "go with green"' };
   const answer = (await change(robot, green, word)).result;
@@ -222,14 +221,14 @@ test('a workspace chooses whether agents’ changes are applied as made or held,
   const looked = ((await call('/api/events', admin, { limit: 5 })).result as any[]).find((e) => e.action === 'changes.seen');
   assert.deepEqual([looked.detail.upto, /alex/.test(looked.actor), logged[0].target_type], [logged[0].seq, true, 'record']);
 
-  await call('/api/workspace_set', admin, { agent_changes: 'hold' });
+  await call('/api/workspace_set', admin, { agent_changes: 'hold', holds_off: false });
   assert.equal((await change(robot, [{ op: 'create', type: 'record', title: 'Three', visibility: 'shared' }])).result.status, 'proposed');
   const [held] = (await call('/api/proposals', admin)).result as any[];
   const let_in = (await call('/api/decide', admin, { proposal: held.id, approve: true })).result;
   const by = (await authorityOf(Object.values(let_in.created)[0] as string)) as any;
   assert.deepEqual([by.of, /alex/.test(by.who), by.stated_by], ['human', true, undefined], 'what a human applies rests on that human');
   const set = ((await call('/api/events', admin, { limit: 50 })).result as any[]).filter((e) => e.action === 'workspace.set').map((e) => e.reason);
-  assert.deepEqual(set, ['agent_changes set to "hold"', 'agent_changes set to "apply"', 'agent_changes set to "hold"'], 'and the choice itself is in the log');
+  assert.deepEqual(set, ['holds_off set to false', 'agent_changes set to "hold"', 'agent_changes set to "apply"', 'holds_off set to false', 'agent_changes set to "hold"'], 'and the choice itself is in the log');
 });
 
 test('a product\u2019s public page is open to anyone, and says nothing until something is made public', async () => {

@@ -77,7 +77,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
           basis: z.string().optional().describe('For "human": what they said and where (required). For "agent": what it rests on.'),
         })
         .optional()
-        .describe('On whose authority. Left out, your own judgment; settling a decision or hypothesis needs it said.'),
+        .describe('On whose authority. Left out, your own judgment.'),
       hold: z.boolean().optional().describe('true to wait for the human even where agents\u2019 changes apply as made.'),
       drawing: z.string().optional().describe('Sent by the page alone.'),
       run: z.string().optional().describe('The run id from session_start, or the session id.'),

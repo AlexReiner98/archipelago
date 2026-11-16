@@ -182,7 +182,7 @@
       "id": "lens",
       "extends": "system",
       "title": "View",
-      "description": "A view kept on the map: a query (a filter, a walk and a limit, as query flat takes them) and how it is drawn, its layout with its settings, so a person opens it anywhere and it draws the same. About a project or item (an about link), it is a view of that thing; about nothing, the workspace's. where things sit on it is kept in the places stream under its id, apart from the map's. Named for the question it answers, its note's first line says what it shows; an agent reuses a view already there with the same name or query about the same items, rather than make it twice. Its life is its status: working (an agent's, about its task, until the owner keeps it; while what it is about is closed, it is retired with it), kept (only on the owner's word: Save in the app, or an agent told so, authority of human), retired. Home lists them; a document line holding its id draws it there; report show with its id opens one.",
+      "description": "A view kept on the map: a query (a filter, a walk and a limit, as query flat takes them) and how it is drawn, its layout with its settings, so a person opens it anywhere and it draws the same. About a project or item (an about link), it is a view of that thing; about nothing, the workspace's. where things sit on it is kept in the places stream under its id, apart from the map's. Named for the question it answers, its note's first line says what it shows; an agent reuses a view already there with the same name or query about the same items, rather than make it twice. Its life is its status: working (an agent's, about its task, until the owner keeps it; while what it is about is closed, it is retired with it), kept (Save in the app, or an agent that keeps it), retired. Home lists them; a document line holding its id draws it there; report show with its id opens one.",
       "moved_from": ["canvas"],
       "statuses": { "open": ["working", "kept"], "closed": ["retired"], "phases": { "working": "under_way", "kept": "standing", "retired": "ended" } },
       "fields": {
@@ -991,19 +991,6 @@
       "say": "Settling \"{title}\" is the owner's: the agent proposes the answer, and they confirm it."
     },
     {
-      "id": "settle_said",
-      "when": {
-        "actor": "agent",
-        "op": "update",
-        "capability": "settles",
-        "status": { "from": "open", "to": "closed" },
-        "held": false,
-        "said": false
-      },
-      "then": "refuse",
-      "say": "\"{title}\": to settle a question, say on whose authority (authority.of: \"human\" with where they said so, or \"agent\" for your own judgment)."
-    },
-    {
       "id": "forget",
       "when": {
         "actor": "agent",
@@ -1039,8 +1026,6 @@
       "say": "The agent asked for a look before it takes effect."
     },
     { "id": "propose_only", "when": { "actor": "agent", "may": "propose" }, "then": "hold", "say": "This agent's token may only propose." },
-    { "id": "kept_by_word", "when": { "actor": "agent", "type": ["lens", "layout"], "status": { "to": "kept" }, "owner_said": false }, "then": "refuse", "say": "\"{title}\": a view or layout is kept only on the owner's word. Leave it working, or say where they said so (authority of human)." },
-    { "id": "kept_retired_by_word", "when": { "actor": "agent", "op": "update", "type": ["lens", "layout"], "status": { "from": "kept", "to": "closed" }, "owner_said": false }, "then": "refuse", "say": "\"{title}\" is kept by the owner: an agent retires it only on their word (authority of human)." },
     {
       "id": "agent_changes",
       "when": { "actor": "agent", "op": ["create", "update", "link", "unlink", "archive", "restore", "merge", "define_type"] },

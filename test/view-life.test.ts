@@ -1,4 +1,4 @@
-// Views and layouts have a life (task e_gkv58kqb): working, an agent's; kept, only on the owner's word; retired.
+// Views and layouts have a life (task e_gkv58kqb): working, an agent's; kept; retired.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { callTool } from '../packs/surface/kernel/tools.ts';
@@ -7,17 +7,17 @@ import * as viewLifePack from '../packs/lenses/kernel/view-life.ts';
 import { agent, fresh, human, make } from './map.ts';
 import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
-test('a view or layout is made working, and only the owner’s word keeps it or retires a kept one', async () => {
+test('a view or layout is made working, and an agent may keep one or retire a kept one, recording on whose authority', async () => {
   const l = await fresh();
   const { mine } = await make(l, [{ op: 'create', ref: 'mine', type: 'lens', title: 'Mine', status: 'kept', props: { filter: { find: ['type decision'] } } }]);
   assert.equal((await l.entity(mine))?.status, 'kept');
   const theirs = await l.change(agent, { ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'An agent’s', body: 'Every task.', props: { filter: { find: ['type task'] } } }], reason: 'test' });
   assert.equal((theirs as { status: string }).status, 'proposed'); // held for the owner, as any agent's change here, not refused
-  await assert.rejects(l.change(agent, { ops: [{ op: 'create', type: 'lens', title: 'Kept unasked', body: 'Every task.', status: 'kept', props: { filter: { find: ['type task'] } } }], reason: 'test' }), /kept only on the owner's word/);
-  await assert.rejects(l.change(agent, { ops: [{ op: 'create', type: 'layout', title: 'Kept unasked', status: 'kept', props: { code: 'export default () => {}' } }], reason: 'test', authority: { of: 'agent', basis: 'I like it' } }), /kept only on the owner's word/);
-  await assert.rejects(l.change(agent, { ops: [{ op: 'update', id: mine, status: 'retired' }], reason: 'test' }), /retires it only on their word/);
-  const told = await l.change(agent, { ops: [{ op: 'create', type: 'lens', title: 'Kept as told', body: 'Every task.', status: 'kept', props: { filter: { find: ['type task'] } } }], reason: 'test', authority: { of: 'human', basis: 'Alex, in chat: keep it' } });
-  assert.notEqual((told as { status: string }).status, 'rejected');
+  // No word of the owner's is asked for (the owner, 16 Nov 2026): the agent gets it themselves, and the log keeps whose it was.
+  const kept = await l.change(agent, { ops: [{ op: 'create', type: 'layout', title: 'Kept unasked', status: 'kept', props: { code: 'export default () => {}' } }], reason: 'test', authority: { of: 'agent', basis: 'I like it' } });
+  assert.notEqual((kept as { status: string }).status, 'rejected');
+  const retired = await l.change(agent, { ops: [{ op: 'update', id: mine, status: 'retired' }], reason: 'test' });
+  assert.notEqual((retired as { status: string }).status, 'rejected');
 });
 
 test('a working view is retired with what it is about, and a kept one outlives it', async () => {

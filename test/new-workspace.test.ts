@@ -153,7 +153,6 @@ test('a settle waits for the owner wherever changes wait, and where they apply i
 
   await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"')`);
   await assert.rejects(l.change(agent, { ops: [{ op: 'update', id: d, status: 'decided' }], reason: 'bare', authority: said }), /what was chosen/);
-  await assert.rejects(l.change(agent, { ops: [settle], reason: 'unsaid' }), /on whose authority/);
   assert.equal((await l.change(agent, { ops: [settle], reason: 'settle it', authority: said })).status, 'applied');
   const asked = (await callTool(l, person, 'view', { name: 'attention', params: { person: 'me', reasons: ['to_confirm'] } })) as { items: { id: string }[] };
   assert.deepEqual(asked.items.map((i) => i.id), [d], 'and the owner is asked to confirm it');
