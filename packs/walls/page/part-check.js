@@ -151,7 +151,7 @@ export const MARKS = {
   button: { attrs: { ...anyMark, ...handled, look: oneOf('main', 'quiet', 'tab'), tone, label: words(partLimits.label), pick: oneOf('item', 'link'), copy: words(2000), try: tryOn }, holds: 'words', keyed: true },
   paint: { attrs: { key, tip: anyMark.tip, width: side, height: side, start: point, pixels: flag, controls: flag }, holds: 'drawn' },
   path: { attrs: { key, item, d: path, look: oneOf('line', 'fill', 'dash', 'area', 'box', 'strong'), tone, weight: step(1, 4), tip: words(partLimits.label), href }, holds: 'nothing', plane: true, needs: ['d'] },
-  note: { attrs: { ...anyMark, tick: flag }, holds: 'words' },
+  note: { attrs: { ...anyMark, tick: flag, voice: oneOf('human', 'agent') }, holds: 'words' },
   menu: { attrs: { ...anyMark, label: words(partLimits.label), look: oneOf('main', 'quiet'), open: flag }, holds: 'marks', only: ['button', 'box', 'text', 'list', 'input', 'menu'], needs: ['label'] },
   thumb: { attrs: { key, view, tip: anyMark.tip }, holds: 'nothing', needs: ['view'] },
   picture: { attrs: anyMark, holds: 'nothing', needs: ['item'] },
