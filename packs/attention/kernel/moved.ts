@@ -28,25 +28,33 @@ export function promisedTypes(ctx: Reg): string[] {
   return ctx.registry.having('promised');
 }
 
-/** Of these items, the readings that have moved since each reader last changed or checked itself. */
-export async function movedReadings(ctx: KernelContext, readers: string[]): Promise<Map<string, Moved[]>> {
+/** What the readings of some items are, read at once (the read attention_state): their links, where each was last said, and what the items read said of the promised fields; what is read is among the items known. */
+export interface MovedRead {
+  reading: Link[];
+  last: { id: string; pos: number }[];
+  facts: { id: string; field: string; value: unknown; op: string; pos: number; at: Date }[];
+}
+
+/** Of these items, the readings that have moved since each reader last changed or checked itself; from what was read at once of more, if given. */
+export async function movedReadings(ctx: KernelContext, readers: string[], got?: MovedRead & { read: Map<string, Item> }): Promise<Map<string, Moved[]>> {
   const out = new Map<string, Moved[]>();
   const kinds = readingTypes(ctx);
   const promised = promisedTypes(ctx);
   if (!readers.length || !kinds.length || !promised.length) return out;
-  const reading = (await ctx.reads({ links: { from: readers, types: kinds } })) as Link[];
-  const read = await byId(ctx, [...new Set(reading.map((r) => r.to_id))]);
+  const asked = new Set(readers);
+  const reading = got ? got.reading.filter((r) => asked.has(r.from_id)) : ((await ctx.reads({ links: { from: readers, types: kinds } })) as Link[]);
+  const read = got?.read ?? (await byId(ctx, [...new Set(reading.map((r) => r.to_id))]));
   const links = reading.flatMap((r) => {
     const e = read.get(r.to_id);
     return e && promised.includes(e.type) && !e.archived_at ? [{ id: r.id, from_id: r.from_id, to_id: r.to_id, type: e.type, title: e.title }] : [];
   });
   if (!links.length) return out;
   // Where each reading began, and each reader's last word: positions in the log, so the order is the log's.
-  const last = (await ctx.reads({ history: { ids: [...new Set(links.map((k) => k.from_id)), ...links.map((k) => k.id)], last: true } })) as { id: string; pos: number }[];
+  const last = got?.last ?? ((await ctx.reads({ history: { ids: [...new Set(links.map((k) => k.from_id)), ...links.map((k) => k.id)], last: true } })) as { id: string; pos: number }[]);
   const at = new Map(last.map((r) => [r.id, r.pos]));
   const fieldsOf = (type: string) => ctx.registry.type(type)?.capabilities.promised?.fields ?? [];
   const fields = [...new Set(links.flatMap((k) => fieldsOf(k.type)))];
-  const facts = (await ctx.reads({ history: { ids: [...new Set(links.map((k) => k.to_id))], fields } })) as { id: string; field: string; value: unknown; op: string; pos: number; at: Date }[];
+  const facts = got?.facts ?? ((await ctx.reads({ history: { ids: [...new Set(links.map((k) => k.to_id))], fields } })) as MovedRead['facts']);
   for (const k of links) {
     const since = Math.max(at.get(k.from_id) ?? 0, at.get(k.id) ?? 0);
     const mine = facts.filter((f) => f.id === k.to_id);

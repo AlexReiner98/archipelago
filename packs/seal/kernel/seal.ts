@@ -9,7 +9,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import type { Q } from '../../database/kernel/db.ts';
 import type { Entry, Fact } from '../../log/kernel/log.ts';
-import { keysFor, keysIn, keysOf, type Key, type VaultDump } from './vault.ts';
+import { keysFor, keysIn, keysOf, ringOf, type Key, type VaultDump, type Wrapped } from './vault.ts';
 import { codeRead, isCodeStored, type Said } from './code-files.ts';
 
 export type Sealed = { $k: number; $n: string; $c: string };
@@ -181,11 +181,21 @@ export async function openSaid<T extends { id: string; field: string; value: unk
   return codeRead(q, await openRows(q, said), (rows) => openRows(q, rows));
 }
 
+/** openSaid with the vault's rows already read (KEYS_OF, of at least the ids whose values are sealed): their keys asked of no one. */
+export async function openSaidWith<T extends { id: string; field: string; value: unknown }>(q: Q, said: T[], keys: Wrapped[]): Promise<T[]> {
+  const ids = new Set(said.filter((r) => isSealed(r.value)).map((r) => r.id));
+  return codeRead(q, ids.size ? openWith(said, ringOf(keys, ids)) : said, (rows) => openRows(q, rows));
+}
+
 /** Values read straight from the log's rows, opened, with nothing read back. */
 export async function openRows<T extends { id: string; field: string; value: unknown }>(q: Q, said: T[]): Promise<T[]> {
   const ids = [...new Set(said.filter((r) => isSealed(r.value)).map((r) => r.id))];
   if (!ids.length) return said;
-  const ring = await keysOf(q, ids);
+  return openWith(said, await keysOf(q, ids));
+}
+
+/** Values opened with the keys of a ring, or left as their digest. */
+function openWith<T extends { id: string; field: string; value: unknown }>(said: T[], ring: Map<string, Key[]>): T[] {
   return said.map((r) => (isSealed(r.value) ? { ...r, value: opened(openNoting(ring.get(r.id), r.field, r.value), r.value) } : r));
 }
 

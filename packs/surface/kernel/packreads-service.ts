@@ -71,6 +71,16 @@ const loggedIn = (l: Archipelago, what: string) => {
 /** The settings key a pack's memory is kept under: its own, apart from the kernel's and every other pack's; under the prefix its manifest declares (kernel.memory), if it does. */
 export const memoryKey = (pack: string, key: string, manifest?: Pick<Manifest, 'id' | 'kernel'>) => memoryPrefix(manifest ?? { id: pack }) + key;
 
+/** Of some items ($1), the fields a person said after any agent last did: the read corrections. */
+export const CORRECTIONS = `with said as (
+         select f.id, f.seq, f.field, e.head->'actor'->>'id' as actor, e.at from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos and e.at = f.at
+          where f.stream = 'facts' and f.id = any($1::text[]) -- index log_fact_history
+       ), agent as (
+         select id, max(seq) filter (where actor is null or actor not like 'human:%') as seq from said group by id
+       )
+       select s.id, s.field, s.actor, s.at, a.seq is null as added from said s join agent a on a.id = s.id
+        where s.actor like 'human:%' and (a.seq is null or s.seq > a.seq) order by s.id, s.seq limit 20000`;
+
 /** The answer to one of these reads, or undefined when the read is none of them. `pack` is the pack asking, when one is. */
 export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string): Promise<unknown> {
   const asked = SERVICE_READS.find((k) => q[k] !== undefined);
@@ -146,17 +156,7 @@ export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string)
     loggedIn(l, 'log');
     // Only the facts a person said after the last an agent (or anyone not a person) said of the item: the rest of each
     // item's history is weighed where it lies, not read back whole.
-    const { rows } = await l.db.query<{ id: string; field: string; actor: string; at: Date; added: boolean }>(
-      `with said as (
-         select f.id, f.seq, f.field, e.head->'actor'->>'id' as actor, e.at from log_fact f join log_entry e on e.stream = f.stream and e.pos = f.pos and e.at = f.at
-          where f.stream = 'facts' and f.id = any($1::text[]) -- index log_fact_history
-       ), agent as (
-         select id, max(seq) filter (where actor is null or actor not like 'human:%') as seq from said group by id
-       )
-       select s.id, s.field, s.actor, s.at, a.seq is null as added from said s join agent a on a.id = s.id
-        where s.actor like 'human:%' and (a.seq is null or s.seq > a.seq) order by s.id, s.seq limit 20000`,
-      [list(q.corrections, 'corrections')],
-    );
+    const { rows } = await l.db.query<{ id: string; field: string; actor: string; at: Date; added: boolean }>(CORRECTIONS, [list(q.corrections, 'corrections')]);
     return rows;
   }
   if (q.uses_lately !== undefined || q.type_counts !== undefined) return usageRead(l, q);

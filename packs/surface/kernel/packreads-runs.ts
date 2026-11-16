@@ -71,6 +71,18 @@ async function opened(l: Archipelago, rows: Row[]): Promise<[string, Event][]> {
   return entries.flatMap((e) => e.facts.filter((f) => f[0] === '+' && f[2] === EVENT_FIELD && !isSealed(f[3]) && typeof (f[3] as Event)?.kind === 'string').map((f): [string, Event] => [f[1], f[3] as Event]));
 }
 
+/** What some runs ($1) changed since a moment ($2), as the log keeps each change's run: the read worked_on's first part. */
+export const CHANGED_BY = `select distinct f.id from log_entry e join log_fact f on f.stream = e.stream and f.pos = e.pos and f.at = e.at
+         where e.stream = 'facts' and e.at > $2 and e.head->>'run' = any($1::text[]) and f.id like 'e\\_%' -- index log_entry_at`;
+/** What some runs ($1) were set to work on, ever: the read worked_on's second part. */
+export const SET_ON = `select to_id as id from relation where type = 'works_on' and from_id = any($1::text[])`;
+/** Some items ($1), and one step along part_of either way: the read part_around (its rows; the items given come first). */
+export const PART_AROUND = `select from_id, to_id from relation where type = 'part_of' and valid_to is null and (from_id = any($1::text[]) or to_id = any($1::text[]))`;
+/** Some items ($1) as the frontier weighs them: the read run_items. */
+export const RUN_ITEMS = `select id, type, title, status, is_open, props from entity where id = any($1::text[]) and archived_at is null`;
+/** Which of some items ($1) others among them are part of: the read hubs_among. */
+export const HUBS_AMONG = `select distinct to_id as id from relation where type = 'part_of' and valid_to is null and to_id = any($1::text[]) and from_id = any($1::text[])`;
+
 /** The answer to one of these reads, or undefined when the read is none of them. */
 export async function runsRead(l: Archipelago, q: RunsRead): Promise<unknown> {
   if (q.run_of !== undefined) {
@@ -176,12 +188,8 @@ export async function runsRead(l: Archipelago, q: RunsRead): Promise<unknown> {
     if (!ids.length) return [];
     // Three reads that wait on nothing of each other, asked together.
     const [{ rows: changed }, { rows: on }, touched] = await Promise.all([
-      l.db.query<{ id: string }>(
-        `select distinct f.id from log_entry e join log_fact f on f.stream = e.stream and f.pos = e.pos and f.at = e.at
-         where e.stream = 'facts' and e.at > $2 and e.head->>'run' = any($1::text[]) and f.id like 'e\\_%' -- index log_entry_at`,
-        [ids, new Date(q.worked_on.since)],
-      ),
-      l.db.query<{ id: string }>(`select to_id as id from relation where type = 'works_on' and from_id = any($1::text[])`, [ids]),
+      l.db.query<{ id: string }>(CHANGED_BY, [ids, new Date(q.worked_on.since)]),
+      l.db.query<{ id: string }>(SET_ON, [ids]),
       touchedSets(l, ids),
     ]);
     return [...new Set([...changed.map((r) => r.id), ...on.map((r) => r.id), ...touched.flat()])];
@@ -189,15 +197,15 @@ export async function runsRead(l: Archipelago, q: RunsRead): Promise<unknown> {
   if (q.part_around !== undefined) {
     const ids = list(q.part_around, 'part_around');
     if (!ids.length) return [];
-    const { rows } = await l.db.query<{ from_id: string; to_id: string }>(`select from_id, to_id from relation where type = 'part_of' and valid_to is null and (from_id = any($1::text[]) or to_id = any($1::text[]))`, [ids]);
+    const { rows } = await l.db.query<{ from_id: string; to_id: string }>(PART_AROUND, [ids]);
     return [...new Set([...ids, ...rows.flatMap((r) => [r.from_id, r.to_id])])];
   }
   if (q.run_items !== undefined) {
-    const { rows } = await l.db.query(`select id, type, title, status, is_open, props from entity where id = any($1::text[]) and archived_at is null`, [list(q.run_items, 'run_items')]);
+    const { rows } = await l.db.query(RUN_ITEMS, [list(q.run_items, 'run_items')]);
     return rows;
   }
   if (q.hubs_among !== undefined) {
-    const { rows } = await l.db.query<{ id: string }>(`select distinct to_id as id from relation where type = 'part_of' and valid_to is null and to_id = any($1::text[]) and from_id = any($1::text[])`, [list(q.hubs_among, 'hubs_among')]);
+    const { rows } = await l.db.query<{ id: string }>(HUBS_AMONG, [list(q.hubs_among, 'hubs_among')]);
     return rows.map((r) => r.id);
   }
   if (q.places_of !== undefined) {

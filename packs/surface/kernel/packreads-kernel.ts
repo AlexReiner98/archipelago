@@ -92,6 +92,15 @@ const loggedIn = (l: Archipelago, what: string) => {
   if (l.props !== 'props') throw new Error(`Anyone with no login reads no ${what}.`);
 };
 
+/** Of some items ($1), where in the log each was last said: the read history, last. */
+export const LAST_SAID = `select id, max(pos)::int as pos from log_fact where stream = 'facts' and id = any($1::text[]) group by id -- index log_fact_history`;
+/** Of some items ($1), what the log said of them, of some fields ($2) or all, in its order: the read history. */
+export const HISTORY = `select id, field, value, op, pos::int as pos, at from log_fact where stream = 'facts' and id = any($1::text[]) and ($2::text[] is null or field = any($2::text[])) order by pos, n -- index log_fact_history`;
+/** Of some items ($1), the outermost each is part of: the read tops. */
+export const TOPS = `select distinct on (c.descendant) c.descendant as id, c.ancestor as top, e.title from part_closure c join entity e on e.id = c.ancestor
+       where c.descendant = any($1::text[]) and not exists (select 1 from part_closure up where up.descendant = c.ancestor)
+       order by c.descendant, c.ancestor`;
+
 /** The answer to one of these reads, or undefined when the read is none of them. */
 export async function kernelRead(l: Archipelago, q: KernelRead, pack?: string): Promise<unknown> {
   if (q.ids !== undefined) {
@@ -120,23 +129,15 @@ export async function kernelRead(l: Archipelago, q: KernelRead, pack?: string): 
     loggedIn(l, 'log');
     const ids = list(q.history.ids, 'history.ids');
     if (q.history.last) {
-      const { rows } = await l.db.query<{ id: string; pos: number }>(`select id, max(pos)::int as pos from log_fact where stream = 'facts' and id = any($1::text[]) group by id -- index log_fact_history`, [ids]);
+      const { rows } = await l.db.query<{ id: string; pos: number }>(LAST_SAID, [ids]);
       return rows;
     }
     const fields = q.history.fields === undefined ? null : list(q.history.fields, 'history.fields');
-    const { rows } = await l.db.query<{ id: string; field: string; value: unknown; op: string; pos: number; at: Date }>(
-      `select id, field, value, op, pos::int as pos, at from log_fact where stream = 'facts' and id = any($1::text[]) and ($2::text[] is null or field = any($2::text[])) order by pos, n -- index log_fact_history`,
-      [ids, fields],
-    );
+    const { rows } = await l.db.query<{ id: string; field: string; value: unknown; op: string; pos: number; at: Date }>(HISTORY, [ids, fields]);
     return openSaid(l.db, rows);
   }
   if (q.tops !== undefined) {
-    const { rows } = await l.db.query<{ id: string; top: string; title: string }>(
-      `select distinct on (c.descendant) c.descendant as id, c.ancestor as top, e.title from part_closure c join entity e on e.id = c.ancestor
-       where c.descendant = any($1::text[]) and not exists (select 1 from part_closure up where up.descendant = c.ancestor)
-       order by c.descendant, c.ancestor`,
-      [list(q.tops, 'tops')],
-    );
+    const { rows } = await l.db.query<{ id: string; top: string; title: string }>(TOPS, [list(q.tops, 'tops')]);
     return rows;
   }
   if (q.within !== undefined) return [...(await scopeOf(l, String(q.within.id), Boolean(q.within.open), q.within.among && list(q.within.among, 'within.among')))];
@@ -188,22 +189,27 @@ export async function kernelRead(l: Archipelago, q: KernelRead, pack?: string): 
 /** Open items among some whose bound is crossed or near: a date due within some days, or a quantity under its limit. */
 async function crossed(l: Archipelago, days: number, among: string[]) {
   type Crossed = { id: string; type: string; title: string; status: string; owner: string | null };
-  const bounds = l.registry.having('bound').map((type) => ({ type, ...l.registry.type(type)!.capabilities.bound! }));
-  const { rows: due } = await l.db.query<Crossed & { due: string; overdue: boolean }>(
-    `select e.id, e.type, e.title, e.status, e.owner, e.props->>b.field as due, (e.props->>b.field)::date < current_date as overdue
-     from entity e join jsonb_to_recordset($2::jsonb) as b(type text, field text) on b.type = e.type
-     where e.id = any($3::text[]) and e.is_open and e.archived_at is null and e.props ? b.field and (e.props->>b.field)::date <= current_date + $1::int
-     order by due`,
-    [days, JSON.stringify(bounds.filter((b) => b.limit)), among],
-  );
-  const { rows: under } = await l.db.query<Crossed & { value: number; limit: number }>(
-    `select e.id, e.type, e.title, e.status, e.owner, (e.props->>b.field)::numeric as value, (e.props->>b.below)::numeric as limit
-     from entity e join jsonb_to_recordset($1::jsonb) as b(type text, field text, below text) on b.type = e.type
-     where e.id = any($2::text[]) and e.is_open and e.archived_at is null and (e.props->>b.field)::numeric < (e.props->>b.below)::numeric`,
-    [JSON.stringify(bounds.filter((b) => b.below)), among],
-  );
+  const bounds = boundsOf(l);
+  const { rows: due } = await l.db.query<Crossed & { due: string; overdue: boolean }>(DUE, [days, bounds.due, among]);
+  const { rows: under } = await l.db.query<Crossed & { value: number; limit: number }>(UNDER, [bounds.under, among]);
   return { due, under };
 }
+
+/** The bounds the types declare, as DUE ($2) and UNDER ($1) take them: a date by a day, a quantity below a field. */
+export const boundsOf = (l: Pick<Archipelago, 'registry'>) => {
+  const bounds = l.registry.having('bound').map((type) => ({ type, ...l.registry.type(type)!.capabilities.bound! }));
+  return { due: JSON.stringify(bounds.filter((b) => b.limit)), under: JSON.stringify(bounds.filter((b) => b.below)) };
+};
+
+/** What is due among some items ($3) within some days ($1), by the bounds ($2): the read bounds' first half. */
+export const DUE = `select e.id, e.type, e.title, e.status, e.owner, e.props->>b.field as due, (e.props->>b.field)::date < current_date as overdue
+     from entity e join jsonb_to_recordset($2::jsonb) as b(type text, field text) on b.type = e.type
+     where e.id = any($3::text[]) and e.is_open and e.archived_at is null and e.props ? b.field and (e.props->>b.field)::date <= current_date + $1::int
+     order by due`;
+/** What is under its limit among some items ($2), by the bounds ($1): the read bounds' second half. */
+export const UNDER = `select e.id, e.type, e.title, e.status, e.owner, (e.props->>b.field)::numeric as value, (e.props->>b.below)::numeric as limit
+     from entity e join jsonb_to_recordset($1::jsonb) as b(type text, field text, below text) on b.type = e.type
+     where e.id = any($2::text[]) and e.is_open and e.archived_at is null and (e.props->>b.field)::numeric < (e.props->>b.below)::numeric`;
 
 /** Open style, layout or screen items with what each is about. */
 const aboutOf = async (l: Archipelago, ids: string[]) =>
