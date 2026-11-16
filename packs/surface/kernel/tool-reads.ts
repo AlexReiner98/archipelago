@@ -257,15 +257,15 @@ export const READ_TOOLS: Record<string, Tool> = {
   },
   get: {
     description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass), the public views that show it (public_views, frozen when shared: one marked behind has changed since, so tell the person, whose act sharing it again is) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
-    input: { id: z.string(), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for all of it whole. Past ${GET_LISTED} links in a direction, an agent is given those and a count by type (links_cut); of what names it the first ${GET_MENTIONS}; of what holds it the number of views about each; and of a large field (a layout's code) its first lines and size. The whole record is in events, with full: true.`) },
+    input: { id: z.string(), bare: z.boolean().optional().describe('true for only what a page draws of it: the item, its source, its links, what names it and the public views that show it; no trail, views it is drawn in or recent changes.'), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for all of it whole. Past ${GET_LISTED} links in a direction, an agent is given those and a count by type (links_cut); of what names it the first ${GET_MENTIONS}; of what holds it the number of views about each; and of a large field (a layout's code) its first lines and size. The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
       // Its recent events are the activity log's (packs/log/kernel/eventlog.ts), read beside the item as get read them.
-      const [item_, read_] = await Promise.all([getItem(l, input.id), readEvents(l.db, { target: input.id, limit: 8 })]);
+      const [item_, read_] = await Promise.all([getItem(l, input.id, input.bare), input.bare ? [] : readEvents(l.db, { target: input.id, limit: 8 })]);
       // A change to its code is said as a line diff (./code-diffs.ts), as the history is anywhere.
       const events_ = input.full ? read_ : eventsWithDiffs(l, read_, actor.kind === 'agent');
       const found = { ...item_, recent_events: events_.map(({ seq, ts, actor, action, changeset, reason, detail }) => ({ seq, ts, actor, action, changeset, reason, detail })), shown_in: [] as unknown[] };
       // The views it is drawn in are the lenses pack's to say (answer.shown_in).
-      found.shown_in = await callAs<unknown[]>(l, 'answer.shown_in', { id: input.id, trail: found.trail });
+      if (!input.bare) found.shown_in = await callAs<unknown[]>(l, 'answer.shown_in', { id: input.id, trail: found.trail });
       // The public views that show it, frozen when shared: one marked behind has changed since, and sharing that view again
       // is the person's (an agent editing it tells them).
       const shared = await showingIn(l, input.id, found.entity.updated_at);

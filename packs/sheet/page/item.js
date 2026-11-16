@@ -81,7 +81,11 @@ export async function entity(id, here) {
   if (!inPlace) page.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
   page.dataset.item = id;
   let data, past;
+  // What needs only its id is asked at once, so it goes to the server as one request (packs/kit/page/reads.js).
   const heldHere = heldOn(id);
+  const sharing = publicOf(id);
+  // The item's own style (one on its type, or about it): how its page opens.
+  const styled = api('view', { name: 'style', params: { of: id } }).then((r) => r?.style ?? null, () => null);
   try {
     [data, past] = await Promise.all([api('get', { id }), api('events', { target: id, limit: 40 })]);
   } catch (err) {
@@ -103,12 +107,12 @@ export async function entity(id, here) {
   const run = isA(e.type, 'run');
   const session = run && e.is_open && !e.archived_at;
   const [owner, { doc }, plan, shared, ownStyle] = await Promise.all([
-    e.owner ? api('get', { id: e.owner }).then((r) => r.entity, () => null) : null,
+    // Its owner is at the end of one of its links (owned_by), named there; asked for only where it is not.
+    e.owner ? (data.outgoing.find((r) => r.id === e.owner) ??api('get', { id: e.owner }).then((r) => r.entity, () => null)) : null,
     readWhole(e.type) ? readDocument(id) : { doc: null },
     !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? api('publish_plan', { within: id }).catch(() => null) : null,
-    publicOf(id),
-    // The item's own style (one on its type, or about it): how its page opens.
-    api('view', { name: 'style', params: { of: id } }).then((r) => r?.style ?? null, () => null),
+    sharing,
+    styled,
   ]);
   const shown = doc && type?.public ? await api('published', { id }).catch(() => null) : null;
   const bands = await Promise.all((await heldHere).map((p) => heldBand(p, again)));
