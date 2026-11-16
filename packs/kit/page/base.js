@@ -4,6 +4,7 @@
 import { applyTheme } from './theme.js';
 import { h } from './dom.js';
 import { reader } from './reads.js';
+import { forgetSignedIn } from './signed-in.js';
 
 export const state = { workspace: undefined, schema: undefined, may: undefined, stamp: undefined, pos: undefined, seq: undefined, dirty: false, selfDrawn: false, trying: null };
 
@@ -161,7 +162,7 @@ export const store = {
   set token(value) {
     const was = this.token;
     this.memory = value;
-    asked = undefined;
+    (asked = undefined), value !== was && forgetSignedIn();
     try {
       if (value) [sessionStorage, localStorage].forEach((s) => s.setItem(TOKEN, value));
       // Signed out here: so is a new tab, unless another tab has since entered elsewhere.

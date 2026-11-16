@@ -33,6 +33,8 @@ test('in a browser, a pack drawing is drawn by a service worker kept between pag
     const session = (await page.send('Target.attachToTarget', { targetId: sw.targetId, flatten: true })).result.sessionId;
     const pictures = async () => (await page.send('Runtime.evaluate', { expression: 'self.pictures ?? 0', returnByValue: true }, session)).result?.result?.value;
     for (const n of [1, 2]) {
+      // A picture this browser has not drawn: one it has is given back from what it kept (packs/walls/page/pictures-kept.js), with no drawing run.
+      await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', type: 'work.task', title: `Step ${n}` }] });
       // Reloaded: the same address with its hash would only move the hash.
       await page.evaluate('window.before = true');
       await page.send('Page.reload');
