@@ -78,8 +78,8 @@ export async function runsRead(l: Archipelago, q: RunsRead): Promise<unknown> {
     const { rows: byId } = await l.db.query<Entity>(`select * from entity where id = $1`, [key]);
     if (byId[0] && l.registry.isA(byId[0].type, 'run')) return byId[0];
     const { rows } = await l.db.query<Entity>(
-      `select * from entity where type = any($1::text[]) and props->>'session_id' = $2 and archived_at is null
-         and ($3::boolean is false or is_open) order by is_open desc, created_at desc limit 1`,
+      `select * from entity where id = any(array(select pelago_run_of($2))) and type = any($1::text[]) and archived_at is null
+         and ($3::boolean is false or is_open) order by is_open desc, created_at desc limit 1 -- index entity_session_id`,
       [l.registry.family('run'), key, q.run_of.open === true],
     );
     return rows[0] ?? null;
@@ -140,13 +140,16 @@ export async function runsRead(l: Archipelago, q: RunsRead): Promise<unknown> {
     const runs = list(q.run_events.runs, 'run_events.runs');
     const out: Record<string, Event[]> = Object.fromEntries(runs.map((r) => [r, []]));
     if (!runs.length) return out;
-    // One run is read by its facts; many, by each entry's facts matched by run, not tested against every run in turn.
+    // The runs' entries found by their positions (pelago_session_ops, packs/surface/kernel/session-indexes.ts), then one run
+    // read by its facts; many, by each entry's facts matched by run, not tested against every run in turn.
+    const since = new Date(q.run_events.since).toISOString();
+    const found = `stream = 'sessions' and pos = any(array(select pelago_session_ops($2::text[], $3, $1::timestamptz))) and at >= $1`;
     const { rows } = runs.length === 1
-      ? await l.db.query<Row>(`select stream, pos::int as pos, at, head, facts from log_op where stream = 'sessions' and at >= $1 and facts @> $2::jsonb order by at, pos`, [new Date(q.run_events.since).toISOString(), JSON.stringify([['+', runs[0], EVENT_FIELD]])])
+      ? await l.db.query<Row>(`select stream, pos::int as pos, at, head, facts from log_op where ${found} and facts @> $4::jsonb order by at, pos -- index log_op_session_run`, [since, runs, EVENT_FIELD, JSON.stringify([['+', runs[0], EVENT_FIELD]])])
       : await l.db.query<Row>(
-          `select stream, pos::int as pos, at, head, facts from log_op where stream = 'sessions' and at >= $1
-           and exists (select 1 from jsonb_array_elements(facts) f where f->>0 = '+' and f->>2 = $3 and f->>1 = any($2::text[])) order by at, pos`,
-          [new Date(q.run_events.since).toISOString(), runs, EVENT_FIELD],
+          `select stream, pos::int as pos, at, head, facts from log_op where ${found}
+           and exists (select 1 from jsonb_array_elements(facts) f where f->>0 = '+' and f->>2 = $3 and f->>1 = any($2::text[])) order by at, pos -- index log_op_session_run`,
+          [since, runs, EVENT_FIELD],
         );
     for (const [run, event] of await opened(l, rows)) out[run]?.push(event);
     // Stable: what came at the same time stays in the order it was sent.

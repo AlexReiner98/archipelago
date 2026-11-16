@@ -11,6 +11,7 @@ import { opEntries } from '../packs/log/kernel/streams.ts';
 import { kept } from '../packs/log/kernel/retention.ts';
 import type { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
+import { runsRead } from '../packs/surface/kernel/packreads-runs.ts';
 
 const hook = (l: Archipelago, body: Record<string, unknown>) => answerHook('events', { whole: l.db, pelago: l, within: [], body, running: { started: new Date().toISOString() }, origin: 'http://127.0.0.1' }) as Promise<Record<string, unknown>>;
 
@@ -74,4 +75,28 @@ test('free text is cut to its length', () => {
   assert.ok('event' in r);
   assert.equal((r.event.question as string).length, 500);
   assert.equal((r.event.gist as string).length, 200);
+});
+
+test('a run and its events are found by their indexes, and only by one who may see the run', async () => {
+  const l = await fresh();
+  const people = await make(l, [{ op: 'create', ref: 'bo', type: 'person', title: 'Bo' }]);
+  const bo = l.as(people.bo);
+  const made = await bo.change({ kind: 'human', name: 'bo', person: people.bo }, { ops: [{ op: 'create', ref: 'run', type: 'run', title: 'Bo’s session', visibility: 'private', props: { session_id: 's3' } }], reason: 'test' });
+  const run = (made as { created: Record<string, string> }).created.run;
+  const other = await make(l, [{ op: 'create', ref: 'run', type: 'run', title: 'Another session', props: { session_id: 's4' } }]);
+  assert.equal((await hook(l, { session_id: 's3', source: 'claude-code', events: BATCH })).kept, 5);
+  assert.equal((await hook(l, { session_id: 's4', source: 'claude-code', events: BATCH.slice(0, 2) })).kept, 2);
+
+  // As Bo, under the row policy: the run by its session, its events and no other run's.
+  assert.equal(((await runsRead(bo, { run_of: { key: 's3' } })) as { id: string }).id, run);
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const mine = (await runsRead(bo, { run_events: { runs: [run], since } })) as Record<string, unknown[]>;
+  assert.equal(mine[run].length, 5);
+  const both = (await runsRead(bo, { run_events: { runs: [run, other.run], since } })) as Record<string, unknown[]>;
+  assert.deepEqual([both[run].length, both[other.run].length], [5, 2]);
+
+  // As someone else: neither the run nor its events.
+  const someone = l.as('someone else');
+  assert.equal(await runsRead(someone, { run_of: { key: 's3' } }), null);
+  assert.deepEqual(((await runsRead(someone, { run_events: { runs: [run], since } })) as Record<string, unknown[]>)[run], []);
 });
