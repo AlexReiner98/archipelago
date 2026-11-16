@@ -21,6 +21,8 @@ export const SLOW: Record<string, string> = {
   'test/backdrop-page.test.ts': 'browser',
   // A backdrop that scrolls with its page: a Chrome page, scrolled, its shown pixels read.
   'test/backdrop-scroll.test.ts': 'browser',
+  // What a backdrop is told of the page's words and the look it tells the page: a Chrome page, scrolled and changed.
+  'test/backdrop-words.test.ts': 'browser',
   // The core loop end to end: a server, the plugin's hook script run per event, and two Chrome pages.
   'test/loop.test.ts': 'browser',
   'test/canvas-drag.test.ts': 'browser',

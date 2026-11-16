@@ -204,6 +204,7 @@ function inside(home, port, given) {
         on: (name, fn) => ((heard[name] ??= []).push(fn), name === 'page' && setTimeout(() => pageLast && pageLast !== pageGiven && call(fn, pageLast))),
         // A backdrop that draws more than the window says, after each frame, the page height its canvas's top stands at: that frame is shown there, scrolling with the page's words (draw-scroll.js).
         drawn: (top) => pageGiven && Number.isFinite(Number(top)) && said.canvas?.transferToImageBitmap && ((b) => post({ type: 'frame', bitmap: b, top: Number(top) }, [b]))(said.canvas.transferToImageBitmap()),
+        look: (colours) => pageGiven && post({ type: 'look', look: Object.fromEntries(Object.entries(colours ?? {}).map(([k, v]) => [String(k), String(v)])) }),
         // An item's id, or opened, an https address too.
         open: (id) => post({ type: 'open', id: String(id) }),
         tip: (text, x, y) => post({ type: 'tip', text: text == null ? null : String(text), x: Number(x), y: Number(y) }),
@@ -343,6 +344,7 @@ function start({ code, answer, style, theme, hot }) {
     else if (said?.type === 'open' && opened && /^https:\/\/\S+$/.test(said.id)) open(said.id, '_blank', 'noopener');
     else if (said?.type === 'drew') say({ type: 'drew' });
     else if (said?.type === 'frame' && said.bitmap instanceof ImageBitmap && Number.isFinite(said.top)) (landed ??= landing(() => (canvas.style.visibility = 'hidden'))).show(said);
+    else if (said?.type === 'look' && pageNow) say({ type: 'look', look: lookSaid(said.look) });
     else if (said?.type === 'error') fail(said.message);
     else if (said?.type === 'cursor' && CURSORS.includes(said.name)) canvas.style.cursor = said.name;
     else if (said?.type === 'field' && typeof said.key === 'string') place(said.key, said.at, theme);
