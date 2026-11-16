@@ -70,9 +70,11 @@ test('in a browser, a canvas gone back to or loaded again is not laid out again,
       const drawn = [...document.querySelectorAll('#canvas *')].find((e) => e.drawn)?.drawn;
       return drawn && (await ${keptNames}).includes(drawn);
     })()`;
+    // Loaded again: waited for on the new page, not the one before it, which drew the same.
     const reloaded = async () => {
+      await page.evaluate('window.before = true');
       await page.send('Page.reload');
-      return page.until(`${has('Wall north')} && ${measures}.length >= 1`, 30000);
+      return page.until(`!window.before && ${has('Wall north')} && ${measures}.length >= 1`, 30000);
     };
     // The answer the page kept current from the log may hold its items in another order than one read afresh (the
     // item just changed comes first): another answer, so another picture. One load reads it afresh, and keeps its picture.
@@ -111,8 +113,9 @@ test('in a browser, signing out or in as another lets go of the pictures kept, s
   const base_ = `(await ${pageModule('base.js')})`;
   // Signed in as `token` the way the page enters a workspace: the token kept, and the page loaded again on the canvas.
   const signIn = async (token: string) => {
-    await page.evaluate(`(async () => { ${base_}.store.token = ${JSON.stringify(token)}; history.replaceState(null, '', ${JSON.stringify(canvas)}); setTimeout(() => location.reload()); })()`);
-    await new Promise((r) => setTimeout(r, 500));
+    await page.evaluate(`(async () => { window.before = true; ${base_}.store.token = ${JSON.stringify(token)}; history.replaceState(null, '', ${JSON.stringify(canvas)}); setTimeout(() => location.reload()); })()`);
+    // Waited for on the new page, not the one before it.
+    assert.ok(await page.until(`!window.before && document.readyState === 'complete'`, 30000), 'the page is loaded again');
   };
   const scopes = () => page.evaluate<string[]>(keptScopes);
   try {

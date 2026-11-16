@@ -274,7 +274,7 @@ export function drawWith(host, answer, style, keep) {
         for (const list of early.splice(0)) apply(list);
         if (moving.size) requestAnimationFrame(run);
         keepScene(named.key, said.scene ?? {}, named.weight);
-        if (!said.scene?.surface) kept().keep(named.key, said.scene ?? {}, drawing.id, drawing.hash);
+        if (!said.scene?.surface && !style.still) kept().keep(named.key, said.scene ?? {}, drawing.id, drawing.hash);
         performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got) } });
       }
       else if (said.type === 'patch' && !mounted) early.push(said.list);
@@ -308,7 +308,9 @@ export function drawWith(host, answer, style, keep) {
   }
   // A picture drawn before from the same, on this page or kept by this browser (./pictures-kept.js), is mounted now,
   // and its drawing not run (above, `begin`); measured as a drawing that took nothing. One with a surface is painted by
-  // its drawing, so it is drawn again. One from storage is checked as every scene is: failing, it is laid out.
+  // its drawing, so it is drawn again. One from storage is checked as every scene is: failing, it is laid out. A
+  // picture that holds still (a published page: anyone's, with no one signed in) is neither given back nor kept: its
+  // first frame is on the page with its text, and its drawing takes it over.
   let given = null;
   const mountKept = (scene, stored) => {
     if (!scene || scene.surface) return false;
@@ -341,9 +343,9 @@ export function drawWith(host, answer, style, keep) {
     }
     begin();
   };
-  if (mountKept(scenes.get(named.key)?.scene, false)) return;
+  if (!style.still && mountKept(scenes.get(named.key)?.scene, false)) return;
   // Asked of storage only where it may hold it: one it does not hold is known at once, and laid out with no wait.
-  const asking = kept().find(named.key);
+  const asking = !style.still && kept().find(named.key);
   if (asking) asking.then((scene) => !ended && !mounted && !mountKept(scene, true) && drawn());
   else drawn();
 
