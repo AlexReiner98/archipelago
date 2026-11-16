@@ -162,9 +162,10 @@ export async function settledUnconfirmed(l: Archipelago, limit: number) {
   return settledFrom(l, rows, since, limit);
 }
 
-/** Up to where the owner last looked or answered. Each mark is in the settings stream; one made before that stream was numbered is an activity entry carried in. */
+/** Up to where the owner last looked or answered, its ops found by their action (pelago_action_ops, action-ops.ts). Each mark is in the settings stream; one made before that stream was numbered is an activity entry carried in. */
 export const CONFIRMED_UPTO = `select max(case when o.stream = 'settings' then (o.facts->0->>3)::int else (o.facts->0->3->'detail'->>'upto')::int end) as upto from log_op o
-     where o.seq is not null and o.facts->0->>2 in ('changes.seen', 'questions.confirmed') and o.stream in ('settings', 'activity') -- index log_op_action`;
+     where o.pos = any(array(select pelago_action_ops(array['changes.seen', 'questions.confirmed'], array['settings', 'activity'])))
+       and o.seq is not null and o.facts->0->>2 in ('changes.seen', 'questions.confirmed') and o.stream in ('settings', 'activity') -- index log_op_action`;
 /** Read from the log: each status an agent set after a mark ($1), on its own say or a human's word it reported, that the item (of a type that settles, $2) still has. */
 export const SETTLED_SINCE = `select distinct on (e.id) e.id, e.type, e.title, e.status, e.props->>'outcome' as outcome, f.seq::int as seq, le.at as ts, le.head->'actor'->>'id' as actor, le.head->'authority' as authority, le.id as changeset
      from log_fact f join log_entry le on le.stream = f.stream and le.at = f.at and le.pos = f.pos join entity e on e.id = f.id

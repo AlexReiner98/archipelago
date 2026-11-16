@@ -66,6 +66,8 @@ test('in a browser, the query line says the lens in one line at both widths', { 
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
     // Split, then find in the second: the bar is the second's. A press in the first gives the bar back to it.
+    // The bar redraws after a resize, its views read again: the button is clicked once it is there.
+    assert.ok(await page.until(`Boolean(document.querySelector('#query [aria-label="Split"]'))`), 'the bar offers a split');
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
     assert.ok(await page.until(`document.querySelectorAll('#canvas .pm-pane').length === 2 && !${drawn(1, made.roof)}`), 'Split opens a blank pane, with no query');
     await press(1);
@@ -122,6 +124,8 @@ test('in a browser, a lens of many long terms stays in the line, and each term c
       for (const name of names) assert.ok(title.includes(name), `the tooltip has the whole: ${name}`);
     }
     await page.send('Emulation.clearDeviceMetricsOverride');
+    // The bar redraws after a resize, its views read again: the button is clicked once it is there.
+    assert.ok(await page.until(`Boolean(document.querySelector('#query [aria-label="Split"]'))`), 'the bar offers a split');
     await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
     assert.ok(await page.until(`document.querySelectorAll('#canvas .pm-pane').length === 2`), 'split');
     assert.ok(await page.still(`[document.getElementById('find')?.getBoundingClientRect(), document.getElementById('canvas')?.getBoundingClientRect()]`), 'laid out split');
