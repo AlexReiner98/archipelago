@@ -775,6 +775,16 @@
       "description": "Participants and stakeholders."
     },
     {
+      "id": "draws",
+      "kernel": true,
+      "extends": "about",
+      "title": "draws",
+      "inverse": "is drawn by",
+      "from": ["layout", "part"],
+      "to": ["*"],
+      "description": "The island this look draws, in every view it is in (decision e_gwfwbx3t, the owner, 17 Nov 2026): its island item or its focus. A flavour of about with a name of its own, so a layout about an item still draws that item's pictures and a look is found by this alone."
+    },
+    {
       "id": "about",
       "moved_from": ["supersedes", "based_on", "governed_by", "reduces"],
       "root": true,
