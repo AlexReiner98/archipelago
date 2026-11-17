@@ -5,12 +5,9 @@
 // list is drawn and the person's own is left as it was.
 
 import { api, whoami } from './base.js';
+import { clean, islandsIn, READS } from './islands-list.js';
 
-/** The live reads a person may toggle on beside islands, by the name the list keeps. */
-export const READS = ['frontier', 'attention'];
-/** What the list may hold: an island's id or a live read's name. */
-const entry = (v) => typeof v === 'string' && (/^e_[a-z0-9]{8}$/.test(v) || READS.includes(v));
-const clean = (v) => (Array.isArray(v) ? [...new Set(v.filter(entry))] : []);
+export { islandsIn, READS };
 
 const LOCAL = 'pelago-islands';
 let person;
@@ -21,7 +18,7 @@ const told = () => heard.forEach((f) => f(list));
 /** The person the page acts as, if the server says (none with sign-in off). */
 const me = () => (person ??= whoami().then((w) => w?.actor?.person ?? null, () => null));
 
-/** The person's list, read once a page; the same promise after. */
+/** The person's list, read once a page; each ask after it answers the list as it is now. */
 let reading;
 export function islandsOn() {
   reading ??= (async () => {
@@ -34,9 +31,9 @@ export function islandsOn() {
         list = [];
       }
     }
-    return list;
   })();
-  return reading;
+  // The list as it is now, not as first read: a toggle since then keeps a new one (Home drawn again read the old).
+  return reading.then(() => list);
 }
 
 /** Hear the list each time it changes; answers how to stop. */
@@ -58,19 +55,11 @@ async function keep(next, reason) {
   }
 }
 
-/** Put an island or a live read on the canvas, or take it off. */
-export async function toggle(what, title = what) {
+/** Keep `next` as the person's list: what the picker makes of a press (./islands-list.js, pressed). */
+export async function keepList(next, reason) {
   await islandsOn();
-  if (!entry(what)) return;
-  const on = list.includes(what);
-  await keep(on ? list.filter((x) => x !== what) : [...list, what], `${title} ${on ? 'taken off' : 'put on'} the canvas`);
+  await keep(clean(next), reason);
 }
-
-/** The islands and reads an address names (`islands=a,b`), or null when it names none. */
-export const islandsIn = (query) => {
-  const named = new URLSearchParams(query ?? '').get('islands');
-  return named === null ? null : clean(named.split(','));
-};
 
 /** Where each island stands on every canvas (its focus's field `corner`), by id: null where no agent has set one. */
 export const corners = {};
