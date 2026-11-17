@@ -139,7 +139,13 @@ body[data-gate] .gate .primary:hover:not(:disabled) {
 body[data-gate] .gate .primary:focus-visible { outline: var(--border-3) solid var(--c-ink); outline-offset: var(--border-3); }
 
 /* The gate: a clearing with room, the form at reading size; fields square, their edge strong enough to see. */
-body[data-gate] .gate { gap: var(--space-8); }
+body[data-gate] .gate { gap: var(--space-10); }
+body[data-gate] .gate-row { gap: var(--space-7); }
+body[data-gate] .gate input, body[data-gate] .gate button:not(.primary) { padding: var(--space-7) var(--space-8); }
+/* What can be pointed at says so: a field or a plain button takes the ink edge, as the primary fills with ink. */
+body[data-gate] .gate input:hover:not(:focus) { border-color: var(--c-ink); }
+body[data-gate] .gate button:not(.primary):hover:not(:disabled) { border-color: var(--c-ink); box-shadow: inset 0 0 0 var(--border-1) var(--c-ink); }
+body[data-gate] .gate .gate-foot { gap: var(--space-5); padding-top: var(--space-4); }
 body[data-gate] .gate h1, :where(main:has(> nav.site-head)) section > h2 { font-size: var(--chart-title); line-height: 1.25; }
 body[data-gate] .gate, :where(main:has(> nav.site-head)) { font-size: var(--chart-text); }
 body[data-gate] .gate input { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }

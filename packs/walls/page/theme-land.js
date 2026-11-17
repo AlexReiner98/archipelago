@@ -33,9 +33,9 @@ export function pageOf(body = document.body, hash = location.hash) {
 export function landFor(style, place) {
   const b = style?.backdrop;
   if (!(b && typeof b === 'object' && Array.isArray(b.on) && b.on.includes(place) && b.drawing?.hash)) return null;
-  // At the gate, the page's own beat: its setup over the land's, and its still.
+  // At the gate, the page's own beat: its setup over the land's.
   const own = place === 'gate' ? b.pages?.[pageOf()] : undefined;
-  return own ? { ...b, setup: { ...b.setup, ...own.setup }, still: own.still ?? b.still, ...(own.emblem && { emblem: own.emblem }) } : b;
+  return own ? { ...b, setup: { ...b.setup, ...own.setup }, ...(own.emblem && { emblem: own.emblem }) } : b;
 }
 
 /** A drawing's modules, kept by their hash once sent, so a style read again without them still runs. */
@@ -43,10 +43,6 @@ const kept = new Map();
 
 let style = null, running = null;
 const LESS_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
-/** The still under a running land: its picture, shown at once and wherever the land cannot run. */
-let still = null;
-const STILL = /^(?:data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+|\/connect\/still\/(?:_|[a-z][a-z-]{0,30})\/(?:wide|narrow)\?v=[0-9a-f]{16})$/;
-
 const EMBLEM = /^(?:data:image\/png;base64,[A-Za-z0-9+/=]+|\/connect\/still\/[a-z][a-z-]{0,30}\/emblem\?v=[0-9a-f]{16})$/;
 /**
  * The emblem the land's page wears (its palette's), wherever the emblem shows while that land runs: the bar's mark and
@@ -58,18 +54,6 @@ function wearEmblem(land) {
   else (document.body.style.removeProperty('--emblem'), delete document.body.dataset.landEmblem);
 }
 
-/** The land's still put under its frame (before the map, so all of the page draws over it), or taken away with none. */
-function layStill(land) {
-  still?.remove();
-  still = null;
-  const s = land?.still;
-  if (!s || !(STILL.test(s.wide ?? '') || STILL.test(s.narrow ?? ''))) return;
-  still = document.createElement('div');
-  still.className = 'land-still';
-  still.setAttribute('aria-hidden', 'true');
-  for (const k of ['wide', 'narrow']) if (STILL.test(s[k] ?? '')) still.style.setProperty(`--land-still-${k}`, `url("${s[k]}")`);
-  document.body.insertBefore(still, document.getElementById('canvas'));
-}
 /** The server's own style, as the gate is painted in: asked once, when the page is first in the gate. */
 let served;
 const servedStyle = () => (served ??= (globalThis.pelagoEarly?.theme ?? fetch('/connect/theme').then((r) => (r.ok ? r.json() : null), () => null)).then((s) => ((served = s ?? null), again(), s)));
@@ -80,23 +64,23 @@ function wear() {
   const land = landFor(place === 'gate' ? (served instanceof Promise ? null : served) : style, place);
   if (land?.drawing.modules) kept.set(land.drawing.hash, land.drawing.modules);
   const code = land && kept.get(land.drawing.hash);
-  // The same land in the same place runs on; a move between places it shows in keeps it running too.
-  // Asked for less motion, a land with a still shows its still alone, and nothing runs.
-  const calm = Boolean(code && land.still && LESS_MOTION.matches);
-  const key = code ? `${calm ? 'still ' : ''}${land.drawing.hash} ${JSON.stringify(land.setup ?? {})} ${JSON.stringify(land.numbers ?? {})}` : '';
+  // The same land in the same place runs on; a move between places it shows in keeps it running too. No still picture
+  // stands in for it (the owner, 17 Nov 2026: one showed through the land as it gathered): asked for less motion, or
+  // where it cannot run, the page is left blank.
+  const calm = Boolean(code && LESS_MOTION.matches);
+  const key = code ? `${calm ? 'calm ' : ''}${land.drawing.hash} ${JSON.stringify(land.setup ?? {})} ${JSON.stringify(land.numbers ?? {})}` : '';
   if (running?.key === key) {
-    if (key) document.body.dataset.land = place;
+    if (key && !running.still) document.body.dataset.land = place;
     return;
   }
   running?.stop();
   running = null;
   delete document.body.dataset.land;
   delete document.body.dataset.landDrew;
-  layStill(code ? land : null);
   wearEmblem(code ? land : null);
   if (!code) return;
-  document.body.dataset.land = place;
   if (calm) return void (running = { key, stop: () => undefined, still: true });
+  document.body.dataset.land = place;
   const stop = runBackdrop({
     code,
     answer: { items: [], links: [] },
@@ -104,16 +88,14 @@ function wear() {
     dressed: document.body,
     // Before the map, so the map, the sheet and the bars are drawn over it.
     under: document.getElementById('canvas'),
-    // Drawn, and given its theme's time to gather: the still gives way to it.
-    drew: () => ((document.body.dataset.landDrew = ''), setTimeout(() => running?.key === key && still?.classList.add('gone'), land.wait?.gather ?? 0)),
+    drew: () => (document.body.dataset.landDrew = ''),
     failed: () => {
       if (running?.key !== key) return;
-      // Where the land cannot run, its still stays and the page stands on it as on the land; kept as this land, so it
-      // is not tried again until the theme or the place changes.
-      still?.classList.remove('gone');
+      // Where the land cannot run the page is blank; kept as this land, so it is not tried again until the theme or
+      // the place changes.
       running = { key, stop: () => undefined, still: true };
       delete document.body.dataset.landDrew;
-      if (!still) delete document.body.dataset.land;
+      delete document.body.dataset.land;
     },
   });
   running = { key, stop };
@@ -131,7 +113,7 @@ const again = () => soon || (soon = setTimeout(() => ((soon = 0), wear())));
 export function landShown(since) {
   return new Promise((done) => {
     const look = () => {
-      // A still alone (less motion, or a land that cannot run): nothing to wait for.
+      // No land running (less motion, or a land that cannot run): nothing to wait for.
       if (running?.still) return void done();
       const wait = served && !(served instanceof Promise) ? landFor(served, 'gate')?.wait : undefined;
       const left = since + (wait?.most ?? 0) - performance.now();

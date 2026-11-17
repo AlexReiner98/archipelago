@@ -388,16 +388,16 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   password.addEventListener('input', () => codes && (send.textContent = password.value ? 'Sign in' : 'Email me a code'));
   password.addEventListener('keydown', (e) => e.key === 'Enter' && withPassword());
 
-  // Where a person with no account begins, if this server offers it; a client waiting to connect is returned to after.
+  // Where a person with no account begins (a pack's start page, else Sign up or a guest map); a client waiting to connect is returned to after.
   const begin = h('div', { hidden: true });
   fetch('/connect/start').then((r) => r.json()).then(({ url }) => {
-    const to = new URL(url ?? '#/try', location.origin); // with no pack's start page, a guest map (packs/identity/page/guest.js)
+    const to = new URL(url ?? '#/try', location.origin); // a guest map: packs/identity/page/guest.js
     if (ref) to.searchParams.set('ref', ref);
     startAt = to.href;
     const tip = 'Make a workspace of your own; a client waiting to connect is asked again once you are in';
     // Sent here by a client, in a browser that has never signed in: most likely they have no account, so it leads.
     const start = h(newcomer ? 'button' : 'a', { class: newcomer ? 'primary' : '', href: newcomer ? undefined : to.href, title: tip, onclick: newcomer ? () => location.assign(to.href) : undefined }, url ? 'Start a workspace' : 'Try it with your agent');
-    begin.replaceWith(h('div', { class: 'gate-row gate-foot' }, h('span', { class: 'muted' }, 'New here?'), start));
+    begin.replaceWith(h('div', { class: 'gate-row gate-foot' }, h('span', { class: 'muted' }, 'New here?'), ...(url ? [] : [h('a', { href: '#/try?then=sign-up', title: 'Make an account now, and add your agent after' }, 'Sign up'), h('span', { class: 'muted' }, 'or')]), start));
   }, () => undefined);
 
   // From inside a workspace the menu lists them already; signed out, they are the quickest way back in.

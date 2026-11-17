@@ -133,7 +133,9 @@ export async function signUpPage(query = '', { machine } = {}) {
   byEmail.append(gateRow(email, send), codeRow, hint);
   // Mail is blocked too often to lean on (the owner, 15 Nov 2026): by email only where the server has no provider.
   const providers = social.filter((p) => PROVIDERS[p]);
-  gate(TITLE, row, ...providers.map((p) => button(`Sign up with ${PROVIDERS[p]}`, withProvider(p), p)), !providers.length && byEmail, error, gateRow(h('a', { href: '#/', class: 'small', title: 'It is kept for a week unsaved' }, 'Back to your map')));
+  // Come straight from Sign up on the sign-in page (#/sign-up?new=1): there is no map to save or go back to yet.
+  const fresh = params.get('new') === '1';
+  gate(fresh ? 'Sign up' : TITLE, row, ...providers.map((p) => button(`Sign up with ${PROVIDERS[p]}`, withProvider(p), p)), !providers.length && byEmail, error, !fresh && gateRow(h('a', { href: '#/', class: 'small', title: 'It is kept for a week unsaved' }, 'Back to your map')));
 }
 
 /** A ticket traded: a token entered, or the agreement, the workspace or the start it waits on. `purpose`: keep or sign-in. */
