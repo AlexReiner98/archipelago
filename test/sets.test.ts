@@ -17,7 +17,7 @@ test('the fast set is every test file but the slow ones, the structure test alwa
 test('the fast set holds no file past LONG seconds, and SLOW names none for its length that has come under it', () => {
   const files = readWeights().files;
   const seconds = (f: string) => Math.max(...ENGINES.map((e) => files[f]?.[e] ?? 0));
-  const over = fastTests().filter((f) => f !== 'test/structure.test.ts' && seconds(f) > LONG);
+  const over = fastTests().filter((f) => !['test/structure.test.ts', 'test/sets.test.ts'].includes(f) && seconds(f) > LONG); // both always in it
   assert.deepEqual(over, [], `over ${LONG} s in CI: put each in SLOW as 'long' (test/sets.ts)`);
   const under = Object.keys(SLOW).filter((f) => SLOW[f] === 'long' && f in files && seconds(f) <= LONG);
   assert.deepEqual(under, [], `no longer over ${LONG} s: take each out of SLOW`);
@@ -64,8 +64,10 @@ test('CI runs every file in exactly one shard, on each engine, and shard 1 alone
 /**
  * Seconds of a runner the heaviest shard may be expected to take on either engine (88 on 4 Nov 2026, with 8 shards),
  * but for a shard its heaviest file alone holds up: more shards do not shorten that one, so it is held to FILE_BUDGET.
+ * 110 since 17 Nov 2026 (the owner, decision e_pfk6jq45): 10 shards an engine fill the 20 jobs the plan runs at once,
+ * and an 11th would wait for a runner of its own run, so the budget follows the work rather than more shards.
  */
-const BUDGET = 95;
+const BUDGET = 110;
 /** Seconds one file may take, as measured: past it, split the file, as no number of shards waits less than it. */
 const FILE_BUDGET = 60;
 

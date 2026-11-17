@@ -70,20 +70,30 @@ export const SLOW: Record<string, string> = {
   'test/pull.test.ts': 'whole map',
   'test/snapshots.test.ts': 'whole map',
   'test/stats.test.ts': 'whole map',
-  // The approvals table: about 4000 changes, a policy's settings dealt between two files (test/approvals.ts, PARTS).
+  // The approvals table: about 4000 changes, a policy's settings dealt among four files (test/approvals.ts, PARTS).
   'test/approvals-review-1.test.ts': 'table',
   'test/approvals-review-2.test.ts': 'table',
+  'test/approvals-review-3.test.ts': 'table',
+  'test/approvals-review-4.test.ts': 'table',
   'test/approvals-dev-1.test.ts': 'table',
   'test/approvals-dev-2.test.ts': 'table',
+  'test/approvals-dev-3.test.ts': 'table',
+  'test/approvals-dev-4.test.ts': 'table',
   'test/approvals-mixed-1.test.ts': 'table',
   'test/approvals-mixed-2.test.ts': 'table',
+  'test/approvals-mixed-3.test.ts': 'table',
+  'test/approvals-mixed-4.test.ts': 'table',
   // The map of a few hundred items drawn whole through its budget, timed: about 22 seconds.
   'packs/canvas/map-time.test.ts': 'timed',
   // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
   'test/sessions.test.ts': 'long',
   'test/new-workspace.test.ts': 'long',
-  'test/seeing.test.ts': 'long',
   'test/setup.test.ts': 'long',
+  // Past LONG in main's runs of 17 Nov 2026.
+  'test/guest.test.ts': 'long',
+  'test/server-auth.test.ts': 'long',
+  'test/site.test.ts': 'long',
+  'test/query-flat.test.ts': 'long',
 };
 
 /** The most seconds a file of the fast set may take in CI, on either engine (test/weights.json). */
@@ -151,9 +161,21 @@ export function predict(files: string[], engine: string, steps = 0, weight = wei
  * whose predicted time (predict, its lanes and on shard 1 FIRST_STEPS) it raises least, on the heavier engine.
  * sets.test.ts checks the workflow runs every file once, and that the heaviest shard keeps under a budget.
  */
-export function shard(part: string, weights = readWeights()): string[] {
+export function shard(part: string, weights?: Weights): string[] {
   const [k, n] = part.split('/').map(Number);
   if (!(n >= 1 && k >= 1 && k <= n)) throw new Error(`No shard ${part}: say k/n`);
+  // Dealing all N parts is seconds of work: dealt once for each N and set of weights, and each part read from that.
+  const w = weights ?? (ownWeights ??= readWeights());
+  const byN = dealt.get(w) ?? dealt.set(w, new Map()).get(w)!;
+  if (!byN.has(n)) byN.set(n, deal(n, w));
+  return [...byN.get(n)![k - 1]];
+}
+
+let ownWeights: Weights | undefined;
+const dealt = new WeakMap<Weights, Map<number, string[][]>>();
+
+/** Every file of the full run dealt into n parts, as shard describes. */
+function deal(n: number, weights: Weights): string[][] {
   const weight = weigher(weights);
   const steps = (i: number, e: string) => (i ? 0 : (weights.steps[e] ?? 0));
   const parts = Array.from({ length: n }, (_, i) => ({ files: [] as string[], browser: Math.max(...ENGINES.map((e) => steps(i, e))) * LANES }));
@@ -172,7 +194,7 @@ export function shard(part: string, weights = readWeights()): string[] {
     const best = parts.reduce((min, _, i) => (after(i) < after(min) ? i : min), 0);
     parts[best].files.push(f);
   }
-  return parts[k - 1].files.sort();
+  return parts.map((p) => p.files.sort());
 }
 
 const HARNESS = /['"]#pelago\/test['"]/;
