@@ -293,9 +293,13 @@ export function packStates(l: Archipelago) {
  * turns all its packs together, in one change set.
  */
 export async function setPack(l: Archipelago, actor: Actor, input: { pack: string; on: boolean }) {
-  needHuman(actor, 'Turning a pack on or off is the owner’s.');
   const { packs: named, bundle } = packsNamed(bundlesHere(l), input.pack);
   if (!bundle && !l.registry.states.has(input.pack)) throw new Error(`No pack "${input.pack}" on this server. Packs: ${[...l.registry.states.keys()].join(', ')}`);
+  // An agent's turn of a pack is the rules' to judge, as any act (the owner, 17 Nov 2026, task e_r4gjaxde): core's
+  // agent_pack_set holds it unless agents' changes apply here, and agent_pack_code while the pack runs code on the
+  // server unless agents' code may run. What it let through says its stakes.
+  const stakes: string[] = [];
+  if (actor.kind !== 'human') for (const pack of named) stakes.push(...(await l.may(actor, 'pack_set', { pack, on: input.on, ...(runsCode(l, pack) && { code: true }) })));
   // A pack the server's list leaves out here (packs/loader/kernel/pack-allow.ts) is not the owner's to add: the server's configuration lets it in.
   if (input.on && !named.every(offeredHere(l))) throw new Error(`The ${input.pack} pack is not offered to this workspace on this server.`);
   const kernel = named.find((id) => KERNEL_PACKS.includes(id));
@@ -325,7 +329,13 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} ${what}`, detail: { pack: input.pack, ...(bundle && { bundle: bundle.id, packs: named }), ...synced, ...(waiting.length && { waiting: waiting.map((w) => w.id) }), ...(woken.length && { woken }) } });
   toolsChanged(l.workspace);
   tellPacksChanged(l, input.on ? 'pack.on' : 'pack.off', [...named, ...waiting.map((w) => w.id), ...woken]);
-  return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated, waiting, woken };
+  return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated, waiting, woken, ...(stakes.length && { stakes: [...new Set(stakes)] }) };
+}
+
+/** Whether a pack runs code on the server or reaches outside it: its kernel modules, handlers, actions, layouts or reach (hosts, the server). */
+function runsCode(l: Archipelago, pack: string): boolean {
+  const p = l.registry.found.find((f) => f.id === pack);
+  return Boolean(p && (p.kernel || p.handlers?.length || p.actions?.length || p.layouts?.length || p.reach));
 }
 
 /**
@@ -359,7 +369,7 @@ const tellPacksChanged = (l: Archipelago, said: string, packs: string[]) =>
 /** The owner’s tools for packs: their states and switch, their secrets, and the acts they ask for. */
 export const PACK_STATE_TOOLS: Record<string, Tool> = {
   packs: {
-    description: 'The packs here and the state of each: active, waiting (with what it needs) or off. One kept as an item names it (made). One whose hosts or webhooks need secrets names them (secrets: each name and whether it is set, never its value; pack_secret_set gives one). To author a pack, make an item of type pack (query schema with type pack says its fields): the owner then adds it here.',
+    description: 'The packs here and the state of each: active, waiting (with what it needs) or off. One kept as an item names it (made). One whose hosts or webhooks need secrets names them (secrets: each name and whether it is set, never its value; pack_secret_set gives one). To author a pack, make an item of type pack (query schema with type pack says its fields), then add it with pack_set: the rules say whether an agent’s turn applies or waits for the owner.',
     input: {},
     run: async (l) => {
       const states = (await (await kernel()).callAs<{ states: { id: string }[] }>(l, 'answer.pack_use', { states: packStates(l) })).states;
@@ -371,9 +381,8 @@ export const PACK_STATE_TOOLS: Record<string, Tool> = {
     },
   },
   pack_set: {
-    description: 'Turn a pack off or on in this workspace. Its items stay; while it is off they are dormant and its tools are gone. The packs relying on it (dependents in packs) wait meanwhile, and wake when it is on again. A bundle (packs that go together) is turned by its id or any of its packs’ ids, all its packs at once.',
+    description: 'Turn a pack off or on in this workspace (an agent’s turn is judged by the rules: agent_pack_set, and agent_pack_code for a pack that runs code). Its items stay; while it is off they are dormant and its tools are gone. The packs relying on it (dependents in packs) wait meanwhile, and wake when it is on again. A bundle (packs that go together) is turned by its id or any of its packs’ ids, all its packs at once.',
     input: { pack: z.string(), on: z.boolean() },
-    humanOnly: true,
     run: async (l, actor, input) => setPack(l, actor, input),
   },
   acts: {

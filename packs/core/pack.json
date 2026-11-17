@@ -1011,6 +1011,22 @@
       "say": "\"{title}\" names a root pack: a root pack is the server's own code, changed only in a pull request the owner approves, never on a map."
     },
     {
+      "id": "agent_pack_set",
+      "when": { "actor": "agent", "op": "pack_set" },
+      "then": "hold",
+      "lifted": "agent_changes",
+      "stake": "A pack turned on or off here: its types, tools and rules come or go for everyone on this map; its items stay, dormant while it is off, and pack_set turns it back.",
+      "say": "Turning a pack on or off is the owner’s here: it applies for agents once they let agents’ changes apply (Settings, under Agents)."
+    },
+    {
+      "id": "agent_pack_code",
+      "when": { "actor": "agent", "op": "pack_set", "fields": ["code"] },
+      "then": "hold",
+      "lifted": "agent_code",
+      "stake": "A pack that runs code on the server, or reaches outside it, is turned on or off here: its code starts or stops for everyone on this map.",
+      "say": "A pack that runs code is the owner’s to turn on or off, unless they let agents’ code run (Settings, under Agents)."
+    },
+    {
       "id": "root_off",
       "when": {
         "op": "pack_off",
