@@ -85,7 +85,6 @@ test('one click makes a guest map its agent writes to at once, with the key alon
   assert.match((await call('/api/publish', page_token, { id: first.result.created.p })).error, SIGN_IN, 'the guest in the page too');
   assert.match((await call('/api/share_create', page_token, { id: first.result.created.p })).error, SIGN_IN);
   assert.match((await call('/api/member_add', page_token, { email: 'friend@example.test' })).error, SIGN_IN);
-  assert.match((await call('/agent/pack_set', key, { pack: 'anatomy_sync', on: true })).error, /reaches outside the map: sign in/);
   assert.match((await call('/agent/workspace_set', key, { drawings_open: true })).error, SIGN_IN);
 
   // At most GUEST_ITEMS items.

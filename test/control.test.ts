@@ -21,6 +21,7 @@ const define = (ws: Awaited<ReturnType<Workspaces['get']>>, type: Record<string,
 function setUp() {
   const root = mkdtempSync(join(tmpdir(), 'pelago-control-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), join(root, 'packs'), { recursive: true });
+  cpSync(join(import.meta.dirname, 'words'), join(root, 'packs'), { recursive: true }); // event, which SITE_VISIT extends
   rmSync(join(root, 'packs', 'local'), { recursive: true, force: true });
   return { root, config: { dataDir: join(root, 'data'), rootDir: join(root, 'workspaces'), packsDir: join(root, 'packs') } };
 }

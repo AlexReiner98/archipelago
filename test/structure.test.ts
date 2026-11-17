@@ -12,7 +12,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../packs/log/kernel/operational.ts';
-import { valueImports } from '../packs/anatomy_sync/reader.ts';
+import { valueImports } from './structure-reader.ts';
 import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, uiFiles, VENDORED, walk } from './structure-kit.ts';
 import { history, RELEASED, RELEASED_KEY, releasedKey } from './structure-history.ts';
 import { rootImports } from './structure-roots.ts';
@@ -43,8 +43,6 @@ test('the kernel names no pack', () => {
 // core's. A released schema step's SQL is history and counts nothing (test/structure-history.ts).
 const NAMES_PACK_TYPES: Record<string, number> = {};
 
-// Core's words until 11 Nov 2026 (people and calendar packs, e_wrdg6udh); `event` is also the kernel's for a log event.
-const LEFT_CORE = ['company', 'works_at', 'event'];
 // The kernel's own words that are also some pack's type (the owner, 12 Nov 2026, e_m8arpfew): the rule leaves them out.
 const KERNEL_WORDS: Record<string, string> = {
   action: "a piece a screen declares, and a pack's call kind (packhost's Call)",
@@ -57,12 +55,13 @@ const KERNEL_WORDS: Record<string, string> = {
   diagram: 'a module of the page (ui/diagram.js), served by name',
   note: "the item page's note: its section and the class it wears",
   file: "an HTML input's type, the page's file chooser",
+  event: "a log event, and the hook events (the calendar pack's type until 17 Nov 2026)",
 };
 
 test("the kernel names no pack's type by its bare name", () => {
   const ids = packIds.filter((p) => !KERNEL_PACKS.includes(p) && existsSync(join(ROOT, 'packs', p, 'pack.json'))).flatMap((p) => {
     const m = JSON.parse(read(`packs/${p}/pack.json`)) as { types?: { id?: string }[]; links?: { id: string }[] };
-    return [...(m.types ?? []), ...(m.links ?? [])].flatMap((t) => (t.id && !LEFT_CORE.includes(t.id) ? [t.id] : []));
+    return [...(m.types ?? []), ...(m.links ?? [])].flatMap((t) => (t.id ? [t.id] : []));
   }).concat(Object.values(LEFT).flat()).filter((id) => !Object.hasOwn(KERNEL_WORDS, id));
   const named = count(kernelFiles, new RegExp(`['"\`](?:${ids.join('|')})['"\`]`, 'g'), history);
   assert.deepEqual(ratchet(named, NAMES_PACK_TYPES), [], 'Ask the registry for a kind or a capability instead of naming a pack type.');

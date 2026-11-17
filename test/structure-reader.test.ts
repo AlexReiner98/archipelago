@@ -2,14 +2,14 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { headerOf, importsOf, kernelCodeOf, packOf, readModule, resolve, resolveServed, rootCodeOf, rootPacksOf, servedNames, typeImports, valueImports } from './reader.ts';
+import { headerOf, importsOf, kernelCodeOf, packOf, readModule, resolve, resolveServed, rootCodeOf, rootPacksOf, servedNames, typeImports, valueImports } from './structure-reader.ts';
 
 const MODULE = [
   '// The map and its single write path.',
   '// Every change goes through change().',
   '',
-  "import { decide, type Policy } from '../anatomy_sync/rules.ts';",
-  "import type { Registry } from '../anatomy_sync/registry.ts';",
+  "import { decide, type Policy } from '../sample/rules.ts';",
+  "import type { Registry } from '../sample/registry.ts';",
   "import { a } from './a.ts'; import { b } from './b.ts';",
   "export { c } from './c.ts';",
   "export type { D } from './d.ts';",
@@ -20,9 +20,9 @@ const MODULE = [
 ].join('\n');
 
 test('value and type imports are told apart', () => {
-  const at = 'packs/anatomy_sync/reader.ts';
+  const at = 'packs/sample/reader.ts';
   assert.deepEqual(valueImports(MODULE, at).map((i) => [i.kind, i.spec]), [
-    ['import', '../anatomy_sync/rules.ts'],
+    ['import', '../sample/rules.ts'],
     ['import', './a.ts'],
     ['import', './b.ts'],
     ['export', './c.ts'],
@@ -32,16 +32,16 @@ test('value and type imports are told apart', () => {
     ['import', 'node:zlib'],
   ]);
   assert.deepEqual(typeImports(MODULE, at).map((i) => [i.kind, i.spec]), [
-    ['import', '../anatomy_sync/registry.ts'],
+    ['import', '../sample/registry.ts'],
     ['export', './d.ts'],
   ]);
 });
 
 test('a relative import is resolved from its file; a dependency or built-in is not', () => {
-  const found = importsOf(MODULE, 'packs/anatomy_sync/reader.ts');
+  const found = importsOf(MODULE, 'packs/sample/reader.ts');
   const to = Object.fromEntries(found.map((i) => [i.spec, i.to]));
-  assert.equal(to['../anatomy_sync/rules.ts'], 'packs/anatomy_sync/rules.ts');
-  assert.equal(to['./a.ts'], 'packs/anatomy_sync/a.ts');
+  assert.equal(to['../sample/rules.ts'], 'packs/sample/rules.ts');
+  assert.equal(to['./a.ts'], 'packs/sample/a.ts');
   assert.equal(to['node:zlib'], undefined);
   assert.equal(to['node:fs'], undefined);
   assert.equal(resolve('src/boot.ts', '../packs/core/kernel/x.ts'), 'packs/core/kernel/x.ts');
@@ -63,10 +63,10 @@ test('the header comment is kept, its markers off', () => {
 
 test('a module knows its pack from its path', () => {
   assert.equal(packOf('packs/write/kernel/pelago.ts'), 'write');
-  assert.equal(packOf('packs/anatomy_sync/reader.ts'), 'anatomy_sync');
+  assert.equal(packOf('packs/sample/reader.ts'), 'sample');
   assert.equal(packOf('src/boot.ts'), undefined);
-  const m = readModule('packs/anatomy_sync/reader.ts', MODULE);
-  assert.equal(m.pack, 'anatomy_sync');
+  const m = readModule('packs/sample/reader.ts', MODULE);
+  assert.equal(m.pack, 'sample');
   assert.equal(m.header.split('\n')[0], 'The map and its single write path.');
   assert.equal(m.imports.length, 10);
   assert.equal('pack' in readModule('src/boot.ts', ''), false);

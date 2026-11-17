@@ -20,8 +20,12 @@ export const agent: Actor = { kind: 'agent', name: 'test' };
  * the tests read them in place; a test that adds a pack makes its own copy. */
 export const PACKS = join(import.meta.dirname, '..', 'packs');
 
-/** A fresh in-memory map with the repository's packs. */
-export const fresh = () => freshWith(new Registry(PACKS));
+/** Words the tests use as any map's vocabulary (company, works_at, event...): the people and calendar packs, which the
+ * product no longer ships (the old maps' packs, removed 17 Nov 2026), kept here and read beside the repository's. */
+export const WORDS = join(import.meta.dirname, 'words');
+
+/** A fresh in-memory map with the repository's packs and the tests' words. */
+export const fresh = () => freshWith(new Registry([PACKS, WORDS]));
 
 /** A fresh in-memory map with these packs, and the policy given. */
 export async function freshWith(registry: Registry, policy?: ConstructorParameters<typeof Archipelago>[2]) {
@@ -34,6 +38,7 @@ export async function freshWith(registry: Registry, policy?: ConstructorParamete
 export function packsWith(...more: (PackFile | string | undefined)[]): string {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-packs-'));
   cpSync(PACKS, dir, { recursive: true });
+  cpSync(WORDS, dir, { recursive: true });
   for (const m of more) {
     if (!m) continue;
     if (typeof m === 'string') cpSync(join(PACKS, '..', 'test', 'packs', m), join(dir, m), { recursive: true });

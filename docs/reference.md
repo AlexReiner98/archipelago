@@ -400,10 +400,8 @@ Types live in packs, one folder each. The open core ships `core` under
   root links, which name kinds or capabilities at their ends (`owned_by` goes
   from `has:owned`, whatever declares owned). A place that says `exclusive` is
   a resource. It is the one pack always on.
-- `people` and `calendar`: vocabulary that left core on 11 Nov 2026, ids kept
-  (`company` and `works_at`; `event`). Calendar also holds `meeting` and
-  `routine`, from time. A pack that uses them requires `type:company` or
-  `type:event`.
+- `people` and `calendar` (company, works_at, event) left with the old maps
+  on 17 Nov 2026; the tests keep them as sample words in `test/words/`.
 
 The hosted service's:
 

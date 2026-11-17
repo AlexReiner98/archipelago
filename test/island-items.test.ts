@@ -11,7 +11,7 @@ import { setIslands } from '../packs/loader/kernel/packstate.ts';
 import { Archipelago, type Op } from '../packs/write/kernel/pelago.ts';
 import { linkOnLegend, typeOnLegend } from '../packs/loader/kernel/island-items.ts';
 import * as queryFlatPack from '../packs/query/kernel/query-flat.ts';
-import { freshWith, human, make } from './map.ts';
+import { freshWith, human, make, WORDS } from './map.ts';
 import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 
 /** A pack of the island shape: one type of its own on work, a link type marked crosses (a stand-in for core's reading of a finding), and an instruction. */
@@ -25,6 +25,7 @@ const pack = (id: string) => ({
 async function islandMap(on = true) {
   const dir = mkdtempSync(join(tmpdir(), 'pelago-island-items-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), dir, { recursive: true });
+  cpSync(WORDS, dir, { recursive: true }); // calendar, a pack of the island shape
   for (const id of ['plain', 'other']) (mkdirSync(join(dir, id)), writeFileSync(join(dir, id, 'pack.json'), JSON.stringify(pack(id))));
   const l = await freshWith(new Registry(dir));
   if (on) await setIslands(l, human, true);
