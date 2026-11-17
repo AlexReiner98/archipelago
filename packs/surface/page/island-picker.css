@@ -1,7 +1,7 @@
 /* The island picker (packs/surface/page/island-picker.js): a list at the canvas's left edge, folded to it or open, the canvas beside it. */
-#islands { position: fixed; z-index: 3; top: var(--band); bottom: 0; left: 0; display: flex; box-sizing: border-box; width: min(var(--side-least), 60%); background: var(--panel); font-size: var(--text-4); }
+#islands { position: fixed; z-index: 3; top: var(--band); bottom: 0; left: 0; display: flex; box-sizing: border-box; width: min(var(--isl-width, var(--side-least)), 60%); background: var(--panel); font-size: var(--text-4); }
 /* The canvas, and the panes in it (fixed to the window, packs/walls/page/part-marks.css), start at the bar's edge. */
-body[data-islands="open"] :is(#canvas, #canvas .pm-panes) { left: min(var(--side-least), 60%); }
+body[data-islands="open"] :is(#canvas, #canvas .pm-panes) { left: min(var(--isl-width, var(--side-least)), 60%); }
 body[data-islands="folded"] :is(#canvas, #canvas .pm-panes), body[data-islands-over="on"] :is(#canvas, #canvas .pm-panes) { left: var(--box-7); }
 body[data-islands="folded"] #islands { width: var(--box-7); }
 body[data-islands="folded"] #islands .isl-panel { display: none; }

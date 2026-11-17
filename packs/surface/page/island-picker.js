@@ -52,7 +52,7 @@ const packOf = (i, on = false) => {
   return h('span', { class: 'isl-pack' }, on ? (same ? 'on' : `on · ${pack}`) : pack);
 };
 
-/** What the side list keeps in this browser: whether it is open. */
+/** What the side list keeps in this browser: whether it is open, and its width. */
 const KEPT = 'pelago-islands-side';
 const kept = (key, fallback) => {
   try {
@@ -97,13 +97,40 @@ export function drawPicker() {
     if (kept) forPage = false;
     document.body.dataset.islands = on ? 'open' : 'folded';
     arrow.textContent = on ? '‹' : '›';
-    fold.title = on ? 'Fold the islands to the edge (Ctrl+K opens them again)' : 'Show the islands (Ctrl+K)';
+    fold.title = on ? 'Fold the islands to the edge (Ctrl+K opens them again); drag to widen' : 'Show the islands (Ctrl+K)';
     fold.setAttribute('aria-label', on ? 'Fold the islands' : 'Show the islands');
     fold.setAttribute('aria-expanded', String(on));
     if (kept) keep('open', on);
     dispatchEvent(new Event('resize'));
   };
-  fold.onclick = () => open(document.body.dataset.islands !== 'open');
+  fold.onclick = () => (dragged ? (dragged = false) : open(document.body.dataset.islands !== 'open'));
+  // Dragged, the rail sets the open bar's width, between the style's picker_width_least and _most, kept in this
+  // browser; a double-click gives the default back.
+  let dragged = false;
+  const widen = (w) => {
+    if (w === null) document.body.style.removeProperty('--isl-width');
+    else document.body.style.setProperty('--isl-width', `${Math.round(Math.max(numberOf(state.style, 'picker_width_least'), Math.min(numberOf(state.style, 'picker_width_most'), w)))}px`);
+    dispatchEvent(new Event('resize'));
+  };
+  const keptWidth = kept('width', null);
+  if (typeof keptWidth === 'number') widen(keptWidth);
+  fold.addEventListener('pointerdown', (down) => {
+    if (document.body.dataset.islands !== 'open') return;
+    const from = down.clientX, start = side.getBoundingClientRect().width, least = numberOf(state.style, 'picker_drag_from');
+    const move = (ev) => {
+      if (!dragged && Math.abs(ev.clientX - from) < least) return;
+      dragged = true;
+      widen(start + ev.clientX - from);
+    };
+    const up = () => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      if (dragged) keep('width', side.getBoundingClientRect().width);
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+  });
+  fold.addEventListener('dblclick', () => (widen(null), keep('width', null), open(true)));
   // A narrow window (below the style's picker_over_below) has no room for the bar beside the canvas: the bar starts
   // folded, and opened it lies over the canvas until an island is pressed or the canvas is.
   const narrow = () => innerWidth < numberOf(state.style, 'picker_over_below');

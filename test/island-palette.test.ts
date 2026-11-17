@@ -113,6 +113,17 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await key('Enter');
     await until('Enter went to it', () => page.evaluate<boolean>(`wentTo.includes(${JSON.stringify(made.quarry)})`));
     await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; delete hooks.toIsland; })()`);
+    // Dragged, the rail widens the bar, the canvas beside it, and the width is kept; a double-click gives it back.
+    const width = `Math.round(document.getElementById('islands').getBoundingClientRect().width)`;
+    const was = await page.evaluate<number>(width);
+    const [rx, ry] = await page.evaluate<[number, number]>(`(() => { const r = document.querySelector('#islands .isl-rail').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: rx, y: ry, button: 'left', clickCount: 1 });
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: rx + 40, y: ry, button: 'left' });
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: rx + 80, y: ry, button: 'left' });
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: rx + 80, y: ry, button: 'left', clickCount: 1 });
+    await until('the bar wider, still open', () => page.evaluate<boolean>(`document.body.dataset.islands === 'open' && Math.abs(${width} - ${was + 80}) <= 1 && JSON.parse(localStorage.getItem('pelago-islands-side:width')) > ${was}`));
+    await page.evaluate(`document.querySelector('#islands .isl-rail').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+    await until('the default width back', () => page.evaluate<boolean>(`${width} === ${was} && localStorage.getItem('pelago-islands-side:width') === 'null'`));
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');
