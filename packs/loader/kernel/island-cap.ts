@@ -7,6 +7,7 @@
 // rule island_full): this only reads the fact, over_cap, for each op that adds to an island past its cap.
 
 import { ISLAND } from './island-items.ts';
+import { islandLooks } from './island-look.ts';
 import { layoutsOf } from './layouts.ts';
 import type { Registry } from './packs.ts';
 import type { Q } from '../../database/kernel/db.ts';
@@ -41,21 +42,11 @@ export async function mapCap(q: Q, reg: Registry): Promise<Most> {
 export async function islandCaps(q: Q, reg: Registry, islands: string[]): Promise<Map<string, Most>> {
   const caps = new Map<string, Most>();
   if (!islands.length) return caps;
-  const { rows } = await q.query<{ island: string; props: Record<string, unknown> }>(
-    `select r.to_id as island, e.props from relation r join entity e on e.id = r.from_id
-      where r.to_id = any($1::text[]) and r.type = 'about' and r.valid_to is null
-        and e.archived_at is null and e.is_open and e.type = any($2::text[])
-      order by e.updated_at desc, e.id`,
-    [islands, [...reg.family('layout'), ...reg.family('part')]],
-  );
-  // The look changed last draws an island (as islandLooks reads it): its cap, else its preset's.
-  const seen = new Set<string>();
-  for (const r of rows) {
-    if (seen.has(r.island)) continue;
-    seen.add(r.island);
-    const own = capOf(r.props.cap); // none (null) is a cap said, not one left unsaid
-    const most = own !== undefined ? own : capOf(shipped(reg).find((d) => d.id === r.props.preset)?.cap);
-    if (most !== undefined) caps.set(r.island, most);
+  // The island's look, as islandLooks reads it (the one place that says how a look names its island): its cap, else its preset's.
+  for (const [island, look] of await islandLooks({ db: q, registry: reg }, islands)) {
+    const own = capOf(look.cap); // none (null) is a cap said, not one left unsaid
+    const most = own !== undefined ? own : capOf(shipped(reg).find((d) => d.id === look.preset)?.cap);
+    if (most !== undefined) caps.set(island, most);
   }
   const missing = islands.filter((id) => !caps.has(id));
   if (missing.length) {
