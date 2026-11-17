@@ -78,8 +78,8 @@ export function drawPicker() {
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // Its shortcut, at the line's right while nothing is typed.
   const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
-  // The bar's button, in the tab bar before the tabs: a press shows the islands or puts them away; how many are on is
-  // its count.
+  // The bar's button, first in the band under the tabs (./canvas.js): a press shows the islands or puts them away; how
+  // many are on is its count.
   const count = h('span', { class: 'isl-toggle-count' });
   const fold = h('button', { type: 'button', class: 'isl-toggle' }, 'Islands', count);
   // The bar's right edge: dragged, it sets the bar's width.
@@ -93,8 +93,8 @@ export function drawPicker() {
   });
   const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), edge);
   document.body.append(side);
-  const nav = document.getElementById('nav');
-  nav?.insertBefore(fold, document.getElementById('tabs'));
+  hooks.islandsButton = () => fold;
+  hooks.drawBand?.();
   /** Whether the bar was folded for an item's page, not by the person: it opens again when the page closes. */
   let forPage = false;
   /** Fold or open the bar; `kept`, as the person left it (a fold for a page is not). */

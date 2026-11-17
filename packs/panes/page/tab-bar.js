@@ -42,7 +42,7 @@ async function startPart() {
     clearTimeout(soon);
     soon = setTimeout(() => dispatchEvent(new Event('resize')), 30);
   }).observe(document.body, { attributes: true, attributeFilter: ['style'] });
-  const button = (label, title, mark, onclick) => h('button', { type: 'button', class: 'q-save', title, 'aria-label': label, onclick }, mark);
+  const button = (label, title, mark, onclick) => h('button', { type: 'button', class: 'q-save q-travel', title, 'aria-label': label, onclick }, mark);
   hooks.paneButtons = () => [
     button('Back', 'Back to what this pane drew before', '‹', () => history.back()),
     button('Forward', 'Forward again', '›', () => history.forward()),

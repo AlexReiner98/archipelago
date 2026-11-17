@@ -13,6 +13,7 @@ import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { cornersOf, corners, islandsOn, onIslands } from './islands-on.js';
 import { islandsOnMap } from './islands-list.js';
 import { unfollow } from './replica.js';
+import { drawBand } from './bar-band.js';
 
 /** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
 let overlay;
@@ -77,8 +78,16 @@ export function activate(c) {
   current = c;
   barNow();
 }
-/** The canvas in focus moved: what follows its address is told. */
-const barNow = () => hooks.addressMoved?.();
+/**
+ * The canvas in focus moved: the band under the tabs is drawn for it (./bar-band.js), and what follows its address is
+ * told. The band holds the island side bar's button, if the map has islands, and the pane's back and forward.
+ */
+function barNow() {
+  if (current?.view) drawBand(current.lens, current.view, h('span', { class: 'q-part q-canvas' }, ...[hooks.islandsButton?.(), ...(hooks.paneButtons?.() ?? [])].filter(Boolean)));
+  hooks.addressMoved?.();
+}
+/** Draw the band again, as a part of it came (the side bar's button, once the side bar is drawn). */
+hooks.drawBand = () => barNow();
 /** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */
 hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: current.view.failed } : null);
 /** The lens Home draws, handed where no query is up. */
