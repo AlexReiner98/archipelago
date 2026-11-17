@@ -66,6 +66,9 @@ export function reads(lens) {
  * items live on), sessions (the sessions it holds) }; `touches` are the facts as the store saw them before folding them in (Store.apply): { id, field,
  * op, link?: { type, from, to }, made?: true, island? }; `made`: how many items the tail says were made anywhere.
  */
+/** The field on an island that lists the packs turned off there (core's island and focus types). */
+const PACKS_OFF = 'packs_off';
+
 export function mayMove(view, touches, made = 0) {
   const r = view.reads ?? reads(view.lens);
   const near = (id) => view.items.has(id) || r.anchors.has(id);
@@ -84,6 +87,9 @@ export function mayMove(view, touches, made = 0) {
       if (r.unanchored && (!r.islands.size || onIsland)) return true;
       continue;
     }
+    // The packs turned off on an island it holds or looks at (the island's packs_off) change what the server derives
+    // of the answer (each pack's state there, what waits): asked again, whatever the query reads.
+    if (t.field === PACKS_OFF && (near(t.id) || islands.has(t.id))) return true;
     if (!(near(t.id) || onIsland)) continue;
     // A session it holds that ends leaves it.
     if (r.sessions && t.field === 'status' && view.sessions?.has(t.id)) return true;
