@@ -132,10 +132,19 @@ export async function searchMap(l: Archipelago, input: SearchInput) {
   if (input.type && !l.registry.type(l.registry.canonical(input.type))) throw new Error(`Unknown type "${input.type}"`);
   const found = await search(l.db, (type) => l.registry.family(type), input);
   if (!input.islands) return found;
+  // When work last changed on each island: the latest of its items' changes and its own, so the picker's Recent lists
+  // where work happened, not which island items were edited.
+  const ids = found.map((e) => e.id);
+  const { rows: worked } = ids.length
+    ? await l.db.query<{ island: string; at: string }>(`select props->>'island' as island, max(updated_at) as at from entity where props->>'island' = any($1::text[]) and archived_at is null group by 1 -- index entity_island`, [ids])
+    : { rows: [] };
+  const workedAt = new Map(worked.map((w) => [w.island, new Date(w.at).getTime()]));
   // Each island with the pack it speaks (an island item's, or a focus's type's), its title and glyph, for the picker.
   return found.map((e) => {
+    const own = new Date(e.updated_at).getTime(), items = workedAt.get(e.id) ?? 0;
+    const worked_at = new Date(Math.max(own, items)).toISOString();
     const id = (typeof e.props.pack === 'string' && e.props.pack) || l.registry.type(e.type)?.pack || '';
     const pack = l.registry.found.find((p) => p.id === id), glyph = glyphOf(pack);
-    return { ...e, pack: { id, title: pack?.title ?? id, ...(glyph && { glyph }) } };
+    return { ...e, worked_at, pack: { id, title: pack?.title ?? id, ...(glyph && { glyph }) } };
   });
 }
