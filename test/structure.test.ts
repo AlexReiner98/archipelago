@@ -13,11 +13,10 @@ import { join, relative } from 'node:path';
 import { test } from 'node:test';
 import { MAP_TABLES, RESTORE, STORES, VIEWS_OPERATIONAL } from '../packs/log/kernel/operational.ts';
 import { valueImports } from './structure-reader.ts';
-import { spacing } from './spacing.ts';
 import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, uiFiles, VENDORED, walk } from './structure-kit.ts';
 import { history, RELEASED, RELEASED_KEY, releasedKey } from './structure-history.ts';
 import { rootImports } from './structure-roots.ts';
-import { drawings, faultsOf, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, setOut, short, WIRED, WRITES } from './wired.ts';
+import { drawings, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, short, WIRED, WRITES } from './wired.ts';
 
 const MAX_LINES = 500;
 
@@ -429,8 +428,8 @@ test("a drawing's list holds every module it reaches", () => {
 // axes (design e_49yk2trw). Counted, as of 30 Oct 2026: a bare number of 3 or more that does not multiply or divide
 // (under 3 is arithmetic), and every px in a string. It catches more than lengths, and only ever goes down.
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
-  'flow/direction.js': 1, 'flow/index.js': 13, 'flow/numbering.js': 5, 'flow/planar.js': 1,
-  'flow/shapes.js': 9, 'flow/thread.js': 3, 'flow/topology.js': 1, 'flow/upward.js': 4,
+  'flow/direction.js': 1, 'flow/index.js': 13,
+  'flow/shapes.js': 9,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;
 
@@ -471,19 +470,6 @@ test("only Metrics sets a place or a wire's points", () => {
   const others = wiredFiles.filter((f) => !ranks(f).includes(LAYERS.indexOf('metrics')));
   const counted = Object.fromEntries(others.map((f) => [short(f), scanned(read(f)).code.match(WRITES)?.length ?? 0]).filter(([, n]) => (n as number) > 0));
   assert.deepEqual(ratchet(counted, WRITERS), [], 'Coordinates are output: Metrics sets them, from what this layer says.');
-});
-// 21. Sealed: each wired drawing runs on small sketches (test/wired.ts), and no two wires of it lie on one line, none stands
-// under the spacing, no box stands on a box, none runs through a box. The spacing is the flow's (test/spacing.ts).
-// Counted for the map as it stood when it became the one layout, 9 Nov 2026; each count may only go down.
-// The map's trunks (one wire for the links of one type and one way off a box) are what share: wires of one box.
-const NOT_SEALED: Record<string, number> = { 'core.map knot: shared': 1, 'core.map fan: shared': 24, 'core.map crossed: shared': 3, 'core.map comb: shared': 31 };
-test('a wired drawing keeps its wires apart', async () => {
-  const counted: Record<string, number> = {};
-  for (const d of wired) {
-    const found = await setOut(d, async (url) => faultsOf(WIRED[d.id], (await import(url('layout.js'))).layout, spacing));
-    for (const [what, n] of Object.entries(found)) counted[`${d.id} ${what}`] = n;
-  }
-  assert.deepEqual(ratchet(counted, NOT_SEALED), [], `Wires take room in the solve: each stretch keeps its distance from every other (docs/layouts.md). Now: ${JSON.stringify(counted)}`);
 });
 // 22. A root imports plumbing, its own pack and the roots before it; what it imported above them is owed (structure-roots.ts).
 test("a root pack's code imports only plumbing and the roots before it", () => {

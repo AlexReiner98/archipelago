@@ -1,5 +1,4 @@
-// The tail says who made each entry, on whose word and why, opened: what the trace overlay tells a change by (the
-// catch_up pack's parts; what a change set says of the rows is test/catch-up-parts.test.ts).
+// The tail says who made each entry, on whose word and why, opened.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

@@ -12,8 +12,8 @@ const browser = chrome();
 
 test('in a browser, what comes into sight is drawn, though the picture changed while it was out of sight', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
-  // A long order: its first step at the top of the picture, its last far below.
-  const titles = Array.from({ length: 10 }, (_, k) => `Step ${k + 1} of the order`);
+  // A long order, laid out plainly in rows: its highest step at the top of the picture, its lowest far below.
+  const titles = Array.from({ length: 80 }, (_, k) => `Step ${k + 1} of the order`);
   const made = (await call('/api/change', undefined, {
     reason: 'test',
     ops: [
@@ -27,15 +27,18 @@ test('in a browser, what comes into sight is drawn, though the picture changed w
   const step = (id: string) => `document.querySelector('#canvas svg a[href="#/e/${id}"]')`;
   const moves = `document.querySelector('#canvas .lens-view').moves`;
   const frames = `new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))`;
-  const [first, last] = [made.s0, made.s9];
   // A step's middle in the picture's units, measured while it is drawn.
   const middle = (id: string) => `(() => { const b = ${step(id)}.getBBox(); return [b.x + b.width / 2, b.y + b.height / 2]; })()`;
   const drawn = (id: string) => `${step(id)}.getAttribute('display') !== 'none'`;
   try {
-    assert.ok(await page.until(`Boolean(${step(last)}) && Boolean(${moves})`), `the order is drawn: ${page.logs().join('\n')}`);
-    assert.ok(await page.still(`${step(last)}.getBoundingClientRect()`), 'the picture stands still');
+    assert.ok(await page.until(`Boolean(${step(made.s79)}) && Boolean(${moves})`), `the order is drawn: ${page.logs().join('\n')}`);
+    assert.ok(await page.still(`${step(made.s79)}.getBoundingClientRect()`), 'the picture stands still');
     await page.evaluate(`(async () => { ${moves}.fit(); await ${frames}; })()`);
-    const [top, bottom] = [await page.evaluate<[number, number]>(middle(first)), await page.evaluate<[number, number]>(middle(last))];
+    // The highest step and the lowest, as the picture placed them.
+    const at: [string, [number, number]][] = [];
+    for (let k = 0; k < titles.length; k++) at.push([made[`s${k}`], await page.evaluate<[number, number]>(middle(made[`s${k}`]))]);
+    at.sort((p, q) => p[1][1] - q[1][1]);
+    const [[first, top], [last, bottom]] = [at[0], at[at.length - 1]];
     assert.ok(bottom[1] - top[1] > 400, `the last step is far below the first: ${top} and ${bottom}`);
 
     // Zoomed in on the first step: the last is out of sight, and not drawn.

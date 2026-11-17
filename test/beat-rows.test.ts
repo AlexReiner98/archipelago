@@ -1,6 +1,6 @@
 // What the runtime hands the parts on `traces` (packs/surface/page/beat-rows.js, task e_p3tygg6p): the rows a beat
-// touched as they were and are. Its half and the part's half (packs/catch_up/parts/changes.js) together say what came,
-// left and changed, on the same facts the page's change set (the old ui/changes.js) told.
+// touched as they were and are. Nothing fills that slot since the catch_up pack went (17 Nov 2026); the runtime's half
+// stays until the canvas is rewritten.
 
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -9,8 +9,6 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { test } from 'node:test';
 import { uiFile } from '../packs/surface/kernel/ui-files.ts';
-// @ts-expect-error a part's module, plain JavaScript
-import { changeSet as partSet } from '../packs/catch_up/parts/changes.js';
 
 /** The page's modules and the projector they import, as the server serves them. */
 async function served() {
@@ -35,7 +33,7 @@ const entries = [
   { pos: 7, at: '2026-11-05T10:03:00.000Z', by, facts: [['+', 'e_aaaaaaaa', 'title', 'Tailed']] },
 ];
 
-test("the runtime's rows and the part's comparison say what came, left and changed", async () => {
+test("the runtime's rows: each row a beat touched as it was and is", async () => {
   const { beatRows } = await served();
   const h = held();
   const before = JSON.stringify([...h.items, ...h.links]);
@@ -43,11 +41,6 @@ test("the runtime's rows and the part's comparison say what came, left and chang
   assert.equal(JSON.stringify([...h.items, ...h.links]), before, 'what it was handed is unchanged');
   assert.deepEqual([beat.from, beat.to], [4, 7]);
   assert.ok(beat.rows.every((r: any) => 'was' in r && 'now' in r && r.pos), 'each row as it was and is, with where');
-  const set = partSet(beat);
-  assert.deepEqual(set.items.map((c: any) => [c.id, c.did, c.pos]).sort(), [['e_aaaaaaaa', 'changed', 7], ['e_bbbbbbbb', 'left', 5], ['e_cccccccc', 'left', 6], ['e_dddddddd', 'came', 5]], 'what was said again as it was is no change; what the reader may no longer see left');
-  assert.deepEqual(set.items.find((c: any) => c.id === 'e_aaaaaaaa').fields.map((f: any) => [f.field, f.was, f.now]), [['title', 'Tail the log', 'Tailed'], ['status', 'todo', 'doing']]);
-  assert.deepEqual(set.links.map((c: any) => [c.id, c.did]).sort(), [['r_aaaaaaaa', 'unlinked'], ['r_bbbbbbbb', 'linked']]);
-  assert.deepEqual(set.items.find((c: any) => c.id === 'e_aaaaaaaa').by, by, 'its latest maker');
   assert.deepEqual(beatRows(held(), kinds, [], { after: 8 }), { from: 8, to: 8, rows: [] });
 });
 
