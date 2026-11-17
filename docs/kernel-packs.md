@@ -91,7 +91,10 @@ trusted).
   (`packs/<id>/kernel/`), loaded with `import()` by the loader. Never a file
   a pack item or a version carries: `pack_code` stays the sandbox's alone.
 - **`fills`**: the fields of an item its `write.rewrite` fillings may set
-  (placement: `["island"]`); none unless said. Only a service pack.
+  (placement: `["island"]`); none unless said. Only a service pack. An entry
+  `rule:<effect>.<key>` stands for the field each active rule names at that
+  path of its `then` (carry: `["rule:carry.field"]`, the fields rules that
+  carry fill).
 - **`provides`**, **`hooks`**, **`tables`**, **`timers`**: below.
 
 Every root and service pack lives in this repository's `packs/`, as

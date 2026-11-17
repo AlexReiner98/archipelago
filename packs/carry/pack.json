@@ -1,0 +1,18 @@
+{
+  "id": "carry",
+  "version": "0.1.0",
+  "title": "Carry",
+  "description": "Carries out the rules that carry (then.carry): an item of a rule's type takes into a field of its own the promised field of what it reads across islands in a role (a reads link's props.as), on its every write, so a compare rule beside it judges what it reads. It fills what a change writes (write.rewrite) and, for a reader the change only links, adds the update (write.follow), judged with the change.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": {
+      "write.rewrite": "carry.ts#rewrite",
+      "write.follow": "carry.ts#follow"
+    },
+    "fills": [
+      "rule:carry.field"
+    ]
+  }
+}

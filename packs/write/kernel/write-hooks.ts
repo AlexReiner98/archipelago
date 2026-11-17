@@ -70,11 +70,20 @@ const slotOf = async (_map: Archipelago): Promise<WriteSlot> => {
   return { fillings: (map, point) => hostAt(map).fillings(map, point), change: (map, pack, input) => kernelContext(map, pack).change(input) };
 };
 
-/** The packs' fields a rewrite may set, by the manifest's `kernel.fills` (none, until a pack says). */
+/**
+ * The packs' fields a rewrite may set, by the manifest's `kernel.fills` (none, until a pack says). An entry
+ * `rule:<effect>.<key>` stands for the field each active rule names there (then.<effect>.<key>): a pack that carries out
+ * an effect rules declare fills the fields those rules name, and no other (typed islands, e_f56ds3ww).
+ */
 const fillsOf = (map: Archipelago, pack: string): string[] => {
   const k = map.registry.packs.find((p) => p.id === pack)?.kernel as { fills?: unknown } | undefined;
-  return Array.isArray(k?.fills) ? k.fills.filter((f): f is string => typeof f === 'string') : [];
+  const said = Array.isArray(k?.fills) ? k.fills.filter((f): f is string => typeof f === 'string') : [];
+  return said.flatMap((f) => (f.startsWith('rule:') ? namedByRules(map.registry.rules, f.slice(5).split('.')) : [f]));
 };
+
+/** The fields active rules name at a path of their then: { carry: { field } } at ["carry", "field"]. */
+const namedByRules = (rules: { then?: unknown }[], path: string[]): string[] =>
+  rules.map((r) => path.reduce<unknown>((v, key) => (v && typeof v === 'object' ? (v as Record<string, unknown>)[key] : undefined), r.then)).filter((f): f is string => typeof f === 'string');
 
 /** Every filling of a point, the write path's own first, then the packs', in order. */
 async function fillings(env: WriteEnv, point: Point): Promise<Filling[]> {

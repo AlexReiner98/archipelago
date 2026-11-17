@@ -88,7 +88,7 @@ export interface RuleDef {
     spreads?: boolean;
   };
   /** spare: what it matches is let through, every other rule it would be under spared by this one (its pack's bookkeeping only), or with spares, those alone. */
-  then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] };
+  then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] } | { carry: Carry };
   /** For spare: the rules it lets the op through, by id, each of its own pack. Left out, every rule (bookkeeping). */
   spares?: string[];
   /** Fields whose values together may belong to one item of the type only. */
@@ -110,6 +110,17 @@ export interface RuleDef {
   /** What compaction leaves of them (packs/log/kernel/retention.ts). */
   keep?: Keep;
 }
+
+/**
+ * A rule that fills a field instead of judging (typed islands, e_f56ds3ww): an item of the rule's when.type takes into
+ * `field` the promised field `read` of what it reads by a crossing link whose props.as is `as`. It holds, refuses and
+ * spares nothing itself: a compare rule beside it judges the field. The pack that fills write.rewrite and write.follow
+ * for it carries it out (packs/carry), on the item's every write.
+ */
+export interface Carry { field: string; as: string; read: string }
+
+/** The carry a rule says, if it says one. */
+export const carryOf = (rule: Pick<RuleDef, 'then'>): Carry | undefined => (typeof rule.then === 'object' && rule.then !== null && 'carry' in rule.then ? rule.then.carry : undefined);
 
 /** A rule as loaded: the pack it is of, and the version of that pack where an island runs one. */
 export type Rule = RuleDef & { pack: string; version?: string };
@@ -306,7 +317,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   // A rule that names what it spares lets the op through those of its own pack's rules alone.
   const named = new Map(sparing.filter((r) => r.spares).flatMap((r) => r.spares!.map((id) => [`${r.pack}.${id}`, `${r.pack}.${r.id ?? ''}`] as const)));
   for (const rule of order) {
-    if (rule.unique || rule.stream || rule.on !== undefined || rule.then === 'spare' || !applies(rule, reg, who, w, targets, held.length > 0, facts)) continue;
+    if (rule.unique || rule.stream || rule.on !== undefined || rule.then === 'spare' || carryOf(rule) || !applies(rule, reg, who, w, targets, held.length > 0, facts)) continue;
     if (letBy) { spared.push({ ...ruled(rule), lifted_by: letBy }); continue; }
     const spare = named.get(`${rule.pack}.${rule.id ?? ''}`);
     if (spare) { spared.push({ ...ruled(rule), lifted_by: spare }); continue; }
@@ -319,7 +330,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
       // A person's own change waits for nobody; one a drawing asked for waits for that person.
       if (!who.human || (who.drawing && rule.when?.drawing)) held.push(ruled(rule));
     } else if (rule.then === 'refuse') refusers.push(ruled(rule)), refused.push(said(rule, `"${title}": refused by ${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`));
-    else if (typeof rule.then === 'object') {
+    else if (typeof rule.then === 'object' && 'require' in rule.then) {
       // A field the item's head holds (its body) is read from the op too.
       const props = { ...targets[0]?.props, ...w.props };
       const value = (f: string) => props[f] ?? (w as unknown as Record<string, unknown>)[f];

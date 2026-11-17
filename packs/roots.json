@@ -30,15 +30,15 @@
     },
     {
       "id": "loader",
-      "hash": "8bfb5e588bcc46228739828a64fa87042a1e1b5685576e54d9086db7f7225e69"
+      "hash": "74648f2ad6a86a2cc0d041ddef7a85a4758721e11e36d832ce30b8934228a860"
     },
     {
       "id": "rules",
-      "hash": "62028c93c7bb64a48bfd3fb82179cd63ff6105caaaec1834629c4db22a0e900f"
+      "hash": "b5d5ce6d359aa0cd0a29fea86ec40495dfc88c9d210d76d6bb46b762a0b46211"
     },
     {
       "id": "write",
-      "hash": "95995bba11d6f4c02fcc77fa09acbcde965e787eba8fb2b77248a833585194c1"
+      "hash": "8345c803832c6dcc833da9afacb3f26097c1175c2fc106b75b872ab6561f10b8"
     },
     {
       "id": "surface",
