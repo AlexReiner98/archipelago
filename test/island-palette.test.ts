@@ -1,5 +1,5 @@
 // The island picker in a real browser (packs/surface/page/island-picker.js; Alex, 17 Nov 2026): the side list at the
-// canvas's left edge, every island in it by pack. Ctrl+K folds it open with its search in focus; typed into, it lists
+// canvas's left edge, the islands changed lately first, then the rest by name. Ctrl+K folds it open with its search in focus; typed into, it lists
 // what it finds within the bar, Enter puts the lit island on and the canvas draws it; the list then has it among those on.
 // Folded, the bar is its rail alone, and the rail opens it again.
 
@@ -31,8 +31,9 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     ['keyDown', 'keyUp'].reduce((p, type) => p.then(() => page.send('Input.dispatchKeyEvent', { type, key: k, code: k.length === 1 ? `Key${k.toUpperCase()}` : k, windowsVirtualKeyCode: k.length === 1 ? k.toUpperCase().charCodeAt(0) : 13, ...more })), Promise.resolve() as Promise<unknown>);
   const draws = (words: string) => page.evaluate<boolean>(`document.querySelector('#canvas svg')?.textContent.includes(${JSON.stringify(words)}) ?? false`);
   try {
-    // The side list is up, every island in it in a group by its pack.
-    await until('the side list', () => page.evaluate<boolean>(`document.querySelectorAll('#islands .isl-group').length > 0`));
+    // The side list is up: no pack groups, the islands changed lately first (both were just made), by latest.
+    await until('the side list', () => page.evaluate<boolean>(`[...document.querySelectorAll('#islands .isl-head')].some((h) => /^Recent · [0-9]/.test(h.textContent))`));
+    assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-group').length`), 0, 'no pack groups');
     assert.match(await page.evaluate<string>(`document.querySelector('#islands .isl-head').textContent`), /On · 0/);
     assert.equal(await draws('Rebuild the pier'), false, 'nothing on yet');
     // Folded, the bar is its rail; Ctrl+K opens it with its search in focus, and nothing is drawn outside it.
@@ -54,15 +55,9 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the canvas draws it', () => draws('Rebuild the pier'));
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
-    // A press on an island in a group puts it on where its row stands: the row lights and gains ×, and nothing moves.
-    // A group says whether it is open: › folded, ⌄ open, in the mark's column.
-    assert.equal(await page.evaluate<string>(`[...document.querySelectorAll('#islands .isl-group')].find((g) => g.getAttribute('aria-expanded') === 'false')?.querySelector('.isl-fold')?.textContent`), '›');
-    await page.evaluate(`[...document.querySelectorAll('#islands .isl-group')].find((g) => g.getAttribute('aria-expanded') === 'false')?.click()`);
-    await until('the group open, its mark turned', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-group[aria-expanded="true"] .isl-fold')?.textContent === '⌄'`));
+    // A press on an island under Recent puts it on where its row stands: the row lights and gains ×, and nothing moves.
     const quarry = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Quarry')`;
-    await until('Quarry in its group', () => page.evaluate<boolean>(`Boolean(${quarry})`));
-    // It sits under its group's name, with no mark of its own.
-    assert.ok(await page.evaluate<boolean>(`(() => { const r = ${quarry}, g = r.closest('.isl-in').previousElementSibling; return !r.querySelector('.isl-mark') && Math.abs(r.querySelector('.isl-name').getBoundingClientRect().left - g.querySelector('.isl-name').getBoundingClientRect().left) < 1; })()`), 'under its group');
+    await until('Quarry under Recent', () => page.evaluate<boolean>(`Boolean(${quarry}) && /^Recent/.test(${quarry}.parentElement.previousElementSibling.textContent)`));
     const before = await page.evaluate<number>(`Math.round(${quarry}.getBoundingClientRect().top)`);
     await page.evaluate(`${quarry}.querySelector('button.isl-name').click()`);
     await until('Quarry on, its row lit where it stood', () => page.evaluate<boolean>(`(() => { const r = ${quarry}; return r?.classList.contains('on') && Boolean(r.querySelector('.isl-off')) && Math.round(r.getBoundingClientRect().top) === ${before} && document.querySelector('#islands .isl-head').textContent.includes('On · 2'); })()`));

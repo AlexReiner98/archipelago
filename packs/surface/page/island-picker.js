@@ -1,12 +1,13 @@
 // The island picker (decision e_n42s8jvn; Alex, 17 Nov 2026: a side list and a palette, for hundreds of islands, all of
 // it within the bar): a list at the canvas's left edge that folds to it. A search line (Ctrl+K opens the bar there), the
-// islands on (each × to take it off), then every other island in groups by pack, each folded with its count; a press on
-// one puts it on. Typed into, the bar lists what it finds best first (./islands-list.js, rankIslands): arrows move,
+// islands on (each × to take it off), then those changed lately, the latest first, then every other by name (Alex, 17 Nov
+// 2026, e_cr4haav9: no pack groups); a press on one puts it on. Typed into, the bar lists what it finds best first (./islands-list.js, rankIslands): arrows move,
 // Enter puts the lit one on, Shift+Enter shows it alone.
 
-import { api, h, hooks } from './base.js';
+import { api, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
-import { atHome, byPack, capital, drawnAt, only, packMarks, rankIslands, turnedOn } from './islands-list.js';
+import { atHome, capital, drawnAt, only, packMarks, rankIslands, recentFirst, turnedOn } from './islands-list.js';
+import { numberOf } from './style-number.js';
 import { titles } from './words.js';
 
 /** Each pack's mark by its id, told apart from the others' (./islands-list.js, packMarks). */
@@ -16,7 +17,7 @@ let reading;
 export const allIslands = () =>
   (reading ??= api('search', { islands: true, limit: 2000 }).then(
     (found) => {
-      const all = found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, pack: e.pack ?? { id: '', title: '' } }));
+      const all = found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, updated_at: e.updated_at, pack: e.pack ?? { id: '', title: '' } }));
       marks = packMarks(all.map((i) => i.pack));
       return all;
     },
@@ -50,7 +51,7 @@ export const packMark = (pack) => h('span', { class: 'isl-mark', 'aria-hidden': 
 /** A pack's title as the list shows it. */
 const packTitle = (pack) => capital(pack?.title || pack?.id);
 
-/** What the side list keeps in this browser: whether it is open, which packs are unfolded. */
+/** What the side list keeps in this browser: whether it is open. */
 const KEPT = 'pelago-islands-side';
 const kept = (key, fallback) => {
   try {
@@ -115,20 +116,19 @@ export function drawPicker() {
   // The window's own resizes, not the one a fold sends: a bar the person opened over a page stays open.
   addEventListener('resize', (ev) => ev.isTrusted && requestAnimationFrame(room));
   room();
-  const unfolded = new Set(kept('packs', []));
 
   let islands = [];
   let found = [];
   let lit = 0;
   /**
-   * The islands laid out under On: set when the list is laid out anew (the page opened, a search cleared, a group
-   * folded), not by a press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
+   * The islands laid out under On: set when the list is laid out anew (the page opened, a search cleared), not by a
+   * press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
    */
   let laidOn = null;
-  /** An island's row: a press on its name puts it on, or, on, brings the canvas to it. In a group (`grouped`) it sits under the group's name with no mark of its own: the group says its pack. */
-  const row = (i, on, grouped = false) =>
+  /** An island's row: its pack's mark and its name, a press on which puts it on, or, on, brings the canvas to it. */
+  const row = (i, on) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
-      grouped ? '' : packMark(i.pack),
+      packMark(i.pack),
       h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? hooks.toIsland?.(i.id) : putOn(i)) }, i.title),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its pack's mark, its name, its pack (and whether it is on), lit as Enter would take it. */
@@ -153,13 +153,9 @@ export function drawPicker() {
     laidOn ??= new Set(drawn);
     const on = found.filter((i) => laidOn.has(i.id)), rest = found.filter((i) => !laidOn.has(i.id));
     const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id))))];
-    for (const g of byPack(rest)) {
-      const shown = unfolded.has(g.id);
-      const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown) },
-        h('span', { class: 'isl-mark isl-fold', 'aria-hidden': 'true' }, shown ? '⌄' : '›'), h('span', { class: 'isl-name' }, capital(g.title) || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
-      head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), relay());
-      parts.push(head, ...(shown ? [h('div', { class: 'isl-in', role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id), true)))] : []));
-    }
+    const { recent, rest: others } = recentFirst(rest, Date.now(), numberOf(state.style, 'picker_recent_days'));
+    const list = (head, all) => (all.length ? [h('div', { class: 'isl-head' }, `${head} · ${all.length}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id))))] : []);
+    parts.push(...list('Recent', recent), ...list('All', others));
     body.replaceChildren(...parts);
   };
   /** Lay the list out anew: what is on now goes under On. */

@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { atHome, capital, drawnAt, islandsIn, packMarks, pressed } from '../packs/surface/page/islands-list.js';
+import { atHome, capital, drawnAt, islandsIn, packMarks, pressed, recentFirst } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
@@ -58,4 +58,17 @@ test("a pack's mark tells it apart from every other pack's, and its title shows 
   assert.deepEqual(packMarks([{ id: 'code', title: 'code' }, { id: 'core', title: 'Core' }]), packMarks([{ id: 'core', title: 'Core' }, { id: 'code', title: 'code' }]), 'the same whatever the order');
   assert.equal(capital('ridges'), 'Ridges');
   assert.equal(capital('Pack anatomy'), 'Pack anatomy');
+});
+
+test('the side list puts the islands changed lately first, the latest first, then the rest by name', () => {
+  const now = Date.parse('2026-11-17T12:00:00Z'), day = (n: number) => new Date(now - n * 86_400_000).toISOString();
+  const { recent, rest } = recentFirst([
+    { id: 'a', title: 'Zebra', updated_at: day(1) },
+    { id: 'b', title: 'Apple', updated_at: day(30) },
+    { id: 'c', title: 'Mango', updated_at: day(0.5) },
+    { id: 'd', title: 'Banana', updated_at: day(8) },
+    { id: 'e', title: 'Cherry' },
+  ], now, 7);
+  assert.deepEqual(recent.map((i: { id: string }) => i.id), ['c', 'a'], 'within the days, the latest first');
+  assert.deepEqual(rest.map((i: { title: string }) => i.title), ['Apple', 'Banana', 'Cherry'], 'every other by name, one with no time among them');
 });

@@ -69,14 +69,15 @@ export function rankIslands(islands, q) {
   return scored.sort(([a, x], [b, y]) => b - a || String(x.title).length - String(y.title).length || byName(x, y)).map(([, i]) => i);
 }
 
-/** The islands in groups by pack, each its pack's id, title and islands by name; packs by title. */
-export function byPack(islands) {
-  const groups = new Map();
-  for (const i of islands) {
-    const id = i.pack?.id || '';
-    (groups.get(id) ?? groups.set(id, { id, title: i.pack?.title || id, islands: [] }).get(id)).islands.push(i);
-  }
-  return [...groups.values()].sort((a, b) => String(a.title).localeCompare(String(b.title)));
+/**
+ * The islands as the side list lays them out (Alex, 17 Nov 2026, e_cr4haav9: recent first, then the rest by name; no
+ * pack groups): those changed within `days` of `now`, the latest first, then every other by name.
+ */
+export function recentFirst(islands, now, days) {
+  const since = now - days * 86_400_000, at = (i) => Date.parse(i.updated_at ?? '') || 0;
+  const recent = islands.filter((i) => at(i) >= since).sort((a, b) => at(b) - at(a) || String(a.title).localeCompare(String(b.title)));
+  const rest = islands.filter((i) => at(i) < since).sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  return { recent, rest };
 }
 
 /** A pack's title as the list shows it: as the pack says it, its first letter a capital. */
