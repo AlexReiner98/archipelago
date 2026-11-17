@@ -62,11 +62,13 @@ export function wear(look, root = document.documentElement) {
 /**
  * Run `code` (a layout's files) as the page's backdrop, its colours read from `dressed` (the view's own element, its
  * style's colours set on it). `drew()` is called once its frame has painted, `failed(why)` if its code stops or cannot
- * start; the frame is then taken away. Only one backdrop runs on a page: a second replaces the first. `under`: the
- * element it is put before, so what follows it on the page is drawn over it (the app's map); else it is put last.
+ * start; the frame is then taken away. Only one backdrop runs on a page: a second replaces the first, unless
+ * `replace` is false (a theme's land fading in over the last, which its caller stops). `under`: the element it is put
+ * before, so what follows it on the page is drawn over it (the app's map); else it is put last. The answer, stop, takes
+ * it away; stop({ quiet: true }) leaves the page's look as it is (worn by the land that follows it).
  */
-export function runBackdrop({ code, answer, style, dressed, under, drew = () => {}, failed = () => {} }) {
-  document.querySelector('body > iframe.page-backdrop')?.remove();
+export function runBackdrop({ code, answer, style, dressed, under, replace = true, drew = () => {}, failed = () => {} }) {
+  if (replace) document.querySelector('body > iframe.page-backdrop')?.remove();
   const frame = h('iframe', { class: 'page-backdrop', sandbox: frameSandbox(), src: '/draw.html', title: 'The page’s backdrop', 'aria-hidden': 'true', tabindex: '-1' });
   const colours = Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(dressed).getPropertyValue(`--ln-${name}`).trim()]));
   const theme = { ...colours, dark: matchMedia('(prefers-color-scheme: dark)').matches };
@@ -90,7 +92,7 @@ export function runBackdrop({ code, answer, style, dressed, under, drew = () => 
   // A picture drawing itself in a view on the page (marks patched each frame) moves no words: only the rest is heard.
   const aboutWords = (r) => !(r.target.nodeType === 1 ? r.target : r.target.parentElement)?.closest('.doc-lens');
   const content = new MutationObserver((records) => records.some(aboutWords) && moved());
-  const stop = () => {
+  const stop = ({ quiet = false } = {}) => {
     removeEventListener('message', hear);
     removeEventListener('scroll', soon);
     removeEventListener('resize', moved);
@@ -99,7 +101,7 @@ export function runBackdrop({ code, answer, style, dressed, under, drew = () => 
     document.fonts?.removeEventListener?.('loadingdone', moved);
     sizes.disconnect();
     content.disconnect();
-    wear({});
+    if (!quiet) wear({});
     frame.remove();
   };
   const hear = (ev) => {

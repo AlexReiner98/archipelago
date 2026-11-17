@@ -26,6 +26,8 @@ export function placeOf(body = document.body) {
 export function pageOf(body = document.body, hash = location.hash) {
   const name = hash.replace(/^#\/?/, '').split(/[/?]/)[0];
   if (body.dataset.first === 'wait' || (name === 'v' && body.dataset.gate !== undefined)) return 'try';
+  // Sign up from the sign-in page passes through Try it (#/try?then=sign-up) on its way: it wears Sign up's land already.
+  if (name === 'try' && /[?&]then=sign-up/.test(hash)) return 'sign-up';
   return name || 'sign-in';
 }
 
@@ -73,10 +75,13 @@ function wear() {
     if (key && !running.still) document.body.dataset.land = place;
     return;
   }
-  running?.stop();
+  // From one page's land to the next (sign in to sign up...): the one shown stays until the next has drawn and fades
+  // in over it, so the page is never blank between them. Anything else is taken away at once.
+  const crossing = Boolean(code && !calm && running && !running.still && running.place === place);
+  if (crossing) leaving.push(running);
+  else (running?.stop(), leaveAll());
   running = null;
-  delete document.body.dataset.land;
-  delete document.body.dataset.landDrew;
+  if (!crossing) (delete document.body.dataset.land, delete document.body.dataset.landDrew);
   wearEmblem(code ? land : null);
   if (!code) return;
   if (calm) return void (running = { key, stop: () => undefined, still: true });
@@ -88,9 +93,11 @@ function wear() {
     dressed: document.body,
     // Before the map, so the map, the sheet and the bars are drawn over it.
     under: document.getElementById('canvas'),
-    drew: () => (document.body.dataset.landDrew = ''),
+    replace: false,
+    drew: () => ((document.body.dataset.landDrew = ''), running?.key === key && leaveFaded()),
     failed: () => {
       if (running?.key !== key) return;
+      leaveAll();
       // Where the land cannot run the page is blank; kept as this land, so it is not tried again until the theme or
       // the place changes.
       running = { key, stop: () => undefined, still: true };
@@ -98,7 +105,22 @@ function wear() {
       delete document.body.dataset.land;
     },
   });
-  running = { key, stop };
+  running = { key, stop, place };
+}
+
+/** The lands a new one is fading in over: each taken away once it has (after `wait` ms), quietly, the new one's look kept. */
+let leaving = [];
+function leaveAll() {
+  const going = leaving;
+  leaving = [];
+  going.forEach((l) => l.stop({ quiet: true }));
+}
+/** Once the newest land has faded in (its frame's opacity transition, packs/surface/page/gate.css), the rest go. */
+function leaveFaded() {
+  const frame = [...document.querySelectorAll('body > iframe.page-backdrop')].at(-1);
+  const fades = frame && getComputedStyle(frame).transitionDuration.split(',').some((d) => parseFloat(d) > 0);
+  if (!fades) return leaveAll();
+  frame.addEventListener('transitionend', leaveAll, { once: true });
 }
 
 let soon = 0;
