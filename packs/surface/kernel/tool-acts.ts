@@ -54,6 +54,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
       ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
       url: WEB_URL.optional().describe('A web page to frame in a pane, in place of a view: http or https (plain http on localhost only).'),
+      // Taken and ignored, so sessions with the tools as they were are not refused; goes with the tabs (task e_e76h6hst).
+      focus: z.boolean().optional().describe('Ignored: a show never moves their view.'),
       note: z.string().max(200).optional().describe('One line, kept on your pane as its tooltip.'),
       watch: z.boolean().optional().describe('true once the owner has approved the plan you show and its sessions are starting: the tab it lands in watches it, so each session working on anything in it is drawn there on its step and shows its work in that tab, not a tab of its own. Show a view that walks works_on< from the plan’s steps and leaves out no run (not: []), so its sessions are drawn on it.'),
       look: z.boolean().optional().describe('Also answer with a picture of it, drawn by the server (as query look draws it).'),
