@@ -22,8 +22,6 @@ const QUERY = `${['work', 'aim', 'question', 'record'].map((t) => `find=${encode
 let making = false;
 
 const TITLE = 'Try it with your agent';
-/** The longest Making your map waits for the theme's land to be seen before it enters the map. */
-const LAND_MOST_MS = 4500;
 
 /** A new map's: its install note, the one record on it, is not drawn: the card said it, and the map is the visitor's work. */
 const FIRST_QUERY = `${['work', 'aim', 'question'].map((t) => `find=${encodeURIComponent(`type ${t}`)}`).join('&')}&over=waits_on&steps=1`;
@@ -147,8 +145,8 @@ export async function tryPage(query = '') {
   const from = new URLSearchParams(query).get('from') ?? undefined;
   if (making) return;
   making = true;
-  // The land is seen on this page before the map is entered (a reload): it is waited for, this long at most from now.
-  const by = performance.now() + LAND_MOST_MS;
+  // The land is seen on this page before the map is entered (a reload): waited for as long as its theme says, from now.
+  const since = performance.now();
   const error = h('div', { class: 'error gate-error' });
   gate(TITLE, gateRow(h('span', { class: 'muted grow' }, from ? 'Copying the map…' : 'Making your map…')), error);
   try {
@@ -163,7 +161,7 @@ export async function tryPage(query = '') {
     // (packs/identity/page/authorize.js, /oauth/authorize opened by the agent's installer) finds the guest by it.
     store.token = page_token;
     known.remember(workspace);
-    await hooks.landShown?.(by);
+    await hooks.landShown?.(since);
     enter(page_token);
   } catch (err) {
     making = false;

@@ -73,21 +73,19 @@ let soon = 0;
 // A timer, not a frame: a page opened behind another tab gets no frames, and its land must be under way when it is shown.
 const again = () => soon || (soon = setTimeout(() => ((soon = 0), wear())));
 
-/** How long the land is given, once drawn, to gather before a page that waits for it moves on. */
-const GATHER_MS = 2200;
-
 /**
- * Resolves once the land at the gate has drawn and had a moment to gather, or at `by` (a time from performance.now())
- * at the latest; at once where there is no land to wait for. What the loading page (Making your map...) waits on, so
- * the land is seen there before the page is entered.
+ * Resolves once the land at the gate has drawn and been given its theme's time to gather (backdrop.wait.gather), or at
+ * the most its theme waits (wait.most) from `since` (a time from performance.now()); at once where there is no land to
+ * wait for. What the loading page (Making your map...) waits on, so the land is seen there before the page is entered.
  */
-export function landShown(by) {
+export function landShown(since) {
   return new Promise((done) => {
     const look = () => {
-      const left = by - performance.now();
-      if (document.body.dataset.landDrew !== undefined) return void setTimeout(done, Math.max(0, Math.min(GATHER_MS, left)));
+      const wait = served && !(served instanceof Promise) ? landFor(served, 'gate')?.wait : undefined;
+      const left = since + (wait?.most ?? 0) - performance.now();
+      if (wait && document.body.dataset.landDrew !== undefined) return void setTimeout(done, Math.max(0, Math.min(wait.gather ?? 0, left)));
       const none = served === null || (served && !(served instanceof Promise) && !landFor(served, 'gate'));
-      if (left <= 0 || none) return void done();
+      if (none || (served && !(served instanceof Promise) && left <= 0)) return void done();
       setTimeout(look, 100);
     };
     look();

@@ -211,6 +211,8 @@ export async function pageStyle(ctx: KernelContext, input: { of?: unknown; style
 
 /** Where a style's backdrop may show: before a workspace (gate), behind a sheet that fills the page, behind the canvas. */
 export const BACKDROP_PLACES = ['gate', 'sheet', 'canvas'];
+/** The longest a page may be held for its backdrop to be seen: ten seconds. */
+const MOST_WAIT_MS = 10_000;
 
 /**
  * A style's backdrop (a theme's land) with the drawing that runs it: the layout a pack ships for its shape, under the
@@ -228,7 +230,10 @@ export async function withBackdrop(ctx: KernelContext, style: Record<string, unk
   if (!drawing || drawing.shape !== b.shape) return rest;
   const setup = b.setup && typeof b.setup === 'object' && !Array.isArray(b.setup) ? b.setup : undefined;
   const numbers = b.numbers && typeof b.numbers === 'object' && !Array.isArray(b.numbers) ? b.numbers : undefined;
-  return { ...rest, backdrop: { shape: b.shape, on, ...(setup && { setup }), ...(numbers && { numbers }), drawing } };
+  const ms = (v: unknown) => (typeof v === 'number' && v >= 0 && v <= MOST_WAIT_MS ? v : 0);
+  const w = b.wait && typeof b.wait === 'object' ? (b.wait as Record<string, unknown>) : undefined;
+  const wait = w && { gather: ms(w.gather), most: ms(w.most) };
+  return { ...rest, backdrop: { shape: b.shape, on, ...(setup && { setup }), ...(numbers && { numbers }), ...(wait && { wait }), drawing } };
 }
 
 /** The workspace's icon, what a browser's tab and a client listing this server show: its style's icon, else its emblem, as PNG bytes, or none. */
