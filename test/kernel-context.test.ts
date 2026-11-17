@@ -54,7 +54,8 @@ test("kernel code from a folder that is not the server's own is refused, and sta
 test('a hook point is filled by the pack, called with its context: ops in, ops out', async () => {
   const l = await freshWith(new Registry(dir));
   const host = new KernelHost((p) => l.registry.folderOf(p));
-  const fills = await host.fillings(l, 'write.follow');
+  // The probe's own: other internal packs fill write.follow too (the carry pack's follow).
+  const fills = (await host.fillings(l, 'write.follow')).filter((f) => f.pack === 'kernel_probe');
   assert.deepEqual(fills.map((f) => [f.pack, f.ref]), [['kernel_probe', 'probe.ts#follow']]);
   assert.deepEqual(await fills[0].run([{ op: 'create', ref: 'a', type: 'task', title: 'Fix the gate' }, { op: 'update', id: 'e_x' }]), [{ op: 'create', ref: 'seen0', type: 'task', title: 'Seen: Fix the gate' }]);
   assert.deepEqual(await host.fillings(l, 'write.retype'), [], 'a point no pack fills has nothing');
