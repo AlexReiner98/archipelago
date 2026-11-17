@@ -80,6 +80,13 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     assert.equal(went, made.quarry, 'the press asks the canvas for the island');
     // Under On, the island the canvas was brought to has the accent bar at its left edge.
     assert.equal(await page.evaluate<string | null>(`${quarry}.getAttribute('aria-current')`), 'location');
+    // Taken off, Harbour works stays under On while the pointer is in the bar, and leaves On once it leaves the bar.
+    const harbourRow = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Harbour works')`;
+    const underOn = `${harbourRow}.parentElement.previousElementSibling.textContent.startsWith('On')`;
+    await page.evaluate(`${harbourRow}.querySelector('.isl-off').click()`);
+    await until('Harbour off where it stood', () => page.evaluate<boolean>(`!${harbourRow}.classList.contains('on') && ${underOn}`));
+    await page.evaluate(`document.getElementById('islands').dispatchEvent(new PointerEvent('pointerleave'))`);
+    await until('Harbour gone from On', () => page.evaluate<boolean>(`!${underOn}`));
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');

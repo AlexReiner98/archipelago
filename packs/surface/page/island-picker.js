@@ -172,6 +172,13 @@ export function drawPicker() {
   };
   /** Lay the list out anew: what is on now goes under On. */
   const relay = () => ((laidOn = null), draw());
+  // Rows stay put while the pointer is in the bar, so the next press lands; once it leaves, what was taken off leaves
+  // On and what was put on joins it.
+  side.addEventListener('pointerleave', () => {
+    if (input.value.trim() || !laidOn) return;
+    const drawn = drawnNow();
+    if (drawn.length !== laidOn.size || drawn.some((id) => !laidOn.has(id))) relay();
+  });
   /** Lay it out anew once the list a press keeps has come back (a search's Enter: it was found, not pointed at). */
   let anew = false;
   input.addEventListener('input', () => ((lit = 0), relay()));
