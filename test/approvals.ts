@@ -3,7 +3,8 @@
 // from the code before every approval was decided by a rule (main at 85b9d84) and is kept in
 // test/fixtures/approvals.json: the rules must come to the same answer on every row. APPROVALS_WRITE=1 writes it again.
 // The table is about 4000 changes, minutes of one process: each server policy's rows are checked by PARTS files
-// (approvals-<policy>-<part>.test.ts), its settings dealt among them, so they all run side by side.
+// (approvals-<policy>-<part>.test.ts), its settings dealt among them, so they all run side by side. Four since 17 Nov
+// 2026: with two, one file took 109 s in CI, longer than any shard should.
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -40,7 +41,7 @@ export const SETTINGS: Record<string, Record<string, unknown>> = {
 };
 
 /** How many files check each policy's rows: its settings dealt among them, the first to part 1, the next to part 2, ... */
-export const PARTS = 2;
+export const PARTS = 4;
 
 /** The settings one part of a policy's rows is checked under. */
 export const settingsOf = (part: number) => Object.keys(SETTINGS).filter((_, i) => i % PARTS === part - 1);
