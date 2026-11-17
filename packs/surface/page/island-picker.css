@@ -31,3 +31,5 @@ body[data-islands="open"] #islands .isl-rail-count { display: none; }
 #islands .isl-hit { cursor: pointer; }
 #islands .isl-hit[aria-selected="true"] { background: var(--accent-soft); }
 #islands .isl-hit .isl-count { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+#islands .isl-row:not(.on, .isl-hit) .isl-name { color: var(--muted); }
+#islands .isl-row:not(.on, .isl-hit) .isl-name:hover { color: var(--text); }

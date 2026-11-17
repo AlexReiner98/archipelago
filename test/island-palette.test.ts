@@ -50,6 +50,13 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the canvas draws it', () => draws('Rebuild the pier'));
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
+    // A press on an island in a group puts it on where its row stands: the row lights and gains ×, and nothing moves.
+    await page.evaluate(`[...document.querySelectorAll('#islands .isl-group')].find((g) => g.getAttribute('aria-expanded') === 'false')?.click()`);
+    const quarry = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Quarry')`;
+    await until('Quarry in its group', () => page.evaluate<boolean>(`Boolean(${quarry})`));
+    const before = await page.evaluate<number>(`Math.round(${quarry}.getBoundingClientRect().top)`);
+    await page.evaluate(`${quarry}.querySelector('button.isl-name').click()`);
+    await until('Quarry on, its row lit where it stood', () => page.evaluate<boolean>(`(() => { const r = ${quarry}; return r?.classList.contains('on') && Boolean(r.querySelector('.isl-off')) && Math.round(r.getBoundingClientRect().top) === ${before} && document.querySelector('#islands .isl-head').textContent.includes('On · 2'); })()`));
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');

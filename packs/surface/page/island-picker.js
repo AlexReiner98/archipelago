@@ -88,8 +88,13 @@ export function drawPicker() {
   let islands = [];
   let found = [];
   let lit = 0;
+  /**
+   * The islands laid out under On: set when the list is laid out anew (the page opened, a search cleared, a group
+   * folded), not by a press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
+   */
+  let laidOn = null;
   const row = (i, on) =>
-    h('div', { class: 'isl-row', role: 'listitem' },
+    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
       packMark(i.pack),
       on
         ? h('span', { class: 'isl-name', title: `${i.title} · ${i.pack.title || i.pack.id}` }, i.title)
@@ -114,23 +119,28 @@ export function drawPicker() {
       return;
     }
     input.removeAttribute('aria-activedescendant');
-    const on = found.filter((i) => drawn.includes(i.id)), rest = found.filter((i) => !drawn.includes(i.id));
-    const parts = [h('div', { class: 'isl-head' }, `On · ${on.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, true)))];
+    laidOn ??= new Set(drawn);
+    const on = found.filter((i) => laidOn.has(i.id)), rest = found.filter((i) => !laidOn.has(i.id));
+    const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id))))];
     for (const g of byPack(rest)) {
       const shown = unfolded.has(g.id);
       const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown), title: `${g.title}: ${g.islands.length} island${g.islands.length === 1 ? '' : 's'}` },
         packMark(g.islands[0]?.pack), h('span', { class: 'isl-name' }, g.title || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
-      head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), draw());
-      parts.push(head, ...(shown ? [h('div', { role: 'list' }, ...g.islands.map((i) => row(i, false)))] : []));
+      head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), relay());
+      parts.push(head, ...(shown ? [h('div', { role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id))))] : []));
     }
     body.replaceChildren(...parts);
   };
-  input.addEventListener('input', () => ((lit = 0), draw()));
+  /** Lay the list out anew: what is on now goes under On. */
+  const relay = () => ((laidOn = null), draw());
+  /** Lay it out anew once the list a press keeps has come back (a search's Enter: it was found, not pointed at). */
+  let anew = false;
+  input.addEventListener('input', () => ((lit = 0), relay()));
   input.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') return void (ev.preventDefault(), (input.value = ''), draw(), input.blur());
+    if (ev.key === 'Escape') return void (ev.preventDefault(), (input.value = ''), relay(), input.blur());
     if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && found.length) return void (ev.preventDefault(), (lit = Math.max(0, Math.min(found.length - 1, lit + (ev.key === 'ArrowDown' ? 1 : -1)))), draw());
     const i = input.value.trim() && found[lit];
-    if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), draw());
+    if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), (anew = true), draw());
   });
   // Ctrl+K (⌘K): the bar opens where it was folded, its search in focus.
   addEventListener('keydown', (ev) => {
@@ -140,6 +150,6 @@ export function drawPicker() {
     input.focus();
     input.select();
   });
-  onDrawn(draw);
+  onDrawn(() => (anew ? ((anew = false), relay()) : draw()));
   Promise.all([islandsOn(), allIslands()]).then(([now, all]) => ((mine = now), (islands = all), draw()));
 }
