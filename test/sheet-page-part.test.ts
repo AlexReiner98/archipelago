@@ -62,6 +62,14 @@ test('a field is drawn by its kind: a pick for its values, a box for words, noth
   assert.ok(fields.includes('empty'), 'the fields that hold nothing are folded');
 });
 
+test('a value with parts stays one short line: entries set apart, a long set of names cut to a few', () => {
+  const cell = JSON.stringify(fieldMarks('cell', [1, 0], { type: 'json' }));
+  assert.ok(cell.includes('·'), '[1, 0] is not read as ten');
+  const settings = Object.fromEntries(['dt', 'hud', 'bend_k', 'dim_ms', 'flow_k', 'w_flow'].map((k, i) => [k, i]));
+  const line = fieldMarks('settings', settings, { type: 'json' })[2];
+  assert.equal(line, 'Dt, Hud, Bend k +3');
+});
+
 test('a pick is a change at once; words wait for Save, as one update', () => {
   assert.deepEqual(fieldEvent({ key: 'field:size', name: 'pick', value: 'l' }, task, words.types.task.fields), { pick: ['size', 'l'] });
   const kept = fieldEvent({ key: 'field:tags', name: 'edit', value: '["z"]' }, task, words.types.task.fields);

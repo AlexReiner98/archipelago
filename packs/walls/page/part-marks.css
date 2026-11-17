@@ -27,7 +27,7 @@
 textarea.pm-input { font: inherit; color: var(--text); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); padding: var(--space-4) var(--space-6); resize: vertical; }
 .pm-input { min-width: 0; }
 /* A title written in place reads as the title it is: no box around it until it is being written. */
-input.pm-input-title { font: inherit; font-family: var(--type-heading-family, inherit); font-size: var(--text-7); font-weight: var(--type-heading-weight, 600); color: var(--text); background: none; border: var(--border-1) solid transparent; border-radius: var(--radius-2); padding: 0; width: 100%; }
+input.pm-input-title { font: inherit; font-family: var(--type-heading-family, inherit); font-size: var(--text-7); font-weight: var(--type-heading-weight, 600); color: var(--text); background: none; border: var(--border-1) solid transparent; border-radius: var(--radius-2); padding: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; }
 input.pm-input-title:hover, input.pm-input-title:focus { border-color: var(--line); }
 textarea.pm-input-plain { width: 100%; }
 /* An item found by name: the box, and what it finds on one line beside it, cut where it does not fit. */
