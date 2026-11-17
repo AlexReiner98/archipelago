@@ -74,8 +74,10 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await page.evaluate(`${quarry}.querySelector('button.isl-name').click()`);
     await until('Quarry on, its row lit where it stood', () => page.evaluate<boolean>(`(() => { const r = ${quarry}; return r?.classList.contains('on') && Boolean(r.querySelector('.isl-off')) && Math.round(r.getBoundingClientRect().top) === ${before} && document.querySelector('#islands .isl-head').textContent.includes('On · 2'); })()`));
     // A press on an island that is on brings the canvas to it (hooks.toIsland, the canvas's).
-    const went = await page.evaluate<string>(`(async () => { const { hooks } = await ${pageModule('base.js')}; const had = hooks.toIsland; let to = ''; hooks.toIsland = (id) => (to = id); ${quarry}.querySelector('button.isl-name').click(); hooks.toIsland = had; return to; })()`);
+    const went = await page.evaluate<string>(`(async () => { const { hooks } = await ${pageModule('base.js')}; const had = hooks.toIsland; let to = ''; hooks.toIsland = (id) => ((to = id), true); ${quarry}.querySelector('button.isl-name').click(); hooks.toIsland = had; return to; })()`);
     assert.equal(went, made.quarry, 'the press asks the canvas for the island');
+    // Under On, the island the canvas was brought to has the accent bar at its left edge.
+    assert.equal(await page.evaluate<string | null>(`${quarry}.getAttribute('aria-current')`), 'location');
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');

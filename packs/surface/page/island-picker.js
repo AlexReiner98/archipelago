@@ -130,10 +130,14 @@ export function drawPicker() {
    * press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
    */
   let laidOn = null;
+  /** The island the canvas was last brought to from the bar: marked under On while it stays on. */
+  let here = null;
+  /** Bring the canvas to island `i`, where the canvas can (hooks.toIsland, the canvas's), and mark it. */
+  const goTo = (i) => hooks.toIsland?.(i.id) && ((here = i.id), draw());
   /** An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack. */
   const row = (i, on) =>
-    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
-      h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? hooks.toIsland?.(i.id) : putOn(i), done()) }, i.title),
+    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', ...(on && i.id === here && { 'aria-current': 'location' }) },
+      h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? goTo(i) : putOn(i), done()) }, i.title),
       packOf(i.pack),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
