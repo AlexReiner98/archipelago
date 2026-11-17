@@ -7,7 +7,7 @@
 //   { visible: false, reducedMotion }, when the tab is hidden: it pauses itself until it hears the page again.
 //   and `focus: { x, y, w, h } | null`, the box of the page's call to action (the link of its first p.action).
 // Coordinates are the page's own (from its top left); `view` is the window less its scrollbar, as the frame is; `clear`
-// holds a box for each block of its words (pageWords: the nav, the title, each paragraph, list and figure, the foot),
+// holds a box for each item of its words (pageWords: each link of the nav, the title, each paragraph, list item and figure, each field and button of a gate),
 // read again only when the page's size or words change, never because it scrolled.
 //
 // What its code may tell the page, with look({ ink, light, land, water, accent }): colours, each a hex, that the page
