@@ -67,6 +67,8 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the canvas draws it', () => draws('Rebuild the pier again'));
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
+    // A row under On is its name and ×, without its pack, so the name has the room.
+    assert.equal(await page.evaluate<number>(`document.querySelector('#islands .isl-head').nextElementSibling.querySelectorAll('.isl-pack').length`), 0, 'no pack under On');
     // A press on an island under Recent puts it on where its row stands: the row lights and gains ×, and nothing moves.
     const quarry = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Quarry')`;
     await until('Quarry under Recent', () => page.evaluate<boolean>(`Boolean(${quarry}) && /^Recent/.test(${quarry}.parentElement.previousElementSibling.textContent)`));

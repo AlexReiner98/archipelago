@@ -134,11 +134,14 @@ export function drawPicker() {
   let here = null;
   /** Bring the canvas to island `i`, where the canvas can (hooks.toIsland, the canvas's), and mark it. */
   const goTo = (i) => hooks.toIsland?.(i.id) && ((here = i.id), draw());
-  /** An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack. */
-  const row = (i, on) =>
+  /**
+   * An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack, but under On
+   * (`atOn`), where the name needs the room beside ×.
+   */
+  const row = (i, on, atOn = false) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', ...(on && i.id === here && { 'aria-current': 'location' }) },
       h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? goTo(i) : putOn(i), done()) }, i.title),
-      packOf(i.pack),
+      atOn ? '' : packOf(i.pack),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
@@ -161,7 +164,7 @@ export function drawPicker() {
     input.removeAttribute('aria-activedescendant');
     laidOn ??= new Set(drawn);
     const on = found.filter((i) => laidOn.has(i.id)), rest = found.filter((i) => !laidOn.has(i.id));
-    const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id))))];
+    const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id), true)))];
     const { recent, rest: others } = recentFirst(rest, Date.now(), numberOf(state.style, 'picker_recent_days'));
     const list = (head, all) => (all.length ? [h('div', { class: 'isl-head' }, `${head} · ${all.length}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id))))] : []);
     parts.push(...list('Recent', recent), ...list('All', others));
