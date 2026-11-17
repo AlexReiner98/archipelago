@@ -22,8 +22,8 @@ const lookedOf = (answer) => (answer?.islands ?? []).filter((i) => i.look?.kind 
  * the module), the same with a hash of its own and what it needs to write its modules (`looks`). `have(hash)` is the
  * modules the page keeps for a hash.
  */
-export function withLooks(drawing, answer, have) {
-  const looked = lookedOf(answer), base = drawing?.modules ?? have(drawing?.hash);
+export function withLooks(drawing, answer, have, plain = false) {
+  const looked = plain ? [] : lookedOf(answer), base = drawing?.modules ?? have(drawing?.hash);
   if (!looked.length || !base || typeof base[LOOKS] !== 'string') return drawing;
   const said = looked.map((i) => `${i.id}${i.look.id}${String(i.look.at ?? '').replace(/\D/g, '')}`).join('');
   const { modules: _m, ...rest } = drawing;

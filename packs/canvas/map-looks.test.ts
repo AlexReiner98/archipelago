@@ -107,3 +107,13 @@ test('an island’s style says where its focus stands, its outline and size', ()
   const plain = drawFocus(undefined);
   assert.ok(Number(rect(box(plain, 'e_aaaaaaaa'))?.height) * 2 <= Number(rect(box(drawFocus({ scale: 2 }), 'e_islandaa'))?.height) + 1, 'twice as big');
 });
+
+test('a view that says its islands are plain draws none by its own look or layer', () => {
+  const answer = { items, links: [], islands: [{ id: 'e_islandaa', title: 'Here', look: { id: 'e_look0000', kind: 'layout' }, style: { type_shapes: { task: 'diamond' } } }, { id: 'e_islandbb', title: 'There' }] };
+  const tools = { measure, looks: new Map([['e_islandaa', column]]), gestures: () => ({ on: () => [] }) };
+  const own = JSON.stringify(draw({ answer, style: { ...house, placed }, reduced: true, width: 1200, height: 800 }, tools).scene.svg);
+  const plain = JSON.stringify(draw({ answer, style: { ...house, placed, island_looks: 'plain' }, reduced: true, width: 1200, height: 800 }, tools).scene.svg);
+  assert.ok(own.includes('"lf-look"'));
+  assert.ok(!plain.includes('"lf-look"') && !plain.includes('"lf-look-item"'), 'no look drawn');
+  assert.doesNotMatch(JSON.stringify(find(JSON.parse(plain), (k: any) => k[1]?.href === '#/e/e_bbbbbbbb')), /"path"/, 'nor the island’s outlines');
+});

@@ -142,7 +142,7 @@ function colours(host, style) {
 /** Draw the answer in host with the drawing its style names. The same call as any of the kernel's shapes. */
 export function drawWith(host, answer, style, keep) {
   // Islands with looks of their own are drawn by the drawing with their code beside its own (./island-looks.js).
-  const drawing = withLooks(style.drawing, answer, (hash) => layouts.get(hash));
+  const drawing = withLooks(style.drawing, answer, (hash) => layouts.get(hash), style.island_looks === 'plain');
   // One that says it is laid out by the page has its box now, before it is measured: drawn once, at the size it will have.
   if (drawing?.flat) host.classList.add('laid-out');
   const { style: _sent, first: opening, ...shown } = answer;

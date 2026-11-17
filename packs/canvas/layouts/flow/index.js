@@ -126,7 +126,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
   const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
   // Each island's own layer, from the packs active on it (decision e_gqmavsb7): outlines and dots for its items.
-  const isleStyle = (id) => record((answer.islands ?? []).find((i) => i.id === id)?.style), focus = focusOf(answer.islands, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, islands: Object.fromEntries((answer.islands ?? []).map((i) => [i.id, record(record(i.style).type_shapes)])) };
+  // A view that says its islands are plain (island_looks) draws each by its own look alone: no island's look or layer.
+  const shown = style.island_looks === 'plain' ? (answer.islands ?? []).map(({ look: _l, style: _s, ...i }) => i) : answer.islands ?? [];
+  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
@@ -135,7 +137,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // One budget for the whole picture (./effort.js): what it spends on looking better, at every level, it spends from this.
   const effort = effortOf(z('picture_work'));
   // An island with a look of its own is asked how what it holds stands and looks (../map/looks.js), by the code the frame hands over.
-  const onIsle = (id) => new Set(answer.items.filter((i) => i.island === id).map((i) => i.id)), looks = new Map((answer.islands ?? []).filter((i) => i.look && (tools.looks ?? kept).get(i.id)).map((i) => ((own) => [i.id, { look: (tools.looks ?? kept).get(i.id), island: { id: i.id, title: i.title, pack: i.pack?.id ?? i.pack ?? null }, links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), numbers: style.numbers, m }])(onIsle(i.id))));
+  const onIsle = (id) => new Set(answer.items.filter((i) => i.island === id).map((i) => i.id)), looks = new Map(shown.filter((i) => i.look && (tools.looks ?? kept).get(i.id)).map((i) => ((own) => [i.id, { look: (tools.looks ?? kept).get(i.id), island: { id: i.id, title: i.title, pack: i.pack?.id ?? i.pack ?? null }, links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), numbers: style.numbers, m }])(onIsle(i.id))));
   const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes, ...(style.placed && typeof style.placed === 'object' && { placed: style.placed }), ...(looks.size && { looks }), ...(focus.at.size && { focusAt: focus.at }) });
   // A picture of items on islands is an archipelago (./archipelago.js): each island laid out alone, a sea between. One
   // island is framed too, with its own legend in place of the key (task e_5rh5ysut).
