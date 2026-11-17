@@ -85,3 +85,25 @@ function find(mark: any, test: (k: any) => boolean): any {
   for (const kid of mark.slice(typeof mark[0] === 'string' ? 2 : 0)) { const f = find(kid, test); if (f) return f; }
   return null;
 }
+
+test('an island’s style says where its focus stands, its outline and size', () => {
+  const focusItem = { ...item('e_islandaa', 'e_islandaa'), title: 'The island itself' };
+  const held = [focusItem, item('e_aaaaaaaa', 'e_islandaa', [0, 0]), item('e_bbbbbbbb', 'e_islandaa', [1, 0])];
+  const drawFocus = (focus: Record<string, unknown> | undefined) => {
+    const answer = { items: held, links: [], islands: [{ id: 'e_islandaa', title: 'Here', focus: true, ...(focus && { style: { focus } }) }] };
+    return draw({ answer, style: { ...house, placed: { e_islandaa: [0, 0] } }, reduced: true, width: 1200, height: 800 }, { measure, gestures: () => ({ on: () => [] }) }).scene;
+  };
+  const box = (scene: any, id: string) => find(scene.svg, (k: any) => k[1]?.href === `#/e/${id}`)?.[3];
+  const rect = (b: any) => (b?.[0] === 'rect' ? b[1] : null);
+  // At the top: over the two others, which now stand lower than it.
+  const top = drawFocus({ at: 'top' });
+  assert.ok(Number(rect(box(top, 'e_islandaa'))?.y) < Number(rect(box(top, 'e_aaaaaaaa'))?.y), 'the focus stands over the rest');
+  // In the corner: left of the rest, on their row.
+  const corner = drawFocus({ at: 'corner' });
+  assert.ok(Number(rect(box(corner, 'e_islandaa'))?.x) < Number(rect(box(corner, 'e_aaaaaaaa'))?.x), 'the focus stands first');
+  // Its outline and size.
+  const shaped = drawFocus({ shape: 'hexagon', scale: 2 });
+  assert.equal(box(shaped, 'e_islandaa')?.[0], 'path', 'drawn as the outline it says');
+  const plain = drawFocus(undefined);
+  assert.ok(Number(rect(box(plain, 'e_aaaaaaaa'))?.height) * 2 <= Number(rect(box(drawFocus({ scale: 2 }), 'e_islandaa'))?.height) + 1, 'twice as big');
+});

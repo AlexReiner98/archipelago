@@ -16,7 +16,7 @@ export const shapesFor = (i, shapes = {}) => ({ ...shapes.type, ...(shapes.islan
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
 export const shapedBy = (i, shapes = {}) => ((own) => lineageOf(i).find((t) => SHAPES.includes(own[t])))(shapesFor(i, shapes));
 /** The outline an item is drawn in: its type's, else the nearest flavour's that has one, else a box. */
-export const shapeIn = (i, shapes = {}) => shapesFor(i, shapes)[shapedBy(i, shapes)] ?? 'box';
+export const shapeIn = (i, shapes = {}) => (SHAPES.includes(shapes.ids?.[i.id]) ? shapes.ids[i.id] : shapesFor(i, shapes)[shapedBy(i, shapes)] ?? 'box');
 /** How far each outline cuts into its box, by the size the style names for it: none for a box, diamond, pill or sheet. */
 const BEVEL = { cut: 'flow_cut', hexagon: 'flow_point', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
 
@@ -63,6 +63,8 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
     if (n.shape === 'hexagon' || n.shape === 'flag' || n.shape === 'ticket') n.w += n.bevel * (n.shape === 'flag' ? 1 : 2);
+    // A focus the style draws bigger (./focus.js): its box, not its words.
+    if (!n.stub && shapes.scales?.[n.id] > 0) (n.w *= shapes.scales[n.id]), (n.h *= shapes.scales[n.id]);
   }
   // Each step's place in the order it was made, a choice not followed after every item: what a free choice goes by.
   let made = 0;
