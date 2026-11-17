@@ -8,6 +8,7 @@
 import { api, h, hooks } from './base.js';
 import { activate, canvasIn, focusOn, homeReady, islandsLens } from './canvas.js';
 import { islandsIn } from './islands-on.js';
+import { islandsName, islandsOfLens } from './islands-lens.js';
 import { presetSettings, savedCanvases, viewParts } from './views-kept.js';
 import { addressOf, opening, readAddress } from './query.js';
 import { titles } from './words.js';
@@ -35,8 +36,9 @@ async function lensOf(at) {
   const [where, query = ''] = at.split('?');
   // A list of islands an address names (an agent's show): drawn, the person's own list left as it was (decision e_n42s8jvn).
   const named = islandsIn(query);
-  if (named) return { lens: islandsLens(named), style: {} };
   const asked = readAddress(query);
+  // A saved canvas that draws a list of islands is read as the view it is, below: its name and its corners.
+  if (named && !asked.style.canvas) return { lens: islandsLens(named), style: asked.style };
   // A saved canvas is named by its title, read from the map when the page does not know it yet.
   if (asked.style.canvas && !cornersBy.has(asked.style.canvas) && asked.lens) await api('get', { id: asked.style.canvas }).then((got) => known(got.entity), () => {});
   // Its islands' corners come from the view itself, whatever the address says of its lens (an item opened over it among them).
@@ -124,7 +126,10 @@ export function drawPane(at, el, said) {
   else
     lensOf(at).then(({ lens, style, here }) => {
       if (!live) return;
-      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? hooks.lensSaid?.(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
+      // A list of islands is named by its islands ("X growth + 2"), any other lens by what its filter finds.
+      const islands = islandsOfLens(lens);
+      const lensName = () => (islands ? islandsName(islands, (id) => hooks.nameSaid?.(id, naming) ?? titles.get(id) ?? '…') : hooks.lensSaid?.(lens.filter, naming));
+      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? lensName() : 'Home') || 'Canvas').slice(0, 120));
       naming();
       canvas.show(lens, here, style);
       // The bar and find act on the pane in focus alone: a pane drawn beside it does not take them.
