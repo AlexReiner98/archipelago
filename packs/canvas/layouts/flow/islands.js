@@ -9,7 +9,7 @@
 // Layer: marks. Pure: the composed model and each island's legend rows in, marks and colour rules out.
 
 /** An island's name as its header says it: its title, and the pack it speaks. */
-export const nameOf = (i) => `${i?.title ?? ''}${i?.pack?.title ? ` · ${i.pack.title}` : ''}`;
+export const nameOf = (i) => (i?.focus ? i?.pack?.title ?? '' : `${i?.title ?? ''}${i?.pack?.title ? ` · ${i.pack.title}` : ''}`);
 
 /** What a link across names: what it points to, and its value. */
 export function saidOf(to) {
