@@ -423,7 +423,7 @@ export function drawWith(host, answer, style, keep) {
       return host.replaceChildren(...[before, legend, beside(h('div', { class: 'lf-stage still' }, picture, over)), after].filter(Boolean));
     }
     const lit = litSwitch(answer.viewer, style, keep, redraw);
-    const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, over, legend);
+    const stage = h('div', { class: 'lf-stage' }, picture, over, legend);
     host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
     if (input.height > 0) followShape(scene);
     const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, beside: sheetAside, told: (now) => (begun ? toDrawing({ type: 'viewport', view: now }) : (view = now)) }));

@@ -1,7 +1,7 @@
 // The island picker in a real browser (packs/surface/page/island-picker.js; Alex, 17 Nov 2026): the side list at the
 // canvas's left edge, the islands changed lately first, then the rest by name. Ctrl+K folds it open with its search in focus; typed into, it lists
 // what it finds within the bar, Enter puts the lit island on and the canvas draws it; the list then has it among those on.
-// Put away, the bar is gone and the canvas has the width; its button in the tab bar brings it back.
+// Put away, the bar is gone and the canvas has the width; its button in the band under the tabs brings it back.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -49,8 +49,8 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     assert.equal(await page.evaluate<string>(`(() => { const r = [...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name').textContent === 'Core'); return r ? String(r.querySelectorAll('.isl-pack').length) : 'no row'; })()`), '0');
     assert.match(await page.evaluate<string>(`document.querySelector('#islands .isl-head').textContent`), /On · 0/);
     assert.equal(await draws('Rebuild the pier again'), false, 'nothing on yet');
-    // Put away by its button in the tab bar, the bar is gone; Ctrl+K brings it back with its search in focus.
-    await page.evaluate(`document.querySelector('#nav .isl-toggle').click()`);
+    // Put away by its button in the band, the bar is gone; Ctrl+K brings it back with its search in focus.
+    await page.evaluate(`document.querySelector('#query .isl-toggle').click()`);
     await until('put away', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && getComputedStyle(document.getElementById('islands')).display === 'none'`));
     await key('k', { modifiers: 2 });
     await until('open, its search in focus', () => page.evaluate<boolean>(`document.body.dataset.islands === 'open' && document.activeElement?.classList.contains('isl-search')`));
@@ -136,12 +136,12 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');
-    await page.evaluate(`document.querySelector('#nav .isl-toggle').click()`);
+    await page.evaluate(`document.querySelector('#query .isl-toggle').click()`);
     await until('the whole width, the bar away', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && ${beside}`));
     // In a narrow window the bar opened lies over the canvas, which keeps the whole width, and a press on the canvas puts it away.
     await page.send('Emulation.setDeviceMetricsOverride', { width: 560, height: 800, deviceScaleFactor: 1, mobile: false });
     await until('narrow: the bar goes over', () => page.evaluate<boolean>(`document.body.dataset.islandsOver === 'on'`));
-    await page.evaluate(`document.querySelector('#nav .isl-toggle').click()`);
+    await page.evaluate(`document.querySelector('#query .isl-toggle').click()`);
     await until('open over the canvas', () => page.evaluate<boolean>(`(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return document.body.dataset.islands === 'open' && pane.left < bar.right - 1; })()`));
     await page.evaluate(`document.getElementById('canvas').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await until('a press on the canvas folds it', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded'`));

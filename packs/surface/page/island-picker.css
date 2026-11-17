@@ -5,15 +5,21 @@
 body[data-islands="open"] :is(#canvas, #canvas .pm-panes) { left: min(var(--isl-width, var(--side-least)), 60%); }
 body[data-islands="folded"] :is(#canvas, #canvas .pm-panes), body[data-islands-over="on"] :is(#canvas, #canvas .pm-panes) { left: 0; }
 body[data-islands="folded"] #islands { display: none; }
+/* The band under the tabs keeps the whole width: the bar opens under it, beside the canvas or over it, never pushing it. */
+body[data-islands] #query { left: 0; }
+body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip)); }
 #islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* The bar's right edge: a strip to drag, drawn only as the line it already has, lit while pointed at. */
 #islands .isl-edge { position: absolute; top: 0; bottom: 0; right: 0; width: var(--space-4); cursor: col-resize; }
 #islands .isl-edge:hover { background: var(--line); }
-/* Its button, in the tab bar before the tabs: a word and how many are on, lit while the bar is open. */
-#nav .isl-toggle { flex: none; display: flex; align-items: center; gap: var(--space-4); align-self: stretch; border: 0; border-bottom: var(--border-3) solid transparent; background: none; padding: 0 var(--space-7); font: inherit; color: var(--muted); cursor: pointer; }
-#nav .isl-toggle:is(:hover, :focus-visible) { color: var(--text); outline: none; }
-#nav .isl-toggle[aria-expanded="true"] { color: var(--text); border-bottom-color: var(--accent); }
-#nav .isl-toggle-count { color: var(--muted); font-size: var(--text-2); }
+/* Its button, first in the band under the tabs: its mark and how many are on, lit while the bar is open. */
+#query .isl-toggle { flex: none; display: flex; align-items: center; gap: var(--space-4); align-self: stretch; border: 0; border-bottom: var(--border-3) solid transparent; border-radius: 0; background: none; padding: 0 var(--space-7); font: inherit; color: var(--muted); cursor: pointer; }
+#query .isl-toggle:is(:hover, :focus-visible) { color: var(--text); outline: none; }
+#query .isl-toggle[aria-expanded="true"] { color: var(--text); border-bottom-color: var(--accent); }
+#query .isl-toggle-count { color: var(--muted); font-size: var(--text-2); }
+/* Its mark: a window and its left panel, outlined; the panel filled while the bar is open. */
+#query .isl-mark { width: var(--text-6); height: var(--text-6); fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; }
+#query .isl-toggle[aria-expanded="true"] .isl-mark-side { fill: currentColor; }
 #islands .isl-top { display: flex; align-items: center; padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6); border-bottom: var(--border-1) solid var(--line); }
 #find[hidden] { display: none; }
 #islands .isl-key { flex: none; padding: 0 var(--space-3); color: var(--muted); font-size: var(--text-2); }
