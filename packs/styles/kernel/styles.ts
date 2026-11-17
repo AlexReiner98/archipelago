@@ -214,6 +214,8 @@ export const BACKDROP_PLACES = ['gate', 'sheet', 'canvas'];
 /** The longest a page may be held for its backdrop to be seen: ten seconds. */
 const MOST_WAIT_MS = 10_000;
 /** A backdrop's still: a picture as a data URL, PNG or WebP, nothing else. */
+/** A gate page's emblem: a PNG as a data URL, as every emblem is. */
+const EMBLEM = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
 /** A gate page's name, as its address says it (sign-in, try...). */
 const PAGE = /^[a-z][a-z-]{0,30}$/;
 const STILL = /^data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+$/;
@@ -238,6 +240,7 @@ export async function withBackdrop(ctx: KernelContext, style: Record<string, unk
   const w = b.wait && typeof b.wait === 'object' ? (b.wait as Record<string, unknown>) : undefined;
   const wait = w && { gather: ms(w.gather), most: ms(w.most) };
   const picture = (v: unknown): string | undefined => (typeof v === 'string' && STILL.test(v) ? v : undefined);
+  const emblemOf = (v: unknown): string | undefined => (typeof v === 'string' && EMBLEM.test(v) ? v : undefined);
   const stillOf = (v: unknown) => {
     const s = v && typeof v === 'object' ? (v as Record<string, unknown>) : undefined;
     const out = s && { ...(picture(s.wide) && { wide: picture(s.wide) }), ...(picture(s.narrow) && { narrow: picture(s.narrow) }) };
@@ -246,7 +249,7 @@ export async function withBackdrop(ctx: KernelContext, style: Record<string, unk
   const still = stillOf(b.still);
   const object = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined);
   // Each gate page's own setup and still (sign-in, try...), over the backdrop's.
-  const pages = Object.fromEntries(Object.entries(object(b.pages) ?? {}).filter(([name]) => PAGE.test(name)).map(([name, p]) => [name, { ...(object(object(p)?.setup) && { setup: object(object(p)?.setup) }), ...(stillOf(object(p)?.still) && { still: stillOf(object(p)?.still) }) }]));
+  const pages = Object.fromEntries(Object.entries(object(b.pages) ?? {}).filter(([name]) => PAGE.test(name)).map(([name, p]) => [name, { ...(object(object(p)?.setup) && { setup: object(object(p)?.setup) }), ...(stillOf(object(p)?.still) && { still: stillOf(object(p)?.still) }), ...(emblemOf(object(p)?.emblem) && { emblem: emblemOf(object(p)?.emblem) }) }]));
   return { ...rest, backdrop: { shape: b.shape, on, ...(setup && { setup }), ...(numbers && { numbers }), ...(wait && { wait }), ...(still && { still }), ...(Object.keys(pages).length && { pages }), drawing } };
 }
 

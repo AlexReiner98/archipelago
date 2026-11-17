@@ -53,15 +53,15 @@ const reply = (res: ServerResponse, status: number, body: unknown) => json(res, 
 const OTHER_WAYS = ['/connect/social', '/connect/verified', '/connect/passkey/options', '/connect/passkey', '/connect/passkey/add/options', '/connect/passkey/add', '/connect/passkey/mine'];
 
 /** Every /connect/, /x/, /oauth/ and /.well-known/ request, given only under a name this server answers to. */
-/** A still's address: the page it is for (the backdrop's own as _), which, and the version of its picture. */
-const STILL_PATH = /^\/connect\/still\/(_|[a-z][a-z-]{0,30})\/(wide|narrow)$/;
+/** A still's address: the page it is for (the backdrop's own as _), which (or the page's emblem), and the version of its picture. */
+const STILL_PATH = /^\/connect\/still\/(_|[a-z][a-z-]{0,30})\/(wide|narrow|emblem)$/;
 const DATA_URL = /^data:(image\/(?:png|webp));base64,([A-Za-z0-9+/=]+)$/;
 type Stills = Record<string, Record<string, string> | undefined>;
 
 /** A backdrop's stills by page (its own as _), as the style holds them. */
 function stillsOf(backdrop: unknown): Stills {
-  const b = (backdrop ?? {}) as { still?: Record<string, string>; pages?: Record<string, { still?: Record<string, string> }> };
-  return { _: b.still, ...Object.fromEntries(Object.entries(b.pages ?? {}).map(([name, p]) => [name, p?.still])) };
+  const b = (backdrop ?? {}) as { still?: Record<string, string>; pages?: Record<string, { still?: Record<string, string>; emblem?: string }> };
+  return { _: b.still, ...Object.fromEntries(Object.entries(b.pages ?? {}).map(([name, p]) => [name, { ...p?.still, ...(p?.emblem && { emblem: p.emblem }) }])) };
 }
 
 /** A backdrop with each still named by its address instead of carried whole: the gate's first read stays small. */
@@ -69,8 +69,8 @@ function stillsAsAddresses(backdrop: unknown): unknown {
   if (!backdrop || typeof backdrop !== 'object') return backdrop ?? null;
   const at = (page: string, still?: Record<string, string>) =>
     still && Object.fromEntries(Object.entries(still).map(([k, url]) => [k, `/connect/still/${page}/${k}?v=${createHash('sha256').update(url).digest('hex').slice(0, 16)}`]));
-  const b = backdrop as { still?: Record<string, string>; pages?: Record<string, { still?: Record<string, string> }> };
-  return { ...b, ...(b.still && { still: at('_', b.still) }), ...(b.pages && { pages: Object.fromEntries(Object.entries(b.pages).map(([name, p]) => [name, { ...p, ...(p?.still && { still: at(name, p.still) }) }])) }) };
+  const b = backdrop as { still?: Record<string, string>; pages?: Record<string, { still?: Record<string, string>; emblem?: string }> };
+  return { ...b, ...(b.still && { still: at('_', b.still) }), ...(b.pages && { pages: Object.fromEntries(Object.entries(b.pages).map(([name, p]) => [name, { ...p, ...(p?.still && { still: at(name, p.still) }), ...(p?.emblem && { emblem: at(name, { emblem: p.emblem })?.emblem }) }])) }) };
 }
 
 export async function serveConnect(req: IncomingMessage, res: ServerResponse, path: string, at: ConnectRoutes) {

@@ -35,7 +35,7 @@ export function landFor(style, place) {
   if (!(b && typeof b === 'object' && Array.isArray(b.on) && b.on.includes(place) && b.drawing?.hash)) return null;
   // At the gate, the page's own beat: its setup over the land's, and its still.
   const own = place === 'gate' ? b.pages?.[pageOf()] : undefined;
-  return own ? { ...b, setup: { ...b.setup, ...own.setup }, still: own.still ?? b.still } : b;
+  return own ? { ...b, setup: { ...b.setup, ...own.setup }, still: own.still ?? b.still, ...(own.emblem && { emblem: own.emblem }) } : b;
 }
 
 /** A drawing's modules, kept by their hash once sent, so a style read again without them still runs. */
@@ -46,6 +46,17 @@ const LESS_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 /** The still under a running land: its picture, shown at once and wherever the land cannot run. */
 let still = null;
 const STILL = /^(?:data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+|\/connect\/still\/(?:_|[a-z][a-z-]{0,30})\/(?:wide|narrow)\?v=[0-9a-f]{16})$/;
+
+const EMBLEM = /^(?:data:image\/png;base64,[A-Za-z0-9+/=]+|\/connect\/still\/[a-z][a-z-]{0,30}\/emblem\?v=[0-9a-f]{16})$/;
+/**
+ * The emblem the land's page wears (its palette's), wherever the emblem shows while that land runs: the bar's mark and
+ * the gate's (packs/surface/page/gate.css, body[data-land-emblem]); the theme's own again once it stops.
+ */
+function wearEmblem(land) {
+  const url = land?.emblem;
+  if (typeof url === 'string' && EMBLEM.test(url)) (document.body.style.setProperty('--emblem', `url("${url}")`), (document.body.dataset.landEmblem = ''));
+  else (document.body.style.removeProperty('--emblem'), delete document.body.dataset.landEmblem);
+}
 
 /** The land's still put under its frame (before the map, so all of the page draws over it), or taken away with none. */
 function layStill(land) {
@@ -82,6 +93,7 @@ function wear() {
   delete document.body.dataset.land;
   delete document.body.dataset.landDrew;
   layStill(code ? land : null);
+  wearEmblem(code ? land : null);
   if (!code) return;
   document.body.dataset.land = place;
   if (calm) return void (running = { key, stop: () => undefined, still: true });
