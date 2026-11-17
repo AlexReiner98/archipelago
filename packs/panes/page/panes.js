@@ -24,16 +24,23 @@ addEventListener('hashchange', () => {
 /** The address of a pane beside a replay that has reached no milestone yet: it draws nothing. */
 const NONE = 'v?shown=none';
 
+/** Where a saved view that lists its islands keeps each one's corner, by view (feature e_u52abqr4): an address carries its lens, not these. */
+const cornersBy = new Map();
+/** A saved view as read from the map: its title, and its islands' corners. */
+const known = (entity) => (titles.set(entity.id, entity.title), cornersBy.set(entity.id, viewParts(entity).style.placed ?? null));
+
 /** The lens and style a pane's address names (no lens for Home): a saved canvas named alone is read from the map. */
 async function lensOf(at) {
   const [where, query = ''] = at.split('?');
   const asked = readAddress(query);
   // A saved canvas is named by its title, read from the map when the page does not know it yet.
-  if (asked.style.canvas && !titles.has(asked.style.canvas) && asked.lens) await api('get', { id: asked.style.canvas }).then((got) => titles.set(got.entity.id, got.entity.title), () => {});
-  if (asked.lens) return asked.style.canvas ? asked : { ...asked, style: { ...presetSettings(asked.lens), ...asked.style } };
+  if (asked.style.canvas && !cornersBy.has(asked.style.canvas) && asked.lens) await api('get', { id: asked.style.canvas }).then((got) => known(got.entity), () => {});
+  // Its islands' corners come from the view itself, whatever the address says of its lens (an item opened over it among them).
+  const placed = asked.style.canvas && cornersBy.get(asked.style.canvas);
+  if (asked.lens) return asked.style.canvas ? (placed ? { ...asked, style: { ...asked.style, placed } } : asked) : { ...asked, style: { ...presetSettings(asked.lens), ...asked.style } };
   if (asked.style.canvas) {
     const got = await api('get', { id: asked.style.canvas });
-    titles.set(got.entity.id, got.entity.title);
+    known(got.entity);
     opening.set(got.entity.id, got.entity);
     // The saved views read again with it, so the bar weighs it as the map has it now (bump e_4j6xvm82).
     savedCanvases(true);
