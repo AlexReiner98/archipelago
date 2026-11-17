@@ -41,7 +41,8 @@ test('in a browser, every chat that shows something has a tab named by its title
     const reader = await page.evaluate<string>('location.hash');
     // Each chat's first show opens its tab: the owner's tab first, then one for each, by its title, out of sight and marked.
     for (const n of [0, 1, 2]) await show(n, `i${n}`);
-    await until('a tab for each chat', async () => (await strip()).length === 4);
+    // A tab may be drawn a moment before its mark: wait for both, so a slow runner does not read a tab not yet marked.
+    await until('a tab for each chat, out of sight and marked', async () => { const s = await strip(); return s.length === 4 && s.slice(1).every((t) => !t[1] && t[2]); });
     const now = await strip();
     assert.equal(now[0][0], 'Home');
     assert.deepEqual(now.slice(1).map((t) => t[0]).sort(), ['Chat 0', 'Chat 1', 'Chat 2']);
