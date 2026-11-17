@@ -33,7 +33,7 @@ test('in a browser, a tab is one canvas: an agent in a tab of its own, its shows
   const until = async (what: string, ok: () => Promise<boolean>) => {
     if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${JSON.stringify(await panes())} ${await page.evaluate<string>('location.hash')} ${page.logs().join('\n')}`);
   };
-  const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { focus: false, ...params } }).then((r) => r.result);
+  const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: 'robot', action: 'show', params }).then((r) => r.result);
   /** The canvases drawn, each its name. */
   const panes = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('${PANE}')].map((p) => ${paneName('p')}?.textContent ?? ''))`).then(JSON.parse) as Promise<string[]>;
   /** Pane `n`'s element, in order. */

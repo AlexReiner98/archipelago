@@ -46,7 +46,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     description:
       'Answer the human with a view on their canvas: a kept view (entity: a view (type lens), a saved canvas) or a query and layout of your own, or open an item\'s page or the workspace. ' +
       'Or frame a web page in a pane (url: a dev server\'s build, a sketch, a page), so they watch it beside the map: it reloads only when you show it again. A site that refuses to be framed (X-Frame-Options or frame-ancestors, as most sign-in pages and large sites do) stays blank, and the pane\'s ↗ opens it in a window of its own; a plain http address frames only on localhost or 127.0.0.1, and this server\'s own pages are shown by entity, not url. ' +
-      'It lands within a couple of seconds in a pane of your session’s own on each page of theirs that is open, beside the pane they are in, which it never takes, and their page brings that tab into sight (focus: false leaves it out of sight, marked). The answer says how many of their pages are open and how many take your shows (pages), and whether it lands in the tab they are looking at (sight: looking, and where, in a line); when it does not, tell them where to look. Add a short note saying what they are looking at. ' +
+      'It never moves their view (decision e_mnuthcap): an item on an island puts that island on their canvas and lights the item in their side bar, where a press takes them to it; anything else lands in a tab of your session’s own, out of sight and marked. The answer says how many of their pages are open and how many take your shows (pages), and whether they are looking at it (sight: looking, and where, in a line); when they are not, tell them where to look. Add a short note saying what it is. ' +
       'A change moves nothing on their page: show what is worth watching. ' +
       'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page). ' +
       'For the person reading a chat, call draw.',
@@ -54,8 +54,6 @@ export const ACT_TOOLS: Record<string, Tool> = {
       ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
       url: WEB_URL.optional().describe('A web page to frame in a pane, in place of a view: http or https (plain http on localhost only).'),
-      // A show takes the owner to it (the owner, 4 Nov 2026: "the tab you open should automatically take focus").
-      focus: z.boolean().optional().describe('false to leave the tab it lands in out of sight, marked (for a show they did not ask to watch). Left out, their page brings that tab into sight.'),
       note: z.string().max(200).optional().describe('One line, kept on your pane as its tooltip.'),
       watch: z.boolean().optional().describe('true once the owner has approved the plan you show and its sessions are starting: the tab it lands in watches it, so each session working on anything in it is drawn there on its step and shows its work in that tab, not a tab of its own. Show a view that walks works_on< from the plan’s steps and leaves out no run (not: []), so its sessions are drawn on it.'),
       look: z.boolean().optional().describe('Also answer with a picture of it, drawn by the server (as query look draws it).'),
@@ -78,11 +76,13 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // Where it pointed, and whether a page of theirs is there to follow it; with a look, the picture of what is there.
       if (input.url && input.look) throw new Error('look draws the map: a url is framed on their page, never drawn by the server.');
       const hash = input.url ? webAddress(input.url) : await viewAddress(l, input);
-      const focus = input.focus ?? true;
-      const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run, focus, input.watch);
-      // Whether the owner sees it: the tab in sight is the one this session's shows go to; brought there, it is asked
-      // until their page has looked again (the presence pack's answer.sight).
-      const { pages, sight } = await callAs<{ pages: unknown; sight: unknown }>(l, 'answer.sight', { whose: whose(l), actor: actor.name, run: input.run, focus });
+      // A show never takes the owner's view (decision e_mnuthcap): an item on an island is lit there, the island put on
+      // their canvas by their page; the step carries the island so the page needs no read to find it.
+      const item = /^e\/(e_[a-z0-9]{8})(?:\?|$)/.exec(hash)?.[1];
+      const island = item ? (await l.entity(item))?.props.island : undefined;
+      const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run, typeof island === 'string' ? island : undefined, input.watch);
+      // Whether the owner is looking at it (the presence pack's answer.sight); nothing brings it into sight.
+      const { pages, sight } = await callAs<{ pages: unknown; sight: unknown }>(l, 'answer.sight', { whose: whose(l), actor: actor.name, run: input.run, focus: false });
       const size = { width: input.width, height: input.height, scheme: input.scheme, fresh: input.fresh };
       return { ...at, pages, sight, ...(input.look && (await callAs<Record<string, unknown>>(l, 'answer.look', { whose: whose(l), actor: actor.name, hash, size }))) };
     },

@@ -6,6 +6,7 @@ import { still } from './look.js';
 import { hear, sessionOf } from './pane-route.js';
 import { numberOf } from './query-base.js';
 import { front, landsIn, poppedTab } from './tabs.js';
+import { islandsOn, keepList } from './islands-on.js';
 import { relations, starterOf, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
@@ -151,6 +152,25 @@ const seenBefore = () => {
   }
 };
 
+/** Islands shows asked on, put on the canvas by a page in sight only, so two of the owner's pages never write their list at once. */
+const putting = new Map();
+async function putOnShown() {
+  if (document.visibilityState !== 'visible' || !putting.size) return;
+  const asked = [...putting.entries()];
+  putting.clear();
+  const on = await islandsOn();
+  const adding = asked.filter(([id]) => !on.includes(id));
+  if (adding.length) await keepList([...on, ...adding.map(([id]) => id)], `${adding.map(([, why]) => why).join('; ')}: put on the canvas by a show`).catch((err) => console.warn(err.message));
+}
+addEventListener('visibilitychange', () => void putOnShown());
+/** A show of an item on an island: the island on the canvas, the item lit in the side bar (the picker's lightIsland). */
+function light(s) {
+  const item = /^e\/(e_[a-z0-9]{8})(?:\?|$)/.exec(s.hash)?.[1] ?? s.island;
+  putting.set(s.island, s.did || (s.title ?? s.actor ?? 'A session'));
+  void putOnShown();
+  hooks.lightIsland?.(s.island, item);
+}
+
 export function follow(steps = []) {
   // A look's page, and a popped-out tab, leave what agents show to the main page.
   if (still || poppedTab) return;
@@ -175,10 +195,16 @@ export function follow(steps = []) {
   if (moved.length) hooks.sessionsTold?.(moved);
   // A chat renamed is named anew on its tab.
   if (fresh.some((s) => s.did === 'titled')) hooks.drawStrip?.();
-  // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed; so does its tab brought into sight.
+  // A show of an item on an island never moves the view (decision e_mnuthcap): its island goes on the canvas and the
+  // item is lit in the side bar. Any other show lands in its session's tab, out of sight and marked; a later one takes
+  // the place of what waits, and its tab of its own, if it was owed one, stays owed.
   for (const s of fresh) if (s.kind === 'show' && s.hash) {
+    if (s.island) {
+      light(s);
+      continue;
+    }
     const was = waiting.get(sessionOf(s));
-    waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens, focus: s.focus || was?.focus });
+    waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens });
   }
   if (document.querySelector('dialog[open]')) return;
   // A part on `tabs` is told each show, and keeps what waits itself (it decides where a show lands, task e_dswpuaft).

@@ -27,8 +27,8 @@ test('in a browser, a show frames a web address in its pane, and says whether th
   try {
     await ready(page);
     // Left out of sight when asked: its first show opens a tab of its own, marked, and the owner stays where they are.
-    const first = await show({ url, note: 'The build', focus: false });
-    assert.equal(first.sight.looking, false, 'focus: false opens a tab of its own, out of sight');
+    const first = await show({ url, note: 'The build' });
+    assert.equal(first.sight.looking, false, 'a show opens a tab of its own, out of sight');
     await until('the chat has a tab', () => page.evaluate<boolean>(`document.querySelectorAll('${TAB}').length === 2`));
     assert.equal(await page.evaluate(`${tabAt(1)}.getAttribute('aria-selected') === 'true'`), true, "the owner's tab stays in sight");
     await press(page, await tabName(page, 2));
@@ -38,16 +38,15 @@ test('in a browser, a show frames a web address in its pane, and says whether th
     assert.equal(await page.evaluate(`Boolean(document.querySelector('${PANE} .lens-view'))`), false, 'in place of the canvas');
     // Its tab in sight now: a show says the owner is looking at it, once the page has said so with its beat.
     const sees = async (looking: boolean) => {
-      if (!(await holds(async () => (await show({ url, focus: false })).sight.looking === looking, 15_000, 500))) assert.fail(`sight never ${looking}: ${page.logs().join(' ')}`);
+      if (!(await holds(async () => (await show({ url })).sight.looking === looking, 15_000, 500))) assert.fail(`sight never ${looking}: ${page.logs().join(' ')}`);
     };
     await sees(true);
-    // Back on the owner's tab, a show with focus: false lands out of sight, and says so.
+    // Back on the owner's tab, a show lands out of sight, and says so.
     await press(page, await tabName(page, 1));
     await sees(false);
-    // A show brings its tab into sight by itself (the owner, 4 Nov 2026), and its answer says they are looking.
-    const brought = await show({ url });
-    assert.equal(brought.sight.looking, true, `brought into sight: ${brought.sight.where}`);
-    assert.equal(await page.evaluate(`${tabAt(2)}.getAttribute('aria-selected') === 'true'`), true, "the chat's tab is the one in sight");
+    // A show never brings its tab into sight (decision e_mnuthcap): the owner's tab stays.
+    await show({ url });
+    assert.equal(await page.evaluate(`${tabAt(1)}.getAttribute('aria-selected') === 'true'`), true, "the owner's tab stays in sight");
   } finally {
     await page.close();
     build.close();
