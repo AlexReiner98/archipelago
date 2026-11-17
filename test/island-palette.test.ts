@@ -1,6 +1,7 @@
-// The island picker in a real browser (packs/surface/page/island-picker.js, island-palette.js; Alex, 17 Nov 2026): the
-// side list at the canvas's left edge, every island in it by pack, and the palette on Ctrl+K. Typed into, the palette
-// finds an island by its name, Enter puts it on and the canvas draws it; the side list then has it among those on.
+// The island picker in a real browser (packs/surface/page/island-picker.js; Alex, 17 Nov 2026): the side list at the
+// canvas's left edge, every island in it by pack. Ctrl+K folds it open with its search in focus; typed into, it lists
+// what it finds within the bar, Enter puts the lit island on and the canvas draws it; the list then has it among those on.
+// Folded, the bar is its rail alone, and the rail opens it again.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -10,7 +11,7 @@ import { until as holds } from './wait.ts';
 
 const browser = chrome();
 
-test('in a browser, the palette finds an island as it is typed and Enter puts it on', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, Ctrl+K finds an island in the side bar as it is typed and Enter puts it on', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   await call('/api/workspace_set', undefined, { islands: true });
   const made = (await call('/api/change', undefined, {
@@ -34,16 +35,19 @@ test('in a browser, the palette finds an island as it is typed and Enter puts it
     await until('the side list', () => page.evaluate<boolean>(`document.querySelectorAll('#islands .isl-group').length > 0`));
     assert.match(await page.evaluate<string>(`document.querySelector('#islands .isl-head').textContent`), /On · 0/);
     assert.equal(await draws('Rebuild the pier'), false, 'nothing on yet');
-    // Ctrl+K opens the palette over the canvas; typed into, it finds the island by a word of its name.
+    // Folded, the bar is its rail; Ctrl+K opens it with its search in focus, and nothing is drawn outside it.
+    await page.evaluate(`document.querySelector('#islands .isl-rail').click()`);
+    await until('folded to its rail', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && getComputedStyle(document.querySelector('#islands .isl-panel')).display === 'none'`));
     await key('k', { modifiers: 2 });
-    await until('the palette open', () => page.evaluate<boolean>(`!document.getElementById('palette').hidden && document.activeElement?.classList.contains('pal-find')`));
+    await until('open, its search in focus', () => page.evaluate<boolean>(`document.body.dataset.islands === 'open' && document.activeElement?.classList.contains('isl-search')`));
+    // Typed into, it finds the island by a word of its name, within the bar.
     await page.send('Input.insertText', { text: 'harb' });
-    await until('it finds the island', () => page.evaluate<boolean>(`document.querySelector('#palette .pal-row[aria-selected="true"] .pal-name')?.textContent === 'Harbour works'`));
-    assert.equal(await page.evaluate<number>(`document.querySelectorAll('#palette .pal-row').length`), 1, 'only what matches');
-    // Enter puts it on: the palette shuts, the canvas draws it, and the side list has it among those on.
+    await until('it finds the island', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-hit[aria-selected="true"] .isl-name')?.textContent === 'Harbour works'`));
+    assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-hit').length`), 1, 'only what matches');
+    assert.ok(await page.evaluate<boolean>(`(() => { const bar = document.getElementById('islands').getBoundingClientRect(); return [...document.querySelectorAll('#islands .isl-hit')].every((r) => r.getBoundingClientRect().right <= bar.right); })()`), 'within the bar');
+    // Enter puts it on: the canvas draws it, and the side list has it among those on.
     await key('Enter');
     await until('the canvas draws it', () => draws('Rebuild the pier'));
-    assert.equal(await page.evaluate<boolean>(`document.getElementById('palette').hidden`), true);
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
     assert.ok(made.harbour);

@@ -1,12 +1,12 @@
-// The island picker (decision e_n42s8jvn; Alex, 17 Nov 2026: a side list and a palette, for hundreds of islands): a list
-// at the canvas's left edge that folds to it, and a palette over the canvas on Ctrl+K (./island-palette.js). Both read
-// one search (./islands-list.js, rankIslands). The side list: a search line, the islands on (each × to take it off),
-// then every other island in groups by pack, each folded with its count; a press on one puts it on.
+// The island picker (decision e_n42s8jvn; Alex, 17 Nov 2026: a side list and a palette, for hundreds of islands, all of
+// it within the bar): a list at the canvas's left edge that folds to it. A search line (Ctrl+K opens the bar there), the
+// islands on (each × to take it off), then every other island in groups by pack, each folded with its count; a press on
+// one puts it on. Typed into, the bar lists what it finds best first (./islands-list.js, rankIslands): arrows move,
+// Enter puts the lit one on, Shift+Enter shows it alone.
 
 import { api, h } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
 import { atHome, byPack, drawnAt, only, rankIslands, turnedOn } from './islands-list.js';
-import { openPalette } from './island-palette.js';
 import { titles } from './words.js';
 
 /** Every island on the map, each with its pack, read once a page. */
@@ -59,20 +59,24 @@ const keep = (key, v) => {
   }
 };
 
-/** Draw the side list and start the palette, once a page; the foot strip of the find bar is put away. */
+/** Draw the side list, once a page; the foot strip of the find bar is put away. */
 export function drawPicker() {
   if (document.getElementById('islands')) return;
   const find = document.getElementById('find');
   if (find) find.hidden = true;
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', autocomplete: 'off' });
-  const fold = h('button', { type: 'button', class: 'isl-fold' });
+  // The rail along the bar's edge, its whole height a press that folds the bar to the edge or opens it again.
+  const arrow = h('span', { class: 'isl-arrow', 'aria-hidden': 'true' });
+  const count = h('span', { class: 'isl-rail-count' });
+  const fold = h('button', { type: 'button', class: 'isl-rail' }, arrow, count);
   const body = h('div', { class: 'isl-body' });
-  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-top' }, fold, input), body);
+  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input), body), fold);
   document.body.append(side);
   const open = (on) => {
     document.body.dataset.islands = on ? 'open' : 'folded';
-    fold.textContent = on ? '‹' : '›';
-    fold.title = on ? 'Fold the islands to the edge' : 'Show the islands';
+    arrow.textContent = on ? '‹' : '›';
+    fold.title = on ? 'Fold the islands to the edge (Ctrl+K opens them again)' : 'Show the islands (Ctrl+K)';
+    fold.setAttribute('aria-label', on ? 'Fold the islands' : 'Show the islands');
     fold.setAttribute('aria-expanded', String(on));
     keep('open', on);
     dispatchEvent(new Event('resize'));
@@ -82,6 +86,8 @@ export function drawPicker() {
   const unfolded = new Set(kept('packs', []));
 
   let islands = [];
+  let found = [];
+  let lit = 0;
   const row = (i, on) =>
     h('div', { class: 'isl-row', role: 'listitem' },
       packMark(i.pack),
@@ -89,14 +95,29 @@ export function drawPicker() {
         ? h('span', { class: 'isl-name', title: `${i.title} · ${i.pack.title || i.pack.id}` }, i.title)
         : h('button', { type: 'button', class: 'isl-name', title: `${i.title}: put on the canvas`, onclick: () => putOn(i) }, i.title),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
+  /** A row of what the search found: its pack's mark, its name, its pack (and whether it is on), lit as Enter would take it. */
+  const hit = (i, n, drawn) =>
+    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), title: `${i.title}: Enter puts it on, Shift+Enter shows it alone`, onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i)) },
+      packMark(i.pack),
+      h('span', { class: 'isl-name' }, i.title),
+      h('span', { class: 'isl-count' }, drawn.includes(i.id) ? `on · ${i.pack.title || i.pack.id}` : i.pack.title || i.pack.id));
   const draw = () => {
     const drawn = drawnNow(), q = input.value.trim();
-    const found = rankIslands(islands, q);
+    count.textContent = drawn.length ? String(drawn.length) : '';
+    found = rankIslands(islands, q);
+    // Searching: one list, best first, worked from the keyboard, within the bar (Alex: nothing drops outside it).
+    if (q) {
+      lit = Math.min(lit, Math.max(0, found.length - 1));
+      body.replaceChildren(h('div', { class: 'isl-head' }, `Found · ${found.length}`), h('div', { role: 'listbox', 'aria-label': 'Islands found' }, ...found.map((i, n) => hit(i, n, drawn))));
+      if (found[lit]) input.setAttribute('aria-activedescendant', `isl-${found[lit].id}`);
+      body.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    input.removeAttribute('aria-activedescendant');
     const on = found.filter((i) => drawn.includes(i.id)), rest = found.filter((i) => !drawn.includes(i.id));
     const parts = [h('div', { class: 'isl-head' }, `On · ${on.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, true)))];
     for (const g of byPack(rest)) {
-      // Searching opens every group that holds a match; else each as the person left it.
-      const shown = Boolean(q) || unfolded.has(g.id);
+      const shown = unfolded.has(g.id);
       const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown), title: `${g.title}: ${g.islands.length} island${g.islands.length === 1 ? '' : 's'}` },
         packMark(g.islands[0]?.pack), h('span', { class: 'isl-name' }, g.title || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
       head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), draw());
@@ -104,13 +125,21 @@ export function drawPicker() {
     }
     body.replaceChildren(...parts);
   };
-  input.addEventListener('input', draw);
+  input.addEventListener('input', () => ((lit = 0), draw()));
   input.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape') return void ((input.value = ''), draw());
-    const first = rankIslands(islands, input.value).find((i) => !drawnNow().includes(i.id));
-    if (ev.key === 'Enter' && first) (ev.preventDefault(), ev.shiftKey ? showOnly(first) : putOn(first));
+    if (ev.key === 'Escape') return void (ev.preventDefault(), (input.value = ''), draw(), input.blur());
+    if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && found.length) return void (ev.preventDefault(), (lit = Math.max(0, Math.min(found.length - 1, lit + (ev.key === 'ArrowDown' ? 1 : -1)))), draw());
+    const i = input.value.trim() && found[lit];
+    if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), draw());
+  });
+  // Ctrl+K (⌘K): the bar opens where it was folded, its search in focus.
+  addEventListener('keydown', (ev) => {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.key.toLowerCase() !== 'k') return;
+    ev.preventDefault();
+    if (document.body.dataset.islands !== 'open') open(true);
+    input.focus();
+    input.select();
   });
   onDrawn(draw);
-  openPalette({ all: allIslands, drawn: drawnNow, putOn, showOnly, mark: packMark });
   Promise.all([islandsOn(), allIslands()]).then(([now, all]) => ((mine = now), (islands = all), draw()));
 }
