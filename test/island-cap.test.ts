@@ -32,8 +32,8 @@ test('an island takes its look’s cap, else the map’s; an agent past it is re
   await make(l, [
     { op: 'create', ref: 'two', type: 'layout', title: 'Two at most', props: { code: CODE, cap: 2 } },
     { op: 'create', ref: 'all', type: 'layout', title: 'Particles', props: { code: CODE, cap: 'none' } },
-    { op: 'link', type: 'about', from: 'two', to: isle.small },
-    { op: 'link', type: 'about', from: 'all', to: isle.big },
+    { op: 'link', type: 'draws', from: 'two', to: isle.small },
+    { op: 'link', type: 'draws', from: 'all', to: isle.big },
   ]);
   const caps = await islandCaps(l.db, l.registry, [isle.small, isle.big, isle.plain]);
   assert.deepEqual([caps.get(isle.small), caps.get(isle.big), caps.get(isle.plain)], [2, null, 40]);
