@@ -30,11 +30,11 @@ test('in a browser, a show of an item on an island puts the island on and lights
     await ready(page);
     // Start from a canvas with nothing on it, so putting the island on is seen.
     await page.evaluate(`(async () => { const { keepList } = await ${pageModule('islands-on.js')}; await keepList([], 'test'); })()`);
-    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; window.lit = []; hooks.lightIsland = (island, item) => lit.push([island, item]); })()`);
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; window.lit = []; hooks.lightIsland = (island, item, by) => lit.push([island, item, by]); })()`);
     const where = await page.evaluate<string>('location.hash');
     const shown = (await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made.pier, run, note: 'The pier' } })).result;
     assert.equal(shown.sight.looking, false, 'nothing brought into sight');
-    await until('the item is lit', () => page.evaluate<boolean>(`JSON.stringify(window.lit) === ${JSON.stringify(JSON.stringify([[made.harbour, made.pier]]))}`));
+    await until('the item is lit', () => page.evaluate<boolean>(`JSON.stringify(window.lit) === ${JSON.stringify(JSON.stringify([[made.harbour, made.pier, 'Lights']]))}`));
     await until('its island is on the canvas', () => page.evaluate<boolean>(`(async () => (await (await ${pageModule('islands-on.js')}).islandsOn()).includes(${JSON.stringify(made.harbour)}))()`));
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('${TAB}').length`), 1, 'no tab opened for it');
     assert.equal(await page.evaluate<string>('location.hash'), where, 'the view stays where it was');

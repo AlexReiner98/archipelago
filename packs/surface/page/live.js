@@ -3,7 +3,7 @@ import { project } from './project.js';
 import { beatRows, missedRows } from './beat-rows.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { still } from './look.js';
-import { hear, sessionOf } from './pane-route.js';
+import { hear, nameOf, sessionOf } from './pane-route.js';
 import { numberOf } from './query-base.js';
 import { front, landsIn, poppedTab } from './tabs.js';
 import { islandsOn, keepList } from './islands-on.js';
@@ -168,7 +168,7 @@ function light(s) {
   const item = /^e\/(e_[a-z0-9]{8})(?:\?|$)/.exec(s.hash)?.[1] ?? s.island;
   putting.set(s.island, s.did || (s.title ?? s.actor ?? 'A session'));
   void putOnShown();
-  hooks.lightIsland?.(s.island, item);
+  hooks.lightIsland?.(s.island, item, nameOf(sessionOf(s)));
 }
 
 export function follow(steps = []) {
