@@ -27,6 +27,7 @@ import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth } from './pack-marks.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
+import { looks as kept } from './island-looks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
 import { carried } from './carried.js';
@@ -131,7 +132,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
   // One budget for the whole picture (./effort.js): what it spends on looking better, at every level, it spends from this.
   const effort = effortOf(z('picture_work'));
-  const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes, ...(style.placed && typeof style.placed === 'object' && { placed: style.placed }) });
+  // An island with a look of its own is asked how what it holds stands and looks (../map/looks.js), by the code the frame hands over.
+  const onIsle = (id) => new Set(answer.items.filter((i) => i.island === id).map((i) => i.id)), looks = new Map((answer.islands ?? []).filter((i) => i.look && (tools.looks ?? kept).get(i.id)).map((i) => ((own) => [i.id, { look: (tools.looks ?? kept).get(i.id), island: { id: i.id, title: i.title, pack: i.pack?.id ?? i.pack ?? null }, links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), numbers: style.numbers, m }])(onIsle(i.id))));
+  const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes, ...(style.placed && typeof style.placed === 'object' && { placed: style.placed }), ...(looks.size && { looks }) });
   // A picture of items on islands is an archipelago (./archipelago.js): each island laid out alone, a sea between. One
   // island is framed too, with its own legend in place of the key (task e_5rh5ysut).
   const parts = !story && islandsOf(answer.items).length > 0 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
@@ -364,6 +367,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const offOn = (id) => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.packs_off ?? answer.items.find((i) => i.id === id)?.fields?.packs_off);
   const header = (id, [x, y], title) => packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on });
   const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header });
+  const drawnBy = new Map((g.islands ?? []).flatMap((isle) => [...(isle.look?.items ?? [])]));
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -372,7 +376,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus'].filter(Boolean).join(' ');
-    const body = [
+    // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's.
+    const body = drawnBy.get(n.id)?.length ? [m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),

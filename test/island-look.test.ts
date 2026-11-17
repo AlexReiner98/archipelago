@@ -36,11 +36,12 @@ test('a layout kept about an island is its look in the answer; a style is none, 
   ]);
 
   const looks = await islandLooks(l, [isle.here, isle.there]);
-  assert.deepEqual(looks.get(isle.here), { id: newer.dash, kind: 'layout', title: 'Dashboard' });
+  assert.deepEqual({ ...looks.get(isle.here), at: undefined }, { id: newer.dash, kind: 'layout', title: 'Dashboard', at: undefined });
+  assert.equal(typeof looks.get(isle.here)?.at, 'string', 'when it last changed, for a page to key its code by');
   assert.equal(looks.has(isle.there), false, 'an island with none has none');
 
   const answer = (await queryFlatPack.flatRead(kernelContext(l, 'query'), { filter: { find: [`island ${isle.here}`, `island ${isle.there}`] } })) as { islands: { id: string; look?: unknown }[] };
-  assert.deepEqual(answer.islands.find((i) => i.id === isle.here)?.look, { id: newer.dash, kind: 'layout', title: 'Dashboard' });
+  assert.equal((answer.islands.find((i) => i.id === isle.here)?.look as { id?: string })?.id, newer.dash);
   assert.equal(answer.islands.find((i) => i.id === isle.there)?.look, undefined);
 
   await make(l, [{ op: 'archive', id: newer.dash }]);

@@ -6,6 +6,8 @@
 // below all.
 // Wires are straight, from box edge to box edge. Layer: metrics. Pure: the layout's args in, the model out.
 
+import { lookOut } from './looks.js';
+
 /** A place [column, row] of whole cells, or nothing. */
 const cellOf = (v) => (Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0) ? v : null);
 
@@ -36,14 +38,20 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   let right = M - GAP;
   for (const [id, items] of own) {
     const corner = cellOf(corners[id]), top = heads.get(id) ?? 0;
-    const unplaced = items.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0;
     const l = corner ? M + corner[0] * cw : right + GAP, t = corner ? M + corner[1] * ch : M;
-    const at = (n, [c, r]) => (x.set(n.id, l + PAD + c * cw + n.w / 2), y.set(n.id, t + PAD + top + r * ch + n.h / 2));
+    // An island with a look of its own (./looks.js) stands where its look puts what it holds; what the look leaves
+    // unplaced is placed by cell beside it.
+    const given = args.looks?.get(id), look = given && lookOut(given.look, { ...given, nodes: items, sizes, measure: args.measure });
+    const lx = l + PAD, ly = t + PAD + top, rest = look ? items.filter((n) => !look.places.has(n.id)) : items, after = look ? look.width + GAP : 0;
+    if (look) for (const n of items) if (look.places.has(n.id)) x.set(n.id, lx + look.places.get(n.id)[0]), y.set(n.id, ly + look.places.get(n.id)[1]);
+    const unplaced = rest.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0;
+    const at = (n, [c, r]) => (x.set(n.id, lx + after + c * cw + n.w / 2), y.set(n.id, ly + r * ch + n.h / 2));
     // Row by row across the block, so the order they came in reads left to right, then down.
     unplaced.forEach((n, k) => at(n, [k % shift, Math.floor(k / shift)]));
-    for (const n of items) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
-    const r = Math.max(l + (wides.get(id) ?? 0), ...items.map((n) => x.get(n.id) + n.w / 2 + PAD)), b = Math.max(...items.map((n) => y.get(n.id) + n.h / 2)) + PAD;
-    islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }] });
+    for (const n of rest) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
+    const r = Math.max(l + (wides.get(id) ?? 0), look ? lx + look.width + PAD : l, ...items.map((n) => x.get(n.id) + n.w / 2 + PAD));
+    const b = Math.max(look ? ly + look.height + PAD : t, ...items.map((n) => y.get(n.id) + n.h / 2 + PAD));
+    islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }], ...(look && { look: { at: [lx, ly], paint: look.paint, items: look.items } }) });
     bottom = Math.max(bottom, b);
     right = Math.max(right, r);
   }
