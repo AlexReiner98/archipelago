@@ -25,6 +25,7 @@ import { draggable } from './part-drag.js';
 import { traceGone, traceMark } from './part-trace.js';
 import { setsField } from './part-echo.js';
 import { codeAt, codeField, codeSet, codeText } from './part-code.js';
+import { boxOfLines, fit, oneLine } from './part-lines.js';
 
 /** What each element was drawn from, and the surface that runs a paint mark. */
 const drawnFrom = new WeakMap();
@@ -188,7 +189,7 @@ function field(node, ctx) {
     return el;
   }
   const many = (node.at.lines ?? 1) > 1;
-  const el = kind === 'pick' ? make('select', 'pm-input') : make(many ? 'textarea' : 'input', 'pm-input');
+  const el = kind === 'pick' ? make('select', 'pm-input') : make(boxOfLines(node.at) ? 'textarea' : 'input', 'pm-input');
   if (el.tagName === 'INPUT') el.type = FIELD_TYPES[kind];
   const value = () => (kind === 'check' ? String(el.checked) : el.value);
   const said = (name, more = {}) => {
@@ -210,7 +211,7 @@ function field(node, ctx) {
   // (with Shift held, `shift`).
   if (PICKS.includes(kind)) el.addEventListener('change', () => said('pick'));
   else {
-    el.addEventListener('input', () => (said('edit'), fit(el)));
+    el.addEventListener('input', () => (oneLine(el, drawnFrom.get(el).at), said('edit'), fit(el, drawnFrom.get(el).at)));
     el.addEventListener('keydown', (e) => !many && e.key === 'Enter' && !e.isComposing && !drawnFrom.get(el).at.keys?.includes('Enter') && (e.preventDefault(), said('submit', e.shiftKey ? { shift: true } : {})));
   }
   return el;
@@ -250,23 +251,13 @@ function finder(node, ctx) {
   return el;
 }
 
-/** A box of lines that fits its words is as tall as they are; the scroll it sits in is kept still while it is measured. */
-function fit(el) {
-  if (el.tagName !== 'TEXTAREA' || !drawnFrom.get(el)?.at.fits) return;
-  const scroller = el.closest('#sheet') ?? document.scrollingElement;
-  const top = scroller?.scrollTop;
-  el.style.height = 'auto';
-  el.style.height = `${el.scrollHeight}px`;
-  if (scroller) scroller.scrollTop = top;
-}
-
 /** Set what a mark says on the element drawn from it; `fresh` when it was just made. Answers with the element that stands for it now. */
 function update(el, node, ctx, fresh = false) {
   const was = drawnFrom.get(el);
   drawnFrom.set(el, node);
   const { at } = node;
   if (node.mark === 'paint') return (surfaces.get(el).update(node), tipped(el, at.tip), el);
-  const remade = node.mark === 'input' ? (at.lines ?? 1) > 1 !== (el.tagName === 'TEXTAREA') || (at.kind ?? 'text') !== (was.at.kind ?? 'text') : node.mark === 'text' && Boolean(at.href) !== Boolean(was?.at.href);
+  const remade = node.mark === 'input' ? boxOfLines(at) !== (el.tagName === 'TEXTAREA') || (at.kind ?? 'text') !== (was.at.kind ?? 'text') : node.mark === 'text' && Boolean(at.href) !== Boolean(was?.at.href);
   if (remade) {
     // A field that changes between one line and many, or its kind, is made again; so is text that becomes a way out or stops being one.
     const made = build(node, ctx);
@@ -327,7 +318,7 @@ function update(el, node, ctx, fresh = false) {
     if (setsField(at.value ?? '', codeText(el), sent.get(el), ctx.seen)) codeSet(el, at.value ?? '');
   } else if (node.mark === 'input') {
     el.placeholder = at.hint ?? '';
-    if (el.tagName === 'TEXTAREA') el.rows = at.lines;
+    if (el.tagName === 'TEXTAREA') el.rows = at.lines ?? 1;
     // A pick offers its values, made again only when they change.
     if (el.tagName === 'SELECT' && (fresh || JSON.stringify([was.at.values, was.at.names]) !== JSON.stringify([at.values, at.names]))) {
       el.replaceChildren(...at.values.map((v, i) => Object.assign(document.createElement('option'), { value: v, textContent: at.names?.[i] ?? v })));
@@ -340,7 +331,7 @@ function update(el, node, ctx, fresh = false) {
       if (at.kind === 'check') el.checked = value === 'true';
       else el.value = value;
     }
-    if (fresh) requestAnimationFrame(() => fit(el));
+    if (fresh) requestAnimationFrame(() => fit(el, drawnFrom.get(el)?.at));
     if (at.focus && el.tagName !== 'SPAN') focusSoon(el);
   }
   if (node.mark === 'text' && at.href && el.getAttribute('href') !== at.href) el.setAttribute('href', at.href);

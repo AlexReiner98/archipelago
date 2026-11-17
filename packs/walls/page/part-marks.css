@@ -14,7 +14,7 @@
 .pm-box-sunk { background: var(--panel); }
 
 .pm-text { font-size: var(--pm-size, inherit); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.pm-text-title { font-size: var(--pm-size, var(--text-7)); font-weight: 600; }
+.pm-text-title { font-size: var(--pm-size, var(--text-7)); font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 .pm-text-muted { color: var(--muted); }
 .pm-text-mark { font-size: var(--pm-size, var(--text-3)); }
 .pm-text-code { font-family: var(--face-mono); }
@@ -27,8 +27,10 @@
 textarea.pm-input { font: inherit; color: var(--text); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-2); padding: var(--space-4) var(--space-6); resize: vertical; }
 .pm-input { min-width: 0; }
 /* A title written in place reads as the title it is: no box around it until it is being written. */
-input.pm-input-title { font: inherit; font-family: var(--type-heading-family, inherit); font-size: var(--text-7); font-weight: var(--type-heading-weight, 600); color: var(--text); background: none; border: var(--border-1) solid transparent; border-radius: var(--radius-2); padding: 0; width: 100%; overflow: hidden; text-overflow: ellipsis; }
-input.pm-input-title:hover, input.pm-input-title:focus { border-color: var(--line); }
+/* A title wraps to the lines it needs: a box of one row that grows with its words by field-sizing alone. Sizing it in
+   script as well (fit() in part-lines.js) loops with the sheet's own measuring and hangs the page. */
+textarea.pm-input-title { font: inherit; font-family: var(--type-heading-family, inherit); font-size: var(--text-7); font-weight: var(--type-heading-weight, 600); line-height: normal; color: var(--text); background: none; border: var(--border-1) solid transparent; border-radius: var(--radius-2); padding: 0; width: 100%; display: block; resize: none; overflow: hidden; field-sizing: content; }
+textarea.pm-input-title:hover, textarea.pm-input-title:focus { border-color: var(--line); }
 textarea.pm-input-plain { width: 100%; }
 /* An item found by name: the box, and what it finds on one line beside it, cut where it does not fit. */
 .pm-finder { display: flex; gap: var(--space-4); align-items: baseline; min-width: 0; overflow: hidden; }
