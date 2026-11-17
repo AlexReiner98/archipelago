@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { atHome, capital, drawnAt, islandsIn, pressed, recentFirst } from '../packs/surface/page/islands-list.js';
+import { atHome, capital, drawnAt, islandsIn, pressed, rankIslands, recentFirst } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
@@ -68,4 +68,17 @@ test('the side list puts the islands worked on lately first, the latest first, t
   const capped = recentFirst([{ id: 'a', title: 'Zebra', worked_at: day(1) }, { id: 'c', title: 'Mango', worked_at: day(0.5) }, { id: 'b', title: 'Apple', worked_at: day(30) }], now, 7, 1);
   assert.deepEqual(capped.recent.map((i: { id: string }) => i.id), ['c'], 'no more than the most, the latest kept');
   assert.deepEqual(capped.rest.map((i: { title: string }) => i.title), ['Apple', 'Zebra'], 'the rest by name, the one left over among them');
+});
+
+test('islands found equally well stand together by name, a family with them', () => {
+  const core = { id: 'core', title: 'Core' };
+  const found = rankIslands([
+    { id: '1', title: 'xAI memory: positioning', pack: core },
+    { id: '2', title: 'Zep memory: marketing', pack: core },
+    { id: '3', title: 'xAI memory: marketing', pack: core },
+    { id: '4', title: 'Memory principles', pack: core },
+    { id: '5', title: 'xAI memory: technical', pack: core },
+  ], 'memory');
+  assert.equal(found[0].title, 'Memory principles', 'the start of a name first');
+  assert.deepEqual(found.slice(1).map((i: { title: string }) => i.title), ['xAI memory: marketing', 'xAI memory: positioning', 'xAI memory: technical', 'Zep memory: marketing']);
 });
