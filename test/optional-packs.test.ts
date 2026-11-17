@@ -12,7 +12,7 @@ import * as duePack from '../packs/clocks/kernel/due.ts';
 import { isOptional, isRequired, memoryPrefix, readManifest } from '../packs/loader/kernel/manifest.ts';
 import { INTERNAL_PACKS, packVersions } from '../packs/loader/kernel/pack-versions.ts';
 import { Registry } from '../packs/loader/kernel/packs.ts';
-import { setPack } from '../packs/loader/kernel/packstate.ts';
+import { packStates, setPack } from '../packs/loader/kernel/packstate.ts';
 import type { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { freshWith, human, make, PACKS, packsWith } from './map.ts';
 import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
@@ -69,7 +69,8 @@ test('the Packs screen: a required internal pack is never taken out; an optional
   await assert.rejects(setPack(l, human, { pack: 'mentions', on: false }), /server's own and required/);
   const { packs } = await setPack(l, human, { pack: 'sessions', on: false });
   assert.equal(packs.find((p) => p.id === 'sessions')?.state, 'off');
-  assert.equal(packs.find((p) => p.id === 'mentions')?.required, true);
+  // pack_set answers the packs it turned; the whole list is the packs read's (bug e_dbzd4d9h).
+  assert.equal(packStates(l).find((p) => p.id === 'mentions')?.required, true);
   assert.equal(packs.find((p) => p.id === 'sessions')?.required, undefined);
 });
 
