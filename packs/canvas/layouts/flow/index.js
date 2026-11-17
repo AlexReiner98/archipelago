@@ -360,8 +360,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its
   // shore; a finding read across outlined in its island's colour (./islands.js).
   // Its header after its name: its pack and what that pack requires, each a mark (./pack-marks.js).
-  // The packs this island turned off, as its item says (packs_off, shown on a focus or an island the answer holds).
-  const offOn = (id) => ((v) => (Array.isArray(v) ? v : []))(answer.items.find((i) => i.id === id)?.fields?.packs_off);
+  // The packs this island turned off, as the answer's island says (packs_off), else its item where the answer holds it.
+  const offOn = (id) => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.packs_off ?? answer.items.find((i) => i.id === id)?.fields?.packs_off);
   const header = (id, [x, y], title) => packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on });
   const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header });
   const stepLayer = steps.map((n) => {

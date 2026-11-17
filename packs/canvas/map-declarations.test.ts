@@ -94,6 +94,10 @@ test('turn on is offered only for a pack this island turned off', () => {
   const here = packsIn(draw(turnedOff, writer).scene.svg).find((m) => m[1].key.endsWith(':runs'));
   assert.ok(here[1].on.includes('toggle') && here[1].pack === 'runs', 'in packs_off: a button');
   assert.match(texts(here).join(' '), /Click to turn it on here/);
+  // An island item is not in its own answer: its packs_off rides on the answer's island.
+  const byIsland = { ...answer, items: answer.items.filter((i: any) => i.id !== 'e_buildisl'), islands: [{ ...answer.islands[0], packs_off: ['runs'] }] };
+  const there = packsIn(draw(byIsland, writer).scene.svg).find((m) => m[1].key.endsWith(':runs'));
+  assert.ok(there?.[1].on.includes('toggle'), "in the answer's island's packs_off: a button, the island's item not drawn");
 });
 
 test('an island with no pack shows no marks', () => {

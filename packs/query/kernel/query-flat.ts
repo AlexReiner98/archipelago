@@ -132,7 +132,7 @@ interface Seeded {
   terms: Record<string, string[]>;
   step: Record<string, number>;
   on_islands: boolean;
-  islands: { id: string; title?: string; pack?: string | null; focus?: boolean; decl?: Record<string, unknown> }[];
+  islands: { id: string; title?: string; pack?: string | null; focus?: boolean; packs_off?: string[]; decl?: Record<string, unknown> }[];
   /** Why an item waits: its type's pack is not active on its island (decision e_57bjxy2x), by item. */
   waiting?: Record<string, { pack: string; why: string }>;
   cut?: boolean;
@@ -246,7 +246,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
     links: seeded.links.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(ctx.registry, r.type).length && { is: flavourOf(ctx.registry, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
-    ...(seeded.islands.length && { islands: seeded.islands.map((r) => { const legend = r.pack ? islandPack(ctx.registry, r.pack, usedOn(r.id)) : undefined, pack = legend || r.decl ? { id: r.pack!, title: r.pack!, types: [] as { id: string; title: string }[], links: [] as { id: string; title: string }[], ...legend, ...r.decl } : undefined; /* its legend, and what it declares there: its state, what it requires, what turning it off would send waiting */ return { id: r.id, ...(r.title !== undefined && { title: r.title }), ...(pack && { pack }), ...(r.focus && { focus: true }) }; }) }),
+    ...(seeded.islands.length && { islands: seeded.islands.map((r) => { const legend = r.pack ? islandPack(ctx.registry, r.pack, usedOn(r.id)) : undefined, pack = legend || r.decl ? { id: r.pack!, title: r.pack!, types: [] as { id: string; title: string }[], links: [] as { id: string; title: string }[], ...legend, ...r.decl } : undefined; /* its legend, and what it declares there: its state, what it requires, what turning it off would send waiting */ return { id: r.id, ...(r.title !== undefined && { title: r.title }), ...(pack && { pack }), ...(r.focus && { focus: true }), ...(r.packs_off?.length && { packs_off: r.packs_off }) }; }) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(seeded.cut && { cut: true }),
     ...(seeded.matched !== undefined && { matched: seeded.matched }),
