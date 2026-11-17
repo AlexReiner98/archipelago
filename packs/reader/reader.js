@@ -49,6 +49,9 @@ export const pictureAt = (page, section) => `${page.replace(/\/$/, '')}/picture/
 export const shareOf = (doc, share) =>
   typeof share === 'string' && doc.parts.some((p) => 'section' in p && p.section.id === share && p.section.picture) ? share : undefined;
 
+/** A site's name: the title of its front page, else its workspace's name, so a workspace serves a site under the site's own name. */
+export const siteName = (pages, name, workspace) => pages.find((page) => page.path === HOME)?.title || name || workspace;
+
 /**
  * The site's name, the pages its header shows, in their menu's order, each at the address href gives it, and what
  * every page ends with: the words of the page published at /footer, as published.
@@ -60,7 +63,7 @@ export async function nav(act, workspace, name, href) {
   const footer = (foot?.parts ?? []).flatMap((part) => (typeof part.text === 'string' ? [part.text] : [])).join(PARAGRAPH);
   return {
     ...(footer && { footer }),
-    name: name ?? workspace,
+    name: siteName(pages, name, workspace),
     home: home ? href(home) : null,
     pages: pages.filter((page) => page.menu != null && page.path !== HOME).map((page) => ({ title: page.title, href: href(page) })).filter((page) => page.href),
   };
@@ -139,7 +142,7 @@ export async function siteOf(parts, act, template) {
     const pages = ((await act('public.list', { workspace })) ?? []).filter(listed);
     const lead = textOf(await act('public.at', { workspace, path: LLMS }));
     const list = pages.map((page) => `- [${page.title}](${origin + onSite(workspace, page)})`).join('\n');
-    const head = lead.startsWith('# ') ? lead : `# ${name ?? workspace}${lead ? PARAGRAPH + lead : ''}`;
+    const head = lead.startsWith('# ') ? lead : `# ${siteName(pages, name, workspace)}${lead ? PARAGRAPH + lead : ''}`;
     // Said before the pages, since one of them may be how to host it: an agent asked to set it up connects to the app.
     const installs = app && !lead.includes('/connect/install')
       ? `${PARAGRAPH}## Install${PARAGRAPH}To set it up for a person, connect to the hosted service at ${app}: fetch ${app}/connect/install and follow the section for your client. There is nothing to host and nothing to ask; a person with no account makes one when the browser opens to sign in. Run a server of your own only if the person asks for that.${PARAGRAPH}- [Install Archipelago for an agent](${app}/connect/install)`

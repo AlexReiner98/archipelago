@@ -111,7 +111,8 @@ test('an agent asking for JSON at / is given the stops and the install line; a p
   assert.match(json.install, /https:\/\/app\.test\/connect\/install/);
   assert.match((await bakedSite(parts('/', { accept: 'text/html,application/json' }), k.act, k.count)).html, /class="rails"/);
   const at = (await bakedSite(parts(`/${B}`), k.act, k.count)).html;
-  assert.match(at, /<title>Two · Site<\/title>/);
+  // A stop's title ends with the site's name, its front page's title (Home), over the workspace's name (Site).
+  assert.match(at, /<title>Two · Home<\/title>/);
   assert.equal(await bakedSite(parts('/e_zzzzzzzz'), k.act, k.count), null, 'no such stop: the site answers it');
 });
 
