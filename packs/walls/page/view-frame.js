@@ -1,8 +1,6 @@
 // A kept view beside a picture: the `view` mark a drawing may make (packs/walls/page/marks.js), as a story's player does for the
 // milestone a step reaches (packs/canvas/layouts/architecture/play.js, used by the map). A drawing names only the view; the page draws it.
-// On a canvas, it is drawn in a pane of its own beside the drawing's (hooks.besidePane, ui/panes.js), so the reader
-// slides the sash between them (the owner, 2 Nov 2026, e_dnewbxxh); the frame itself stays empty. Elsewhere (a
-// document), it is drawn in the frame as it is kept (keptView, packs/surface/page/views-kept.js), in the sandbox as every picture is:
+// It is drawn in the frame as it is kept (a tab is one canvas since 17 Nov 2026: no pane of its own beside it) (keptView, packs/surface/page/views-kept.js), in the sandbox as every picture is:
 // named again (a patch with the mark whole), the new view is drawn under the old, out of sight, and takes its place
 // once it has drawn, so nothing jumps; named with no id, the frame is empty.
 
@@ -14,9 +12,6 @@ export function viewFrame(attrs, fail) {
   const el = h('div', { class: 'view-frame' });
   let at;
   const draw = (want) => {
-    // Where it stands is known once the mark is on the page.
-    const pane = el.closest('[data-pane]')?.dataset.pane;
-    if (pane && hooks.besidePane) return void (el.classList.add('beside'), hooks.besidePane(pane, want));
     for (const old of el.querySelectorAll(':scope > .view-next')) old.remove();
     // A page that draws no kept views (one with no canvases) leaves the frame empty.
     if (!want || !hooks.keptView) return el.replaceChildren();

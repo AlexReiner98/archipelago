@@ -239,6 +239,8 @@ export interface LayoutDef {
   notes?: 'whole';
   /** Laid out by the page, drawn to the size it gives (a scene that says `flat`): the page gives it that box before it measures, so one draw is enough. */
   flat?: boolean;
+  /** How many items an island it draws may hold (decision e_bgw2u5aw): a whole number, or "none". The map-shaped one's is every island's without a look of its own. */
+  cap?: number | 'none';
 }
 
 /** What a pack shows on the page of every item of the kinds or types it is on: one column of pieces. */

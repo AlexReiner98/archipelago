@@ -51,6 +51,8 @@ export const UI_FILES: Record<string, string> = {
   '/notes.css': 'notes.css',
   '/story.css': 'story.css',
   '/menus.css': 'menus.css',
+  // The island picker: the side list (packs/surface/page/island-picker.js).
+  '/island-picker.css': 'island-picker.css',
   // How a part's marks look: classes and steps the style gives values to (packs/walls/page/part-render.js).
   '/part-marks.css': 'part-marks.css',
   

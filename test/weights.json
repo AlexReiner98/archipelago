@@ -251,7 +251,6 @@
   "test/sessions.test.ts": { "pglite": 16.5, "postgres": 8.2 },
   "test/sets.test.ts": { "pglite": 4.2, "postgres": 5.5 },
   "test/setup.test.ts": { "pglite": 19.8, "postgres": 13.7 },
-  "test/show-follows.test.ts": { "pglite": 6.8, "postgres": 6.5 },
   "test/show-lands.test.ts": { "pglite": 16, "postgres": 14.1 },
   "test/show-tab-life.test.ts": { "pglite": 11.5, "postgres": 10.9 },
   "test/show-web.test.ts": { "pglite": 14.8, "postgres": 13.4 },

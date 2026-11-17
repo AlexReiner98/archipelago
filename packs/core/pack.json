@@ -121,7 +121,7 @@
       "title": "Person",
       "description": "A human being.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
-      "fields": { "email": { "type": "string" }, "role": { "type": "string", "description": "What they do, in a few words." } }
+      "fields": { "email": { "type": "string" }, "role": { "type": "string", "description": "What they do, in a few words." }, "islands": { "type": "json", "description": "What they have on their canvas, their Home: islands by id and live reads by name (frontier, attention, waits, replies, changed), toggled at the canvas's foot (decision e_n42s8jvn)." } }
     },
     {
       "id": "agent",
@@ -214,7 +214,7 @@
         "link_colours": { "type": "json", "description": "A colour for each link type, by its name, as hex colours: the flow draws each wire and tie in its own, and a type not named here takes one of link_hues, the same each time unless another type in the picture has it." },
         "type_shapes": { "type": "json", "description": "The outline each type is drawn in, by type: box, diamond, pill, sheet, cut (a box with cut corners), hexagon, flag, tab or ticket (a box with a notch in each end), e.g. {\"question\": \"diamond\"}. A type not named takes the outline of the nearest type it is a flavour of that is named, else a box." },
         "held_up": { "type": "enum", "values": ["none", "trouble"], "description": "Whether a step held up by an open step it depends on has its dot in the trouble colour (trouble), or is drawn as its phase alone, the order's wire saying the rest (none)." },
-        "glyph": { "type": "string", "description": "A pack's mark, a character or two, in a preset its pack ships: an island's header shows it for the pack (decision e_e3ss8nqm). A pack with none shows its initial." }, "pack_marks": { "type": "json", "description": "How an island's header colours each pack's mark by its state there (active, waiting, off): { hue }, one of the theme's colours by name. A state not named is muted." }, "phase_marks": { "type": "json", "description": "How a step's dot says where it stands, by phase (not_started, under_way, finished, ended, trouble, standing): hollow, half, full or none. A phase not named is hollow." },
+        "glyph": { "type": "string", "description": "A pack's mark, a character or two, in a preset its pack ships: an island's header shows it for the pack (decision e_e3ss8nqm). A pack with none shows its initial." }, "island_looks": { "type": "enum", "values": ["own", "plain"], "description": "Whether a view draws each island by its own look and the looks on its pack's types (own, as every view does unless it says), or every island alike in the view's own look (plain)." }, "focus": { "type": "json", "description": "How an island treats its focus (decision e_up4wjd94): where it stands (at: cell, corner, or top, over the rest), its outline (shape, one of type_shapes' outlines) and how much bigger than an item it is drawn (scale). On an island's own layer, from the looks on its pack's types, or on the view for every island." }, "pack_marks": { "type": "json", "description": "How an island's header colours each pack's mark by its state there (active, waiting, off): { hue }, one of the theme's colours by name. A state not named is muted." }, "phase_marks": { "type": "json", "description": "How a step's dot says where it stands, by phase (not_started, under_way, finished, ended, trouble, standing): hollow, half, full or none. A phase not named is hollow." },
         "session_marks": { "type": "json", "description": "How the flow draws a run's session state (waiting, your_move, blocked, working, quiet, idle, done), by state: { shape, hue, lit }. shape: disc, ring, half, square, diamond or triangle; hue: one of the theme's colours by name (you, blocked, session, warn, muted, done...); lit: drawn as what waits on you, and laid out first. A run whose state is named shows its line in place of its title." },
         "link_hues": { "type": "json", "description": "The colours a link type not named in link_colours takes, as hex colours: by its name, stepping past one another type in the same picture has. hues when not set." },
         "key": { "type": "enum", "values": ["shown", "hidden"], "description": "Whether a picture's key is drawn: what each mark it uses means, as its layout says (the scene's key), always in sight on the canvas. shown unless said." },
@@ -269,6 +269,7 @@
         "writes": { "type": "json", "description": "The types this layout's code may change by itself, as a list, e.g. [\"local.ridges_setup\"]: what its layout asks for (a preset saved, one deleted) the page sends as the person looking, and it applies where it writes only these types; anything else waits for that person (core's drawing_* rules). Written by an agent, it waits for the human, as code does." },
         "modules": { "type": "json", "large": true, "code": true, "description": "The owner's version of a layout a pack ships (with preset, the layout’s id): its modules by name, each a JavaScript module's text, standing in for the pack's module of that name. The layout runs as code does, in a worker inside a sandboxed frame, and answers with marks (SVG and HTML as data) the page checks before it draws them: index.js exports picture(input, tools), typed as PictureFn in packs/walls/page/draw.d.ts. Written by an agent, it waits for the human to approve it." },
         "settings": { "type": "json", "description": "The style fields it draws with, such as text or colors, as a style holds them: under the view's own, which say otherwise." },
+        "cap": { "type": "json", "description": "How many items an island drawn by this look may hold (decision e_bgw2u5aw, the owner, 17 Nov 2026): a whole number, or \"none\" for a look built for big graphs. Kept about an island, it is that island’s cap; unset, its preset’s." },
         "preset": { "type": "string", "description": "The id of the pack's drawing this is the owner's version of (a layout in a pack's layouts).", "system": true }
       }
     },
@@ -280,6 +281,7 @@
       "statuses": { "open": ["working", "kept"], "closed": ["retired"], "phases": { "working": "under_way", "kept": "standing", "retired": "ended" } },
       "fields": {
         "pack": { "type": "string", "description": "The pack whose part it is, by id." },
+        "cap": { "type": "json", "description": "How many items an island drawn by this look may hold (decision e_bgw2u5aw, the owner, 17 Nov 2026): a whole number, or \"none\" for a look built for big graphs. Kept about an island, it is that island’s cap; unset, its preset’s." },
         "slot": { "type": "string", "description": "The slot it fills: the host's (bar, canvas, sheet, find, home, piece.<name>, page.<name>), or one a pack's part opens (<pack>.<name>)." },
         "reads": { "type": "json", "description": "The fields it reads, by type, as { \"<type>\": [\"<field>\", ...] }: what the host hands it of an item, and no more." },
         "sends": { "type": "json", "description": "The actions it may send, as a list: its pack's own, each sent as a change on the authority of the person looking." },
@@ -773,6 +775,16 @@
       "description": "Participants and stakeholders."
     },
     {
+      "id": "draws",
+      "kernel": true,
+      "extends": "about",
+      "title": "draws",
+      "inverse": "is drawn by",
+      "from": ["layout", "part"],
+      "to": ["*"],
+      "description": "The island this look draws, in every view it is in (decision e_gwfwbx3t, the owner, 17 Nov 2026): its island item or its focus. A flavour of about with a name of its own, so a layout about an item still draws that item's pictures and a look is found by this alone."
+    },
+    {
       "id": "about",
       "moved_from": ["supersedes", "based_on", "governed_by", "reduces"],
       "root": true,
@@ -911,6 +923,12 @@
       "then": "hold",
       "stake": "Code of a version now runs on another island too: \"{title}\" runs it for everyone who works there.",
       "say": "\"{title}\" would run a version's code another island already tries: spreading it is the owner's to allow."
+    },
+    {
+      "id": "island_full",
+      "when": { "actor": "agent", "over_cap": true },
+      "then": "refuse",
+      "say": "{over_cap}: split it first, or give it a look that says a larger cap (the owner, 17 Nov 2026, e_bgw2u5aw)."
     },
     {
       "id": "code_runs",

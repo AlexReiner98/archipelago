@@ -1,5 +1,5 @@
 // A view that lists its islands (feature e_u52abqr4): each item stands at the cell an agent set for it, each island at
-// the corner the view keeps, with no solve; what no one placed stands in a column at its island's left edge.
+// the corner the view keeps, with no solve; what no one placed stands in a block at its island's left edge.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -46,4 +46,20 @@ test('the same picture twice is the same', () => {
   const one = draw(placed), two = draw(placed);
   assert.deepEqual([...one.x], [...two.x]);
   assert.deepEqual([...one.y], [...two.y]);
+});
+
+test('an island with no corner stands to the right of those that have one', () => {
+  const g = draw({ e_islandbb: [0, 0] });
+  assert.ok(g.x.get('e_aaaaaaaa') > g.x.get('e_dddddddd'), 'the island with no corner follows the placed one');
+});
+
+test('a big island with nothing placed wraps to a block the pane’s shape, not one tall column', () => {
+  const many = Array.from({ length: 40 }, (_, k) => item(`e_many${String(k).padStart(4, '0')}`, 'e_islandcc'));
+  const run = (part: any) => layout({ ...part, undrawn: [], headless: house.headless, measure, sizes: house.sizes, aspect: 1.6, shapes: { type: {} }, placed: { e_islandcc: [0, 0] } });
+  const g = compose(islandModels({ items: many, links: [], run }), { legends: new Map(), names: new Map(), sizes: house.sizes });
+  const xs = new Set(many.map((i) => Math.round(g.x.get(i.id)))), ys = new Set(many.map((i) => Math.round(g.y.get(i.id))));
+  assert.ok(xs.size > 1 && ys.size < many.length, `in columns and rows: ${xs.size} by ${ys.size}`);
+  const span = (v: number[]) => Math.max(...v) - Math.min(...v);
+  const wide = span(many.map((i) => g.x.get(i.id))), tall = span(many.map((i) => g.y.get(i.id)));
+  assert.ok(wide / tall > 0.8, `shaped to the pane, not a column: ${Math.round(wide)} by ${Math.round(tall)}`);
 });

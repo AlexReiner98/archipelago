@@ -13,7 +13,20 @@ import { pinchOf } from './pinch.js';
 export const tierOf = (px, { text_least, more_from }) => (px < text_least ? 'none' : px < more_from ? 'names' : 'all');
 
 /** The numbers a plane moves by, the style's (the house style names every one). */
-const planeOf = (style) => Object.fromEntries(['zoom_least', 'zoom_most', 'open_least', 'text_least', 'more_from', 'margin', 'wheel', 'drag_from', 'fit_pad'].map((n) => [n, numberOf(style, `plane_${n}`)]));
+const planeOf = (style) => Object.fromEntries(['zoom_least', 'zoom_most', 'open_least', 'fit_least', 'text_least', 'more_from', 'margin', 'wheel', 'drag_from', 'fit_pad'].map((n) => [n, numberOf(style, `plane_${n}`)]));
+
+/**
+ * Where to stand to see the box [l, t, r, b] of a picture in a room `room` [left, top, width, height] of the frame,
+ * `pad` kept round it: all of it, centred, when that is at least `least` a unit; else at `least`, from its top left, each
+ * way it does not fit (a way it fits is still centred). Answers the view { s, x, y } and the scale that shows all of it.
+ */
+export function framed([l, t, r, b], [rl, rt, rw, rh], pad, least = 0) {
+  const w = Math.max(1, r - l), hh = Math.max(1, b - t);
+  const whole = Math.min(1, (rw - pad) / w, (rh - pad) / hh);
+  const s = Math.max(whole, least);
+  const along = (from, size, start, room) => (size * s <= room - pad ? from - (start + (room - size * s) / 2) / s : from - (start + pad / 2) / s);
+  return { s, x: along(l, w, rl, rw), y: along(t, hh, rt, rh), whole };
+}
 
 /**
  * Make `svg` (`width` by `height` in its own units) move inside `frame`. `start` is a point to open on when all of
@@ -92,17 +105,23 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
 
   /**
    * All of it in sight, centred in the room beside what floats on the left and what covers the frame's right (`right`),
-   * and between what floats over its top and its foot (`top`, `bottom`: the bars).
+   * and between what floats over its top and its foot (`top`, `bottom`: the bars). `readable`: never smaller than the
+   * style's least readable scale (`plane_fit_least`), what does not fit then reached by panning from its top left.
    */
-  const fit = (right = 0, top = 0, bottom = 0) => {
+  const fit = (right = 0, top = 0, bottom = 0, readable = false) => {
+    fitted = toBox([0, 0, width, height], right, top, bottom, readable);
+  };
+  /** The room the picture is seen in, beside and between what covers the frame. */
+  const roomOf = (right, top, bottom) => {
     const [W, H] = size();
-    const room = Math.max(1, W - aside - right);
-    const tall = Math.max(1, H - top - bottom);
-    fitted = Math.min(1, (room - plane.fit_pad) / width, (tall - plane.fit_pad) / height);
-    view.s = fitted;
-    view.x = -(aside + (room - width * view.s) / 2) / view.s;
-    view.y = -(top + (tall - height * view.s) / 2) / view.s;
+    return [aside, top, Math.max(1, W - aside - right), Math.max(1, H - top - bottom)];
+  };
+  /** A box of the picture [l, t, r, b] in sight as fit puts all of it (an island, by whoever knows where it lies): the scale that shows all of it. */
+  const toBox = (box, right = 0, top = 0, bottom = 0, readable = true) => {
+    const { s, x, y, whole } = framed(box, roomOf(right, top, bottom), plane.fit_pad, readable ? plane.fit_least : 0);
+    Object.assign(view, { s, x, y });
     now();
+    return whole;
   };
   const open = () => {
     fit();
@@ -214,5 +233,11 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   /** Where it stands now, and put back where it stood (a picture drawn again, kept where the reader left it). */
   const state = () => ({ ...view });
   const restore = (was) => (Object.assign(view, was), now());
-  return { zoomBy, fit, open, show, state, restore, inView, stop };
+  /** Where a mark of the picture lies [l, t, r, b], in its units: the mark drawn directly in it that holds `el`. */
+  // Measured as the cull measures it (a mark out of sight has no box of its own now).
+  const boxOf = (el) => {
+    if (!marks) read();
+    return marks.find((m) => m.el.contains(el))?.at ?? null;
+  };
+  return { zoomBy, fit, toBox, boxOf, open, show, state, restore, inView, stop };
 }

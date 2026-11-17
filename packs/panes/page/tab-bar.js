@@ -1,7 +1,7 @@
 // Tabs at the top of the page and the panes of the one in sight (decision e_mzer5m4t), drawn by the panes pack's part
 // (packs/panes/parts/index.js): the strip in the top bar, the panes in #canvas, one part mounted twice so one model.
-// Every chat at work has a tab of its own, opened and closed as it begins and ends; tabs merge, pop out and dock back.
-// This starts the part, gives the query bar its back, forth and split for the pane in focus, and keeps beside the strip
+// Every chat at work has a tab of its own, opened and closed as it begins and ends; a tab is one canvas.
+// This starts the part, gives the bar its back and forth, and keeps beside the strip
 // the count of sessions waiting on the owner, which goes to the oldest (e_82rggead). A look's page,
 // and a frozen link's, draw their one view in a pane of their own, with no tabs.
 
@@ -10,13 +10,12 @@ import { still } from './look.js';
 import { heard, hearOpen, nameOf } from './pane-route.js';
 import { lonePane } from './panes.js';
 import { atOf } from './pane-address.js';
-import { poppedTab } from './tabs.js';
 
 const strip = document.getElementById('tabs');
 
 /**
- * Draw the tabs and the panes with the panes pack's part. The query bar's back, forth and split go to it: a step of
- * the browser's, and `split` told; in a popped window, Dock back too. True when a part filled them.
+ * Draw the tabs and the canvas with the panes pack's part. The bar's back and forth go to it, as a step of the
+ * browser's. True when a part filled them.
  */
 async function startPart() {
   const canvas = document.getElementById('canvas');
@@ -47,29 +46,8 @@ async function startPart() {
   hooks.paneButtons = () => [
     button('Back', 'Back to what this pane drew before', '‹', () => history.back()),
     button('Forward', 'Forward again', '›', () => history.forward()),
-    button('Split', 'Split: a new pane beside this one', '◫', () => hooks.tellSlot?.('tabs', { name: 'split' })),
-    // In a popped window, its tab goes back into the main one as it closes.
-    poppedTab && button('Dock back', 'Dock this window back into the main one, as a tab', '⇲', () => (hooks.tellSlot?.('tabs', { name: 'dock' }), closeDocked())),
-  ].filter(Boolean);
+  ];
   return true;
-}
-
-/**
- * Close this popped window once the part has kept its tab as docked (under `out:<key>`, where the main page reads it):
- * closed sooner, the main page would never hear it. Given up after a while, so the window still closes.
- */
-function closeDocked(started = Date.now()) {
-  let docked = false;
-  try {
-    for (let n = 0; n < localStorage.length && !docked; n++) {
-      const key = localStorage.key(n);
-      docked = Boolean(key?.endsWith(`:out:${poppedTab}`) && /"docked":true/.test(localStorage.getItem(key) ?? ''));
-    }
-  } catch {
-    docked = true;
-  }
-  if (docked || Date.now() - started > 3000) return void window.close();
-  setTimeout(() => closeDocked(started), 50);
 }
 
 // ---- The sessions waiting on the owner, counted beside the strip, so every tab sees them (docs/sessions.md).
@@ -90,7 +68,7 @@ const countEl = h('button', { type: 'button', class: 'tab-count', hidden: true }
 strip?.after(countEl);
 function drawCount() {
   const yours = onYou(open);
-  countEl.hidden = !yours.length || Boolean(poppedTab);
+  countEl.hidden = !yours.length;
   if (countEl.hidden) return;
   const tip = countTip(yours, (s) => (heard.has(s.id) ? nameOf(s.id) : s.title ?? s.id));
   countEl.title = tip;
@@ -106,7 +84,7 @@ const readOpen = () => api('view', { name: 'sessions' }).then((got) => ((open = 
 /** A session was heard from (packs/surface/page/live.js): its state may have moved, so the open ones are read again, once for a burst. */
 let rereading;
 hooks.sessionsMoved = () => {
-  if (poppedTab || rereading) return;
+  if (rereading) return;
   rereading = setTimeout(() => ((rereading = undefined), readOpen(), hooks.tellSlot?.('tabs', { name: 'sessions' })), 1000);
 };
 /** A session renamed: the tabs read the sessions again, so a tab is called by its chat's new title. */
@@ -119,7 +97,6 @@ export function startTabs() {
   started = true;
   if (still) return lonePane(atOf(location.hash) ?? 'v');
   void startPart().then((drawn) => drawn || canvasFailed());
-  if (poppedTab) return;
   // What is open is read once the first view has drawn, by the count and by the part, never before it.
   firstDrawn.then(() => (readOpen(), hooks.tellSlot?.('tabs', { name: 'sessions' })));
   // Coming back to the page, what ended or began while it was out of sight is counted again.

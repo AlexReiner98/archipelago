@@ -9,6 +9,7 @@ import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** What names a view, as show and query look take it. */
 export const VIEW_INPUT = {
+  islands: z.array(z.string().regex(/^(?:e_[a-z0-9]{8}|frontier|attention)$/)).max(50).optional().describe('Islands to draw, by id, each at its corner (and the live reads frontier and attention by name); the person\'s own list stays as it is. With entity, under that item\'s page.'),
   entity: z.string().optional().describe('An item id: its page; a view kept on the map (type lens, a saved canvas) is drawn as the canvas it is, its query in the query bar.'),
   query: z
     .record(z.string(), z.unknown())
@@ -27,6 +28,7 @@ export const VIEW_INPUT = {
 };
 
 export interface ViewAsked {
+  islands?: string[];
   entity?: string;
   screen?: string;
   query?: Record<string, unknown>;
@@ -52,6 +54,8 @@ export async function viewAddress(l: Archipelago, asked: ViewAsked): Promise<str
   const kept = input.entity && (await l.entity(input.entity));
   if (input.entity && !kept) throw new Error(`No item "${input.entity}"`);
   if (kept && !input.lens && !input.style && l.registry.isA(kept.type, 'lens')) return `v?canvas=${input.entity}`;
+  // A list of islands (decision e_n42s8jvn): drawn as it is named, under the item's page when one is named.
+  if (input.islands) return `${input.entity ? `e/${input.entity}` : 'v'}?${new URLSearchParams({ islands: input.islands.join(',') })}`;
   if (input.lens || input.style) {
     // Read as the flat lens reads it, so a lens the canvas could not draw is refused here and not on a screen.
     const wanted = (input.lens ?? {}) as { limit?: unknown };

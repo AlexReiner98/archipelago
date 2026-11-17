@@ -20,6 +20,7 @@ import { panZoom } from './pan-zoom.js';
 import { transition } from './transition.js';
 import { pictureKey } from './picture-name.js';
 import { keepScene, keptHere, scenes } from './pictures-kept.js';
+import { looksModules, withLooks } from './island-looks.js';
 
 /** A held change's id, as a drawing names it in the key of the mark that decides it: `held:<id>`. */
 export const HELD = /^held:(p_[a-z0-9]+)/;
@@ -140,7 +141,8 @@ function colours(host, style) {
 
 /** Draw the answer in host with the drawing its style names. The same call as any of the kernel's shapes. */
 export function drawWith(host, answer, style, keep) {
-  const { drawing } = style;
+  // Islands with looks of their own are drawn by the drawing with their code beside its own (./island-looks.js).
+  const drawing = withLooks(style.drawing, answer, (hash) => layouts.get(hash), style.island_looks === 'plain');
   // One that says it is laid out by the page has its box now, before it is measured: drawn once, at the size it will have.
   if (drawing?.flat) host.classList.add('laid-out');
   const { style: _sent, first: opening, ...shown } = answer;
@@ -164,7 +166,7 @@ export function drawWith(host, answer, style, keep) {
   const failed = (message) => ((broken = true), host.replaceChildren(h('div', { class: 'lens-error' }, `This drawing stopped: ${String(message).slice(0, 300)}`)), saidDrawn(host, 'error', message));
   // Its code: sent with the answer, kept by this browser, or fetched from this server by its hash (a published page's).
   const sent = drawing?.modules ?? layouts.get(drawing?.hash);
-  const code = sent ? Promise.resolve(sent) : /^\/[^/]/.test(drawing?.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : null;
+  const code = sent ? Promise.resolve(sent) : drawing?.looks ? looksModules(drawing.looks) : /^\/[^/]/.test(drawing?.src ?? '') ? fetch(drawing.src).then((res) => (res.ok ? res.json() : Promise.reject(new Error('its code could not be fetched')))) : null;
   if (!code) return failed('its code was not sent');
   const id = drawing.hash.slice(0, 16);
   const channel = new MessageChannel(), port = channel.port1;

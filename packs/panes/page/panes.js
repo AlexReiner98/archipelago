@@ -6,7 +6,9 @@
 // view in a pane of their own, with no tabs.
 
 import { api, h, hooks } from './base.js';
-import { activate, canvasIn, focusOn } from './canvas.js';
+import { activate, canvasIn, focusOn, homeReady, islandsLens } from './canvas.js';
+import { islandsIn } from './islands-on.js';
+import { islandsName, islandsOfLens } from './islands-lens.js';
 import { presetSettings, savedCanvases, viewParts } from './views-kept.js';
 import { addressOf, opening, readAddress } from './query.js';
 import { titles } from './words.js';
@@ -32,7 +34,11 @@ const known = (entity) => (titles.set(entity.id, entity.title), cornersBy.set(en
 /** The lens and style a pane's address names (no lens for Home): a saved canvas named alone is read from the map. */
 async function lensOf(at) {
   const [where, query = ''] = at.split('?');
+  // A list of islands an address names (an agent's show): drawn, the person's own list left as it was (decision e_n42s8jvn).
+  const named = islandsIn(query);
   const asked = readAddress(query);
+  // A saved canvas that draws a list of islands is read as the view it is, below: its name and its corners.
+  if (named && !asked.style.canvas) return { lens: islandsLens(named), style: asked.style };
   // A saved canvas is named by its title, read from the map when the page does not know it yet.
   if (asked.style.canvas && !cornersBy.has(asked.style.canvas) && asked.lens) await api('get', { id: asked.style.canvas }).then((got) => known(got.entity), () => {});
   // Its islands' corners come from the view itself, whatever the address says of its lens (an item opened over it among them).
@@ -47,7 +53,14 @@ async function lensOf(at) {
     return viewParts(got.entity);
   }
   const id = /^e\/(e_[a-z0-9]{8})/.exec(where)?.[1];
-  return id ? { lens: focusOn(id), style: {}, here: id } : { lens: null, style: {} };
+  // An item's own address draws its island under its page (decision e_n42s8jvn); one on no island, the item and what it holds.
+  if (id) {
+    const island = (await api('get', { id }).catch(() => null))?.entity?.props?.island;
+    return { lens: island ? islandsLens([island]) : focusOn(id), style: {}, here: id };
+  }
+  // Home: the person's own islands, read before it is drawn.
+  await homeReady();
+  return { lens: null, style: {} };
 }
 /** A pane's address for an address of the page: an item's page draws the lens beside it, else the item's own canvas. */
 function paneAt(href) {
@@ -55,7 +68,8 @@ function paneAt(href) {
   const [where, query = ''] = bare.split('?');
   const item = /^e\/(e_[a-z0-9]{8})$/.exec(where)?.[1];
   if (!item) return bare;
-  return `v?${readAddress(query).lens ? query : addressOf(focusOn(item), {})}`;
+  if (islandsIn(query) || readAddress(query).lens) return `v?${query}`;
+  return `e/${item}`;
 }
 
 /**
@@ -112,7 +126,10 @@ export function drawPane(at, el, said) {
   else
     lensOf(at).then(({ lens, style, here }) => {
       if (!live) return;
-      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? hooks.lensSaid?.(lens.filter, naming) : 'Home') || 'Canvas').slice(0, 120));
+      // A list of islands is named by its islands ("X growth + 2"), any other lens by what its filter finds.
+      const islands = islandsOfLens(lens);
+      const lensName = () => (islands ? islandsName(islands, (id) => hooks.nameSaid?.(id, naming) ?? titles.get(id) ?? '…') : hooks.lensSaid?.(lens.filter, naming));
+      const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? lensName() : 'Home') || 'Canvas').slice(0, 120));
       naming();
       canvas.show(lens, here, style);
       // The bar and find act on the pane in focus alone: a pane drawn beside it does not take them.
@@ -133,12 +150,6 @@ export function drawPane(at, el, said) {
   return () => ((live = false), watching.disconnect(), focus.disconnect(), clearTimeout(soon), canvas.close());
 }
 hooks.paneFrame = drawPane;
-
-/**
- * A view a drawing in pane `from` names (a replay's milestone, packs/walls/page/view-frame.js), drawn in a pane of its
- * own on its right: the part opens it once and moves it to each view named.
- */
-hooks.besidePane = (from, view) => hooks.tellSlot?.('tabs', { name: 'beside', pane: from, view: view ?? null });
 
 // ---- A page with no tabs (a look's, a frozen link's): its one view in a pane of its own, at the page's address.
 

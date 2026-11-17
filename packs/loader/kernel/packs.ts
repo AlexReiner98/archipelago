@@ -7,7 +7,7 @@ import { capacityOf, checkCapabilities, type Capabilities } from './capabilities
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts'; import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
-import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { CELL, CELL_FIELD, FOCUS, FOCUS_FIELD, ISLAND, ISLAND_FIELD, livesOnIsland, mayBeFocus, PACKS_OFF, promisedHead, PACKS_OFF_FIELD } from './island-items.ts';
+import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { CELL, CELL_FIELD, CORNER, CORNER_FIELD, FOCUS, FOCUS_FIELD, ISLAND, ISLAND_FIELD, livesOnIsland, mayBeFocus, PACKS_OFF, promisedHead, PACKS_OFF_FIELD } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts'; import { checkRules } from './rule-check.ts';
 import { isApp, isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
@@ -215,7 +215,7 @@ export class Registry {
         system: kernel,
         statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
         // A type that extends nothing keeps in its row the columns it declares, or the common ones (packs/loader/kernel/head.ts, ownHead).
-        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD, [CELL]: CELL_FIELD, ...(mayBeFocus({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])], capabilities: { ...parent?.capabilities, ...def.capabilities } }) && { [FOCUS]: FOCUS_FIELD, [PACKS_OFF]: PACKS_OFF_FIELD }) }) }, statuses),
+        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD, [CELL]: CELL_FIELD, ...(mayBeFocus({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])], capabilities: { ...parent?.capabilities, ...def.capabilities } }) && { [FOCUS]: FOCUS_FIELD, [CORNER]: CORNER_FIELD, [PACKS_OFF]: PACKS_OFF_FIELD }) }) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false, ...((def.private ?? parent?.private) && { private: true }),
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),

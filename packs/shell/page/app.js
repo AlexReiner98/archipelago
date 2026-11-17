@@ -6,7 +6,7 @@
 import { authorizePage } from './authorize.js';
 import { firstMoments, tryPage } from './guest.js';
 import { otherWays, signInBack, signUpOffer, signUpPage } from './sign-up.js';
-import { SignInNeeded, api, tell, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
+import { SignInNeeded, api, tell, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { warmLayouts } from './layout.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
@@ -22,6 +22,7 @@ import { startTabs } from './pane-land.js';
 import { hrefNow, toAddress } from './panes.js';
 import { startTips } from './tip.js';
 import { workspace } from './workspace.js';
+import { drawPicker } from './island-picker.js';
 
 // What the kit asks for by name (packs/kit/page/base.js), loaded the first time it is asked: the runtime that draws
 // parts, and the password page.
@@ -47,14 +48,6 @@ const close = () => (location.hash === hrefNow() ? route() : (location.hash = hr
 document.getElementById('sheet-close').addEventListener('click', close);
 addEventListener('keydown', (ev) => ev.key === 'Escape' && document.body.dataset.sheet && !document.querySelector('dialog[open]') && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName ?? '') && close());
 
-/** Find at the canvas's foot, the find pack's part (slot `find`), drawn once: it follows the address itself. */
-let findDrawn = false;
-function drawFindSlot() {
-  const node = document.querySelector('#find .find-part');
-  if (findDrawn || !node) return;
-  findDrawn = true;
-  drawSlot(node, { slot: 'find' }).catch((err) => console.warn(err.message));
-}
 
 /** `pulse`: the map changed under the page, which is drawn again where it stands. */
 async function route(pulse = false) {
@@ -88,7 +81,7 @@ async function route(pulse = false) {
   }
   // In a workspace: the page is the app again, whatever signed-out page was up.
   ungate();
-  drawFindSlot();
+  drawPicker();
   drawNav();
   signUpOffer();
   firstMoments();

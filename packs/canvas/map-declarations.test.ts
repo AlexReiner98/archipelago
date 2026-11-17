@@ -94,6 +94,10 @@ test('turn on is offered only for a pack this island turned off', () => {
   const here = packsIn(draw(turnedOff, writer).scene.svg).find((m) => m[1].key.endsWith(':runs'));
   assert.ok(here[1].on.includes('toggle') && here[1].pack === 'runs', 'in packs_off: a button');
   assert.match(texts(here).join(' '), /Click to turn it on here/);
+  // An island item is not in its own answer: its packs_off rides on the answer's island.
+  const byIsland = { ...answer, items: answer.items.filter((i: any) => i.id !== 'e_buildisl'), islands: [{ ...answer.islands[0], packs_off: ['runs'] }] };
+  const there = packsIn(draw(byIsland, writer).scene.svg).find((m) => m[1].key.endsWith(':runs'));
+  assert.ok(there?.[1].on.includes('toggle'), "in the answer's island's packs_off: a button, the island's item not drawn");
 });
 
 test('an island with no pack shows no marks', () => {
@@ -116,4 +120,11 @@ test('a waiting item is faint at its cell, why in its tip', () => {
   assert.equal(typeof house.numbers.flow_waiting, 'number');
   const tip = p.on({ name: 'enter', key: 's:e_twozzzzz' }).find((x: any) => x.tip)?.tip.mark;
   assert.match(texts(tip).join(' '), /Waiting on runs: Turned off on this island/);
+});
+
+test('an island over its cap says so after its packs, and only then', async () => {
+  const { capText } = await import(pathToFileURL(join(import.meta.dirname, 'layouts/flow/pack-marks.js')).href);
+  assert.equal(capText({ count: 178, most: 40 }), '178/40');
+  assert.equal(capText({ count: 30, most: 40 }), '');
+  assert.equal(capText({ count: 1966, most: null }), '', 'no cap, nothing said');
 });
