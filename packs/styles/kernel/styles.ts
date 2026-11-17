@@ -213,6 +213,8 @@ export async function pageStyle(ctx: KernelContext, input: { of?: unknown; style
 export const BACKDROP_PLACES = ['gate', 'sheet', 'canvas'];
 /** The longest a page may be held for its backdrop to be seen: ten seconds. */
 const MOST_WAIT_MS = 10_000;
+/** A backdrop's still: a picture as a data URL, PNG or WebP, nothing else. */
+const STILL = /^data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+$/;
 
 /**
  * A style's backdrop (a theme's land) with the drawing that runs it: the layout a pack ships for its shape, under the
@@ -233,7 +235,10 @@ export async function withBackdrop(ctx: KernelContext, style: Record<string, unk
   const ms = (v: unknown) => (typeof v === 'number' && v >= 0 && v <= MOST_WAIT_MS ? v : 0);
   const w = b.wait && typeof b.wait === 'object' ? (b.wait as Record<string, unknown>) : undefined;
   const wait = w && { gather: ms(w.gather), most: ms(w.most) };
-  return { ...rest, backdrop: { shape: b.shape, on, ...(setup && { setup }), ...(numbers && { numbers }), ...(wait && { wait }), drawing } };
+  const s = b.still && typeof b.still === 'object' ? (b.still as Record<string, unknown>) : undefined;
+  const picture = (v: unknown) => (typeof v === 'string' && STILL.test(v) ? v : undefined);
+  const still = s && { ...(picture(s.wide) && { wide: picture(s.wide) }), ...(picture(s.narrow) && { narrow: picture(s.narrow) }) };
+  return { ...rest, backdrop: { shape: b.shape, on, ...(setup && { setup }), ...(numbers && { numbers }), ...(wait && { wait }), ...(still && Object.keys(still).length && { still }), drawing } };
 }
 
 /** The workspace's icon, what a browser's tab and a client listing this server show: its style's icon, else its emblem, as PNG bytes, or none. */

@@ -58,6 +58,11 @@ body[data-first="wait"] #canvas, body[data-first="wait"] #sheet { visibility: hi
 body[data-land] > iframe.page-backdrop { color-scheme: light; position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity var(--motion-slow, 0.6s) ease; }
 body[data-land] > iframe.page-backdrop.drew { opacity: 1; }
 :root body[data-land="gate"] :is(#sheet, #canvas, .first), :root body[data-land="sheet"] #sheet, :root body[data-land="canvas"] #canvas { background: transparent; }
+/* A land's still (theme-land.js): its picture, at its own size in the middle of the window (the words it was baked round
+   stand there too), the narrow one on a window taller than wide; gone once the land has gathered, kept where it cannot run. */
+body > .land-still { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: var(--land-still-wide, var(--land-still-narrow)) center / auto no-repeat; transition: opacity var(--motion-slow, 0.6s) ease; }
+@media (max-aspect-ratio: 3/4) { body > .land-still { background-image: var(--land-still-narrow, var(--land-still-wide)); } }
+body > .land-still.gone { opacity: 0; }
 /* A new guest map's first card is on the gate's paper, so the page it came from (Making your map) and it are one sheet. */
 body[data-first="wait"] { background: var(--chart-ground, var(--bg)); }
 /* Making your map gives way to the card in place: the sheet it stood on is put away at once, never slid. */

@@ -29,6 +29,23 @@ export function landFor(style, place) {
 const kept = new Map();
 
 let style = null, running = null;
+const LESS_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
+/** The still under a running land: its picture, shown at once and wherever the land cannot run. */
+let still = null;
+const STILL = /^data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+$/;
+
+/** The land's still put under its frame (before the map, so all of the page draws over it), or taken away with none. */
+function layStill(land) {
+  still?.remove();
+  still = null;
+  const s = land?.still;
+  if (!s || !(STILL.test(s.wide ?? '') || STILL.test(s.narrow ?? ''))) return;
+  still = document.createElement('div');
+  still.className = 'land-still';
+  still.setAttribute('aria-hidden', 'true');
+  for (const k of ['wide', 'narrow']) if (STILL.test(s[k] ?? '')) still.style.setProperty(`--land-still-${k}`, `url("${s[k]}")`);
+  document.body.insertBefore(still, document.getElementById('canvas'));
+}
 /** The server's own style, as the gate is painted in: asked once, when the page is first in the gate. */
 let served;
 const servedStyle = () => (served ??= (globalThis.pelagoEarly?.theme ?? fetch('/connect/theme').then((r) => (r.ok ? r.json() : null), () => null)).then((s) => ((served = s ?? null), again(), s)));
@@ -40,7 +57,9 @@ function wear() {
   if (land?.drawing.modules) kept.set(land.drawing.hash, land.drawing.modules);
   const code = land && kept.get(land.drawing.hash);
   // The same land in the same place runs on; a move between places it shows in keeps it running too.
-  const key = code ? `${land.drawing.hash} ${JSON.stringify(land.setup ?? {})} ${JSON.stringify(land.numbers ?? {})}` : '';
+  // Asked for less motion, a land with a still shows its still alone, and nothing runs.
+  const calm = Boolean(code && land.still && LESS_MOTION.matches);
+  const key = code ? `${calm ? 'still ' : ''}${land.drawing.hash} ${JSON.stringify(land.setup ?? {})} ${JSON.stringify(land.numbers ?? {})}` : '';
   if (running?.key === key) {
     if (key) document.body.dataset.land = place;
     return;
@@ -49,8 +68,10 @@ function wear() {
   running = null;
   delete document.body.dataset.land;
   delete document.body.dataset.landDrew;
+  layStill(code ? land : null);
   if (!code) return;
   document.body.dataset.land = place;
+  if (calm) return void (running = { key, stop: () => undefined, still: true });
   const stop = runBackdrop({
     code,
     answer: { items: [], links: [] },
@@ -58,12 +79,16 @@ function wear() {
     dressed: document.body,
     // Before the map, so the map, the sheet and the bars are drawn over it.
     under: document.getElementById('canvas'),
-    drew: () => (document.body.dataset.landDrew = ''),
+    // Drawn, and given its theme's time to gather: the still gives way to it.
+    drew: () => ((document.body.dataset.landDrew = ''), setTimeout(() => running?.key === key && still?.classList.add('gone'), land.wait?.gather ?? 0)),
     failed: () => {
       if (running?.key !== key) return;
-      running = null;
-      delete document.body.dataset.land;
+      // Where the land cannot run, its still stays and the page stands on it as on the land; kept as this land, so it
+      // is not tried again until the theme or the place changes.
+      still?.classList.remove('gone');
+      running = { key, stop: () => undefined, still: true };
       delete document.body.dataset.landDrew;
+      if (!still) delete document.body.dataset.land;
     },
   });
   running = { key, stop };
@@ -81,6 +106,8 @@ const again = () => soon || (soon = setTimeout(() => ((soon = 0), wear())));
 export function landShown(since) {
   return new Promise((done) => {
     const look = () => {
+      // A still alone (less motion, or a land that cannot run): nothing to wait for.
+      if (running?.still) return void done();
       const wait = served && !(served instanceof Promise) ? landFor(served, 'gate')?.wait : undefined;
       const left = since + (wait?.most ?? 0) - performance.now();
       if (wait && document.body.dataset.landDrew !== undefined) return void setTimeout(done, Math.max(0, Math.min(wait.gather ?? 0, left)));
@@ -98,5 +125,6 @@ export function startLand() {
   // Asked already where the page opens before a workspace (packs/surface/page/early.js): taken now, so the land starts at once.
   if (globalThis.pelagoEarly?.theme) servedStyle();
   onTheme((next) => ((style = next), again()));
+  LESS_MOTION.addEventListener('change', again);
   new MutationObserver(again).observe(document.body, { attributes: true, attributeFilter: ['data-gate', 'data-sheet', 'data-first'] });
 }
