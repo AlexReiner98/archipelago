@@ -6,7 +6,7 @@
 import { filterSaid, namer } from './lens-terms.js';
 
 /** The frame slots handed the canvas's query. */
-export const QUERY_SLOTS = ['bar.find', 'bar.find.rows', 'canvas', 'traces', 'find'];
+export const QUERY_SLOTS = ['bar.find', 'bar.find.rows', 'canvas', 'find'];
 /** The slots handed the canvas's answer in brief too. */
 export const ANSWER_SLOTS = ['bar.find', 'bar.find.rows'];
 /** The slots whose part answers a decision, not marks. */

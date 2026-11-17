@@ -144,48 +144,6 @@ test('panes stand one over another on a tall page, and give an open sheet its ro
   assert.equal(sheetRoom(false, 400, 1600), 0);
 });
 
-test('a trace names an item and its line, and is drawn nowhere itself', () => {
-  const t = checkMarks(['list', {}, ['trace', { key: 'tr1', item: 'e_abcdefgh', tip: 'Session Sark, set status done: shipped', hue: 'Sark' }]]);
-  assert.equal(t.kids[0].at.item, 'e_abcdefgh');
-  refused(['trace', { tip: 'x' }], /a trace with no item/);
-  refused(['trace', { item: 'e_abcdefgh' }, ['text', 'x']], /a trace holding something/);
-  refused(['trace', { item: 'e_abcdefgh', tip: 'x'.repeat(501) }], /tip: more than 500 characters/);
-});
-
-test('a replay names its step and the entries it plays, and the host plays them through the store', async () => {
-  const r = checkMarks(['replay', { key: 'rp', at: 1, steps: [{ pos: 7, ids: ['e_abcdefgh', 'r_abcdefgh'] }, { pos: 9, ids: ['e_abcdefgh'] }] }]);
-  assert.equal(r.at.steps[1].pos, 9);
-  refused(['replay', { at: 0 }], /a replay with no steps/);
-  refused(['replay', { at: 0, steps: [{ pos: -1, ids: [] }] }], /a step that is not \{ pos, ids \}/);
-  refused(['replay', { at: 0, steps: [{ pos: 1, ids: ['x'] }] }], /not an item's or a link's id/);
-  // @ts-ignore
-  const { stepsFrom } = await import('../packs/surface/page/replay.js');
-  const entries = [{ pos: 7, at: 't', facts: [['+', 'e_abcdefgh', 'title', 'A'], ['+', 'e_zzzzzzzz', 'title', 'B']] }];
-  assert.deepEqual(stepsFrom(entries, [{ pos: 7, ids: ['e_abcdefgh'] }, { pos: 8, ids: [] }]).map((s: any) => s.facts), [[['+', 'e_abcdefgh', 'title', 'A']]]);
-});
-
-test('the host rewinds the store, plays each step once, and ends where the map is', async () => {
-  // @ts-ignore
-  const { replayIn } = await import('../packs/surface/page/replay.js');
-  const applied: number[] = [], projected: number[] = [];
-  const store: any = { items: new Map([['e_new00000', { title: 'made since' }], ['e_abcdefgh', { title: 'now' }]]), links: new Map(), at: new Map(), kinds: {}, apply: (x: any) => applied.push(x.pos) };
-  const view = { store, ids: ['e_new00000', 'e_abcdefgh'], links: new Map(), tell: () => {} };
-  const entries = [{ pos: 7, at: 'a', facts: [['+', 'e_abcdefgh', 'title', 'B']] }, { pos: 9, at: 'b', facts: [['+', 'e_new00000', 'type', 'task']] }];
-  store.missed = { view, then: { items: new Map([['e_abcdefgh', { title: 'then' }]]), links: new Map() }, entries, from: 5, to: 9 };
-  const steps = [{ pos: 7, ids: ['e_abcdefgh'] }, { pos: 9, ids: ['e_new00000'] }];
-  replayIn(store, { at: 0, steps }, () => {});
-  assert.equal(store.playing, true);
-  assert.equal(store.items.get('e_abcdefgh').title, 'then');
-  assert.equal(store.items.has('e_new00000'), false, 'what was made since leaves while it plays');
-  replayIn(store, { at: 1, steps }, () => {});
-  replayIn(store, { at: 1, steps }, () => {});
-  assert.deepEqual(applied, [7], 'a step is played once');
-  replayIn(store, null, (_s: any, _k: any, at: string) => projected.push(at === 'b' ? 9 : 0));
-  assert.deepEqual(projected, [9], 'what was not played is projected at once');
-  assert.equal(store.playing, false);
-  assert.equal(store.at.get('e_abcdefgh'), 9);
-});
-
 test('a ghost is data: an item, a link or a mark on one, held for the owner', () => {
   const g = checkMarks(['list', {},
     ['ghost', { of: 'item', id: 'p_ab12:ref', type: 'task', title: 'Draft', proposal: 'p_ab12', op: 'create', by: 'Session Sark' }],

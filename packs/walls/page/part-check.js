@@ -29,9 +29,6 @@
 //   slot    a slot the part opens, drawn in its place by the parts that fill it (`name`, one of its manifest's opens)
 //   ghost   nothing where it stands: a change held for the owner, as data the canvas reads back into its answer and draws
 //           where it would land (of an item, a link, or a mark on one)
-//   replay  nothing where it stands: the canvas under it shows what the person missed, up to step `at` of its steps
-//   trace   nothing where it stands: its item's marks on the canvas painted with its line (`tip`), in a session's hue,
-//           until the person has seen them; then the part is told `seen`
 // Any mark may also carry `lights`: the items it stands for, lit on the canvas while the person points at it, the rest
 // faded. A box may be `fits`: it shows as many of its marks as fit on one line and says how many are left (`more`: the
 // key a press on the count goes back by). A box, a button or a pane may carry `drag`: the host follows it when it is
@@ -123,18 +120,6 @@ const GHOST = /^p_[a-z0-9]+:#?[A-Za-z0-9_.-]+$/;
 const ghostId = (v, why) => (typeof v === 'string' && v.length <= partLimits.key && GHOST.test(v) ? v : why("not a ghost's id (p_x:ref, p_x:#n)"));
 const proposal = (v, why) => (typeof v === 'string' && /^p_[a-z0-9]+$/.test(v) ? v : why("not a proposal's id"));
 const rowId = (v, why) => (typeof v === 'string' && (/^[er]_[a-z0-9]{8}$/.test(v) || GHOST.test(v)) ? v : why("not an item's, a link's or a ghost's id"));
-/** An item's or a link's id, as a step of a replay names what it plays. */
-const ROW = /^[er]_[a-z0-9]{8}$/;
-/** The steps of a replay: each the position of an entry of the log and the ids whose facts it plays. */
-const replaySteps = (v, why) => {
-  if (!Array.isArray(v) || v.length > partLimits.marks) return why(`not a list of at most ${partLimits.marks} steps`);
-  let n = 0;
-  return v.map((s) => {
-    if (!plain(s) || !Number.isInteger(s.pos) || s.pos < 0 || !Array.isArray(s.ids)) return why('a step that is not { pos, ids }');
-    if ((n += s.ids.length) > partLimits.marks * 10) return why('more ids than a replay may play');
-    return { pos: s.pos, ids: s.ids.map((id) => (typeof id === 'string' && ROW.test(id) ? id : why("not an item's or a link's id"))) };
-  });
-};
 /** Where a dragged mark may be let go: a side of a pane or its middle, the strip of tabs, or out of the page. */
 export const DROP_ZONES = ['left', 'right', 'above', 'below', 'center', 'tabs', 'out'];
 
@@ -160,8 +145,6 @@ export const MARKS = {
   panes: { attrs: { key, dir: oneOf('row', 'column') }, holds: 'marks', only: ['pane'], keyed: true },
   slot: { attrs: { key, name: slotName, piece: settings }, holds: 'nothing', needs: ['name'] },
   ghost: { attrs: { key, of: oneOf('item', 'link', 'mark'), id: ghostId, type: key, title: words(partLimits.label), status: key, body: words(4000), proposal, by: words(partLimits.label), reason: words(partLimits.label), op: oneOf('create', 'link', 'update', 'archive', 'unlink'), from: rowId, to: rowId, on: rowId }, holds: 'nothing', needs: ['of', 'proposal', 'op'] },
-  replay: { attrs: { key, at: step(0, 1000000), steps: replaySteps }, holds: 'nothing', needs: ['at', 'steps'] },
-  trace: { attrs: { key, item, tip: words(500), hue: words(partLimits.key) }, holds: 'nothing', needs: ['item'] },
   swatch: { attrs: { key, tip: anyMark.tip, preset: key, label: words(partLimits.label), on: oneOf('kept', 'trying') }, holds: 'nothing', needs: ['preset'] },
 };
 
