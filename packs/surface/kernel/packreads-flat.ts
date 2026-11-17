@@ -363,7 +363,8 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
   // Where each lives, on a map with islands on, and each island's name and the pack it speaks, read for those sent alone.
   const islandOf = (e: { props: Record<string, unknown> }) => (l.registry.onIslands && typeof e.props?.[ISLAND] === 'string' ? (e.props[ISLAND] as string) : undefined);
   const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
-  const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; pack: string | null }>(`select id, title, props->>'pack' as pack from entity where id = any($1::text[])`, [islandIds])).rows : [];
+  // A focus is its own island (decision e_mqex8wrf): it speaks its type's pack, and says it is one so a drawing names the island by it.
+  const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; type: string; pack: string | null; focus: string | null }>(`select id, title, type, props->>'pack' as pack, props->>'focus' as focus from entity where id = any($1::text[])`, [islandIds])).rows.map(({ type, focus, ...r }) => (focus === 'true' ? { ...r, pack: l.registry.type(type)?.pack ?? null, focus: true } : r)) : [];
   return {
     items, links, whole: ((w) => items.filter((e) => w.has(e.id)).map((e) => e.id))(new Set(wholeIds)),
     found: Object.fromEntries(foundBy), terms: Object.fromEntries(termsBy), step: Object.fromEntries(stepOf),

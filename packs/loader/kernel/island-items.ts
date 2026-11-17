@@ -22,6 +22,12 @@ export const ISLAND_FIELD: FieldDef = { type: 'string', description: 'The island
 export const CELL = 'cell';
 export const CELL_FIELD: FieldDef = { type: 'json', cell: true, shown: true, description: 'Its place on its island, [column, row] in whole cells from the island’s corner: set by an agent, the same in every view that shows the island.' };
 
+/** The field that makes an item a focus: its own island, the one thing everything on it moves forward (decision e_mqex8wrf). */
+export const FOCUS = 'focus';
+export const FOCUS_FIELD: FieldDef = { type: 'boolean', shown: true, description: 'true makes it a focus: an island of its own (its island is its own id), speaking its type’s pack, that everything on it moves forward. Said when it is made; only a type its pack marks as one that may be a focus.' };
+/** Whether an item of a type may be a focus: one that lives on an island and whose pack marks it so (capability focus). */
+export const mayBeFocus = (t: { system: boolean; lineage: string[]; capabilities?: { focus?: boolean } }) => livesOnIsland(t) && t.capabilities?.focus === true;
+
 /** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors. */
 export const livesOnIsland = (t: { system: boolean; lineage: string[] }) => !t.system && !t.lineage.includes('actor');
 
@@ -75,6 +81,8 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
   const packOf = async (key: string): Promise<{ pack?: string; why?: string }> => {
     const ref = made.get(key);
     const found = ref ? { type: ref.type, props: ref.props, archived_at: null } : await map.entity(key);
+    // A focus is an island of its own, speaking its type's pack (decision e_mqex8wrf).
+    if (found && found.props[FOCUS] === true && found.props[ISLAND] === key) return found.archived_at ? { why: `the focus ${key} is archived` } : { pack: reg.type(found.type)?.pack ?? '' };
     if (!found || !reg.isA(found.type, ISLAND)) return { why: `"${key}" is no island` };
     if (found.archived_at) return { why: `the island ${key} is archived` };
     return { pack: String(found.props.pack ?? '') };
@@ -126,12 +134,17 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
       if (!type) continue;
       const props = op.props ?? {};
       if (reg.isA(op.type, ISLAND) && !reg.packs.some((p) => p.id === props.pack)) problem(`${where}: an island speaks a pack active here (props.pack): ${reg.packs.map((p) => p.id).join(', ')}`);
+      const ref = op.ref ?? `#${i + 1}`;
+      if (props[FOCUS] === true && islandKey(props.island) !== ref) { problem(`${where}: a focus is its own island: give it a ref and props.island "{ref}", or leave props.island out`); continue; }
       if (livesOnIsland(type)) problem(bare(where, props.island) ?? (await placing(where, type, islandKey(props.island))));
     } else if (op.op === 'update' && op.props) {
       const before = await map.entity(op.id);
       const type = before && reg.type(before.type);
       if (!before || !type) continue;
       if (reg.isA(type.id, ISLAND) && op.props.pack !== undefined && op.props.pack !== before.props.pack) problem(`${where}: an island’s pack is fixed once it is made`);
+      // Becoming a focus later, or ceasing to be one, is a promotion: it comes with the port it leaves behind, not yet.
+      if (op.props[FOCUS] !== undefined && (op.props[FOCUS] === true) !== (before.props[FOCUS] === true)) problem(`${where}: an item is made a focus when it is made; promoting one later (leaving a port behind) is not built yet`);
+      if (before.props[FOCUS] === true && op.props.island !== undefined && op.props.island !== op.id) problem(`${where}: a focus is its own island and does not move`);
       const mark = type.capabilities.promised?.published;
       if (mark && op.props[mark] === false && before.props[mark] === true) {
         // Taken back, it may no longer be read across: its readers on other islands unlink first.

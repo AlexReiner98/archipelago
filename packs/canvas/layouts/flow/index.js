@@ -128,6 +128,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const shapes = { type: record(style.type_shapes) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
+  // A focus is its island (decision e_mqex8wrf): it names the island's header, which opens it, and is no box on it.
+  const foci = new Set((answer.islands ?? []).filter((i) => i.focus).map((i) => i.id));
+  if (foci.size) answer = { ...answer, items: answer.items.filter((i) => !foci.has(i.id)), links: (answer.links ?? []).filter((l) => !foci.has(l.from) && !foci.has(l.to)) };
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
   // One budget for the whole picture (./effort.js): what it spends on looking better, at every level, it spends from this.
   const effort = effortOf(z('picture_work'));

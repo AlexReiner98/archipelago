@@ -26,6 +26,8 @@ const ISLANDS_READ = 50;
  */
 export async function placeOnIslands(ctx: KernelContext, reg: Reg, ops: Op[], given?: string): Promise<void> {
   if (!reg.onIslands) return;
+  // A focus is its own island (decision e_mqex8wrf): one made with a ref and naming none names itself (a rewrite keeps its refs as given).
+  ops.forEach((op, i) => { if (op.op === 'create' && op.props?.focus === true && !op.props.island && op.ref) ops[i] = { ...op, props: { ...op.props, island: `{${op.ref}}` } }; });
   const bare = new Set(ops.flatMap((op, i) => (op.op === 'create' && !op.props?.island && reg.type(op.type) && livesOnIsland(reg.type(op.type)!) ? [i] : [])));
   if (!bare.size) return;
   const shared = new Set(reg.packs.filter((p) => KERNEL_PACKS.includes(p.id)).flatMap((m) => m.shared ?? []));

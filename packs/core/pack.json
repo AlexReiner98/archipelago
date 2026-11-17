@@ -49,7 +49,7 @@
     },
     {
       "id": "question",
-      "capabilities": { "owned": true, "actionable": true },
+      "capabilities": { "owned": true, "actionable": true, "focus": true },
       "altitude": "step",
       "title": "Question",
       "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. A starter type of the work: a pack's type may extend it, or extend nothing.",
