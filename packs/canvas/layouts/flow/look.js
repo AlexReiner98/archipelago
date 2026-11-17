@@ -11,6 +11,8 @@ export const css = `
 .lf-step.you .lf-shape { stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke-lit); fill: color-mix(in srgb, var(--ln-you) var(--ln-flow-you-tint), var(--ln-land)); }
 /* What is closed recedes: its line as quiet as its name. */
 .lf-step.closed .lf-shape { stroke: var(--ln-line); }
+/* A focus, the item its island is (decision e_53tcvjbv): outlined heavier, in ink. */
+.lf-step.focus .lf-shape { stroke: var(--ln-text); stroke-width: var(--ln-flow-focus-stroke); }
 .lf-step:hover .lf-shape, .lf-step:focus .lf-shape { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
 /* The step whose page is open is lit, in the page's accent, while the page is open: not as a hover is. */
 .lf-step.here .lf-shape { stroke: var(--accent, var(--ln-text)); stroke-width: var(--ln-flow-stroke-lit); fill: color-mix(in srgb, var(--accent, var(--ln-text)) 18%, var(--ln-land)); }

@@ -132,7 +132,7 @@ interface Seeded {
   terms: Record<string, string[]>;
   step: Record<string, number>;
   on_islands: boolean;
-  islands: { id: string; title?: string; pack?: string | null }[];
+  islands: { id: string; title?: string; pack?: string | null; focus?: boolean }[];
   cut?: boolean;
   matched?: number;
 }
@@ -242,7 +242,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
     links: seeded.links.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(ctx.registry, r.type).length && { is: flavourOf(ctx.registry, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
-    ...(seeded.islands.length && { islands: seeded.islands.map((r) => { const pack = r.pack ? islandPack(ctx.registry, r.pack, usedOn(r.id)) : undefined; return { id: r.id, ...(r.title !== undefined && { title: r.title }), ...(pack && { pack }) }; }) }),
+    ...(seeded.islands.length && { islands: seeded.islands.map((r) => { const pack = r.pack ? islandPack(ctx.registry, r.pack, usedOn(r.id)) : undefined; return { id: r.id, ...(r.title !== undefined && { title: r.title }), ...(pack && { pack }), ...(r.focus && { focus: true }) }; }) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(seeded.cut && { cut: true }),
     ...(seeded.matched !== undefined && { matched: seeded.matched }),

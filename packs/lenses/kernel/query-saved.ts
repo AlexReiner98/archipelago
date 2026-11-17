@@ -36,7 +36,9 @@ const flat = (ctx: KernelContext, lens: Props) => ctx.call<Props, Flat>('answer.
 
 /** The flat lens a kept view draws: its filter with what its steps name, its walk, its limit and its window of time. */
 export function viewQuery(props: Props) {
-  const filter = { ...((props.filter ?? {}) as Props) };
+  // A view that lists its islands finds what lives on them (feature e_u52abqr4).
+  const isles = Array.isArray(props.islands) ? (props.islands as Props[]).map((i) => i?.island).filter((i): i is string => typeof i === 'string') : [];
+  const filter = isles.length ? { find: isles.map((i) => `island ${i}`) } as Props : { ...((props.filter ?? {}) as Props) };
   const ids = stepIds(props.steps).map((id) => `id ${id}`);
   if (ids.length) filter.find = [...new Set([...list(filter.find), ...ids])];
   return { filter, walk: props.walk ?? { over: [], steps: 0 }, ...(typeof props.limit === 'number' && { limit: props.limit }), ...(props.time != null && { time: props.time }), ...(props.sessions === false && { sessions: false }) };

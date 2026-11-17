@@ -41,11 +41,17 @@ export function savedCanvases(fresh = false) {
 }
 
 /** What a saved canvas draws: its filter, its walk and its limit; and its style, with its own id. */
+/** A view's islands, each { island, cell }, where it lists them. */
+const islandsOf = (p) => (Array.isArray(p.islands) && p.islands.some((i) => i?.island) ? p.islands.filter((i) => i?.island) : null);
+/** Where a view that lists its islands keeps each one's corner, by island, for the drawing (packs/canvas/layouts/map/placed.js). */
+const cornersOf = (p) => islandsOf(p) && Object.fromEntries(islandsOf(p).map((i) => [i.island, i.cell ?? [0, 0]]));
+
 export function viewParts(item) {
   const p = item.props ?? {};
-  const filter = p.filter ?? {};
+  // A view that lists its islands draws what lives on them (feature e_u52abqr4).
+  const filter = islandsOf(p) ? { find: islandsOf(p).map((i) => `island ${i.island}`) } : p.filter ?? {};
   const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }), ...(p.time && { time: p.time }), ...(p.sessions === false && { sessions: false }) };
-  return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }) } };
+  return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }), ...(cornersOf(p) && { placed: cornersOf(p) }) } };
 }
 
 /** Where a saved canvas opens: the address names it, and its lens is read from the map when it is opened; a pack's, by its lens. */

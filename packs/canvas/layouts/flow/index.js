@@ -128,10 +128,12 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const shapes = { type: record(style.type_shapes) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
+  // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
+  const foci = new Set((answer.islands ?? []).filter((i) => i.focus).map((i) => i.id));
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
   // One budget for the whole picture (./effort.js): what it spends on looking better, at every level, it spends from this.
   const effort = effortOf(z('picture_work'));
-  const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
+  const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes, ...(style.placed && typeof style.placed === 'object' && { placed: style.placed }) });
   // A picture of items on islands is an archipelago (./archipelago.js): each island laid out alone, a sea between. One
   // island is framed too, with its own legend in place of the key (task e_5rh5ysut).
   const parts = !story && islandsOf(answer.items).length > 0 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
@@ -365,7 +367,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && isles.found.get(n.id)].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus'].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.

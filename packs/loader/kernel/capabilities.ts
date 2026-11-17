@@ -111,9 +111,11 @@ export interface Capabilities {
   plannable?: true;
   /** The kernel's own (views, styles, runs, rules): what views of the work leave out. Only a kernel pack's types carry it. */
   kernel?: true;
+  /** May be a focus: an item that is its own island, made so by a change that says `focus: true` (feature e_u52abqr4, the owner, 17 Nov 2026). A flavour may say false. */
+  focus?: boolean;
 }
 
-export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'promised', 'owned', 'actionable', 'plannable', 'kernel', 'subject'] as const;
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'promised', 'owned', 'actionable', 'plannable', 'kernel', 'subject', 'focus'] as const;
 
 const DATES = ['date', 'datetime'];
 

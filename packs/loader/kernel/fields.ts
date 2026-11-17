@@ -33,7 +33,7 @@ export function checkValue(field: FieldDef, value: unknown): string | undefined 
         ? undefined
         : `must be one of: ${(field.values ?? []).join(', ')}`;
     case 'json':
-      return undefined;
+      return field.cell && !(Array.isArray(value) && value.length === 2 && value.every((n) => Number.isInteger(n) && n >= 0 && n < 10000)) ? 'must be a place [column, row]: two whole numbers from 0' : undefined;
   }
 }
 
