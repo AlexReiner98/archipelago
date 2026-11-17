@@ -52,6 +52,7 @@ export const SLOW: Record<string, string> = {
   'test/island-palette.test.ts': 'browser',
   'test/band.test.ts': 'browser',
   'test/tab-strip.test.ts': 'browser',
+  'test/island-sessions.test.ts': 'browser',
   'test/published-frames.test.ts': 'browser',
   'test/show-lands.test.ts': 'browser',
   'test/show-tab-life.test.ts': 'browser',

@@ -57,3 +57,18 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 /* Recent: where work is now, named in full colour, when at its right. */
 #islands .isl-sec-recent .isl-row .isl-name { color: var(--text); }
 #islands .isl-row:not(.on, .isl-hit) .isl-name:hover { color: var(--text); }
+
+/* The chats at work (./island-sessions.js): a row each, its state a mark in the room the island rows keep for their dot. */
+#islands .isl-chat::before { display: none; }
+#islands .isl-chat-mark { flex: none; width: var(--space-5); color: var(--muted); text-align: center; }
+#islands .isl-chat:is([data-state="waiting"], [data-state="your_move"]) .isl-chat-mark { color: var(--warn); }
+#islands .isl-chat[data-state="working"] .isl-chat-mark { color: var(--ok); }
+#islands .isl-chat .isl-name { color: var(--text); }
+/* An island a show added: its row on the soft ground and its name bold until it is pressed (decision e_mnuthcap). */
+#islands .isl-row.shown { background: var(--accent-soft); }
+#islands .isl-row.shown .isl-name { color: var(--text); font-weight: 600; }
+/* The count of chats waiting on the owner, in the band beside the islands button: its mark in the warning's colour. */
+#query .q-waiting { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: var(--box-7); padding: 0 var(--space-4); border: 0; border-radius: 0; background: none; font: inherit; font-size: var(--text-4); color: var(--text); cursor: pointer; }
+#query .q-waiting[hidden] { display: none; }
+#query .q-waiting:hover { background: var(--accent-soft); }
+#query .q-waiting-mark { color: var(--warn); }
