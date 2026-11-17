@@ -1,7 +1,8 @@
-# The root packs as pinned (docs/kernel-packs.md, "The boot stub"): every root pack's folder hashes to what
-# packs/roots.json pins (node src/boot.ts --check). A change to a root pack's folder that brings no new hash fails
-# here, as the server would refuse to start on it. The owner's word for a root change is their merge of the pull
-# request (the owner, 17 Nov 2026: no separate approval of roots.json).
+# The root packs (docs/kernel-packs.md, "The boot stub"). The owner's word for a root change is their merge of the
+# pull request (the owner, 17 Nov 2026), so root hashes are not pinned in packs/roots.json, which every branch that
+# touched a root conflicted on (bug e_8y7xhhjq): the server derives them at each start and records them. Here CI
+# checks the root list (node src/boot.ts --check) and, on a pull request, says which roots it changes: in the run's
+# summary and as the label "root pack", so the owner sees a root change before they merge.
 
 name: Roots
 
@@ -28,3 +29,38 @@ jobs:
         with:
           node-version: 24 # package.json: engines
       - run: node src/boot.ts --check
+
+  changed:
+    name: roots-changed
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Name the roots this pull request changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          ids=$(node -e "console.log(require('./packs/roots.json').roots.map((r) => r.id).join(' '))")
+          changed=""
+          for id in $ids; do
+            if git diff --name-only "$BASE...HEAD" -- "packs/$id" | grep -v '/README.md$' | grep -q .; then changed="$changed $id"; fi
+          done
+          if git diff --name-only "$BASE...HEAD" -- packs/roots.json | grep -q .; then changed="$changed roots.json"; fi
+          if [ -n "$changed" ]; then
+            echo "### This pull request changes root packs:$changed" >> "$GITHUB_STEP_SUMMARY"
+            echo "Merging it is the owner's word for each." >> "$GITHUB_STEP_SUMMARY"
+            gh label create "root pack" --color B60205 --description "Changes a root pack: the owner's merge is its word" --force || true
+            gh pr edit "$PR" --add-label "root pack" || true
+          else
+            echo "No root pack changes." >> "$GITHUB_STEP_SUMMARY"
+            gh pr edit "$PR" --remove-label "root pack" 2>/dev/null || true
+          fi

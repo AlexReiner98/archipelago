@@ -3,7 +3,8 @@
 Every part of `src/` becomes a pack, and what is trusted is a declared tier,
 not a place in the tree (decision e_3pxvwdn7, the owner, 12 Nov 2026). Ten
 **root packs** (core's words and nine with code) hold control: changed only
-with the owner's word, pinned by hash, needing nothing above them.
+only by a pull request the owner merges, hashed at each start, needing
+nothing above them.
 Twenty-four **service packs** run in-process beside them through one narrow,
 typed context, and fill hook points the root packs open. One **boot stub**
 that is no pack loads the roots. What stays in `src/` is the stub, nine
@@ -25,8 +26,8 @@ above it, never more.
 | plain (no tier) | in the sandbox, as today (`packs/loader/kernel/packhost.ts`) | everything `docs/packs.md` gives a pack | anything in-process |
 
 Core stays what it is, the pack of words every map starts with (starter
-types, the shared set, core's rules). It joins the root list, so it is pinned
-by hash too, and holds no code.
+types, the shared set, core's rules). It joins the root list, so it is hashed
+at each start too, and holds no code.
 
 ## The manifest key `kernel`
 
@@ -209,8 +210,8 @@ may (the owner, 12 Nov 2026, e_tjkzs42m). As built in `packs/loader/kernel/root-
   calls, the map the caller's context is of, or for a server duty the server's workspaces) and the
   input, and answers with values: never a handle on the database.
 - **Called only by the listed packs.** `packs/roots.json` holds `calls`, each name with the internal
-  service packs that may call it. The list is pinned with the roots: changing it is a change to
-  `roots.json`, which needs the owner's approved pull request. A caller also says it in its
+  service packs that may call it. Changing it is a change to
+  `roots.json`, in a pull request the owner merges. A caller also says it in its
   manifest (`uses: ["service:root.<name>"]`).
 - **Checked at boot and at each call.** `checkRoots` (`src/boot.ts`) refuses a list that names a
   pack not here or not an internal service pack, or a name no root provides. `ctx.call` refuses any
@@ -332,11 +333,15 @@ importing module.
 `src/boot.ts`, a few hundred lines with no SQL, no route and no type name.
 It is the server's entry point (`npm start`, `npm run dev`).
 
-1. Reads `packs/roots.json`: the root packs in order, each with its hash.
-2. Hashes each root pack's folder (`pack.json` and every other file of it but its README:
-   `kernel/**`, `page/**`, `parts/**`, canonical
-   JSON and SHA-256, `src/jcs.ts`, `src/hashes.ts`) and refuses to start on
-   a difference, naming the pack and both hashes.
+1. Reads `packs/roots.json`: the root packs in order (ids only; it refuses
+   a hash there).
+2. Refuses a list that leaves out a root pack or names one that is not
+   root, then hashes each root pack's folder (`pack.json` and every other
+   file of it but its README: `kernel/**`, `page/**`, `parts/**`, canonical
+   JSON and SHA-256, `src/jcs.ts`, `src/hashes.ts`). The hashes are derived,
+   not pinned (bug e_8y7xhhjq): the owner's word for a root is their merge of
+   the pull request that changes it (17 Nov 2026), and CI names on each pull
+   request the roots it changes (`.github/workflows/roots.yml`).
 3. Starts the roots in order, handing each a context of the roots before it,
    by id. A root that asks for one after it stops the start.
 4. Asks the loader for the hook points' and slots' fillings and hands them
@@ -487,7 +492,7 @@ never opens the hot file.
   `import type { KernelContext } from '#pelago/kernel'` (rule 4); what it needs of the kernel is its context.
 - Its tests go in `test/` (a root's, or one that needs a database) or beside it (`packs/<id>/kernel/*.test.ts`,
   run on a fake context); each names the module at its own place.
-- A change under a root pack's folder or `packs/core` changes its pinned hash: `npm run roots`.
+- A change under a root pack's folder or `packs/core` is a root change: the pull request says so, and the owner's merge is its word.
 
 During the waves a step moved a module with `git mv` and left a shim at its old path in `src/`, so no importer
 changed and steps did not collide; the gather step removed them all (`scripts/gather.ts`).
@@ -545,8 +550,8 @@ Set by the database step (e_8e5yhfdy) and kept by every root since.
 
 - **The pack.** `pack.json` with `kernel: { trust: "root", internal: true, modules: "kernel/" }`,
   and `kernel/index.ts` exporting `start(ctx)`, which the stub calls at boot; it answers its parts as lazy
-  `import()`s. Its place in `packs/roots.json` is its place in "The root packs"; `npm run roots` pins its hash and
-  `npm run roots:check` checks it.
+  `import()`s. Its place in `packs/roots.json` is its place in "The root packs"; `npm run roots:check` checks the list
+  and prints each root's hash.
 - **Imports.** A module of the same pack is `./<m>.ts`, plumbing is `../../../src/<m>.ts`, another root's code is
   `../../<p>/kernel/<m>.ts`. What reads paths from its own place (`import.meta.url`, `import.meta.dirname`) counts
   from `packs/<p>/kernel/`. A module run as a script answers at its entry in `src/` too ("Plumbing").
@@ -652,7 +657,7 @@ backup's (`act.capture.backup_merge`, on the whole map). A refused change is kep
 - A lens answer the kernel answered itself (`READINGS`, `packs/query/kernel/query-presets.ts`)
   becomes `answer.<name>` the pack provides, and leaves `LENS_ANSWERS`
   (`packs/loader/kernel/declared.ts`) in the same step. A view that names it moves to the pack
-  keeping its `core.x` id (core is re-pinned: `npm run roots`); a pack that
+  keeping its `core.x` id (a change to core, a root); a pack that
   names it from elsewhere says `"uses": ["service:answer.<name>"]` (canvas).
 - An internal pack's answers are always there, so any pack's view may name
   them (`checkDeclared`'s `always`, filled from the registry's internal packs).

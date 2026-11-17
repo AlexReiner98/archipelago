@@ -1,10 +1,10 @@
 // The boot stub: the server's entry point, and the one part of the kernel that is no pack (docs/kernel-packs.md,
 // "The boot stub"; decision e_3pxvwdn7). It holds no SQL, no route and no type name. It
 //
-//   1. reads packs/roots.json, the root packs in order, each with its hash;
-//   2. hashes each root pack's folder (pack.json as canonical JSON, and every other file but its README: kernel/**, page/**, parts/**) and refuses to start on a
-//      difference, naming the pack and both hashes, and refuses a list of root service callers (roots.json calls)
-//      that names a pack not here or a name no root provides (src/root-calls.ts);
+//   1. reads packs/roots.json, the root packs in order;
+//   2. refuses a list that leaves out a root pack or names one that is not root, and a list of root service callers
+//      (roots.json calls) that names a pack not here or a name no root provides (src/root-calls.ts), then hashes each
+//      root pack's folder (pack.json as canonical JSON, and every other file but its README: kernel/**, page/**, parts/**);
 //   3. starts the roots in order, each handed the roots before it by id: a root that asks for one after it stops
 //      the start;
 //   4. hands each root the fillings of the hook points and slots it opens, as the root that has them (the loader)
@@ -14,11 +14,12 @@
 //   6. records the root hashes on the control log at each start, which /health answers too;
 //   7. stops the roots in reverse order.
 //
-// The owner's word for a change to a root pack is their approval of the pull request that changes roots.json: CI
-// runs `node src/boot.ts --check` and refuses a roots.json the owner has not approved (.github/workflows/roots.yml).
-// `npm run roots` writes the hashes of the folders as they are, for that pull request.
+// The owner's word for a change to a root pack is their merge of the pull request that changes it (the owner, 17 Nov
+// 2026). The hashes are not pinned in roots.json, which every branch touching a root would then conflict on (bug
+// e_8y7xhhjq): they are derived from the folders at each start and recorded, so what ran is always known, and CI says
+// on each pull request which roots it changes (.github/workflows/roots.yml).
 
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { controlValue, setControlValue } from '../packs/identity/kernel/control.ts';
@@ -37,7 +38,7 @@ export { OPEN_PHASES } from '../packs/identity/kernel/open-phases.ts'; import { 
 export const STARTS_KEY = 'boot.starts';
 const STARTS_KEPT = 50;
 
-/** One root in roots.json. */
+/** One root as started: its id in roots.json, and its folder's hash as it is. */
 export interface RootEntry {
   id: string;
   hash: string;
@@ -124,19 +125,20 @@ export function hashPack(packDir: string): string {
   return sha256Hex(jcs(files));
 }
 
-/** The root list, checked for its shape. */
-export function readRoots(file: string): RootEntry[] {
+/** The root list's ids in order, checked for its shape. */
+export function readRoots(file: string): string[] {
   if (!existsSync(file)) throw new BootRefused(`${file} is missing: it lists the root packs the server starts.`);
   const parsed = JSON.parse(text(file)) as { roots?: unknown };
   const roots = parsed.roots;
   if (!Array.isArray(roots) || !roots.length) throw new BootRefused(`${file} lists no root packs.`);
   const seen = new Set<string>();
-  for (const r of roots as RootEntry[]) {
-    if (typeof r?.id !== 'string' || typeof r.hash !== 'string') throw new BootRefused(`${file}: each root is { "id", "hash" }.`);
+  for (const r of roots as { id?: unknown; hash?: unknown }[]) {
+    if (typeof r?.id !== 'string') throw new BootRefused(`${file}: each root is { "id" }.`);
+    if ('hash' in r) throw new BootRefused(`${file}: ${r.id} carries a hash. Root hashes are derived at each start, not pinned (bug e_8y7xhhjq): take it out.`);
     if (seen.has(r.id)) throw new BootRefused(`${file} lists ${r.id} twice.`);
     seen.add(r.id);
   }
-  return roots as RootEntry[];
+  return [...seen];
 }
 
 interface Manifest {
@@ -156,47 +158,38 @@ function declaredRoots(packsDir: string): string[] {
 }
 
 /**
- * Every difference between roots.json and the folders: a hash that is not the folder's, a root pack the list
- * leaves out, a listed pack that is not root. Empty when the server may start.
+ * Every difference between roots.json and the folders: a listed pack with no folder, a root pack the list leaves
+ * out, a listed pack that is not root. Empty when the server may start.
  */
 export function checkRoots(home = HOME): string[] {
   const packsDir = join(home, 'packs'), roots = readRoots(join(home, ROOTS_FILE)), wrong: string[] = [];
-  for (const r of roots) {
-    const dir = join(packsDir, r.id);
-    if (!existsSync(join(dir, 'pack.json'))) { wrong.push(`${r.id}: listed in ${ROOTS_FILE}, but packs/${r.id} has no pack.json.`); continue; }
+  for (const id of roots) {
+    const dir = join(packsDir, id);
+    if (!existsSync(join(dir, 'pack.json'))) { wrong.push(`${id}: listed in ${ROOTS_FILE}, but packs/${id} has no pack.json.`); continue; }
     const m = manifestOf(dir);
-    if (m.id !== r.id) wrong.push(`${r.id}: packs/${r.id}/pack.json says its id is ${m.id}.`);
-    if (m.kernel && m.kernel.trust !== 'root') wrong.push(`${r.id}: listed as a root, but its manifest's kernel.trust is ${m.kernel.trust ?? 'missing'}.`);
-    const now = hashPack(dir);
-    if (now !== r.hash) wrong.push(`${r.id}: ${ROOTS_FILE} pins ${r.hash}, but its folder hashes to ${now}. A root pack changes only with the owner's word: npm run roots, in a pull request they approve.`);
+    if (m.id !== id) wrong.push(`${id}: packs/${id}/pack.json says its id is ${m.id}.`);
+    if (m.kernel && m.kernel.trust !== 'root') wrong.push(`${id}: listed as a root, but its manifest's kernel.trust is ${m.kernel.trust ?? 'missing'}.`);
   }
-  const listed = new Set(roots.map((r) => r.id));
+  const listed = new Set(roots);
   for (const id of declaredRoots(packsDir)) if (!listed.has(id)) wrong.push(`${id}: its manifest says it is a root pack, but ${ROOTS_FILE} does not list it.`);
   // The root services, and the packs roots.json lets call each (src/root-calls.ts): every name provided, every caller here.
   wrong.push(...readRootTable(home).problems);
   return wrong;
 }
 
-/** roots.json with each listed pack's hash as its folder is now: what a pull request that changes a root brings. */
-export function pinRoots(home = HOME): RootEntry[] {
-  const file = join(home, ROOTS_FILE), parsed = JSON.parse(text(file)) as { roots: RootEntry[] };
-  parsed.roots = parsed.roots.map((r) => ({ id: r.id, hash: hashPack(join(home, 'packs', r.id)) }));
-  writeFileSync(file, `${JSON.stringify(parsed, null, 2)}\n`);
-  return parsed.roots;
-}
-
 /** Loads a root pack's module: TypeScript under its own folder, never a file a pack item carries. */
 const importModule = async (path: string) => (await import(pathToFileURL(path).href)) as RootModule;
 
 /**
- * Checks the roots and starts them in order. Refuses (BootRefused) on a hash that differs, a root that asks for
- * one after it, or a root whose start fails; the roots started before it are stopped again first.
+ * Checks the roots, hashes each folder as it is, and starts them in order. Refuses (BootRefused) on a list that is
+ * not the root packs here, a root that asks for one after it, or a root whose start fails; the roots started before
+ * it are stopped again first.
  */
 export async function boot(options: { home?: string; load?: (path: string, id: string) => Promise<RootModule>; said?: (message: string) => void } = {}): Promise<Booted> {
   const home = options.home ?? HOME, said = options.said ?? ((m: string) => console.error(m)), load = options.load ?? importModule;
   const wrong = checkRoots(home);
-  if (wrong.length) throw new BootRefused(`The server does not start: its root packs are not the ones pinned.\n${wrong.join('\n')}`);
-  const roots = readRoots(join(home, ROOTS_FILE));
+  if (wrong.length) throw new BootRefused(`The server does not start: ${ROOTS_FILE} is not the root packs here.\n${wrong.join('\n')}`);
+  const roots: RootEntry[] = readRoots(join(home, ROOTS_FILE)).map((id) => ({ id, hash: hashPack(join(home, 'packs', id)) }));
   const started = new Map<string, RootStarted>(), order: string[] = [];
   const get = <T>(id: string): T => {
     const r = started.get(id);
@@ -274,7 +267,7 @@ export async function boot(options: { home?: string; load?: (path: string, id: s
   };
 }
 
-/** The command line: `--check` the pinned roots, `--pin` them, or boot and serve (`node src/boot.ts`; `node src/server.ts` runs it too). */
+/** The command line: `--check` the root list, or boot and serve (`node src/boot.ts`; `node src/server.ts` runs it too). */
 export async function run(arg = process.argv[2]): Promise<void> {
   if (arg === '--check') {
     const wrong = checkRoots();
@@ -282,9 +275,7 @@ export async function run(arg = process.argv[2]): Promise<void> {
       console.error(wrong.join('\n'));
       process.exit(1);
     }
-    console.log(`root packs as pinned: ${readRoots(join(HOME, ROOTS_FILE)).map((r) => r.id).join(', ')}`);
-  } else if (arg === '--pin') {
-    for (const r of pinRoots()) console.log(`${r.id} ${r.hash}`);
+    for (const id of readRoots(join(HOME, ROOTS_FILE))) console.log(`${id} ${hashPack(join(HOME, 'packs', id))}`);
   } else {
     let booted: Booted;
     try {
