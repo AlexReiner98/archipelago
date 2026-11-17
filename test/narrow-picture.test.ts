@@ -1,11 +1,11 @@
 // An edit that only narrows changes the picture on screen at once (task e_ws9e2acq), in a real browser (skipped where
-// there is no Chrome): what left the answer fades out of the picture shown, with its wires, within 100 ms of the
+// there is no Chrome): what left the answer fades out of the picture shown, with its wires, at once after the
 // edit and before the drawing has laid out the new answer; then what stayed glides to where that layout puts it, and
 // the picture it settles on is the one the answer draws on a page opened fresh.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chrome, open, pageModule } from './browser.ts';
+import { AT_ONCE, chrome, open, pageModule } from './browser.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
@@ -48,9 +48,9 @@ test('in a browser, a narrowing edit takes what left out of the picture at once,
     const shown = await page.evaluate<any>(`(() => {
       const m = performance.getEntriesByName('narrow shown')[0], at = performance.getEntriesByName('lens-narrow-shown')[0].startTime;
       const edit = performance.getEntriesByName('lens-edit')[0].startTime;
-      return { took: m.duration, marks: m.detail.marks, before: window.sceneAt === null || window.sceneAt > at, faded: window.fadedAt !== null && window.fadedAt - edit < 100 && (window.sceneAt === null || window.fadedAt < window.sceneAt) };
+      return { took: m.duration, marks: m.detail.marks, before: window.sceneAt === null || window.sceneAt > at, faded: window.fadedAt !== null && window.fadedAt - edit < ${AT_ONCE} && (window.sceneAt === null || window.fadedAt < window.sceneAt) };
     })()`);
-    assert.ok(shown.took < 100, `the picture changes within 100 ms of the edit (${Math.round(shown.took)} ms)`);
+    assert.ok(shown.took < AT_ONCE, `the picture changes at once after the edit (${Math.round(shown.took)} ms)`);
     assert.ok(shown.before, 'it changes before the drawing has laid out the new answer');
     assert.ok(shown.faded, `each item that left fades out of the picture shown: ${JSON.stringify(shown)}`);
     // Their wires with them: three questions, the two depends_on between them and the one to the last task, their part_of ties.

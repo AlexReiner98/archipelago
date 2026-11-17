@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { LIMITS, LISTING } from '../packs/surface/kernel/listing.ts';
 import { installPage, llmsTxt } from '../packs/connect/kernel/install.ts';
-import { FOLDER, PLUGIN_ICON, pluginFiles } from '../scripts/plugin.ts';
+import { FOLDER, pluginFiles } from '../scripts/plugin.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 
@@ -18,7 +18,6 @@ test('the listing fits every directory', () => {
   const icon = readFileSync(join(ROOT, LISTING.icon));
   const [width, height] = [icon.readUInt32BE(16), icon.readUInt32BE(20)];
   assert.ok(icon.subarray(1, 4).toString() === 'PNG' && width === height && width >= 512 && width <= 2048 && icon.length < 2_000_000, 'the icon is a square PNG of 512 to 2048 px, under 2 MB');
-  assert.ok(readFileSync(join(ROOT, PLUGIN_ICON)).equals(icon), 'the plugin carries the listing icon: run npm run plugin');
 });
 
 test('the plugin and its marketplace say what the listing says', () => {

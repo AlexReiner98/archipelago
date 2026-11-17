@@ -15,8 +15,8 @@ import { serve } from './serve.ts';
 
 const ROOT = join(import.meta.dirname, '..');
 
-test('the plugin in the repository is what its sources make (npm run plugin writes it)', () => {
-  for (const [path, text] of Object.entries(pluginFiles())) assert.equal(existsSync(join(ROOT, path)) && readFileSync(join(ROOT, path), 'utf8'), text, `${path} is behind: run npm run plugin`);
+// That the plugin's files in the repository are what pluginFiles makes is the structure test's (test/generated.ts).
+test('the plugin hooks every event and carries no token', () => {
   const hooks = JSON.parse(pluginFiles()[`${FOLDER}/hooks/hooks.json`]).hooks;
   assert.deepEqual(Object.keys(hooks).sort(), ['Notification', 'PostToolUse', 'SessionEnd', 'SessionStart', 'Stop', 'StopFailure', 'UserPromptSubmit']);
   const server = JSON.parse(pluginFiles()[`${FOLDER}/.mcp.json`]).mcpServers.pelago;

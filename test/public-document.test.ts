@@ -149,8 +149,9 @@ test('a published document reads as it was published until it is published again
   assert.equal(restyled.restyled, true);
   await call('/api/publish', undefined, { id: d });
   const again = (await call('/api/published', undefined, { id: d })).result;
-  assert.equal(again.changed, false);
-  assert.equal(again.restyled, undefined);
+  // Failed once in CI on postgres only (PR #429), and not again in 28 runs on a local Postgres: say which half differs.
+  assert.equal(again.restyled, undefined, `its look reads as changed: ${JSON.stringify(again)}`);
+  assert.equal(again.changed, false, `its words read as changed: ${JSON.stringify(again)}`);
 
   // Unpublished, its address answers nothing and it is shared again.
   await call('/api/unpublish', undefined, { id: d });
