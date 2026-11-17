@@ -297,7 +297,7 @@
       "fields": {
         "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." },
         "pack_version": { "type": "string", "description": "A version of its pack to try here, by the id of a pack item that is one (version_of): its types, rules and instructions are this island's while the rest of the map keeps the pack as it is. Unset, it runs the map's: unsetting it rolls the trial back." },
-        "packs_off": { "type": "json", "description": "The packs turned off on this island alone, by id ([\"build\"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack." }
+        "packs_off": { "type": "json", "shown": true, "description": "The packs turned off on this island alone, by id ([\"build\"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack." }
       }
     },
     {

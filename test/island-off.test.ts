@@ -146,6 +146,7 @@ test('a focus turns its own pack off and back on: it waits meanwhile, and is sti
   const answer = await flat(l, f);
   assert.deepEqual([answer.islands[0].pack.state, answer.islands[0].focus], ['off', true]);
   assert.equal(answer.items.find((i: { id: string }) => i.id === f).waiting.pack, 'feat', 'the focus waits too');
+  assert.deepEqual(answer.items.find((i: { id: string }) => i.id === f).fields.packs_off, ['feat'], 'the page reads what is off from the focus’s fields');
   assert.equal(answer.items.find((i: { id: string }) => i.id === s).waiting.why, 'turned off on this island');
   await refused(l, [{ op: 'create', type: 'feat.step', title: 'Another', props: { island: f } }], /feat\.step waits on this island/);
   await make(l, [{ op: 'update', id: f, props: { packs_off: [] } }]);
