@@ -67,10 +67,28 @@ test('each mark says its state as a class, its tip the pack, its state and why',
 test('a toggle only where the session may write, naming its island and pack', () => {
   const read = packsIn(draw(answer).scene.svg);
   assert.ok(read.every((m) => !m[1].on.includes('toggle') && !m[1].pack), 'a reader has no button');
-  const wrote = packsIn(draw(answer, writer).scene.svg);
-  assert.ok(wrote.every((m) => m[1].on.includes('toggle') && m[1].item === 'e_buildisl'), 'a writer toggles each');
-  assert.deepEqual(wrote.map((m) => m[1].pack), ['build', 'core', 'runs']);
+  const wrote = packsIn(draw(answer, writer).scene.svg).filter((m) => m[1].on.includes('toggle'));
+  assert.ok(wrote.every((m) => m[1].item === 'e_buildisl'), 'each toggle names its island');
+  assert.deepEqual(wrote.map((m) => m[1].pack), ['build', 'core'], 'a writer toggles each it may (runs is off, but not by this island)');
   assert.match(texts(wrote[0]).join(' '), /2 items would wait/, 'what turning it off sends waiting');
+});
+
+test("the kernel's own pack is no toggle, and says it is always on", () => {
+  const a = { ...answer, islands: [{ ...answer.islands[0], pack: { ...answer.islands[0].pack, requires: [{ id: 'core', title: 'Core', state: 'active', kernel: true }] } }] };
+  const [, core] = packsIn(draw(a, writer).scene.svg);
+  assert.ok(!core[1].on.includes('toggle') && !core[1].pack, 'no button');
+  assert.match(texts(core).join(' '), /Always on: the kernel's own/);
+  assert.doesNotMatch(texts(core).join(' '), /Click/);
+});
+
+test('turn on is offered only for a pack this island turned off', () => {
+  const notHere = packsIn(draw(answer, writer).scene.svg).find((m) => m[1].key.endsWith(':runs'));
+  assert.ok(!notHere[1].on.includes('toggle'), 'off for another reason (not in packs_off): no button');
+  assert.doesNotMatch(texts(notHere).join(' '), /turn it on/);
+  const turnedOff = { ...answer, items: answer.items.map((i: any) => (i.id === 'e_buildisl' ? { ...i, fields: { packs_off: ['runs'] } } : i)) };
+  const here = packsIn(draw(turnedOff, writer).scene.svg).find((m) => m[1].key.endsWith(':runs'));
+  assert.ok(here[1].on.includes('toggle') && here[1].pack === 'runs', 'in packs_off: a button');
+  assert.match(texts(here).join(' '), /Click to turn it on here/);
 });
 
 test('an island with no pack shows no marks', () => {
