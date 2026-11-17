@@ -241,6 +241,7 @@ export class View {
     this.listeners = new Set();
     this.why = new Map();
     this.placed = new Map();
+    this.waiting = new Map();
     this.whole = new Set();
     this.reads = reads(undefined);
     /** The styles and layouts the view is drawn with (the style's `used`): not in its answer, followed for their facts alone. */
@@ -256,6 +257,8 @@ export class View {
     this.why = new Map((answer.items ?? []).filter((i) => i.found || i.step).map((i) => [i.id, { ...(i.found ? { found: i.found, terms: i.terms } : { step: i.step }), ...(i.reasons && { reasons: i.reasons }) }]));
     // Where each falls on the lens's time axis, its lane and what it counts toward, worked out by the server: kept until the lens is read again.
     this.placed = new Map((answer.items ?? []).filter((i) => i.time).map((i) => [i.id, { time: i.time, ...(i.lane !== undefined && { lane: i.lane }), ...(i.stream !== undefined && { stream: i.stream }) }]));
+    // What waits on its pack on its island, and why (decision e_57bjxy2x): derived by the server, kept until the lens is read again.
+    this.waiting = new Map((answer.items ?? []).filter((i) => i.waiting).map((i) => [i.id, i.waiting]));
     // The items whose notes the lens was asked to send whole (`notes`, for the pages): kept whole as they change.
     this.whole = new Set(answer.whole ?? []);
     this.lens = answer.lens;
@@ -309,6 +312,7 @@ export class View {
       ...(r.session && { session: r.session }),
       ...this.why.get(id),
       ...this.placed.get(id),
+      ...(this.waiting.has(id) && { waiting: this.waiting.get(id) }),
     };
   }
 
