@@ -865,8 +865,8 @@
       "title": "reads",
       "inverse": "is read by",
       "from": ["*"],
-      "to": ["finding"],
-      "description": "Relies on a finding's value, from this island or another: the one link that crosses between islands. Its readers are who is told when the finding moves; when it was made, with the finding's history, says which value was read."
+      "to": ["has:promised"],
+      "description": "Relies on what an item promises its readers (a finding's value, or the fields of any type with the promised capability), from this island or another: the one link that crosses between islands. Its readers are who is told when a promised field moves; when it was made, with the item's history, says which value was read. props.expects names the type the reading relies on: a target not of it is refused."
     },
     {
       "id": "works_on",

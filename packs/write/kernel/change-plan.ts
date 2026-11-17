@@ -1,7 +1,7 @@
 // Planning a change: its ops checked against the schema and the map as it is now, before anything is written. The
 // write path (packs/write/kernel/pelago.ts) asks it before a change is judged and again before it is applied.
 
-import { undeclaredColumns } from '../../loader/kernel/head.ts'; import { typedProblems } from '../../loader/kernel/fields.ts';
+import { undeclaredColumns } from '../../loader/kernel/head.ts'; import { typedProblems } from '../../loader/kernel/fields.ts'; import { expectsProblem } from '../../loader/kernel/link-ends.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
 import { currentNames, typesAfter } from '../../loader/kernel/type-items.ts'; import { privateDependencies } from '../../rules/kernel/private-deps.ts';
 import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from '../../loader/kernel/island-items.ts'; import { islandRegistry, pinRefusals } from '../../loader/kernel/island-pin.ts';
@@ -96,7 +96,8 @@ export async function planChange(map: Archipelago, ops: Op[], who?: Who): Promis
         if (from && to) {
           // A link is judged by the version its from item's island runs, as that item is.
           const island = refIslands.has(op.from) ? refIslands.get(op.from) : (await map.entity(op.from))?.props.island;
-          const problem = (await islandRegistry(map, island, reg)).checkRelation(op.type, from, to);
+          const here = await islandRegistry(map, island, reg);
+          const problem = here.checkRelation(op.type, from, to) ?? expectsProblem(here.relations.get(op.type), to, op.props?.expects, (t, a) => here.isA(t, a), (t) => here.type(t) !== undefined);
           if (problem) errors.push(`${where}: ${problem}`);
         }
         break;
