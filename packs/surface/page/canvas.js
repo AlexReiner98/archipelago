@@ -10,7 +10,8 @@ import { api, drawnNone, drawSlots, h, hooks, idsOf, state, whoami } from './bas
 import { wiresOn } from './canvas-wires.js';
 import { added, moved } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
-import { cornersOf, corners, hasIslands, islandsOn, onIslands } from './islands-on.js';
+import { cornersOf, corners, islandsOn, onIslands } from './islands-on.js';
+import { islandsOnMap } from './islands-list.js';
 import { unfollow } from './replica.js';
 
 /** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
@@ -48,7 +49,7 @@ export const home = () =>
     ? islandsLens(listNow)
     : { filter: { find: ['frontier', 'waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => `type ${t.id}`)], not: ['done', 'kind system'] } };
 /** Home's list read, before Home is first drawn (ui/panes.js). */
-export const homeReady = () => Promise.all([islandsOn(), hasIslands()]).then(([list, has]) => ((listNow = list), (islanded = has)));
+export const homeReady = () => ((islanded = islandsOnMap(state.schema)), islanded ? islandsOn().then((list) => (listNow = list)) : Promise.resolve());
 // A toggle at the foot draws Home again in every canvas that draws it.
 onIslands((list) => {
   listNow = list;

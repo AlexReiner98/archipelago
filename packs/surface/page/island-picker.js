@@ -6,7 +6,7 @@
 
 import { api, firstDrawn, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
-import { atHome, capital, drawnAt, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
+import { atHome, capital, drawnAt, islandsOnMap, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
 import { numberOf } from './style-number.js';
 import { titles } from './words.js';
 
@@ -72,6 +72,8 @@ const keep = (key, v) => {
 /** Draw the side list, once a page; the foot strip of the find bar is put away. */
 export function drawPicker() {
   if (document.getElementById('islands')) return;
+  // A map with islands off has nothing to pick: no bar, decided before anything is drawn so the canvas never moves.
+  if (!islandsOnMap(state.schema)) return;
   const find = document.getElementById('find');
   if (find) find.hidden = true;
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
@@ -234,11 +236,5 @@ export function drawPicker() {
   });
   onDrawn(() => (anew ? ((anew = false), relay()) : draw()));
   // Read once the first view is drawn, as the bar read its saved views: the drawing goes first (test/first-drawing.test.ts).
-  firstDrawn.then(() => Promise.all([islandsOn(), allIslands()])).then(([now, all]) => {
-    // A map with no islands (islands off) has nothing to pick: no bar, and the canvas has the page.
-    if (!all.length) return void ((side.hidden = true), delete document.body.dataset.islands, delete document.body.dataset.islandsOver, dispatchEvent(new Event('resize')));
-    mine = now;
-    islands = all;
-    draw();
-  });
+  firstDrawn.then(() => Promise.all([islandsOn(), allIslands()])).then(([now, all]) => ((mine = now), (islands = all), draw()));
 }

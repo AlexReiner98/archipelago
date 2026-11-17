@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { atHome, capital, drawnAt, islandsIn, pressed, recentFirst } from '../packs/surface/page/islands-list.js';
+import { atHome, capital, drawnAt, islandsIn, islandsOnMap, pressed, recentFirst } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
@@ -83,4 +83,10 @@ test('the side list puts the islands worked on lately first, the latest first, t
   const capped = recentFirst([{ id: 'a', title: 'Zebra', worked_at: day(1) }, { id: 'c', title: 'Mango', worked_at: day(0.5) }, { id: 'b', title: 'Apple', worked_at: day(30) }], now, 7, 1);
   assert.deepEqual(capped.recent.map((i: { id: string }) => i.id), ['c'], 'no more than the most, the latest kept');
   assert.deepEqual(capped.rest.map((i: { title: string }) => i.title), ['Apple', 'Zebra'], 'the rest by name, the one left over among them');
+});
+
+test('a map keeps islands when its types that live on one declare the field island; one with islands off has no bar', () => {
+  assert.equal(islandsOnMap({ types: [{ id: 'task', fields: { island: { type: 'string' }, cell: {} } }, { id: 'person', fields: {} }] }), true);
+  assert.equal(islandsOnMap({ types: [{ id: 'task', fields: { cell: {} } }] }), false);
+  assert.equal(islandsOnMap(undefined), false, 'no schema read yet: no islands assumed');
 });

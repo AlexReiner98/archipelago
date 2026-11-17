@@ -18,10 +18,6 @@ const told = () => heard.forEach((f) => f(list));
 /** The person the page acts as, if the server says (none with sign-in off). */
 const me = () => (person ??= whoami().then((w) => w?.actor?.person ?? null, () => null));
 
-/** Whether the map has any island at all (a map with islands off has none): asked once a page. */
-let any;
-export const hasIslands = () => (any ??= api('search', { islands: true, limit: 1 }).then((found) => found.length > 0, () => false));
-
 /** The islands Home draws for a person who has chosen none yet: the map's, the latest first. */
 const unchosen = () => api('search', { islands: true }).then((found) => clean(found.map((e) => e.id)), () => []);
 
