@@ -51,3 +51,14 @@ test('a preset on a pack’s types styles its islands alone, under the owner’s
   await make(l, [{ op: 'update', id: isle.here, props: { packs_off: ['plain'] } }]);
   assert.equal((await islandStyles(l, both)).has(isle.here), false, 'and so does the island’s own pack off');
 });
+
+test('a pack’s glyph comes from a look on its types, and the island pack stays words only', async () => {
+  const marked = { ...looks, id: 'plainmark', styles: [{ id: 'plainmark.glyph', title: 'Plain’s mark', on: ['plain.thing'], props: { glyph: '▲' } }] };
+  const l = await freshWith(new Registry(packsWith(plain, marked)));
+  await setIslands(l, human, true);
+  assert.equal(l.registry.states.get('plain')?.state, 'active', 'the island pack is taken: it holds no look');
+  const isle = await make(l, [{ op: 'create', ref: 'here', type: 'island', title: 'Here', props: { pack: 'plain' } }]);
+  await make(l, [{ op: 'create', type: 'plain.thing', title: 'A thing', props: { island: isle.here } }]);
+  const answer = (await queryFlatPack.flatRead(kernelContext(l, 'query'), { filter: { find: [`island ${isle.here}`] } })) as { islands: { id: string; pack?: { glyph?: string } }[] };
+  assert.equal(answer.islands.find((i) => i.id === isle.here)?.pack?.glyph, '▲');
+});
