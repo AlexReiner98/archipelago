@@ -95,6 +95,10 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
     const found = await map.entity(key);
     return found && { island: (found.props.island as string | undefined) ?? null, title: found.title };
   };
+  /** The link types that say only that two items belong together: core's link, about and part_of, and their flavours. */
+  const retired = new Set(['link', 'about', 'part_of'].flatMap((f) => reg.relationFamily(f)));
+  /** Whether an island is a focus's: the item it names is a focus (decision e_mqex8wrf). */
+  const focusIsland = async (key: string) => { const ref = made.get(key); return (ref ? ref.props[FOCUS] : (await map.entity(key))?.props[FOCUS]) === true; };
   const crossing = (where: string, a: Where, b: Where) =>
     a.island && b.island && a.island !== b.island ? `${where}: "${a.title}" lives on the island ${a.island} and "${b.title}" on ${b.island}: no link joins two islands; publish a finding instead` : undefined;
   /** The field an item read across islands must mark true (its type's promised.published), and the item as this change leaves it. */
@@ -164,6 +168,8 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
       const [a, b] = op.op === 'link' ? [op.from, op.to] : [op.keep, op.drop];
       const [x, y] = [await whereIs(a), await whereIs(b)];
       if (x && y) problem(crossing(where, x, y));
+      // On a focus's island everything is taken as related (decision e_e7bmgd92): a link only says how, never that.
+      if (op.op === 'link' && x?.island && x.island === y?.island && retired.has(op.type) && (await focusIsland(x.island))) problem(`${where}: "${x.title}" and "${y.title}" are on one focus's island, which already says they belong together: link them by depends_on or a link type that says how, not ${op.type}`);
     }
   }
   return errors;
