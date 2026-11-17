@@ -139,7 +139,11 @@ number, boolean, date; checked on write) with its `unit`, its confidence, and
 at most. Marked `published`, it is what its island stands by, and only then
 may another island read it; the rest are its working findings. An option, a
 bug or working research is not a finding. A reader ties itself to one with a
-`reads` link, the one link that crosses between islands (`crosses`).
+`reads` link, the one link that crosses between islands (`crosses`). A finding
+is one type that promises fields to its readers: `reads` points to any type
+with the `promised` capability (`has:promised`), so a typed fact crosses as an
+item of its own type, and a reading may name the type it relies on
+(`props.expects`), refusing a target not of it.
 
 **place.** Where a drawing's layout puts an item: never set by hand (the
 owner, 3 Nov 2026), never meaning anything. The `places` stream that once

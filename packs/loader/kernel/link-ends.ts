@@ -30,6 +30,17 @@ export function holds(allowed: string, type: Pick<ResolvedType, 'lineage' | 'cap
   return cap ? type.capabilities[cap] !== undefined : type.lineage.includes(allowed);
 }
 
+/**
+ * Why a link's expected type (props.expects) does not hold, if it does not: only a link that crosses islands says what it
+ * expects of the item it reads; the expected type is one the packs define; and the item read is of it or a flavour of it.
+ */
+export function expectsProblem(rel: { id: string; crosses?: boolean } | undefined, toType: string, expects: unknown, isA: (type: string, ancestor: string) => boolean, known: (id: string) => boolean): string | undefined {
+  if (expects === undefined || expects === null) return undefined;
+  if (!rel?.crosses) return `props.expects is said only on a link that crosses islands (reads), not "${rel?.id}"`;
+  if (typeof expects !== 'string' || !known(expects)) return `props.expects names a type the packs define, not ${JSON.stringify(expects)}`;
+  return isA(toType, expects) ? undefined : `"${rel.id}" expects a ${expects}, and what it reads is a ${toType}`;
+}
+
 /** Whether an end a flavour of a link type names lies inside what its parent allows there. */
 export function within(end: string, parentEnd: string[], type: (id: string) => ResolvedType | undefined): boolean {
   return parentEnd.some((a) => a === '*' || (end !== '*' && (capabilityOf(end) ? a === end : holds(a, type(end)))));

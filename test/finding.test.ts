@@ -54,7 +54,7 @@ test('a reader reads a finding; reads points at a finding only, and crosses', as
   ]);
   const read = await l.change(agent, { ops: [{ op: 'link', type: 'reads', from: made.costs, to: made.f }], reason: 'test' });
   assert.notEqual(read.status, 'refused');
-  await refused(l, [{ op: 'link', type: 'reads', from: made.f, to: made.budget }], /"reads" must point to finding/);
+  await refused(l, [{ op: 'link', type: 'reads', from: made.f, to: made.budget }], /"reads" must point to has:promised/);
   const reads = l.registry.relations.get('reads');
   assert.equal(reads?.crosses, true, 'the islands let it cross');
   assert.ok(!l.registry.relations.get('uses')?.crosses, 'what it extends does not');
