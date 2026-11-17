@@ -85,7 +85,7 @@ export interface RuleDef {
     /** The op writes a version's part code alone, the version pinned on one island at most: a trial (packs/loader/kernel/part-trial.ts). */
     part_trial?: boolean;
     /** The op pins an island to a version carrying code that another island already pins. */
-    spreads?: boolean; /** The op turns a pack that runs code off or on, on one island (its packs_off, packs/loader/kernel/island-off.ts). */ island_code?: boolean;
+    spreads?: boolean; /** The op turns a pack that runs code off or on, on one island (its packs_off, packs/loader/kernel/island-off.ts). */ island_code?: boolean; /** It adds an item to an island past its cap (packs/loader/kernel/island-cap.ts); {over_cap} in say is how. */ over_cap?: boolean;
   };
   /** spare: what it matches is let through, every other rule it would be under spared by this one (its pack's bookkeeping only), or with spares, those alone. */
   then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] } | { carry: Carry };
@@ -208,7 +208,7 @@ function capable(reg: Registry, type: string, wanted: string | Record<string, Re
 /** What is read of an op before the rules judge it, beside the op itself (packs/loader/kernel/part-trial.ts). */
 export interface OpFacts {
   part_trial?: boolean;
-  spreads?: boolean; island_code?: boolean;
+  spreads?: boolean; island_code?: boolean; /** Of an op that adds to an island past its cap, how far past (packs/loader/kernel/island-cap.ts). */ over_cap?: string;
   /** It makes an item of an island's own pack on that island, in the change that makes the island: in reach of the pack making it. */ own_island?: boolean;
 }
 
@@ -216,7 +216,7 @@ export interface OpFacts {
 function applies(rule: RuleDef & { pack?: string }, reg: Registry, who: Who, w: Written, targets: Target[], held: boolean, facts: OpFacts = {}): boolean {
   const when = rule.when ?? {};
   if (when.part_trial !== undefined && Boolean(facts.part_trial) !== when.part_trial) return false;
-  if (when.spreads !== undefined && Boolean(facts.spreads) !== when.spreads) return false; if (when.island_code !== undefined && Boolean(facts.island_code) !== when.island_code) return false;
+  if (when.spreads !== undefined && Boolean(facts.spreads) !== when.spreads) return false; if (when.island_code !== undefined && Boolean(facts.island_code) !== when.island_code) return false; if (when.over_cap !== undefined && Boolean(facts.over_cap) !== when.over_cap) return false;
   if (when.actor && (when.actor === 'human') !== who.human) return false;
   if (who.reading && !(rule.readings ?? rule.then !== 'hold')) return false;
   if (when.op && !list(when.op)!.includes(w.op)) return false;
@@ -307,7 +307,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const refusers: Ruled[] = [];
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
   const said = (rule: Rule, fallback: string) =>
-    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
+    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{over_cap}', facts.over_cap ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
   const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`), ...(rule.stake && { stake: said({ ...rule, say: rule.stake }, rule.stake) }) });
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];

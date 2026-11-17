@@ -90,7 +90,7 @@ function attentionParts(l: Archipelago, p: Params, among: string, ask: Attention
     `att_live as (select id from att_rows where is_open and archived_at is null and not (type = any(${p.add(systemTypes(l))}::text[])))`,
     `att_waits as (\n${linksWhere(l, `r.from_id = any(${live}) and r.type = any(${p.add(l.registry.relationFamily('waits_on'))}::text[])`)}\n)`,
     `att_reach as (\n${bind(REACH, live, p.add(families.flat()))}\n)`,
-    `att_edges as (\n${bind(EDGES(' and r.from_id = any($4::text[])'), p.add(families[0]), p.add(families[1]), p.add(families[2]), reached)}\n)`,
+    `att_edges as (\n${bind(EDGES(' and r.from_id = any($5::text[])'), p.add(families[0]), p.add(families[1]), p.add(families[2]), p.add(families[3]), reached)}\n)`,
     `att_held as (\n${bind(HELD(' and n.from_id = any($2::text[])'), p.add(needs), reached)}\n)`,
     `att_works as (\n${linksWhere(l, `r.to_id = any(${live}) and r.type = 'works_on'`)}\n)`,
     ...(moved

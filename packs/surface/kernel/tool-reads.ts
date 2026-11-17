@@ -254,6 +254,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       owner: z.string().optional(),
       open: z.boolean().optional().describe('true for unfinished only, false for finished only.'),
       include_archived: z.boolean().optional(),
+      islands: z.boolean().optional().describe('true for islands only: items of type island and focus items (each its own island), the newest first.'),
       limit: z.number().int().positive().optional(),
       full: z.boolean().optional().describe('true for every field whole. Left out, an agent is given long fields cut, with their length; get has one item whole.'),
     },

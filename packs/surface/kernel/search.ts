@@ -9,6 +9,7 @@
 
 import type { Q } from '../../database/kernel/db.ts';
 import type { Archipelago, Entity } from '../../write/kernel/pelago.ts';
+import { glyphOf } from '../../loader/kernel/island-decl.ts';
 
 // The words of a title and its note, kept in an index on the very expression search matches with, so the index finds
 // exactly what reading every row found; and the trigrams of every title, for a match anywhere in it and for the
@@ -66,6 +67,8 @@ export interface SearchInput {
   owner?: string;
   open?: boolean;
   include_archived?: boolean;
+  /** Only islands: items of core's type island, and the focus items, each its own island (decision e_mqex8wrf). */
+  islands?: boolean;
   limit?: number;
   /** Types left out, each with the types that extend it. */
   except?: string[];
@@ -104,8 +107,11 @@ export async function search(db: Q, family: (type: string) => string[], input: S
     if (input.status) add(`status = ?`, input.status);
     if (input.owner) add(`owner = ?`, input.owner);
     if (input.open !== undefined) add(`is_open = ?`, input.open);
+    // An island is an item of core's type island, or a focus, its own island (decision e_mqex8wrf): by entity_type_created and entity_focus.
+    if (input.islands) add(`(type = any(?::text[]) or props->>'focus' = 'true')`, family('island'));
     if (!input.include_archived) where.push(`archived_at is null`);
-    params.push(Math.min(input.limit ?? 25, 200));
+    // Islands are few beside items: the picker reads every one of them, hundreds at once.
+    params.push(Math.min(input.limit ?? 25, input.islands ? 2000 : 200));
     const { rows } = await db.query<Entity>(
       `select id, type, title, status, is_open, owner, confidence, props, updated_at from entity ${hits}
        ${where.length ? 'where ' + where.join(' and ') : ''} order by ${rank}updated_at desc limit $${params.length}`,
@@ -124,5 +130,21 @@ export async function search(db: Q, family: (type: string) => string[], input: S
 /** Search a map over titles and notes, the type named checked against its registry first: the kernel's read `search`. */
 export async function searchMap(l: Archipelago, input: SearchInput) {
   if (input.type && !l.registry.type(l.registry.canonical(input.type))) throw new Error(`Unknown type "${input.type}"`);
-  return search(l.db, (type) => l.registry.family(type), input);
+  const found = await search(l.db, (type) => l.registry.family(type), input);
+  if (!input.islands) return found;
+  // When work last changed on each island: the latest of its items' changes and its own, so the picker's Recent lists
+  // where work happened, not which island items were edited.
+  const ids = found.map((e) => e.id);
+  const { rows: worked } = ids.length
+    ? await l.db.query<{ island: string; at: string }>(`select props->>'island' as island, max(updated_at) as at from entity where props->>'island' = any($1::text[]) and archived_at is null group by 1 -- index entity_island`, [ids])
+    : { rows: [] };
+  const workedAt = new Map(worked.map((w) => [w.island, new Date(w.at).getTime()]));
+  // Each island with the pack it speaks (an island item's, or a focus's type's), its title and glyph, for the picker.
+  return found.map((e) => {
+    const own = new Date(e.updated_at).getTime(), items = workedAt.get(e.id) ?? 0;
+    const worked_at = new Date(Math.max(own, items)).toISOString();
+    const id = (typeof e.props.pack === 'string' && e.props.pack) || l.registry.type(e.type)?.pack || '';
+    const pack = l.registry.found.find((p) => p.id === id), glyph = glyphOf(pack);
+    return { ...e, worked_at, pack: { id, title: pack?.title ?? id, ...(glyph && { glyph }) } };
+  });
 }

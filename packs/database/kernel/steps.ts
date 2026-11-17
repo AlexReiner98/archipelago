@@ -5,7 +5,7 @@ import type { StepPart } from './migrate.ts';
 import { AGENT_CODE_READ, AGENT_PUBLISH_READ, HELD_BY, HOLDS_OFF_READ, ITEM_HIDDEN, LINK_SNAPSHOT, MEMBER, ORDERED, SCHEMA, SETTING_READ_OPEN, TOKEN_GRANT, TOKEN_SCOPE, VISIBILITY, WORKSPACE_SHARE } from './schema.ts';
 import { PUBLIC_DOCUMENT, PUBLIC_VIEW, PUBLISHED, PUBLISHED_PATH, PUBLISHED_TO_PUBLIC_VIEW, PUBLIC_VIEW_SHOWS, SHARE_PUBLISHABLE, SHARE_WORKSPACE_GONE } from './public-schema.ts';
 import { MENTIONS } from './mentions.ts';
-import { ACTIVE_HOLDS_BY_KEY, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
+import { ACTIVE_HOLDS_BY_KEY, ISLANDS_INDEX, READ_INDEXES, ROW_POLICIES } from './read-indexes.ts';
 import { GUESTS_GONE, MEMBER_READ_ONLY, VAULT_KEY_POLICY } from './member-schema.ts';
 
 export const STEPS: StepPart[] = [
@@ -37,4 +37,5 @@ export const STEPS: StepPart[] = [
   { version: 43, name: 'guests, gone', sql: GUESTS_GONE },
   { version: 44, name: 'what a public view shows, indexed', sql: PUBLIC_VIEW_SHOWS },
   { version: 45, name: 'a member reads the settings packs open to members', sql: SETTING_READ_OPEN },
+  { version: 51, name: 'the islands, indexed', sql: ISLANDS_INDEX },
 ];
