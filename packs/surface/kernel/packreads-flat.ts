@@ -12,6 +12,7 @@ import { kernelTypes, SYSTEM, WRAPS } from '../../loader/kernel/head.ts';
 import { ISLAND, onIslands } from '../../loader/kernel/island-items.ts';
 import { islandDeclarations } from '../../loader/kernel/island-decl.ts';
 import { islandLooks } from '../../loader/kernel/island-look.ts';
+import { islandStands } from '../../loader/kernel/island-cap.ts';
 import { headPos } from '../../log/kernel/tail.ts';
 import { blockGraph } from './blocking.ts';
 import { proposals } from './map-reads.ts';
@@ -373,10 +374,12 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
   const { decls, waiting } = isles.length ? await islandDeclarations(l, isles, items.map((e) => ({ id: e.id, type: e.type, island: islandOf(e) }))) : { decls: new Map(), waiting: new Map() };
   // Each island's own look (decision e_3c3wr7jv): a layout or part kept about it, drawn wherever the island is.
   const looks = await islandLooks(l, islandIds);
+  // How many items each holds against its look's cap (decision e_bgw2u5aw): the header marks one past it.
+  const caps = await islandStands(l.db, l.registry, islandIds);
   return {
     items, links, whole: ((w) => items.filter((e) => w.has(e.id)).map((e) => e.id))(new Set(wholeIds)),
     found: Object.fromEntries(foundBy), terms: Object.fromEntries(termsBy), step: Object.fromEntries(stepOf),
-    on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id), ...(decls.has(id) && { decl: decls.get(id) }), ...(looks.has(id) && { look: looks.get(id) }) })),
+    on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id), ...(decls.has(id) && { decl: decls.get(id) }), ...(looks.has(id) && { look: looks.get(id) }), ...(caps.has(id) && { cap: caps.get(id) }) })),
     ...(waiting.size && { waiting: Object.fromEntries(waiting) }),
     ...(cut && { cut: true }), ...(matched !== undefined && { matched }),
   };

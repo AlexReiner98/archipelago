@@ -269,6 +269,7 @@
         "writes": { "type": "json", "description": "The types this layout's code may change by itself, as a list, e.g. [\"local.ridges_setup\"]: what its layout asks for (a preset saved, one deleted) the page sends as the person looking, and it applies where it writes only these types; anything else waits for that person (core's drawing_* rules). Written by an agent, it waits for the human, as code does." },
         "modules": { "type": "json", "large": true, "code": true, "description": "The owner's version of a layout a pack ships (with preset, the layout’s id): its modules by name, each a JavaScript module's text, standing in for the pack's module of that name. The layout runs as code does, in a worker inside a sandboxed frame, and answers with marks (SVG and HTML as data) the page checks before it draws them: index.js exports picture(input, tools), typed as PictureFn in packs/walls/page/draw.d.ts. Written by an agent, it waits for the human to approve it." },
         "settings": { "type": "json", "description": "The style fields it draws with, such as text or colors, as a style holds them: under the view's own, which say otherwise." },
+        "cap": { "type": "json", "description": "How many items an island drawn by this look may hold (decision e_bgw2u5aw, the owner, 17 Nov 2026): a whole number, or \"none\" for a look built for big graphs. Kept about an island, it is that island’s cap; unset, its preset’s." },
         "preset": { "type": "string", "description": "The id of the pack's drawing this is the owner's version of (a layout in a pack's layouts).", "system": true }
       }
     },
@@ -280,6 +281,7 @@
       "statuses": { "open": ["working", "kept"], "closed": ["retired"], "phases": { "working": "under_way", "kept": "standing", "retired": "ended" } },
       "fields": {
         "pack": { "type": "string", "description": "The pack whose part it is, by id." },
+        "cap": { "type": "json", "description": "How many items an island drawn by this look may hold (decision e_bgw2u5aw, the owner, 17 Nov 2026): a whole number, or \"none\" for a look built for big graphs. Kept about an island, it is that island’s cap; unset, its preset’s." },
         "slot": { "type": "string", "description": "The slot it fills: the host's (bar, canvas, sheet, find, home, piece.<name>, page.<name>), or one a pack's part opens (<pack>.<name>)." },
         "reads": { "type": "json", "description": "The fields it reads, by type, as { \"<type>\": [\"<field>\", ...] }: what the host hands it of an item, and no more." },
         "sends": { "type": "json", "description": "The actions it may send, as a list: its pack's own, each sent as a change on the authority of the person looking." },
@@ -911,6 +913,12 @@
       "then": "hold",
       "stake": "Code of a version now runs on another island too: \"{title}\" runs it for everyone who works there.",
       "say": "\"{title}\" would run a version's code another island already tries: spreading it is the owner's to allow."
+    },
+    {
+      "id": "island_full",
+      "when": { "actor": "agent", "over_cap": true },
+      "then": "refuse",
+      "say": "{over_cap}: split it first, or give it a look that says a larger cap (the owner, 17 Nov 2026, e_bgw2u5aw)."
     },
     {
       "id": "code_runs",
