@@ -79,6 +79,11 @@ test("the kernel's own pack is no toggle, and says it is always on", () => {
   assert.ok(!core[1].on.includes('toggle') && !core[1].pack, 'no button');
   assert.match(texts(core).join(' '), /Always on: the kernel's own/);
   assert.doesNotMatch(texts(core).join(' '), /Click/);
+  // As the kernel half answers it (#427): an island that speaks core, its own pack the kernel's.
+  const shared = { ...answer, islands: [{ ...answer.islands[0], pack: { id: 'core', title: 'Core', state: 'active', kernel: true, requires: [] } }] };
+  const [own] = packsIn(draw(shared, writer).scene.svg);
+  assert.ok(!own[1].on.includes('toggle'), "an island's own pack, when the kernel's, is no button either");
+  assert.match(texts(own).join(' '), /Always on/);
 });
 
 test('turn on is offered only for a pack this island turned off', () => {
