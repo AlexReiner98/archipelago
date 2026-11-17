@@ -33,7 +33,7 @@ test('the page draws its head, note, fields, source and history as marks the hos
   const marks = pageMarks({ item: task, words, views: { item: { outgoing: [{ type: 'depends_on' }] }, history: { events: [{ changeset: 'c_aaaa', actor: 'agent:x', reason: 'Made', ts: '2026-11-13T10:00:00Z' }] } } }, { draft: { fields: {} }, open: new Set() });
   assert.doesNotThrow(() => checkMarks(noSlots(marks), { kinds }));
   const text = JSON.stringify(marks);
-  for (const s of ['HEAD', 'NOTE', 'FIELDS', 'SOURCE', 'HISTORY', 'Walk from it', 'Link']) assert.ok(text.includes(s), s);
+  for (const s of ['section:head', 'NOTE', 'FIELDS', 'SOURCE', 'HISTORY', 'Walk from it', 'Link']) assert.ok(text.includes(s), s);
   // Other packs' sections stand below the source and above history (decision e_axz9au5f).
   assert.ok(text.indexOf('section:source') < text.indexOf('sheet.sections') && text.indexOf('sheet.sections') < text.indexOf('section:history'));
 });
@@ -119,6 +119,20 @@ test('a page opens on the band its type declares: choices, answer, measure, aler
   assert.doesNotThrow(() => checkMarks(noSlots(told), { kinds }));
   assert.ok(JSON.stringify(told).includes('2 earlier') && JSON.stringify(told).includes('Beat 8') && !JSON.stringify(told).includes('Beat 2"'), 'the latest beats, the rest counted');
   assert.ok(!lead({ type: 'task', props: {} }), 'a type that declares no lead opens as before');
+});
+
+test('the head is one line of marks: type, status to pick, age, who may see it; how sure only when not sure', () => {
+  const line = (item: object) => (pageMarks({ item: { ...task, ...item }, words, views: {} }, { draft: { fields: {} }, open: new Set() }) as unknown[]).find((m) => Array.isArray(m) && (m[1] as { key?: string })?.key === 'section:head');
+  const sure = JSON.stringify(line({ confidence: 1 }));
+  assert.ok(sure.includes('head:status') && sure.includes('head:visibility') && sure.includes('"Task"'), 'type, status and who may see it, in one row');
+  assert.ok(!sure.includes('sure') && !sure.includes('HEAD'), 'no heading, and how sure is not said when sure');
+  assert.ok(JSON.stringify(line({ confidence: 0.6 })).includes('60% sure'));
+});
+
+test('an item that waits on the person looking says so in its band, with what for; on another, nothing', () => {
+  const marks = (me: string) => JSON.stringify(pageMarks({ item: { ...task, is_open: true }, words, views: { item: { waits: [{ id: 'e_pppppppp', title: 'Alex', for: 'choosing a layout' }], me } } }, { draft: { fields: {} }, open: new Set() }));
+  assert.ok(marks('e_pppppppp').includes('Waits on you') && marks('e_pppppppp').includes('choosing a layout'));
+  assert.ok(!marks('e_qqqqqqqq').includes('Waits on you'), 'it waits on someone else: their wire, not a line here');
 });
 
 test('the alert\'s press makes its field true, as one change', async () => {

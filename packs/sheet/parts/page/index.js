@@ -60,13 +60,14 @@ export function pageMarks(input, s) {
         ...(writes ? [['button', { key: 'archive', tone: 'bad' }, 'Archive']] : [])]]];
   return ['box', { flow: 'column', gap: 3 },
     head,
+    // What it is and where it stands, one line under its title (decision e_x3h4vbe7).
+    fold('head', 'Head', 'Type, status, owner, who may see it, when made', () => headMarks({ ...item, owner_title: view.owner?.title }, type, { writes })),
     linkMarks({ finding: s.finding, picked: s.picked }),
     s.said && ['text', { tone: 'bad', tip: s.said.slice(0, 200) }, s.said],
     s.archiving && ['box', { look: 'sunk', flow: 'row', gap: 2, pad: 2 }, ['text', {}, `Archive "${item.title}"? It leaves every view but stays in the history.`], ['button', { key: 'archive-yes', look: 'main', tone: 'bad' }, 'Archive'], ['button', { key: 'archive-no', look: 'quiet' }, 'Cancel']],
     ['slot', { key: 'slot-bands', name: 'sheet.bands' }],
     // What it is for, before what it is: the band its type declares (decision e_ktr4vbcd).
-    leadMarks(item, type, c, { writes, asking: s.asking }),
-    fold('head', 'Head', 'Type, status, owner, who may see it, when made', () => headMarks({ ...item, owner_title: view.owner?.title }, type, { writes })),
+    leadMarks(item, type, c, { writes, asking: s.asking, waits: view.waits, me: view.me }),
     section('note', 'Note', 0, noteMarks(item, s.draft, { writes, writing: s.writing, count, voice: view.voice })),
     fold('fields', 'Fields', 'Its fields', () => section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : []), ...leadFields(item, type, c)], titles: view.titles ?? {}, files: s.files }) ?? ['text', { look: 'muted' }, 'None'])),
     fold('source', 'Source', 'Where its facts came from', () => sourceMarks(view.source)),

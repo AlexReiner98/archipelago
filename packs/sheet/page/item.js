@@ -7,14 +7,14 @@
 // above history (sheet.sections, e_axz9au5f). The frame reads the item once and tells the parts (`page`), so a page
 // drawn again in place is not mounted anew under the person's typing.
 
-import { api, ask, drawSlots, h, hooks, may, part, state, tell } from './base.js';
+import { api, ask, drawSlots, h, hooks, may, part, state, tell, whoami } from './base.js';
 import { bakeBeforeGoingOut } from './style-code.js';
 import { drawIn, openHere } from './canvas.js';
 import { viewsOn } from './views-kept.js';
 import { readDocument, readingOf } from './item-reading.js';
 import { publicMark, publicOf, shareMenu } from './item-share.js';
 import { heldBand, heldOn } from './item-held.js';
-import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, readWhole, sectionsOn, toolOf } from './screens.js';
+import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, leadsOn, readWhole, sectionsOn, toolOf } from './screens.js';
 import { isA, menu, relations, titles, who } from './words.js';
 import { pageType, readPageModel } from './page-schema.js';
 
@@ -59,7 +59,7 @@ const voiceOf = (actor) => (typeof actor !== 'string' ? null : actor.startsWith(
 /** The parts of an item's page its style may fold a click away. */
 const FOLDS = ['head', 'fields', 'source', 'history'];
 
-function told(data, past, owner, count, named, folds) {
+function told(data, past, owner, count, named, folds, me) {
   const e = data.entity;
   const tie = (r) => ({ type: r.type, root: rootOf(r.type) });
   const names = {};
@@ -68,7 +68,8 @@ function told(data, past, owner, count, named, folds) {
     name: 'page',
     item: Object.fromEntries(['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'].filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),
     views: {
-      item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(tie), titles: named, ...(voiceOf(data.note_by) && { voice: voiceOf(data.note_by) }),...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
+      // Who it waits on and for what, and who is looking: the band says when it is them (decision e_xj9cs33u).
+      item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(tie), titles: named, waits: data.outgoing.filter((r) => rootOf(r.type) === 'waits_on').map((r) => ({ id: r.id, title: r.title, ...(typeof r.props?.for === 'string' && { for: r.props.for.slice(0, 200) }) })), ...(me && { me }), ...(voiceOf(data.note_by) && { voice: voiceOf(data.note_by) }),...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
       history: { events: past.map(({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail }) => ({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail: { ...(detail?.undone_by && { undone_by: detail.undone_by }), ...(detail?.forgot && { forgot: true }), ...diffsOf(detail) } })), names },
     },
     ...(count && { count }),
@@ -208,9 +209,11 @@ export async function entity(id, here) {
   );
   // A document reads in its note's place as it will publish (the publish pack's reading), above the page's note.
   const reading = doc && readingOf(e, doc, ownStyle ?? state.style, again);
-  const said = told(data, past, owner, countOn(data), named, FOLDS.filter((part) => ownStyle?.page?.[part] === 'folded'));
+  const me = await whoami().then((w) => w?.actor?.person ?? null, () => null);
+  const said = told(data, past, owner, countOn(data), named, FOLDS.filter((part) => ownStyle?.page?.[part] === 'folded'), me);
   const sections = sectionsOn(data);
-  const above = [...bands, acting, reading && h('section', { class: 'page-section note' }, reading)].filter(Boolean);
+  // What the screens stand in its band (place: lead) comes after what is held on it and a pack's action form.
+  const above = [...bands, acting, ...leadsOn(data), reading && h('section', { class: 'page-section note' }, reading)].filter(Boolean);
 
   // Mounted once for an item, told again when it is drawn again: the person's typing is not taken from under them.
   if (inPlace && mounted?.id === id && mounted.node.isConnected) {

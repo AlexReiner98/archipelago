@@ -12,22 +12,28 @@ export const section = (key, title, n, ...content) =>
 /** A name and its value on one line. */
 export const row = (name, value, tip) => ['box', { flow: 'row', gap: 3 }, ['text', { look: 'muted', ...(tip && { tip: String(tip).slice(0, 200) }) }, name], value];
 
-/** Its head: what it is, where it stands, whose it is, who may see it, when it was made and changed. */
+/**
+ * Its head, one line of marks under its title (decision e_x3h4vbe7): what it is, where it stands (a pick), how long
+ * since it changed, who may see it (a pick), whose it is, and how sure, said only when not sure. When it was made and
+ * changed in full are the age's tip.
+ */
 export function headMarks(item, type, { writes = false, now } = {}) {
   const statuses = [...(type.open ?? []), ...(type.closed ?? [])];
   const archived = Boolean(item.archived_at);
   const seen = item.private_to ? 'private' : item.visibility;
+  const dot = ['text', { look: 'muted' }, '·'];
   const status = writes && !archived && statuses.length ? ['input', { key: 'head:status', kind: 'pick', values: statuses, value: item.status ?? '', tip: 'Status' }] : ['text', { look: 'mark' }, String(item.status ?? '—')];
-  const visibility = writes && !archived && ['private', 'shared'].includes(seen) ? ['input', { key: 'head:visibility', kind: 'pick', values: ['private', 'shared'], value: seen, tip: 'Who can see it' }] : ['text', {}, String(seen ?? '—')];
-  return section('head', 'Head', 0,
-    row('Type', ['text', { tip: item.type }, type.title]),
-    row('Status', status),
-    item.owner !== undefined && row('Owner', item.owner ? ['text', { item: item.owner, look: 'mark' }, item.owner_title ?? item.owner] : ['text', { look: 'muted' }, '—']),
-    row('Visibility', visibility),
-    typeof item.confidence === 'number' && row('Confidence', ['text', {}, String(item.confidence)]),
-    row('Created', ['text', { tip: item.created_at ?? '' }, ago(item.created_at, now)]),
-    row('Updated', ['text', { tip: item.updated_at ?? '' }, ago(item.updated_at, now)]),
-    archived && row('Archived', ['text', { tip: item.archived_at }, ago(item.archived_at, now)]));
+  const visibility = writes && !archived && ['private', 'shared'].includes(seen) ? ['input', { key: 'head:visibility', kind: 'pick', values: ['private', 'shared'], value: seen, tip: 'Who can see it' }] : ['text', { look: 'muted', tip: 'Who can see it' }, String(seen ?? '—')];
+  const when = `Made ${String(item.created_at ?? '').slice(0, 16).replace('T', ' ')}, changed ${String(item.updated_at ?? '').slice(0, 16).replace('T', ' ')}`;
+  const parts = [
+    ['text', { look: 'muted', tip: item.type }, type.title],
+    status,
+    ['text', { look: 'muted', tip: when }, archived ? `archived ${ago(item.archived_at, now)}` : ago(item.updated_at, now)],
+    visibility,
+    item.owner && ['text', { item: item.owner, look: 'mark', tip: 'Whose it is' }, item.owner_title ?? item.owner],
+    typeof item.confidence === 'number' && item.confidence !== 1 && ['text', { look: 'muted', tip: 'How sure, 0 to 1' }, `${Math.round(item.confidence * 100)}% sure`],
+  ].filter(Boolean);
+  return ['box', { key: 'section:head', flow: 'row', gap: 4 }, ...parts.flatMap((m, i) => (i ? [dot, m] : [m]))];
 }
 
 /** What a gesture on the head comes to: a change of its status or of who may see it, or null. */

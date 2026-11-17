@@ -171,7 +171,11 @@ title, before its head (decision e_ktr4vbcd, `packs/sheet/parts/page/lead.js`): 
 on its choices, or its answer once settled; any other type on what its capability `lead` declares, as
 data a pack ships: a `measure` (its `value` large, with `unit` and `as_of`), an `alert` while the boolean
 `unless` is false (with `says`, and a press that makes it true), or a `timeline` of the beats a json
-`beats` field keeps. Fields the band shows are not shown again below it. A note is written in one dialect (`packs/kit/page/text.js`: titles,
+`beats` field keeps. Fields the band shows are not shown again below it. The head is one line of marks under the title (type, status as a
+pick, age, who may see it, the owner, how sure only when not sure: e_x3h4vbe7). An item that waits on the
+person looking says so in the band, with what for (a state, not a listed link: e_xj9cs33u). A screen's
+piece with `place: "lead"` stands in the band too, the kernel's own or one a pack's part draws as
+`piece.<name>` (e_x89zp8uz). A note is written in one dialect (`packs/kit/page/text.js`: titles,
 lists, checklists, callouts, tables, code, emphasis, links, items by id),
 read the same by the sheet and the published reader; ticking a checklist is a
 change to that line. How it looks is the style's `notes` (callout colours, the

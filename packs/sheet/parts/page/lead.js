@@ -90,15 +90,32 @@ function timeline(item, lead, now) {
       ...(b.at ? [['text', { look: 'muted', size: 2, tip: String(b.at) }, ago(b.at, now)]] : [])])]);
 }
 
-/** The band an item's page opens on, as marks, or null when its type declares none or it holds nothing to show. */
-export function leadMarks(item, type, c, { writes = false, asking, now } = {}) {
+/**
+ * Whether it waits on the person looking, and for what: a state of the item, said in one line (decision e_xj9cs33u).
+ * Whom else it waits on is a wire on the canvas, never listed here.
+ */
+export function waitsOnMe(item, waits, me) {
+  if (!me || item?.is_open === false || !Array.isArray(waits)) return null;
+  return waits.find((w) => w?.id === me) ?? null;
+}
+
+const waitsLine = (w) => ['box', { flow: 'row', gap: 2 },
+  ['text', { tone: 'warn', bold: true }, '↩ Waits on you'],
+  ...(w.for ? [['text', { look: 'muted', tip: tip(w.for) }, w.for]] : [])];
+
+/** The band an item's page opens on, as marks, or null when its type declares none, it holds nothing to show and nothing waits on the person looking. */
+export function leadMarks(item, type, c, { writes = false, asking, now, waits, me } = {}) {
   const lead = leadOf(item, type, c);
-  if (!lead) return null;
-  if (lead.form === 'choices') return choices(c, { writes: writes && item.is_open !== false, asking });
-  if (lead.form === 'answer') return answer(item, c);
-  if (lead.form === 'measure') return measure(item, lead);
-  if (lead.form === 'alert') return alert(item, lead, { writes });
-  return timeline(item, lead, now);
+  const mine = waitsOnMe(item, waits, me);
+  const body = !lead ? null
+    : lead.form === 'choices' ? choices(c, { writes: writes && item.is_open !== false, asking })
+    : lead.form === 'answer' ? answer(item, c)
+    : lead.form === 'measure' ? measure(item, lead)
+    : lead.form === 'alert' ? alert(item, lead, { writes })
+    : timeline(item, lead, now);
+  if (!mine) return body;
+  // The line stands first in the band; with no band of its own, it is the band.
+  return body ? [body[0], body[1], waitsLine(mine), ...body.slice(2)] : band(waitsLine(mine));
 }
 
 /** What a press on the band comes to: the alert's field made true, as one change on the person's word; else null. */

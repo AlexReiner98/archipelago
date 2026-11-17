@@ -13,7 +13,9 @@ in control here stays protected (decisions e_gyzm7rj3, e_bn76z5fu).
 
 Under the title it draws the band its type declares (`parts/page/lead.js`):
 a question's choices or answer, or a type's `lead` capability (measure, alert,
-timeline). `sheet.page` reads items whole and writes the starter types as the person
+timeline), the head as one line of marks, and a line when the item waits on the
+person looking. A screen's piece placed `lead` the frame stands in `sheet.bands`.
+`sheet.page` reads items whole and writes the starter types as the person
 (`reads: "*"`, `writes`, a root pack's part alone). Frame, fields, links and
 draft are one part because the note and every field share one Save. It
 opens two slots: `sheet.bands`, under the title, and `sheet.sections`,
