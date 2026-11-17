@@ -2,7 +2,7 @@
 #islands { position: fixed; z-index: 3; top: var(--band); bottom: 0; left: 0; display: flex; box-sizing: border-box; width: min(var(--side-least), 60%); background: var(--panel); font-size: var(--text-4); }
 /* The canvas, and the panes in it (fixed to the window, packs/walls/page/part-marks.css), start at the bar's edge. */
 body[data-islands="open"] :is(#canvas, #canvas .pm-panes) { left: min(var(--side-least), 60%); }
-body[data-islands="folded"] :is(#canvas, #canvas .pm-panes) { left: var(--box-7); }
+body[data-islands="folded"] :is(#canvas, #canvas .pm-panes), body[data-islands-over="on"] :is(#canvas, #canvas .pm-panes) { left: var(--box-7); }
 body[data-islands="folded"] #islands { width: var(--box-7); }
 body[data-islands="folded"] #islands .isl-panel { display: none; }
 #islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -14,24 +14,23 @@ body[data-islands="folded"] #islands .isl-panel { display: none; }
 body[data-islands="open"] #islands .isl-rail-count { display: none; }
 #islands .isl-top { display: flex; align-items: center; padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6); border-bottom: var(--border-1) solid var(--line); }
 #find[hidden] { display: none; }
+#islands .isl-key { flex: none; padding: 0 var(--space-3); color: var(--muted); font-size: var(--text-2); }
+#islands .isl-search:not(:placeholder-shown) + .isl-key { display: none; }
 #islands .isl-search { flex: 1; min-width: 0; box-sizing: border-box; height: var(--box-7); border: 0; background: none; padding: 0 var(--space-3); font: inherit; color: var(--text); outline: none; }
-#islands .isl-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-3) 0 var(--space-9); }
+#islands .isl-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding: var(--space-3) 0 var(--space-9); }
 #islands .isl-head { padding: var(--space-5) var(--space-6) var(--space-3); color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
-#islands :is(.isl-row, .isl-group) { display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-7); padding: 0 var(--space-6); white-space: nowrap; }
-#islands .isl-group { margin-top: var(--space-3); border: 0; border-top: var(--border-1) solid var(--line); background: none; font: inherit; color: var(--muted); text-align: left; cursor: pointer; }
-#islands .isl-group:hover, #islands .isl-row:hover { background: var(--accent-soft); }
-/* A group's islands sit one step in, their names under the group's name. */
-#islands .isl-in .isl-row { padding-left: calc(var(--space-6) + var(--space-11) + var(--space-5)); }
-#islands .isl-mark { flex: none; width: var(--space-11); overflow: hidden; color: var(--muted); text-align: center; }
-#islands .isl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
-#islands .isl-group .isl-name { color: var(--muted); }
-#islands .isl-count { flex: none; color: var(--muted); }
+#islands .isl-row { display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-7); padding: 0 var(--space-6); white-space: nowrap; }
+#islands .isl-row:hover { background: var(--accent-soft); }
+#islands .isl-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
 #islands .isl-off { flex: none; border: 0; background: none; padding: 0 var(--space-3); font: inherit; color: var(--muted); cursor: pointer; }
 #islands .isl-off:hover { color: var(--accent); }
 
 #islands .isl-hit { cursor: pointer; }
-/* The keyboard's row: the accent bar at its left edge, as the tab in sight has it at its top; a hover is the soft ground alone. */
-#islands .isl-hit[aria-selected="true"] { box-shadow: inset var(--border-3) 0 0 var(--accent); }
-#islands .isl-hit .isl-count { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
+#islands .isl-none { overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+/* The keyboard's row (found, or lit in the list), and under On the island the canvas was brought to: the accent bar at its left edge, as the tab in sight has it at its top; a hover is the soft ground alone. */
+#islands .isl-body:focus { outline: none; }
+#islands .isl-hit[aria-selected="true"], #islands .isl-row[aria-current="location"], #islands .isl-row[data-lit] { box-shadow: inset var(--border-3) 0 0 var(--accent); }
+/* A row's pack at its right, muted, cut short before the name is. */
+#islands .isl-pack { flex: 0 100 auto; min-width: var(--box-7); max-width: 40%; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 #islands .isl-row:not(.on, .isl-hit) .isl-name { color: var(--muted); }
 #islands .isl-row:not(.on, .isl-hit) .isl-name:hover { color: var(--text); }

@@ -57,7 +57,10 @@ export function packRules(style) {
  * the gestures the session may make on a mark (['toggle'] where it may write). Answers { marks, tips, width }: `tips`
  * the tip of each mark, by its key, for the drawing to show on hover.
  */
-export function packMarks({ island, pack, off = [], at: [x, y], z, m, titled, on = () => [] }) {
+/** What an island over its cap says after its packs (islands[].cap: { count, most }, most null for none): count/most, else nothing. */
+export const capText = (cap) => (Number.isInteger(cap?.count) && typeof cap?.most === 'number' && cap.count > cap.most ? `${cap.count}/${cap.most}` : '');
+
+export function packMarks({ island, pack, off = [], at: [x, y], z, m, titled, on = () => [], cap, measure = () => 0 }) {
   const [D, GAP] = ['island_pack_mark', 'island_pack_gap'].map(z);
   const tips = new Map();
   const marks = packsOf(pack).map((p, k) => {
@@ -68,11 +71,14 @@ export function packMarks({ island, pack, off = [], at: [x, y], z, m, titled, on
     const cls = `lf-pack st-${stateOf(p)}${p.own ? ' own' : ''}${toggle ? ' toggles' : ''}`;
     return titled(m('g', { key, on: ['enter', 'leave', ...(toggle ? ['toggle'] : [])], ...(toggle && { item: island, pack: p.id }), class: cls }, ring, glyph), lines.join('\n'));
   });
-  return { marks, tips, width: packsWidth(pack, z) - GAP };
+  // Over its cap, how many it holds against how many its look reads well at, after its packs.
+  const over = capText(cap);
+  if (over) marks.push(titled(m('text', { x: x + packsWidth(pack, z), y, class: 'lf-cap' }, over), `${cap.count} items: more than the ${cap.most} its look reads well at`));
+  return { marks, tips, width: packsWidth(pack, z, cap, measure) - GAP };
 }
 
 /** How wide an island's packs stand after its name: the gap before them and each mark with its gap. */
-export const packsWidth = (pack, z) => ((n) => (n ? n * (z('island_pack_mark') + z('island_pack_gap')) : 0))(packsOf(pack).length);
+export const packsWidth = (pack, z, cap, measure = () => 0) => ((n) => (n ? n * (z('island_pack_mark') + z('island_pack_gap')) : 0))(packsOf(pack).length) + ((t) => (t ? measure(t, z('island_pack_text')) + z('island_pack_gap') : 0))(capText(cap));
 
 export const css = `
 /* An island's packs: each a ring with its glyph, in its state's colour (pack_marks); off, the ring dashed. */
@@ -82,5 +88,7 @@ export const css = `
 .lf-pack text { fill: var(--lf-pack, var(--ln-muted)); font-size: var(--ln-flow-island-pack-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: central; }
 .lf-pack.toggles { cursor: pointer; outline: none; }
 .lf-pack.toggles:is(:hover, :focus-visible) circle { stroke-width: var(--ln-flow-stroke-lit); }
-[data-text=none] .lf-pack { display: none; }
+/* Over its cap: the count against the cap, in the colour of what is in trouble. */
+.lf-cap { fill: var(--ln-blocked); font-size: var(--ln-flow-island-pack-text); font-family: var(--ln-font); dominant-baseline: central; }
+[data-text=none] .lf-pack, [data-text=none] .lf-cap { display: none; }
 `;

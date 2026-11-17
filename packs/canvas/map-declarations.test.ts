@@ -121,3 +121,10 @@ test('a waiting item is faint at its cell, why in its tip', () => {
   const tip = p.on({ name: 'enter', key: 's:e_twozzzzz' }).find((x: any) => x.tip)?.tip.mark;
   assert.match(texts(tip).join(' '), /Waiting on runs: Turned off on this island/);
 });
+
+test('an island over its cap says so after its packs, and only then', async () => {
+  const { capText } = await import(pathToFileURL(join(import.meta.dirname, 'layouts/flow/pack-marks.js')).href);
+  assert.equal(capText({ count: 178, most: 40 }), '178/40');
+  assert.equal(capText({ count: 30, most: 40 }), '');
+  assert.equal(capText({ count: 1966, most: null }), '', 'no cap, nothing said');
+});

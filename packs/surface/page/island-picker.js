@@ -1,25 +1,20 @@
 // The island picker (decision e_n42s8jvn; Alex, 17 Nov 2026: a side list and a palette, for hundreds of islands, all of
 // it within the bar): a list at the canvas's left edge that folds to it. A search line (Ctrl+K opens the bar there), the
-// islands on (each × to take it off), then every other island in groups by pack, each folded with its count; a press on
-// one puts it on. Typed into, the bar lists what it finds best first (./islands-list.js, rankIslands): arrows move,
+// islands on (each × to take it off), then those changed lately, the latest first, then every other by name (Alex, 17 Nov
+// 2026, e_cr4haav9: no pack groups); a press on one puts it on. Typed into, the bar lists what it finds best first (./islands-list.js, rankIslands): arrows move,
 // Enter puts the lit one on, Shift+Enter shows it alone.
 
-import { api, h, hooks } from './base.js';
+import { api, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
-import { atHome, byPack, capital, drawnAt, only, packMarks, rankIslands, turnedOn } from './islands-list.js';
+import { atHome, capital, drawnAt, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
+import { numberOf } from './style-number.js';
 import { titles } from './words.js';
 
-/** Each pack's mark by its id, told apart from the others' (./islands-list.js, packMarks). */
-let marks = new Map();
 /** Every island on the map, each with its pack, read once a page. */
 let reading;
 export const allIslands = () =>
   (reading ??= api('search', { islands: true, limit: 2000 }).then(
-    (found) => {
-      const all = found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, pack: e.pack ?? { id: '', title: '' } }));
-      marks = packMarks(all.map((i) => i.pack));
-      return all;
-    },
+    (found) => found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, worked_at: e.worked_at ?? e.updated_at, pack: e.pack ?? { id: '', title: '' } })),
     () => [],
   ));
 
@@ -45,12 +40,19 @@ export const takeOff = (i) => apply({ list: drawnNow().filter((x) => x !== i.id)
 /** Island `i` alone on the canvas. */
 export const showOnly = (i) => apply(only(location.hash, i.id), `${i.title} alone on the canvas`);
 
-/** A pack's mark: its glyph, else two of its letters, unlike every other pack's. */
-export const packMark = (pack) => h('span', { class: 'isl-mark', 'aria-hidden': 'true' }, marks.get(pack?.id ?? '') ?? packMarks([pack]).get(pack?.id ?? ''));
 /** A pack's title as the list shows it. */
 const packTitle = (pack) => capital(pack?.title || pack?.id);
+/**
+ * Island `i`'s pack, at its row's right in muted text, cut short where it does not fit: what tells like names apart.
+ * None where the pack has the island's own name.
+ */
+const packOf = (i, on = false) => {
+  const pack = packTitle(i.pack), same = pack.toLowerCase() === String(i.title).toLowerCase();
+  if (same && !on) return '';
+  return h('span', { class: 'isl-pack' }, on ? (same ? 'on' : `on · ${pack}`) : pack);
+};
 
-/** What the side list keeps in this browser: whether it is open, which packs are unfolded. */
+/** What the side list keeps in this browser: whether it is open. */
 const KEPT = 'pelago-islands-side';
 const kept = (key, fallback) => {
   try {
@@ -73,17 +75,20 @@ export function drawPicker() {
   const find = document.getElementById('find');
   if (find) find.hidden = true;
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
+  // Its shortcut, at the line's right while nothing is typed.
+  const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
   // The rail along the bar's edge, its whole height a press that folds the bar to the edge or opens it again.
   const arrow = h('span', { class: 'isl-arrow', 'aria-hidden': 'true' });
   const count = h('span', { class: 'isl-rail-count' });
   const fold = h('button', { type: 'button', class: 'isl-rail' }, arrow, count);
-  const body = h('div', { class: 'isl-body' });
+  // The list is one stop for Tab, worked with arrows (see `keys` below); its rows' presses are for the pointer.
+  const body = h('div', { class: 'isl-body', tabindex: '0', 'aria-label': 'Islands' });
   // No tooltip on a row: a name cut short has the whole of it as its tooltip, the name alone.
   body.addEventListener('pointerover', (ev) => {
     const name = ev.target.closest?.('.isl-name');
     if (name) name.scrollWidth > name.clientWidth ? (name.title = name.textContent) : name.removeAttribute('title');
   });
-  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input), body), fold);
+  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), fold);
   document.body.append(side);
   /** Whether the bar was folded for an item's page, not by the person: it opens again when the page closes. */
   let forPage = false;
@@ -99,7 +104,16 @@ export function drawPicker() {
     dispatchEvent(new Event('resize'));
   };
   fold.onclick = () => open(document.body.dataset.islands !== 'open');
-  open(kept('open', true));
+  // A narrow window (below the style's picker_over_below) has no room for the bar beside the canvas: the bar starts
+  // folded, and opened it lies over the canvas until an island is pressed or the canvas is.
+  const narrow = () => innerWidth < numberOf(state.style, 'picker_over_below');
+  const over = () => (document.body.dataset.islandsOver = narrow() ? 'on' : '');
+  over();
+  if (narrow()) open(false, false);
+  else open(kept('open', true));
+  /** Over the canvas, the bar folds away once a press has done what it was opened for. */
+  const done = () => document.body.dataset.islandsOver === 'on' && document.body.dataset.islands === 'open' && open(false, false);
+  document.getElementById('canvas')?.addEventListener('pointerdown', done);
   // An item's page takes the right: where the canvas left between it and the open bar would be narrower than the bar,
   // the bar folds to its rail, and opens again as it was once the page is shut or the window has the room.
   let wide = side.offsetWidth;
@@ -113,30 +127,35 @@ export function drawPicker() {
   };
   new MutationObserver(room).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
   // The window's own resizes, not the one a fold sends: a bar the person opened over a page stays open.
-  addEventListener('resize', (ev) => ev.isTrusted && requestAnimationFrame(room));
+  addEventListener('resize', (ev) => ev.isTrusted && requestAnimationFrame(() => (over(), room())));
   room();
-  const unfolded = new Set(kept('packs', []));
 
   let islands = [];
   let found = [];
   let lit = 0;
   /**
-   * The islands laid out under On: set when the list is laid out anew (the page opened, a search cleared, a group
-   * folded), not by a press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
+   * The islands laid out under On: set when the list is laid out anew (the page opened, a search cleared), not by a
+   * press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
    */
   let laidOn = null;
-  /** An island's row: a press on its name puts it on, or, on, brings the canvas to it. In a group (`grouped`) it sits under the group's name with no mark of its own: the group says its pack. */
-  const row = (i, on, grouped = false) =>
-    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
-      grouped ? '' : packMark(i.pack),
-      h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? hooks.toIsland?.(i.id) : putOn(i)) }, i.title),
-      on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
-  /** A row of what the search found: its pack's mark, its name, its pack (and whether it is on), lit as Enter would take it. */
+  /** The island the canvas was last brought to from the bar: marked under On while it stays on. */
+  let here = null;
+  /** Bring the canvas to island `i`, where the canvas can (hooks.toIsland, the canvas's), and mark it. */
+  const goTo = (i) => hooks.toIsland?.(i.id) && ((here = i.id), draw());
+  /**
+   * An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack, but under On
+   * (`atOn`), where the name needs the room beside ×.
+   */
+  const row = (i, on, atOn = false) =>
+    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
+      h('button', { type: 'button', class: 'isl-name', tabindex: '-1', onclick: () => (on ? goTo(i) : putOn(i), done()) }, i.title),
+      atOn ? '' : packOf(i),
+      on ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
+  /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
-    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i)) },
-      packMark(i.pack),
+    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i), done()) },
       h('span', { class: 'isl-name' }, i.title),
-      h('span', { class: 'isl-count' }, drawn.includes(i.id) ? `on · ${packTitle(i.pack)}` : packTitle(i.pack)));
+      packOf(i, drawn.includes(i.id)));
   const draw = () => {
     const drawn = drawnNow(), q = input.value.trim();
     count.textContent = drawn.length ? String(drawn.length) : '';
@@ -144,7 +163,8 @@ export function drawPicker() {
     // Searching: one list, best first, worked from the keyboard, within the bar (Alex: nothing drops outside it).
     if (q) {
       lit = Math.min(lit, Math.max(0, found.length - 1));
-      body.replaceChildren(h('div', { class: 'isl-head' }, `Found · ${found.length}`), h('div', { role: 'listbox', 'aria-label': 'Islands found' }, ...found.map((i, n) => hit(i, n, drawn))));
+      const none = found.length ? [] : [h('div', { class: 'isl-row isl-none' }, `Nothing named “${q}”`)];
+      body.replaceChildren(h('div', { class: 'isl-head' }, `Found · ${found.length}`), ...none, h('div', { role: 'listbox', 'aria-label': 'Islands found' }, ...found.map((i, n) => hit(i, n, drawn))));
       if (found[lit]) input.setAttribute('aria-activedescendant', `isl-${found[lit].id}`);
       body.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
       return;
@@ -152,26 +172,57 @@ export function drawPicker() {
     input.removeAttribute('aria-activedescendant');
     laidOn ??= new Set(drawn);
     const on = found.filter((i) => laidOn.has(i.id)), rest = found.filter((i) => !laidOn.has(i.id));
-    const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id))))];
-    for (const g of byPack(rest)) {
-      const shown = unfolded.has(g.id);
-      const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown) },
-        h('span', { class: 'isl-mark isl-fold', 'aria-hidden': 'true' }, shown ? '⌄' : '›'), h('span', { class: 'isl-name' }, capital(g.title) || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
-      head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), relay());
-      parts.push(head, ...(shown ? [h('div', { class: 'isl-in', role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id), true)))] : []));
-    }
+    const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id), true)))];
+    const { recent, rest: others } = recentFirst(rest, Date.now(), numberOf(state.style, 'picker_recent_days'), numberOf(state.style, 'picker_recent_most'));
+    const list = (head, all) => (all.length ? [h('div', { class: 'isl-head' }, `${head} · ${all.length}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id))))] : []);
+    parts.push(...list('Recent', recent), ...list('All', others));
     body.replaceChildren(...parts);
+    light();
   };
+  /** The row the keyboard is on in the list (an island's id), lit while the list has the focus. */
+  let cur = null;
+  const rowsNow = () => [...body.querySelectorAll('.isl-row[data-id]')];
+  const light = () => {
+    const rows = rowsNow(), focused = document.activeElement === body;
+    if (focused && !rows.some((r) => r.dataset.id === cur)) cur = rows[0]?.dataset.id ?? null;
+    for (const r of rows) r.toggleAttribute('data-lit', focused && r.dataset.id === cur);
+    body.querySelector('[data-lit]')?.scrollIntoView({ block: 'nearest' });
+  };
+  body.addEventListener('focus', light);
+  body.addEventListener('blur', light);
+  // Arrows move the lit row, Enter presses its name (puts it on, or goes to it), Delete takes it off; up from the top,
+  // or Escape, goes back to the search line.
+  body.addEventListener('keydown', (ev) => {
+    const rows = rowsNow(), at = rows.findIndex((r) => r.dataset.id === cur), row = rows[at];
+    const to = (n) => ((cur = rows[Math.max(0, Math.min(rows.length - 1, n))]?.dataset.id ?? cur), light());
+    if (ev.key === 'ArrowDown') to(at + 1);
+    else if (ev.key === 'ArrowUp') at <= 0 ? input.focus() : to(at - 1);
+    else if (ev.key === 'Home') to(0);
+    else if (ev.key === 'End') to(rows.length - 1);
+    else if (ev.key === 'Enter') row?.querySelector('.isl-name')?.click();
+    else if (ev.key === 'Delete' || ev.key === 'Backspace') row?.querySelector('.isl-off')?.click();
+    else if (ev.key === 'Escape') input.focus();
+    else return;
+    ev.preventDefault();
+  });
   /** Lay the list out anew: what is on now goes under On. */
   const relay = () => ((laidOn = null), draw());
+  // Rows stay put while the pointer is in the bar, so the next press lands; once it leaves, what was taken off leaves
+  // On and what was put on joins it.
+  side.addEventListener('pointerleave', () => {
+    if (input.value.trim() || !laidOn) return;
+    const drawn = drawnNow();
+    if (drawn.length !== laidOn.size || drawn.some((id) => !laidOn.has(id))) relay();
+  });
   /** Lay it out anew once the list a press keeps has come back (a search's Enter: it was found, not pointed at). */
   let anew = false;
   input.addEventListener('input', () => ((lit = 0), relay()));
   input.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') return void (ev.preventDefault(), (input.value = ''), relay(), input.blur());
+    if (ev.key === 'ArrowDown' && !input.value.trim()) return void (ev.preventDefault(), body.focus());
     if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && found.length) return void (ev.preventDefault(), (lit = Math.max(0, Math.min(found.length - 1, lit + (ev.key === 'ArrowDown' ? 1 : -1)))), draw());
     const i = input.value.trim() && found[lit];
-    if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), (anew = true), draw());
+    if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), (anew = true), draw(), done());
   });
   // Ctrl+K (⌘K): the bar opens where it was folded, its search in focus.
   addEventListener('keydown', (ev) => {

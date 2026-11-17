@@ -29,6 +29,18 @@ On 9 Nov 2026 the owner kept Map alone, to bring the others back one by one as t
 
 To read one: `git show archive/layouts-2026-11-09:packs/canvas/layouts/<folder>/<file>`. To bring one back: `git checkout archive/layouts-2026-11-09 -- packs/canvas/layouts/<folder>`, its entry in `layouts` and its shape in the style's `shape` enum in `packs/core/pack.json`, and its tests (`git show --stat archive/layouts-2026-11-09` lists them; `git diff archive/layouts-2026-11-09 -- test packs/core` shows what went). Much of what follows (Wired drawings, Levels and ports) was written of the flow and holds of Map where it reuses the flow's modules.
 
+## An island's own look
+
+An island may be drawn by code of its own (decisions e_3c3wr7jv and e_r4emvndv, the owner, 17 Nov 2026): a layout kept on the map and linked `about` the island (its island item or its focus). The islands answer names it (`islands[].look`, `packs/loader/kernel/island-look.ts`); the page puts its files beside Map's own under names of their own and writes Map's `island-looks.js` to import them (`packs/walls/page/island-looks.js`), so it runs in the drawing's worker behind the same walls. Its `index.js` exports:
+
+```js
+export function island({ island, items, links, style }, { measure, m }) {
+  return { width, height, places: { [id]: [x, y] }, paint: [marks], items: { [id]: [marks] } };
+}
+```
+
+Each item carries its `box` ([w, h]). Places are box middles, measured from the island's top left under its header; `paint` is drawn over its land and under what it holds; `items` draws an item as it says, about its middle. Map keeps the frame's place, the header and its toggles, ghosts and held badges, each item's link and tip, and the wires (`packs/canvas/layouts/map/looks.js`). What it leaves unplaced stands beside, by cell; a look that throws or gives no size is left out. Published pages draw islands as any other.
+
 ## Where a drawing comes from
 
 A pack declares it in `pack.json`:
