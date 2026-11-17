@@ -68,8 +68,10 @@ term added in find makes it a filter of the map.
   depth, of any type, not the item itself"; "the walk follows each link out,
   in or either way, as it is named"; "Only's plain words: each must hold of
   every seed, and the walk is not narrowed".
-- `test/find-query.test.ts`: "in a browser, the find bar sets the text of the
-  canvas lens".
+
+> [!NOTE]
+> Since 17 Nov 2026 find and the view's band are no longer mounted: the canvas draws the islands a person turns on
+> (decision e_n42s8jvn), and the query is read by address alone until it is retired. Their browser tests went with them.
 
 ### 4. Query and layout are the whole surface, for people and agents
 A person grows a canvas by editing its query in find, at the canvas's foot,
@@ -121,12 +123,8 @@ draws in a style it names: it finds it as an item, whose page opens over the
 canvas, and Use here there, a button its type declares on a screen
 (`docs/packs.md`), does what the switch does (task e_q3yfvnz7). Deleting a
 layout or style says which views use it; they go to the default.
-- `test/saved-canvases.test.ts`, `test/saved-canvases-narrow.test.ts`: "in a
-  browser, a canvas is saved from the bar at 1280 px (560 px) and listed on
-  Home"; `test/saved-canvases-switch.test.ts`: "a saved
-  canvas is opened from Home and switched to from the bar".
-- `test/style-items.test.ts`: "in a browser, find opens a style’s page and
-  Apply draws the canvas in it".
+- `test/saved-canvases.test.ts`: "a pack ships canvases as presets: the schema
+  offers each, its lens answers, and the owner keeps their version under its id".
 - `test/structure.test.ts`: "every store is named, with its rule"; "the
   canvas draws no depth, and nothing keeps places".
 
