@@ -51,6 +51,16 @@ test('a capability naming a field the type lacks stops its pack from loading', (
   assert.equal(checkCapabilities({ settles: { by: 'word', on: 'decided_on' } }, { decided_on: { type: 'string' } }, new Set()).length, 1);
 });
 
+test('a lead names a form the page draws and fields of the kinds it reads', () => {
+  const fields = { value: { type: 'json' }, unit: { type: 'string' }, as_of: { type: 'date' }, seen: { type: 'boolean' }, story: { type: 'json' } } as never;
+  assert.deepEqual(checkCapabilities({ lead: { form: 'measure', value: 'value', unit: 'unit', as_of: 'as_of' } }, fields, new Set()), []);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'alert', unless: 'seen' } }, fields, new Set()), []);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'timeline', beats: 'story' } }, fields, new Set()), []);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'alert', unless: 'unit' } }, fields, new Set()), ['lead.unless reads "unit", a string, not a boolean']);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'timeline' } } as never, fields, new Set()), ['a timeline lead names its beats']);
+  assert.equal(checkCapabilities({ lead: { form: 'chart' } } as never, fields, new Set()).length, 1);
+});
+
 test('every core deadline is a bound, and a flavour inherits its parent capabilities', async () => {
   const l = await map(SHOP);
   assert.deepEqual(l.registry.type('task')!.capabilities.bound, { field: 'due', limit: 'today' });

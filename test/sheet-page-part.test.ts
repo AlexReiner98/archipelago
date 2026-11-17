@@ -98,6 +98,38 @@ test('settling a question by a choice: asked, then one change with what was chos
   assert.deepEqual((sent[0] as { ops: unknown[] }).ops, [{ op: 'update', id: q.id, status: 'decided', props: { outcome: 'Yes', rationale: 'Because' } }]);
 });
 
+test('a page opens on the band its type declares: choices, answer, measure, alert, timeline, or none', () => {
+  const lw = { ...words, types: { ...words.types,
+    finding: { title: 'Finding', open: ['current'], closed: ['superseded'], fields: { value: { type: 'json' }, unit: { type: 'string' }, as_of: { type: 'date' } }, capabilities: { lead: { form: 'measure', value: 'value', unit: 'unit', as_of: 'as_of' } } },
+    work: { title: 'Work', open: ['todo'], closed: ['done'], fields: { seen_working: { type: 'boolean' }, to_see: { type: 'string' } }, capabilities: { lead: { form: 'alert', unless: 'seen_working', says: 'to_see' } } },
+    run: { title: 'Run', open: ['running'], closed: ['finished'], fields: { story: { type: 'json' } }, capabilities: { lead: { form: 'timeline', beats: 'story' } } } } };
+  const marks = (item: object) => pageMarks({ item: { ...task, ...item }, words: lw, views: {} }, { draft: { fields: {} }, open: new Set() });
+  const lead = (item: object) => JSON.stringify(marks(item)).includes('"key":"lead"');
+  const open = marks({ type: 'decision', is_open: true, props: { options: [{ title: 'Named', says: 'A short list' }, { title: 'Module', says: 'Code' }] } });
+  assert.doesNotThrow(() => checkMarks(noSlots(open), { kinds }));
+  assert.ok(JSON.stringify(open).includes('choice:1') && JSON.stringify(open).includes('A short list'), 'choices given as { title, says } are each a press, with what they mean');
+  const settled = JSON.stringify(marks({ type: 'decision', status: 'decided', is_open: false, props: { options: ['A: refresh + four', 'B: refresh only'], outcome: 'A: refresh the weights' } }));
+  assert.ok(settled.includes('A: refresh the weights') && settled.includes('B: refresh only') && !settled.includes('"A: refresh + four"'), 'the answer, and only the choice not taken set aside, matched by its label');
+  const measured = marks({ type: 'finding', props: { value: 147, unit: 's', as_of: '2026-11-17' } });
+  assert.doesNotThrow(() => checkMarks(noSlots(measured), { kinds }));
+  assert.ok(JSON.stringify(measured).includes('"size":9') && !JSON.stringify(measured).includes('field-row:value'), 'the number large, and not again among the fields');
+  assert.ok(lead({ type: 'work', props: { seen_working: false, to_see: 'Open the page' } }), 'built and not seen working');
+  assert.ok(!lead({ type: 'work', props: { seen_working: true } }) && !lead({ type: 'work', props: {} }), 'seen, or nothing said: no band');
+  const told = marks({ type: 'run', props: { story: Array.from({ length: 8 }, (_, i) => ({ n: i + 1, at: '2026-11-17T21:00:00Z', said: `Beat ${i + 1}` })) } });
+  assert.doesNotThrow(() => checkMarks(noSlots(told), { kinds }));
+  assert.ok(JSON.stringify(told).includes('2 earlier') && JSON.stringify(told).includes('Beat 8') && !JSON.stringify(told).includes('Beat 2"'), 'the latest beats, the rest counted');
+  assert.ok(!lead({ type: 'task', props: {} }), 'a type that declares no lead opens as before');
+});
+
+test('the alert\'s press makes its field true, as one change', async () => {
+  const lw = { ...words, types: { ...words.types, work: { title: 'Work', open: ['todo'], closed: ['done'], fields: { seen_working: { type: 'boolean' } }, capabilities: { lead: { form: 'alert', unless: 'seen_working' } } } } };
+  const w = { ...task, type: 'work', props: { seen_working: false } };
+  const sent: { ops: unknown[] }[] = [];
+  const p = page({ item: w, words: lw, views: {} }, { change: async (ops: unknown[]) => (sent.push({ ops }), { status: 'applied' }), keep: () => {}, state: () => {} });
+  await p.on({ key: 'lead-yes', name: 'press' });
+  assert.deepEqual(sent[0].ops, [{ op: 'update', id: w.id, props: { seen_working: true } }]);
+});
+
 test('Save sends the note and the fields written as one change, and lets the kept words go', async () => {
   const sent: { ops: unknown[] }[] = [];
   const keeps: unknown[] = [], states: unknown[] = [];

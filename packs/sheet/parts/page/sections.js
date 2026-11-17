@@ -41,14 +41,27 @@ export function headEvent(event, item) {
 /** The choices a question settles by (its type's capability settles), or null when it has none to pick from. */
 export function choicesOf(item, type) {
   const settles = type?.capabilities?.settles;
-  const list = settles?.choices ? item.props?.[settles.choices] : undefined;
-  if (!Array.isArray(list) || !list.length || !list.every((x) => typeof x === 'string')) return null;
-  return { field: settles.choices, chosen: settles.chosen, why: settles.why, on: settles.on, list, picked: settles.chosen ? item.props?.[settles.chosen] : undefined };
+  const kept = settles?.choices ? item.props?.[settles.choices] : undefined;
+  // A choice is a few words, or { title, says }: its name, and a line on what it means.
+  const name = (x) => (typeof x === 'string' ? x : x && typeof x === 'object' && typeof (x.title ?? x.says) === 'string' ? x.title ?? x.says : null);
+  if (!Array.isArray(kept) || !kept.length || !kept.every((x) => name(x) !== null)) return null;
+  const says = kept.map((x) => (typeof x === 'object' && x.title && typeof x.says === 'string' ? x.says : undefined));
+  return { field: settles.choices, chosen: settles.chosen, why: settles.why, on: settles.on, list: kept.map(name), says, picked: settles.chosen ? item.props?.[settles.chosen] : undefined };
 }
+
+/** The label a choice goes by, where it has one: "A" of "A: refresh the weights". */
+const tag = (s) => /^\s*([A-Za-z0-9]{1,3})\s*[:.)]/.exec(s)?.[1]?.toLowerCase();
+
+/** Whether a choice is the one its question was settled by: the same words, the start of them, or the same label. */
+export const isChosen = (picked, choice) => {
+  if (typeof picked !== 'string' || !picked.trim()) return false;
+  const [p, x] = [picked.trim().toLowerCase(), choice.trim().toLowerCase()];
+  return p === x || p.startsWith(x) || x.startsWith(p) || (tag(p) !== undefined && tag(p) === tag(x));
+};
 
 /** The choices, a row each, the one chosen marked; while it is open, a press on one asks to settle it by that. */
 export function choicesMarks(item, c, { writes = false, asking } = {}) {
-  const chosen = (x) => typeof c.picked === 'string' && (c.picked === x || c.picked.toLowerCase().startsWith(x.toLowerCase()));
+  const chosen = (x) => isChosen(c.picked, x);
   const open = writes && item.is_open !== false && !item.archived_at;
   return section('choices', label(c.field), c.list.length,
     ['list', { look: 'rows' }, ...c.list.map((x, i) =>
