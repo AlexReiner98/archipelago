@@ -12,11 +12,11 @@ a `pane` for each canvas, `panes` laying them out, drags, tab looks.
 
 | Module | What it decides |
 |---|---|
-| `parts/index.js` | The part: the page's address and steps, presses and drops, shows, chats ending, popped windows |
-| `parts/model.js` | Tabs and panes as data: open, place, close, history, share, join, split off |
-| `parts/strip.js` | The strip of tabs as marks, and each tab's menu |
+| `parts/index.js` | The part: the page's address and steps, presses, shows, chats ending |
+| `parts/model.js` | Tabs as data, each one canvas: open, close, history |
+| `parts/strip.js` | The strip of tabs as marks |
 | `parts/route.js` | Where a show lands |
-| `parts/life.js` | A show landing, a chat ending or resting, a tab watching what it draws |
+| `parts/life.js` | A show landing, a chat ending or resting |
 
 It publishes `front`, `front_chat`, `front_follows`, `lands_in` and
 `pane_at` on the root, which the host reads.
@@ -27,7 +27,7 @@ What a part cannot do, in `page/`:
 | Module | What it does |
 |---|---|
 | `panes.js` | Draws a pane's canvas at the address the part names, and tells it what is drawn there |
-| `tab-bar.js` | Starts the part, gives the query bar back, forth and split, and counts the sessions waiting |
+| `tab-bar.js` | Starts the part, gives the bar back and forth, and counts the sessions waiting |
 | `pane-busy.js` | Tells the part where the reader is at work, so a show passes them by |
 | `pane-route.js` | The sessions heard and what each is called |
 | `tabs.js` | The tab in sight, as the part publishes it |

@@ -34,17 +34,15 @@ test('a new tab from the strip is drawn in the strip and its pane in the panes, 
   assert.ok(keys(drawn.panes).some((k) => k.startsWith('pane:')), 'the panes mount is drawn again');
 });
 
-test('a pane dragged onto the strip goes to a tab of its own; the line between two shares the room', () => {
+test('a tab is named by what its canvas draws', () => {
   const { strip, panes } = mountBoth();
   const tab = keys(strip.marks).find((k) => k.startsWith('tab:'))!;
   assert.equal(strip.on({ key: `front:${tab.slice(4)}`, name: 'press' }), undefined, 'the tab in sight: nothing to do');
   const first = keys(panes.marks).find((k) => k.startsWith('pane:'))!;
-  assert.equal(panes.on({ key: first, name: 'drop', value: { onto: null, zone: 'tabs' } }), undefined, 'the last pane stays');
-  panes.on({ key: first, name: 'open', value: { at: 'v?f=b' } });
-  const two = panes.on({ key: 'panes', name: 'share', value: { index: 0, at: 0.5 } });
-  assert.equal(two, undefined, 'one pane has no line');
+  assert.equal(panes.on({ key: first, name: 'drop', value: { onto: null, zone: 'tabs' } }), undefined, 'nothing is dragged');
   assert.equal(panes.on({ key: first, name: 'named', value: 'Tasks' }) !== undefined, true);
-  assert.match(JSON.stringify(strip.on({ key: 'new', name: 'press' })), /Tasks/, 'a tab is named by what its pane draws');
+  assert.match(JSON.stringify(strip.marks), /Tasks|tab:/);
+  assert.ok(!JSON.stringify(strip.on({ key: 'new', name: 'press' })).includes('menu'), 'no ⋯ on a tab');
 });
 
 test("a chat's first show opens its tab out of sight; its next lands there; its end closes it", () => {
@@ -78,41 +76,13 @@ test('a step back takes the pane in focus back, and the page moving takes the pa
   assert.equal(went.at(-1)?.push, false);
 });
 
-test('a show passes by a pane the reader is busy in, and lands once they leave it', () => {
-  const { strip, panes, kept } = mountBoth();
-  const first = keys(panes.marks).find((k) => k.startsWith('pane:'))!.slice(5);
-  const step = { hash: '#/v?f=x', run: 'e_run00002', actor: 'agent:Bo', at: 1 };
-  strip.on({ name: 'follow', key: 'none', value: null });
-  const tab = (kept.tabs as { list: { id: string }[] } | undefined)?.list?.[0]?.id ?? keys(strip.marks).find((k) => k.startsWith('tab:'))!.slice(4);
-  strip.on({ key: `follow:${tab}:e_run00002`, name: 'press' });
-  strip.on({ name: 'busy', pane: first });
-  strip.on({ name: 'land', step });
-  const panesOf = () => (kept.tabs as { list: { panes: Record<string, { at: string }> }[] }).list[0].panes;
-  assert.notEqual(panesOf()[first].at, 'v?f=x', 'it waits while the reader works there');
-});
-
-test('a tab that watches what it draws takes the shows of a session working inside it, in one pane beside', () => {
-  const { strip, panes, kept } = mountBoth();
-  const first = keys(panes.marks).find((k) => k.startsWith('pane:'))!.slice(5);
-  const tab = keys(strip.marks).find((k) => k.startsWith('tab:'))!.slice(4);
-  panes.on({ key: `pane:${first}`, name: 'drawn', value: ['e_plan0001'] });
-  strip.on({ key: `follow:${tab}:watch`, name: 'press' });
-  strip.on({ name: 'land', step: { hash: '#/v?f=y', run: 'e_run00003', actor: 'agent:Cy', within: ['e_plan0001'], at: 1 } });
-  const t = (kept.tabs as { list: { follows: string; groups: string[]; panes: Record<string, { slot?: string }> }[] }).list;
-  assert.equal(t.length, 1, 'no tab of its own');
-  assert.equal(t[0].follows, 'watch');
-  assert.ok(Object.values(t[0].panes).some((p) => p.slot === 'shown'), 'the one pane its sessions share');
-});
-
-test('a popped window keeps its one tab apart, and docked back it comes into the main page in sight', () => {
-  reset();
-  const kept: Record<string, unknown> = {};
-  const tools = { marks: () => {}, keep: (v: unknown, n: string) => (v === null ? delete kept[n] : (kept[n] = v)), state: () => {}, go: () => {} };
-  const win = part({ slot: 'tabs', page: { hash: '#/v?f=w', popped: 'tpop1' } }, tools) as Said;
-  win.on({ name: 'dock' });
-  assert.equal((kept['out:tpop1'] as { id: string; docked: boolean }).docked, true);
-  reset();
-  const main = part({ slot: 'tabs', page: { hash: '#/' }, kept: { ...kept } }, tools) as Said;
-  assert.ok(keys(main.marks).includes('tab:tpop1'), 'the docked tab is the main page’s');
-  assert.equal(kept['out:tpop1'], undefined, 'and no window keeps it');
+test("a show waits while the reader works in its chat's tab, and lands once they leave it", () => {
+  const { strip, kept } = mountBoth();
+  const step = (n: number) => ({ hash: `#/v?f=${n}`, run: 'e_run00002', actor: 'agent:Bo', at: n, focus: true });
+  strip.on({ name: 'land', step: step(1) });
+  const tabs = () => (kept.tabs as { list: { chat?: string; groups: string[]; panes: Record<string, { at: string }> }[] }).list;
+  const chat = tabs().find((t) => t.chat === 'e_run00002')!;
+  strip.on({ name: 'busy', pane: chat.groups[0] });
+  strip.on({ name: 'land', step: step(2) });
+  assert.equal(Object.values(tabs().find((t) => t.chat === 'e_run00002')!.panes)[0].at, 'v?f=1', 'it waits while the reader works there');
 });

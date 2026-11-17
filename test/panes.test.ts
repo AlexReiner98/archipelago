@@ -1,19 +1,18 @@
-// More than one canvas at once (the panes part, packs/panes/parts/index.js; each canvas packs/panes/page/panes.js), every pane alike: an agent's show can name a pane of the owner's page, the
-// step carrying it; in a real browser (skipped where there is no Chrome) a session's show opens a tab of its own, apart from
-// the reader's, a change reaches every pane, the bar, find, back and the address follow the pane last touched, a reload
-// draws every pane again, a click in any pane opens the item's page over it, and a pane's name dragged docks it.
+// A tab is one canvas (the panes part, packs/panes/parts/index.js; the canvas packs/panes/page/panes.js; Alex, 17 Nov
+// 2026: no split panes): in a real browser (skipped where there is no Chrome) a session's show opens a tab of its own,
+// apart from the reader's, its next show draws in that same canvas, a change reaches it, the sheet takes its room, and
+// a reload draws it again. A show may still name a pane (the step carries it); the page draws it in the one canvas.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
-import * as F from './find-dom.ts';
-import { PANE, TAB, paneMark, paneName, ready, tabAt } from './tab-page.ts';
+import { PANE, TAB, paneName, ready, tabAt } from './tab-page.ts';
 import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
 
 const browser = chrome();
 
-test('in a browser, every pane is alike: its own lens, history and address, an agent in a tab of its own', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a tab is one canvas: an agent in a tab of its own, its shows drawn there', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base, call } = await serve('off');
   const made = (await call('/api/change', undefined, {
     reason: 'test',
@@ -35,102 +34,38 @@ test('in a browser, every pane is alike: its own lens, history and address, an a
     if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${JSON.stringify(await panes())} ${await page.evaluate<string>('location.hash')} ${page.logs().join('\n')}`);
   };
   const show = (params: Record<string, unknown>) => call('/agent/report', undefined, { actor: 'robot', action: 'show', params: { focus: false, ...params } }).then((r) => r.result);
-  /** The panes as the reader sees them, in order: each one's name, its left edge, whose it is, and whether it is in focus. */
-  const panes = () =>
-    page
-      .evaluate<string>(`JSON.stringify([...document.querySelectorAll('${PANE}')].map((p) => [${paneName('p')}.textContent, Math.round(p.getBoundingClientRect().left), ${paneMark('p')}?.textContent ?? '', p.getAttribute('aria-selected') === 'true']))`)
-      .then(JSON.parse) as Promise<[string, number, string, boolean][]>;
+  /** The canvases drawn, each its name. */
+  const panes = () => page.evaluate<string>(`JSON.stringify([...document.querySelectorAll('${PANE}')].map((p) => ${paneName('p')}?.textContent ?? ''))`).then(JSON.parse) as Promise<string[]>;
   /** Pane `n`'s element, in order. */
   const nth = (n: number) => `[...document.querySelectorAll('${PANE}')][${n}]`;
   const draws = (n: number, words: string) => page.evaluate<boolean>(`${nth(n)}?.querySelector('svg')?.textContent.includes(${JSON.stringify(words)}) ?? false`);
-  const press = async (n: number) => {
-    const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${nth(n)}.querySelector('.pane-canvas').getBoundingClientRect(); return [r.left + r.width / 2, r.bottom - 20]; })())`));
-    for (const type of ['mousePressed', 'mouseReleased']) await page.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
-  };
-  // Words found through find, the find pack's part (test/find-dom.ts): typed, then Enter.
-  const find = (words: string) => page.evaluate(`(() => { ${F.type(words)}; ${F.key('Enter')}; })()`);
   try {
     await ready(page);
-    // A session's show opens a tab of its own, out of sight: the reader's pane, the bar and the address stay theirs.
+    // A session's show opens a tab of its own, out of sight: the reader's canvas and the address stay theirs.
     await show({ entity: views.f });
     await until('a tab of its own', () => page.evaluate<boolean>(`document.querySelectorAll('${TAB}').length === 2`));
-    assert.deepEqual((await panes()).map((p) => [p[0], p[3]]), [['Home', true]], 'the reader keeps their pane and the bar');
+    assert.equal((await panes()).length, 1, 'the reader keeps their one canvas');
     assert.ok(['', '#/'].includes(await page.evaluate<string>('location.hash')), 'the address stays the reader’s');
-    // Brought into sight, its tab draws what it showed.
+    // Brought into sight, its tab draws what it showed; its next show draws in the same canvas, never beside it.
     await page.evaluate(`${tabAt(2)}.querySelector('[data-key^="front:"]').click()`);
     await until('its tab draws the first', async () => (await panes()).length === 1 && (await draws(0, 'First step')));
-    // A pane by a name of the session's own, beside it.
     await show({ entity: views.g, pane: 'second' });
-    await until('the named pane draws the second', async () => (await panes()).length === 2 && (await draws(1, 'Second step')));
-    // Every pane stays live: a rename reaches each from the log.
-    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.a, title: 'First step, renamed' }, { op: 'update', id: made.b, title: 'Second step, renamed' }] });
-    await until('each pane follows the log', async () => (await draws(0, 'First step, renamed')) && (await draws(1, 'Second step, renamed')));
-    // In its own tab, alone keeps only the pane it names.
-    await show({ entity: views.f, pane: 'alone' });
-    await until('only its pane', async () => (await panes()).length === 1 && (await draws(0, 'First step, renamed')));
-    assert.ok(await page.evaluate(`${nth(0)}.getBoundingClientRect().width > 1200`), 'the one pane has the page');
-    // The sheet takes its room from the pane, one alone too, so whatever it draws stands beside the sheet; shut, it has the page again.
-    await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.a}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
-    await until('the pane stops at the sheet', () => page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && Math.abs(${nth(0)}.querySelector('.pane-canvas').getBoundingClientRect().right - (innerWidth - document.getElementById('sheet').offsetWidth)) < 2`));
+    await until('the same canvas draws the second', async () => (await panes()).length === 1 && (await draws(0, 'Second step')));
+    assert.equal(await page.evaluate<number>(`document.querySelectorAll('${TAB}').length`), 2, 'no tab more');
+    // The canvas stays live: a rename reaches it from the log.
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.b, title: 'Second step, renamed' }] });
+    await until('it follows the log', () => draws(0, 'Second step, renamed'));
+    assert.ok(await page.evaluate(`(() => { const r = ${nth(0)}.getBoundingClientRect(), bar = document.getElementById('islands')?.getBoundingClientRect().right ?? 0; return Math.abs(r.left - bar) < 2 && Math.abs(r.right - innerWidth) < 2; })()`), 'the one canvas has the page beside the islands bar');
+    // The sheet takes its room from the canvas, so whatever it draws stands beside the sheet; shut, it has the page again.
+    await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.b}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
+    await until('the canvas stops at the sheet', () => page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && Math.abs(${nth(0)}.querySelector('.pane-canvas').getBoundingClientRect().right - (innerWidth - document.getElementById('sheet').offsetWidth)) < 2`));
     await page.evaluate(`document.getElementById('sheet-close').click()`);
-    await until('the pane has the page again', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && ${nth(0)}.getBoundingClientRect().width > 1200 && document.getElementById('sheet').getBoundingClientRect().left >= innerWidth - 1`));
-
-    // By hand: split, and each pane is its own. A press in the second makes it the one the bar, find and the address act on.
-    await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
-    await until('two panes', async () => (await panes()).length === 2);
-    await press(1);
-    await until('the second is in focus', async () => (await panes())[1][3]);
-    // A new pane is blank, with no query (the owner, 3 Nov 2026, e_33eqyryy).
-    await until('the second is blank', () => page.evaluate<boolean>(`${nth(1)}.querySelectorAll('svg a[href^="#/e/"]').length === 0 && !location.hash.includes('find=')`));
-    await find('Second');
-    await until('the second draws what find found', async () => (await draws(1, 'Second step, renamed')) && !(await draws(1, 'First step')) && (await draws(0, 'First step, renamed')) && !(await draws(0, 'Second step')));
-    assert.match(await page.evaluate<string>('location.hash'), /Second/, 'the address is the pane in focus’s');
-    // ‹ in the bar, and the browser's own back, act on the pane in focus.
-    await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
-    await until('back draws what the pane drew before: nothing', async () => !(await draws(1, 'Second step')));
-    await find('Second');
-    await until('found again', async () => (await draws(1, 'Second step, renamed')));
-    await page.evaluate('history.back()');
-    await until('the browser’s back draws what the pane drew before', async () => !(await draws(1, 'Second step')));
-    await page.evaluate('history.forward()');
-    await until('and forward again', async () => (await draws(1, 'Second step, renamed')));
-    // A press in the first gives it the bar and the address, with nothing of the second's.
-    await press(0);
-    await until('the first is in focus', async () => (await panes())[0][3] && (await page.evaluate<boolean>(`document.getElementById('find-lens').textContent.includes('First step, renamed')`)));
-    assert.doesNotMatch(await page.evaluate<string>('location.hash'), /Second/, 'the address is the first pane’s');
-    // A reload draws every pane as it was, each with its own history.
+    await until('the canvas has the page again', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && (() => { const r = ${nth(0)}.getBoundingClientRect(), bar = document.getElementById('islands')?.getBoundingClientRect().right ?? 0; return Math.abs(r.left - bar) < 2 && Math.abs(r.right - innerWidth) < 2; })()`));
+    // A tab has no ⋯ and no split: its name and × alone.
+    assert.equal(await page.evaluate<number>(`document.querySelectorAll('#tabs details.pm-menu, #query [aria-label="Split"]').length`), 0);
+    // A reload draws it again as it was.
     await page.evaluate('location.reload()');
-    await until('both panes again', async () => (await panes()).length === 2 && (await draws(0, 'First step, renamed')) && (await draws(1, 'Second step, renamed')) && (await panes())[0][3]);
-    await press(1);
-    await until('the second keeps its history', () => page.evaluate<boolean>(`document.querySelector('#query [aria-label="Back"]')?.disabled === false`));
-    // A click on a node in either pane opens its page over it, that pane's lens as it was (e_jedng69e): the second
-    // finds by its words, and the item clicked is not added to its ids.
-    await page.evaluate(`${nth(1)}.querySelector('svg a[href="#/e/${made.b}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
-    await until('its page is open over the second', async () => (await page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && location.hash.startsWith('#/e/${made.b}?') && location.hash.includes('find=text+Second') && !(new URLSearchParams(location.hash.split('?')[1]).getAll('find').join() ?? '').includes('${made.b}')`)) && (await panes())[1][3]);
-    await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.a}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
-    await until('its page is open over the first', async () => (await page.evaluate<boolean>(`location.hash.startsWith('#/e/${made.a}?') && !location.hash.includes('Second')`)) && (await panes())[0][3]);
-    await page.evaluate(`document.getElementById('sheet-close').click()`);
-    // Shut, and slid away: until then it covers the second pane's strip.
-    await until('the sheet shut', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && getComputedStyle(document.getElementById('sheet')).visibility === 'hidden'`));
-
-    // A pane's name dragged to the left of the other docks it there, and × closes it; the strip has only ⧉ and ×.
-    const [x, y] = JSON.parse(await page.evaluate<string>(`JSON.stringify((() => { const r = ${paneName(nth(1))}.getBoundingClientRect(); return [r.left + 10, r.top + r.height / 2]; })())`));
-    const mouse = (type: string, at: number[]) => page.send('Input.dispatchMouseEvent', { type, x: at[0], y: at[1], button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
-    await mouse('mousePressed', [x, y]);
-    for (let n = 1; n <= 8; n++) await mouse('mouseMoved', [x + ((30 - x) * n) / 8, y + ((450 - y) * n) / 8]);
-    await mouse('mouseReleased', [30, 450]);
-    await until('the second docked on the left', async () => (await draws(0, 'Second step, renamed')) && (await panes())[0][1] === 0 && (await panes())[1][1] > 500);
-    await page.evaluate(`${nth(0)}.querySelector('[title="Close this pane"]').click()`);
-    await until('closed by hand', async () => (await panes()).length === 1 && (await draws(0, 'First step, renamed')));
-    await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
-    await until('a pane once more', async () => (await panes()).length === 2);
-    assert.deepEqual(await page.evaluate(`[...${nth(1)}.querySelectorAll('.pm-pane-strip button')].map((b) => b.title)`), ['Move this pane to a new tab', 'Close this pane'], 'every pane has the same controls');
-    // A pane of the reader's own splits too: Split opens a second of it, not the pane it finds drawing the same.
-    await page.evaluate(`${nth(0)}.querySelector('[title="Close this pane"]').click()`);
-    await until('the reader’s pane alone', async () => (await panes()).length === 1);
-    await press(0);
-    await page.evaluate(`document.querySelector('#query [aria-label="Split"]').click()`);
-    await until('the reader’s pane split', async () => (await panes()).length === 2);
+    await until('drawn again', async () => (await panes()).length === 1 && (await draws(0, 'Second step, renamed')));
   } finally {
     await page.close();
   }

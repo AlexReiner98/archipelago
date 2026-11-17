@@ -70,7 +70,8 @@ export async function bakedSite(parts, act, count) {
   }
   const stop = steps.length === 1 ? stopOf(baked, steps[0]) : undefined;
   if (steps.length === 1 && !stop) return null;
-  const site = { name: name ?? workspace, footer: footerOf(await act('public.at', { workspace, path: 'footer' }).catch(() => null)) };
+  // The site's name is its front page's title, as every page of it says (./reader.js, siteName).
+  const site = { name: doc.title || name || workspace, footer: footerOf(await act('public.at', { workspace, path: 'footer' }).catch(() => null)) };
   // Its head says the stop it opens at, else the view; the picture a link shows is the view's own (page.share).
   const own = typeof doc.share === 'string' && doc.parts?.some((p) => p.section?.id === doc.share && p.section.picture) ? doc.share : undefined;
   const image = own ? `${origin}/picture/${own}` : undefined;

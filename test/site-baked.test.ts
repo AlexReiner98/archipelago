@@ -68,7 +68,8 @@ test('a home view drawn by the rails is baked at /: its stops in order, each at 
   const stop = await visit(base, `/${made.b}`, 'site.test');
   assert.equal(stop.status, 200);
   assert.match(stop.body, new RegExp(`<link rel="canonical" href="https://site\\.test/${made.b}" />`));
-  assert.match(stop.body, /<title>Say who waits · Default<\/title>/);
+  // A stop's title ends with the site's name: its front page's title.
+  assert.match(stop.body, /<title>Say who waits · Archipelago<\/title>/);
   assert.match(stop.body, new RegExp(`data-start="${made.b}"`));
   assert.equal((await visit(base, `/${made.p}`, 'site.test')).status, 404, 'a private item is no stop');
   assert.equal((await visit(base, `/go/seen/${made.p}`, 'site.test')).status, 404);

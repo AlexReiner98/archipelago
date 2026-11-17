@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { describe, publishedPage } from './head.js';
-import { pageOf, siteOf } from './reader.js';
+import { pageOf, siteName, siteOf } from './reader.js';
 
 const TEMPLATE = '<html><head><meta name="robots" content="noindex" />\n<title>Document</title></head><body><main id="main"><p>Loading…</p></main><script type="module" src="/frozen-page.js"></script></body></html>';
 const HASH = 'a'.repeat(64);
@@ -16,7 +16,7 @@ const doc = { id: D, title: 'About <us>', path: 'about', share: SEC, parts: [{ t
 const home = { id: HOMEID, title: 'Home', path: 'home', share: SEC, parts: [{ section: { id: SEC, title: 'Hero', picture: true, body: '' } }] };
 const footer = { id: 'e_foot0001', title: 'Footer', path: 'footer', parts: [{ text: 'Contact us.' }, { text: 'Legal.' }] };
 const pages = [
-  { id: HOMEID, title: 'Home', path: 'home', menu: 0, published_at: '2026-11-01T00:00:00Z' },
+  { id: HOMEID, title: 'Acme Tools', path: 'home', menu: 0, published_at: '2026-11-01T00:00:00Z' },
   { id: D, title: 'About', path: 'about', menu: 1, published_at: '2026-11-02T00:00:00Z' },
   { id: 'e_foot0001', title: 'Footer', path: 'footer', menu: null, published_at: '2026-11-03T00:00:00Z' },
   { id: VIEW, title: 'The roadmap', path: null, menu: null, published_at: '2026-11-04T00:00:00Z' },
@@ -45,11 +45,12 @@ test('a published document at /p/ is its page: its head for search engines, its 
   assert.match(page.html, /<meta name="description" content="The first words." \/>/);
   assert.match(page.html, /<link rel="canonical" href="https:\/\/app.example\/p\/acme\/e_doc00001" \/>/);
   assert.match(page.html, /og:image" content="https:\/\/app.example\/p\/acme\/e_doc00001\/picture\/e_sec00001"/);
-  assert.match(page.html, /og:site_name" content="Acme"/);
+  // A site is named by its front page's title, over its workspace's name.
+  assert.match(page.html, /og:site_name" content="Acme Tools"/);
   assert.match(page.html, /twitter:card" content="summary_large_image"/);
   assert.doesNotMatch(page.html, /noindex|Loading/);
   const data = JSON.parse(/id="page-data">(.*)<\/script>/.exec(page.html)![1]);
-  assert.deepEqual(data.site, { footer: 'Contact us.\n\nLegal.', name: 'Acme', home: `/p/acme/${HOMEID}`, pages: [{ title: 'About', href: `/p/acme/${D}` }] });
+  assert.deepEqual(data.site, { footer: 'Contact us.\n\nLegal.', name: 'Acme Tools', home: `/p/acme/${HOMEID}`, pages: [{ title: 'About', href: `/p/acme/${D}` }] });
   assert.ok(page.html.indexOf('src="/frozen-page.js') < page.html.indexOf('id="page-data"'), 'its script is asked for before its data is read');
   // On its site's domain, that is the address to keep.
   assert.match(((await pageOf({ workspace: 'acme', id: D, domain: 'acme.example' }, act, TEMPLATE)) as { html: string }).html, /canonical" href="https:\/\/acme.example\/about"/);
@@ -84,7 +85,7 @@ test('a site: its front page at /, each page at its word, its figures, drawings,
   assert.match(about.html, /canonical" href="https:\/\/acme.example\/about"/);
   assert.match(about.html, /og:image" content="https:\/\/acme.example\/about\/picture\/e_sec00001"/);
   const data = ((await at('/about/data')) as { json: { site: unknown; lenses: Record<string, { style: { drawing: { src: string } } }> } }).json;
-  assert.deepEqual(data.site, { footer: 'Contact us.\n\nLegal.', name: 'Acme', home: '/', pages: [{ title: 'About', href: '/about' }], host: 'acme.example' });
+  assert.deepEqual(data.site, { footer: 'Contact us.\n\nLegal.', name: 'Acme Tools', home: '/', pages: [{ title: 'About', href: '/about' }], host: 'acme.example' });
   assert.equal(data.lenses[SEC].style.drawing.src, `/about/drawing/${HASH}`, "a drawing is read below the page's own address");
   // Served beside an app, every page's head carries the way in to it.
   const withApp = ((await siteOf({ workspace: 'acme', path: '/about/data', host: 'acme.example', name: 'Acme', app: 'https://app.example' }, act, TEMPLATE)) as { json: { site: { app?: string } } }).json;
@@ -117,6 +118,14 @@ test('a page with no share of its own on a site shows its front page figure; wit
   assert.match(((await siteOf({ workspace: 'acme', path: '/about', host: 'acme.example' }, only, TEMPLATE)) as { html: string }).html, /og:image" content="https:\/\/acme.example\/picture\/e_sec00001"/);
   const empty = async (name: string) => (name === 'public.list' ? [] : null);
   assert.deepEqual(await siteOf({ workspace: 'acme', path: '/', host: 'acme.example' }, empty, TEMPLATE), { status: 404, text: 'This site has no front page yet.', type: 'text/plain' });
+});
+
+test('a site with no front page is named by its workspace', async () => {
+  const { act } = acts();
+  const headless = async (name: string, input: Record<string, unknown>) => (name === 'public.list' ? pages.filter((p) => p.path !== 'home') : act(name, input));
+  const data = ((await pageOf({ workspace: 'acme', id: D, what: 'data', name: 'Acme' }, headless, TEMPLATE)) as { json: { site: { name: string } } }).json;
+  assert.equal(data.site.name, 'Acme');
+  assert.equal(siteName([], undefined, 'acme'), 'acme');
 });
 
 test('a document is described by the first paragraph it opens on, cut short', () => {

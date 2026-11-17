@@ -9,6 +9,8 @@ import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles, types } from './words.js';
 import { drawnKey, narrowed as narrowedFrom, unheard } from './narrow.js';
 import { indexNow, indexWhenIdle, narrowPicture } from './narrow-picture.js';
+import { islandsIn } from './islands-list.js';
+import { islandsLens, islandsOfLens } from './islands-lens.js';
 
 // Where a held change would land on a canvas is the decision of the part on `ghosts` (the write pack's).
 ghostAsker.ask = (input) => askSlot('ghosts', input);
@@ -109,13 +111,16 @@ const list = (value) => (value ?? '').split(',').filter(Boolean);
  */
 export function readAddress(query) {
   const p = new URLSearchParams(query);
+  const style = {};
+  for (const key of ['lit', 'shape', 'style', 'canvas']) if (p.get(key)) style[key] = p.get(key);
+  // A list of islands (`islands=a,b`), as addressOf says one (./islands-lens.js).
+  const islands = islandsIn(query);
+  if (islands) return { lens: islandsLens(islands), style };
   const filter = {};
   const named = list(p.get('from')).map((id) => `id ${id}`);
   if (named.length || p.getAll('find').length) filter.find = [...new Set([...named, ...p.getAll('find').filter(Boolean)])];
   if (p.getAll('only').length) filter.only = p.getAll('only').filter(Boolean);
   if (p.has('not')) filter.not = p.getAll('not').filter(Boolean);
-  const style = {};
-  for (const key of ['lit', 'shape', 'style', 'canvas']) if (p.get(key)) style[key] = p.get(key);
   // A lens that names a view draws its answer in place of what a filter finds (the plan pack's usage).
   if (p.get('view')) return { lens: { view: p.get('view'), filter: {}, walk: { over: [], steps: 0 } }, style };
   if (!includesAny(filter) && !p.has('nothing')) return { lens: null, style };
@@ -134,6 +139,12 @@ export const includesAny = (f) => Boolean(f.find?.length);
 /** The end of the address that says this flat lens (and the style asked of it): what readAddress reads back. */
 export function addressOf(lens, style = {}) {
   const p = new URLSearchParams();
+  // A list of islands is said as that list, its ids as they are (decision e_n42s8jvn), read back by readAddress.
+  const islands = islandsOfLens(lens);
+  if (islands) {
+    for (const key of ['lit', 'shape', 'style', 'canvas']) if (style[key]) p.set(key, style[key]);
+    return [`islands=${islands.join(',')}`, p.toString()].filter(Boolean).join('&');
+  }
   if (lens.view) p.set('view', lens.view);
   else if (!includesAny(lens.filter)) p.set('nothing', '');
   const { find, only, not } = lens.filter;

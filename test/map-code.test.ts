@@ -43,7 +43,7 @@ test('settings.json: one change of the settings alone, status names what it watc
     await pull(call, 'local', id, folder);
     assert.deepEqual(JSON.parse(readFileSync(join(folder, 'settings.json'), 'utf8')), { numbers: { hold_ms: 400 } });
     const before = await status(call, folder);
-    assert.deepEqual(before.watching, ['code (index.js)', 'modules (none yet)', 'writes (writes.json, none yet)', 'settings (settings.json)']);
+    assert.deepEqual(before.watching, ['code (index.js)', 'modules (none yet)', 'writes (writes.json, none yet)', 'settings (settings.json)', 'cap (cap.json, none yet)']);
     assert.deepEqual(pick(before), { changed: [], moved: [] });
 
     writeFileSync(join(folder, 'settings.json'), JSON.stringify({ numbers: { hold_ms: 0 } }, null, 2));

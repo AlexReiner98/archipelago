@@ -29,11 +29,6 @@ export function hearOpen(open) {
     heard.set(s.id, { name: s.name ?? was?.name ?? s.title, called: s.title, at: Math.max(Date.parse(s.last_seen), was?.at ?? 0), run: s.id, ended: false, quiet: Boolean(s.stale) });
   }
 }
-/** Whom a tab can follow, newest first: the sessions not ended, and an agent at work with no session of its own, within `recent`. */
-export function followable({ now, recent }) {
-  const can = ([key, one]) => !one.ended && (key.startsWith('e_') || now - one.at < recent);
-  return [...heard].filter(can).sort(([, a], [, b]) => b.at - a.at).map(([key]) => key);
-}
 /** A session as a tab or a pane says it: what it is called, with its run when another session goes by the same. */
 export function nameOf(key) {
   const one = heard.get(key);

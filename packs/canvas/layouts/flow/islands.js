@@ -57,7 +57,9 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
       if (row.add) return titled(m('g', { key: `add:${row.add}`, item: row.add, on: ['add'], class: 'lf-island-key lf-island-add' }, ...key.slice(2)), row.tip);
       return key;
     });
-    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, land, shore, name, head?.marks ?? [], legend);
+    // What its own look paints (../map/looks.js), over its land and under what it holds.
+    const painted = isle.look?.paint.length ? m('g', { class: 'lf-look', transform: `translate(${isle.look.at[0]} ${isle.look.at[1]})` }, ...isle.look.paint) : null;
+    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, land, shore, painted, name, head?.marks ?? [], legend);
   });
   // A gate on each shore a link between islands crosses: a bar across the wire in its island's colour, as long as the
   // port it marks. A finding

@@ -11,6 +11,9 @@ import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { kernelTypes, SYSTEM, WRAPS } from '../../loader/kernel/head.ts';
 import { ISLAND, onIslands } from '../../loader/kernel/island-items.ts';
 import { islandDeclarations } from '../../loader/kernel/island-decl.ts';
+import { islandLooks } from '../../loader/kernel/island-look.ts';
+import { islandStands } from '../../loader/kernel/island-cap.ts';
+import { islandStyles, styleSources } from '../../loader/kernel/island-style.ts';
 import { headPos } from '../../log/kernel/tail.ts';
 import { blockGraph } from './blocking.ts';
 import { proposals } from './map-reads.ts';
@@ -365,14 +368,22 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
   const islandOf = (e: { props: Record<string, unknown> }) => (l.registry.onIslands && typeof e.props?.[ISLAND] === 'string' ? (e.props[ISLAND] as string) : undefined);
   const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
   // A focus is its own island (decision e_mqex8wrf): it speaks its type's pack, and says it is one so a drawing names the island by it.
-  const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; type: string; pack: string | null; focus: string | null }>(`select id, title, type, props->>'pack' as pack, props->>'focus' as focus from entity where id = any($1::text[])`, [islandIds])).rows.map(({ type, focus, ...r }) => (focus === 'true' ? { ...r, pack: l.registry.type(type)?.pack ?? null, focus: true } : r)) : [];
+  // The packs it turned off ride with it, so a drawing offers to turn them on again where its item is not in the answer (an island item).
+  const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; type: string; pack: string | null; focus: string | null; packs_off: unknown }>(`select id, title, type, props->>'pack' as pack, props->>'focus' as focus, props->'packs_off' as packs_off from entity where id = any($1::text[])`, [islandIds])).rows.map(({ type, focus, packs_off, ...r }) => ({ ...(focus === 'true' ? { ...r, pack: l.registry.type(type)?.pack ?? null, focus: true } : r), ...(Array.isArray(packs_off) && packs_off.length && { packs_off: packs_off.filter((p): p is string => typeof p === 'string') }) })) : [];
   // What each island declares (its pack, what that requires, each one's state there) and which items wait because their
   // pack is not active on their island (task e_ter3cwup, decision e_57bjxy2x): derived here, nothing written to an item.
-  const { decls, waiting } = isles.length ? await islandDeclarations(l, isles, items.map((e) => ({ id: e.id, type: e.type, island: islandOf(e) }))) : { decls: new Map(), waiting: new Map() };
+  const sources = isles.length ? await styleSources(l) : undefined;
+  const { decls, waiting } = isles.length ? await islandDeclarations(l, isles, items.map((e) => ({ id: e.id, type: e.type, island: islandOf(e) })), sources) : { decls: new Map(), waiting: new Map() };
+  // Each island's own look (decision e_3c3wr7jv): a layout or part kept about it, drawn wherever the island is.
+  const looks = await islandLooks(l, islandIds);
+  // Each island styled by the packs active on it (decision e_gqmavsb7): the presets on its pack's types.
+  // How many items each holds against its look's cap (decision e_bgw2u5aw): the header marks one past it.
+  const caps = await islandStands(l.db, l.registry, islandIds);
+  const styled = await islandStyles(l, isles, sources);
   return {
     items, links, whole: ((w) => items.filter((e) => w.has(e.id)).map((e) => e.id))(new Set(wholeIds)),
     found: Object.fromEntries(foundBy), terms: Object.fromEntries(termsBy), step: Object.fromEntries(stepOf),
-    on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id), ...(decls.has(id) && { decl: decls.get(id) }) })),
+    on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id), ...(decls.has(id) && { decl: decls.get(id) }), ...(looks.has(id) && { look: looks.get(id) }), ...(styled.has(id) && { style: styled.get(id) }), ...(caps.has(id) && { cap: caps.get(id) }) })),
     ...(waiting.size && { waiting: Object.fromEntries(waiting) }),
     ...(cut && { cut: true }), ...(matched !== undefined && { matched }),
   };

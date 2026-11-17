@@ -25,11 +25,23 @@ export const CELL_FIELD: FieldDef = { type: 'json', cell: true, shown: true, des
 /** The field that makes an item a focus: its own island, the one thing everything on it moves forward (decision e_mqex8wrf). */
 export const FOCUS = 'focus';
 export const FOCUS_FIELD: FieldDef = { type: 'boolean', shown: true, description: 'true makes it a focus: an island of its own (its island is its own id), speaking its type’s pack, that everything on it moves forward. Said when it is made; only a type its pack marks as one that may be a focus.' };
+/** The field of a focus that holds where its island stands on every canvas (decision e_n42s8jvn, the owner, 17 Nov 2026): set by an agent, the same for everyone. */
+export const CORNER = 'corner';
+export const CORNER_FIELD: FieldDef = { type: 'json', cell: true, shown: true, description: 'Where its island stands on every canvas, [column, row] in whole cells: set by an agent, the same for everyone who has the island on. Only a focus has it.' };
 /** The field of an island (or a focus) that names the packs turned off there alone (task e_hr4qvr9u, packs/loader/kernel/island-off.ts). */
 export const PACKS_OFF = 'packs_off';
 export const PACKS_OFF_FIELD: FieldDef = { type: 'json', shown: true, description: 'The packs turned off on this island alone, by id (["build"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack.' };
 /** Whether an item of a type may be a focus: one that lives on an island and whose pack marks it so (capability focus). */
 export const mayBeFocus = (t: { system: boolean; lineage: string[]; capabilities?: { focus?: boolean } }) => livesOnIsland(t) && t.capabilities?.focus === true;
+
+/**
+ * A type's capabilities, with what a head promises (decision e_z2daaf92, the owner, 17 Nov 2026): on a map with islands on,
+ * a type that may be a focus promises its status to its readers, from any island, unless its pack says what it promises.
+ * So a step reads another island's head (core's reads, which ends on has:promised) and waits while it is open.
+ */
+export function promisedHead<C extends { focus?: boolean; promised?: { fields: string[]; published?: string } }>(islands: boolean, t: { system: boolean; lineage: string[]; capabilities: C }): C {
+  return islands && !t.capabilities.promised && mayBeFocus(t) ? { ...t.capabilities, promised: { fields: ['status'] } } : t.capabilities;
+}
 
 /** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors. */
 export const livesOnIsland = (t: { system: boolean; lineage: string[] }) => !t.system && !t.lineage.includes('actor');
