@@ -4,7 +4,7 @@
 // was owed (test/fixtures/root-imports.json); every owed import is cut, the list is empty, and nothing is added to it.
 
 import { posix } from 'node:path';
-import { valueImports } from '../packs/anatomy_sync/reader.ts';
+import { valueImports } from './structure-reader.ts';
 import { raw, rawWalk } from './structure-kit.ts';
 
 const CONTRACT = raw('docs/kernel-packs.md').replace(/\r\n/g, '\n');

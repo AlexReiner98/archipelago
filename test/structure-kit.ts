@@ -2,7 +2,7 @@
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { kernelCodeOf, packOf, resolve, resolveServed, rootCodeOf, rootPacksOf, servedNames, valueImports, walkFiles } from '../packs/anatomy_sync/reader.ts';
+import { kernelCodeOf, packOf, resolve, resolveServed, rootCodeOf, rootPacksOf, servedNames, valueImports, walkFiles } from './structure-reader.ts';
 
 export const ROOT = join(import.meta.dirname, '..');
 const CODE = /\.(ts|js|mjs|css|html)$/;
@@ -22,7 +22,7 @@ export const raw = (path: string) => readFileSync(join(ROOT, path), 'utf8');
 export const walk = rawWalk;
 /** A file's text. */
 export const read = raw;
-// How a file's pack, imports and their targets are read is the anatomy sync's reader (packs/anatomy_sync/reader.ts),
+// How a file's pack, imports and their targets are read is the structure reader (test/structure-reader.ts),
 // so the structure rules and the map of the code read code alike.
 /** The pack a path is in, if it is under packs/. */
 export const packOfPath = packOf;
@@ -52,7 +52,7 @@ export const served = servedNames(uiFiles);
 /** A page module's value imports of other served files, as paths: by served name, as the browser loads them. */
 export const pageImports = (f: string) => valueImports(read(f)).filter((i) => i.kind !== 'bare' && i.kind !== 'require' && i.spec.startsWith('./')).map((i) => resolveServed(f, i.spec, served));
 export const kernelFiles = [...walk('src'), ...uiFiles, ...rootCode].filter((f) => /\.(ts|js)$/.test(f) && !VENDORED.includes(f));
-/** The packs gone to hosted (9 Nov 2026), with their type and link names. */
+/** The packs gone to hosted (9 Nov 2026) or removed with the old maps (17 Nov 2026), with their type and link names. */
 export const LEFT = JSON.parse(read('test/fixtures/left-packs.json')) as Record<string, string[]>;
 /** The kernel's own packs: the kinds, the root relations and the system tier. */
 export const KERNEL_PACKS = ['core', 'local'];
