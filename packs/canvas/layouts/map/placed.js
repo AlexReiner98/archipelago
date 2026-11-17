@@ -1,7 +1,9 @@
 // A view that is a list of islands (feature e_u52abqr4, the owner, 17 Nov 2026): no solver. Each item stands at its
 // place on its island (its field `cell`, [column, row], set by an agent and the same in every view), each island at the
 // corner the view keeps for it (`placed`, by island id), in cells as wide and tall as the picture's largest box. What
-// no agent has placed yet stands in a column at its island's left edge; what lives on no island, in a row below all.
+// no agent has placed yet stands in a block at its island's left edge, as many columns as make it the pane's shape
+// (`aspect`, width over height: Alex, 17 Nov 2026, a big island not one tall column); what lives on no island, in a row
+// below all.
 // Wires are straight, from box edge to box edge. Layer: metrics. Pure: the layout's args in, the model out.
 
 /** A place [column, row] of whole cells, or nothing. */
@@ -34,10 +36,11 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   let right = M - GAP;
   for (const [id, items] of own) {
     const corner = cellOf(corners[id]), top = heads.get(id) ?? 0;
-    const unplaced = items.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? 1 : 0;
+    const unplaced = items.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0;
     const l = corner ? M + corner[0] * cw : right + GAP, t = corner ? M + corner[1] * ch : M;
     const at = (n, [c, r]) => (x.set(n.id, l + PAD + c * cw + n.w / 2), y.set(n.id, t + PAD + top + r * ch + n.h / 2));
-    unplaced.forEach((n, k) => at(n, [0, k]));
+    // Row by row across the block, so the order they came in reads left to right, then down.
+    unplaced.forEach((n, k) => at(n, [k % shift, Math.floor(k / shift)]));
     for (const n of items) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
     const r = Math.max(l + (wides.get(id) ?? 0), ...items.map((n) => x.get(n.id) + n.w / 2 + PAD)), b = Math.max(...items.map((n) => y.get(n.id) + n.h / 2)) + PAD;
     islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }] });
@@ -47,6 +50,9 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
   return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
 }
+
+/** How many columns `n` boxes of cells `cw` by `ch` take to stand in a block of `aspect` (width over height): one with no aspect. */
+export const columns = (n, aspect, cw, ch) => (aspect > 0 ? Math.max(1, Math.min(n, Math.round(Math.sqrt((n * aspect * ch) / cw)))) : 1);
 
 /** The kit's graph `m` wired straight, from box edge to box edge, its boxes standing at `x`, `y`: its chains and ties. */
 export function straight(m, x, y) {

@@ -467,8 +467,3 @@ body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + (var
 .part-going-row { display: flex; align-items: baseline; gap: var(--space-5); max-width: 100%; min-width: 0; white-space: nowrap; color: var(--muted); pointer-events: auto; }
 .part-going-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* The island picker (decision e_n42s8jvn): the islands on in one line, then a field to find more; what it finds rises above as rows, one line each, a mark where an island is on. */
-
-#find .isl-on { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-8); height: var(--box-9); padding: 0 var(--space-6); overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
-#find .isl-name { flex: none; max-width: var(--select-least); overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; font-size: var(--text-4); color: var(--muted); cursor: pointer; }
-#find .isl-name[aria-pressed="true"] { color: var(--text); }
-#find .isl-name:hover { color: var(--accent); }
