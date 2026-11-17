@@ -33,7 +33,7 @@ import { drawn } from './polyline.js';
 import { carried } from './carried.js';
 import { shapedBy, shapeIn, SHAPES } from './steps.js';
 import { focusOf } from './focus.js';
-import { paintIslands } from './painted.js';
+import { comingIn, paintIslands } from './painted.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
@@ -318,7 +318,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
-  const painting = canvases.length ? paintIslands({ tools, islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
+  const painting = canvases.length ? paintIslands({ tools, wire: { stroke: z('stroke'), head: [z('head_length'), z('head_half')] }, islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, wires: comingIn(c, { g, items: answer.items, painted: inPainted, endsOf, order: ORDER_TYPE }), answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
 
   // A read that ends on a finding's name has no head there: the wire from the name to the finding carries it.
   const tieHeads = g.ties.map((t) => heads(t, t.type)), chainHeads = g.chains.map((c) => heads(c, ORDER_TYPE));
@@ -475,6 +475,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);
+      if (String(key).startsWith('paint:')) return painting?.pointer(String(key).replace(/^paint:/, ''), name, event.at) ?? [];
       // A shared mark's tip, over the step's while the pointer is on the mark; off it, back to the step it is on, if any.
       if (!story && markTip(String(key))) {
         if (name === 'enter') return [{ tip: { key, mark: markTip(String(key)) } }];
