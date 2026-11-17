@@ -16,7 +16,7 @@
 // through a shim is named, to be put on its context by hand. A script run by path (`node src/<m>.ts`: server, deploy,
 // backup, cli) keeps a tiny entry there that only runs the moved module (ENTRIES). The contract's history
 // (docs/kernel-packs.md) is left as written. An entry of test/bypassing-rls.test.ts whose count went down is lowered.
-// Last, every root's hash is pinned again (`npm run roots`).
+// Last, the root list is checked (`npm run roots:check`); root hashes are derived at each start, not pinned.
 
 import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
@@ -425,9 +425,9 @@ if (!DRY) {
   for (const [f, text] of writes) writeFileSync(join(ROOT, f), crlf(f, text));
   for (const f of removable.keys()) unlinkSync(join(ROOT, f));
   if (noneKept && existsSync(join(ROOT, KEPT_FILE))) unlinkSync(join(ROOT, KEPT_FILE));
-  // Every root's folder changed: pin the new hashes (packs/roots.json), as any change under a root's folder needs.
-  const pinned = spawnSync('npm run roots', { cwd: ROOT, shell: true, encoding: 'utf8' });
-  if (pinned.status !== 0) { console.error(pinned.stderr || pinned.stdout); process.exitCode = 1; }
+  // Every root's folder changed: check the root list still names them (packs/roots.json, bug e_8y7xhhjq).
+  const checked = spawnSync('npm run roots:check', { cwd: ROOT, shell: true, encoding: 'utf8' });
+  if (checked.status !== 0) { console.error(checked.stderr || checked.stdout); process.exitCode = 1; }
 }
 const adapters = [...shims.values()].filter((s) => s.adapter);
 const summary = {

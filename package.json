@@ -15,7 +15,6 @@
   },
   "scripts": {
     "start": "node src/boot.ts",
-    "roots": "node src/boot.ts --pin",
     "roots:check": "node src/boot.ts --check",
     "dev": "node scripts/dev.ts",
     "pull": "node scripts/pull.ts",

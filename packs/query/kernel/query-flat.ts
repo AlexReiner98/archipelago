@@ -123,6 +123,10 @@ interface Row {
   props: Record<string, unknown>; created_at: Date; updated_at: Date;
 }
 
+/** An island as the flat read sends it: its id, name and the pack it speaks (an id), what that pack declares there
+ * (`decl`), and whatever else the read puts on it, which reaches the answer as it is. */
+interface IslandRow { id: string; title?: string; pack?: string | null; focus?: boolean; decl?: Record<string, unknown>; [field: string]: unknown }
+
 /** What the reads API's flat read answers: the rows sent, the links among them, and why each is there. */
 interface Seeded {
   items: Row[];
@@ -132,7 +136,8 @@ interface Seeded {
   terms: Record<string, string[]>;
   step: Record<string, number>;
   on_islands: boolean;
-  islands: { id: string; title?: string; pack?: string | null; focus?: boolean; decl?: Record<string, unknown> }[];
+  /** Each island as the read gives it, passed to the answer whole: only its pack is built here (bug e_e5vwnpg6). */
+  islands: IslandRow[];
   /** Why an item waits: its type's pack is not active on its island (decision e_57bjxy2x), by item. */
   waiting?: Record<string, { pack: string; why: string }>;
   cut?: boolean;
@@ -246,7 +251,13 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
     links: seeded.links.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(ctx.registry, r.type).length && { is: flavourOf(ctx.registry, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
-    ...(seeded.islands.length && { islands: seeded.islands.map((r) => { const legend = r.pack ? islandPack(ctx.registry, r.pack, usedOn(r.id)) : undefined, pack = legend || r.decl ? { id: r.pack!, title: r.pack!, types: [] as { id: string; title: string }[], links: [] as { id: string; title: string }[], ...legend, ...r.decl } : undefined; /* its legend, and what it declares there: its state, what it requires, what turning it off would send waiting */ return { id: r.id, ...(r.title !== undefined && { title: r.title }), ...(pack && { pack }), ...(r.focus && { focus: true }) }; }) }),
+    // Each island passes through whole; its pack (an id at the source) becomes its legend and what it declares there:
+    // its state, what it requires, what turning it off would send waiting. `decl` is folded into it, not sent apart.
+    ...(seeded.islands.length && { islands: seeded.islands.map(({ pack: packId, decl, ...isle }) => {
+      const legend = packId ? islandPack(ctx.registry, packId, usedOn(isle.id)) : undefined;
+      const pack = legend || decl ? { id: packId!, title: packId!, types: [] as { id: string; title: string }[], links: [] as { id: string; title: string }[], ...legend, ...decl } : undefined;
+      return { ...isle, ...(pack && { pack }) };
+    }) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(seeded.cut && { cut: true }),
     ...(seeded.matched !== undefined && { matched: seeded.matched }),
