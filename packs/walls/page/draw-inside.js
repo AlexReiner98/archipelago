@@ -54,11 +54,12 @@ function inside(home, given) {
   /**
    * The gesture a drawing opts into (decision e_qpaqnmrc, axis F): a button to add an item on an island. The drawing
    * says which of its marks are islands, and draws the button where `on` gives it events; the page answers it itself
-   * (ui/marks-add.js), so nothing is heard here. A session that may not write is given no events, so no button.
+   * (ui/marks-add.js), so nothing is heard here. A pack's mark in an island's header (`pack(key)`) is a toggle the page
+   * answers the same way (./marks-toggle.js). A session that may not write is given no events, so no button.
    */
-  const gesturesOf = (may) => ({ island = () => null } = {}) => {
+  const gesturesOf = (may) => ({ island = () => null, pack = () => false } = {}) => {
     const writes = Array.isArray(may) && may.includes('write');
-    return { on: (key) => (writes && island(key) ? ['add'] : []), hear: () => false };
+    return { on: (key) => (!writes ? [] : island(key) ? ['add'] : pack(key) ? ['toggle'] : []), hear: () => false };
   };
 
   /**

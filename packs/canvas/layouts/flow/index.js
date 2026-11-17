@@ -24,6 +24,7 @@ import { layout } from './layout.js';
 import { effortOf } from './effort.js';
 import { css } from './look.js';
 import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
+import { css as packCss, packMarks, packRules, packsWidth } from './pack-marks.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
@@ -157,6 +158,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const text = String(i.body ?? i.gist ?? '').split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
     return text.length > NOTE ? `${text.slice(0, NOTE - 1).trimEnd()}…` : text;
   };
+  /** Why an item waits: its pack is not active on its island (decision e_57bjxy2x), and the pack's why. */
+  const waitWords = (i) => `Waiting on ${i.waiting.pack ?? 'its pack'}${i.waiting.why ? `: ${i.waiting.why}` : ''}`;
   // A head points along the way its line comes in: from the last point before the tip that is not the tip.
   const head = (points, tip = points.at(-1), rest = points.slice(0, -1).reverse()) => {
     const from = rest.find((p) => p[0] !== tip[0] || p[1] !== tip[1]) ?? [tip[0], tip[1] - 1];
@@ -201,7 +204,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const dims = new Map(), keyed = new Map(), tipped = new Set(), stepBadges = new Map();
   // The gesture of the drawing tools (packs/walls/page/draw-marks.js), where the session may write: a button in an island's legend
   // that adds an item there (./islands.js), answered by the page. Not while a story plays.
-  const gestures = !story && tools.gestures ? tools.gestures({ island: (key) => (/^i:e_/.test(key) ? key.slice(2) : null) }) : { on: () => [] };
+  const gestures = !story && tools.gestures ? tools.gestures({ island: (key) => (/^i:e_/.test(key) ? key.slice(2) : null), pack: (key) => key.startsWith('pk:') }) : { on: () => [] };
   // Ties under everything, then wires, each broken where it passes under, then the steps over all, then what each choice is.
   const drawIn = story ? { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 } : {};
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
@@ -298,7 +301,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id }] : []);
   const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
-  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region');
+  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z);
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
   if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
   const steps = g.all.filter((n) => !n.dummy);
@@ -356,7 +359,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   };
   // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its
   // shore; a finding read across outlined in its island's colour (./islands.js).
-  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)) });
+  // Its header after its name: its pack and what that pack requires, each a mark (./pack-marks.js).
+  const header = (id, [x, y], title) => packOf(id) && packMarks({ island: id, pack: packOf(id), at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on });
+  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header });
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -364,7 +369,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus'].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus'].filter(Boolean).join(' ');
     const body = [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
@@ -383,7 +388,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
     tipped.add(key);
     if (ghost) return m('g', { key: `held:${i.pending.proposal}:${n.id}`, on: ['click'] }, titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`));
-    const el = titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), i.said ?? i.title);
+    const el = titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), [i.said ?? i.title, i.waiting && waitWords(i)].filter(Boolean).join('\n'));
     dims.set(n.id, el);
     return el;
   });
@@ -421,7 +426,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
     const i = g.nodes.get(key.slice(2)).item, note = held(i.pending) ? `Held for you${i.pending.reason ? `: ${i.pending.reason}` : ''}` : opening(i);
-    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), yours(i) && m('span', { class: 'lf-tip-you' }, 'Waits on you'), ...reasonLines(i).map((r) => m('span', {}, r)), (i.named ?? note) && m('span', {}, i.named ?? note));
+    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), i.waiting && m('span', { class: 'lf-tip-waiting' }, waitWords(i)), yours(i) && m('span', { class: 'lf-tip-you' }, 'Waits on you'), ...reasonLines(i).map((r) => m('span', {}, r)), (i.named ?? note) && m('span', {}, i.named ?? note));
   };
   /** The tip of a shared mark (a dot, a held badge, a gate), by its key; none for any other. */
   const markTips = [dotTips, heldTips, isles.tips];
@@ -448,7 +453,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     size.width = width;
   }
   return {
-    scene: { css: [css, ...(parts ? [islandCss, ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: player?.end,
     on(event) {
       const { name, key } = event;

@@ -17,10 +17,10 @@ function edge([cx, cy], n, [px, py]) {
 
 /**
  * The picture of `args` placed as agents set it: `m` the kit's graph, `islandOf(id)` where an item lives, `heads` how
- * tall each island's name and legend stand. Answers what laidOut answers: the model's `x`, `y`, `nodes`, `chains`,
+ * tall each island's name and legend stand, `wides` how wide its header is, which its frame is at least. Answers what laidOut answers: the model's `x`, `y`, `nodes`, `chains`,
  * `ties` and each island's frame.
  */
-export function placedOut(args, m, islandOf, heads) {
+export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   const { sizes } = args, GAP = sizes.flow_node_gap, PAD = sizes.flow_island_pad, M = sizes.flow_margin;
   const corners = args.placed ?? {}, cellBy = new Map((args.items ?? []).map((i) => [i.id, cellOf(i.fields?.cell)]));
   const list = [...m.nodes.values()];
@@ -39,7 +39,7 @@ export function placedOut(args, m, islandOf, heads) {
     const at = (n, [c, r]) => (x.set(n.id, l + PAD + c * cw + n.w / 2), y.set(n.id, t + PAD + top + r * ch + n.h / 2));
     unplaced.forEach((n, k) => at(n, [0, k]));
     for (const n of items) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
-    const r = Math.max(...items.map((n) => x.get(n.id) + n.w / 2)) + PAD, b = Math.max(...items.map((n) => y.get(n.id) + n.h / 2)) + PAD;
+    const r = Math.max(l + (wides.get(id) ?? 0), ...items.map((n) => x.get(n.id) + n.w / 2 + PAD)), b = Math.max(...items.map((n) => y.get(n.id) + n.h / 2)) + PAD;
     islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }] });
     bottom = Math.max(bottom, b);
     right = Math.max(right, r);
