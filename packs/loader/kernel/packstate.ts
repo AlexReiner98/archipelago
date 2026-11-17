@@ -329,7 +329,8 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
   await l.log(l.db, { actor: actorId(actor), action: input.on ? 'pack.on' : 'pack.off', reason: `${input.on ? 'Turned on' : 'Turned off'} ${what}`, detail: { pack: input.pack, ...(bundle && { bundle: bundle.id, packs: named }), ...synced, ...(waiting.length && { waiting: waiting.map((w) => w.id) }), ...(woken.length && { woken }) } });
   toolsChanged(l.workspace);
   tellPacksChanged(l, input.on ? 'pack.on' : 'pack.off', [...named, ...waiting.map((w) => w.id), ...woken]);
-  return { packs: packStates(l), dormant: synced.dormant, activated: synced.activated, waiting, woken, ...(stakes.length && { stakes: [...new Set(stakes)] }) };
+  // The packs it turned, whole; the rest are query packs' to list (bug e_dbzd4d9h: the whole list answered 620 KB).
+  return { packs: packStates(l).filter((p) => named.includes(p.id) || waiting.some((w) => w.id === p.id) || woken.includes(p.id)), dormant: synced.dormant, activated: synced.activated, waiting, woken, ...(stakes.length && { stakes: [...new Set(stakes)] }) };
 }
 
 /** Whether a pack runs code on the server or reaches outside it: its kernel modules, handlers, actions, layouts or reach (hosts, the server). */
