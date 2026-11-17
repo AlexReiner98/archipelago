@@ -7,7 +7,7 @@ import { capacityOf, checkCapabilities, type Capabilities } from './capabilities
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts'; import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
-import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { CELL, CELL_FIELD, FOCUS, FOCUS_FIELD, ISLAND, ISLAND_FIELD, livesOnIsland, mayBeFocus, PACKS_OFF, PACKS_OFF_FIELD } from './island-items.ts';
+import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { CELL, CELL_FIELD, FOCUS, FOCUS_FIELD, ISLAND, ISLAND_FIELD, livesOnIsland, mayBeFocus, PACKS_OFF, promisedHead, PACKS_OFF_FIELD } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts'; import { checkRules } from './rule-check.ts';
 import { isApp, isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
@@ -220,7 +220,7 @@ export class Registry {
         public: def.public ?? parent?.public ?? false, ...((def.private ?? parent?.private) && { private: true }),
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
         ...((def.belongs_with ?? parent?.belongs_with)?.length && { belongs_with: def.belongs_with ?? parent?.belongs_with }),
-        capabilities: { ...parent?.capabilities, ...def.capabilities },
+        capabilities: promisedHead(this.islands, { system: kernel, lineage: [id, ...(parent?.lineage ?? [])], capabilities: { ...parent?.capabilities, ...def.capabilities } }),
         ...((def.note_max ?? parent?.noteMax) && { noteMax: def.note_max ?? parent?.noteMax }),
         ...(def.moved_from?.length && { movedFrom: def.moved_from }), ...(def.moved_statuses && { movedStatuses: def.moved_statuses }), ...(def.retired && { retired: true }),
       };
@@ -258,7 +258,7 @@ export class Registry {
     for (const rel of relations.values()) rel.root = rootOf(declared.get(rel.id)!, []);
 
     const openedOf = (pack: string) => { const p = ordered.find((x) => x.id === pack); return p ? openedTo(p, 'capability') : []; }; for (const type of types.values()) {
-      const problems = [...checkCapabilities(type.capabilities, type.fields, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed], openedOf(type.pack)), ...checkFieldDecls(type, raw.get(type.id), extra.get(type.id)), ...checkPhases(raw.get(type.id)?.statuses ?? { open: [], closed: [] })];
+      const problems = [...checkCapabilities(type.capabilities, { ...type.columns, ...type.fields }, new Set(relations.keys()), [...type.statuses.open, ...type.statuses.closed], openedOf(type.pack)), ...checkFieldDecls(type, raw.get(type.id), extra.get(type.id)), ...checkPhases(raw.get(type.id)?.statuses ?? { open: [], closed: [] })];
       if (problems.length) throw new Error(`Type "${type.id}" in pack "${type.pack}": ${problems.join('; ')}`);
     }
 

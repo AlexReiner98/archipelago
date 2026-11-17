@@ -31,6 +31,15 @@ export const PACKS_OFF_FIELD: FieldDef = { type: 'json', shown: true, descriptio
 /** Whether an item of a type may be a focus: one that lives on an island and whose pack marks it so (capability focus). */
 export const mayBeFocus = (t: { system: boolean; lineage: string[]; capabilities?: { focus?: boolean } }) => livesOnIsland(t) && t.capabilities?.focus === true;
 
+/**
+ * A type's capabilities, with what a head promises (decision e_z2daaf92, the owner, 17 Nov 2026): on a map with islands on,
+ * a type that may be a focus promises its status to its readers, from any island, unless its pack says what it promises.
+ * So a step reads another island's head (core's reads, which ends on has:promised) and waits while it is open.
+ */
+export function promisedHead<C extends { focus?: boolean; promised?: { fields: string[]; published?: string } }>(islands: boolean, t: { system: boolean; lineage: string[]; capabilities: C }): C {
+  return islands && !t.capabilities.promised && mayBeFocus(t) ? { ...t.capabilities, promised: { fields: ['status'] } } : t.capabilities;
+}
+
 /** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors. */
 export const livesOnIsland = (t: { system: boolean; lineage: string[] }) => !t.system && !t.lineage.includes('actor');
 
