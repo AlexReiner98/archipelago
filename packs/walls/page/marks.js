@@ -4,8 +4,8 @@
 // is no script, no style attribute and no event handler, and its stylesheet is kept to its own host (cssFor).
 //
 // A mark is [tag, attributes, ...what is in it], a string being text. Two attributes are not drawn: `key`, the name
-// a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click), or `add`, a button the
-// page answers itself (ui/marks-add.js); a third, `pulse`, is kept on
+// a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click), or `add` or `toggle`, a
+// button the page answers itself (./marks-add.js, ./marks-toggle.js, the latter naming its pack by `pack`); a third, `pulse`, is kept on
 // the mark as words, for the page to run it along its line when they change (ui/transition.js). A mark says the item it
 // stands for with `item` (an id), which a link to the item says too: the page lights marks by it (packs/surface/page/light-items.js),
 // whatever drew them. Two tags are the page's own, made from an item's id alone: `reader`, a document as its reader
@@ -13,6 +13,7 @@
 
 import { cssProblem, uncommented } from './css-check.js';
 import { addable } from './marks-add.js';
+import { togglable } from './marks-toggle.js';
 import { readerFrame } from './reader-frame.js';
 import { viewFrame } from './view-frame.js';
 
@@ -20,11 +21,13 @@ const SVG = 'http://www.w3.org/2000/svg';
 const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'line', 'polyline', 'polygon', 'text', 'tspan', 'title', 'a', 'defs', 'clipPath', 'linearGradient', 'radialGradient', 'stop']);
 const HTML_TAGS = new Set(['div', 'span', 'p', 'b', 'strong', 'em', 'i', 'small', 'ul', 'ol', 'li', 'br', 'a', 'button']);
 const ITEM_ID = /^e_[a-z0-9]{8}$/;
+/** A pack's id, as a toggle names the pack it turns off or on (./marks-toggle.js). */
+const PACK_ID = /^[a-z][a-z0-9_.-]{0,63}$/;
 const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
 /** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight. */
-const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen', add: 'add' };
+const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen', add: 'add', toggle: 'toggle' };
 /** The events the page answers in its own way: once in sight, and the add button. */
-const OWN = { seen: (el, key, tell) => seen(el, () => tell(key, 'seen')), add: addable };
+const OWN = { seen: (el, key, tell) => seen(el, () => tell(key, 'seen')), add: addable, toggle: togglable };
 const seen = (el, fn) => {
   const sight = new IntersectionObserver((all) => all.some((e) => e.isIntersecting) && (sight.disconnect(), fn()), { threshold: 0.5 });
   sight.observe(el);
@@ -45,6 +48,7 @@ function attribute(el, name, value) {
   if (name === 'item') return void (ITEM_ID.test(text) ? (el.dataset.item = text) : fail(`the item "${text.slice(0, 80)}"`));
   // What a pulse carries (ui/transition.js): words only, kept on the mark, never drawn.
   if (name === 'pulse') return void (el.dataset.pulse = text);
+  if (name === 'pack') return void (PACK_ID.test(text) ? (el.dataset.pack = text) : fail(`the pack "${text.slice(0, 80)}"`));
   if (!ATTRS.has(name)) fail(`the attribute "${name}"`);
   if (name === 'href' && !ITEM.test(text)) fail(`a link to "${text.slice(0, 80)}"`);
   if (name === 'href') el.dataset.item = text.slice(4);
