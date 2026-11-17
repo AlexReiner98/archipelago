@@ -40,7 +40,7 @@ body[data-panes="1"] #canvas .lf-legend { bottom: auto; pointer-events: auto; }
 /* The bar runs across the page over the sheet, one pane or several: the sheet opens under it (the owner, 27 Oct 2026). */
 /* One layout for one pane or several: the bar in a band across the top, over the sheet, and every pane under it with
    its strip, so nothing moves or changes width when a tab is split. */
-body { --band: calc(max(var(--box-9), var(--emblem-size, var(--box-9))) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
+body { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
 /* The lines of the frame are one system: a line under the tabs across the page, the tab in sight standing on it in the
    panel's colour; a line under each band; one line between two panes, which is what is dragged and lights when it is
    (ui/panes.js). Nothing draws a border of its own around a view. */
@@ -125,7 +125,7 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 .term-pick-x { flex: none; border: 0; background: none; padding: var(--space-3) var(--space-5); color: var(--muted); cursor: pointer; }
 .term-pick-x:hover { color: var(--text); }
 /* The emblem, the theme's own (its style's emblem, ui/theme.js), in place of the name: the name is still what it is called. */
-#nav .brand { flex: none; width: var(--emblem-size, var(--box-9)); height: var(--emblem-size, var(--box-9)); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
+#nav .brand { flex: none; width: var(--box-9); height: var(--box-9); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
 #nav .brand > .error { font-size: var(--text-2); }
 #nav .brand .workspace-name { display: none; }
 /* Under the tabs, two bands, each the width of the pane: the view, in the panel's colour and joined to the tab in sight
