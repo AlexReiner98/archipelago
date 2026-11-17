@@ -1,5 +1,6 @@
 // The panes pack's one part, panes.panes (task e_d5ewsvgf, decision e_bn76z5fu): the strip of tabs (slot `tabs`) and
-// the panes of the tab in sight (mounted again with the piece `slot: 'panes'`), decided from one model (./model.js)
+// the canvas of the tab in sight (mounted again with the piece `slot: 'panes'`; a tab is one canvas, Alex, 17 Nov
+// 2026), decided from one model (./model.js)
 // and drawn by the runtime with the pane marks (packs/walls/page/part-pane.js). Both mounts share this module, so one
 // model; a change redraws each. The model is kept in the person's browser by workspace (tools.keep), never on the map.
 //
@@ -10,15 +11,9 @@
 
 import * as M from './model.js';
 import { strip } from './strip.js';
-import { ended, land, leaving, mirror, rested, sides, watchTab } from './life.js';
+import { ended, land, leaving, mirror, rested, sides } from './life.js';
 
 const KEEP = 'tabs';
-/** In a window popped out of the main one, the tab it draws (its key, as the runtime hands it); null in the main one. */
-let popped = null;
-/** Where the tabs are kept: the main page's list, or a popped window's one tab, which the main page reads too. */
-const keepName = () => (popped ? `out:${popped}` : KEEP);
-/** The tabs popped out into windows of their own, as each window keeps it: drawn at the strip's end, pressed to go to it. */
-let outs = [];
 let n = 0;
 const newId = (prefix) => `${prefix}${Date.now().toString(36)}${(++n).toString(36)}`;
 
@@ -33,15 +28,10 @@ const waiting = new Map();
 /** The page open over a tab, kept with it: an item's, a screen, the workspace. */
 const sheetOf = (hash) => /^#\/(e\/e_[a-z0-9]{8}|s\/[^?]*|workspace|you|new[^?]*)/.exec(hash ?? '')?.[1];
 
-/** The model kept, or a fresh one on the address the page opened on. */
+/** The model kept (each tab cut to its one canvas), or a fresh one on the address the page opened on. */
 function modelOf(input) {
-  if (popped) {
-    const own = input?.kept?.[keepName()];
-    const t = M.sound(own) ? own : { ...M.freshTab(newId, M.atOf(input?.page?.hash ?? '#/') ?? 'v'), id: popped };
-    return sides(M.model([t], t.id));
-  }
   const kept = input?.kept?.[KEEP];
-  const list = Array.isArray(kept?.list) ? kept.list.filter(M.sound) : [];
+  const list = Array.isArray(kept?.list) ? kept.list.filter(M.sound).map(M.alone) : [];
   if (list.length) return sides({ ...M.model(list, kept.front), heard: kept.heard ?? {}, landed: kept.landed ?? {}, dismissed: kept.dismissed ?? [] });
   const hash = input?.page?.hash ?? '#/';
   const fresh = M.model([M.freshTab(newId, M.atOf(hash) ?? 'v')]);
@@ -52,41 +42,18 @@ function modelOf(input) {
 /** The sessions as the strip names and marks them: what each is called, the word its hue is made from, whether it ended. */
 const sessionsOf = () => Object.fromEntries(Object.entries(m.heard ?? {}).map(([k, s]) => [k, { name: s.called, word: s.name, ended: s.ended, state: s.state, for: s.for }]));
 
-/** A web page framed in a pane is named by its host. */
-function hostOf(at) {
-  try {
-    const url = M.webOf(at);
-    return url ? new URL(url).host : undefined;
-  } catch {
-    return undefined;
-  }
+/** The tab in sight's canvas, as a mark: drawn at its address, named by what it draws. */
+function paneMark(t) {
+  const id = M.focusOf(t);
+  return ['panes', { key: 'panes', dir: 'row' }, ['pane', { key: `pane:${id}`, at: t.panes[id].at, share: 1, selected: true }, ['text', {}, String(t.panes[id].name ?? 'Canvas').slice(0, 120)]]];
 }
 
-/** The panes of the tab in sight, as marks: each its canvas at its address, its strip its name, its mark and its two buttons. */
-function panesMarks(t) {
-  const focus = M.focusOf(t);
-  const pane = (id) => {
-    const p = t.panes[id];
-    const share = t.sizes[t.groups.indexOf(id)];
-    const who = p.slot ?? (p.held ? m.heard?.[p.held]?.called ?? '' : '');
-    return ['pane', { key: `pane:${id}`, at: p.at, share, drag: 'pane', selected: id === focus, ...(p.ring && Date.now() - p.ring < 2000 && { ring: true }), tip: 'Drag its name to dock it elsewhere' },
-      ['text', {}, String(hostOf(p.at) ?? p.name ?? 'Canvas').slice(0, 120)],
-      // Whose it is, and in its tip what that session last said of it.
-      ...(who || p.said ? [['text', { look: 'mark', ...(p.said && { tip: String(p.said).slice(0, 200) }) }, String(who).slice(0, 40)]] : []),
-      ['button', { key: `totab:${id}`, look: 'quiet', tip: 'Move this pane to a new tab' }, '⧉'],
-      ...(t.groups.length > 1 ? [['button', { key: `close:${id}`, look: 'quiet', tip: 'Close this pane' }, '×']] : []),
-    ];
-  };
-  return ['panes', { key: 'panes', dir: t.dir ?? 'row' }, ...t.groups.map(pane)];
-}
-
-// A popped window draws its one tab's panes, and no strip.
-const marksFor = (slot) => (slot === 'panes' ? panesMarks(M.frontOf(m)) : popped ? ['box', {}] : strip(m, { sessions: sessionsOf(), out: outs }));
+const marksFor = (slot) => (slot === 'panes' ? paneMark(M.frontOf(m)) : strip(m, { sessions: sessionsOf() }));
 
 /** Keep the model, publish what the host reads of it, and redraw every mount: the strip and the panes read the same tabs. */
 function changed() {
   const t = M.frontOf(m);
-  driver?.tools.keep(popped ? t : { list: m.list, front: m.front, heard: m.heard, landed: m.landed, dismissed: m.dismissed }, keepName());
+  driver?.tools.keep({ list: m.list, front: m.front, heard: m.heard, landed: m.landed, dismissed: m.dismissed }, KEEP);
   driver?.tools.state?.('front', m.front);
   driver?.tools.state?.('lands_in', M.landsIn(m, t).join(' ') || null);
   driver?.tools.state?.('front_chat', t.chat ?? null);
@@ -113,80 +80,24 @@ function show(id) {
 /** What a press, a drop or a pane's word does to the model: false when nothing, true when it changed, 'step' when the address takes a step. */
 export function act(event) {
   const { key = '', name, value } = event ?? {};
-  const [what, a, b] = String(key).split(':');
+  const [what, a] = String(key).split(':');
   const t = M.frontOf(m);
   if (name === 'press' || name === 'close') {
     if (what === 'new') return Boolean(M.openTab(m, newId, M.BLANK)) && (say(false), true);
-    if (what === 'front') return show(a) || goOut(a);
-    if ((what === 'tab' && name === 'close') || (what === 'close' && a?.startsWith('t'))) return M.closeTab(m, a) && (say(false), true);
-    if (what === 'close') return M.closePane(t, a) && (say(false), true);
-    if (what === 'totab') return Boolean(M.paneToTab(m, newId, a)) && (say(false), true);
-    if (what === 'follow' && b === 'watch') return Boolean(M.tabOf(m, a)) && (watchTab(M.tabOf(m, a)), true);
-    if (what === 'follow') return (Object.assign(M.tabOf(m, a) ?? {}, { follows: b }), true);
-    if (what === 'keep') return (M.keepTab(M.tabOf(m, a)), true);
-    if (what === 'merge') return (M.joinTab(m, M.tabOf(m, a), M.tabOf(m, b)), say(false), true);
-    if (what === 'pop') return m.list.length > 1 && popOut(a);
-    if (what === 'split') return Boolean(M.openPane(t, newId, M.BLANK, 'right', M.focusOf(t), { anew: true })) && (say(false), true);
+    if (what === 'front') return show(a);
+    if ((what === 'tab' && name === 'close') || what === 'close') return M.closeTab(m, a) && (say(false), true);
     return false;
   }
-  if (name === 'share' && what === 'panes') return Number.isInteger(value?.index) && value.index + 1 < t.sizes.length && (M.share(t, value.index, Number(value.at)), true);
-  if (name === 'focus' && what === 'pane') return t.focus !== a && t.groups.includes(a) && ((t.focus = a), say(false), true);
-  if (name === 'drawn' && what === 'pane') return void (t.panes[a] && (t.panes[a].ids = (Array.isArray(value) ? value : []).slice(0, 500))), false;
-  if (name === 'named' && what === 'pane') return Boolean(t.panes[a]) && t.panes[a].name !== value && ((t.panes[a].name = String(value ?? '').slice(0, 120)), true);
-  if ((name === 'open' || name === 'go') && what === 'pane') {
+  const pane = M.focusOf(t);
+  if (what !== 'pane' || a !== pane) return false;
+  // What it draws: an item opened that it already draws keeps it there (moved).
+  if (name === 'drawn') return void (t.panes[a].ids = (Array.isArray(value) ? value : []).slice(0, 500)), false;
+  if (name === 'named') return t.panes[a].name !== value && ((t.panes[a].name = String(value ?? '').slice(0, 120)), true);
+  if (name === 'open' || name === 'go') {
     const at = M.paneAt(String(value?.at ?? value ?? ''));
-    if (!M.drawable(at) || !M.goPane(t, a, at)) return false;
-    if (a === M.focusOf(t)) say(true);
-    return true;
-  }
-  if (name === 'opened' && what === 'pane') return t.focus !== a && t.groups.includes(a) && ((t.focus = a), true);
-  if (name === 'drop') {
-    const [onto, target] = String(value?.onto ?? '').split(':');
-    if (what === 'pane' && value?.zone === 'tabs') return (onto === 'tab' ? (M.joinTab(m, t, M.tabOf(m, target), [a]), true) : Boolean(M.paneToTab(m, newId, a))) && (say(false), true);
-    if (what === 'pane' && onto === 'pane') return M.dropPane(t, a, target, value.zone);
-    if (what === 'tab' && value?.zone === 'tabs' && onto === 'tab' && target !== a) return (M.joinTab(m, M.tabOf(m, a), M.tabOf(m, target)), say(false), true);
-    if (what === 'tab' && value?.zone === 'out' && m.list.length > 1) return popOut(a);
+    return M.drawable(at) && M.goPane(t, a, at) && (say(true), true);
   }
   return false;
-}
-
-/** Pop tab `id` out into a window of its own; this page draws it no more. */
-function popOut(id) {
-  const t = M.tabOf(m, id);
-  if (!t || !driver?.tools.window) return false;
-  driver.tools.keep(t, `out:${id}`);
-  driver.tools.window(id, M.tabHref(t));
-  outs = [...outs.filter((o) => o.id !== id), t];
-  m.list = m.list.filter((o) => o !== t);
-  if (m.front === id) (m.front = m.list[0].id), say(false);
-  return true;
-}
-
-/** Go to the window tab `id` was popped out into, opening it again if it was closed. */
-function goOut(id) {
-  const t = outs.find((o) => o.id === id);
-  if (t) driver?.tools.window?.(id, M.tabHref(t));
-  return false;
-}
-
-/**
- * What each window keeps, handed again when another changes it: the tabs popped out are drawn at the strip's end, and
- * one docked back comes into this page's tabs, in sight. True when the tabs changed.
- */
-function keptMoved(kept) {
-  if (popped || !kept) return false;
-  const out = Object.entries(kept).filter(([k, v]) => k.startsWith('out:') && M.sound(v));
-  let changes = false;
-  for (const [name, t] of out.filter(([, v]) => v.docked)) {
-    const { docked: _, ...back } = t;
-    m.list = [...m.list.filter((o) => o.id !== back.id), back];
-    m.front = back.id;
-    driver?.tools.keep(null, name);
-    changes = true;
-  }
-  const before = outs.map((o) => o.id).join(' ');
-  outs = out.filter(([, v]) => !v.docked && !m.list.some((o) => o.id === v.id)).map(([, v]) => v);
-  return changes || before !== outs.map((o) => o.id).join(' ');
 }
 
 /** The page moved to `hash` (a link followed, a page opened over the canvas): the tab in sight keeps the page, its pane in focus the lens. */
@@ -211,20 +122,6 @@ function stepped(by) {
   const went = M.travel(t, M.focusOf(t), by);
   say(false);
   return went;
-}
-
-/**
- * A view a drawing in pane `from` names (a replay's milestone), drawn in a pane of its own on its right: opened once,
- * then moved to each view named, with no step in its history; named with none (before the first milestone), it is empty.
- */
-function beside(from, view) {
-  const t = M.frontOf(m);
-  if (!t.groups.includes(from)) return false;
-  const mine = t.groups.find((id) => t.panes[id]?.shows === from);
-  if (!view) return Boolean(mine) && M.goPane(t, mine, 'v?shown=none', false);
-  const at = `v?canvas=${view}`;
-  if (mine) return M.goPane(t, mine, at, false);
-  return Boolean(M.openPane(t, newId, at, 'right', from, { anew: true, shows: from }));
 }
 
 /** Land a show, or keep it to try again; then try those that wait. */
@@ -256,9 +153,6 @@ async function readOpen() {
 function heard(event) {
   if (event?.name === 'sessions') return (void readOpen(), false);
   if (event?.name === 'busy') return void (m.busy = { ...m.busy, [String(event.pane)]: Date.now() }), waiting.size > 0;
-  if (event?.name === 'dock' && popped) return (driver?.tools.keep({ ...M.frontOf(m), docked: true }, keepName()), false);
-  if (event?.name === 'split') return act({ key: 'split', name: 'press' });
-  if (event?.name === 'beside') return beside(String(event.pane ?? ''), event.view ?? null);
   if (event?.name === 'step') return stepped(event.step === -1 ? -1 : 1);
   if (event?.name === 'land' && event.step) return landed(event.step);
   if (event?.name === 'ended') return (ended(m, newId, event.run, false), true);
@@ -267,14 +161,12 @@ function heard(event) {
 }
 
 export default function panes(input, tools) {
-  popped ??= typeof input?.page?.popped === 'string' ? input.page.popped : null;
   m ??= modelOf(input);
   const mount = { slot: (input?.slot ?? input?.piece?.slot) === 'panes' ? 'panes' : 'tabs', tools, hash: input?.page?.hash };
   mounts.add(mount);
   // The strip's mount hears the page: the address it opened on goes to the pane in focus, as the page's own panes took it.
   if (mount.slot === 'tabs') {
     driver = mount;
-    keptMoved(input?.kept);
     if (input?.page?.hash) moved(input.page.hash);
     // The open sessions are read once the page has drawn its first view (the host says so: `sessions`), never before.
     queueMicrotask(changed);
@@ -289,7 +181,6 @@ export default function panes(input, tools) {
         mount.hash = hash;
         if (moved(hash)) changed();
       }
-      if (mount === driver && keptMoved(next?.kept)) (say(false), changed());
       if (mount === driver && waiting.size) (retry(), changed());
       return marksFor(mount.slot);
     },
@@ -308,4 +199,4 @@ export default function panes(input, tools) {
 }
 
 /** For tests: start again with this model. */
-export const reset = (list = [], front = null) => ((m = list.length ? sides(M.model(list, front)) : null), mounts.clear(), (driver = null), waiting.clear(), (popped = null), (outs = []));
+export const reset = (list = [], front = null) => ((m = list.length ? sides(M.model(list, front)) : null), mounts.clear(), (driver = null), waiting.clear());

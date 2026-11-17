@@ -66,6 +66,8 @@ export interface SearchInput {
   owner?: string;
   open?: boolean;
   include_archived?: boolean;
+  /** Only islands: items of core's type island, and the focus items, each its own island (decision e_mqex8wrf). */
+  islands?: boolean;
   limit?: number;
   /** Types left out, each with the types that extend it. */
   except?: string[];
@@ -104,6 +106,8 @@ export async function search(db: Q, family: (type: string) => string[], input: S
     if (input.status) add(`status = ?`, input.status);
     if (input.owner) add(`owner = ?`, input.owner);
     if (input.open !== undefined) add(`is_open = ?`, input.open);
+    // An island is an item of core's type island, or a focus, its own island (decision e_mqex8wrf): by entity_type_created and entity_focus.
+    if (input.islands) add(`(type = any(?::text[]) or props->>'focus' = 'true')`, family('island'));
     if (!input.include_archived) where.push(`archived_at is null`);
     params.push(Math.min(input.limit ?? 25, 200));
     const { rows } = await db.query<Entity>(

@@ -58,7 +58,6 @@ export const SLOW: Record<string, string> = {
   'test/saved-canvases-narrow.test.ts': 'browser',
   'test/saved-canvases-switch.test.ts': 'browser',
   'test/show-lands.test.ts': 'browser',
-  'test/show-follows.test.ts': 'browser',
   'test/show-tab-life.test.ts': 'browser',
   'test/show-web.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',

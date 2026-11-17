@@ -146,12 +146,6 @@ export function drawPane(at, el, said) {
 }
 hooks.paneFrame = drawPane;
 
-/**
- * A view a drawing in pane `from` names (a replay's milestone, packs/walls/page/view-frame.js), drawn in a pane of its
- * own on its right: the part opens it once and moves it to each view named.
- */
-hooks.besidePane = (from, view) => hooks.tellSlot?.('tabs', { name: 'beside', pane: from, view: view ?? null });
-
 // ---- A page with no tabs (a look's, a frozen link's): its one view in a pane of its own, at the page's address.
 
 let lone = null;
