@@ -16,4 +16,11 @@ if (!new URLSearchParams(location.search).has('may')) {
   const headers = token ? { authorization: `Bearer ${token}` } : {};
   const post = (tool, input) => fetch(`/api/${tool}`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(input) });
   globalThis.pelagoEarly = { token, whoami: fetch('/whoami', { headers }), schema: post('schema', {}), style: post('view', { name: 'style', params: {} }) };
+  // The server's own look, its land with it (packs/walls/page/theme-land.js), where the page opens before a workspace:
+  // signed out, at Try it, or on a new guest map's first card. Read as JSON once, by whoever asks first.
+  let first = false;
+  try {
+    first = localStorage.getItem('pelago-guest-first') !== null;
+  } catch {}
+  if (!token || first || location.hash.startsWith('#/try')) globalThis.pelagoEarly.theme = fetch('/connect/theme').then((r) => (r.ok ? r.json() : null), () => null);
 }

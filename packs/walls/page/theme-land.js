@@ -10,6 +10,7 @@
 // unbroken from Try it to a new guest map's first card; in a workspace, the workspace's.
 
 import { onTheme } from './theme.js';
+import { hooks } from './base.js';
 import { runBackdrop } from './backdrop.js';
 
 /** Which place the page is in now, as the body says. */
@@ -30,7 +31,7 @@ const kept = new Map();
 let style = null, running = null;
 /** The server's own style, as the gate is painted in: asked once, when the page is first in the gate. */
 let served;
-const servedStyle = () => (served ??= fetch('/connect/theme').then((r) => (r.ok ? r.json() : null), () => null).then((s) => ((served = s ?? null), again(), s)));
+const servedStyle = () => (served ??= (globalThis.pelagoEarly?.theme ?? fetch('/connect/theme').then((r) => (r.ok ? r.json() : null), () => null)).then((s) => ((served = s ?? null), again(), s)));
 
 function wear() {
   const place = placeOf();
@@ -69,10 +70,35 @@ function wear() {
 }
 
 let soon = 0;
-const again = () => soon || (soon = requestAnimationFrame(() => ((soon = 0), wear())));
+// A timer, not a frame: a page opened behind another tab gets no frames, and its land must be under way when it is shown.
+const again = () => soon || (soon = setTimeout(() => ((soon = 0), wear())));
+
+/** How long the land is given, once drawn, to gather before a page that waits for it moves on. */
+const GATHER_MS = 2200;
+
+/**
+ * Resolves once the land at the gate has drawn and had a moment to gather, or at `by` (a time from performance.now())
+ * at the latest; at once where there is no land to wait for. What the loading page (Making your map...) waits on, so
+ * the land is seen there before the page is entered.
+ */
+export function landShown(by) {
+  return new Promise((done) => {
+    const look = () => {
+      const left = by - performance.now();
+      if (document.body.dataset.landDrew !== undefined) return void setTimeout(done, Math.max(0, Math.min(GATHER_MS, left)));
+      const none = served === null || (served && !(served instanceof Promise) && !landFor(served, 'gate'));
+      if (left <= 0 || none) return void done();
+      setTimeout(look, 100);
+    };
+    look();
+  });
+}
 
 /** Start wearing the theme's land: each style the page is painted in, and each move between places, is heard. */
 export function startLand() {
+  hooks.landShown = landShown;
+  // Asked already where the page opens before a workspace (packs/surface/page/early.js): taken now, so the land starts at once.
+  if (globalThis.pelagoEarly?.theme) servedStyle();
   onTheme((next) => ((style = next), again()));
   new MutationObserver(again).observe(document.body, { attributes: true, attributeFilter: ['data-gate', 'data-sheet', 'data-first'] });
 }

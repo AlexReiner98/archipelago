@@ -38,13 +38,13 @@ const GHOST = /^p_[a-z0-9]+:/;
 const SHEET = { e: 'item', held: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
 // An item named outside the app (?link=): a tab open on its workspace takes it, else this page opens on it there.
+// The theme's land, where it says it shows (packs/walls/page/theme-land.js): started first, so it runs on the loading page.
+startLand();
 const linked = await linkFirst();
 startTips();
 // The frame drawings run in, and the drawing this browser drew last loaded in it, started before anything is read: the
 // worker is ready when the first answer comes.
 warmLayouts();
-// The theme's land, where it says it shows (packs/walls/page/theme-land.js).
-startLand();
 // A sheet opened where the address stays (the sign-in form, from Home) is shut by drawing that address again.
 const close = () => (location.hash === hrefNow() ? route() : (location.hash = hrefNow()));
 document.getElementById('sheet-close').addEventListener('click', close);
