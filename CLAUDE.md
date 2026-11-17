@@ -155,7 +155,7 @@ reply ending) is `docs/agents.md`.
   `packs/loader/kernel/declared.ts`); the item page (`packs/sheet/page/item.js`) names no pack's type.
 - **The UI has no build step and no framework.** Plain files, all in packs (`ui/` is gone since 13 Nov 2026): parts in map packs'
   `parts/`, the host's (what keeps humans in control) in the root packs'
-  `page/` and `parts/`, under their hash (`npm run roots` after a change there).
+  `page/` and `parts/`, changed only by a pull request the owner merges.
 - **Dependencies stay at four** (`@electric-sql/pglite`,
   `@modelcontextprotocol/sdk`, `zod`, and since 18 Oct 2026 `pg`, for a
   Postgres server) unless the owner agrees to another. One library is kept as a file, not

@@ -1,12 +1,12 @@
-// The boot stub (src/boot.ts): it starts only on the root packs roots.json pins, starts them in order with only the
+// The boot stub (src/boot.ts): it starts only on the root packs roots.json lists, hashes each as it is, starts them in order with only the
 // roots above each in reach, fills what they open, opens a workspace in phases, and stops them in reverse.
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { boot, BootRefused, checkRoots, hashPack, HOME, OPEN_PHASES, pinRoots, type RootModule, type RootStarted } from '../src/boot.ts';
+import { boot, BootRefused, checkRoots, hashPack, HOME, OPEN_PHASES, type RootModule, type RootStarted } from '../src/boot.ts';
 
 const homes: string[] = [];
 after(() => { for (const h of homes) rmSync(h, { recursive: true, force: true }); });
@@ -19,15 +19,14 @@ function home(packs: Record<string, { kernel?: object; files?: Record<string, st
     writeFileSync(join(h, 'packs', id, 'pack.json'), p.json ?? JSON.stringify({ id, version: '1.0.0', ...(p.kernel ? { kernel: p.kernel } : {}) }));
     for (const [f, text] of Object.entries(p.files ?? {})) writeFileSync(join(h, 'packs', id, 'kernel', f), text);
   }
-  writeFileSync(join(h, 'packs', 'roots.json'), JSON.stringify({ roots: roots.map((id) => ({ id, hash: '' })) }));
-  pinRoots(h);
+  writeFileSync(join(h, 'packs', 'roots.json'), JSON.stringify({ roots: roots.map((id) => ({ id })) }));
   return h;
 }
 
 const root = { trust: 'root', internal: true, modules: 'kernel/' };
 
-test('the repository starts on the root packs it pins', () => {
-  assert.deepEqual(checkRoots(HOME), [], 'packs/roots.json pins every root pack as its folder is: npm run roots');
+test('the repository starts on the root packs it lists', () => {
+  assert.deepEqual(checkRoots(HOME), [], 'packs/roots.json lists every root pack, and only root packs');
 });
 
 test("a root pack's hash is its folder's, whatever the line endings and the manifest's spacing", () => {
@@ -41,6 +40,11 @@ test("a root pack's hash is its folder's, whatever the line endings and the mani
   mkdirSync(join(b, 'packs', 'x', 'parts', 'row'), { recursive: true });
   writeFileSync(join(b, 'packs', 'x', 'parts', 'row', 'index.js'), 'export default () => ({ marks: [] });\n');
   assert.notEqual(hashPack(join(b, 'packs', 'x')), before, 'parts/** is in the hash');
+  const withPart = hashPack(join(b, 'packs', 'x'));
+  writeFileSync(join(b, 'packs', 'x', 'README.md'), 'What x is.\n');
+  assert.equal(hashPack(join(b, 'packs', 'x')), withPart, 'a README only says what it is');
+  writeFileSync(join(b, 'packs', 'x', 'served.css'), 'a {}\n');
+  assert.notEqual(hashPack(join(b, 'packs', 'x')), withPart, 'a file beside its folders counts');
 });
 
 // A root pack's parts are the owner's too: what the refiner may not change is pinned, wherever in the pack it lives
@@ -60,32 +64,24 @@ test("a root pack's parts and layouts are pinned with its kernel and its page", 
   assert.notEqual(hashPack(at), withPart, 'a layout counts too');
 });
 
-test('a changed root pack stops the start, naming it and both hashes', async () => {
+// The owner's word for a root is their merge of the pull request that changes it (bug e_8y7xhhjq): a changed root
+// starts, and what it started on is its folder's hash as it is, never a pin carried in every branch.
+test('a changed root pack starts, and its hash is its folder as it is now', async () => {
   const h = home({ core: {}, db: { kernel: root, files: { 'index.ts': '' } } }, ['core', 'db']);
-  const pinned = JSON.parse(readFileSync(join(h, 'packs', 'roots.json'), 'utf8')).roots[1].hash;
+  const was = hashPack(join(h, 'packs', 'db'));
   writeFileSync(join(h, 'packs', 'db', 'kernel', 'more.ts'), 'export {};\n');
   const now = hashPack(join(h, 'packs', 'db'));
-  await assert.rejects(boot({ home: h, load: async () => ({ start: () => ({}) }) }), (err: Error) => err instanceof BootRefused && err.message.includes('db:') && err.message.includes(pinned) && err.message.includes(now));
+  assert.notEqual(now, was);
+  assert.deepEqual(checkRoots(h), []);
+  const booted = await boot({ home: h, load: async () => ({ start: () => ({}) }) });
+  assert.equal(booted.hashes.db, now);
+  await booted.stop();
 });
 
-test("a changed root part, or any file a root serves, stops the start; its README does not", async () => {
-  const h = home({ core: {}, sheet: { kernel: root, files: { 'index.ts': '' } } }, ['core', 'sheet']);
-  const dir = join(h, 'packs', 'sheet');
-  mkdirSync(join(dir, 'parts', 'page'), { recursive: true });
-  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: [] });\n");
-  writeFileSync(join(dir, 'README.md'), 'What the sheet is.\n');
-  pinRoots(h);
-  assert.deepEqual(checkRoots(h), [], 'pinned with its part');
-  writeFileSync(join(dir, 'README.md'), 'What the sheet is, said again.\n');
-  assert.deepEqual(checkRoots(h), [], 'a README only says what it is');
-  const pinned = hashPack(dir);
-  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: ['text', {}, 'changed'] });\n");
-  const now = hashPack(dir);
-  assert.notEqual(now, pinned);
-  await assert.rejects(boot({ home: h, load: async () => ({ start: () => ({}) }) }), (err: Error) => err instanceof BootRefused && err.message.includes('sheet:') && err.message.includes(pinned) && err.message.includes(now));
-  writeFileSync(join(dir, 'parts', 'page', 'index.js'), "export default () => ({ marks: [] });\n");
-  writeFileSync(join(dir, 'served.css'), 'a {}\n');
-  assert.match(checkRoots(h).join('\n'), /sheet:/, 'a file beside its folders counts too');
+test('a roots.json that carries a hash is refused: hashes are derived, not pinned', async () => {
+  const h = home({ core: {} }, ['core']);
+  writeFileSync(join(h, 'packs', 'roots.json'), JSON.stringify({ roots: [{ id: 'core', hash: 'abc' }] }));
+  assert.throws(() => checkRoots(h), (err: Error) => err instanceof BootRefused && /core carries a hash/.test(err.message));
 });
 
 test('a root pack the list leaves out, or a listed pack that is no root, stops the start', () => {

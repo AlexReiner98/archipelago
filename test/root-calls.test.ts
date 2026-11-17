@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, test } from 'node:test';
-import { checkRoots, HOME, pinRoots } from '../src/boot.ts';
+import { checkRoots, HOME } from '../src/boot.ts';
 import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 import { kernelProblems } from '../packs/loader/kernel/manifest.ts';
 import { callRoot, readRootTable } from '../packs/loader/kernel/root-calls.ts';
@@ -32,8 +32,7 @@ function home(calls: Record<string, unknown>): string {
   pack('db', { kernel: { ...root, provides: { 'root.count': { run: 'count.ts#count' } } } }, { 'count.ts': 'export const count = (call, input) => ({ caller: call.caller, n: input.n + 1 });\n' });
   pack('svc', { uses: ['service:root.count'], kernel: service });
   pack('other', { uses: ['service:root.count'], kernel: service });
-  writeFileSync(join(h, 'packs', 'roots.json'), JSON.stringify({ roots: [{ id: 'core', hash: '' }, { id: 'db', hash: '' }], calls }));
-  pinRoots(h);
+  writeFileSync(join(h, 'packs', 'roots.json'), JSON.stringify({ roots: [{ id: 'core' }, { id: 'db' }], calls }));
   return h;
 }
 

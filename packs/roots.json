@@ -1,64 +1,49 @@
 {
   "roots": [
     {
-      "id": "core",
-      "hash": "efa1e86153a1f3a307376aeb69323a1c870b670c1f0d8709784793bd5f14904c"
+      "id": "core"
     },
     {
-      "id": "database",
-      "hash": "54a08e9b23df7a6941242a1217d03dad6e540a756531f8ad97947da7b6293bf3"
+      "id": "database"
     },
     {
-      "id": "seal",
-      "hash": "0f7a02a1b79c81cd5e217206531b76eaa6d892587658a64b78348cc1e8e64528"
+      "id": "seal"
     },
     {
-      "id": "log",
-      "hash": "82c6d7b0594561cab6383ee64ca04ba5734d27b6a3211b1832b15a9ce514b5c8"
+      "id": "log"
     },
     {
-      "id": "kit",
-      "hash": "10374e3c935a58163c55860e492a16e725917ecd88d71259506df6ab67c7e87b"
+      "id": "kit"
     },
     {
-      "id": "identity",
-      "hash": "a291f9dd9db68884cbe1185cf34d96a37e63a845d9a58e713d9785e3c090246d"
+      "id": "identity"
     },
     {
-      "id": "walls",
-      "hash": "a2689490e48e899f5c26ca2bae229b9dea46cde89b0364ad923c0d3bdaf90a17"
+      "id": "walls"
     },
     {
-      "id": "loader",
-      "hash": "a4ff63d0ed6dc96d16dc94676fae9f6ca8401fbb8a5f4daf46cbc6bdf2c15f57"
+      "id": "loader"
     },
     {
-      "id": "rules",
-      "hash": "a96a09712fcd1e1b5dc25e4669b0eabac9feca85bf97e15735ff64ad4a647264"
+      "id": "rules"
     },
     {
-      "id": "write",
-      "hash": "37525398fa06ec816d0705c0ea7d3231571bb486784c04c359c64cc41dd2ba84"
+      "id": "write"
     },
     {
-      "id": "surface",
-      "hash": "c5b2af824635ec031aa7b9480616f0e62e7c93124a3d2941d43b5cb9c7e025ff"
+      "id": "surface"
     },
     {
-      "id": "panes",
-      "hash": "c2dab63cb9995c0ed28f5e7bf1273b68cacf4947184e3594d003f46c1ea27425"
+      "id": "panes"
     },
     {
-      "id": "bar",
-      "hash": "17a82ece6e1beee0f55c1c579755d8687a7239ccc892955f75ea8d591f9891bd"
+      "id": "bar"
     },
     {
-      "id": "sheet",
-      "hash": "b4816ce3c12eb0686ce2cc36389335252915abb4692fe9ff21705aba5bfa6910"
+      "id": "sheet"
     },
     {
-      "id": "shell",
-      "hash": "4e19d3c5b328c96d90bb48d07851038c76510561c85f55606740e0d3b72090f2"
+      "id": "shell"
     }
   ],
   "calls": {
