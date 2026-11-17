@@ -26,12 +26,19 @@ export function packsOf(pack) {
   return [{ ...pack, own: true }, ...required];
 }
 
-/** A pack's tip: its name, its state on this island and why, and what turning it off would send waiting. */
+/**
+ * Whether a click may turn a pack off or on here: never the kernel's own (`kernel`, on every island), and on again only
+ * one this island turned off (in `off`, its packs_off): a pack off for another reason (not on this server) is not this
+ * island's to turn on.
+ */
+export const togglesHere = (p, off = []) => p.kernel !== true && (stateOf(p) !== 'off' || off.includes(p.id));
+
+/** A pack's tip: its name, its state on this island and why, and what a click would do where it may (`writes`). */
 export function tipOf(p, writes) {
   const state = stateOf(p), n = Number.isInteger(p.off_would_wait) ? p.off_would_wait : 0;
   return [
     `${p.title ?? p.id}${p.own ? '' : ' (required)'}`,
-    `${PACK_STATES[state]}${p.why ? `: ${p.why}` : ''}`,
+    p.kernel === true ? "Always on: the kernel's own" : `${PACK_STATES[state]}${p.why ? `: ${p.why}` : ''}`,
     writes && (state === 'off' ? 'Click to turn it on here' : `Click to turn it off here${n ? `; ${n} item${n === 1 ? '' : 's'} would wait` : ''}`),
   ].filter(Boolean);
 }
@@ -50,11 +57,11 @@ export function packRules(style) {
  * the gestures the session may make on a mark (['toggle'] where it may write). Answers { marks, tips, width }: `tips`
  * the tip of each mark, by its key, for the drawing to show on hover.
  */
-export function packMarks({ island, pack, at: [x, y], z, m, titled, on = () => [] }) {
+export function packMarks({ island, pack, off = [], at: [x, y], z, m, titled, on = () => [] }) {
   const [D, GAP] = ['island_pack_mark', 'island_pack_gap'].map(z);
   const tips = new Map();
   const marks = packsOf(pack).map((p, k) => {
-    const cx = x + D / 2 + k * (D + GAP), key = `pk:${island}:${p.id}`, toggle = on(key).includes('toggle');
+    const cx = x + D / 2 + k * (D + GAP), key = `pk:${island}:${p.id}`, toggle = on(key).includes('toggle') && togglesHere(p, off);
     const lines = tipOf(p, toggle);
     tips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, lines[0]), ...lines.slice(1).map((l) => m('span', {}, l))));
     const ring = m('circle', { cx, cy: y, r: D / 2 }), glyph = m('text', { x: cx, y }, glyphOf(p));
