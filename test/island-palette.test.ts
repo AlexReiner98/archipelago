@@ -50,6 +50,11 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the canvas draws it', () => draws('Rebuild the pier'));
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
+    // The canvas draws beside the bar, open or folded, never under it.
+    const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
+    assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');
+    await page.evaluate(`document.querySelector('#islands .isl-rail').click()`);
+    await until('beside the folded rail', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && ${beside}`));
     assert.ok(made.harbour);
   } finally {
     await page.close();

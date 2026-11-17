@@ -55,12 +55,12 @@ test('in a browser, a tab is one canvas: an agent in a tab of its own, its shows
     // The canvas stays live: a rename reaches it from the log.
     await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.b, title: 'Second step, renamed' }] });
     await until('it follows the log', () => draws(0, 'Second step, renamed'));
-    assert.ok(await page.evaluate(`${nth(0)}.getBoundingClientRect().width > 1200`), 'the one canvas has the page');
+    assert.ok(await page.evaluate(`(() => { const r = ${nth(0)}.getBoundingClientRect(), bar = document.getElementById('islands')?.getBoundingClientRect().right ?? 0; return Math.abs(r.left - bar) < 2 && Math.abs(r.right - innerWidth) < 2; })()`), 'the one canvas has the page beside the islands bar');
     // The sheet takes its room from the canvas, so whatever it draws stands beside the sheet; shut, it has the page again.
     await page.evaluate(`${nth(0)}.querySelector('svg a[href="#/e/${made.b}"]').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))`);
     await until('the canvas stops at the sheet', () => page.evaluate<boolean>(`document.body.dataset.sheet === 'open' && Math.abs(${nth(0)}.querySelector('.pane-canvas').getBoundingClientRect().right - (innerWidth - document.getElementById('sheet').offsetWidth)) < 2`));
     await page.evaluate(`document.getElementById('sheet-close').click()`);
-    await until('the canvas has the page again', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && ${nth(0)}.getBoundingClientRect().width > 1200`));
+    await until('the canvas has the page again', () => page.evaluate<boolean>(`document.body.dataset.sheet !== 'open' && (() => { const r = ${nth(0)}.getBoundingClientRect(), bar = document.getElementById('islands')?.getBoundingClientRect().right ?? 0; return Math.abs(r.left - bar) < 2 && Math.abs(r.right - innerWidth) < 2; })()`));
     // A tab has no ⋯ and no split: its name and × alone.
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('#tabs details.pm-menu, #query [aria-label="Split"]').length`), 0);
     // A reload draws it again as it was.
