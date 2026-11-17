@@ -94,7 +94,8 @@ async function route(pulse = false) {
   drawFindSlot();
   drawNav();
   signUpOffer();
-  firstMoments();
+  // A map made a moment ago opens on Making your map until its land has gathered: nothing more is drawn yet.
+  if (firstMoments() === 'making') return;
   startTabs();
   const params = new URLSearchParams(query);
   // The canvas: the pane in focus draws the lens the address says (the bar pack's parts show it); an item's page with none

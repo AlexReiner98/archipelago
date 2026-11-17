@@ -60,3 +60,5 @@ body[data-land] > iframe.page-backdrop.drew { opacity: 1; }
 :root body[data-land="gate"] :is(#sheet, #canvas, .first), :root body[data-land="sheet"] #sheet, :root body[data-land="canvas"] #canvas { background: transparent; }
 /* A new guest map's first card is on the gate's paper, so the page it came from (Making your map) and it are one sheet. */
 body[data-first="wait"] { background: var(--chart-ground, var(--bg)); }
+/* Making your map gives way to the card in place: the sheet it stood on is put away at once, never slid. */
+body[data-first="wait"] #sheet { transition: none; }
