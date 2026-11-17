@@ -5,6 +5,9 @@ body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; 
 body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
 /* In the middle of the page both ways, a little above centre, as most sign-in pages sit; the mark and title centred over it. */
 .gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: auto; padding-bottom: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
+/* While a land runs whose page has its own emblem (theme-land.js), the gate's mark wears it, as the bar's does: its own
+   picture pushed out of its box by a padding as wide as the box, the emblem drawn as its ground. */
+body[data-land-emblem] .gate-mark { box-sizing: border-box; padding-left: var(--gate-mark, var(--box-10)); min-height: var(--gate-mark, var(--box-10)); background: var(--emblem) center / contain no-repeat; }
 .gate-mark { align-self: center; width: var(--gate-mark, var(--box-10)); height: var(--gate-mark, var(--box-10)); border-radius: var(--radius-2); }
 .gate h1 { margin: 0 0 var(--space-4); text-align: center; }
 .gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
@@ -52,3 +55,18 @@ body[data-first="wait"] #canvas, body[data-first="wait"] #sheet { visibility: hi
 .first-status { display: flex; align-items: center; gap: var(--space-6); padding-top: var(--space-8); border-top: var(--border-1) solid var(--line); color: var(--ok); font-size: var(--text-5); }
 .first-status::before { content: ''; flex: none; width: var(--box-3); height: var(--box-3); border-radius: 50%; background: currentColor; animation: first-beat 1.6s ease-in-out infinite; }
 @keyframes first-beat { 50% { opacity: 0.25; } }
+
+/* A theme's land behind the page (packs/walls/page/theme-land.js, body[data-land]): its frame under everything but the
+   page's own ground, fading in once it has drawn; the page see-through in the place it runs. */
+body[data-land] > iframe.page-backdrop { color-scheme: light; position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity var(--motion-slow, 0.6s) ease; }
+body[data-land] > iframe.page-backdrop.drew { opacity: 1; }
+:root body[data-land="gate"] :is(#sheet, #canvas, .first), :root body[data-land="sheet"] #sheet, :root body[data-land="canvas"] #canvas { background: transparent; }
+/* A land's still (theme-land.js): its picture, at its own size in the middle of the window (the words it was baked round
+   stand there too), the narrow one on a window taller than wide; gone once the land has gathered, kept where it cannot run. */
+body > .land-still { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: var(--land-still-wide, var(--land-still-narrow)) center / auto no-repeat; transition: opacity var(--motion-slow, 0.6s) ease; }
+@media (max-aspect-ratio: 3/4) { body > .land-still { background-image: var(--land-still-narrow, var(--land-still-wide)); } }
+body > .land-still.gone { opacity: 0; }
+/* A new guest map's first card is on the gate's paper, so the page it came from (Making your map) and it are one sheet. */
+body[data-first="wait"] { background: var(--chart-ground, var(--bg)); }
+/* Making your map gives way to the card in place: the sheet it stood on is put away at once, never slid. */
+body[data-first="wait"] #sheet { transition: none; }

@@ -9,7 +9,7 @@
 // address to a computer (e_hmmh2xta).
 // The host's: it enters a token, which no pack's code may do.
 
-import { enter, gate, gateRow, h, hooks, keepLanding, known, postJson, store, workspaceOf } from './base.js';
+import { enter, gate, gateRow, h, hooks, keepLanding, known, postJson, store, ungate, workspaceOf } from './base.js';
 
 /**
  * What the canvas under the note shows: a query, as an address says one (packs/surface/page/query.js, readAddress). A new
@@ -108,12 +108,43 @@ function drawCard(first) {
     ),
   );
   document.body.append(card);
+  // In over Making your map, where its words stood: from nothing, the next moment.
+  if (fadeIn) (card.classList.add('first-gone'), void card.offsetWidth, card.classList.remove('first-gone'), (fadeIn = false));
 }
 
-/** On each route: on the guest map just made, the card until the agent has drawn the work, then the map, quiet. */
+/** Whether the land a fresh map's first page waits for has been asked for yet, on this page. */
+let landAsked = false;
+/** Whether the card is to fade in, as it does over Making your map. */
+let fadeIn = false;
+
+/**
+ * On each route: on the guest map just made, the card until the agent has drawn the work, then the map, quiet. A map
+ * made a moment ago opens on Making your map, the page that made it, while the theme's land gathers round it (the
+ * reload that entered the map comes before the land starts, so it runs on one page, unbroken); then the card. Says
+ * 'making' while that page is up, and the route draws nothing more.
+ */
 export function firstMoments() {
   const first = firstNow();
   if (!first || first.ws !== workspaceOf(store.token)) return void (hooks.awaiting = hooks.made = undefined);
+  if (first.fresh) {
+    gate(TITLE, gateRow(h('span', { class: 'muted grow' }, 'Making your map…')));
+    if (!landAsked) {
+      landAsked = true;
+      const made = () => {
+        delete first.fresh;
+        keepFirst(first);
+        // The map stays quiet as the gate is taken down, so nothing of it slides or shows; the card fades in over the land.
+        document.body.dataset.first = 'wait';
+        fadeIn = true;
+        ungate();
+        document.body.dataset.sheet = '';
+        // The map's own page, drawn as its address says, with the card over it.
+        dispatchEvent(new HashChangeEvent('hashchange'));
+      };
+      (hooks.landShown?.(performance.now()) ?? Promise.resolve()).then(made);
+    }
+    return 'making';
+  }
   first.stage ??= 'wait';
   document.body.dataset.first = first.stage === 'shown' ? 'shown' : 'wait';
   if (first.stage === 'shown') return void (hooks.awaiting = hooks.made = undefined);
@@ -154,7 +185,7 @@ export async function tryPage(query = '') {
     const { workspace, page_token } = body.result;
     // A new map opens on the card (firstMoments), over the canvas the agent draws on; a copy, on the copy.
     keepLanding(workspace.id, `#/v?${from ? QUERY : FIRST_QUERY}`);
-    if (!from) keepFirst({ ws: workspace.id, prompt: body.result.prompt, stage: 'wait' });
+    if (!from) keepFirst({ ws: workspace.id, prompt: body.result.prompt, stage: 'wait', fresh: true });
     // The page token is this browser's sign-in, remembered as any workspace is: signing in to keep the map
     // (packs/identity/page/authorize.js, /oauth/authorize opened by the agent's installer) finds the guest by it.
     store.token = page_token;

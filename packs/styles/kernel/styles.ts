@@ -205,7 +205,52 @@ export async function pageStyle(ctx: KernelContext, input: { of?: unknown; style
     delete read.style.code;
     delete read.coder;
   }
+  read.style = await withBackdrop(ctx, read.style, input.have);
   return input.have === undefined ? read : { ...read, style: await drawn(ctx, read.style, input.have) };
+}
+
+/** Where a style's backdrop may show: before a workspace (gate), behind a sheet that fills the page, behind the canvas. */
+export const BACKDROP_PLACES = ['gate', 'sheet', 'canvas'];
+/** The longest a page may be held for its backdrop to be seen: ten seconds. */
+const MOST_WAIT_MS = 10_000;
+/** A backdrop's still: a picture as a data URL, PNG or WebP, nothing else. */
+/** A gate page's emblem: a PNG as a data URL, as every emblem is. */
+const EMBLEM = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/;
+/** A gate page's name, as its address says it (sign-in, try...). */
+const PAGE = /^[a-z][a-z-]{0,30}$/;
+const STILL = /^data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+$/;
+
+/**
+ * A style's backdrop (a theme's land) with the drawing that runs it: the layout a pack ships for its shape, under the
+ * owner's version of it, by hash, with its modules unless the page has them (`have`). One whose shape no pack draws,
+ * or that says nowhere to show, is left out.
+ */
+export async function withBackdrop(ctx: KernelContext, style: Record<string, unknown>, have?: unknown): Promise<Record<string, unknown>> {
+  const said = style.backdrop;
+  if (!said || typeof said !== 'object' || Array.isArray(said)) return style;
+  const { backdrop: _b, ...rest } = style;
+  const b = said as Record<string, unknown>;
+  const on = (Array.isArray(b.on) ? b.on : ['gate']).map(String).filter((p) => BACKDROP_PLACES.includes(p));
+  if (typeof b.shape !== 'string' || !on.length) return rest;
+  const drawing = (await ctx.reads({ drawing: { style: { shape: b.shape }, have: Array.isArray(have) ? have.map(String) : [] } })) as { shape?: string } | null;
+  if (!drawing || drawing.shape !== b.shape) return rest;
+  const setup = b.setup && typeof b.setup === 'object' && !Array.isArray(b.setup) ? b.setup : undefined;
+  const numbers = b.numbers && typeof b.numbers === 'object' && !Array.isArray(b.numbers) ? b.numbers : undefined;
+  const ms = (v: unknown) => (typeof v === 'number' && v >= 0 && v <= MOST_WAIT_MS ? v : 0);
+  const w = b.wait && typeof b.wait === 'object' ? (b.wait as Record<string, unknown>) : undefined;
+  const wait = w && { gather: ms(w.gather), most: ms(w.most) };
+  const picture = (v: unknown): string | undefined => (typeof v === 'string' && STILL.test(v) ? v : undefined);
+  const emblemOf = (v: unknown): string | undefined => (typeof v === 'string' && EMBLEM.test(v) ? v : undefined);
+  const stillOf = (v: unknown) => {
+    const s = v && typeof v === 'object' ? (v as Record<string, unknown>) : undefined;
+    const out = s && { ...(picture(s.wide) && { wide: picture(s.wide) }), ...(picture(s.narrow) && { narrow: picture(s.narrow) }) };
+    return out && Object.keys(out).length ? out : undefined;
+  };
+  const still = stillOf(b.still);
+  const object = (v: unknown) => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : undefined);
+  // Each gate page's own setup and still (sign-in, try...), over the backdrop's.
+  const pages = Object.fromEntries(Object.entries(object(b.pages) ?? {}).filter(([name]) => PAGE.test(name)).map(([name, p]) => [name, { ...(object(object(p)?.setup) && { setup: object(object(p)?.setup) }), ...(stillOf(object(p)?.still) && { still: stillOf(object(p)?.still) }), ...(emblemOf(object(p)?.emblem) && { emblem: emblemOf(object(p)?.emblem) }) }]));
+  return { ...rest, backdrop: { shape: b.shape, on, ...(setup && { setup }), ...(numbers && { numbers }), ...(wait && { wait }), ...(still && { still }), ...(Object.keys(pages).length && { pages }), drawing } };
 }
 
 /** The workspace's icon, what a browser's tab and a client listing this server show: its style's icon, else its emblem, as PNG bytes, or none. */

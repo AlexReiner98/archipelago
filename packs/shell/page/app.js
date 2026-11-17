@@ -9,6 +9,7 @@ import { otherWays, signInBack, signUpOffer, signUpPage } from './sign-up.js';
 import { SignInNeeded, api, tell, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { warmLayouts } from './layout.js';
+import { startLand } from './theme-land.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { home } from './home.js';
 import { entity } from './item.js';
@@ -38,6 +39,8 @@ const GHOST = /^p_[a-z0-9]+:/;
 const SHEET = { e: 'item', held: 'item', new: 'item', s: 'screen', workspace: 'workspace', you: 'you' };
 const sheet = document.getElementById('sheet');
 // An item named outside the app (?link=): a tab open on its workspace takes it, else this page opens on it there.
+// The theme's land, where it says it shows (packs/walls/page/theme-land.js): started first, so it runs on the loading page.
+startLand();
 const linked = await linkFirst();
 startTips();
 // The frame drawings run in, and the drawing this browser drew last loaded in it, started before anything is read: the
@@ -84,7 +87,8 @@ async function route(pulse = false) {
   drawPicker();
   drawNav();
   signUpOffer();
-  firstMoments();
+  // A map made a moment ago opens on Making your map until its land has gathered: nothing more is drawn yet.
+  if (firstMoments() === 'making') return;
   startTabs();
   const params = new URLSearchParams(query);
   // The canvas: the pane in focus draws the lens the address says (the bar pack's parts show it); an item's page with none

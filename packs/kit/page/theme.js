@@ -54,6 +54,15 @@ const paint = () => {
 };
 dark.addEventListener('change', paint);
 
+/** Who wears more of a style than its paint (its backdrop: packs/walls/page/theme-land.js), told each style painted. */
+const wearers = new Set();
+let worn;
+/** Be told each style the page is painted in, the one it wears now first. */
+export function onTheme(fn) {
+  wearers.add(fn);
+  if (worn !== undefined) fn(worn);
+}
+
 /** Paint the page in a style's theme, lengths, faces and text roles. */
 export function applyTheme(style) {
   theme = style?.theme;
@@ -61,4 +70,6 @@ export function applyTheme(style) {
   lengths = style?.lengths;
   text = typeVars(style?.type, style?.faces);
   paint();
+  worn = style ?? null;
+  for (const fn of wearers) fn(worn);
 }
