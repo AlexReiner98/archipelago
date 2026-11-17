@@ -14,6 +14,7 @@ import { cornersOf, corners, islandsOn, onIslands } from './islands-on.js';
 import { islandsOnMap } from './islands-list.js';
 import { unfollow } from './replica.js';
 import { drawBand } from './bar-band.js';
+import './sessions-open.js';
 
 /** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
 let overlay;
@@ -80,10 +81,11 @@ export function activate(c) {
 }
 /**
  * The canvas in focus moved: the band under the tabs is drawn for it (./bar-band.js), and what follows its address is
- * told. The band holds the island side bar's button, if the map has islands, and the pane's back and forward.
+ * told. The band holds the island side bar's button, if the map has islands, the count of chats waiting on the
+ * owner (./sessions-open.js), and the pane's back and forward.
  */
 function barNow() {
-  if (current?.view) drawBand(current.lens, current.view, h('span', { class: 'q-part q-canvas' }, ...[hooks.islandsButton?.(), ...(hooks.paneButtons?.() ?? [])].filter(Boolean)));
+  if (current?.view) drawBand(current.lens, current.view, h('span', { class: 'q-part q-canvas' }, ...[hooks.islandsButton?.(), hooks.waitingButton?.(), ...(hooks.paneButtons?.() ?? [])].filter(Boolean)));
   hooks.addressMoved?.();
 }
 /** Draw the band again, as a part of it came (the side bar's button, once the side bar is drawn). */
