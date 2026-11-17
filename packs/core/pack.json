@@ -121,7 +121,7 @@
       "title": "Person",
       "description": "A human being.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
-      "fields": { "email": { "type": "string" }, "role": { "type": "string", "description": "What they do, in a few words." } }
+      "fields": { "email": { "type": "string" }, "role": { "type": "string", "description": "What they do, in a few words." }, "islands": { "type": "json", "description": "What they have on their canvas, their Home: islands by id and live reads by name (frontier, attention, waits, replies, changed), toggled at the canvas's foot (decision e_n42s8jvn)." } }
     },
     {
       "id": "agent",

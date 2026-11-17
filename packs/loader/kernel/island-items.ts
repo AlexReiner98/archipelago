@@ -25,6 +25,9 @@ export const CELL_FIELD: FieldDef = { type: 'json', cell: true, shown: true, des
 /** The field that makes an item a focus: its own island, the one thing everything on it moves forward (decision e_mqex8wrf). */
 export const FOCUS = 'focus';
 export const FOCUS_FIELD: FieldDef = { type: 'boolean', shown: true, description: 'true makes it a focus: an island of its own (its island is its own id), speaking its type’s pack, that everything on it moves forward. Said when it is made; only a type its pack marks as one that may be a focus.' };
+/** The field of a focus that holds where its island stands on every canvas (decision e_n42s8jvn, the owner, 17 Nov 2026): set by an agent, the same for everyone. */
+export const CORNER = 'corner';
+export const CORNER_FIELD: FieldDef = { type: 'json', cell: true, shown: true, description: 'Where its island stands on every canvas, [column, row] in whole cells: set by an agent, the same for everyone who has the island on. Only a focus has it.' };
 /** Whether an item of a type may be a focus: one that lives on an island and whose pack marks it so (capability focus). */
 export const mayBeFocus = (t: { system: boolean; lineage: string[]; capabilities?: { focus?: boolean } }) => livesOnIsland(t) && t.capabilities?.focus === true;
 

@@ -47,3 +47,8 @@ test('the same picture twice is the same', () => {
   assert.deepEqual([...one.x], [...two.x]);
   assert.deepEqual([...one.y], [...two.y]);
 });
+
+test('an island with no corner stands to the right of those that have one', () => {
+  const g = draw({ e_islandbb: [0, 0] });
+  assert.ok(g.x.get('e_aaaaaaaa') > g.x.get('e_dddddddd'), 'the island with no corner follows the placed one');
+});

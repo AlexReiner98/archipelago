@@ -29,17 +29,20 @@ export function placedOut(args, m, islandOf, heads) {
   for (const n of list) (groups.get(islandOf(n.id)) ?? groups.set(islandOf(n.id), []).get(islandOf(n.id))).push(n);
   const x = new Map(), y = new Map(), islands = [];
   let bottom = M;
-  const own = [...groups].filter(([id]) => id !== null);
+  // Islands an agent has given a corner stand there; the rest follow in a row to the right of all of those.
+  const own = [...groups].filter(([id]) => id !== null).sort(([a], [b]) => Number(!cellOf(corners[a])) - Number(!cellOf(corners[b])));
+  let right = M - GAP;
   for (const [id, items] of own) {
-    const corner = cellOf(corners[id]) ?? [0, 0], top = heads.get(id) ?? 0;
+    const corner = cellOf(corners[id]), top = heads.get(id) ?? 0;
     const unplaced = items.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? 1 : 0;
-    const l = M + corner[0] * cw, t = M + corner[1] * ch;
+    const l = corner ? M + corner[0] * cw : right + GAP, t = corner ? M + corner[1] * ch : M;
     const at = (n, [c, r]) => (x.set(n.id, l + PAD + c * cw + n.w / 2), y.set(n.id, t + PAD + top + r * ch + n.h / 2));
     unplaced.forEach((n, k) => at(n, [0, k]));
     for (const n of items) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
     const r = Math.max(...items.map((n) => x.get(n.id) + n.w / 2)) + PAD, b = Math.max(...items.map((n) => y.get(n.id) + n.h / 2)) + PAD;
     islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }] });
     bottom = Math.max(bottom, b);
+    right = Math.max(right, r);
   }
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
   const line = (w) => {

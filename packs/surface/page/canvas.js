@@ -6,12 +6,11 @@
 // which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
 // themselves (a page opened or shut then leaves it be).
 
-import { api, drawSlot, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
+import { api, drawSlots, h, hooks, idsOf, whoami } from './base.js';
 import { wiresOn } from './canvas-wires.js';
-import { canvasSwitch } from './views-kept.js';
-import { added, moved, numberOf } from './query-base.js';
+import { added, moved } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
-import { drawBand } from './bar-band.js';
+import { cornersOf, corners, islandsOn, onIslands } from './islands-on.js';
 import { unfollow } from './replica.js';
 
 /** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
@@ -32,15 +31,20 @@ async function caughtUp(view) {
   return hooks.tellMissed?.(view);
 }
 
-/**
- * Home: what agents' recent work reaches that needs attention now (the frontier, the same answer a session starts
- * with: decision e_gsxbzvxe), whatever waits on the viewer, and open projects (what stands at a project's altitude),
- * with no walk and a short limit, so the first canvas answers one question (decision e_5stjvfvb). Growing it is a step
- * taken from an item.
- */
-export const home = () => ({
-  filter: { find: ['frontier', 'waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => `type ${t.id}`)], not: ['done', 'kind system'] },
-  limit: numberOf(state.style, 'home_limit'),
+/** What lives on these islands (a list as a person keeps it: islands by id, live reads by name, which are not islands). */
+export const islandsLens = (list) => ({ filter: { find: list.filter((x) => /^e_/.test(x)).map((id) => `island ${id}`) }, walk: { over: [], steps: 0 } });
+/** The islands a lens draws, where it is a list of islands. */
+const islandsOf = (lens) => (lens?.filter?.find ?? []).filter((t) => t.startsWith('island ')).map((t) => t.slice(7));
+/** The person's own list as last read (./islands-on.js). */
+let listNow = [];
+/** Home: the islands the person has toggled on at the canvas's foot, each at its corner (decision e_n42s8jvn). */
+export const home = () => islandsLens(listNow);
+/** Home's list read, before Home is first drawn (ui/panes.js). */
+export const homeReady = () => islandsOn().then((list) => (listNow = list));
+// A toggle at the foot draws Home again in every canvas that draws it.
+onIslands((list) => {
+  listNow = list;
+  for (const c of all) if (c.home) c.show(null, c.here, c.asked);
 });
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
 export const focusOn = (id) => ({ filter: { find: [`id ${id}`] }, walk: { over: FOCUS, steps: 1 } });
@@ -64,25 +68,8 @@ export function activate(c) {
   current = c;
   barNow();
 }
-function barNow() {
-  const c = current;
-  mountBar();
-  if (c?.view) drawBand(c.lens, c.view, canvasSwitch(c.lens, c.asked, c.home, c.pane.open));
-  hooks.addressMoved?.();
-}
-/**
- * Find's line and the rows above it, the bar pack's parts (`bar.find`, `bar.find.rows`): mounted once, in the nodes find
- * holds them in, and handed the lens and its answer as they move (./part-lens.js).
- */
-let barMounted = false;
-function mountBar() {
-  if (barMounted) return;
-  barMounted = true;
-  for (const [slot, id] of [['bar.find', 'find-lens'], ['bar.find.rows', 'find-rows']]) {
-    const node = document.getElementById(id);
-    if (node) drawSlot(node, { slot }).catch((err) => console.warn(`${slot}: ${err?.message ?? err}`));
-  }
-}
+/** The canvas in focus moved: what follows its address is told. */
+const barNow = () => hooks.addressMoved?.();
 /** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */
 hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: current.view.failed } : null);
 /** The lens Home draws, handed where no query is up. */
@@ -281,8 +268,12 @@ export function canvasIn(host, pane) {
     /** Draw the lens up now anew. */
     draw() {
       const of = idsOf(at.lens.filter)[0];
+      // A list of islands stands each at its corner, read first (./islands-on.js), and is drawn with no solve.
+      const isles = islandsOf(at.lens);
+      if (isles.some((id) => !(id in corners))) return void cornersOf(isles).then(() => at && c.draw());
+      const style = isles.length ? { ...at.style, placed: Object.fromEntries(isles.filter((id) => corners[id]).map((id) => [id, corners[id]])) } : at.style;
       // A kept view up plays its steps, if it keeps any (from the map as it is, when Play is pressed: style.play).
-      const view = flatView({ lens: at.lens, style: at.style, of, key: `canvas:${canvasOf(at.asked)}`, played: at.style.canvas, before: handedOn(at.lens) });
+      const view = flatView({ lens: at.lens, style, of, key: `canvas:${canvasOf(at.asked)}`, played: at.style.canvas, before: handedOn(at.lens) });
       // The picture it replaces stops being kept current from the log.
       if (at.view?.store) unfollow(at.view.store);
       at.view = view;

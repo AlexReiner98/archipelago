@@ -6,7 +6,8 @@
 // view in a pane of their own, with no tabs.
 
 import { api, h, hooks } from './base.js';
-import { activate, canvasIn, focusOn } from './canvas.js';
+import { activate, canvasIn, focusOn, homeReady, islandsLens } from './canvas.js';
+import { islandsIn } from './islands-on.js';
 import { presetSettings, savedCanvases, viewParts } from './views-kept.js';
 import { addressOf, opening, readAddress } from './query.js';
 import { titles } from './words.js';
@@ -32,6 +33,9 @@ const known = (entity) => (titles.set(entity.id, entity.title), cornersBy.set(en
 /** The lens and style a pane's address names (no lens for Home): a saved canvas named alone is read from the map. */
 async function lensOf(at) {
   const [where, query = ''] = at.split('?');
+  // A list of islands an address names (an agent's show): drawn, the person's own list left as it was (decision e_n42s8jvn).
+  const named = islandsIn(query);
+  if (named) return { lens: islandsLens(named), style: {} };
   const asked = readAddress(query);
   // A saved canvas is named by its title, read from the map when the page does not know it yet.
   if (asked.style.canvas && !cornersBy.has(asked.style.canvas) && asked.lens) await api('get', { id: asked.style.canvas }).then((got) => known(got.entity), () => {});
@@ -47,7 +51,14 @@ async function lensOf(at) {
     return viewParts(got.entity);
   }
   const id = /^e\/(e_[a-z0-9]{8})/.exec(where)?.[1];
-  return id ? { lens: focusOn(id), style: {}, here: id } : { lens: null, style: {} };
+  // An item's own address draws its island under its page (decision e_n42s8jvn); one on no island, the item and what it holds.
+  if (id) {
+    const island = (await api('get', { id }).catch(() => null))?.entity?.props?.island;
+    return { lens: island ? islandsLens([island]) : focusOn(id), style: {}, here: id };
+  }
+  // Home: the person's own islands, read before it is drawn.
+  await homeReady();
+  return { lens: null, style: {} };
 }
 /** A pane's address for an address of the page: an item's page draws the lens beside it, else the item's own canvas. */
 function paneAt(href) {
@@ -55,7 +66,8 @@ function paneAt(href) {
   const [where, query = ''] = bare.split('?');
   const item = /^e\/(e_[a-z0-9]{8})$/.exec(where)?.[1];
   if (!item) return bare;
-  return `v?${readAddress(query).lens ? query : addressOf(focusOn(item), {})}`;
+  if (islandsIn(query) || readAddress(query).lens) return `v?${query}`;
+  return `e/${item}`;
 }
 
 /**
