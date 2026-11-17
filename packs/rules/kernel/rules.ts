@@ -85,7 +85,7 @@ export interface RuleDef {
     /** The op writes a version's part code alone, the version pinned on one island at most: a trial (packs/loader/kernel/part-trial.ts). */
     part_trial?: boolean;
     /** The op pins an island to a version carrying code that another island already pins. */
-    spreads?: boolean;
+    spreads?: boolean; /** The op turns a pack that runs code off or on, on one island (its packs_off, packs/loader/kernel/island-off.ts). */ island_code?: boolean;
   };
   /** spare: what it matches is let through, every other rule it would be under spared by this one (its pack's bookkeeping only), or with spares, those alone. */
   then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] } | { carry: Carry };
@@ -208,7 +208,7 @@ function capable(reg: Registry, type: string, wanted: string | Record<string, Re
 /** What is read of an op before the rules judge it, beside the op itself (packs/loader/kernel/part-trial.ts). */
 export interface OpFacts {
   part_trial?: boolean;
-  spreads?: boolean;
+  spreads?: boolean; island_code?: boolean;
   /** It makes an item of an island's own pack on that island, in the change that makes the island: in reach of the pack making it. */ own_island?: boolean;
 }
 
@@ -216,7 +216,7 @@ export interface OpFacts {
 function applies(rule: RuleDef & { pack?: string }, reg: Registry, who: Who, w: Written, targets: Target[], held: boolean, facts: OpFacts = {}): boolean {
   const when = rule.when ?? {};
   if (when.part_trial !== undefined && Boolean(facts.part_trial) !== when.part_trial) return false;
-  if (when.spreads !== undefined && Boolean(facts.spreads) !== when.spreads) return false;
+  if (when.spreads !== undefined && Boolean(facts.spreads) !== when.spreads) return false; if (when.island_code !== undefined && Boolean(facts.island_code) !== when.island_code) return false;
   if (when.actor && (when.actor === 'human') !== who.human) return false;
   if (who.reading && !(rule.readings ?? rule.then !== 'hold')) return false;
   if (when.op && !list(when.op)!.includes(w.op)) return false;

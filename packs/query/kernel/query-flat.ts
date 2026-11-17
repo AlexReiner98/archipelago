@@ -132,7 +132,9 @@ interface Seeded {
   terms: Record<string, string[]>;
   step: Record<string, number>;
   on_islands: boolean;
-  islands: { id: string; title?: string; pack?: string | null; focus?: boolean }[];
+  islands: { id: string; title?: string; pack?: string | null; focus?: boolean; decl?: Record<string, unknown> }[];
+  /** Why an item waits: its type's pack is not active on its island (decision e_57bjxy2x), by item. */
+  waiting?: Record<string, { pack: string; why: string }>;
   cut?: boolean;
   matched?: number;
 }
@@ -234,6 +236,8 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
         created_at: e.created_at, updated_at: e.updated_at,
         ...(Object.keys(fields).length && { fields }),
         ...(islandOf(e) && { island: islandOf(e) }),
+        // Its pack is not active on its island: it waits, drawn as a ghost with why, and wakes when the pack is back.
+        ...(seeded.waiting?.[e.id] && { waiting: seeded.waiting[e.id] }),
         ...(spans && { time: filed!.filed[e.id] ?? spans.get(e.id) ?? [] }),
         ...(filed && has(filed.lane, e.id) && { lane: filed.lane[e.id] }),
         ...(filed && has(filed.stream, e.id) && { stream: filed.stream[e.id] }),
@@ -242,7 +246,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
     }),
     // A link that extends another says what it is a flavour of (`is`, nearest first), so a drawing treats it as its root.
     links: seeded.links.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(ctx.registry, r.type).length && { is: flavourOf(ctx.registry, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
-    ...(seeded.islands.length && { islands: seeded.islands.map((r) => { const pack = r.pack ? islandPack(ctx.registry, r.pack, usedOn(r.id)) : undefined; return { id: r.id, ...(r.title !== undefined && { title: r.title }), ...(pack && { pack }), ...(r.focus && { focus: true }) }; }) }),
+    ...(seeded.islands.length && { islands: seeded.islands.map((r) => { const legend = r.pack ? islandPack(ctx.registry, r.pack, usedOn(r.id)) : undefined, pack = legend || r.decl ? { id: r.pack!, title: r.pack!, types: [] as { id: string; title: string }[], links: [] as { id: string; title: string }[], ...legend, ...r.decl } : undefined; /* its legend, and what it declares there: its state, what it requires, what turning it off would send waiting */ return { id: r.id, ...(r.title !== undefined && { title: r.title }), ...(pack && { pack }), ...(r.focus && { focus: true }) }; }) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(seeded.cut && { cut: true }),
     ...(seeded.matched !== undefined && { matched: seeded.matched }),

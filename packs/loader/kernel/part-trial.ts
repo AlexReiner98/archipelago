@@ -7,6 +7,7 @@
 
 import { ISLAND } from './island-items.ts';
 import { mapPack, PACK_VERSION } from './island-pin.ts';
+import { offFacts } from './island-off.ts';
 import { codeTexts } from './pack-code.ts';
 import { PACK_ITEM } from './pack-items.ts';
 import type { Registry } from './packs.ts';
@@ -60,7 +61,7 @@ async function pins(q: Q, reg: Registry, versions: string[]): Promise<Map<string
  */
 export async function opFacts(q: Q, reg: Registry, ops: { op: string }[], found: Map<string, Target>): Promise<OpFacts[]> {
   const given = ops as OpLike[];
-  if (!reg.types.has(PACK) || !reg.types.has(ISLAND)) return given.map(() => ({}));
+  if (!reg.types.has(PACK) || !reg.types.has(ISLAND)) return given.map((op) => offFacts(reg, op, op.id ? found.get(op.id) : undefined));
   const isPack = (type: string | undefined) => Boolean(type && reg.isA(type, PACK));
   const isIsland = (type: string | undefined) => Boolean(type && reg.isA(type, ISLAND));
   const asked = new Set<string>();
@@ -76,7 +77,7 @@ export async function opFacts(q: Q, reg: Registry, ops: { op: string }[], found:
   return given.map((op) => {
     const target = op.id ? found.get(op.id) : undefined;
     const type = op.op === 'create' ? op.type : target?.type;
-    const facts: OpFacts = {};
+    const facts: OpFacts = offFacts(reg, op, target); // an island's packs off, turning one that runs code (packs/loader/kernel/island-off.ts)
     if ((op.op === 'create' || op.op === 'update') && isPack(type)) {
       const props = { ...target?.props, ...op.props };
       const only = Object.keys(op).every((k) => TRIAL_HEAD.has(k)) && Object.keys(op.props ?? {}).every((k) => op.op === 'create' || TRIAL_FIELDS.has(k));

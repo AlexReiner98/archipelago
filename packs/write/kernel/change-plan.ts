@@ -4,7 +4,7 @@
 import { undeclaredColumns } from '../../loader/kernel/head.ts'; import { typedProblems } from '../../loader/kernel/fields.ts'; import { expectsProblem } from '../../loader/kernel/link-ends.ts';
 import { bodyAfter } from './ops.ts'; import { mergeRefusals } from './merge.ts';
 import { currentNames, typesAfter } from '../../loader/kernel/type-items.ts'; import { privateDependencies } from '../../rules/kernel/private-deps.ts';
-import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from '../../loader/kernel/island-items.ts'; import { islandRegistry, pinRefusals } from '../../loader/kernel/island-pin.ts';
+import { publicTypes, type Entity, type Op } from './pelago-types.ts'; import { OWNED_BY } from './owner-link.ts'; import { islandRefusals } from '../../loader/kernel/island-items.ts'; import { islandRegistry, pinRefusals } from '../../loader/kernel/island-pin.ts'; import { offRefusals } from '../../loader/kernel/island-off.ts';
 import type { Archipelago } from './pelago.ts';
 import { validate, type Who } from './write-hooks.ts';
 
@@ -55,6 +55,7 @@ export async function planChange(map: Archipelago, ops: Op[], who?: Who): Promis
         if (op.owner) await checkOwner(reg.type(op.type) && op.type, op.owner, where);
         const type = here.type(op.type);
         if (!type) break; if (type.retired) errors.push(`${where}: ${op.type} is retired here: no new item is made of it`);
+        else if (type.dormant && here !== reg && !reg.type(op.type)?.dormant) errors.push(`${where}: ${op.type} waits on this island: its pack ${type.pack} is ${here.states.get(type.pack)?.state ?? 'off'} here${here.states.get(type.pack)?.why ? ` (${here.states.get(type.pack)!.why})` : ''}, so no new item of it is made here`); // an island's packs off (packs/loader/kernel/island-off.ts)
         if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
         errors.push(...[...typedProblems(op.type, type.fields, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
         if (op.ref) {
@@ -130,7 +131,7 @@ export async function planChange(map: Archipelago, ops: Op[], who?: Who): Promis
   }
   // An item kept with its subject is the placement pack's to check (answer.subject_refusals), judged by this registry.
   const subject = (await (await import('../../loader/kernel/kernel-context.ts')).callAs<{ refusals: string[] }>(map, 'answer.subject_refusals', { ops, registry: reg })).refusals;
-  errors.push(...(await islandRefusals(map, reg, ops)), ...subject, ...(await pinRefusals(map, reg, ops)));
+  errors.push(...(await islandRefusals(map, reg, ops)), ...subject, ...(await pinRefusals(map, reg, ops)), ...(await offRefusals(map, reg, ops)));
   const checked = await validate({ map, reg, who }, ops); // a view's twins, an automation's trigger, and what packs check
   errors.push(...checked.refusals); warnings.push(...checked.warnings);
   if (!errors.length) errors.push(...(await privateDependencies(map, ops)));

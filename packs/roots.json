@@ -2,7 +2,7 @@
   "roots": [
     {
       "id": "core",
-      "hash": "a64fed9756f7524a24a542cb320c94a0e7f0dc9819e96d24e97ed4874c34159b"
+      "hash": "3595f69bff1ebcbc715d796ba993b7c0157f492c003d04f499a797b1328b407b"
     },
     {
       "id": "database",
@@ -30,19 +30,19 @@
     },
     {
       "id": "loader",
-      "hash": "8ebdca114279a05c1fda4409678bf28251cc61ce542b3737f321b43e24714ee7"
+      "hash": "43fbcaae8bd8aa283afb18053472521621aa790a7897a0f5f07e25e7c8821156"
     },
     {
       "id": "rules",
-      "hash": "6efa0e5c2cd56844d96c3e934ff104427b53ccc193d54167ff84e14de7521c00"
+      "hash": "a96a09712fcd1e1b5dc25e4669b0eabac9feca85bf97e15735ff64ad4a647264"
     },
     {
       "id": "write",
-      "hash": "8345c803832c6dcc833da9afacb3f26097c1175c2fc106b75b872ab6561f10b8"
+      "hash": "37525398fa06ec816d0705c0ea7d3231571bb486784c04c359c64cc41dd2ba84"
     },
     {
       "id": "surface",
-      "hash": "c045369fd626b47a7ff244ed41647236ac9556b1feee20b60b74ed7c9ed82f1c"
+      "hash": "798df14f204f738bd640733810d100b2de79dbec1ba2282d1597fa01320e0f0d"
     },
     {
       "id": "panes",
