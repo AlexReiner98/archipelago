@@ -25,6 +25,9 @@ export const CELL_FIELD: FieldDef = { type: 'json', cell: true, shown: true, des
 /** The field that makes an item a focus: its own island, the one thing everything on it moves forward (decision e_mqex8wrf). */
 export const FOCUS = 'focus';
 export const FOCUS_FIELD: FieldDef = { type: 'boolean', shown: true, description: 'true makes it a focus: an island of its own (its island is its own id), speaking its type’s pack, that everything on it moves forward. Said when it is made; only a type its pack marks as one that may be a focus.' };
+/** The field of an island (or a focus) that names the packs turned off there alone (task e_hr4qvr9u, packs/loader/kernel/island-off.ts). */
+export const PACKS_OFF = 'packs_off';
+export const PACKS_OFF_FIELD: FieldDef = { type: 'json', shown: true, description: 'The packs turned off on this island alone, by id (["build"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack.' };
 /** Whether an item of a type may be a focus: one that lives on an island and whose pack marks it so (capability focus). */
 export const mayBeFocus = (t: { system: boolean; lineage: string[]; capabilities?: { focus?: boolean } }) => livesOnIsland(t) && t.capabilities?.focus === true;
 

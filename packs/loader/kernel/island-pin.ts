@@ -11,6 +11,7 @@
 // from the registry the island runs (islandRegistry).
 
 import { ISLAND } from './island-items.ts';
+import { offOn } from './island-off.ts';
 import { actorsOf, packKind, sharedOf } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import type { PackVersion } from './pack-items.ts';
@@ -68,9 +69,39 @@ export async function islandVersion(map: Archipelago, island: unknown, reg: Regi
   return run instanceof Error || !run ? undefined : { registry: run, version: reg.versions.get(pinned as string)! };
 }
 
-/** The registry an island runs: the one of the version it names, else the map's (`reg`). No island, or one that names none, is the map's. */
+/** The registries built for islands with packs off, by the map registry's versions, then by the version run and the packs off. */
+const builtOff = new WeakMap<Map<string, PackVersion>, Map<string, Registry | Error>>();
+
+/**
+ * The registry that runs a version (by its item, or none for the map's pack) with packs turned off (task e_hr4qvr9u): what
+ * relies on those waits, and the types and link types they declare are kept dormant, so their items stay and are
+ * edited, and no new one is made. With none off, the version's registry (or the map's). Built once per map load.
+ */
+export function offRegistry(reg: Registry, version: string | undefined, off: string[]): Registry | Error {
+  const base = version ? versionRegistry(reg, version) : reg;
+  if (!off.length || !base || base instanceof Error) return base ?? reg;
+  const mine = builtOff.get(reg.versions) ?? builtOff.set(reg.versions, new Map()).get(reg.versions)!;
+  const key = `${version ?? ''}|${[...off].sort().join(',')}`;
+  if (!mine.has(key)) {
+    try {
+      const run = reg.trial(reg.items, [], version ? reg.versions.get(version) : undefined, off);
+      run.keep({ types: [...base.types.values()].filter((t) => !run.types.has(t.id)), relations: [...base.relations.values()].filter((r) => !run.relations.has(r.id)) });
+      mine.set(key, run);
+    } catch (err) {
+      mine.set(key, err as Error);
+    }
+  }
+  return mine.get(key)!;
+}
+
+/** The registry an island runs: the one of the version it names, with the packs it turned off (packs/loader/kernel/island-off.ts), else the map's (`reg`). No island, or one that names neither, is the map's. */
 export async function islandRegistry(map: Archipelago, island: unknown, reg: Registry = map.registry): Promise<Registry> {
-  return (await islandVersion(map, island, reg))?.registry ?? reg;
+  if (typeof island !== 'string' || !island) return reg;
+  const found = await map.entity(island);
+  const pinned = found ? pinOf(reg, found) : undefined;
+  const version = pinned && !(versionRegistry(reg, pinned) instanceof Error) ? pinned : undefined;
+  const run = offRegistry(reg, version, offOn(reg, found ?? undefined));
+  return run instanceof Error ? (version ? (versionRegistry(reg, version) as Registry) : reg) : run;
 }
 
 /** Why ops that set an island's version cannot be kept, as sentences: it names no version, one of another pack, or one that does not load. */
