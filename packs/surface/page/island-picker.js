@@ -146,7 +146,8 @@ export function drawPicker() {
     // Searching: one list, best first, worked from the keyboard, within the bar (Alex: nothing drops outside it).
     if (q) {
       lit = Math.min(lit, Math.max(0, found.length - 1));
-      body.replaceChildren(h('div', { class: 'isl-head' }, `Found · ${found.length}`), h('div', { role: 'listbox', 'aria-label': 'Islands found' }, ...found.map((i, n) => hit(i, n, drawn))));
+      const none = found.length ? [] : [h('div', { class: 'isl-row isl-none' }, `Nothing named “${q}”`)];
+      body.replaceChildren(h('div', { class: 'isl-head' }, `Found · ${found.length}`), ...none, h('div', { role: 'listbox', 'aria-label': 'Islands found' }, ...found.map((i, n) => hit(i, n, drawn))));
       if (found[lit]) input.setAttribute('aria-activedescendant', `isl-${found[lit].id}`);
       body.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
       return;

@@ -24,6 +24,7 @@ body[data-islands="open"] #islands .isl-rail-count { display: none; }
 #islands .isl-off:hover { color: var(--accent); }
 
 #islands .isl-hit { cursor: pointer; }
+#islands .isl-none { overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 /* The keyboard's row: the accent bar at its left edge, as the tab in sight has it at its top; a hover is the soft ground alone. */
 #islands .isl-hit[aria-selected="true"] { box-shadow: inset var(--border-3) 0 0 var(--accent); }
 /* A row's pack at its right, muted, cut short before the name is. */
