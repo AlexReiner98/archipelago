@@ -1,5 +1,5 @@
 // Islands drawn by looks of their own (feature e_6efhubbz; decisions e_3c3wr7jv, e_r4emvndv): an answer's island names
-// the layout kept about it (`look`, packs/loader/kernel/island-look.ts), and the drawing that draws islands imports
+// the layout that draws it (`look`, core's link draws; packs/loader/kernel/island-look.ts), and the drawing that draws islands imports
 // each island's look from its module `island-looks.js` (packs/canvas/layouts/map/island-looks.js, none by default). Here
 // that module is written again for the islands this answer holds, and each look's files are put beside the drawing's
 // under names of their own, so a look imports only its own files. The code stays in the drawing's worker, behind the
@@ -14,7 +14,7 @@ const LOOKS = 'island-looks.js';
 /** Each look's files as fetched, by its id and when it last changed. */
 const fetched = new Map();
 
-/** The islands of an answer that a layout kept about them draws, in a steady order. */
+/** The islands of an answer that a layout draws, in a steady order. */
 const lookedOf = (answer) => (answer?.islands ?? []).filter((i) => i.look?.kind === 'layout' && i.look.coded !== false && typeof i.look.id === 'string').sort((a, b) => (a.id < b.id ? -1 : 1));
 
 /**

@@ -1,5 +1,5 @@
 // An island drawn by its own look (feature e_6efhubbz; decisions e_3c3wr7jv, e_r4emvndv, the owner, 17 Nov 2026: place
-// and paint). A look is code kept on the map about an island (a layout, its index.js exporting `island`), handed by the
+// and paint). A look is code kept on the map that draws an island (a layout linked draws to it, its index.js exporting `island`), handed by the
 // frame to the map's drawing as `tools.looks`, by island id. It is asked once per picture with what that island holds
 // and answers where each item stands and what to paint: the map keeps the frame's place, the header and its toggles,
 // ghosts and held badges, each item's link and the wires between islands. A look that throws or answers nothing usable
