@@ -5,6 +5,7 @@
 // code rules. Pinning such a version on another island spreads it (spreads), which core's version_spread holds for
 // the owner. What becomes of the op is decide's alone (packs/rules/kernel/rules.ts): this only reads the facts.
 
+import { overCap } from './island-cap.ts';
 import { ISLAND } from './island-items.ts';
 import { mapPack, PACK_VERSION } from './island-pin.ts';
 import { offFacts } from './island-off.ts';
@@ -60,6 +61,12 @@ async function pins(q: Q, reg: Registry, versions: string[]): Promise<Map<string
  * they are before the change.
  */
 export async function opFacts(q: Q, reg: Registry, ops: { op: string }[], found: Map<string, Target>): Promise<OpFacts[]> {
+  // Whether it adds to an island past its cap (packs/loader/kernel/island-cap.ts), beside what this reads of versions.
+  const [facts, over] = await Promise.all([versionFacts(q, reg, ops, found), overCap(q, reg, ops as OpLike[], found)]);
+  return facts.map((f, i) => (over[i] ? { ...f, over_cap: over[i] } : f));
+}
+
+async function versionFacts(q: Q, reg: Registry, ops: { op: string }[], found: Map<string, Target>): Promise<OpFacts[]> {
   const given = ops as OpLike[];
   if (!reg.types.has(PACK) || !reg.types.has(ISLAND)) return given.map((op) => offFacts(reg, op, op.id ? found.get(op.id) : undefined));
   const isPack = (type: string | undefined) => Boolean(type && reg.isA(type, PACK));

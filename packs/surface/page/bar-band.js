@@ -116,5 +116,7 @@ export function lensSaid(filter, redraw) {
 }
 
 hooks.lensSaid = lensSaid;
+/** An item's name as the page knows it, asked for when it does not yet (`redraw` called once it has come). */
+hooks.nameSaid = (id, redraw) => (titles.has(id) ? titles.get(id) : (askName(id, redraw), '…'));
 hooks.fitBar = fitBar;
 hooks.lights = (ids) => lightItems(up, ids?.length ? ids : null);

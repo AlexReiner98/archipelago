@@ -20,8 +20,7 @@ export const heard = (page: Page) =>
 
 /**
  * The tabs and panes as the panes part draws them (packs/panes/parts/index.js), each mark found by its key: a tab is
- * `tab:<id>` (its name `front:<id>`, its × `close:<id>`, its menu `menu:<id>`), a pane `pane:<id>` (its strip's first
- * words its name, the next whose it is, with what that session said in its tip). In the page, as JavaScript.
+ * `tab:<id>` (its name `front:<id>`, its × `close:<id>`), its canvas `pane:<id>`. In the page, as JavaScript.
  */
 export const TAB = '#tabs [data-key^="tab:"]';
 export const PANE = '#canvas .pm-pane';
@@ -29,11 +28,8 @@ export const PANE = '#canvas .pm-pane';
 export const tabAt = (n: number) => `[...document.querySelectorAll('${TAB}')][${n - 1}]`;
 /** A selector for the name of the tab at `n` (from 1), to press: by the key of the tab there now. */
 export const tabName = async (page: Page, n: number) => `[data-key="front:${(await page.evaluate<string>(`${tabAt(n)}.dataset.key`)).slice(4)}"]`;
-/** What a pane's strip says: its name, and whose it is. */
+/** What a pane's strip says: its name. */
 export const paneName = (pane: string) => `${pane}.querySelector('.pm-pane-strip .pm-text')`;
-export const paneMark = (pane: string) => `${pane}.querySelector('.pm-pane-strip .pm-text + .pm-text')`;
-/** The buttons of tab `tab`'s menu (an expression of the page), opened. */
-export const menuOf = (tab: string) => `(() => { const m = ${tab}.querySelector('details.pm-menu'); m.open = true; return [...m.querySelectorAll('.menu-items button')]; })()`;
 
 /** The page is up, its tabs drawn, and has heard the server: it follows agents' steps from here on. */
 export async function ready(page: Page) {

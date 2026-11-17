@@ -15,6 +15,9 @@ create index if not exists event_pushes on event (target_id, seq desc) where act
 create index if not exists log_fact_kept on log_fact (field, id, pos desc) where field in ('pack', 'segment', 'forgotten');
 `;
 
+// The islands, newest first (search with islands: true, the island picker): a few among millions of items.
+export const ISLANDS_INDEX = `create index if not exists entity_focus on entity (updated_at desc) where props->>'focus' = 'true' and archived_at is null;`;
+
 // Row-level security that asks of each row whether the reader may see its ends, by the key, as rows are read: the
 // policies before this (packs/database/kernel/schema.ts, migration 1) read every visible item into a set first, on every query of
 // links or events, which at a million items is half a second before the query starts.

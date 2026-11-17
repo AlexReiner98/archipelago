@@ -1,0 +1,53 @@
+/* The island picker (packs/surface/page/island-picker.js): a list at the canvas's left edge, folded to it or open, the canvas beside it. */
+#islands { position: fixed; z-index: 3; top: var(--band); bottom: 0; left: 0; display: flex; box-sizing: border-box; width: min(var(--isl-width, var(--side-least)), 60%); border-right: var(--border-1) solid var(--line); background: var(--panel); font-size: var(--text-4); }
+#islands[hidden] { display: none; }
+/* The canvas, and the panes in it (fixed to the window, packs/walls/page/part-marks.css), start at the bar's edge; put away, the bar is gone and the canvas has the width. */
+body[data-islands="open"] :is(#canvas, #canvas .pm-panes) { left: min(var(--isl-width, var(--side-least)), 60%); }
+body[data-islands="folded"] :is(#canvas, #canvas .pm-panes), body[data-islands-over="on"] :is(#canvas, #canvas .pm-panes) { left: 0; }
+body[data-islands="folded"] #islands { display: none; }
+#islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* The bar's right edge: a strip to drag, drawn only as the line it already has, lit while pointed at. */
+#islands .isl-edge { position: absolute; top: 0; bottom: 0; right: 0; width: var(--space-4); cursor: col-resize; }
+#islands .isl-edge:hover { background: var(--line); }
+/* Its button, in the tab bar before the tabs: a word and how many are on, lit while the bar is open. */
+#nav .isl-toggle { flex: none; display: flex; align-items: center; gap: var(--space-4); align-self: stretch; border: 0; border-bottom: var(--border-3) solid transparent; background: none; padding: 0 var(--space-7); font: inherit; color: var(--muted); cursor: pointer; }
+#nav .isl-toggle:is(:hover, :focus-visible) { color: var(--text); outline: none; }
+#nav .isl-toggle[aria-expanded="true"] { color: var(--text); border-bottom-color: var(--accent); }
+#nav .isl-toggle-count { color: var(--muted); font-size: var(--text-2); }
+#islands .isl-top { display: flex; align-items: center; padding: var(--space-4) var(--space-4) var(--space-4) var(--space-6); border-bottom: var(--border-1) solid var(--line); }
+#find[hidden] { display: none; }
+#islands .isl-key { flex: none; padding: 0 var(--space-3); color: var(--muted); font-size: var(--text-2); }
+#islands .isl-search:not(:placeholder-shown) + .isl-key { display: none; }
+#islands .isl-search { flex: 1; min-width: 0; box-sizing: border-box; height: var(--box-8); border: 0; background: none; padding: 0 var(--space-3); font: inherit; font-size: var(--text-5); color: var(--text); outline: none; }
+#islands .isl-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding: 0 0 var(--space-9); }
+/* The list's parts, each a band: a line and space above it, its head small and spaced, its rows under it. */
+#islands .isl-sec { padding-bottom: var(--space-5); }
+#islands .isl-sec + .isl-sec { border-top: var(--border-1) solid var(--line); }
+#islands .isl-head { padding: var(--space-8) var(--space-6) var(--space-4); color: var(--muted); font-size: var(--text-1); text-transform: uppercase; letter-spacing: var(--track-3); }
+/* On: what the canvas draws, on the canvas's own ground, its names the largest and brightest in the bar. */
+#islands .isl-sec-on { background: var(--bg); }
+#islands .isl-sec-on .isl-row { height: var(--box-8); font-size: var(--text-5); }
+#islands .isl-sec-on .isl-head { color: var(--text); }
+#islands .isl-row { display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-7); padding: 0 var(--space-6); white-space: nowrap; }
+/* A mark for the state: a dot before every island that is on, wherever its row stands; an off one keeps the room. */
+#islands .isl-row::before { content: ''; flex: none; width: var(--space-5); color: var(--ok); font-size: var(--text-5); line-height: 1; text-align: center; }
+#islands .isl-row.on::before { content: '•'; }
+/* Under On every row is on but one just taken off, which its muted name says: no dot there, the name has the room. */
+#islands :is(.isl-none, .isl-sec-on .isl-row)::before { display: none; }
+#islands .isl-sec-on .isl-row:not(.on) .isl-name { color: var(--muted); }
+#islands .isl-row:hover { background: var(--accent-soft); }
+#islands .isl-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+#islands .isl-off { flex: none; border: 0; background: none; padding: 0 var(--space-3); font: inherit; color: var(--muted); cursor: pointer; }
+#islands .isl-off:hover { color: var(--accent); }
+
+#islands .isl-hit { cursor: pointer; }
+#islands .isl-none { overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+/* The keyboard's row (found, or lit in the list), and under On the island the canvas was brought to: the accent bar at its left edge, as the tab in sight has it at its top; a hover is the soft ground alone. */
+#islands .isl-body:focus { outline: none; }
+#islands .isl-hit[aria-selected="true"], #islands .isl-row[aria-current="location"], #islands .isl-row[data-lit] { box-shadow: inset var(--border-3) 0 0 var(--accent); }
+/* A row's pack at its right, muted, cut short before the name is. */
+#islands :is(.isl-pack, .isl-when) { flex: 0 100 auto; min-width: var(--box-7); max-width: 40%; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+#islands .isl-row:not(.on, .isl-hit) .isl-name { color: var(--muted); }
+/* Recent: where work is now, named in full colour, when at its right. */
+#islands .isl-sec-recent .isl-row .isl-name { color: var(--text); }
+#islands .isl-row:not(.on, .isl-hit) .isl-name:hover { color: var(--text); }

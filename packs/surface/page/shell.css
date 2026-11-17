@@ -466,3 +466,4 @@ body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + (var
 .part-going:empty { display: none; }
 .part-going-row { display: flex; align-items: baseline; gap: var(--space-5); max-width: 100%; min-width: 0; white-space: nowrap; color: var(--muted); pointer-events: auto; }
 .part-going-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* The island picker (decision e_n42s8jvn): the islands on in one line, then a field to find more; what it finds rises above as rows, one line each, a mark where an island is on. */

@@ -27,10 +27,13 @@ import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth } from './pack-marks.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
+import { looks as kept } from './island-looks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
 import { carried } from './carried.js';
-import { shapedBy } from './steps.js';
+import { shapedBy, shapeIn, SHAPES } from './steps.js';
+import { focusOf } from './focus.js';
+import { paintIslands } from './painted.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
@@ -123,7 +126,10 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const pane = width > 0 && height > 0 ? width / height : ASPECT;
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
   const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
-  const shapes = { type: record(style.type_shapes) };
+  // Each island's own layer, from the packs active on it (decision e_gqmavsb7): outlines and dots for its items.
+  // A view that says its islands are plain (island_looks) draws each by its own look alone: no island's look or layer.
+  const shown = style.island_looks === 'plain' ? (answer.islands ?? []).map(({ look: _l, style: _s, ...i }) => i) : answer.islands ?? [];
+  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
@@ -131,7 +137,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
   // One budget for the whole picture (./effort.js): what it spends on looking better, at every level, it spends from this.
   const effort = effortOf(z('picture_work'));
-  const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes, ...(style.placed && typeof style.placed === 'object' && { placed: style.placed }) });
+  // An island with a look of its own is asked how what it holds stands and looks (../map/looks.js), by the code the frame hands over.
+  const onIsle = (id) => new Set(answer.items.filter((i) => i.island === id).map((i) => i.id)), looks = new Map(shown.filter((i) => i.look && (tools.looks ?? kept).get(i.id)).map((i) => ((own) => [i.id, { look: (tools.looks ?? kept).get(i.id), island: { id: i.id, title: i.title, pack: i.pack?.id ?? i.pack ?? null }, links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), numbers: style.numbers, m }])(onIsle(i.id))));
+  const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes, ...(style.placed && typeof style.placed === 'object' && { placed: style.placed }), ...(looks.size && { looks }), ...(focus.at.size && { focusAt: focus.at }) });
   // A picture of items on islands is an archipelago (./archipelago.js): each island laid out alone, a sea between. One
   // island is framed too, with its own legend in place of the key (task e_5rh5ysut).
   const parts = !story && islandsOf(answer.items).length > 0 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
@@ -143,12 +151,12 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const yours = (i) => Boolean(stateOf(i).you);
   // How each phase's dot is drawn (the style's phase_marks): hollow, half, full or none.
   const MARKS = ['hollow', 'half', 'full', 'none'], marks = record(style.phase_marks);
-  const markOf = (phase) => (MARKS.includes(marks[phase]) ? marks[phase] : 'hollow');
+  const markOf = (phase, island) => ((own) => (MARKS.includes(own[phase]) ? own[phase] : 'hollow'))({ ...marks, ...record(isleStyle(island).phase_marks) });
   // Whether a step held up by an open step it depends on is marked in the trouble colour (the style's held_up): the
   // house style does not, since the order's wire already says it and red is kept for trouble (the owner, 3 Nov 2026).
   const heldUp = (i) => style.held_up === 'trouble' && Boolean(stateOf(i).blocked);
   /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
-  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
+  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
   const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : mark === 'half'
     ? m('g', { class: `lf-dot ${cls}` }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-dot-fill' }))
@@ -291,22 +299,26 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // An island that says its pack (the answer's `islands`) names it in the pack's words and order, but only what is in
   // use on it (the owner, 6 Nov 2026): the types of its items and the link types of its own links.
   const packRows = (pack, group) => [
-    ...pack.types.filter((t) => group.items.some((i) => i.type === t.id)).map((t) => ((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapes.type?.[shapedBy({ type: t.id, is: t.is }, shapes)] ?? 'box')),
+    ...pack.types.filter((t) => group.items.some((i) => i.type === t.id)).map((t) => ((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapeIn({ type: t.id, is: t.is, island: group.id }, shapes))),
     ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => mark(r.id === ORDER_TYPE ? m('path', { d: 'M1 7H21', class: `lf-wire${kind(r.id)}` }) : tieKey(r.id, kind(r.id)), r.title)),
   ];
-  const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack;
+  const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack, capOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.cap;
   // An island's findings are items, drawn as any item is where its query holds them; its shore lists none (the owner, 10 Nov 2026).
   const [KW, KH] = ['key_width', 'key_height'].map(z);
   // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id }] : []);
   const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
-  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z);
+  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
   if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
+  // Islands whose look paints (./painted.js): their items are painted on the surface, not drawn as steps, nor the wires among them.
+  const canvases = (g.islands ?? []).filter((i) => i.canvas), inPainted = new Set(answer.items.filter((i) => canvases.some((c) => c.id === i.island)).map((i) => i.id));
+  if (inPainted.size) g = { ...g, all: g.all.filter((n) => !inPainted.has(n.id)), chains: g.chains.filter((w) => !inPainted.has(w.a) || !inPainted.has(w.b)), ties: g.ties.filter((w) => !inPainted.has(w.a) || !inPainted.has(w.b)) };
   const steps = g.all.filter((n) => !n.dummy);
-  if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
+  if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
+  const painting = canvases.length ? paintIslands({ tools, most: z('surface_most'), islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
 
   // A read that ends on a finding's name has no head there: the wire from the name to the finding carries it.
   const tieHeads = g.ties.map((t) => heads(t, t.type)), chainHeads = g.chains.map((c) => heads(c, ORDER_TYPE));
@@ -340,7 +352,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
     return [left - z('dot_gap'), g.y.get(n.id)];
   };
-  const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase), ...dotPlace(n), z('dot'));
+  const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase, n.item.island), ...dotPlace(n), z('dot'));
   const sessionDot = (n) => marked(n.item) && stateMark(m, sessionOf(n.item).state, marked(n.item), ...dotPlace(n), z('dot'));
   // Where a step stands is of the grammar every island shares: its dot says so in a tip of its own, over a ring wider
   // than the dot to hover (`p:<id>`), so an island's legend need not.
@@ -360,10 +372,11 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its
   // shore; a finding read across outlined in its island's colour (./islands.js).
   // Its header after its name: its pack and what that pack requires, each a mark (./pack-marks.js).
-  // The packs this island turned off, as its item says (packs_off, shown on a focus or an island the answer holds).
-  const offOn = (id) => ((v) => (Array.isArray(v) ? v : []))(answer.items.find((i) => i.id === id)?.fields?.packs_off);
-  const header = (id, [x, y], title) => packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on });
+  // The packs this island turned off, as the answer's island says (packs_off), else its item where the answer holds it.
+  const offOn = (id) => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.packs_off ?? answer.items.find((i) => i.id === id)?.fields?.packs_off);
+  const header = (id, [x, y], title) => packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) });
   const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header });
+  const drawnBy = new Map((g.islands ?? []).flatMap((isle) => [...(isle.look?.items ?? [])]));
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
@@ -372,7 +385,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus'].filter(Boolean).join(' ');
-    const body = [
+    // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's.
+    const body = drawnBy.get(n.id)?.length ? [m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
       outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
@@ -455,8 +469,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     size.width = width;
   }
   return {
-    scene: { css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
-    end: player?.end,
+    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    end: () => (player?.end?.(), painting?.end()),
+    viewport: (v) => (painting?.view(v), []),
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);

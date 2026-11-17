@@ -139,22 +139,15 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
 
   // 6. Share: a view of the plan, made public as it is now, which anyone opens with no login and search engines list,
   // drawn by its layout, with a way to start a map of their own.
-  // Made where a person is: the view up on the canvas, saved in its band (the menu pack's part asks its name there),
-  // then its band's menu, Share it, what goes out said first, then the address.
-  const sharer = await open(`${base}/#/v?find=in+${ids.hub}`);
+  // Made where a person is: the view kept on the map (a view item), its page opened over the canvas, Share in its menu,
+  // what goes out said first, then the address. (The bar that saved and shared the view up went with the islands canvas.)
+  const view = ((await person('change', { reason: 'A view of the plan', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'The login plan', props: { filter: { find: [`in ${ids.hub}`] }, walk: { over: [], steps: 0 } } }] })) as { created: Record<string, string> }).created.v;
+  const sharer = await open(`${base}/#/e/${view}`);
   let link: { path: string };
   try {
-    const bandButton = (tip: string) => `[...document.querySelectorAll('#query .pm-button')].find((b) => b.title === ${JSON.stringify(tip)})`;
-    assert.ok(await sharer.until(`Boolean(${bandButton('Save this view')})`, 20000), 'the band offers to save it');
-    await sharer.evaluate(`${bandButton('Save this view')}.click()`);
-    assert.ok(await sharer.until(`Boolean(document.querySelector('#query input[aria-label="The view’s name"]'))`), `asked for a name: ${await sharer.evaluate('document.querySelector("#query")?.innerText')} | ${await sharer.evaluate('location.hash')}`);
-    await sharer.evaluate(`(() => { const i = document.querySelector('#query input[aria-label="The view’s name"]'); i.value = 'The login plan'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
-    await sharer.evaluate(`${bandButton('Keep what is up under this name')}.click()`);
-    assert.ok(await sharer.until(`document.querySelector('#query .q-pick')?.dataset.title === 'The login plan'`), `kept, the bar names it: ${await sharer.evaluate('document.querySelector("#query")?.innerText')} | ${await sharer.evaluate('location.hash')} | ${sharer.logs().join(" ").slice(-400)}`);
-    assert.ok(await sharer.until(`Boolean(document.querySelector('.q-band-menu'))`, 20000), 'the band has its menu');
-    await sharer.evaluate(`document.querySelector('.q-band-menu').click()`);
-    assert.ok(await sharer.until(`[...document.querySelectorAll('.tab-menu button')].some((b) => b.textContent === 'Share it')`), 'the menu offers to share it');
-    await sharer.evaluate(`[...document.querySelectorAll('.tab-menu button')].find((b) => b.textContent === 'Share it').click()`);
+    const share = `[...document.querySelectorAll('#sheet details.menu .menu-items button')].find((b) => b.textContent === 'Share')`;
+    assert.ok(await sharer.until(`Boolean(${share})`, 20000), `its page offers to share it: ${sharer.logs().join(' ').slice(0, 400)}`);
+    await sharer.evaluate(`${share}.click()`);
     // A public view is of a view kept on the map: kept above, it is asked how to share it.
     const choose = `document.querySelector('dialog.ask button[value="choice:0"]')`;
     const sure = `/^Share “The login plan”\\?/.test(document.querySelector('dialog.ask h2')?.textContent ?? '')`;
