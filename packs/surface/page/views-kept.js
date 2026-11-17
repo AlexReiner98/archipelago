@@ -51,7 +51,7 @@ export function viewParts(item) {
   // A view that lists its islands draws what lives on them (feature e_u52abqr4).
   const filter = islandsOf(p) ? { find: islandsOf(p).map((i) => `island ${i.island}`) } : p.filter ?? {};
   const lens = { ...(p.view && { view: p.view }), filter, walk: p.walk ?? { over: [], steps: 0 }, ...(p.limit && { limit: p.limit }), ...(p.time && { time: p.time }), ...(p.sessions === false && { sessions: false }) };
-  return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }) } };
+  return { lens, style: { ...(p.style ?? {}), ...(!item.preset && { canvas: item.id }), ...(cornersOf(p) && { placed: cornersOf(p) }) } };
 }
 
 /** Where a saved canvas opens: the address names it, and its lens is read from the map when it is opened; a pack's, by its lens. */
@@ -99,7 +99,7 @@ export function keptView(id, { key = `kept:${id}`, style = {} } = {}) {
       const ids = idsOf(kept.lens.filter);
       const ends = [...(kept.lens.filter.find ?? []), ...(kept.lens.filter.only ?? [])].filter((t) => !/^(id|text|type|kind) /.test(t)).map((t) => t.split(/\s+/).slice(1).join(' '));
       const from = ids.includes(of) || ends.includes(of) ? of : ids.length === 1 ? ids[0] : true;
-      const view = flatView({ lens: kept.lens, style: { ...kept.style, ...style }, of, key, nest: from, ...((steps || cornersOf(got.entity.props ?? {})) && { extra: { ...(steps && { steps }), ...(cornersOf(got.entity.props ?? {}) && { placed: cornersOf(got.entity.props ?? {}) }) } }) });
+      const view = flatView({ lens: kept.lens, style: { ...kept.style, ...style }, of, key, nest: from, ...(steps && { extra: { steps } }) });
       Object.defineProperty(host, 'answer', { get: () => view.answer, configurable: true });
       host.mark = (here) => view.mark(here);
       host.replaceChildren(view);

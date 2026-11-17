@@ -306,7 +306,7 @@ export class Registry {
   keep(kept: { types: ResolvedType[]; relations: ResolvedRelation[] }): void {
     this.kept = kept;
     // One kept before owned was a capability says it by its owner column: links from it are allowed as they were.
-    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, starter: t.starter ?? t.lineage?.at(-1) ?? t.id, capabilities: { ...(t.columns?.owner && { owned: true }), ...t.capabilities }, dormant: true });
+    for (const t of kept.types) if (!this.types.has(t.id)) this.types.set(t.id, { ...t, ...(this.islands && t.fields?.[ISLAND] && !t.fields[CELL] ? { fields: { ...t.fields, [CELL]: CELL_FIELD } } : {}), starter: t.starter ?? t.lineage?.at(-1) ?? t.id, capabilities: { ...(t.columns?.owner && { owned: true }), ...t.capabilities }, dormant: true });
     for (const r of kept.relations) if (!this.relations.has(r.id)) this.relations.set(r.id, { ...r, dormant: true });
   }
 
