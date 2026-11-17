@@ -51,3 +51,12 @@ test('the flat lens by name reads its seeds through the reads API as the asker, 
   const seeds = asked.find((q) => q.flat)!.flat as { find: { as: string }[]; said_not: boolean; limit: number };
   assert.deepEqual([seeds.find.map((t) => t.as), seeds.said_not, seeds.limit], [['type task'], false, 500]);
 });
+
+test('an island reaches the flat answer whole: a field set at the source arrives, its decl folded into its pack', async () => {
+  const row = { id: 'e_a', type: 'task', title: 'A', body: '', visibility: 'shared', status: 'todo', is_open: true, owner: null, props: { island: 'e_i' }, created_at: new Date(0), updated_at: new Date(0) };
+  const island = { id: 'e_i', title: 'Isle', pack: 'design', focus: true, packs_off: ['design'], decl: { state: 'off', requires: [] } };
+  const { ctx } = fake((q) => (q.me ? null : q.flat ? { items: [row], links: [], whole: [], found: { e_a: ['type'] }, terms: { e_a: ['type task'] }, step: {}, on_islands: true, islands: [island] } : undefined));
+  (ctx.registry as unknown as { packs: unknown[] }).packs = [];
+  const answer = (await flat(ctx, { filter: { find: ['type task'] } })) as { islands: Record<string, unknown>[] };
+  assert.deepEqual(answer.islands, [{ id: 'e_i', title: 'Isle', focus: true, packs_off: ['design'], pack: { id: 'design', title: 'design', types: [], links: [], state: 'off', requires: [] } }]);
+});

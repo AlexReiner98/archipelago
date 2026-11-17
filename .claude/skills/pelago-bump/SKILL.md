@@ -38,14 +38,22 @@ prevented it cheaply, it counts.
 
 ## How to record one
 
-1. **Find the home.** Bumps live as issues under the Archipelago project's feature
-   for friction. `query` with name `search`, params type `feature` and q
-   `friction`; `references/home.md` says the same for this workspace. If there
-   is none, create the issue as part of the Archipelago project instead. On a
-   map with islands, a bump is of the type the home's island takes: `bug` where
-   it speaks code, `issue` where it speaks work (a refusal names which). A map
-   with no `issue` type (`query` `schema` says which it has) takes each bump as
-   a `finding` linked `about` the item it concerns, in the same shape below.
+1. **Find the home, and read the type from it.** Bumps live under the
+   Archipelago project's feature for friction: `query` with name `search`,
+   params type `feature` and q `friction` (`references/home.md` says the same
+   for this workspace). This skill names no type or field, because each map
+   has its own; read them from the home instead, in two calls:
+   - `query` `get` the home. The bump type is the type its existing bumps
+     have (the `incoming` `part_of` rows, by `entity_type`). On a map with
+     islands, also keep the home's `props.island`: a new bump lives there.
+   - `query` `schema` with that type. Its `fields` are the only props you
+     may set (an undeclared one is refused), and their types say how
+     (`touches` a string, `severity` one of its values).
+   If the home has no bumps yet, `get` its island: its `props.pack` names
+   the pack it speaks, and `query` `schema` lists the types with their
+   `pack`; take that pack's type for a defect or friction. If there is no
+   home at all, make the bump part of the Archipelago project, of a type its
+   island takes, and say in its first line that it is about Archipelago.
 
 2. **Look for it first.** `query` `search` with that type, `open: true`, and
    one distinctive word of what happened in q (a search of several words can
@@ -57,7 +65,8 @@ prevented it cheaply, it counts.
    anyone can tell. If it was marked resolved and you have just hit it again,
    reopen it and say so.
 
-4. **If it is new, create an issue**, part of the friction feature:
+4. **If it is new, create one** of that type, part of the friction feature,
+   with `island` set to the home's island where the map has islands:
    - **Title**: what is wrong, named in a few plain words a person would nod
      at, 60 characters at most (the server refuses longer from an agent).
      "A long note is re-sent whole to change a line", not "body update UX"
@@ -77,11 +86,11 @@ prevented it cheaply, it counts.
      An update that appends to, or replaces part of, a body.
      ```
 
-   - **props**: `kind: "problem"`, and `severity`: `high` if it stopped the
-     work or lost something, `medium` if it cost real time or would mislead,
-     `low` if it is only awkward.
-   - **touches**, in props, where its type has the field (`query`
-     `schema` with that type): what it touched, so the snags view (the refine
+   - **props**, only those the schema declares. Where it has `severity`:
+     `high` if it stopped the work or lost something, `medium` if it cost real
+     time or would mislead, `low` if it is only awkward. Where it has `kind`,
+     `"problem"`.
+   - **touches**, in props, where its type has the field: what it touched, so the snags view (the refine
      pack's) can group it with the others that did. One or more of `pack:<id>`, `instruction:<id>`,
      `tool:<name>`, `rule:<id>`, `view:<name>`, `hook:<event>`,
      `page:<name>` or `part:<pack>.<name>` (a part of the page, by its id:
@@ -97,7 +106,7 @@ prevented it cheaply, it counts.
 
 5. **A map found out of date** is corrected before it is counted. Fix the item
    itself first (its status, or a "Stands at" line rewritten, not appended),
-   then add one dated line under "Seen" on the open issue about the map going
+   then add one dated line under "Seen" on the open bump about the map going
    stale (search q `stale`; create it if there is none), naming which cause it
    was, so the causes are counted:
    1. a body keeps "not merged" or "not pushed" after the merge;
@@ -112,9 +121,9 @@ prevented it cheaply, it counts.
 
 ## When one is fixed
 
-When a change removes a bump, resolve its issue in the same breath, in the
+When a change removes a bump, resolve it in the same breath, in the
 change that records the commit (a commit item with its sha, linked settles to
-the issue).
+the bump).
 
 ## Keeping this smooth
 
