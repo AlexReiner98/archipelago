@@ -33,6 +33,7 @@ import { drawn } from './polyline.js';
 import { carried } from './carried.js';
 import { shapedBy, shapeIn, SHAPES } from './steps.js';
 import { focusOf } from './focus.js';
+import { paintIslands } from './painted.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
@@ -311,9 +312,13 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
   if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
+  // Islands whose look paints (./painted.js): their items are painted on the surface, not drawn as steps, nor the wires among them.
+  const canvases = (g.islands ?? []).filter((i) => i.canvas), inPainted = new Set(answer.items.filter((i) => canvases.some((c) => c.id === i.island)).map((i) => i.id));
+  if (inPainted.size) g = { ...g, all: g.all.filter((n) => !inPainted.has(n.id)), chains: g.chains.filter((w) => !inPainted.has(w.a) || !inPainted.has(w.b)), ties: g.ties.filter((w) => !inPainted.has(w.a) || !inPainted.has(w.b)) };
   const steps = g.all.filter((n) => !n.dummy);
-  if (!steps.length) return { scene: { message: 'Nothing here yet.' } };
+  if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
+  const painting = canvases.length ? paintIslands({ tools, most: z('surface_most'), islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
 
   // A read that ends on a finding's name has no head there: the wire from the name to the finding carries it.
   const tieHeads = g.ties.map((t) => heads(t, t.type)), chainHeads = g.chains.map((c) => heads(c, ORDER_TYPE));
@@ -464,8 +469,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     size.width = width;
   }
   return {
-    scene: { css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
-    end: player?.end,
+    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    end: () => (player?.end?.(), painting?.end()),
+    viewport: (v) => (painting?.view(v), []),
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);

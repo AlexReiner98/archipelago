@@ -33,10 +33,10 @@ export function withLooks(drawing, answer, have, plain = false) {
 /** A look's files: one text is its index.js. */
 const filesOf = (code) => (typeof code === 'string' ? { 'index.js': code } : code && typeof code === 'object' ? Object.fromEntries(Object.entries(code).filter(([, v]) => typeof v === 'string')) : {});
 
-/** A look's code, fetched once for each time it changed. */
+/** A look's code and its settings (what a look that paints reads as its style), fetched once for each time it changed. */
 const codeOf = (look) => {
   const key = `${look.id}@${look.at ?? ''}`;
-  if (!fetched.has(key)) fetched.set(key, api('get', { id: look.id }).then((r) => filesOf(r?.entity?.props?.code)).catch(() => ({})));
+  if (!fetched.has(key)) fetched.set(key, api('get', { id: look.id }).then((r) => ({ files: filesOf(r?.entity?.props?.code), settings: r?.entity?.props?.settings ?? {} })).catch(() => ({ files: {}, settings: {} })));
   return fetched.get(key);
 };
 
@@ -44,12 +44,12 @@ const codeOf = (look) => {
 export async function looksModules({ base, looked }) {
   const out = { ...base }, lines = [], entries = [];
   const codes = await Promise.all(looked.map((i) => codeOf(i.look)));
-  codes.forEach((files, k) => {
+  codes.forEach(({ files, settings }, k) => {
     if (typeof files['index.js'] !== 'string') return;
     const own = (name) => `look.${k}.${name}`;
     for (const [name, text] of Object.entries(files)) out[own(name)] = text.replace(/(\bfrom\s*|\bimport\s*\(?\s*)(['"])\.\/([\w.-]+\.js)\2/g, (_, before, q, dep) => `${before}${q}./${own(dep)}${q}`);
     lines.push(`import * as l${k} from './${own('index.js')}';`);
-    entries.push(`[${JSON.stringify(looked[k].id)}, l${k}]`);
+    entries.push(`[${JSON.stringify(looked[k].id)}, { ...l${k}, settings: ${JSON.stringify(settings && typeof settings === 'object' ? settings : {})} }]`);
   });
   out[LOOKS] = `${lines.join('\n')}\nexport const looks = new Map([${entries.join(', ')}]);\n`;
   return out;

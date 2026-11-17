@@ -33,3 +33,6 @@ export function lookOut(look, { island, nodes, links, sizes, numbers, measure, m
   const items = new Map(Object.entries(said.items ?? {}).filter(([id]) => own.has(id)).map(([id, v]) => [id, marks(v)]));
   return { width, height, places, paint: marks(said.paint), items };
 }
+
+/** Whether a look paints its island on a canvas (a layout's code: its default draws on one) rather than placing marks. */
+export const paints = (look) => typeof look?.default === 'function' && typeof look?.island !== 'function';

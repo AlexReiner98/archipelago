@@ -117,3 +117,15 @@ test('a view that says its islands are plain draws none by its own look or layer
   assert.ok(!plain.includes('"lf-look"') && !plain.includes('"lf-look-item"'), 'no look drawn');
   assert.doesNotMatch(JSON.stringify(find(JSON.parse(plain), (k: any) => k[1]?.href === '#/e/e_bbbbbbbb')), /"path"/, 'nor the island’s outlines');
 });
+
+test('a look that paints is given its island’s frame and a surface, its items left to it', () => {
+  const field = { default: () => {} };
+  const answer = { items, links: [], islands: [{ id: 'e_islandaa', title: 'Here', look: { id: 'e_look0000', kind: 'layout', coded: true } }, { id: 'e_islandbb', title: 'There' }] };
+  const tools = { measure, looks: new Map([['e_islandaa', field]]), gestures: () => ({ on: () => [] }), frame: () => new Promise(() => {}) };
+  const out = draw({ answer, style: { ...house, placed }, reduced: true, width: 1200, height: 800 }, tools);
+  assert.deepEqual(out.scene.surface, { key: 'islands-painted' }, 'the scene asks for a surface');
+  const svg = JSON.stringify(out.scene.svg);
+  assert.ok(!svg.includes('#/e/e_aaaaaaaa'), 'its items are not drawn as steps');
+  assert.ok(svg.includes('#/e/e_dddddddd'), 'the other island’s are');
+  out.end?.();
+});
