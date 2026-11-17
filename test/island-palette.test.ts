@@ -57,6 +57,8 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the group open, its mark turned', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-group[aria-expanded="true"] .isl-fold')?.textContent === '⌄'`));
     const quarry = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Quarry')`;
     await until('Quarry in its group', () => page.evaluate<boolean>(`Boolean(${quarry})`));
+    // It sits under its group's name, with no mark of its own.
+    assert.ok(await page.evaluate<boolean>(`(() => { const r = ${quarry}, g = r.closest('.isl-in').previousElementSibling; return !r.querySelector('.isl-mark') && Math.abs(r.querySelector('.isl-name').getBoundingClientRect().left - g.querySelector('.isl-name').getBoundingClientRect().left) < 1; })()`), 'under its group');
     const before = await page.evaluate<number>(`Math.round(${quarry}.getBoundingClientRect().top)`);
     await page.evaluate(`${quarry}.querySelector('button.isl-name').click()`);
     await until('Quarry on, its row lit where it stood', () => page.evaluate<boolean>(`(() => { const r = ${quarry}; return r?.classList.contains('on') && Boolean(r.querySelector('.isl-off')) && Math.round(r.getBoundingClientRect().top) === ${before} && document.querySelector('#islands .isl-head').textContent.includes('On · 2'); })()`));

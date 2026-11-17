@@ -112,9 +112,10 @@ export function drawPicker() {
    * folded), not by a press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
    */
   let laidOn = null;
-  const row = (i, on) =>
+  /** An island's row; in a group (`grouped`) it sits under the group's name with no mark of its own: the group says its pack. */
+  const row = (i, on, grouped = false) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
-      packMark(i.pack),
+      grouped ? '' : packMark(i.pack),
       on
         ? h('span', { class: 'isl-name', title: `${i.title} · ${i.pack.title || i.pack.id}` }, i.title)
         : h('button', { type: 'button', class: 'isl-name', title: `${i.title}: put on the canvas`, onclick: () => putOn(i) }, i.title),
@@ -146,7 +147,7 @@ export function drawPicker() {
       const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown), title: `${g.title}: ${g.islands.length} island${g.islands.length === 1 ? '' : 's'}` },
         h('span', { class: 'isl-mark isl-fold', 'aria-hidden': 'true' }, shown ? '⌄' : '›'), h('span', { class: 'isl-name' }, g.title || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
       head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), relay());
-      parts.push(head, ...(shown ? [h('div', { role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id))))] : []));
+      parts.push(head, ...(shown ? [h('div', { class: 'isl-in', role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id), true)))] : []));
     }
     body.replaceChildren(...parts);
   };
