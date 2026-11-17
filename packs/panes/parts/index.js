@@ -42,20 +42,10 @@ function modelOf(input) {
 /** The sessions as the strip names and marks them: what each is called, the word its hue is made from, whether it ended. */
 const sessionsOf = () => Object.fromEntries(Object.entries(m.heard ?? {}).map(([k, s]) => [k, { name: s.called, word: s.name, ended: s.ended, state: s.state, for: s.for }]));
 
-/** A web page framed in a pane is named by its host. */
-function hostOf(at) {
-  try {
-    const url = M.webOf(at);
-    return url ? new URL(url).host : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/** The tab in sight's canvas, as a mark: drawn at its address, named by what it draws (a web page by its host). */
+/** The tab in sight's canvas, as a mark: drawn at its address, named by what it draws. */
 function paneMark(t) {
   const id = M.focusOf(t);
-  return ['panes', { key: 'panes', dir: 'row' }, ['pane', { key: `pane:${id}`, at: t.panes[id].at, share: 1, selected: true }, ['text', {}, String(hostOf(t.panes[id].at) ?? t.panes[id].name ?? 'Canvas').slice(0, 120)]]];
+  return ['panes', { key: 'panes', dir: 'row' }, ['pane', { key: `pane:${id}`, at: t.panes[id].at, share: 1, selected: true }, ['text', {}, String(t.panes[id].name ?? 'Canvas').slice(0, 120)]]];
 }
 
 const marksFor = (slot) => (slot === 'panes' ? paneMark(M.frontOf(m)) : strip(m, { sessions: sessionsOf() }));

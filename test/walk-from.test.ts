@@ -38,9 +38,9 @@ test('in a browser, an item page walks from the item, in place of the lens or ad
     await page.evaluate(S.press('walk'));
     assert.ok(await page.until(`${drawn(made.a)} && ${drawn(made.b)} && !${drawn(made.c)}`), `the item and what it links to, in place of the lens: ${await page.evaluate('location.hash')}`);
     assert.ok(await page.evaluate(`location.hash.startsWith('#/e/${made.a}?') && ${lens}.get('over') === 'depends_on' && ${lens}.get('find') === 'id ${made.a}'`), `the walk named by the link it has: ${await page.evaluate('location.hash')}`);
-    // Back to both (the address the page opened at: the query line and its Back went with find, decision e_n42s8jvn),
-    // then from the other's page, added to the lens.
-    await page.evaluate(`location.hash = ${JSON.stringify(`#/v?find=id+${made.a}&find=id+${made.c}`)}`);
+    assert.ok(await page.until(`document.querySelector('#find-lens').textContent.includes('Walk')`), 'the query line says the walk');
+    // Back to both, then from the other's page, added to the lens.
+    await page.evaluate(`document.querySelector('#query [aria-label="Back"]').click()`);
     assert.ok(await page.until(`${drawn(made.c)} && !${drawn(made.b)}`), 'back to the lens as it was');
     await click(made.c);
     assert.ok(await page.until(`location.hash.startsWith('#/e/${made.c}?') && ${S.has('walk')}`), 'the other’s page is open');

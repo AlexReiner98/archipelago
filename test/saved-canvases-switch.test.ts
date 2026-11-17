@@ -1,0 +1,71 @@
+// Saved canvases opened and switched to (task e_uq77ps44), in a real browser at 560 px (skipped where there is no
+// Chrome): one listed on Home opens in one click and is named in the bar, the bar switches between them, a view kept
+// about an item is folded on Home and opened from there, and a view a document brings in is in neither list. Saving
+// one from the bar is test/saved-canvases.test.ts.
+
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { chrome } from './browser.ts';
+import { savedCanvasPage } from './saved-canvas-page.ts';
+
+const browser = chrome();
+
+test('in a browser, a saved canvas is opened and switched to from the bar; a view about an item is listed there, one a document brings in is not', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+  const { base, call, made, page, drawn, canvasUp, picked, width, keptBefore, panelRows } = await savedCanvasPage();
+  const pick = (title: string) => page.evaluate(`${panelRows}.find((r) => r.dataset.title === ${JSON.stringify(title)}).click()`);
+  try {
+    // As the canvases saved from the bar left the page: narrow, with one saved at 1280 px.
+    await width(560);
+    await keptBefore(1280);
+
+    // An agent's canvas of another task; switched between from the bar.
+    const other = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'c', type: 'lens', title: 'The other one', props: { filter: { find: [`id ${made.q}`] }, walk: { over: [], steps: 0 } } }] })).result.created.c as string;
+    await page.go(`${base}/#/v?find=id+${made.q}`);
+    // The views kept are in the bar's switcher, not on Home (the owner, 10 Nov 2026).
+    assert.ok(await page.until(`${panelRows}.some((r) => r.dataset.title === 'The other one')`), 'the new one is listed');
+    await pick('The other one');
+    assert.ok(await page.until(drawn(made.q)), 'opened in one click: its lens drawn');
+    assert.equal(await canvasUp(), other);
+    assert.ok(await page.until(`${picked} === 'The other one'`), 'named in the bar');
+    // As a chip, or in the folded line when the bar is narrow (560 px, as set above).
+    assert.ok(await page.until(`[...document.querySelectorAll('#find-lens .pm-text, #find-lens .pm-fits-rest')].some((c) => (c.textContent + c.title).includes('Another task'))`), 'its lens in the bar');
+    // From the switcher's panel, its scope All.
+    await page.evaluate(`document.querySelector('#query .q-pick').click()`);
+    assert.ok(await page.until(`Boolean(document.querySelector('.view-panel:popover-open .pm-input'))`), 'the panel opens');
+    assert.ok(await page.until(`${panelRows}.some((r) => r.dataset.title === 'Saved at 1280')`), 'its part has drawn the rows');
+    await page.evaluate(`${panelRows}.find((r) => r.dataset.title === 'Saved at 1280').click()`);
+    assert.ok(await page.until(drawn(made.a)), 'switched from the bar');
+    assert.ok(await page.until(`${picked} === 'Saved at 1280'`));
+
+    // A view kept about an item: in the switcher too, and opened from there.
+    assert.ok(await page.until(`${panelRows}.some((r) => r.dataset.title === 'A view of it')`), 'a view about an item is listed');
+    await pick('A view of it');
+    assert.ok(await page.until(`${picked} === 'A view of it'`), `opened as a canvas: ${page.logs().join(' | ')}`);
+    assert.ok(await page.until(drawn(made.a)));
+
+    // A view a document brings in is a part of that page: in neither list, and named in the bar only while it is up.
+    const held = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'A page’s picture', props: { filter: { find: [`id ${made.p}`] }, walk: { over: ['part_of'], steps: 1 } } }, { op: 'link', type: 'about', from: 'v', to: made.p }] })).result.created.v as string;
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'd', type: 'page', title: 'A page', body: `Words.\n\n${held}` }] });
+    // Not in the switcher's panel.
+    const listed = `${panelRows}.map((r) => r.dataset.title)`;
+    await page.go(`${base}/#/v?canvas=${other}`);
+    assert.ok(await page.until(`${picked} === 'The other one'`));
+    assert.ok(!(await page.evaluate<string[]>(listed)).includes('A page’s picture'), 'not in the switch');
+    await page.go(`${base}/#/v?canvas=${held}`);
+    assert.ok(await page.until(`${picked} === 'A page’s picture'`), 'named while it is up');
+
+    // A view made, then changed, after the page read the saved views opens as saved, not as new or changed since (bump e_4j6xvm82).
+    // The band's part (the menu pack's menu.band) says a view kept as it is as Saved, in words, where it would offer Save.
+    const saved = `[...document.querySelectorAll('#query .pm-text')].some((t) => t.textContent === 'Saved') && ![...document.querySelectorAll('#query .pm-button')].some((b) => ['Save', 'Save •', 'Keep'].includes(b.textContent))`;
+    const late = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'l', type: 'lens', title: 'Made since', status: 'kept', props: { filter: { find: [`id ${made.q}`] }, walk: { over: ['part_of'], steps: 1 } } }] })).result.created.l as string;
+    await page.go(`${base}/#/v?canvas=${late}`);
+    assert.ok(await page.until(`${picked} === 'Made since'`), 'named in the bar');
+    assert.ok(await page.until(saved), 'saved, as it was made');
+    await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: late, props: { walk: { over: ['part_of'], steps: 2 } } }] });
+    await page.go(`${base}/#/v?canvas=${other}`);
+    await page.go(`${base}/#/v?canvas=${late}`);
+    assert.ok(await page.until(`${picked} === 'Made since' && ${saved}`), 'saved, as it was changed');
+  } finally {
+    await page.close();
+  }
+});

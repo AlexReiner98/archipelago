@@ -97,16 +97,15 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
   const ids = made.created;
   await agent('report', { action: 'tell', params: { run: run1, said: 'Cookie sessions are enough: one server.', about: [ids.auth] } });
 
-  // 3. Read: the frontier draws the open work the agent left, each with why it needs attention, in a real browser. (Home
-  // draws the islands a person has turned on (decision e_n42s8jvn); this map has islands off, so the frontier is asked by address.)
-  const page = await open(`${base}/#/v?find=frontier&find=waits_on+me&not=done&not=kind+system`);
+  // 3. Read: Home draws the open work the agent left, each with why it needs attention, in a real browser.
+  const page = await open(`${base}/`);
   try {
     const drawn = (title: string) => `document.body.innerText.includes(${JSON.stringify(title)}) || [...document.querySelectorAll('svg text, svg title')].some((t) => t.textContent.includes(${JSON.stringify(title)}))`;
-    assert.ok(await page.until(drawn('Which hashing library?'), 20000), `the frontier draws the agent's open work: ${page.logs().join('\n').slice(0, 600)}`);
+    assert.ok(await page.until(drawn('Which hashing library?'), 20000), `Home draws the agent's open work: ${page.logs().join('\n').slice(0, 600)}`);
     assert.ok(await page.until(drawn('Login form')), 'every open step');
     // Why it needs attention is its mark, never a word on it: the question nobody has settled waits on the person.
     assert.ok(await page.until(`[...document.querySelectorAll('.lf-step.you')].some((s) => s.textContent.includes('Which hashing library?'))`), 'with why it needs attention, as a mark');
-    assert.ok(!(await page.evaluate<boolean>(drawn('Nothing to draw'))), 'not an empty canvas');
+    assert.ok(!(await page.evaluate<boolean>(drawn('Nothing to draw'))), 'not an empty Home');
   } finally {
     await page.close();
   }
@@ -140,14 +139,37 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
 
   // 6. Share: a view of the plan, made public as it is now, which anyone opens with no login and search engines list,
   // drawn by its layout, with a way to start a map of their own.
-  // Kept on the map as a view of the project, then shared as the item's page shares it (packs/surface/page/item-share.js):
-  // what goes out said first, then the address. (The band that saved and shared the view up went with find: decision
-  // e_n42s8jvn.)
-  const kept = ((await person('change', { reason: 'Keep the plan', ops: [{ op: 'create', ref: 'v', type: 'lens', title: 'The login plan', props: { filter: { find: [`in ${ids.hub}`] } } }] })) as { created: Record<string, string> }).created.v;
-  const plan = (await person('share_plan', { id: kept })) as { goes: { id: string }[] };
-  assert.ok(plan.goes.some((i) => i.id === ids.form), `what goes out with it is said first: ${JSON.stringify(plan).slice(0, 400)}`);
-  const shared = (await person('share_create', { id: kept })) as { address: string };
-  const link = { path: shared.address };
+  // Made where a person is: the view up on the canvas, saved in its band (the menu pack's part asks its name there),
+  // then its band's menu, Share it, what goes out said first, then the address.
+  const sharer = await open(`${base}/#/v?find=in+${ids.hub}`);
+  let link: { path: string };
+  try {
+    const bandButton = (tip: string) => `[...document.querySelectorAll('#query .pm-button')].find((b) => b.title === ${JSON.stringify(tip)})`;
+    assert.ok(await sharer.until(`Boolean(${bandButton('Save this view')})`, 20000), 'the band offers to save it');
+    await sharer.evaluate(`${bandButton('Save this view')}.click()`);
+    assert.ok(await sharer.until(`Boolean(document.querySelector('#query input[aria-label="The view’s name"]'))`), `asked for a name: ${await sharer.evaluate('document.querySelector("#query")?.innerText')} | ${await sharer.evaluate('location.hash')}`);
+    await sharer.evaluate(`(() => { const i = document.querySelector('#query input[aria-label="The view’s name"]'); i.value = 'The login plan'; i.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+    await sharer.evaluate(`${bandButton('Keep what is up under this name')}.click()`);
+    assert.ok(await sharer.until(`document.querySelector('#query .q-pick')?.dataset.title === 'The login plan'`), `kept, the bar names it: ${await sharer.evaluate('document.querySelector("#query")?.innerText')} | ${await sharer.evaluate('location.hash')} | ${sharer.logs().join(" ").slice(-400)}`);
+    assert.ok(await sharer.until(`Boolean(document.querySelector('.q-band-menu'))`, 20000), 'the band has its menu');
+    await sharer.evaluate(`document.querySelector('.q-band-menu').click()`);
+    assert.ok(await sharer.until(`[...document.querySelectorAll('.tab-menu button')].some((b) => b.textContent === 'Share it')`), 'the menu offers to share it');
+    await sharer.evaluate(`[...document.querySelectorAll('.tab-menu button')].find((b) => b.textContent === 'Share it').click()`);
+    // A public view is of a view kept on the map: kept above, it is asked how to share it.
+    const choose = `document.querySelector('dialog.ask button[value="choice:0"]')`;
+    const sure = `/^Share “The login plan”\\?/.test(document.querySelector('dialog.ask h2')?.textContent ?? '')`;
+    assert.ok(await sharer.until(`Boolean(${choose}) || ${sure}`, 10000), 'asked how to share it');
+    if (await sharer.evaluate<boolean>(`Boolean(${choose})`)) await sharer.evaluate(`${choose}.click()`);
+    // What goes out with it is said before it goes (what is left out as private is test/public-view.test.ts's).
+    assert.ok(await sharer.until(sure, 10000), `asked to share it: ${sharer.logs().join(' ').slice(0, 400)}`);
+    assert.match(await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`), /^Goes out with it: .+ and \d+ more\./);
+    await sharer.evaluate(`document.querySelector('dialog.ask button[value="ok"]').click()`);
+    assert.ok(await sharer.until(`(document.querySelector('dialog.ask .ask-message')?.textContent ?? '').includes('/p/')`, 10000), `the address is shown: ${sharer.logs().join(' ').slice(0, 400)}`);
+    const message = await sharer.evaluate<string>(`document.querySelector('dialog.ask .ask-message').textContent`);
+    link = { path: new URL(message.trim().split(/\s+/)[0]).pathname };
+  } finally {
+    await sharer.close();
+  }
   assert.match(link.path, /^\/p\/[^/]+\/e_[a-z0-9]{8}$/);
   const reader = await open(`${base}${link.path}`);
   try {
