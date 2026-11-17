@@ -106,6 +106,7 @@ test('the island answer declares its pack, what it requires, each one’s state 
   assert.equal(pack.title, 'Plain');
   assert.equal(pack.glyph, undefined, 'a pack with no glyph says none: the page shows its initial');
   assert.equal(pack.state, 'active');
+  assert.equal(pack.kernel, undefined, 'a pack that may be turned off says nothing of the kernel');
   assert.deepEqual(pack.requires, [], 'core is the kernel’s own, on every island: not named');
   assert.equal(pack.off_would_wait, 1, 'its one thing here would wait; the shared task would not');
   assert.ok(pack.types.some((x: { id: string }) => x.id === 'plain.thing'), 'and its legend, as before');
@@ -153,4 +154,12 @@ test('a focus turns its own pack off and back on: it waits meanwhile, and is sti
   const woken = await flat(l, f);
   assert.equal(woken.islands[0].pack.state, 'active');
   assert.ok(woken.items.every((i: { waiting?: unknown }) => i.waiting === undefined), 'it wakes by itself');
+});
+
+test('an island that speaks the kernel’s own pack says so: it is never turned off', async () => {
+  const { l } = await map();
+  const { k } = await make(l, [{ op: 'create', ref: 'k', type: 'island', title: 'Plans', props: { pack: 'core' } }]);
+  await make(l, [{ op: 'create', type: 'task', title: 'A plan', props: { island: k } }]);
+  const pack = (await flat(l, k)).islands.find((i: { id: string }) => i.id === k).pack;
+  assert.deepEqual([pack.id, pack.state, pack.kernel], ['core', 'active', true]);
 });

@@ -11,7 +11,7 @@ import type { PackFile, Registry } from './packs.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** A pack as an island's header names it. */
-export interface Declared { id: string; title: string; glyph?: string; state: PackState['state']; why?: string }
+export interface Declared { id: string; title: string; glyph?: string; state: PackState['state']; why?: string; /** The kernel's own: always on, never turned off. */ kernel?: true }
 /** An island's own pack, with what it requires and what turning it off there would send waiting. */
 export type IslandDecl = Declared & { requires: Declared[]; off_would_wait: number };
 /** Why an item waits: the pack of its type, not active on its island, and why. */
@@ -28,7 +28,7 @@ function declared(map: Registry, run: Registry, id: string): Declared {
   const pack = run.found.find((p) => p.id === id) ?? map.found.find((p) => p.id === id);
   const s = run.states.get(id) ?? { state: 'off' as const, why: 'not on this server' };
   const glyph = glyphOf(pack);
-  return { id, title: pack?.title ?? id, ...(glyph && { glyph }), state: s.state, ...(s.why && { why: s.why }) };
+  return { id, title: pack?.title ?? id, ...(glyph && { glyph }), state: s.state, ...(s.why && { why: s.why }), ...(KERNEL_PACKS.includes(id) && { kernel: true as const }) };
 }
 
 /** The packs a pack requires, by the packs that provide each (an active one first), the kernel's own left out: it is on every island. */
