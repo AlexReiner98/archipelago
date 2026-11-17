@@ -75,9 +75,14 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     // A press on an island under Recent puts it on where its row stands: the row lights and gains ×, and nothing moves.
     const quarry = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Quarry')`;
     await until('Quarry under Recent', () => page.evaluate<boolean>(`Boolean(${quarry}) && /^Recent/.test(${quarry}.parentElement.previousElementSibling.textContent)`));
+    // The canvas's way to an island, stood in for: it records where it is asked to go.
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; window.wentTo = []; hooks.toIsland = (id) => (wentTo.push(id), true); })()`);
     const before = await page.evaluate<number>(`Math.round(${quarry}.getBoundingClientRect().top)`);
     await page.evaluate(`${quarry}.querySelector('button.isl-name').click()`);
     await until('Quarry on, its row lit where it stood', () => page.evaluate<boolean>(`(() => { const r = ${quarry}; return r?.classList.contains('on') && Boolean(r.querySelector('.isl-off')) && Math.round(r.getBoundingClientRect().top) === ${before} && document.querySelector('#islands .isl-head').textContent.includes('On · 2'); })()`));
+    // Put on, the canvas is brought to it, and it is marked as where the canvas went.
+    await until('the canvas brought to Quarry', () => page.evaluate<boolean>(`wentTo.includes(${JSON.stringify(made.quarry)}) && ${quarry}.getAttribute('aria-current') === 'location'`));
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; delete hooks.toIsland; })()`);
     // A press on an island that is on brings the canvas to it (hooks.toIsland, the canvas's).
     const went = await page.evaluate<string>(`(async () => { const { hooks } = await ${pageModule('base.js')}; const had = hooks.toIsland; let to = ''; hooks.toIsland = (id) => ((to = id), true); ${quarry}.querySelector('button.isl-name').click(); hooks.toIsland = had; return to; })()`);
     assert.equal(went, made.quarry, 'the press asks the canvas for the island');

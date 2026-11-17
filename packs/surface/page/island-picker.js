@@ -141,19 +141,29 @@ export function drawPicker() {
   /** The island the canvas was last brought to from the bar: marked under On while it stays on. */
   let here = null;
   /** Bring the canvas to island `i`, where the canvas can (hooks.toIsland, the canvas's), and mark it. */
-  const goTo = (i) => hooks.toIsland?.(i.id) && ((here = i.id), draw());
+  const goTo = (i) => hooks.toIsland?.(i.id) && ((here = i.id), draw(), true);
+  /**
+   * Put island `i` on (or `alone`) and bring the canvas to it once the canvas has drawn it: asked again every
+   * picker_go_every ms, picker_go_tries times at most, as the canvas draws the new list.
+   */
+  const putOnAndGo = (i, alone = false) => {
+    (alone ? showOnly : putOn)(i);
+    let tries = numberOf(state.style, 'picker_go_tries');
+    const go = () => goTo(i) || (--tries > 0 && setTimeout(go, numberOf(state.style, 'picker_go_every')));
+    if (hooks.toIsland) setTimeout(go, numberOf(state.style, 'picker_go_every'));
+  };
   /**
    * An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack, but under On
    * (`atOn`), where the name needs the room beside ×.
    */
   const row = (i, on, atOn = false) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
-      h('button', { type: 'button', class: 'isl-name', tabindex: '-1', onclick: () => (on ? goTo(i) : putOn(i), done()) }, i.title),
+      h('button', { type: 'button', class: 'isl-name', tabindex: '-1', onclick: () => (on ? goTo(i) : putOnAndGo(i), done()) }, i.title),
       atOn ? '' : packOf(i),
       on ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
-    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i), done()) },
+    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (putOnAndGo(i, ev.shiftKey), done()) },
       h('span', { class: 'isl-name' }, i.title),
       packOf(i, drawn.includes(i.id)));
   const draw = () => {
@@ -222,7 +232,7 @@ export function drawPicker() {
     if (ev.key === 'ArrowDown' && !input.value.trim()) return void (ev.preventDefault(), body.focus());
     if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && found.length) return void (ev.preventDefault(), (lit = Math.max(0, Math.min(found.length - 1, lit + (ev.key === 'ArrowDown' ? 1 : -1)))), draw());
     const i = input.value.trim() && found[lit];
-    if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), (anew = true), draw(), done());
+    if (ev.key === 'Enter' && i) (ev.preventDefault(), putOnAndGo(i, ev.shiftKey), (input.value = ''), (anew = true), draw(), done());
   });
   // Ctrl+K (⌘K): the bar opens where it was folded, its search in focus.
   addEventListener('keydown', (ev) => {
