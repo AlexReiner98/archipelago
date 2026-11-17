@@ -1,16 +1,16 @@
 // An item's one page, as the sheet root's walled part (decision e_bn76z5fu; task e_zhxd9bhb): its title, a head of
 // what it is and where it stands, its note, its fields, the choices it settles by, where its facts came from, the
-// sections other packs give it, and its history. The frame, field editing, link picking and settling stay the host's
+// sections other packs give it. Its history is not shown (decision e_de2sh7gc: kept in the background until asked). The frame, field editing, link picking and settling stay the host's
 // (e_gyzm7rj3): this root pack is the host, protected from the refiner, and every write is a change on the person's word.
 //
 // It is handed the item whole, the island's words with each type's fields, and its named reads (`item`: its links and
-// source; `history`: its events). It answers with marks; what is written waits for one Save, kept by the host.
-// Other packs' sections are a slot under the source, above history (e_axz9au5f); the page carries two menus, the
+// source, who it waits on and who is looking). It answers with marks; what is written waits for one Save, kept by the host.
+// Other packs' sections are a slot under the source (e_axz9au5f); the page carries two menus, the
 // frame's, which the runtime draws with the kernel's acts, and this part's own (e_dd7gdy8z).
 
 import { label, typeOf } from './words.js';
 import { fieldEvent, fieldsMarks } from './fields.js';
-import { choicesOf, headEvent, headMarks, historyMarks, section, settleOps, sourceMarks } from './sections.js';
+import { choicesOf, headEvent, headMarks, section, settleOps, sourceMarks } from './sections.js';
 import { leadEvent, leadFields, leadMarks } from './lead.js';
 import { blank, barMarks, codeChanges, draftEvent, noteMarks, saveOps, titleMarks, unsaved } from './draft.js';
 import { linkEvent, linkMarks } from './links.js';
@@ -33,7 +33,7 @@ const HEAD = ['status', 'owner', 'confidence', 'visibility', 'source'];
 export const pageTold = (now, told) => (told?.name === 'page' && told.item?.id ? { ...now, item: told.item, views: { ...(now?.views ?? {}), ...(told.views ?? {}) }, piece: { ...(now?.piece ?? {}), ...(told.count && { count: told.count }), folds: told.folds ?? [] } } : now);
 
 /** The page's state as one value: what is open, what is written, what is asked, what was said. */
-const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) }, from: { ...(kept?.draft?.from ?? {}) } }, open: new Set(), files: {}, emptyOpen: false, diffs: new Set(), writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined, moved: false });
+const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) }, from: { ...(kept?.draft?.from ?? {}) } }, open: new Set(), files: {}, emptyOpen: false, writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined, moved: false });
 
 /** The whole page as marks. */
 export function pageMarks(input, s) {
@@ -45,7 +45,7 @@ export function pageMarks(input, s) {
   const c = choicesOf(item, type);
   const walk = along(view);
   const count = input.piece?.count ?? input.views?.item?.count;
-  // A part its own style folds (page.head, fields, source, history: folded) is one quiet row, opened with a click.
+  // A part its own style folds (page.head, fields, source: folded) is one quiet row, opened with a click.
   const folds = input.piece?.folds ?? [];
   const fold = (part, title, tip, marks) => (folds.includes(part) && !s.open.has(`part:${part}`) ? ['button', { key: `unfold:${part}`, look: 'quiet', tip }, `▸ ${title}`] : marks());
   const head = ['box', { flow: 'row', gap: 2, align: 'between' },
@@ -73,7 +73,6 @@ export function pageMarks(input, s) {
     fold('source', 'Source', 'Where its facts came from', () => sourceMarks(view.source)),
     ['slot', { key: 'slot-sections', name: 'sheet.sections' }],
     barMarks(s.draft, item, { saving: s.saving, said: s.saveSaid, diffs: codeChanges(s.draft, type.fields), diffOpen: s.diffOpen, moved: s.moved }),
-    fold('history', 'History', 'What was done to it, and by whom', () => historyMarks(input.views?.history?.events ?? input.views?.history ?? [], { writes, names: input.views?.history?.names, shown: s.diffs })),
   ].filter(Boolean);
 }
 
@@ -124,7 +123,7 @@ export default function page(input, tools) {
     if (!it.id || !event?.key) return undefined;
     const k = event.key;
     // A part folded by its style, opened.
-    const unfold = /^unfold:(head|fields|source|history)$/.exec(k);
+    const unfold = /^unfold:(head|fields|source)$/.exec(k);
     if (unfold && event.name === 'press') return (s.open.add(`part:${unfold[1]}`), draw());
     // The draft: title, note, Save and Discard.
     const d = draftEvent(event, it, s.draft);
@@ -212,15 +211,6 @@ export default function page(input, tools) {
     if (k === 'archive' && event.name === 'press') return ((s.archiving = true), draw());
     if (k === 'archive-no') return ((s.archiving = false), draw());
     if (k === 'archive-yes' && event.name === 'press') return ((s.archiving = false), await change({ ops: [{ op: 'archive', id: it.id }], reason: 'Archived in the UI' }), draw());
-    // A change to code: its line diff unfolded under its line, or folded again.
-    const dk = /^diff:(c_[a-z0-9]+)$/.exec(k);
-    if (dk && event.name === 'press') return (s.diffs.has(dk[1]) ? s.diffs.delete(dk[1]) : s.diffs.add(dk[1]), draw());
-    const u = /^undo:(c_[a-z0-9]+)$/.exec(k);
-    if (u && event.name === 'press') {
-      const r = await tools.undo?.(u[1]);
-      if (r?.error) s.said = `That was not undone: ${r.error}`;
-      return draw();
-    }
     return undefined;
   }
   return {

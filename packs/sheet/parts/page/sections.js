@@ -1,9 +1,8 @@
 // The sections of an item's page that are not its fields or its note, as marks: its head, the choices a question
-// settles by, where its facts came from, and its history (task e_qfdnex9w; from the host's item-sections.js). Each is
+// settles by, and where its facts came from (task e_qfdnex9w; from the host's item-sections.js). Each is
 // a band under a short title, never a box in a box (rule e_vgs9vt5j).
 
 import { ago, label } from './words.js';
-import { counts, diffMarks } from './diff.js';
 
 /** A section: its title, a count where it has one, what it holds. */
 export const section = (key, title, n, ...content) =>
@@ -93,35 +92,4 @@ export function sourceMarks(source) {
   return section('source', 'Source', 0,
     source.title && row('Name', ['text', { ...(source.id && { item: source.id }) }, source.title]),
     row('Address', ['text', { tip: source.uri.slice(0, 200), ...(web && { href: source.uri }) }, source.uri]));
-}
-
-/**
- * History: a change set a line, newest first, with who, what and when; each but a forget can be taken back. A change
- * to code says its counts, and pressed, its line diff under the line (`shown`: the change sets unfolded).
- */
-export function historyMarks(events, { writes = false, names = {}, now, shown } = {}) {
-  const sets = [];
-  for (const ev of events ?? []) {
-    const last = sets.at(-1);
-    if (ev.changeset && last?.changeset === ev.changeset) last.events.push(ev);
-    else sets.push({ changeset: ev.changeset, events: [ev] });
-  }
-  const who = (a) => names[a] ?? (a?.startsWith('agent:') ? a.slice(6) : a?.startsWith('human:') ? 'You' : (a ?? '?'));
-  const line = (g) => {
-    const first = g.events[0];
-    const said = first.reason ?? first.target_title ?? label(String(first.action ?? '').replace(/^\w+\./, ''));
-    const undone = g.events.some((e) => e.detail?.undone_by);
-    const forgot = g.events.some((e) => e.detail?.forgot);
-    const diffs = g.events.flatMap((e) => e.detail?.diffs ?? []);
-    const open = diffs.length > 0 && g.changeset && shown?.has(g.changeset);
-    const headRow = ['box', { flow: 'row', gap: 2, ...(!diffs.length && { key: `set:${g.changeset ?? first.seq}` }) },
-      ['text', { look: 'muted' }, who(first.actor)],
-      ['text', { tip: String(said).slice(0, 200), ...(undone && { tone: 'closed' }) }, String(said)],
-      ['text', { look: 'muted', tip: first.ts ?? '' }, ago(first.ts, now)],
-      ...(diffs.length && g.changeset ? [['button', { key: `diff:${g.changeset}`, look: 'quiet', tip: open ? 'Fold the lines it changed' : 'See the lines it changed' }, `${counts(diffs)} ${open ? '▴' : '▾'}`]] : []),
-      ...(writes && g.changeset && !undone && !forgot ? [['button', { key: `undo:${g.changeset}`, look: 'quiet', tip: 'Put back what it did, as a new change' }, 'Undo']] : [])];
-    if (!diffs.length) return headRow;
-    return ['box', { flow: 'column', gap: 1, key: `set:${g.changeset ?? first.seq}` }, headRow, ...(open ? [diffMarks(diffs)] : [])];
-  };
-  return section('history', 'History', sets.length, ['list', { look: 'rows' }, ...sets.map(line)]);
 }

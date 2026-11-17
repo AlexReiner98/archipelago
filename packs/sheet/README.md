@@ -8,7 +8,7 @@ in control here stays protected (decisions e_gyzm7rj3, e_bn76z5fu).
 
 | Part | Slot | Code |
 |---|---|---|
-| `sheet.page` | `sheet` | `parts/page/`: the title, head, note, fields, choices, source, links picked, Save and history |
+| `sheet.page` | `sheet` | `parts/page/`: the title, head, note, fields, choices, source, links picked and Save; no history (e_de2sh7gc) |
 | `sheet.follow` | `sheet` | `parts/follow/`: the page shown follows the reading |
 
 Under the title it draws the band its type declares (`parts/page/lead.js`):
@@ -19,7 +19,7 @@ person looking. A screen's piece placed `lead` the frame stands in `sheet.bands`
 (`reads: "*"`, `writes`, a root pack's part alone). Frame, fields, links and
 draft are one part because the note and every field share one Save. It
 opens two slots: `sheet.bands`, under the title, and `sheet.sections`,
-below the source and above history, where other packs' sections stand
+below the source, where other packs' sections stand
 (e_axz9au5f).
 
 ## What stays the host's
@@ -28,7 +28,7 @@ below the source and above history, where other packs' sections stand
 acts (publish, share, launch, end a session, a pack's actions) beside the
 part's own menu (e_dd7gdy8z), and the public mark. It reads the item once
 and tells the parts as data (`page`: the item, its links, source, owner,
-history, and the names of the items its fields name). It fills the two slots
+who it waits on, who is looking, and the names of the items its fields name). It fills the two slots
 with what the host draws: the changes held on it and a pack's action form,
 and the screens' sections.
 

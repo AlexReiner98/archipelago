@@ -29,18 +29,19 @@ const task = { id: 'e_aaaaaaaa', type: 'task', title: 'Try it', body: 'The point
 const noSlots = (m: unknown): unknown => (Array.isArray(m) ? (m[0] === 'slot' ? ['box'] : m.map(noSlots)) : m);
 const kinds = Object.keys(MARKS);
 
-test('the page draws its head, note, fields, source and history as marks the host draws', () => {
+test('the page draws its head, note, fields and source as marks the host draws, and no history (e_de2sh7gc)', () => {
   const marks = pageMarks({ item: task, words, views: { item: { outgoing: [{ type: 'depends_on' }] }, history: { events: [{ changeset: 'c_aaaa', actor: 'agent:x', reason: 'Made', ts: '2026-11-13T10:00:00Z' }] } } }, { draft: { fields: {} }, open: new Set() });
   assert.doesNotThrow(() => checkMarks(noSlots(marks), { kinds }));
   const text = JSON.stringify(marks);
-  for (const s of ['section:head', 'NOTE', 'FIELDS', 'SOURCE', 'HISTORY', 'Walk from it', 'Link']) assert.ok(text.includes(s), s);
-  // Other packs' sections stand below the source and above history (decision e_axz9au5f).
-  assert.ok(text.indexOf('section:source') < text.indexOf('sheet.sections') && text.indexOf('sheet.sections') < text.indexOf('section:history'));
+  for (const s of ['section:head', 'NOTE', 'FIELDS', 'SOURCE', 'Walk from it', 'Link']) assert.ok(text.includes(s), s);
+  assert.ok(!text.includes('HISTORY') && !text.includes('c_aaaa') && !text.includes('undo:'), 'its history stays in the background: no list, no Undo');
+  // Other packs' sections stand below the source (decision e_axz9au5f).
+  assert.ok(text.indexOf('section:source') < text.indexOf('sheet.sections'));
 });
 
-test('a part its style folds is one quiet row, opened with a click; the note stays (page.head, fields, source, history)', async () => {
-  const folds = ['head', 'fields', 'source', 'history'];
-  const input = { item: task, words, piece: { folds }, views: { item: {}, history: { events: [] } } };
+test('a part its style folds is one quiet row, opened with a click; the note stays (page.head, fields, source)', async () => {
+  const folds = ['head', 'fields', 'source'];
+  const input = { item: task, words, piece: { folds }, views: { item: {} } };
   const marks = pageMarks(input, { draft: { fields: {} }, open: new Set() });
   assert.doesNotThrow(() => checkMarks(noSlots(marks), { kinds }));
   const text = JSON.stringify(marks);
@@ -49,8 +50,8 @@ test('a part its style folds is one quiet row, opened with a click; the note sta
   // Told what the item page read of its style, the part keeps it; with none, nothing folds.
   assert.deepEqual(pageTold({}, { name: 'page', item: task, folds: ['head'] }).piece.folds, ['head']);
   assert.deepEqual(pageTold({}, { name: 'page', item: task }).piece.folds, []);
-  const opened = pageMarks(input, { draft: { fields: {} }, open: new Set(['part:history']) });
-  assert.ok(JSON.stringify(opened).includes('section:history'), 'opened, it is drawn whole');
+  const opened = pageMarks(input, { draft: { fields: {} }, open: new Set(['part:source']) });
+  assert.ok(JSON.stringify(opened).includes('section:source'), 'opened, it is drawn whole');
 });
 
 test('a field is drawn by its kind: a pick for its values, a box for words, nothing to change for the system', () => {
@@ -173,11 +174,11 @@ test('told the page scrolled, the follow names the page', () => {
   assert.deepEqual(went, [{ item: 'e_bbbbbbbb', replace: true }]);
 });
 
-test('the frame tells the page part the item, its links and history, and it draws them without being mounted again', async () => {
+test('the frame tells the page part the item and its links, and it draws them without being mounted again', async () => {
   const p = page({ item: { id: task.id, type: 'task' }, words, views: {} }, { change: async () => ({ status: 'applied' }), keep: () => {}, state: () => {} });
-  const marks = await p.on({ name: 'page', item: task, views: { item: { outgoing: [{ type: 'depends_on', root: 'depends_on' }], source: { title: 'A talk', uri: 'https://example.com' } }, history: { events: [{ changeset: 'c_bbbb', actor: 'human:local', reason: 'Made it', ts: '2026-11-13T10:00:00Z' }], names: { 'human:local': 'You' } } } });
+  const marks = await p.on({ name: 'page', item: task, views: { item: { outgoing: [{ type: 'depends_on', root: 'depends_on' }], source: { title: 'A talk', uri: 'https://example.com' } } } });
   const text = JSON.stringify(marks);
-  for (const s of ['Try it', 'A talk', 'Made it', 'Walk from it']) assert.ok(text.includes(s), s);
+  for (const s of ['Try it', 'A talk', 'Walk from it']) assert.ok(text.includes(s), s);
   assert.equal(pageTold({ item: { id: 'x' } }, { name: 'scrolled' }).item.id, 'x', 'a scroll is not the page');
   assert.ok(!text.includes('field-row:status'), 'what the head says is not a field again');
 });

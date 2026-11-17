@@ -1,10 +1,10 @@
 // The page every item lands on, in the sheet that opens from the side of the canvas. Its page is the sheet root's
 // walled parts (decision e_bn76z5fu, task e_zhxd9bhb): sheet.page draws the title, head, note, fields, choices, source,
-// links picked and history, and writes as the person; sheet.follow follows the reading. What stays the host's here is
+// and links picked, and writes as the person; sheet.follow follows the reading. What stays the host's here is
 // the frame (e_gyzm7rj3, e_dd7gdy8z): its menu with the kernel's acts (publish, share, launch, end a session, a pack's
 // actions), the public mark, and what it places in the slots the page part opens: the changes held on it and a pack's
-// action form under the title (sheet.bands), and the sections other packs' screens give it below the source and
-// above history (sheet.sections, e_axz9au5f). The frame reads the item once and tells the parts (`page`), so a page
+// action form under the title (sheet.bands), and the sections other packs' screens give it below the source
+// (sheet.sections, e_axz9au5f). Its history is not shown (e_de2sh7gc). The frame reads the item once and tells the parts (`page`), so a page
 // drawn again in place is not mounted anew under the person's typing.
 
 import { api, ask, drawSlots, h, hooks, may, part, state, tell, whoami } from './base.js';
@@ -15,7 +15,7 @@ import { readDocument, readingOf } from './item-reading.js';
 import { publicMark, publicOf, shareMenu } from './item-share.js';
 import { heldBand, heldOn } from './item-held.js';
 import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, leadsOn, readWhole, sectionsOn, toolOf } from './screens.js';
-import { isA, menu, relations, titles, who } from './words.js';
+import { isA, menu, relations, titles } from './words.js';
 import { pageType, readPageModel } from './page-schema.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
@@ -46,34 +46,25 @@ function fillSlots(m, above, sections) {
   m.watching = [fillSlot(m.node, 'sheet.bands', above), fillSlot(m.node, 'sheet.sections', sections)];
 }
 
-/** A change to code, as the server said it: each code field's line diff (packs/surface/kernel/code-diffs.ts). */
-const diffsOf = (detail) => {
-  const diffs = Object.entries(detail?.changes ?? {}).filter(([, c]) => c?.diff && typeof c.diff === 'object').map(([key, c]) => ({ field: key.replace(/^props./, ''), diff: c.diff }));
-  return diffs.length ? { diffs } : {};
-};
-
-/** What the page part is told of the page, as data: the item, its links, source, owner and history, its note's count. */
+/** What the page part is told of the page, as data: the item, its links, source and owner, its note's count. */
 /** Whose voice a note is in, by who last wrote it (get's note_by, an actor): a person's or an agent's; none for the system. */
 const voiceOf = (actor) => (typeof actor !== 'string' ? null : actor.startsWith('human:') ? 'human' : actor.startsWith('agent:') ? 'agent' : null);
 
 /** The parts of an item's page its style may fold a click away. */
-const FOLDS = ['head', 'fields', 'source', 'history'];
+const FOLDS = ['head', 'fields', 'source'];
 
-function told(data, past, owner, count, named, folds, me) {
+function told(data, owner, count, named, folds, me) {
   const e = data.entity;
   const tie = (r) => ({ type: r.type, root: rootOf(r.type) });
-  const names = {};
-  for (const ev of past) if (ev.actor && !names[ev.actor]) names[ev.actor] = who(ev.actor).textContent;
   return {
     name: 'page',
     item: Object.fromEntries(['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'].filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),
     views: {
       // Who it waits on and for what, and who is looking: the band says when it is them (decision e_xj9cs33u).
       item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(tie), titles: named, waits: data.outgoing.filter((r) => rootOf(r.type) === 'waits_on').map((r) => ({ id: r.id, title: r.title, ...(typeof r.props?.for === 'string' && { for: r.props.for.slice(0, 200) }) })), ...(me && { me }), ...(voiceOf(data.note_by) && { voice: voiceOf(data.note_by) }),...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
-      history: { events: past.map(({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail }) => ({ seq, ts, actor, action, target_id, target_title, reason, changeset, detail: { ...(detail?.undone_by && { undone_by: detail.undone_by }), ...(detail?.forgot && { forgot: true }), ...diffsOf(detail) } })), names },
     },
     ...(count && { count }),
-    // The parts its own style folds a click away (page.head, fields, source, history: folded), a style on its type or about it.
+    // The parts its own style folds a click away (page.head, fields, source: folded), a style on its type or about it.
     ...(folds.length && { folds }),
   };
 }
@@ -84,14 +75,14 @@ export async function entity(id, here) {
   const inPlace = page.dataset.item === id && page.childElementCount > 0;
   if (!inPlace) page.replaceChildren(h('div', { class: 'empty' }, 'Loading…'));
   page.dataset.item = id;
-  let data, past;
+  let data;
   // What needs only its id is asked at once, so it goes to the server as one request (packs/kit/page/reads.js).
   const heldHere = heldOn(id);
   const sharing = publicOf(id);
   // The item's own style (one on its type, or about it): how its page opens.
   const styled = api('view', { name: 'style', params: { of: id } }).then((r) => r?.style ?? null, () => null);
   try {
-    [data, past] = await Promise.all([api('get', { id }), api('events', { target: id, limit: 40 })]);
+    data = await api('get', { id });
   } catch (err) {
     return page.replaceChildren(h('div', { class: 'error' }, err.message));
   }
@@ -210,7 +201,7 @@ export async function entity(id, here) {
   // A document reads in its note's place as it will publish (the publish pack's reading), above the page's note.
   const reading = doc && readingOf(e, doc, ownStyle ?? state.style, again);
   const me = await whoami().then((w) => w?.actor?.person ?? null, () => null);
-  const said = told(data, past, owner, countOn(data), named, FOLDS.filter((part) => ownStyle?.page?.[part] === 'folded'), me);
+  const said = told(data, owner, countOn(data), named, FOLDS.filter((part) => ownStyle?.page?.[part] === 'folded'), me);
   const sections = sectionsOn(data);
   // What the screens stand in its band (place: lead) comes after what is held on it and a pack's action form.
   const above = [...bands, acting, ...leadsOn(data), reading && h('section', { class: 'page-section note' }, reading)].filter(Boolean);
