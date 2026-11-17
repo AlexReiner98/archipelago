@@ -45,6 +45,8 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await page.send('Input.insertText', { text: 'harb' });
     await until('it finds the island', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-hit[aria-selected="true"] .isl-name')?.textContent === 'Harbour works'`));
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-hit').length`), 1, 'only what matches');
+    // A found row names its pack at its right, muted and cut with an ellipsis, so like names are told apart.
+    assert.deepEqual(await page.evaluate<string[]>(`(() => { const c = document.querySelector('#islands .isl-hit .isl-count'), s = getComputedStyle(c); return [c.textContent, s.textOverflow, String(s.color === getComputedStyle(document.querySelector('#islands .isl-hit .isl-name')).color)]; })()`), ['Core', 'ellipsis', 'false']);
     // No tooltip on a row whose name shows whole.
     assert.equal(await page.evaluate<number>(`(() => { const n = document.querySelector('#islands .isl-hit .isl-name'); n.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })); return document.querySelectorAll('#islands .isl-hit[title], #islands .isl-hit [title]').length; })()`), 0, 'no tooltip on a whole name');
     // The keyboard's row has the accent bar at its left edge, not a hover's ground.
