@@ -9,6 +9,7 @@ import { embedding } from './embedding.js';
 import { ORDER } from './graph.js';
 import { finish } from './land.js';
 import { model } from './model.js';
+import { placedOut } from './placed.js';
 import { relax } from './relax.js';
 import { shape } from './shape.js';
 import { stage } from './stage.js';
@@ -90,6 +91,8 @@ function plainly(args, m, islandOf, heads) {
  */
 export function laidOut(args, { islandOf = () => null, heads = new Map() } = {}) {
   const { sizes } = args, headless = args.headless ?? [], m = model(args);
+  // A view that lists its islands draws them where agents placed them, with no solve (./placed.js).
+  if (args.placed && m.nodes.size) return placedOut(args, m, islandOf, heads);
   // One step alone has nothing to embed (its s and t would be itself): it stands at the margin.
   if (m.nodes.size < 2 && !m.chains.length && !m.ties.length) {
     const x = new Map([...m.nodes].map(([id, n]) => [id, sizes.flow_margin + n.w / 2])), y = new Map([...m.nodes].map(([id, n]) => [id, sizes.flow_margin + n.h / 2]));

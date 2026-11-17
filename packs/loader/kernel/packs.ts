@@ -7,7 +7,7 @@ import { capacityOf, checkCapabilities, type Capabilities } from './capabilities
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts'; import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
-import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
+import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { CELL, CELL_FIELD, ISLAND, ISLAND_FIELD, livesOnIsland } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts'; import { checkRules } from './rule-check.ts';
 import { isApp, isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
@@ -24,7 +24,7 @@ export interface FieldDef {
   /** Maintained by the system; shown but not offered for editing. */
   system?: boolean;
   /** Sent with the item in a lens answer, so a style can draw by it (a type to colour, an amount, a date). */
-  shown?: boolean; /** Never carried off the map: a frozen (published) view leaves its value out, and so does a copy made from one. */ private?: boolean;
+  shown?: boolean; /** Of type json: a place on an island, [column, row] in whole cells (packs/loader/kernel/island-items.ts, CELL). */ cell?: boolean; /** Never carried off the map: a frozen (published) view leaves its value out, and so does a copy made from one. */ private?: boolean;
   /** Kept in a column of the item's row, not in props: status, owner, confidence and source, declared by a starter type (packs/loader/kernel/head.ts). */ column?: boolean; /** May hold a value over LARGE: a system type's field only (code, a story). */ large?: boolean; /** A published page's stylesheet: checked on write as the page checks it (packs/walls/kernel/css-check.ts). */ css?: boolean; /** Holds code (a module, a stylesheet): drawn as a code block, folded. */ code?: boolean; /** Of type string and code: may instead hold files by path, each a text, entered at index.js (packs/loader/kernel/fields.ts). */ files?: boolean;
   /** Of type json, holding a value of the simple type another field of the item names (packs/loader/kernel/fields.ts SIMPLE_TYPES): checked on write with the two together. */ typed_by?: string;
 }
@@ -215,7 +215,7 @@ export class Registry {
         system: kernel,
         statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
         // A type that extends nothing keeps in its row the columns it declares, or the common ones (packs/loader/kernel/head.ts, ownHead).
-        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD }) }, statuses),
+        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD, [CELL]: CELL_FIELD }) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false, ...((def.private ?? parent?.private) && { private: true }),
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),

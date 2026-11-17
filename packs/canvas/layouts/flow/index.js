@@ -131,7 +131,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
   // One budget for the whole picture (./effort.js): what it spends on looking better, at every level, it spends from this.
   const effort = effortOf(z('picture_work'));
-  const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes });
+  const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, shapes, ...(answer.placed && { placed: answer.placed }) });
   // A picture of items on islands is an archipelago (./archipelago.js): each island laid out alone, a sea between. One
   // island is framed too, with its own legend in place of the key (task e_5rh5ysut).
   const parts = !story && islandsOf(answer.items).length > 0 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;

@@ -18,6 +18,10 @@ export const ISLAND = 'island';
 /** The field the kernel declares, with islands on, on every type that lives on an island. */
 export const ISLAND_FIELD: FieldDef = { type: 'string', description: 'The island it lives on, by id: on a map with islands on, every item but the kernel’s own and actors lives on one, and its type is that island’s pack’s or of the shared set.' };
 
+/** The field of an item that holds its place on its island (feature e_u52abqr4, the owner, 17 Nov 2026): set by an agent, the same in every view that shows the island. */
+export const CELL = 'cell';
+export const CELL_FIELD: FieldDef = { type: 'json', cell: true, shown: true, description: 'Its place on its island, [column, row] in whole cells from the island’s corner: set by an agent, the same in every view that shows the island.' };
+
 /** Whether items of a type live on an island: all but the kernel's own (the kernel flag) and actors. */
 export const livesOnIsland = (t: { system: boolean; lineage: string[] }) => !t.system && !t.lineage.includes('actor');
 
