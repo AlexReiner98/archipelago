@@ -5,9 +5,9 @@
 import { h } from './base.js';
 import { YOURS } from './sessions-open.js';
 
-/** The mark for a session's state: what waits on the owner by its own, one at work a dot, one blocked a square, one resting none. */
+/** The mark for a session's state: what waits on the owner the inbox (by its class), one at work a dot, one blocked a square, one resting none. */
 const MARKS = { working: '•', blocked: '■' };
-const markOf = (state) => YOURS[state]?.mark ?? MARKS[state] ?? '';
+const markOf = (state) => (YOURS[state] ? '' : (MARKS[state] ?? ''));
 
 /** A chat's row: its mark, its name cut short, its line or state in the tooltip. */
 function row(s, done) {
@@ -15,7 +15,8 @@ function row(s, done) {
   const said = s.session?.line || YOURS[state]?.said || state;
   const name = s.title ?? s.label ?? s.name ?? s.id;
   return h('div', { class: 'isl-row isl-chat', role: 'listitem', 'data-id': s.id, 'data-state': state },
-    h('span', { class: 'isl-chat-mark', 'aria-hidden': 'true' }, markOf(state)),
+    // What waits on the owner is the inbox, the page's one mark for it (inbox.svg); the rest a glyph.
+    h('span', { class: `isl-chat-mark${YOURS[state] ? ' on-you' : ''}`, 'aria-hidden': 'true' }, markOf(state)),
     h('button', { type: 'button', class: 'isl-name', tabindex: '-1', title: `${name}: ${said}`, onclick: () => ((location.hash = `#/e/${s.id}`), done()) }, name));
 }
 

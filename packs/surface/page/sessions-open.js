@@ -6,7 +6,7 @@
 import { api, firstDrawn, h, hooks } from './base.js';
 
 /** The states that wait on the owner, each its mark and what it is called. */
-export const YOURS = { waiting: { mark: '?', said: 'waits on you' }, your_move: { mark: '↩', said: 'your move' } };
+export const YOURS = { waiting: { mark: '✉', said: 'waits on you' }, your_move: { mark: '✉', said: 'your move' } };
 /** The open sessions waiting on the owner, the one waiting longest first. */
 export const onYou = (open = []) =>
   open
@@ -42,9 +42,11 @@ hooks.sessionsMoved = () => {
 firstDrawn.then(readOpen);
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && readOpen());
 
-// ---- The count of those waiting on the owner, in the band under the tabs beside the islands button.
+// ---- The count of those waiting on the owner, in the band under the tabs beside the islands button: an inbox (the
+// page's one mark for what waits on you, inbox.svg), its count a badge on it, as a mail app's (Alex, 17 Nov 2026).
 
-const count = h('button', { type: 'button', class: 'q-waiting', hidden: true });
+const badge = h('span', { class: 'q-waiting-badge', 'aria-hidden': 'true' });
+const count = h('button', { type: 'button', class: 'q-waiting', hidden: true }, h('span', { class: 'on-you', 'aria-hidden': 'true' }), badge);
 /** A session's line for a tooltip: its mark, its name, what it waits on. */
 const lineOf = (s) => `${YOURS[s.session.state].mark} ${s.title ?? s.id}: ${s.session.line || YOURS[s.session.state].said}`;
 onOpen((list) => {
@@ -54,7 +56,7 @@ onOpen((list) => {
   const tip = yours.map(lineOf).join('\n');
   count.title = tip;
   count.setAttribute('aria-label', `${yours.length} waiting on you: ${tip}`);
-  count.replaceChildren(h('span', { class: 'q-waiting-mark', 'aria-hidden': 'true' }, '↩'), String(yours.length));
+  badge.textContent = String(yours.length);
   // To the oldest one's page.
   count.onclick = () => (location.hash = `#/e/${yours[0].id}`);
 });
