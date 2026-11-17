@@ -42,8 +42,15 @@ export const showOnly = (i) => apply(only(location.hash, i.id), `${i.title} alon
 
 /** A pack's title as the list shows it. */
 const packTitle = (pack) => capital(pack?.title || pack?.id);
-/** A row's pack, at its right in muted text, cut short where it does not fit: what tells like names apart. */
-const packOf = (pack, on = false) => h('span', { class: 'isl-pack' }, on ? `on · ${packTitle(pack)}` : packTitle(pack));
+/**
+ * Island `i`'s pack, at its row's right in muted text, cut short where it does not fit: what tells like names apart.
+ * None where the pack has the island's own name.
+ */
+const packOf = (i, on = false) => {
+  const pack = packTitle(i.pack), same = pack.toLowerCase() === String(i.title).toLowerCase();
+  if (same && !on) return '';
+  return h('span', { class: 'isl-pack' }, on ? (same ? 'on' : `on · ${pack}`) : pack);
+};
 
 /** What the side list keeps in this browser: whether it is open. */
 const KEPT = 'pelago-islands-side';
@@ -141,13 +148,13 @@ export function drawPicker() {
   const row = (i, on, atOn = false) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', ...(on && i.id === here && { 'aria-current': 'location' }) },
       h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? goTo(i) : putOn(i), done()) }, i.title),
-      atOn ? '' : packOf(i.pack),
+      atOn ? '' : packOf(i),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
     h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i), done()) },
       h('span', { class: 'isl-name' }, i.title),
-      packOf(i.pack, drawn.includes(i.id)));
+      packOf(i, drawn.includes(i.id)));
   const draw = () => {
     const drawn = drawnNow(), q = input.value.trim();
     count.textContent = drawn.length ? String(drawn.length) : '';

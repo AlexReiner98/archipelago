@@ -19,6 +19,7 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     ops: [
       { op: 'create', ref: 'harbour', type: 'island', title: 'Harbour works', props: { pack: 'core' } },
       { op: 'create', ref: 'quarry', type: 'island', title: 'Quarry', props: { pack: 'core' } },
+      { op: 'create', ref: 'named', type: 'island', title: 'Core', props: { pack: 'core' } },
       { op: 'create', ref: 'pier', type: 'task', title: 'Rebuild the pier', props: { island: '{harbour}' } },
       { op: 'create', ref: 'stone', type: 'task', title: 'Cut the stone', props: { island: '{quarry}' } },
     ],
@@ -40,6 +41,8 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     // The side list is up: no pack groups, the islands changed lately first (both were just made), by latest.
     await until('the side list', () => page.evaluate<boolean>(`[...document.querySelectorAll('#islands .isl-head')].some((h) => /^Recent · [0-9]/.test(h.textContent))`));
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-group').length`), 0, 'no pack groups');
+    // An island named as its pack shows no pack.
+    assert.equal(await page.evaluate<string>(`(() => { const r = [...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name').textContent === 'Core'); return r ? String(r.querySelectorAll('.isl-pack').length) : 'no row'; })()`), '0');
     assert.match(await page.evaluate<string>(`document.querySelector('#islands .isl-head').textContent`), /On · 0/);
     assert.equal(await draws('Rebuild the pier again'), false, 'nothing on yet');
     // Folded, the bar is its rail; Ctrl+K opens it with its search in focus, and nothing is drawn outside it.
