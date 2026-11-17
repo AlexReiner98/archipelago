@@ -1,8 +1,8 @@
 // Islands whose look paints (decision e_rxj936fk, the owner, 17 Nov 2026: a live canvas per island; Field the first): the
 // map asks for one surface over its picture (docs/layouts.md, surface) and each such island's look runs as a layout's
-// code runs, `default({ canvas, answer, style, theme, size, on, open, tip, cursor })`, on a canvas of its own the size of
-// the island's frame, with that island's items and links alone. Each frame the canvases are laid into the surface where
-// their islands stand, and the surface is shown. The map keeps the frame, the header and the wires to other islands.
+// code runs, `default({ canvas, answer, style, theme, size, view, on, open, tip, cursor })`, on a canvas of its own the
+// size of the surface, with that island's items and links alone, and the map's camera on its island's frame (`view`).
+// Each frame the part of each canvas inside its island's frame is laid into the surface, and the surface is shown. The map keeps the frame, the header and the wires to other islands.
 // Nothing here reaches past the drawing's worker. The pointer is not yet passed in: a look paints, and an item opens
 // from its page. A look's own frames are stopped when its picture ends: each look's animation frames carry the run that
 // asked for them, and a run that ended is not called again. Layer: marks.
@@ -36,13 +36,16 @@ function framesByRun() {
 
 /**
  * Start painting `islands` ({ id, at: [x, y], size: [w, h], look, answer }: where each stands in the picture, its look's
- * module with its `settings`, and what it holds) into the surface; `most` the most pixels across an island is painted
- * at. The surface lies over the pane while the picture pans and zooms under it, so each frame every island is laid
- * where the latest view (`view`: what is in sight, in the picture's units) puts it, and an island whose size on screen
- * has halved or doubled is painted again at that size. Answers { view, end }: the first view comes once the page has
- * mounted the scene, which is what makes the surface; asked sooner, the page has none to give, and says so for good.
+ * module with its `settings`, and what it holds) into the surface. There is one camera, the map's: each look paints at
+ * the screen's own pixels, on a canvas the surface's size, and is handed `view()`, its island's frame ({ width, height },
+ * in the picture's units) and where that frame lands on screen ({ k, tx, ty }: a unit of it is k pixels, its corner at
+ * tx, ty), heard as 'view' each time the map pans or zooms. A look fits its picture to the frame, not to its canvas, and
+ * so follows the map as one with it: no canvas is remade as one zooms, and words are written at their own size. Each
+ * frame the part of each canvas inside its island's frame is laid into the surface. Answers { view, end }: the first
+ * view comes once the page has mounted the scene, which is what makes the surface; asked sooner, the page has none to
+ * give, and says so for good.
  */
-export function paintIslands({ islands, tools, most }) {
+export function paintIslands({ islands, tools }) {
   let over = false, view = null, begun;
   const runs = [];
   const frames = framesByRun();
@@ -52,18 +55,24 @@ export function paintIslands({ islands, tools, most }) {
     const surface = over ? null : await tools.surface?.();
     if (!surface || over) return;
     const ctx = surface.canvas.getContext('2d');
-    for (const isle of islands) runs.push({ ended: false, canvas: new OffscreenCanvas(1, 1), w: isle.size[0], h: isle.size[1], at: isle.at, size: { width: 1, height: 1, dpr: 1 }, heard: new Map() });
-    /** How many of the surface's pixels a unit of the picture is, as it is in sight now. */
-    const unit = () => surface.canvas.width / Math.max(1, view.width);
-    const sized = (r) => {
-      const k = Math.min(1, most / Math.max(r.w, r.h) / unit()) * unit(), was = r.size.width / Math.max(1, r.w);
-      if (was && k / was < 2 && was / k < 2) return;
-      (r.size.width = r.w * k), (r.size.height = r.h * k), r.heard.get('resize')?.();
+    const size = { width: 1, height: 1, dpr: 1 };
+    for (const isle of islands) runs.push({ ended: false, canvas: new OffscreenCanvas(1, 1), w: isle.size[0], h: isle.size[1], at: isle.at, cam: { width: isle.size[0], height: isle.size[1], k: 1, tx: 0, ty: 0 }, heard: new Map() });
+    /** Where each island's frame lands on screen now, in the surface's own pixels (not the device's); 'view' told where it moved. */
+    const place = () => {
+      const k = size.width / Math.max(1, view.width);
+      for (const r of runs) {
+        const tx = (r.at[0] - view.x) * k, ty = (r.at[1] - view.y) * k;
+        if (r.cam.k === k && r.cam.tx === tx && r.cam.ty === ty) continue;
+        Object.assign(r.cam, { k, tx, ty });
+        if (!r.ended) frames.as(r, () => r.heard.get('view')?.());
+      }
     };
     const fit = () => {
-      surface.canvas.width = Math.max(1, Math.round(surface.size.width * (surface.size.dpr || 1)));
-      surface.canvas.height = Math.max(1, Math.round(surface.size.height * (surface.size.dpr || 1)));
-      runs.forEach(sized);
+      Object.assign(size, { width: surface.size.width, height: surface.size.height, dpr: surface.size.dpr || 1 });
+      surface.canvas.width = Math.max(1, Math.round(size.width * size.dpr));
+      surface.canvas.height = Math.max(1, Math.round(size.height * size.dpr));
+      place();
+      for (const r of runs) if (!r.ended) frames.as(r, () => r.heard.get('resize')?.());
     };
     fit();
     const theme = themeOf(surface.colours);
@@ -71,7 +80,7 @@ export function paintIslands({ islands, tools, most }) {
       const isle = islands[k];
       try {
         frames.as(r, () => isle.look.default({
-          canvas: r.canvas, answer: isle.answer, style: isle.look.settings ?? {}, theme, size: r.size, hot: null,
+          canvas: r.canvas, answer: isle.answer, style: isle.look.settings ?? {}, theme, size, hot: null, view: () => r.cam,
           on: (name, fn) => r.heard.set(name, fn), open: (id) => tools.open?.(id), tip: () => {}, cursor: () => {},
         }));
       } catch {
@@ -79,16 +88,17 @@ export function paintIslands({ islands, tools, most }) {
       }
     });
     surface.resized?.((now) => ((surface.size = now), fit()));
-    // Each frame of the page: every island's canvas laid where the view puts it, and the surface shown.
+    // Each frame of the page: the part of every island's canvas inside its frame, laid where it stands, and the surface shown.
     while (!over) {
       await tools.frame();
       if (over) break;
-      const u = unit();
+      place();
       ctx.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
       for (const r of runs) {
         if (r.ended || r.canvas.width <= 1) continue;
-        sized(r);
-        ctx.drawImage(r.canvas, (r.at[0] - view.x) * u, (r.at[1] - view.y) * u, r.w * u, r.h * u);
+        const d = size.dpr, x0 = Math.max(0, Math.floor(r.cam.tx * d)), y0 = Math.max(0, Math.floor(r.cam.ty * d));
+        const x1 = Math.min(r.canvas.width, surface.canvas.width, Math.ceil((r.cam.tx + r.w * r.cam.k) * d)), y1 = Math.min(r.canvas.height, surface.canvas.height, Math.ceil((r.cam.ty + r.h * r.cam.k) * d));
+        if (x1 > x0 && y1 > y0) ctx.drawImage(r.canvas, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
       }
       surface.show();
     }
