@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { atHome, capital, drawnAt, islandsIn, packMarks, pressed } from '../packs/surface/page/islands-list.js';
+import { atHome, capital, drawnAt, islandsIn, pressed, recentFirst } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
@@ -49,13 +49,23 @@ test('an address names islands and live reads only', () => {
   assert.equal(islandsIn('find=x'), null);
 });
 
-test("a pack's mark tells it apart from every other pack's, and its title shows with a capital", () => {
-  const marks = packMarks([{ id: 'core', title: 'Core' }, { id: 'code', title: 'code' }, { id: 'arch', title: 'Architecture' }, { id: 'x', title: 'Glyphed', glyph: '◆' }, { id: 'core', title: 'Core' }]);
-  assert.equal(marks.get('x'), '◆', 'its glyph where it has one');
-  assert.equal(marks.get('arch'), 'Ar', 'else its first two letters');
-  assert.equal(new Set(['core', 'code'].map((id) => marks.get(id))).size, 2, 'code and Core apart');
-  assert.ok(['core', 'code'].every((id) => /^C[a-z]$/.test(marks.get(id))));
-  assert.deepEqual(packMarks([{ id: 'code', title: 'code' }, { id: 'core', title: 'Core' }]), packMarks([{ id: 'core', title: 'Core' }, { id: 'code', title: 'code' }]), 'the same whatever the order');
+test("a pack's title shows with a capital", () => {
   assert.equal(capital('ridges'), 'Ridges');
   assert.equal(capital('Pack anatomy'), 'Pack anatomy');
+});
+
+test('the side list puts the islands worked on lately first, the latest first, then the rest by name', () => {
+  const now = Date.parse('2026-11-17T12:00:00Z'), day = (n: number) => new Date(now - n * 86_400_000).toISOString();
+  const { recent, rest } = recentFirst([
+    { id: 'a', title: 'Zebra', worked_at: day(1) },
+    { id: 'b', title: 'Apple', worked_at: day(30) },
+    { id: 'c', title: 'Mango', worked_at: day(0.5) },
+    { id: 'd', title: 'Banana', worked_at: day(8) },
+    { id: 'e', title: 'Cherry' },
+  ], now, 7);
+  assert.deepEqual(recent.map((i: { id: string }) => i.id), ['c', 'a'], 'within the days, the latest first');
+  assert.deepEqual(rest.map((i: { title: string }) => i.title), ['Apple', 'Banana', 'Cherry'], 'every other by name, one with no time among them');
+  const capped = recentFirst([{ id: 'a', title: 'Zebra', worked_at: day(1) }, { id: 'c', title: 'Mango', worked_at: day(0.5) }, { id: 'b', title: 'Apple', worked_at: day(30) }], now, 7, 1);
+  assert.deepEqual(capped.recent.map((i: { id: string }) => i.id), ['c'], 'no more than the most, the latest kept');
+  assert.deepEqual(capped.rest.map((i: { title: string }) => i.title), ['Apple', 'Zebra'], 'the rest by name, the one left over among them');
 });
