@@ -68,6 +68,15 @@ const keep = (key, v) => {
   }
 };
 
+/** The side bar's mark, as an editor draws its own: a window with its left panel, filled while the bar is open (the CSS). */
+function sideMark() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => Object.entries(attrs).reduce((e, [k, v]) => (e.setAttribute(k, v), e), document.createElementNS(NS, tag));
+  const svg = el('svg', { viewBox: '0 0 16 16', class: 'isl-mark', 'aria-hidden': 'true' });
+  svg.append(el('rect', { x: '1.5', y: '2.5', width: '13', height: '11', rx: '1.5', class: 'isl-mark-frame' }), el('rect', { x: '1.5', y: '2.5', width: '4.5', height: '11', rx: '1.5', class: 'isl-mark-side' }));
+  return svg;
+}
+
 /** Draw the side list, once a page; the foot strip of the find bar is put away. */
 export function drawPicker() {
   if (document.getElementById('islands')) return;
@@ -81,7 +90,7 @@ export function drawPicker() {
   // The bar's button, first in the band under the tabs (./canvas.js): a press shows the islands or puts them away; how
   // many are on is its count.
   const count = h('span', { class: 'isl-toggle-count' });
-  const fold = h('button', { type: 'button', class: 'isl-toggle' }, 'Islands', count);
+  const fold = h('button', { type: 'button', class: 'isl-toggle', 'aria-label': 'Islands' }, sideMark(), count);
   // The bar's right edge: dragged, it sets the bar's width.
   const edge = h('div', { class: 'isl-edge', 'aria-hidden': 'true', title: 'Drag to widen; double-click for the usual width' });
   // The list is one stop for Tab, worked with arrows (see `keys` below); its rows' presses are for the pointer.

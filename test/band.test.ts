@@ -27,7 +27,11 @@ test('in a browser, the band under the tabs holds the islands button, back and f
       buttons: [...q.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.firstChild.textContent) }; })()`;
   /** Whether the islands button is the topmost thing where it stands, so a press reaches it. */
   const reachable = `(() => { const b = document.querySelector('#query .isl-toggle').getBoundingClientRect(); return document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest('.isl-toggle') != null; })()`;
+  /** The side bar, open, stands under the band, which keeps the whole width: it is never pushed over by it. */
+  const under = `(() => { const q = document.getElementById('query').getBoundingClientRect(), s = document.getElementById('islands').getBoundingClientRect();
+    return document.body.dataset.islands === 'open' && q.left === 0 && Math.abs(q.width - innerWidth) < 1 && s.top >= q.bottom - 1; })()`;
   try {
+    await until('the side bar open under the band', () => page.evaluate<boolean>(under));
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false });
       await until(`the band at ${width} px`, () => page.evaluate<boolean>(`${band}.shown`));
@@ -51,6 +55,7 @@ test('in a browser, the band under the tabs holds the islands button, back and f
     await page.evaluate(`document.querySelector('#query .isl-toggle').click()`);
     await until('open over the canvas', () => page.evaluate<boolean>(`document.body.dataset.islands === 'open' && document.body.dataset.islandsOver === 'on'`));
     assert.ok(await page.evaluate<boolean>(reachable), 'the islands button in reach over the open side bar');
+    assert.ok(await page.evaluate<boolean>(under), 'narrow, the side bar opens under the band too');
     await page.evaluate(`document.querySelector('#query .isl-toggle').click()`);
     await until('put away', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded'`));
   } finally {
