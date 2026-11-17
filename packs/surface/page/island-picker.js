@@ -76,10 +76,12 @@ export function drawPicker() {
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // Its shortcut, at the line's right while nothing is typed.
   const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
-  // The rail along the bar's edge, its whole height a press that folds the bar to the edge or opens it again.
-  const arrow = h('span', { class: 'isl-arrow', 'aria-hidden': 'true' });
-  const count = h('span', { class: 'isl-rail-count' });
-  const fold = h('button', { type: 'button', class: 'isl-rail' }, arrow, count);
+  // The bar's button, in the tab bar before the tabs: a press shows the islands or puts them away; how many are on is
+  // its count.
+  const count = h('span', { class: 'isl-toggle-count' });
+  const fold = h('button', { type: 'button', class: 'isl-toggle' }, 'Islands', count);
+  // The bar's right edge: dragged, it sets the bar's width.
+  const edge = h('div', { class: 'isl-edge', 'aria-hidden': 'true', title: 'Drag to widen; double-click for the usual width' });
   // The list is one stop for Tab, worked with arrows (see `keys` below); its rows' presses are for the pointer.
   const body = h('div', { class: 'isl-body', tabindex: '0', 'aria-label': 'Islands' });
   // No tooltip on a row: a name cut short has the whole of it as its tooltip, the name alone.
@@ -87,23 +89,23 @@ export function drawPicker() {
     const name = ev.target.closest?.('.isl-name');
     if (name) name.scrollWidth > name.clientWidth ? (name.title = name.textContent) : name.removeAttribute('title');
   });
-  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), fold);
+  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), edge);
   document.body.append(side);
+  const nav = document.getElementById('nav');
+  nav?.insertBefore(fold, document.getElementById('tabs'));
   /** Whether the bar was folded for an item's page, not by the person: it opens again when the page closes. */
   let forPage = false;
   /** Fold or open the bar; `kept`, as the person left it (a fold for a page is not). */
   const open = (on, kept = true) => {
     if (kept) forPage = false;
     document.body.dataset.islands = on ? 'open' : 'folded';
-    arrow.textContent = on ? '‹' : '›';
-    fold.title = on ? 'Fold the islands to the edge (Ctrl+K opens them again); drag to widen' : 'Show the islands (Ctrl+K)';
-    fold.setAttribute('aria-label', on ? 'Fold the islands' : 'Show the islands');
+    fold.title = on ? 'Put the islands away (Ctrl+K brings them back)' : 'Show the islands (Ctrl+K)';
     fold.setAttribute('aria-expanded', String(on));
     if (kept) keep('open', on);
     dispatchEvent(new Event('resize'));
   };
-  fold.onclick = () => (dragged ? (dragged = false) : open(document.body.dataset.islands !== 'open'));
-  // Dragged, the rail sets the open bar's width, between the style's picker_width_least and _most, kept in this
+  fold.onclick = () => open(document.body.dataset.islands !== 'open');
+  // Dragged, the edge sets the open bar's width, between the style's picker_width_least and _most, kept in this
   // browser; a double-click gives the default back.
   let dragged = false;
   const widen = (w) => {
@@ -113,8 +115,10 @@ export function drawPicker() {
   };
   const keptWidth = kept('width', null);
   if (typeof keptWidth === 'number') widen(keptWidth);
-  fold.addEventListener('pointerdown', (down) => {
+  edge.addEventListener('pointerdown', (down) => {
     if (document.body.dataset.islands !== 'open') return;
+    down.preventDefault();
+    dragged = false;
     const from = down.clientX, start = side.getBoundingClientRect().width, least = numberOf(state.style, 'picker_drag_from');
     const move = (ev) => {
       if (!dragged && Math.abs(ev.clientX - from) < least) return;
@@ -129,7 +133,7 @@ export function drawPicker() {
     addEventListener('pointermove', move);
     addEventListener('pointerup', up);
   });
-  fold.addEventListener('dblclick', () => (widen(null), keep('width', null), open(true)));
+  edge.addEventListener('dblclick', () => (widen(null), keep('width', null)));
   // A narrow window (below the style's picker_over_below) has no room for the bar beside the canvas: the bar starts
   // folded, and opened it lies over the canvas until an island is pressed or the canvas is.
   const narrow = () => innerWidth < numberOf(state.style, 'picker_over_below');
