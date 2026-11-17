@@ -296,7 +296,8 @@
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." },
-        "pack_version": { "type": "string", "description": "A version of its pack to try here, by the id of a pack item that is one (version_of): its types, rules and instructions are this island's while the rest of the map keeps the pack as it is. Unset, it runs the map's: unsetting it rolls the trial back." }
+        "pack_version": { "type": "string", "description": "A version of its pack to try here, by the id of a pack item that is one (version_of): its types, rules and instructions are this island's while the rest of the map keeps the pack as it is. Unset, it runs the map's: unsetting it rolls the trial back." },
+        "packs_off": { "type": "json", "description": "The packs turned off on this island alone, by id ([\"build\"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack." }
       }
     },
     {
@@ -1026,6 +1027,22 @@
       "lifted": "agent_code",
       "stake": "A pack that runs code on the server, or reaches outside it, is turned on or off here: its code starts or stops for everyone on this map.",
       "say": "A pack that runs code is the owner’s to turn on or off, unless they let agents’ code run (Settings, under Agents)."
+    },
+    {
+      "id": "agent_island_pack",
+      "when": { "actor": "agent", "op": ["create", "update"], "fields": ["packs_off"] },
+      "then": "hold",
+      "lifted": "agent_changes",
+      "stake": "A pack turned on or off on \"{title}\" alone: its types and rules come or go there; its items stay, waiting while it is off, and the rest of the map keeps it.",
+      "say": "Turning a pack on or off on an island is the owner’s here: it applies for agents once they let agents’ changes apply (Settings, under Agents)."
+    },
+    {
+      "id": "agent_island_code",
+      "when": { "actor": "agent", "op": ["create", "update"], "fields": ["packs_off"], "island_code": true },
+      "then": "hold",
+      "lifted": "agent_code",
+      "stake": "A pack that runs code on the server is turned on or off on \"{title}\": what it does for that island starts or stops.",
+      "say": "A pack that runs code is the owner’s to turn on or off, on an island too, unless they let agents’ code run (Settings, under Agents)."
     },
     {
       "id": "root_off",

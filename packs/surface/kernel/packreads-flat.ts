@@ -10,6 +10,7 @@
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { kernelTypes, SYSTEM, WRAPS } from '../../loader/kernel/head.ts';
 import { ISLAND, onIslands } from '../../loader/kernel/island-items.ts';
+import { islandDeclarations } from '../../loader/kernel/island-decl.ts';
 import { headPos } from '../../log/kernel/tail.ts';
 import { blockGraph } from './blocking.ts';
 import { proposals } from './map-reads.ts';
@@ -365,10 +366,14 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
   const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
   // A focus is its own island (decision e_mqex8wrf): it speaks its type's pack, and says it is one so a drawing names the island by it.
   const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; type: string; pack: string | null; focus: string | null }>(`select id, title, type, props->>'pack' as pack, props->>'focus' as focus from entity where id = any($1::text[])`, [islandIds])).rows.map(({ type, focus, ...r }) => (focus === 'true' ? { ...r, pack: l.registry.type(type)?.pack ?? null, focus: true } : r)) : [];
+  // What each island declares (its pack, what that requires, each one's state there) and which items wait because their
+  // pack is not active on their island (task e_ter3cwup, decision e_57bjxy2x): derived here, nothing written to an item.
+  const { decls, waiting } = isles.length ? await islandDeclarations(l, isles, items.map((e) => ({ id: e.id, type: e.type, island: islandOf(e) }))) : { decls: new Map(), waiting: new Map() };
   return {
     items, links, whole: ((w) => items.filter((e) => w.has(e.id)).map((e) => e.id))(new Set(wholeIds)),
     found: Object.fromEntries(foundBy), terms: Object.fromEntries(termsBy), step: Object.fromEntries(stepOf),
-    on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id) })),
+    on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id), ...(decls.has(id) && { decl: decls.get(id) }) })),
+    ...(waiting.size && { waiting: Object.fromEntries(waiting) }),
     ...(cut && { cut: true }), ...(matched !== undefined && { matched }),
   };
 }
