@@ -31,7 +31,7 @@ import { looks as kept } from './island-looks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
 import { carried } from './carried.js';
-import { shapedBy } from './steps.js';
+import { shapedBy, shapeIn } from './steps.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
@@ -124,7 +124,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const pane = width > 0 && height > 0 ? width / height : ASPECT;
   const aspect = ASPECT * (pane / ASPECT) ** FOLLOW;
   const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
-  const shapes = { type: record(style.type_shapes) };
+  // Each island's own layer, from the packs active on it (decision e_gqmavsb7): outlines and dots for its items.
+  const isleStyle = (id) => record((answer.islands ?? []).find((i) => i.id === id)?.style), shapes = { type: record(style.type_shapes), islands: Object.fromEntries((answer.islands ?? []).map((i) => [i.id, record(record(i.style).type_shapes)])) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
@@ -146,12 +147,12 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const yours = (i) => Boolean(stateOf(i).you);
   // How each phase's dot is drawn (the style's phase_marks): hollow, half, full or none.
   const MARKS = ['hollow', 'half', 'full', 'none'], marks = record(style.phase_marks);
-  const markOf = (phase) => (MARKS.includes(marks[phase]) ? marks[phase] : 'hollow');
+  const markOf = (phase, island) => ((own) => (MARKS.includes(own[phase]) ? own[phase] : 'hollow'))({ ...marks, ...record(isleStyle(island).phase_marks) });
   // Whether a step held up by an open step it depends on is marked in the trouble colour (the style's held_up): the
   // house style does not, since the order's wire already says it and red is kept for trouble (the owner, 3 Nov 2026).
   const heldUp = (i) => style.held_up === 'trouble' && Boolean(stateOf(i).blocked);
   /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
-  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
+  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
   const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : mark === 'half'
     ? m('g', { class: `lf-dot ${cls}` }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-dot-fill' }))
@@ -294,7 +295,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // An island that says its pack (the answer's `islands`) names it in the pack's words and order, but only what is in
   // use on it (the owner, 6 Nov 2026): the types of its items and the link types of its own links.
   const packRows = (pack, group) => [
-    ...pack.types.filter((t) => group.items.some((i) => i.type === t.id)).map((t) => ((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapes.type?.[shapedBy({ type: t.id, is: t.is }, shapes)] ?? 'box')),
+    ...pack.types.filter((t) => group.items.some((i) => i.type === t.id)).map((t) => ((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapeIn({ type: t.id, is: t.is, island: group.id }, shapes))),
     ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => mark(r.id === ORDER_TYPE ? m('path', { d: 'M1 7H21', class: `lf-wire${kind(r.id)}` }) : tieKey(r.id, kind(r.id)), r.title)),
   ];
   const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack;
@@ -343,7 +344,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
     return [left - z('dot_gap'), g.y.get(n.id)];
   };
-  const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase), ...dotPlace(n), z('dot'));
+  const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase, n.item.island), ...dotPlace(n), z('dot'));
   const sessionDot = (n) => marked(n.item) && stateMark(m, sessionOf(n.item).state, marked(n.item), ...dotPlace(n), z('dot'));
   // Where a step stands is of the grammar every island shares: its dot says so in a tip of its own, over a ring wider
   // than the dot to hover (`p:<id>`), so an island's legend need not.

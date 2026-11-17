@@ -67,3 +67,21 @@ test('the drawing paints the look under its island and draws the items it gives 
   assert.ok(text.includes('"lf-look-item"'), 'the item the look draws is drawn as it says');
   assert.ok(text.includes('#/e/e_aaaaaaaa'), 'and still links to its page');
 });
+
+test('an island’s own style gives its items their outline there alone', () => {
+  const style = { ...house, placed };
+  const two = [item('e_aaaaaaaa', 'e_islandaa', [0, 0]), item('e_dddddddd', 'e_islandbb', [0, 0])];
+  const answer = { items: two, links: [], islands: [{ id: 'e_islandaa', title: 'Here', style: { type_shapes: { task: 'diamond' } } }, { id: 'e_islandbb', title: 'There' }] };
+  const { scene } = draw({ answer, style, reduced: true, width: 1200, height: 800 }, { measure, gestures: () => ({ on: () => [] }) });
+  const step = (id: string) => JSON.stringify(find(scene.svg, (k: any) => k[1]?.href === `#/e/${id}`));
+  assert.match(step('e_aaaaaaaa'), /"path"/, 'a diamond on the island whose pack says so');
+  assert.doesNotMatch(step('e_dddddddd'), /"path"/, 'a box on the other');
+});
+
+/** The first mark in a scene that `test` holds of. */
+function find(mark: any, test: (k: any) => boolean): any {
+  if (!Array.isArray(mark)) return null;
+  if (typeof mark[0] === 'string' && test(mark)) return mark;
+  for (const kid of mark.slice(typeof mark[0] === 'string' ? 2 : 0)) { const f = find(kid, test); if (f) return f; }
+  return null;
+}

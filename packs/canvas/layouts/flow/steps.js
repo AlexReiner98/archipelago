@@ -11,8 +11,12 @@ const need = (set, name) => {
 
 /** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
 export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket'];
+/** The outlines by type an item is drawn by: the view's, under those its island's packs give (`shapes.islands`, by island id; decision e_gqmavsb7). */
+export const shapesFor = (i, shapes = {}) => ({ ...shapes.type, ...(shapes.islands?.[i.island] ?? {}) });
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
-export const shapedBy = (i, shapes = {}) => lineageOf(i).find((t) => SHAPES.includes(shapes.type?.[t]));
+export const shapedBy = (i, shapes = {}) => ((own) => lineageOf(i).find((t) => SHAPES.includes(own[t])))(shapesFor(i, shapes));
+/** The outline an item is drawn in: its type's, else the nearest flavour's that has one, else a box. */
+export const shapeIn = (i, shapes = {}) => shapesFor(i, shapes)[shapedBy(i, shapes)] ?? 'box';
 /** How far each outline cuts into its box, by the size the style names for it: none for a box, diamond, pill or sheet. */
 const BEVEL = { cut: 'flow_cut', hexagon: 'flow_point', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
 
@@ -22,7 +26,7 @@ const BEVEL = { cut: 'flow_cut', hexagon: 'flow_point', flag: 'flow_point', tab:
  */
 export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
   const [MAX_TEXT, TEXT, STUB_TEXT, DIAMOND_PAD, DIAMOND_H, END_PAD, END_H, BOX_PAD, BOX_H, SHEET_H] = ['flow_max_text', 'flow_text', 'flow_stub_text', 'flow_diamond_pad', 'flow_diamond_height', 'flow_end_pad', 'flow_end_height', 'flow_box_pad', 'flow_box_height', 'flow_sheet_height'].map((n) => need(sizes, n));
-  const shapeOf = (i) => shapes.type?.[shapedBy(i, shapes)] ?? 'box';
+  const shapeOf = (i) => shapeIn(i, shapes);
   const nodes = new Map();
   // The items come made first (./graph.js): a place the answer gives (a run's, ./session.js) goes before that.
   for (const i of [...items].sort((a, b) => (a.place ?? 0) - (b.place ?? 0))) nodes.set(i.id, { id: i.id, item: i, shape: shapeOf(i) });
