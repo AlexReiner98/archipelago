@@ -67,7 +67,6 @@ export const SLOW: Record<string, string> = {
   'test/tabs-busy.test.ts': 'browser',
   'test/tabs-canvas.test.ts': 'browser',
   'test/tips.test.ts': 'browser',
-  'test/traces-page.test.ts': 'browser',
   'test/transition-browser.test.ts': 'browser',
   'test/walk-from.test.ts': 'browser',
   // A whole map moved, backed up, restored, migrated or pulled: databases opened, filled and replayed from the log,
@@ -89,12 +88,6 @@ export const SLOW: Record<string, string> = {
   'test/approvals-mixed-2.test.ts': 'table',
   // The map of a few hundred items drawn whole through its budget, timed: about 22 seconds.
   'packs/canvas/map-time.test.ts': 'timed',
-  // Dense pictures drawn six times over, each checked: about 22 seconds.
-  'packs/canvas/map-routing.test.ts': 'long',
-  // Eighteen real canvases, up to 200 items, each drawn whole and its picture hashed: about 8 seconds.
-  'packs/canvas/map-corpus.test.ts': 'long',
-  // The same canvases drawn again with their starts spread over helpers of one, three and six: about 22 seconds.
-  'packs/canvas/map-spread.test.ts': 'long',
   // Many tests in one file, past LONG seconds of one process in CI (test/weights.json, 8 Nov 2026).
   'test/sessions.test.ts': 'long',
   'test/new-workspace.test.ts': 'long',

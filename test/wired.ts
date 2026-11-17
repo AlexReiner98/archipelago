@@ -1,6 +1,6 @@
-// A wired drawing run as the page runs it, for the structure test (test/structure.test.ts): its modules set out under the
-// names pack.json gives them, a few small maps to draw, and what each draws read as boxes and lines. Kept apart so that
-// test stays within the length every file keeps to.
+// The wired drawings, for the structure test (test/structure.test.ts): their modules, the layer each says, and a drawing
+// set out under the names pack.json gives its modules, to run as the page runs it. Kept apart so that test stays within
+// the length every file keeps to.
 
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -18,95 +18,16 @@ export const imported = (text: string) => [...text.matchAll(/(?:from\s+|import\s
 export const pathOf = (d: Layout, name: string) => `packs/${d.pack}/${d.modules[name]}`;
 export const short = (file: string) => file.replace('packs/canvas/layouts/', '');
 
-export type Sketch = { items: any[]; links: { type: string; from: string; to: string }[] };
-type Line = { ends: string[]; points: number[][] };
-type Box = { id: string; l: number; r: number; t: number; u: number };
-
-const measure = (text: string, px: number) => text.length * px * 0.55;
-const item = (id: string, kind = 'work') => ({ id, kind, type: 'task', title: `Step ${id}`, open: true, status: 'todo', state: { blocked: false, waits_on: [], sessions: 0 } });
-const dep = (from: string, to: string) => ({ id: `d_${from}_${to}`, type: 'depends_on', from, to });
-const tie = (from: string, to: string, type = 'calls') => ({ id: `t_${from}_${to}`, type, from, to });
-const named = (n: number, at = 'n') => Array.from({ length: n }, (_, k) => `${at}${k}`);
-const sketch = (ids: string[], links: Sketch['links']): Sketch => ({ items: ids.map((id) => item(id)), links });
-
-/** Order and ties tangled enough to take the search, not the even rows, with a few leaves on `hub`. */
-function knot() {
-  const ids = named(48), kids = named(3, 'k');
-  return sketch([...ids, ...kids, 'hub'], [
-    ...ids.flatMap((id, k) => [...(k % 7 ? [dep(id, ids[k - 1])] : []), ...(k > 8 && k % 5 === 0 ? [tie(ids[k - 8], id)] : [])]),
-    ...kids.map((id) => tie(id, 'hub', 'part_of')), dep('hub', 'n3'), dep('n20', 'hub'),
-  ]);
-}
-
-/** One box many wires land on, from both sides. */
-function fan() {
-  const before = named(8, 'a'), after = named(8, 'b');
-  return sketch([...before, ...after, 'mid'], [...before.map((id) => dep('mid', id)), ...after.map((id) => dep(id, 'mid'))]);
-}
-
-/** Three that each reach the same three, so some wires must cross. */
-function crossed() {
-  const tops = named(3, 'p'), feet = named(3, 'q');
-  return sketch([...tops, ...feet], feet.flatMap((q) => tops.map((p) => dep(q, p))));
-}
-
-/** A holder with many leaves, in a chain: every leaf's wire is its own. */
-function comb() {
-  const kids = named(12, 'k');
-  return sketch([...kids, 'hub', 'up', 'down'], [...kids.map((id) => tie(id, 'hub', 'part_of')), dep('hub', 'up'), dep('down', 'hub')]);
-}
-
-/** What is not joined: two chains, and items joined to nothing. */
-function apart() {
-  const [a, b, c] = [named(4, 'a'), named(4, 'b'), named(5, 'c')];
-  return sketch([...a, ...b, ...c], [...[a, b].flatMap((chain) => chain.slice(1).map((id, k) => dep(id, chain[k])))]);
-}
-
-export const SKETCHES: Record<string, Sketch> = { knot: knot(), fan: fan(), crossed: crossed(), comb: comb(), apart: apart() };
-
-/** The house style (canvas's, kept under core's id). */
-const house = () => JSON.parse(readFileSync(join(ROOT, 'packs/canvas/pack.json'), 'utf8')).styles.find((s: any) => s.id === 'core.house').props;
-
-const boxesOf = (g: any): Box[] => g.all.filter((n: any) => !n.dummy).map((n: any) => {
-  const [x, y] = [g.x.get(n.id), g.y.get(n.id)];
-  return { id: n.id, l: x - n.w / 2, r: x + n.w / 2, t: y - n.h / 2, u: y + n.h / 2 };
-});
-const linesOf = (wires: any[]): Line[] => wires.filter((w) => w.points?.length > 1).map((w) => ({ ends: [w.a, w.b], points: w.points }));
-
-/** What every wired drawing draws of a sketch, with its layout, and the spacing it keeps its wires at. A new wired
- *  drawing is added here; those retired on 9 Nov 2026 are at git tag archive/layouts-2026-11-09. */
-export const WIRED: Record<string, { gap: (sizes: Record<string, number>) => number; draw: (layout: any, s: Sketch) => { boxes: Box[]; lines: Line[] } }> = {
-  'core.map': {
-    gap: (sizes) => sizes.flow_wire_gap,
-    draw(layout, { items, links }) {
-      const { sizes, headless, undrawn } = house(), g = layout({ items, links, measure, sizes, headless, undrawn });
-      return { boxes: boxesOf(g), lines: linesOf([...g.chains, ...g.ties]) };
-    },
-  },
-};
-
-/** How each sketch fails a drawing, counted: `spacing` (test/spacing.ts) run on its lines at `gap`. */
-export function faultsOf(wired: (typeof WIRED)[string], layout: any, spacing: (lines: Line[], gap: number) => any) {
-  const gap = wired.gap(house().sizes), found: Record<string, number> = {};
-  for (const [name, s] of Object.entries(SKETCHES)) {
-    const { boxes, lines } = wired.draw(layout, s), { down, across } = spacing(lines, gap);
-    const stand = boxes.flatMap((p, i) => boxes.slice(i + 1).filter((q) => Math.min(p.r, q.r) - Math.max(p.l, q.l) > 0.5 && Math.min(p.u, q.u) - Math.max(p.t, q.t) > 0.5)).length;
-    const through = lines.filter((w) => boxes.some((b) => !w.ends.includes(b.id) && w.points.some((p, i) => {
-      const q = w.points[i - 1];
-      return i > 0 && Math.max(p[0], q[0]) > b.l + 1 && Math.min(p[0], q[0]) < b.r - 1 && Math.max(p[1], q[1]) > b.t + 1 && Math.min(p[1], q[1]) < b.u - 1;
-    }))).length;
-    const counts = { overlaps: down.overlaps + across.overlaps, shared: down.shared + across.shared, under: down.under + across.under, 'boxes on boxes': stand, 'wires through boxes': through };
-    for (const [what, n] of Object.entries(counts)) if (n) found[`${name}: ${what}`] = n;
-  }
-  return found;
-}
+/** The wired drawings, whose modules keep the layers apart (docs/layouts.md). Those retired on 9 Nov 2026 are at git tag
+ *  archive/layouts-2026-11-09. */
+export const WIRED: Record<string, true> = { 'core.map': true };
 
 /** The layers of a wired drawing, in the order each may read those before it (docs/layouts.md). */
 export const LAYERS = ['graph', 'topology', 'shape', 'metrics', 'marks'];
 /** What each module that does not yet say its layer will say, by folder then layer. Architecture's are a first reading. */
 const LAYERS_OWED: Record<string, Record<string, string>> = {
   flow: {
-    graph: 'combs graph lines places polyline shapes steps', topology: 'count numbering planar thread upward', shape: 'faults',
+    graph: 'combs graph lines places polyline shapes steps', topology: 'count', shape: 'faults',
     metrics: 'layout', marks: 'index look story',
   },
   architecture: {

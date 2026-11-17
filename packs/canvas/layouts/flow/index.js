@@ -28,9 +28,6 @@ import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { placesAsColours } from './places.js';
 import { drawn } from './polyline.js';
-import { spreading } from './spread.js';
-
-export { helpers } from './spread.js';
 import { carried } from './carried.js';
 import { shapedBy } from './steps.js';
 import { play } from './play.js';
@@ -81,7 +78,7 @@ function outline(shape, x, y, w, hgt, rx, cut = 0) {
  * The graph: its steps, the wires and ties between them and what each choice is. `input` is what the page gives every
  * drawing (the answer, the style); `tools.measure(text, px, font, role)` is how wide a text is drawn, as one of the style's text roles when one is given.
  */
-/** The picture, drawn here alone: `picture` spreads the search's starts over helpers where it has them (./spread.js). */
+/** The picture. */
 export function draw({ answer: given, style, reduced, width, height }, tools) {
   let answer = shownOnly(given);
   // A story lays out what its steps bring in, all of it, each mark hidden until a step shows it.
@@ -406,8 +403,6 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, trunkLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = [
-    // A picture too large to wire says so, and how many links it leaves out (bug e_a9w5jeme).
-    ...(g.unwired ? [{ label: `${g.unwired} link${g.unwired === 1 ? '' : 's'} not drawn: too many to wire` }] : []),
     ...(parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 })),
   ];
 
@@ -479,4 +474,4 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   };
 }
 
-export const picture = spreading(draw);
+export const picture = draw;

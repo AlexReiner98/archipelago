@@ -7,7 +7,6 @@
 // page to light the stop it stands at. Layer: marks. Its lengths are the style's: rails_stop_span, rails_stop_room.
 
 import { draw as map } from './map.js';
-import { spreading } from './spread.js';
 import { readingOrder } from './walk.js';
 
 /** A note's first paragraph, plain, for a stop's words. */
@@ -37,6 +36,5 @@ function draw(args, tools) {
   return { ...drawn, scene: { ...scene, svg: said(scene.svg), stops, whole: { x: width / 2, y: height / 2, span: width, zoom: 1 } } };
 }
 
-/** Its starts spread as the map's are (./spread.js). */
-export const picture = spreading(draw);
-export { helpers } from './spread.js';
+/** What the frame calls. */
+export const picture = draw;

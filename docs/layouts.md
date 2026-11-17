@@ -2,7 +2,7 @@
 
 Every picture is drawn by a drawing: code a pack ships for one shape, which the owner changes on the map, run in the browser's sandbox and answering with marks the page checks. The kernel keeps only the frame every picture has (the stage that pans and zooms, the key, the bar, a published page's still frame) and draws no shape of its own.
 
-The canvas pack (`packs/canvas`, moved out of core with its ids on 11 Nov 2026, decision e_fgsgw8ja) ships one drawing, **Map** (`core.map`, shape `map`; the owner, 9 Nov 2026): the whole graph made plane at once, islands and their ports with it, given right angles with the fewest bends, then its distances relaxed keeping that shape. Its entry and marks are the flow's (`layouts/flow/index.js`), its layout `layouts/map/layout.js`, built on `planarize/`, `shape/` and `relax/`. The house style (`core.house`, canvas's) draws every view with it; canvas's own preset, which still names an old shape, draws it too. Every map starts with canvas: the page reads its numbers off the house style, so a map without it draws nothing. A style or saved view that names a shape no pack draws (one retired below) is drawn by the first drawing the packs ship, so nothing kept stops drawing (`packs/loader/kernel/layouts.ts`). A view is always fitted into sight until the reader moves it; there is no Fit setting.
+The canvas pack (`packs/canvas`, moved out of core with its ids on 11 Nov 2026, decision e_fgsgw8ja) ships one drawing, **Map** (`core.map`, shape `map`; the owner, 9 Nov 2026): every item where an agent placed it, with no solver (the owner, 17 Nov 2026). A view that lists its islands draws each at the corner it keeps, each item at its `cell` (`layouts/map/placed.js`); any other picture is placed plainly, each island's items in rows, until the canvas draws only placed islands. Wires are straight, box edge to box edge. Its entry and marks are the flow's (`layouts/flow/index.js`), its layout `layouts/map/layout.js`. The solver it had until then (`planarize/`, `shape/`, `relax/`) is at git tag `archive/before-focus-2026-11-17`. The house style (`core.house`, canvas's) draws every view with it; canvas's own preset, which still names an old shape, draws it too. Every map starts with canvas: the page reads its numbers off the house style, so a map without it draws nothing. A style or saved view that names a shape no pack draws (one retired below) is drawn by the first drawing the packs ship, so nothing kept stops drawing (`packs/loader/kernel/layouts.ts`). A view is always fitted into sight until the reader moves it; there is no Fit setting.
 
 **Rails** (`core.rails`, shape `rails`; decision e_btxq2nzq) is the shipped map with a walk through it: its picture is core.map's, mark for mark (`layouts/rails/index.js` runs `layouts/flow/index.js` as `map.js`), so a page baked from a view looks as the product does. Every item drawn is a stop, read in the view's order (`walk.js`: an `order` field first, then what an item depends on before it, then the answer's order), and each item's mark says its `item`. Beside the marks its scene carries `stops` (each item's id, title, first paragraph, and the camera on it: `x`, `y`, the `span` of picture it frames, `zoom` against the whole, read off where the map put it, `places`) and `whole`. A page baked from it is walked by scrolling with `packs/reader/public/rails.js` and `rails.css` (the markup they read is in rails.js's head): wide, the map fills a screen held still and scroll only moves its camera: the stop at rest is lit, the rest dimmed, and its words stand in one callout beside its box, a dot row at the foot the walk (question e_m7tssx3y); at `rails_narrow_at` or less, a column of cards with a wire between; asked for less motion, or with no script, a plain page of titles and notes. The camera's lengths are `rails_stop_span` and `rails_stop_room`; the page's the other `rails_*` sizes.
 
@@ -69,7 +69,7 @@ export function picture({ answer, style, reduced }, { measure, patch, open, fram
 - `key` says what each mark the picture uses means, one row each: `{ glyph, label, item }`, `glyph` a small mark (an `svg` of its own, checked as every mark is, drawn in the scene's stylesheet), `label` its words, and `item`, when the row stands for an item, the id its row opens. The page draws the key in the one frame every key has: on the canvas always in sight, beside the picture in the room the bars leave (the fit leaves room for it), below a picture the page lays out, above a still one; and not at all where the style says `key: "hidden"` (core's house style says `shown`). A drawing names only what it draws: the flow a row for each shape, state and link type it uses, each link type in its colour. A drawing written before the key was data may still give `legend`, marks it lays out itself.
 - The page tells a drawing how wide it is (`width`: the text's width in a published document, else its host's) and how tall its host is (`height`, 0 where the host is as tall as what it holds), so a drawing can lay out to the pane's shape (the flow leans down a narrow pane and across a wide one, by `flow_aspect_follow`; the calendar sizes its hours to fit); a drawing the page lays out says so in its entry (`flat: true`), the style answer carries that, and the page gives it its box before measuring, so it is drawn once at the size it will have; a scene that says `shaped: true` is drawn again when its pane settles into another shape (by more than `plane_reshape_ratio`, still for `plane_reshape_after` ms), and the values each type's fields may take (`fields`, by type then field) and each link's title (`relations`), for the types and links the answer holds: a drawing has no registry of its own.
 - `surface()` resolves, once the scene has asked for one (`surface: { key }`), to `{ canvas, size, colours, three, resized, show }`: a canvas of the drawing's own to paint (an OffscreenCanvas, 2D or WebGL), the size of its picture, the page's colours (`page`, by the theme's names, and `lens`), three.js, a way to hear the size change, and `show()`, which sends what is painted to the page as an image, shown on a canvas laid over the picture (`packs/walls/page/surface.js`). Where the scene asked for none, it resolves to null.
-- `helpers`, where it is given, is work run side by side (task e_bsp7jhrw). A drawing whose `index.js` exports `helpers` (an object of functions) is given workers of its own code by the frame (`packs/walls/page/draw-marks.js`), started as its own worker is, so the same walls hold them, pinged with it and stopped with it; a picture is handed a channel to each that is ready, as `{ size, run(name, arg, at) }`, and `run` answers what `helpers[name](arg)` came to on helper `at`, copied both ways. Their number is the machine's cores less one, one at least and six at most. The map spreads its search's starts over them (`packs/canvas/layouts/planarize/spread.js`): the starts are judged in order by the same rules, so the picture is the one drawn without them; where there are none, or one fails, it is drawn one start after another.
+- `helpers`, where it is given, is work run side by side (task e_bsp7jhrw). A drawing whose `index.js` exports `helpers` (an object of functions) is given workers of its own code by the frame (`packs/walls/page/draw-marks.js`), started as its own worker is, so the same walls hold them, pinged with it and stopped with it; a picture is handed a channel to each that is ready, as `{ size, run(name, arg, at) }`, and `run` answers what `helpers[name](arg)` came to on helper `at`, copied both ways. Their number is the machine's cores less one, one at least and six at most.
 - The picture lies on one plane (`packs/walls/page/pan-zoom.js`): no edge holds it in, zoom is only scale, and the page leaves undrawn each mark (what is directly in the `svg`, or in a bare `g` directly in it) that is out of sight, a margin round the view kept drawn (the style's `plane_*` numbers). Text too small on screen is not drawn: the frame says by how big the picture's text is on screen (`data-text`: `none`, `names` or `all`, by `plane_text_least` and `plane_more_from`), and a drawing's stylesheet says what more than a name is under `[data-text=names]` (the flow folds what a choice is and the count on a step). `viewport(view)` is told what is in view as the plane moves (`{ x, y, width, height, scale }`, in the picture's units), only the latest when it moves faster than the drawing answers, and answers with patches: a drawing with more than is worth drawing at once draws what is in view.
 - `on({ name, key })` is told of `enter`, `leave` and `click` on a mark that asked for them, and `seen` once, when the mark is first half in sight, and answers with patches; `restyle(style)` is told when the reader changes what stays lit.
 - **Gestures** (decision e_qpaqnmrc, axis F). `may` in the input is what the session may do (`read`, `write`, `admin`, from `/whoami`, `packs/surface/kernel/may.ts`). `change(ops, reason)` asks the page for a change and resolves to `{ status, created, proposal, held }` or `{ error }`: the page puts it to the person first (a link's type picked from those that fit, an item's type and name) and sends it as theirs (`packs/walls/page/layout-asks.js`); a drawing may ask to make one item and to link items, nothing else. `gestures({ island(key) })` is the helper a drawing opts into: `on(key)` gives `add` for an island's mark, nothing where the session may not write, so a reader's picture has no button. A mark with `on: ['add']` and an `item` (the island's id) is a button the page answers itself, without telling the drawing (`ui/marks-add.js`): it puts a new item on that island to the person. A drawing's port runs its messages in turn, so a click told to it waits for any solve under way; nothing on the plane makes or links by dragging or double clicking (the owner, 10 Nov 2026): a link starts from an item's page. Map opts in, with an Add row in each island's legend.
@@ -80,94 +80,32 @@ export function picture({ answer, style, reduced }, { measure, patch, open, fram
 
 Every drawing has one path: the answer, the style and the pins (`placed`) go in, a model is made from them, and the marks are drawn from the model. Every drawing's module list holds all it imports, and every length is a size on the style.
 
-A wired drawing, one with wires between its boxes, adds layers and one solver. The wired ones are Flow and Architecture. Grid, Time, Pages, Meters and the social pack's channels table (`social.table`: a row per channel per month, summed from its posts, the conversations linked `came_from` them and the hours `part_of` them, sources below) have no wires.
+A wired drawing, one with wires between its boxes, adds layers. The wired ones are Flow and Architecture. Grid, Time, Pages, Meters and the social pack's channels table (`social.table`: a row per channel per month, summed from its posts, the conversations linked `came_from` them and the hours `part_of` them, sources below) have no wires.
 
 `test/structure.test.ts` checks all of this. Each rule keeps a list of what already breaks it, and a list may only shrink: when a number comes down, lower it in the same commit, and never raise one.
 
 ## Wired drawings
 
-A wired drawing is built in layers, and wires take room during layout the way boxes do, so spacing is built and not repaired. Flow is built this way. Architecture is not yet: its `layout.js` and `route.js` are more than one layer, and its entries on the lists say how far it has to come.
+A wired drawing is built in layers. Architecture is not yet: its `layout.js` and `route.js` are more than one layer, and its entries on the lists say how far it has to come.
 
 ### The layers
 
-Each module says its layer in its first comment (`Layer: metrics.`). A layer reads those before it and nothing after. A module that has not said so yet is on `LAYERS_OWED` in `test/wired.ts`, with what it will say; once it says it, its name comes off.
-
-| Layer | Holds | Flow's modules |
-| --- | --- | --- |
-| Graph | Steps, links and which way each runs, combs, the picture's budget, and the small things every layer says of lines | `graph`, `steps`, `lines`, `direction`, `combs`, `hangs`, `places`, `polyline`, `shapes`, `effort` |
-| Topology | Who crosses whom, the faces, the order of wires round each box | `topology`, `planar`, `lr`, `thread`, `numbering`, `upward`, `count` |
-| Shape | Each wire's turns, and which drawing of a part is kept | `search`, `shape`, `faults` |
-| Metrics | Every coordinate | `solve`, `shelves`, `wrap`, `assemble`, `pins`, `finish`, `layout`, `ports`, `archipelago` |
-| Marks | What is drawn | `index`, `look`, `story`, `islands` |
-
-`flow/part.js` is still Shape and Metrics together, and `flow/shape.js` still works on a sketch of coordinates that the solve then replaces.
-
-Only Metrics sets a place or a wire's points. What still does so elsewhere is listed by module.
-
-### The one solver
-
-`draw/flow/solve.js` places every box edge and wire stretch. Each is a number on one axis, and each pair that stands beside one another keeps a least distance, named by what the two are:
-
-| Distance | Between | Size |
-| --- | --- | --- |
-| `wire` | Two wires | `flow_wire_gap`, or a third of `flow_node_gap` if that is more |
-| `room` | A wire and a box it passes | `flow_wire_room` |
-| `run` | A wire and a box it goes to | `flow_port_run` |
-| `corner` | A wire's end and the corner of its box | `flow_port_corner` |
-| `apart` | Two boxes | half of `flow_node_gap` |
-| `section` | Sections that are not joined | `flow_section_gap` |
-
-Order on an axis is read off the drawing as given, so nothing crossed is undone and nothing new is crossed. A box is as big as its name and what lands on it need, and past that it stands rigid. One that cannot, because its ports are held further apart than it measures, gives way and is counted (`freed`).
-
-Each joined section is solved alone (`solveSections`), then set out a section apart.
+Each module says its layer in its first comment (`Layer: metrics.`). A layer reads those before it and nothing after. A module that has not said so yet is on `LAYERS_OWED` in `test/wired.ts`, with what it will say; once it says it, its name comes off. The layers are graph, topology, shape, metrics and marks. Only Metrics sets a place or a wire's points. What still does so elsewhere is listed by module.
 
 ### Named lengths
 
 A distance is a size on the style, used on both axes, with no constant in the code. `test/structure.test.ts` counts each bare number of 3 or more in a drawing that does not multiply or divide, and each `px` in a string. That catches more than lengths, and the count only goes down.
 
-### No shared wires
-
-Every wire is its own line: no two wires share a stretch, a comb's among them, and two links between one pair of boxes are two wires, each with a route of its own (`routesOf` in `layout.js`). A wired drawing runs on small sketches (`test/wired.ts`) and is counted by `spacing` in `draw/flow/faults.js`: two wires on one line, of different boxes (`overlaps`) or of one box (`shared`), and neighbours nearer than the spacing (`under`). A box on a box and a wire through a box count too. Flow is clean on all of them.
-
-### One path
-
-Every picture is drawn the same way, whatever its size: a planar drawing of each part, `shape`, then `solve`. Nothing sets a wire for good ahead of them. Each picture is drawn twice, its headed links as wires of the core and as leaves of combs, and the one that crosses less is kept, as wires where they tie; past `flow_trial_total` items it is drawn as combs alone, for the time a page has.
-
 ### One budget
 
-A picture of any size draws well inside the page's twelve seconds: what makes it look better than it must spends from one budget per picture, `flow_picture_work` (`flow/effort.js`). That is each trial of a part past the first (`flow_part_work` for each item times link), the second drawing of a level (it costs what the first did), the wires' shaping (each two stretches of wires held against one another) and each split of a bundle at sea. Once it is spent, each takes its plain way: one trial, combs alone, the first wires, the bundle as it is. Work is counted, never timed, so a picture is the same on every machine and each time it is asked. A layout kept from another picture is used again only where it would come out the same from what is left, and spends what it spent then; one this picture has already had is free. Measured in headless Chrome (`node scripts/flow-bench.ts <answer>`), 7 Nov 2026: the view that stopped, 67 items and 147 links on three islands, is drawn as before in 3.6 seconds (4.2 before); three times its size in 5 (10 or more before), and six times in 5. `packs/canvas/flow-time.test.ts` keeps it so.
-
-Where two wires cross, one passes under: the line drawn has a gap there (`flow_break_half`), a tie under a wire of the order, else what runs up or down under what runs across. A picture that plays keeps its wires whole, for they are drawn in.
-
-### Levels and ports
-
-A picture of items on islands, one or more (a single island is framed too, with its legend in place of the corner key: task e_5rh5ysut, the owner, 7 Nov 2026), is the same layout run at two levels, an island and the sea, with no router of its own (design e_87x2us2b, the owner, 6 Nov 2026). A level is boxes and the wires among them; a wire that leaves its level is two wires joined at a port on its box's side. `flow/archipelago.js` runs four passes:
-
-| Pass | Level | What it lays out | What it gives the next |
-| --- | --- | --- | --- |
-| 1 | Island | Each island alone, as any picture | Its frame: steps, and at their left its name over its legend, down columns as tall as the steps (at most `flow_island_legend_columns`) |
-| 2 | Sea | Each island a box of its frame, a sea apart (`flow_island_sea`), each read across a link of its own | Whether each read leaves and comes in by its island's top or its foot |
-| 3 | Island | Each island again, its ports part of its order, and its name and legend one box the solve keeps at the top left (`first`: left of every box and wire, none higher), where no port is | Where each port stands, and its frame round all of it |
-| 4 | Sea | The islands again, each read a wire whose ends are held where pass 3 put its ports | Where each island stands, and every wire at sea |
-
-What a port is, at each level:
-
-| | Island (pass 3) | Sea (pass 4) |
-| --- | --- | --- |
-| Port | A box on the frame (`edge`): beyond every other box by `flow_island_pad` and every wire by `room`, on one line with that side's other ports, free along it | The end of a wire, held at a set point on its island (a route's `ends`), the island keeping its size |
-| Its wire | In the topology: a rise over the top ports and a fall under the foot ports are the numbering's top and foot, top ports numbered first and foot ports last, so each port's wire has a column of its own out to the frame (`portItems`, `numbered`, `drawPart`) | Starts from the sea's own first route between the two islands, each end brought round its island from its port; the solve sets it |
-| Ports on one side | Stand a wire apart | Reads that share a finding's port land across it, a wire apart and off its middle |
-
-A read across is drawn as three wires: from its reader to the reader's port, across the sea, and from the finding's port to the finding. Every port is small (`flow_island_port`), one to a read, but where two or more reads of a finding leave by one side: they share a port there, a bar as long as they need, and one wire in from its middle to the finding (`toPort` and `fromPort` on the ties). What crosses is named by the finding itself, outlined in its island's colour. At sea an island is its frame and what stands out of it. Where any two wires cross, inside an island or at sea, one passes under (`bridged` in `finish.js`), as in any picture. What lives on no island (a person) is a group of its own, laid out the same way, with no shore.
-
-`flow/ports.js` holds what a level needs for ports: the frame, the items of an island with its ports, where a port first stands (`setPorts`, `holdPorts`), and the island read back without them (`apart`). `flow/islands.js` draws each island's frame, its name and legend, a bar at each port, the class that outlines each finding read across in its island's colour (`found`), and the pulse that runs across the sea when a finding moves.
+What makes a picture look better than it must spends from one budget per picture, `flow_picture_work` (`flow/effort.js`). Work is counted, never timed, so a picture is the same on every machine and each time it is asked. `packs/canvas/map-time.test.ts` keeps a large picture inside it.
 
 ### Adding a wired drawing
 
 1. List its modules in `pack.json`, entered at `index.js`.
 2. Give each module one layer in its first comment.
 3. Put its layout in `layout.js`, exporting `layout`, and name every length it uses in the house style.
-4. Add it to `WIRED` in `test/wired.ts`: how it draws a sketch, and the size it keeps its wires apart by.
+4. Add it to `WIRED` in `test/wired.ts`.
 5. Run `npm test -- test/structure.test.ts`. A new drawing does not go on the lists: it passes each rule, or the rule says what to fix.
 
 ## Marks and patches
