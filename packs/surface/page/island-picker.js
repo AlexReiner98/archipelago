@@ -6,21 +6,15 @@
 
 import { api, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
-import { atHome, capital, drawnAt, only, packMarks, rankIslands, recentFirst, turnedOn } from './islands-list.js';
+import { atHome, capital, drawnAt, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
 import { numberOf } from './style-number.js';
 import { titles } from './words.js';
 
-/** Each pack's mark by its id, told apart from the others' (./islands-list.js, packMarks). */
-let marks = new Map();
 /** Every island on the map, each with its pack, read once a page. */
 let reading;
 export const allIslands = () =>
   (reading ??= api('search', { islands: true, limit: 2000 }).then(
-    (found) => {
-      const all = found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, worked_at: e.worked_at ?? e.updated_at, pack: e.pack ?? { id: '', title: '' } }));
-      marks = packMarks(all.map((i) => i.pack));
-      return all;
-    },
+    (found) => found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, worked_at: e.worked_at ?? e.updated_at, pack: e.pack ?? { id: '', title: '' } })),
     () => [],
   ));
 
@@ -46,10 +40,10 @@ export const takeOff = (i) => apply({ list: drawnNow().filter((x) => x !== i.id)
 /** Island `i` alone on the canvas. */
 export const showOnly = (i) => apply(only(location.hash, i.id), `${i.title} alone on the canvas`);
 
-/** A pack's mark: its glyph, else two of its letters, unlike every other pack's. */
-export const packMark = (pack) => h('span', { class: 'isl-mark', 'aria-hidden': 'true' }, marks.get(pack?.id ?? '') ?? packMarks([pack]).get(pack?.id ?? ''));
 /** A pack's title as the list shows it. */
 const packTitle = (pack) => capital(pack?.title || pack?.id);
+/** A row's pack, at its right in muted text, cut short where it does not fit: what tells like names apart. */
+const packOf = (pack, on = false) => h('span', { class: 'isl-pack' }, on ? `on · ${packTitle(pack)}` : packTitle(pack));
 
 /** What the side list keeps in this browser: whether it is open. */
 const KEPT = 'pelago-islands-side';
@@ -125,18 +119,17 @@ export function drawPicker() {
    * press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
    */
   let laidOn = null;
-  /** An island's row: its pack's mark and its name, a press on which puts it on, or, on, brings the canvas to it. */
+  /** An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack. */
   const row = (i, on) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
-      packMark(i.pack),
       h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? hooks.toIsland?.(i.id) : putOn(i)) }, i.title),
+      packOf(i.pack),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
-  /** A row of what the search found: its pack's mark, its name, its pack (and whether it is on), lit as Enter would take it. */
+  /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
     h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i)) },
-      packMark(i.pack),
       h('span', { class: 'isl-name' }, i.title),
-      h('span', { class: 'isl-count' }, drawn.includes(i.id) ? `on · ${packTitle(i.pack)}` : packTitle(i.pack)));
+      packOf(i.pack, drawn.includes(i.id)));
   const draw = () => {
     const drawn = drawnNow(), q = input.value.trim();
     count.textContent = drawn.length ? String(drawn.length) : '';
