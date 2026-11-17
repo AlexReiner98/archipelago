@@ -351,11 +351,11 @@ It is the server's entry point (`npm start`, `npm run dev`).
    them in `GET /health` beside `commit` and `started`.
 8. Stops the roots in reverse order.
 
-**The owner's word for a root change** is their approval of the pull request
+**The owner's word for a root change** is their merge of the pull request
 that changes `packs/roots.json`: a CI check refuses a change to a root pack's
-folder that does not bring a new hash in `roots.json`, and refuses a change
-to `roots.json` the repository's owner has not approved. An agent may
-propose one; the refiner never applies one.
+folder that does not bring a new hash in `roots.json` (the owner, 17 Nov
+2026, took away the separate approval of `roots.json`). An agent may propose
+one; the refiner never applies one.
 
 ## The root packs
 
@@ -534,8 +534,8 @@ service step took it.
 - **A system change applies unless a rule holds it**: `agent_changes` does
   not hold a service pack's own changes; `system_reach` and the pack's
   rules do.
-- **The owner's word for a root change is their pull-request approval**,
-  checked in CI with `packs/roots.json`.
+- **The owner's word for a root change is their merge of its pull request**;
+  CI checks the pins in `packs/roots.json`.
 - **Shims during the wave**, removed by the gather step, so nineteen sessions
   can move code without rewriting each other's imports.
 
