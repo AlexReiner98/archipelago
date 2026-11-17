@@ -72,17 +72,36 @@ export function drawPicker() {
   const body = h('div', { class: 'isl-body' });
   const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input), body), fold);
   document.body.append(side);
-  const open = (on) => {
+  /** Whether the bar was folded for an item's page, not by the person: it opens again when the page closes. */
+  let forPage = false;
+  /** Fold or open the bar; `kept`, as the person left it (a fold for a page is not). */
+  const open = (on, kept = true) => {
+    if (kept) forPage = false;
     document.body.dataset.islands = on ? 'open' : 'folded';
     arrow.textContent = on ? '‹' : '›';
     fold.title = on ? 'Fold the islands to the edge (Ctrl+K opens them again)' : 'Show the islands (Ctrl+K)';
     fold.setAttribute('aria-label', on ? 'Fold the islands' : 'Show the islands');
     fold.setAttribute('aria-expanded', String(on));
-    keep('open', on);
+    if (kept) keep('open', on);
     dispatchEvent(new Event('resize'));
   };
   fold.onclick = () => open(document.body.dataset.islands !== 'open');
   open(kept('open', true));
+  // An item's page takes the right: where the canvas left between it and the open bar would be narrower than the bar,
+  // the bar folds to its rail, and opens again as it was once the page is shut or the window has the room.
+  let wide = side.offsetWidth;
+  const room = () => {
+    const shown = document.body.dataset.islands === 'open';
+    if (shown) wide = side.offsetWidth || wide;
+    const page = document.body.dataset.sheet === 'open' ? (document.getElementById('sheet')?.offsetWidth ?? 0) : 0;
+    const cramped = page > 0 && innerWidth - page - wide < wide;
+    if (shown && cramped) open(false, false), (forPage = true);
+    else if (forPage && !cramped) (forPage = false), open(true, false);
+  };
+  new MutationObserver(room).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+  // The window's own resizes, not the one a fold sends: a bar the person opened over a page stays open.
+  addEventListener('resize', (ev) => ev.isTrusted && requestAnimationFrame(room));
+  room();
   const unfolded = new Set(kept('packs', []));
 
   let islands = [];
