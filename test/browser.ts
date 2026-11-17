@@ -19,6 +19,14 @@ export function chrome(): string | null {
   return found;
 }
 
+/**
+ * What a browser test takes as "at once", in ms of the page's clock. The page's aim is under 100 ms, but a shared CI
+ * runner stalls a process for longer by chance (narrow-first read 101 ms on PR #429), so a wall-clock limit is wide
+ * and kept here alone. That the page waits on nothing is checked by order (a server answer held back, a mark before
+ * another), not by this.
+ */
+export const AT_ONCE = 1000;
+
 /** An expression importing the page's own copy of one of its modules (`live.js`), at the version it loads them at
  * (packs/surface/kernel/ui-files.ts): a bare address would load a second copy, with state and timers of its own. */
 export const pageModule = (name: string) => `import('/${name}' + new URL(document.querySelector('link[href^="/base.js"]').href).search)`;

@@ -3,7 +3,7 @@
 // import one way; the UI loads as modules; there are four dependencies; every picture is a drawing a pack ships; every view
 // the kernel answers is a lens preset or named as operational; the page calls no more tools than it did; the canvas draws no
 // depth; a drawing's modules are all in its list, a length in one is named, and a wired one keeps its layers and wires apart;
-// a root pack needs only the roots before it. Each rule keeps a list of what already broke it when the rule was made (16 Oct
+// a root pack needs only the roots before it; a generated file is what its sources make. Each rule keeps a list of what already broke it when the rule was made (16 Oct
 // 2026). An entry may only shrink, and goes once the rule is met: when you bring a number down, lower it here. Every module
 // is read at its own place (test/structure-kit.ts); a list keyed by a path names it there.
 import assert from 'node:assert/strict';
@@ -16,6 +16,7 @@ import { valueImports } from './structure-reader.ts';
 import { codeFiles, count, counts, KERNEL_PACKS, kernelFiles, LEFT, lines, type Owed, packIds, ratchet, read, ROOT, rootCode, rootPacks, serviceImports, srcCode, target, uiFiles, VENDORED, walk } from './structure-kit.ts';
 import { history, RELEASED, RELEASED_KEY, releasedKey } from './structure-history.ts';
 import { rootImports } from './structure-roots.ts';
+import { behind } from './generated.ts';
 import { drawings, imported, LAYERS, owedLayer, pathOf, ranks, saysLayer, short, WIRED, WRITES } from './wired.ts';
 
 const MAX_LINES = 500;
@@ -481,3 +482,6 @@ test('a released schema step is never edited', async () => assert.equal(await re
 // 23. A service name is answered as the map that asks it (callAs, packs/loader/kernel/kernel-context.ts): callService ran its provider as the map the names were filled for, and is gone (wave 6); none comes back.
 const CALLS_SERVICE: Record<string, number> = {}, servicePacks = walk('packs').filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'));
 test('a service name is answered as the map that asks it', () => assert.deepEqual(ratchet(count([...kernelFiles, ...servicePacks], /(?<!function )\bcallService\s*[<(]/g), CALLS_SERVICE), [], 'Call it with callAs(l, name, input): its provider reads as the asker, under row-level security.'));
+
+// 24. A generated file is what its sources make (test/generated.ts): a script reads its sources by path, so no test a change names picks the check up, and a stale file failed only in CI.
+test('every generated file is what its sources make', () => assert.deepEqual(behind(), [], 'Run the command named, and commit what it writes.'));

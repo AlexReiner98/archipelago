@@ -7,7 +7,7 @@ import { test } from 'node:test';
 // @ts-expect-error A pack's handler is plain JavaScript.
 import handler, { hookIn, hookOut, read } from './handler.js';
 // @ts-expect-error The same.
-import { made, OUT } from './sync.mjs';
+import { made } from './sync.mjs';
 
 test('a hook comes in as the kernel’s event and body; one the kernel does not answer is not asked', () => {
   assert.deepEqual(hookIn({ event: 'prompt', body: { session_id: 's1', prompt: 'hi' } }), { event: 'prompt', body: { session_id: 's1', prompt: 'hi' } });
@@ -45,10 +45,6 @@ test('the launcher names only what the kernel fills', () => {
   const fills = headless.argv.flatMap((a: string) => [...a.matchAll(/\{([a-z_]+)\}/g)].map((m) => m[1]));
   assert.deepEqual(fills, ['mode', 'session_id', 'mcp_config', 'tools', 'model']);
   assert.ok(!headless.argv.some((a: string) => a.includes('{prompt}')), 'the prompt goes on its standard input');
-});
-
-test('the setup handed out is made from this repository’s scripts (node packs/claude_code/sync.mjs)', () => {
-  assert.equal(readFileSync(OUT, 'utf8'), made(), 'Run node packs/claude_code/sync.mjs and commit files/setup.mjs.');
 });
 
 test('the setup, filled, gives the hook its server and its version', async () => {
