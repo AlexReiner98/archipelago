@@ -296,6 +296,7 @@ export const KERNEL_VERBS: Record<string, string> = {
   withdraw: 'revise',
   publish: 'revise',
   publish_all: 'revise',
+  pack_set: 'revise',
   restart: 'revise',
   undo: 'revise',
 };

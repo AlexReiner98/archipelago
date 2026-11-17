@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import type { PackFile } from '../packs/loader/kernel/packs.ts';
 import { Registry } from '../packs/loader/kernel/packs.ts';
 import { setPack } from '../packs/loader/kernel/packstate.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
 import { agent, freshWith, human, packsWith } from './map.ts';
 
 /** A pack of words alone: it runs nothing. */
@@ -46,4 +47,11 @@ test('a pack that runs code stays the owner’s to turn, unless agents’ code m
   const off = await setPack(l, agent, { pack: 'sessions', on: false });
   assert.equal(state(l, 'sessions'), 'off');
   assert.match(off.stakes?.join(' ') ?? '', /runs code on the server/);
+});
+
+test('an agent reaches it under the revise verb', async () => {
+  const l = await map({ agent_changes: 'apply' });
+  const off = (await callTool(l, agent, 'revise', { action: 'pack_set', params: { pack: 'tally', on: false } })) as { stakes?: string[] };
+  assert.equal(state(l, 'tally'), 'off');
+  assert.match(off.stakes?.join(' ') ?? '', /A pack turned on or off here/);
 });
