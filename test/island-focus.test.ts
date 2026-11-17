@@ -49,6 +49,25 @@ test('a focus is its own island, speaking its type’s pack', async () => {
   await refused(l, [{ op: 'update', id: f, props: { island: t } }], /a focus is its own island/);
 });
 
+test('on a focus’s island a link says how two items go together, never only that they do', async () => {
+  const l = await focusMap();
+  const { f } = await make(l, [{ op: 'create', ref: 'f', type: 'plain_feature', title: 'Billing', props: { focus: true } }]);
+  const { a, b } = await make(l, [
+    { op: 'create', ref: 'a', type: 'task', title: 'Price it', props: { island: f } },
+    { op: 'create', ref: 'b', type: 'task', title: 'Bill it', props: { island: f } },
+  ]);
+  await make(l, [{ op: 'link', type: 'depends_on', from: b, to: a }]); // its order is what a link is for
+  for (const type of ['link', 'about', 'part_of']) await refused(l, [{ op: 'link', type, from: b, to: a }], /on one focus's island/);
+  await refused(l, [{ op: 'link', type: 'part_of', from: a, to: f }], /on one focus's island/);
+  // An island that is not a focus's keeps its links as they were.
+  const { i } = await make(l, [{ op: 'create', ref: 'i', type: 'island', title: 'Old', props: { pack: 'plain' } }]);
+  const { c, d } = await make(l, [
+    { op: 'create', ref: 'c', type: 'task', title: 'One', props: { island: i } },
+    { op: 'create', ref: 'd', type: 'task', title: 'Two', props: { island: i } },
+  ]);
+  await make(l, [{ op: 'link', type: 'part_of', from: c, to: d }]);
+});
+
 test('a focus and what is on it come back as one island, named by the focus', async () => {
   const l = await focusMap();
   const { f } = await make(l, [{ op: 'create', ref: 'f', type: 'plain_feature', title: 'Billing', props: { focus: true } }]);
