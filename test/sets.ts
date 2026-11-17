@@ -55,6 +55,7 @@ export const SLOW: Record<string, string> = {
   'test/island-sessions.test.ts': 'browser',
   'test/published-frames.test.ts': 'browser',
   'test/show-lands.test.ts': 'browser',
+  'test/show-lights.test.ts': 'browser',
   'test/show-tab-life.test.ts': 'browser',
   'test/show-web.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',

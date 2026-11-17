@@ -22,7 +22,7 @@ test('in a browser, tabs are cut to the style’s length, their × only on the t
   const until = async (what: string, ok: () => Promise<boolean>) => {
     if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${page.logs().join('\n')}`);
   };
-  for (const [n, run] of runs.entries()) await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[`i${n}`], run, focus: n === 1 } });
+  for (const [n, run] of runs.entries()) await call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[`i${n}`], run } });
   /** Each tab: its width, whether it is in sight, whether its × shows, and whether it stands whole inside the bar. */
   const tabs = `(() => { const bar = document.getElementById('tabs').getBoundingClientRect(); return [...document.querySelectorAll('${TAB}')].map((t) => { const r = t.getBoundingClientRect(), x = t.querySelector('[data-key^="close:"]');
     return { width: r.width, front: t.getAttribute('aria-selected') === 'true', cross: x ? getComputedStyle(x).visibility === 'visible' : null, inside: r.left >= bar.left - 1 && r.right <= bar.right + 1 }; }); })()`;
@@ -31,7 +31,10 @@ test('in a browser, tabs are cut to the style’s length, their × only on the t
   const plus = `(() => { const bar = document.getElementById('tabs').getBoundingClientRect(), p = document.querySelector('#tabs [data-key="new"]').getBoundingClientRect(); return p.width > 0 && p.right <= bar.right + 1; })()`;
   try {
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
-    await until('three chats’ tabs, the long one in sight', () => page.evaluate<boolean>(`(() => { const t = ${tabs}; return t.length === 4 && t.filter((x) => x.front).length === 1; })()`));
+    await until('three chats’ tabs', () => page.evaluate<boolean>(`${tabs}.length === 4`));
+    // A show never brings its tab into sight (decision e_mnuthcap): the long one is pressed.
+    await page.evaluate(`[...document.querySelectorAll('${TAB} [data-key^="front:"]')].find((t) => t.textContent.startsWith('Islands placement')).click()`);
+    await until('the long one in sight', () => page.evaluate<boolean>(`[...document.querySelectorAll('${TAB}')].find((t) => t.getAttribute('aria-selected') === 'true')?.textContent.includes('Islands placement') ?? false`));
     const most = await page.evaluate<number>(`parseFloat(getComputedStyle(document.body).getPropertyValue('--tab-most') || getComputedStyle(document.body).getPropertyValue('--side-least'))`);
     const wide = await page.evaluate<Tab[]>(tabs);
     for (const t of wide) assert.ok(t.width <= most + 1, `no tab wider than ${most}px: ${JSON.stringify(wide)}`);
