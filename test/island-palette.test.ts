@@ -23,6 +23,12 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
       { op: 'create', ref: 'stone', type: 'task', title: 'Cut the stone', props: { island: '{quarry}' } },
     ],
   })).result.created as Record<string, string>;
+  // An island's time is when work last changed on it: a change to an item on it, after the island's own.
+  await new Promise((r) => setTimeout(r, 20));
+  await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'update', id: made.pier, title: 'Rebuild the pier again' }] });
+  const islands = (await call('/api/search', undefined, { islands: true, limit: 50 })).result as { id: string; updated_at: string; worked_at: string }[];
+  const harbour = islands.find((i) => i.id === made.harbour)!;
+  assert.ok(Date.parse(harbour.worked_at) > Date.parse(harbour.updated_at), 'worked on after it was made');
   const page = await open(`${base}/`);
   const until = async (what: string, ok: () => Promise<boolean>) => {
     if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${page.logs().join('\n')}`);
@@ -35,7 +41,7 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the side list', () => page.evaluate<boolean>(`[...document.querySelectorAll('#islands .isl-head')].some((h) => /^Recent · [0-9]/.test(h.textContent))`));
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-group').length`), 0, 'no pack groups');
     assert.match(await page.evaluate<string>(`document.querySelector('#islands .isl-head').textContent`), /On · 0/);
-    assert.equal(await draws('Rebuild the pier'), false, 'nothing on yet');
+    assert.equal(await draws('Rebuild the pier again'), false, 'nothing on yet');
     // Folded, the bar is its rail; Ctrl+K opens it with its search in focus, and nothing is drawn outside it.
     await page.evaluate(`document.querySelector('#islands .isl-rail').click()`);
     await until('folded to its rail', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && getComputedStyle(document.querySelector('#islands .isl-panel')).display === 'none'`));
@@ -54,7 +60,7 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     assert.ok(await page.evaluate<boolean>(`(() => { const bar = document.getElementById('islands').getBoundingClientRect(); return [...document.querySelectorAll('#islands .isl-hit')].every((r) => r.getBoundingClientRect().right <= bar.right); })()`), 'within the bar');
     // Enter puts it on: the canvas draws it, and the side list has it among those on.
     await key('Enter');
-    await until('the canvas draws it', () => draws('Rebuild the pier'));
+    await until('the canvas draws it', () => draws('Rebuild the pier again'));
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
     // A press on an island under Recent puts it on where its row stands: the row lights and gains ×, and nothing moves.

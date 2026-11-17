@@ -60,13 +60,13 @@ test("a pack's mark tells it apart from every other pack's, and its title shows 
   assert.equal(capital('Pack anatomy'), 'Pack anatomy');
 });
 
-test('the side list puts the islands changed lately first, the latest first, then the rest by name', () => {
+test('the side list puts the islands worked on lately first, the latest first, then the rest by name', () => {
   const now = Date.parse('2026-11-17T12:00:00Z'), day = (n: number) => new Date(now - n * 86_400_000).toISOString();
   const { recent, rest } = recentFirst([
-    { id: 'a', title: 'Zebra', updated_at: day(1) },
-    { id: 'b', title: 'Apple', updated_at: day(30) },
-    { id: 'c', title: 'Mango', updated_at: day(0.5) },
-    { id: 'd', title: 'Banana', updated_at: day(8) },
+    { id: 'a', title: 'Zebra', worked_at: day(1) },
+    { id: 'b', title: 'Apple', worked_at: day(30) },
+    { id: 'c', title: 'Mango', worked_at: day(0.5) },
+    { id: 'd', title: 'Banana', worked_at: day(8) },
     { id: 'e', title: 'Cherry' },
   ], now, 7);
   assert.deepEqual(recent.map((i: { id: string }) => i.id), ['c', 'a'], 'within the days, the latest first');

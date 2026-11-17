@@ -17,7 +17,7 @@ let reading;
 export const allIslands = () =>
   (reading ??= api('search', { islands: true, limit: 2000 }).then(
     (found) => {
-      const all = found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, updated_at: e.updated_at, pack: e.pack ?? { id: '', title: '' } }));
+      const all = found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, worked_at: e.worked_at ?? e.updated_at, pack: e.pack ?? { id: '', title: '' } }));
       marks = packMarks(all.map((i) => i.pack));
       return all;
     },
