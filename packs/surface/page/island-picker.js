@@ -72,12 +72,17 @@ export function drawPicker() {
   if (document.getElementById('islands')) return;
   const find = document.getElementById('find');
   if (find) find.hidden = true;
-  const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', autocomplete: 'off' });
+  const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // The rail along the bar's edge, its whole height a press that folds the bar to the edge or opens it again.
   const arrow = h('span', { class: 'isl-arrow', 'aria-hidden': 'true' });
   const count = h('span', { class: 'isl-rail-count' });
   const fold = h('button', { type: 'button', class: 'isl-rail' }, arrow, count);
   const body = h('div', { class: 'isl-body' });
+  // No tooltip on a row: a name cut short has the whole of it as its tooltip, the name alone.
+  body.addEventListener('pointerover', (ev) => {
+    const name = ev.target.closest?.('.isl-name');
+    if (name) name.scrollWidth > name.clientWidth ? (name.title = name.textContent) : name.removeAttribute('title');
+  });
   const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input), body), fold);
   document.body.append(side);
   /** Whether the bar was folded for an item's page, not by the person: it opens again when the page closes. */
@@ -125,12 +130,12 @@ export function drawPicker() {
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
       grouped ? '' : packMark(i.pack),
       on
-        ? h('span', { class: 'isl-name', title: `${i.title} · ${packTitle(i.pack)}` }, i.title)
-        : h('button', { type: 'button', class: 'isl-name', title: `${i.title}: put on the canvas`, onclick: () => putOn(i) }, i.title),
+        ? h('span', { class: 'isl-name' }, i.title)
+        : h('button', { type: 'button', class: 'isl-name', onclick: () => putOn(i) }, i.title),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its pack's mark, its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
-    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), title: `${i.title}: Enter puts it on, Shift+Enter shows it alone`, onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i)) },
+    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i)) },
       packMark(i.pack),
       h('span', { class: 'isl-name' }, i.title),
       h('span', { class: 'isl-count' }, drawn.includes(i.id) ? `on · ${packTitle(i.pack)}` : packTitle(i.pack)));
@@ -152,7 +157,7 @@ export function drawPicker() {
     const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id))))];
     for (const g of byPack(rest)) {
       const shown = unfolded.has(g.id);
-      const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown), title: `${capital(g.title)}: ${g.islands.length} island${g.islands.length === 1 ? '' : 's'}` },
+      const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown) },
         h('span', { class: 'isl-mark isl-fold', 'aria-hidden': 'true' }, shown ? '⌄' : '›'), h('span', { class: 'isl-name' }, capital(g.title) || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
       head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), relay());
       parts.push(head, ...(shown ? [h('div', { class: 'isl-in', role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id), true)))] : []));

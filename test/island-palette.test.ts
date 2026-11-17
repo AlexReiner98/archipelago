@@ -44,6 +44,8 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await page.send('Input.insertText', { text: 'harb' });
     await until('it finds the island', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-hit[aria-selected="true"] .isl-name')?.textContent === 'Harbour works'`));
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-hit').length`), 1, 'only what matches');
+    // No tooltip on a row whose name shows whole.
+    assert.equal(await page.evaluate<number>(`(() => { const n = document.querySelector('#islands .isl-hit .isl-name'); n.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })); return document.querySelectorAll('#islands .isl-hit[title], #islands .isl-hit [title]').length; })()`), 0, 'no tooltip on a whole name');
     // The keyboard's row has the accent bar at its left edge, not a hover's ground.
     assert.match(await page.evaluate<string>(`getComputedStyle(document.querySelector('#islands .isl-hit[aria-selected="true"]')).boxShadow`), /inset/);
     assert.ok(await page.evaluate<boolean>(`(() => { const bar = document.getElementById('islands').getBoundingClientRect(); return [...document.querySelectorAll('#islands .isl-hit')].every((r) => r.getBoundingClientRect().right <= bar.right); })()`), 'within the bar');
