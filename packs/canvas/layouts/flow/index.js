@@ -301,14 +301,14 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     ...pack.types.filter((t) => group.items.some((i) => i.type === t.id)).map((t) => ((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapeIn({ type: t.id, is: t.is, island: group.id }, shapes))),
     ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => mark(r.id === ORDER_TYPE ? m('path', { d: 'M1 7H21', class: `lf-wire${kind(r.id)}` }) : tieKey(r.id, kind(r.id)), r.title)),
   ];
-  const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack;
+  const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack, capOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.cap;
   // An island's findings are items, drawn as any item is where its query holds them; its shore lists none (the owner, 10 Nov 2026).
   const [KW, KH] = ['key_width', 'key_height'].map(z);
   // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id }] : []);
   const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
-  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z);
+  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
   if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
   const steps = g.all.filter((n) => !n.dummy);
@@ -369,7 +369,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // Its header after its name: its pack and what that pack requires, each a mark (./pack-marks.js).
   // The packs this island turned off, as the answer's island says (packs_off), else its item where the answer holds it.
   const offOn = (id) => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.packs_off ?? answer.items.find((i) => i.id === id)?.fields?.packs_off);
-  const header = (id, [x, y], title) => packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on });
+  const header = (id, [x, y], title) => packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) });
   const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header });
   const drawnBy = new Map((g.islands ?? []).flatMap((isle) => [...(isle.look?.items ?? [])]));
   const stepLayer = steps.map((n) => {

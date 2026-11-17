@@ -36,13 +36,18 @@ test('a layout kept about an island is its look in the answer; a style is none, 
   ]);
 
   const looks = await islandLooks(l, [isle.here, isle.there]);
-  assert.deepEqual({ ...looks.get(isle.here), at: undefined }, { id: newer.dash, kind: 'layout', title: 'Dashboard', at: undefined });
+  assert.deepEqual({ ...looks.get(isle.here), at: undefined }, { id: newer.dash, kind: 'layout', title: 'Dashboard', at: undefined, coded: true });
   assert.equal(typeof looks.get(isle.here)?.at, 'string', 'when it last changed, for a page to key its code by');
   assert.equal(looks.has(isle.there), false, 'an island with none has none');
 
   const answer = (await queryFlatPack.flatRead(kernelContext(l, 'query'), { filter: { find: [`island ${isle.here}`, `island ${isle.there}`] } })) as { islands: { id: string; look?: unknown }[] };
   assert.equal((answer.islands.find((i) => i.id === isle.here)?.look as { id?: string })?.id, newer.dash);
   assert.equal(answer.islands.find((i) => i.id === isle.there)?.look, undefined);
+
+  assert.equal(looks.get(isle.here)?.coded, true);
+  const capOnly = await make(l, [{ op: 'create', ref: 'c', type: 'layout', title: 'A cap alone', props: {} }, { op: 'link', type: 'about', from: 'c', to: isle.there }]);
+  assert.equal((await islandLooks(l, [isle.there])).get(isle.there)?.coded, false, 'a look with no code says so, and its island is drawn as any other');
+  assert.ok(capOnly.c);
 
   await make(l, [{ op: 'archive', id: newer.dash }]);
   assert.equal((await islandLooks(l, [isle.here])).get(isle.here)?.id, kept.old, 'archived, the one before draws it');

@@ -15,7 +15,7 @@ const LOOKS = 'island-looks.js';
 const fetched = new Map();
 
 /** The islands of an answer that a layout kept about them draws, in a steady order. */
-const lookedOf = (answer) => (answer?.islands ?? []).filter((i) => i.look?.kind === 'layout' && typeof i.look.id === 'string').sort((a, b) => (a.id < b.id ? -1 : 1));
+const lookedOf = (answer) => (answer?.islands ?? []).filter((i) => i.look?.kind === 'layout' && i.look.coded !== false && typeof i.look.id === 'string').sort((a, b) => (a.id < b.id ? -1 : 1));
 
 /**
  * The drawing to draw `answer` with: `drawing` itself, or, where islands have looks and the drawing takes them (it has
