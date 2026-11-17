@@ -311,6 +311,10 @@ test('a view whose query reads a field asks again when it moves; one made anywhe
   assert.equal(mayMove(isle, [], 1), false, 'one looking at an island hears only what is made there');
   assert.equal(mayMove(isle, [{ id: 'e_bbbbbbbb', field: 'type', op: '+', made: true, island: 'e_iiiiiiii' }]), true);
   assert.equal(mayMove(isle, [{ id: 'e_bbbbbbbb', field: 'type', op: '+', made: true, island: 'e_jjjjjjjj' }]), false);
+  // The packs turned off on an island change what the server derives of its answer (pack states, what waits): asked again.
+  assert.equal(mayMove(isle, [{ id: 'e_iiiiiiii', field: 'packs_off', op: '+' }]), true, 'an island it looks at turns a pack off');
+  assert.equal(mayMove(named, fact('packs_off')), true, 'an island it holds (a focus) turns a pack off');
+  assert.equal(mayMove(isle, [{ id: 'e_jjjjjjjj', field: 'packs_off', op: '+' }]), false, 'not another island');
   const r = reads({ filter: { find: ['id e_aaaaaaaa', 'text replica'], not: ['done'] }, walk: { over: ['depends_on<'], steps: 2 } });
   assert.deepEqual([[...r.anchors], [...r.fields].sort(), [...r.links], r.unanchored], [['e_aaaaaaaa'], ['body', 'status', 'title'], ['works_on', 'depends_on'], true]);
 });
