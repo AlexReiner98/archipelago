@@ -62,9 +62,10 @@ export function wear(look, root = document.documentElement) {
 /**
  * Run `code` (a layout's files) as the page's backdrop, its colours read from `dressed` (the view's own element, its
  * style's colours set on it). `drew()` is called once its frame has painted, `failed(why)` if its code stops or cannot
- * start; the frame is then taken away. Only one backdrop runs on a page: a second replaces the first.
+ * start; the frame is then taken away. Only one backdrop runs on a page: a second replaces the first. `under`: the
+ * element it is put before, so what follows it on the page is drawn over it (the app's map); else it is put last.
  */
-export function runBackdrop({ code, answer, style, dressed, drew = () => {}, failed = () => {} }) {
+export function runBackdrop({ code, answer, style, dressed, under, drew = () => {}, failed = () => {} }) {
   document.querySelector('body > iframe.page-backdrop')?.remove();
   const frame = h('iframe', { class: 'page-backdrop', sandbox: frameSandbox(), src: '/draw.html', title: 'The page’s backdrop', 'aria-hidden': 'true', tabindex: '-1' });
   const colours = Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(dressed).getPropertyValue(`--ln-${name}`).trim()]));
@@ -127,6 +128,7 @@ export function runBackdrop({ code, answer, style, dressed, drew = () => {}, fai
   sizes.observe(document.body);
   // What the page's main holds, as it is drawn or changed (a word, a block); the frame is put outside it.
   content.observe(document.querySelector('main') ?? document.body, { childList: true, subtree: true, characterData: true });
-  document.body.append(frame);
+  if (under?.parentNode === document.body) document.body.insertBefore(frame, under);
+  else document.body.append(frame);
   return stop;
 }

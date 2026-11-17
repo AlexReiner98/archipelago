@@ -104,7 +104,7 @@ export async function openRoutes() {
   type Answer = { status: number; body: unknown };
   return {
     email: mail.email,
-    pageStyle: (l: Archipelago) => onMap<{ style: { theme?: unknown; lengths?: unknown } }>(l, 'surface.page_style', {}, false),
+    pageStyle: (l: Archipelago) => onMap<{ style: { theme?: unknown; lengths?: unknown; faces?: unknown; type?: unknown; emblem?: unknown; backdrop?: unknown } }>(l, 'surface.page_style', {}, false),
     bounces: { ...mail.bounces, noteBounced: (l: Archipelago, emails: string[]) => onMap(l, 'surface.note_bounced', emails) },
     connect: {
       installed: (path: string, origin: string) => connect.installed(path, origin, workingRules),

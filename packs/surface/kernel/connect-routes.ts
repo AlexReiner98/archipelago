@@ -6,6 +6,7 @@
 // bounce the mail pack's: what is above the surface is handed in by the server (./server.ts), never imported here.
 // A sign-in mail goes out as the mail pack's member-mail says, which the server loads with its first start (./first-start.ts).
 
+import { createHash } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Q } from '../../database/kernel/db.ts';
@@ -27,7 +28,7 @@ export interface ConnectRoutes extends OpenRoutes {
   /** An address in its one form (the mail pack's normalEmail). */
   email(given: unknown): string | undefined;
   /** The page's look before anyone is signed in (the styles pack's pageStyle). */
-  pageStyle(l: Archipelago): Promise<{ style: { theme?: unknown; lengths?: unknown } }>;
+  pageStyle(l: Archipelago): Promise<{ style: { theme?: unknown; lengths?: unknown; faces?: unknown; type?: unknown; emblem?: unknown; backdrop?: unknown } }>;
   /** A failure notice the relay hands over (the mail pack's bounces). */
   bounces: { fromRelay(authorization: string | undefined): boolean; failedFor(text: string): string[]; noteBounced(l: Archipelago, failed: string[]): Promise<unknown>; days: number };
   /** The connect pack's answers: the install pages, and a system's request for its token and its poll. */
@@ -52,6 +53,26 @@ const reply = (res: ServerResponse, status: number, body: unknown) => json(res, 
 const OTHER_WAYS = ['/connect/social', '/connect/verified', '/connect/passkey/options', '/connect/passkey', '/connect/passkey/add/options', '/connect/passkey/add', '/connect/passkey/mine'];
 
 /** Every /connect/, /x/, /oauth/ and /.well-known/ request, given only under a name this server answers to. */
+/** A still's address: the page it is for (the backdrop's own as _), which (or the page's emblem), and the version of its picture. */
+const STILL_PATH = /^\/connect\/still\/(_|[a-z][a-z-]{0,30})\/(wide|narrow|emblem)$/;
+const DATA_URL = /^data:(image\/(?:png|webp));base64,([A-Za-z0-9+/=]+)$/;
+type Stills = Record<string, Record<string, string> | undefined>;
+
+/** A backdrop's stills by page (its own as _), as the style holds them. */
+function stillsOf(backdrop: unknown): Stills {
+  const b = (backdrop ?? {}) as { still?: Record<string, string>; pages?: Record<string, { still?: Record<string, string>; emblem?: string }> };
+  return { _: b.still, ...Object.fromEntries(Object.entries(b.pages ?? {}).map(([name, p]) => [name, { ...p?.still, ...(p?.emblem && { emblem: p.emblem }) }])) };
+}
+
+/** A backdrop with each still named by its address instead of carried whole: the gate's first read stays small. */
+function stillsAsAddresses(backdrop: unknown): unknown {
+  if (!backdrop || typeof backdrop !== 'object') return backdrop ?? null;
+  const at = (page: string, still?: Record<string, string>) =>
+    still && Object.fromEntries(Object.entries(still).map(([k, url]) => [k, `/connect/still/${page}/${k}?v=${createHash('sha256').update(url).digest('hex').slice(0, 16)}`]));
+  const b = backdrop as { still?: Record<string, string>; pages?: Record<string, { still?: Record<string, string>; emblem?: string }> };
+  return { ...b, ...(b.still && { still: at('_', b.still) }), ...(b.pages && { pages: Object.fromEntries(Object.entries(b.pages).map(([name, p]) => [name, { ...p, ...(p?.still && { still: at(name, p.still) }), ...(p?.emblem && { emblem: at(name, { emblem: p.emblem })?.emblem }) }])) }) };
+}
+
 export async function serveConnect(req: IncomingMessage, res: ServerResponse, path: string, at: ConnectRoutes) {
   const host = req.headers.host ?? '';
   if (!at.hosts.includes(host)) return reply(res, 404, { error: 'Not found' });
@@ -78,7 +99,18 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   if (req.method === 'GET' && path === '/connect/theme') {
     if (at.tooOften()) return;
     const { style } = await at.pageStyle((await at.workspaces.get(at.fallback)).pelago);
-    return reply(res, 200, { theme: style.theme ?? null, lengths: style.lengths ?? null });
+    return reply(res, 200, { theme: style.theme ?? null, lengths: style.lengths ?? null, faces: style.faces ?? null, type: style.type ?? null, emblem: style.emblem ?? null, backdrop: stillsAsAddresses(style.backdrop) });
+  }
+  // A gate land's still, at the address /connect/theme names it by: its picture alone, kept by the browser (the address
+  // changes with the picture), so a page fetches only the one it shows.
+  const still = req.method === 'GET' ? STILL_PATH.exec(path) : null;
+  if (still) {
+    if (at.tooOften()) return;
+    const { style } = await at.pageStyle((await at.workspaces.get(at.fallback)).pelago);
+    const picture = DATA_URL.exec(stillsOf(style.backdrop)[still[1]]?.[still[2]] ?? '');
+    if (!picture) return reply(res, 404, { error: 'No such still' });
+    res.writeHead(200, { 'content-type': picture[1], 'cache-control': 'public, max-age=31536000, immutable', 'x-content-type-options': 'nosniff' });
+    return res.end(Buffer.from(picture[2], 'base64'));
   }
   // The documents a person agrees to before they are signed in, for a page that asks for them first (a signup).
   if (req.method === 'GET' && path === '/connect/agreements') {

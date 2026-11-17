@@ -294,7 +294,7 @@ export const apiFirst = (name, ask) => (early(name)?.then(answerOf).catch(ask) ?
 export const { api } = reader((tool, input) => call(`/api/${tool}`, input, authHeaders()), (calls) => call('/api/reads', { calls }, authHeaders()), (tool) => state.schema?.pack_tools?.some((t) => t.tool === tool && t.view) === true);
 
 // Signed out, the style is not read with the rest: its colours are asked for on their own.
-const themeSignedOut = () => fetch('/connect/theme').then((r) => r.json()).then(applyTheme, () => undefined);
+const themeSignedOut = () => (globalThis.pelagoEarly?.theme ?? fetch('/connect/theme').then((r) => r.json())).then((s) => s && applyTheme(s), () => undefined);
 
 /**
  * A page for whoever is not in a workspace yet, or is asked something before they are (sign in, agree, sign up,

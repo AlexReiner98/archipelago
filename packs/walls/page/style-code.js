@@ -147,7 +147,7 @@ export function bakeCode({ code, answer, style, theme, width, height }) {
 
 /**
  * Where a page's words stand, in the page's own coordinates: its hero (the section it opens on), what stands above it
- * (its nav, a title), its name where it shows one, and its column (everything else in its main, and its foot), as one
+ * (its nav, a title), its name where it shows one, and its column (everything else in its main, a new guest map's first card, and its foot), as one
  * box. A page's frame is baked around them (pageAt). A backdrop is told each block on its own instead (`blocks`: the
  * nav, the title, each paragraph, list and figure, the foot) and the page's call to action (`focus`, the link of its
  * first p.action), so its land may come between them (packs/walls/page/backdrop.js).
@@ -160,7 +160,7 @@ export function pageWords(doc, win) {
   const lead = seen(doc.querySelector('main section.lead')) ?? [...doc.querySelectorAll('main section')].find(seen) ?? null;
   // What stands above the hero (the site's nav, a title) is kept clear where it is; the rest below it is the column.
   const heroFoot = lead ? box(lead).y + box(lead).h : 0;
-  const shown = [...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('footer')].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead) && el.getBoundingClientRect().height > 0).map(box);
+  const shown = [...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('.first-card'), ...doc.querySelectorAll('footer')].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead) && el.getBoundingClientRect().height > 0).map(box);
   const above = shown.filter((b) => b.y + b.h <= heroFoot - (lead ? box(lead).h : 0) + 4), parts = shown.filter((b) => b.y >= heroFoot - 4);
   const x0 = Math.min(...parts.map((b) => b.x)), x1 = Math.max(...parts.map((b) => b.x + b.w)), y0 = Math.min(...parts.map((b) => b.y)), y1 = Math.max(...parts.map((b) => b.y + b.h));
   // The page's name, where it shows it (its title over the hero, or a heading in it): kept clear, and the drawing draws no name of its own.
@@ -168,10 +168,11 @@ export function pageWords(doc, win) {
   const named = namedEls.map(box);
   // Each block apart: what holds blocks (words, a band, a section) is opened, and a call to action is its link alone.
   const into = (el) => (!shows(el) ? [] : el.matches('div.text, div.doc-band, div.band-pictures, section') ? [...el.children].flatMap(into) : el.matches('p.action') ? [el.querySelector('a') ?? el].filter(shows) : [el]);
-  const tops = new Set([...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('footer')]);
+  const tops = new Set([...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('.first-card'), ...doc.querySelectorAll('footer')]);
   const blockEls = [...tops].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead)).flatMap(into);
   const blocks = [...blockEls, ...namedEls.filter((el) => !blockEls.some((b) => b.contains(el)))].map(box);
-  const action = [...doc.querySelectorAll('main p.action a')].find(shows);
+  // A gate's own card (a new guest map's, the sign-in column) is its call to action too: the land gathers round all of it.
+  const action = [...doc.querySelectorAll('main p.action a, .first-card, main > .gate')].find(shows);
   return { hero: lead && box(lead), above, named, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null, blocks, focus: action ? box(action) : null };
 }
 
