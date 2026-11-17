@@ -70,6 +70,8 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the canvas draws it', () => draws('Rebuild the pier again'));
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
+    // The list is in parts, each a band: On on the canvas's ground, its names larger; every island on has its dot.
+    assert.ok(await page.evaluate<boolean>(`(() => { const on = document.querySelector('#islands .isl-sec-on'), rest = document.querySelector('#islands .isl-sec-recent, #islands .isl-sec-all'); return getComputedStyle(on).backgroundColor !== getComputedStyle(rest).backgroundColor && parseFloat(getComputedStyle(on.querySelector('.isl-name')).fontSize) > parseFloat(getComputedStyle(rest.querySelector('.isl-name')).fontSize); })()`), 'On stands apart');
     // A row under On is its name and ×, without its pack, so the name has the room.
     assert.equal(await page.evaluate<number>(`document.querySelector('#islands .isl-head').nextElementSibling.querySelectorAll('.isl-pack').length`), 0, 'no pack under On');
     // A press on an island under Recent puts it on where its row stands: the row lights and gains ×, and nothing moves.
@@ -79,6 +81,7 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; window.wentTo = []; hooks.toIsland = (id) => (wentTo.push(id), true); })()`);
     const before = await page.evaluate<number>(`Math.round(${quarry}.getBoundingClientRect().top)`);
     await page.evaluate(`${quarry}.querySelector('button.isl-name').click()`);
+    await until('Quarry on, its dot shown', () => page.evaluate<boolean>(`getComputedStyle(${quarry}, '::before').content.includes('•')`));
     await until('Quarry on, its row lit where it stood', () => page.evaluate<boolean>(`(() => { const r = ${quarry}; return r?.classList.contains('on') && Boolean(r.querySelector('.isl-off')) && Math.round(r.getBoundingClientRect().top) === ${before} && document.querySelector('#islands .isl-head').textContent.includes('On · 2'); })()`));
     // Put on, the canvas is brought to it, and it is marked as where the canvas went.
     await until('the canvas brought to Quarry', () => page.evaluate<boolean>(`wentTo.includes(${JSON.stringify(made.quarry)}) && ${quarry}.getAttribute('aria-current') === 'location'`));

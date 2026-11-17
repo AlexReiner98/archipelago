@@ -8,7 +8,7 @@ import { api, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
 import { atHome, capital, drawnAt, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
 import { numberOf } from './style-number.js';
-import { titles } from './words.js';
+import { ago, titles } from './words.js';
 
 /** Every island on the map, each with its pack, read once a page. */
 let reading;
@@ -44,12 +44,11 @@ export const showOnly = (i) => apply(only(location.hash, i.id), `${i.title} alon
 const packTitle = (pack) => capital(pack?.title || pack?.id);
 /**
  * Island `i`'s pack, at its row's right in muted text, cut short where it does not fit: what tells like names apart.
- * None where the pack has the island's own name.
+ * None where the pack has the island's own name. Whether it is on is the row's dot.
  */
-const packOf = (i, on = false) => {
-  const pack = packTitle(i.pack), same = pack.toLowerCase() === String(i.title).toLowerCase();
-  if (same && !on) return '';
-  return h('span', { class: 'isl-pack' }, on ? (same ? 'on' : `on · ${pack}`) : pack);
+const packOf = (i) => {
+  const pack = packTitle(i.pack);
+  return pack.toLowerCase() === String(i.title).toLowerCase() ? '' : h('span', { class: 'isl-pack' }, pack);
 };
 
 /** What the side list keeps in this browser: whether it is open, and its width. */
@@ -182,19 +181,20 @@ export function drawPicker() {
   /** A found island taken: one that is on is gone to (with Shift, shown alone); one that is off is put on and gone to. */
   const press = (i, alone = false) => (drawnNow().includes(i.id) && !alone ? goTo(i) : putOnAndGo(i, alone));
   /**
-   * An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack, but under On
-   * (`atOn`), where the name needs the room beside ×.
+   * An island's row in part `at` of the list (on, recent, all): its name, a press on which puts it on, or, on, brings the
+   * canvas to it; then what tells it apart there: under Recent when work last changed on it, under All its pack, under
+   * On nothing, where the name needs the room beside ×.
    */
-  const row = (i, on, atOn = false) =>
+  const row = (i, on, at) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
       h('button', { type: 'button', class: 'isl-name', tabindex: '-1', onclick: () => (on ? goTo(i) : putOnAndGo(i), done()) }, i.title),
-      atOn ? '' : packOf(i),
+      at === 'recent' ? h('span', { class: 'isl-when' }, ago(i.worked_at)) : at === 'all' ? packOf(i) : '',
       on ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
-  /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it; one on reads as on. */
+  /** A row of what the search found: its dot if it is on, its name, its pack; lit as Enter would take it. */
   const hit = (i, n, drawn) =>
     h('div', { class: `isl-row isl-hit${drawn.includes(i.id) ? ' on' : ''}`, role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (press(i, ev.shiftKey), done()) },
       h('span', { class: 'isl-name' }, i.title),
-      packOf(i, drawn.includes(i.id)));
+      packOf(i));
   const draw = () => {
     const drawn = drawnNow(), q = input.value.trim();
     count.textContent = drawn.length ? String(drawn.length) : '';
@@ -203,7 +203,7 @@ export function drawPicker() {
     if (q) {
       lit = Math.min(lit, Math.max(0, found.length - 1));
       const none = found.length ? [] : [h('div', { class: 'isl-row isl-none' }, `Nothing named “${q}”`)];
-      body.replaceChildren(h('div', { class: 'isl-head' }, `Found · ${found.length}`), ...none, h('div', { role: 'listbox', 'aria-label': 'Islands found' }, ...found.map((i, n) => hit(i, n, drawn))));
+      body.replaceChildren(h('div', { class: 'isl-sec isl-sec-found' }, h('div', { class: 'isl-head' }, `Found · ${found.length}`), ...none, h('div', { role: 'listbox', 'aria-label': 'Islands found' }, ...found.map((i, n) => hit(i, n, drawn)))));
       if (found[lit]) input.setAttribute('aria-activedescendant', `isl-${found[lit].id}`);
       body.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' });
       return;
@@ -211,11 +211,11 @@ export function drawPicker() {
     input.removeAttribute('aria-activedescendant');
     laidOn ??= new Set(drawn);
     const on = found.filter((i) => laidOn.has(i.id)), rest = found.filter((i) => !laidOn.has(i.id));
-    const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id), true)))];
     const { recent, rest: others } = recentFirst(rest, Date.now(), numberOf(state.style, 'picker_recent_days'), numberOf(state.style, 'picker_recent_most'));
-    const list = (head, all) => (all.length ? [h('div', { class: 'isl-head' }, `${head} · ${all.length}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id))))] : []);
-    parts.push(...list('Recent', recent), ...list('All', others));
-    body.replaceChildren(...parts);
+    // Each part a band of its own, under a head with its count: On first, on the canvas's own ground, then Recent and All.
+    const part = (at, head, all, count = all.length) =>
+      h('div', { class: `isl-sec isl-sec-${at}` }, h('div', { class: 'isl-head' }, `${head} · ${count}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id), at))));
+    body.replaceChildren(part('on', 'On', on, drawn.length), ...(recent.length ? [part('recent', 'Recent', recent)] : []), ...(others.length ? [part('all', 'All', others)] : []));
     light();
   };
   /** The row the keyboard is on in the list (an island's id), lit while the list has the focus. */
