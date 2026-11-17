@@ -13,7 +13,7 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 #islands .isl-edge { position: absolute; top: 0; bottom: 0; right: 0; width: var(--space-4); cursor: col-resize; }
 #islands .isl-edge:hover { background: var(--line); }
 /* Its button, first in the band under the tabs: its mark and how many are on, lit while the bar is open. */
-#query .isl-toggle { flex: none; display: flex; align-items: center; gap: var(--space-4); align-self: stretch; border: 0; border-bottom: var(--border-3) solid transparent; background: none; padding: 0 var(--space-7); font: inherit; color: var(--muted); cursor: pointer; }
+#query .isl-toggle { flex: none; display: flex; align-items: center; gap: var(--space-4); align-self: stretch; border: 0; border-bottom: var(--border-3) solid transparent; border-radius: 0; background: none; padding: 0 var(--space-7); font: inherit; color: var(--muted); cursor: pointer; }
 #query .isl-toggle:is(:hover, :focus-visible) { color: var(--text); outline: none; }
 #query .isl-toggle[aria-expanded="true"] { color: var(--text); border-bottom-color: var(--accent); }
 #query .isl-toggle-count { color: var(--muted); font-size: var(--text-2); }

@@ -57,7 +57,12 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 #tabs > .tabs-part, #tabs > .tabs-part > .part-body { min-width: 0; flex: 1 1 auto; }
 #tabs .pm-box[aria-selected] { position: relative; flex: 0 1 auto; min-width: var(--box-10); max-width: var(--tab-most, var(--side-least)); }
 #tabs .pm-box[aria-selected] > .pm-button-tab { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-#tabs .pm-box[aria-selected]:hover > .pm-button-tab { color: var(--text); }
+/* A tab is one square shape: under the pointer the whole of it is tinted, never a rounded outline round its name, its
+   × or +; its words a step smaller than the canvas's, so the strip reads quieter than what it holds. */
+#tabs .pm-box[aria-selected] { font-size: var(--text-4); }
+#tabs .pm-box[aria-selected="false"]:hover { background: var(--accent-soft); }
+#tabs .pm-box[aria-selected] > .pm-button, #tabs [data-key="new"] { border: 0; border-radius: 0; background: none; font-size: inherit; }
+#tabs .pm-box[aria-selected]:hover > .pm-button-tab, #tabs .pm-box[aria-selected] > .pm-button-quiet:hover, #tabs [data-key="new"]:hover { color: var(--text); }
 #tabs .pm-box[aria-selected] > .pm-button-quiet { width: var(--box-7); padding: 0; }
 #tabs .pm-box[aria-selected="false"]:not(:hover, :focus-within) > .pm-button-quiet { visibility: hidden; }
 #tabs .pm-box[aria-selected="false"] + .pm-box[aria-selected="false"]::before { content: ''; position: absolute; left: 0; top: var(--space-5); bottom: var(--space-5); width: var(--border-1); background: var(--line); }
