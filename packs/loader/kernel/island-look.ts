@@ -4,23 +4,27 @@
 // look, and an island pack none (packs/loader/kernel/islands.ts). The view frames it. Read for the islands an answer
 // holds alone; where several are kept about one island, the one changed last draws it.
 
+import type { Registry } from './packs.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 
+/** What reading looks needs: a query and the registry, as the map has them and as the rules' decide is handed them. */
+type Reads = { db: Pick<Archipelago['db'], 'query'>; registry: Pick<Registry, 'family'> };
+
 /** An island's own look, as an answer names it: the kept item that draws it, what it is (a layout or a part) and its name. */
-export interface IslandLook { id: string; kind: 'layout' | 'part'; title: string; /** When it last changed: what a page keys the code it fetched by. */ at: string; /** Whether it has code to draw by: one with none (a cap alone) leaves its island drawn as any other. */ coded: boolean }
+export interface IslandLook { id: string; kind: 'layout' | 'part'; title: string; /** When it last changed: what a page keys the code it fetched by. */ at: string; /** Whether it has code to draw by: one with none (a cap alone) leaves its island drawn as any other. */ coded: boolean; /** What it says of how big an island it reads well at: a number, "none", or nothing said (island-cap's). */ cap?: unknown; /** The preset it is a version of, if any. */ preset?: string }
 
 /** The look kept about each of these islands, by island id: none for an island with none. */
-export async function islandLooks(map: Archipelago, islands: string[]): Promise<Map<string, IslandLook>> {
+export async function islandLooks(map: Reads, islands: string[]): Promise<Map<string, IslandLook>> {
   const looks = new Map<string, IslandLook>();
   if (!islands.length) return looks;
   const layouts = map.registry.family('layout'), parts = map.registry.family('part');
-  const { rows } = await map.db.query<{ island: string; id: string; type: string; title: string; at: string; coded: boolean }>(
-    `select r.to_id as island, e.id, e.type, e.title, e.updated_at::text as at, coalesce(e.props->>'code', '') <> '' as coded from relation r join entity e on e.id = r.from_id
+  const { rows } = await map.db.query<{ island: string; id: string; type: string; title: string; at: string; coded: boolean; cap: unknown; preset: string | null }>(
+    `select r.to_id as island, e.id, e.type, e.title, e.updated_at::text as at, coalesce(e.props->>'code', '') <> '' as coded, e.props->'cap' as cap, e.props->>'preset' as preset from relation r join entity e on e.id = r.from_id
       where r.to_id = any($1::text[]) and r.type = 'about' and r.valid_to is null
         and e.archived_at is null and e.is_open and e.type = any($2::text[])
       order by e.updated_at desc, e.id`,
     [islands, [...layouts, ...parts]],
   );
-  for (const r of rows) if (!looks.has(r.island)) looks.set(r.island, { id: r.id, kind: layouts.includes(r.type) ? 'layout' : 'part', title: r.title, at: r.at, coded: r.coded });
+  for (const r of rows) if (!looks.has(r.island)) looks.set(r.island, { id: r.id, kind: layouts.includes(r.type) ? 'layout' : 'part', title: r.title, at: r.at, coded: r.coded, ...(r.cap != null && { cap: r.cap }), ...(r.preset && { preset: r.preset }) });
   return looks;
 }
