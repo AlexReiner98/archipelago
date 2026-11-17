@@ -4,7 +4,7 @@
 // 2026, e_cr4haav9: no pack groups); a press on one puts it on. Typed into, the bar lists what it finds best first (./islands-list.js, rankIslands): arrows move,
 // Enter puts the lit one on, Shift+Enter shows it alone.
 
-import { api, h, hooks, state } from './base.js';
+import { api, firstDrawn, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
 import { atHome, capital, drawnAt, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
 import { numberOf } from './style-number.js';
@@ -284,12 +284,19 @@ export function drawPicker() {
   });
   // Ctrl+K (⌘K): the bar opens where it was folded, its search in focus.
   addEventListener('keydown', (ev) => {
-    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.key.toLowerCase() !== 'k') return;
+    if (side.hidden || !(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.key.toLowerCase() !== 'k') return;
     ev.preventDefault();
     if (document.body.dataset.islands !== 'open') open(true);
     input.focus();
     input.select();
   });
   onDrawn(() => (anew ? ((anew = false), relay()) : draw()));
-  Promise.all([islandsOn(), allIslands()]).then(([now, all]) => ((mine = now), (islands = all), draw()));
+  // Read once the first view is drawn, as the bar read its saved views: the drawing goes first (test/first-drawing.test.ts).
+  firstDrawn.then(() => Promise.all([islandsOn(), allIslands()])).then(([now, all]) => {
+    // A map with no islands (islands off) has nothing to pick: no bar, nor its button, and the canvas has the page.
+    if (!all.length) return void ((side.hidden = true), (fold.hidden = true), delete document.body.dataset.islands, delete document.body.dataset.islandsOver, dispatchEvent(new Event('resize')));
+    mine = now;
+    islands = all;
+    draw();
+  });
 }

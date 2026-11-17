@@ -18,19 +18,30 @@ const told = () => heard.forEach((f) => f(list));
 /** The person the page acts as, if the server says (none with sign-in off). */
 const me = () => (person ??= whoami().then((w) => w?.actor?.person ?? null, () => null));
 
+/** Whether the map has any island at all (a map with islands off has none): asked once a page. */
+let any;
+export const hasIslands = () => (any ??= api('search', { islands: true, limit: 1 }).then((found) => found.length > 0, () => false));
+
+/** The islands Home draws for a person who has chosen none yet: the map's, the latest first. */
+const unchosen = () => api('search', { islands: true }).then((found) => clean(found.map((e) => e.id)), () => []);
+
 /** The person's list, read once a page; each ask after it answers the list as it is now. */
 let reading;
 export function islandsOn() {
   reading ??= (async () => {
     const id = await me();
-    if (id) list = clean((await api('get', { id }).catch(() => null))?.entity?.props?.islands);
+    let kept;
+    if (id) kept = (await api('get', { id }).catch(() => null))?.entity?.props?.islands;
     else {
       try {
-        list = clean(JSON.parse(localStorage.getItem(LOCAL) ?? '[]'));
+        kept = JSON.parse(localStorage.getItem(LOCAL) ?? 'null');
       } catch {
-        list = [];
+        kept = null;
       }
     }
+    // A person who has never chosen sees the map's islands, the latest first (as many as search gives by default), so
+    // the work agents left is drawn on their first look; their first toggle makes the list their own.
+    list = kept == null ? await unchosen() : clean(kept);
   })();
   // The list as it is now, not as first read: a toggle since then keeps a new one (Home drawn again read the old).
   return reading.then(() => list);

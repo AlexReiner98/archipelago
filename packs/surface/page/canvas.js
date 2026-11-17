@@ -6,11 +6,11 @@
 // which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
 // themselves (a page opened or shut then leaves it be).
 
-import { api, drawSlots, h, hooks, idsOf, whoami } from './base.js';
+import { api, drawnNone, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { added, moved } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
-import { cornersOf, corners, islandsOn, onIslands } from './islands-on.js';
+import { cornersOf, corners, hasIslands, islandsOn, onIslands } from './islands-on.js';
 import { unfollow } from './replica.js';
 
 /** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
@@ -37,10 +37,18 @@ export const islandsLens = (list) => ({ filter: { find: list.filter((x) => /^e_/
 const islandsOf = (lens) => (lens?.filter?.find ?? []).filter((t) => t.startsWith('island ')).map((t) => t.slice(7));
 /** The person's own list as last read (./islands-on.js). */
 let listNow = [];
-/** Home: the islands the person has toggled on at the canvas's foot, each at its corner (decision e_n42s8jvn). */
-export const home = () => islandsLens(listNow);
+/** Whether the map has islands: one with none (islands off) keeps the Home it had before them. */
+let islanded = true;
+/**
+ * Home: the islands the person has on, each at its corner (decision e_n42s8jvn). On a map with no islands, what
+ * agents' recent work reaches that needs attention now (the frontier) and what waits on the person, as before islands.
+ */
+export const home = () =>
+  islanded
+    ? islandsLens(listNow)
+    : { filter: { find: ['frontier', 'waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => `type ${t.id}`)], not: ['done', 'kind system'] } };
 /** Home's list read, before Home is first drawn (ui/panes.js). */
-export const homeReady = () => islandsOn().then((list) => (listNow = list));
+export const homeReady = () => Promise.all([islandsOn(), hasIslands()]).then(([list, has]) => ((listNow = list), (islanded = has)));
 // A toggle at the foot draws Home again in every canvas that draws it.
 onIslands((list) => {
   listNow = list;
@@ -289,6 +297,8 @@ export function canvasIn(host, pane) {
       // Home with no island on says, where the canvas would be, how to put one on (e_cgg39chd); one on, it is gone.
       const none = at.home && !isles.length;
       host.replaceChildren(view, ...(none ? [h('div', { class: 'empty' }, 'Put an island on from the list, or Ctrl+K')] : []));
+      // Nothing to draw is drawn at once: what waits for the first drawing (the island list among it) goes on.
+      if (none) drawnNone();
       // The first canvas a page draws is caught up from where its reader last looked (caughtUp).
       view.ready?.then(() => caughtUp(view.store)).catch(() => {});
     },
