@@ -68,6 +68,8 @@ export function drawPicker() {
   const find = document.getElementById('find');
   if (find) find.hidden = true;
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
+  // Its shortcut, at the line's right while nothing is typed.
+  const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
   // The rail along the bar's edge, its whole height a press that folds the bar to the edge or opens it again.
   const arrow = h('span', { class: 'isl-arrow', 'aria-hidden': 'true' });
   const count = h('span', { class: 'isl-rail-count' });
@@ -78,7 +80,7 @@ export function drawPicker() {
     const name = ev.target.closest?.('.isl-name');
     if (name) name.scrollWidth > name.clientWidth ? (name.title = name.textContent) : name.removeAttribute('title');
   });
-  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input), body), fold);
+  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), fold);
   document.body.append(side);
   /** Whether the bar was folded for an item's page, not by the person: it opens again when the page closes. */
   let forPage = false;

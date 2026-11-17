@@ -50,7 +50,9 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     // A search that finds nothing says so, in one row.
     assert.equal(await page.evaluate<string>(`(() => { const i = document.querySelector('#islands .isl-search'); i.value = 'zzqx'; i.dispatchEvent(new Event('input')); const t = document.querySelector('#islands .isl-none')?.textContent; i.value = ''; i.dispatchEvent(new Event('input')); return t; })()`), 'Nothing named “zzqx”');
     // Typed into, it finds the island by a word of its name, within the bar.
+    assert.equal(await page.evaluate<string>(`getComputedStyle(document.querySelector('#islands .isl-key')).display`) === 'none', false, 'its shortcut shows while empty');
     await page.send('Input.insertText', { text: 'harb' });
+    assert.equal(await page.evaluate<string>(`getComputedStyle(document.querySelector('#islands .isl-key')).display`), 'none', 'and goes once typed into');
     await until('it finds the island', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-hit[aria-selected="true"] .isl-name')?.textContent === 'Harbour works'`));
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-hit').length`), 1, 'only what matches');
     // A found row names its pack at its right, muted and cut with an ellipsis, so like names are told apart.
