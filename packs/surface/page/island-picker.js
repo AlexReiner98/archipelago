@@ -94,7 +94,16 @@ export function drawPicker() {
     dispatchEvent(new Event('resize'));
   };
   fold.onclick = () => open(document.body.dataset.islands !== 'open');
-  open(kept('open', true));
+  // A narrow window (below the style's picker_over_below) has no room for the bar beside the canvas: the bar starts
+  // folded, and opened it lies over the canvas until an island is pressed or the canvas is.
+  const narrow = () => innerWidth < numberOf(state.style, 'picker_over_below');
+  const over = () => (document.body.dataset.islandsOver = narrow() ? 'on' : '');
+  over();
+  if (narrow()) open(false, false);
+  else open(kept('open', true));
+  /** Over the canvas, the bar folds away once a press has done what it was opened for. */
+  const done = () => document.body.dataset.islandsOver === 'on' && document.body.dataset.islands === 'open' && open(false, false);
+  document.getElementById('canvas')?.addEventListener('pointerdown', done);
   // An item's page takes the right: where the canvas left between it and the open bar would be narrower than the bar,
   // the bar folds to its rail, and opens again as it was once the page is shut or the window has the room.
   let wide = side.offsetWidth;
@@ -108,7 +117,7 @@ export function drawPicker() {
   };
   new MutationObserver(room).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
   // The window's own resizes, not the one a fold sends: a bar the person opened over a page stays open.
-  addEventListener('resize', (ev) => ev.isTrusted && requestAnimationFrame(room));
+  addEventListener('resize', (ev) => ev.isTrusted && requestAnimationFrame(() => (over(), room())));
   room();
 
   let islands = [];
@@ -122,12 +131,12 @@ export function drawPicker() {
   /** An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack. */
   const row = (i, on) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
-      h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? hooks.toIsland?.(i.id) : putOn(i)) }, i.title),
+      h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? hooks.toIsland?.(i.id) : putOn(i), done()) }, i.title),
       packOf(i.pack),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
-    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i)) },
+    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i), done()) },
       h('span', { class: 'isl-name' }, i.title),
       packOf(i.pack, drawn.includes(i.id)));
   const draw = () => {
@@ -160,7 +169,7 @@ export function drawPicker() {
     if (ev.key === 'Escape') return void (ev.preventDefault(), (input.value = ''), relay(), input.blur());
     if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && found.length) return void (ev.preventDefault(), (lit = Math.max(0, Math.min(found.length - 1, lit + (ev.key === 'ArrowDown' ? 1 : -1)))), draw());
     const i = input.value.trim() && found[lit];
-    if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), (anew = true), draw());
+    if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), (anew = true), draw(), done());
   });
   // Ctrl+K (⌘K): the bar opens where it was folded, its search in focus.
   addEventListener('keydown', (ev) => {

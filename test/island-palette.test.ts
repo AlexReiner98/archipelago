@@ -77,6 +77,13 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');
     await page.evaluate(`document.querySelector('#islands .isl-rail').click()`);
     await until('beside the folded rail', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && ${beside}`));
+    // In a narrow window the bar opened lies over the canvas, which stays at the rail, and a press on the canvas folds it.
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 560, height: 800, deviceScaleFactor: 1, mobile: false });
+    await until('narrow: the bar goes over', () => page.evaluate<boolean>(`document.body.dataset.islandsOver === 'on'`));
+    await page.evaluate(`document.querySelector('#islands .isl-rail').click()`);
+    await until('open over the canvas', () => page.evaluate<boolean>(`(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return document.body.dataset.islands === 'open' && pane.left < bar.right - 1; })()`));
+    await page.evaluate(`document.getElementById('canvas').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
+    await until('a press on the canvas folds it', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded'`));
     assert.ok(made.harbour);
   } finally {
     await page.close();
