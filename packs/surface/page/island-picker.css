@@ -27,8 +27,9 @@ body[data-islands="open"] #islands .isl-rail-count { display: none; }
 
 #islands .isl-hit { cursor: pointer; }
 #islands .isl-none { overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
-/* The keyboard's row, and under On the island the canvas was brought to: the accent bar at its left edge, as the tab in sight has it at its top; a hover is the soft ground alone. */
-#islands .isl-hit[aria-selected="true"], #islands .isl-row[aria-current="location"] { box-shadow: inset var(--border-3) 0 0 var(--accent); }
+/* The keyboard's row (found, or lit in the list), and under On the island the canvas was brought to: the accent bar at its left edge, as the tab in sight has it at its top; a hover is the soft ground alone. */
+#islands .isl-body:focus { outline: none; }
+#islands .isl-hit[aria-selected="true"], #islands .isl-row[aria-current="location"], #islands .isl-row[data-lit] { box-shadow: inset var(--border-3) 0 0 var(--accent); }
 /* A row's pack at its right, muted, cut short before the name is. */
 #islands .isl-pack { flex: 0 100 auto; min-width: var(--box-7); max-width: 40%; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 #islands .isl-row:not(.on, .isl-hit) .isl-name { color: var(--muted); }

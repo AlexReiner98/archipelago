@@ -90,6 +90,16 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('Harbour off where it stood', () => page.evaluate<boolean>(`!${harbourRow}.classList.contains('on') && ${underOn}`));
     await page.evaluate(`document.getElementById('islands').dispatchEvent(new PointerEvent('pointerleave'))`);
     await until('Harbour gone from On', () => page.evaluate<boolean>(`!${underOn}`));
+    // The list is one stop, worked with arrows: down from the search line lights its first row, End its last.
+    await page.evaluate(`document.querySelector('#islands .isl-search').focus()`);
+    await key('ArrowDown');
+    const lit = `document.querySelector('#islands .isl-row[data-lit]')?.dataset.id`;
+    await until('the list in focus, its first row lit', () => page.evaluate<boolean>(`document.activeElement?.classList.contains('isl-body') && ${lit} === document.querySelector('#islands .isl-row[data-id]').dataset.id`));
+    assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-body [tabindex="-1"]').length > 0 && document.querySelectorAll('#islands .isl-body button:not([tabindex="-1"])').length`), 0, 'no row is a tab stop');
+    await key('End');
+    await until('the last row lit', () => page.evaluate<boolean>(`${lit} === [...document.querySelectorAll('#islands .isl-row[data-id]')].at(-1).dataset.id`));
+    await key('Escape');
+    await until('back to the search line', () => page.evaluate<boolean>(`document.activeElement?.classList.contains('isl-search') && !document.querySelector('#islands .isl-row[data-lit]')`));
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');

@@ -81,7 +81,8 @@ export function drawPicker() {
   const arrow = h('span', { class: 'isl-arrow', 'aria-hidden': 'true' });
   const count = h('span', { class: 'isl-rail-count' });
   const fold = h('button', { type: 'button', class: 'isl-rail' }, arrow, count);
-  const body = h('div', { class: 'isl-body' });
+  // The list is one stop for Tab, worked with arrows (see `keys` below); its rows' presses are for the pointer.
+  const body = h('div', { class: 'isl-body', tabindex: '0', 'aria-label': 'Islands' });
   // No tooltip on a row: a name cut short has the whole of it as its tooltip, the name alone.
   body.addEventListener('pointerover', (ev) => {
     const name = ev.target.closest?.('.isl-name');
@@ -146,10 +147,10 @@ export function drawPicker() {
    * (`atOn`), where the name needs the room beside ×.
    */
   const row = (i, on, atOn = false) =>
-    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', ...(on && i.id === here && { 'aria-current': 'location' }) },
-      h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? goTo(i) : putOn(i), done()) }, i.title),
+    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
+      h('button', { type: 'button', class: 'isl-name', tabindex: '-1', onclick: () => (on ? goTo(i) : putOn(i), done()) }, i.title),
       atOn ? '' : packOf(i),
-      on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
+      on ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
     h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i), done()) },
@@ -176,7 +177,34 @@ export function drawPicker() {
     const list = (head, all) => (all.length ? [h('div', { class: 'isl-head' }, `${head} · ${all.length}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id))))] : []);
     parts.push(...list('Recent', recent), ...list('All', others));
     body.replaceChildren(...parts);
+    light();
   };
+  /** The row the keyboard is on in the list (an island's id), lit while the list has the focus. */
+  let cur = null;
+  const rowsNow = () => [...body.querySelectorAll('.isl-row[data-id]')];
+  const light = () => {
+    const rows = rowsNow(), focused = document.activeElement === body;
+    if (focused && !rows.some((r) => r.dataset.id === cur)) cur = rows[0]?.dataset.id ?? null;
+    for (const r of rows) r.toggleAttribute('data-lit', focused && r.dataset.id === cur);
+    body.querySelector('[data-lit]')?.scrollIntoView({ block: 'nearest' });
+  };
+  body.addEventListener('focus', light);
+  body.addEventListener('blur', light);
+  // Arrows move the lit row, Enter presses its name (puts it on, or goes to it), Delete takes it off; up from the top,
+  // or Escape, goes back to the search line.
+  body.addEventListener('keydown', (ev) => {
+    const rows = rowsNow(), at = rows.findIndex((r) => r.dataset.id === cur), row = rows[at];
+    const to = (n) => ((cur = rows[Math.max(0, Math.min(rows.length - 1, n))]?.dataset.id ?? cur), light());
+    if (ev.key === 'ArrowDown') to(at + 1);
+    else if (ev.key === 'ArrowUp') at <= 0 ? input.focus() : to(at - 1);
+    else if (ev.key === 'Home') to(0);
+    else if (ev.key === 'End') to(rows.length - 1);
+    else if (ev.key === 'Enter') row?.querySelector('.isl-name')?.click();
+    else if (ev.key === 'Delete' || ev.key === 'Backspace') row?.querySelector('.isl-off')?.click();
+    else if (ev.key === 'Escape') input.focus();
+    else return;
+    ev.preventDefault();
+  });
   /** Lay the list out anew: what is on now goes under On. */
   const relay = () => ((laidOn = null), draw());
   // Rows stay put while the pointer is in the bar, so the next press lands; once it leaves, what was taken off leaves
@@ -191,6 +219,7 @@ export function drawPicker() {
   input.addEventListener('input', () => ((lit = 0), relay()));
   input.addEventListener('keydown', (ev) => {
     if (ev.key === 'Escape') return void (ev.preventDefault(), (input.value = ''), relay(), input.blur());
+    if (ev.key === 'ArrowDown' && !input.value.trim()) return void (ev.preventDefault(), body.focus());
     if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && found.length) return void (ev.preventDefault(), (lit = Math.max(0, Math.min(found.length - 1, lit + (ev.key === 'ArrowDown' ? 1 : -1)))), draw());
     const i = input.value.trim() && found[lit];
     if (ev.key === 'Enter' && i) (ev.preventDefault(), ev.shiftKey ? showOnly(i) : putOn(i), (input.value = ''), (anew = true), draw(), done());
