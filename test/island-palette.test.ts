@@ -105,6 +105,14 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the last row lit', () => page.evaluate<boolean>(`${lit} === [...document.querySelectorAll('#islands .isl-row[data-id]')].at(-1).dataset.id`));
     await key('Escape');
     await until('back to the search line', () => page.evaluate<boolean>(`document.activeElement?.classList.contains('isl-search') && !document.querySelector('#islands .isl-row[data-lit]')`));
+    // Found again while it is on, Quarry reads as on, and Enter goes to it rather than doing nothing.
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; window.wentTo = []; hooks.toIsland = (id) => (wentTo.push(id), true); })()`);
+    await page.evaluate(`document.querySelector('#islands .isl-search').focus()`);
+    await page.send('Input.insertText', { text: 'quarry' });
+    await until('Quarry found, on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-hit[aria-selected="true"]')?.classList.contains('on') ?? false`));
+    await key('Enter');
+    await until('Enter went to it', () => page.evaluate<boolean>(`wentTo.includes(${JSON.stringify(made.quarry)})`));
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; delete hooks.toIsland; })()`);
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');

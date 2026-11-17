@@ -152,6 +152,8 @@ export function drawPicker() {
     const go = () => goTo(i) || (--tries > 0 && setTimeout(go, numberOf(state.style, 'picker_go_every')));
     if (hooks.toIsland) setTimeout(go, numberOf(state.style, 'picker_go_every'));
   };
+  /** A found island taken: one that is on is gone to (with Shift, shown alone); one that is off is put on and gone to. */
+  const press = (i, alone = false) => (drawnNow().includes(i.id) && !alone ? goTo(i) : putOnAndGo(i, alone));
   /**
    * An island's row: its name, a press on which puts it on, or, on, brings the canvas to it; then its pack, but under On
    * (`atOn`), where the name needs the room beside ×.
@@ -161,9 +163,9 @@ export function drawPicker() {
       h('button', { type: 'button', class: 'isl-name', tabindex: '-1', onclick: () => (on ? goTo(i) : putOnAndGo(i), done()) }, i.title),
       atOn ? '' : packOf(i),
       on ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
-  /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it. */
+  /** A row of what the search found: its name, its pack (and whether it is on), lit as Enter would take it; one on reads as on. */
   const hit = (i, n, drawn) =>
-    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (putOnAndGo(i, ev.shiftKey), done()) },
+    h('div', { class: `isl-row isl-hit${drawn.includes(i.id) ? ' on' : ''}`, role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (press(i, ev.shiftKey), done()) },
       h('span', { class: 'isl-name' }, i.title),
       packOf(i, drawn.includes(i.id)));
   const draw = () => {
@@ -232,7 +234,7 @@ export function drawPicker() {
     if (ev.key === 'ArrowDown' && !input.value.trim()) return void (ev.preventDefault(), body.focus());
     if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && found.length) return void (ev.preventDefault(), (lit = Math.max(0, Math.min(found.length - 1, lit + (ev.key === 'ArrowDown' ? 1 : -1)))), draw());
     const i = input.value.trim() && found[lit];
-    if (ev.key === 'Enter' && i) (ev.preventDefault(), putOnAndGo(i, ev.shiftKey), (input.value = ''), (anew = true), draw(), done());
+    if (ev.key === 'Enter' && i) (ev.preventDefault(), press(i, ev.shiftKey), (input.value = ''), (anew = true), draw(), done());
   });
   // Ctrl+K (⌘K): the bar opens where it was folded, its search in focus.
   addEventListener('keydown', (ev) => {
