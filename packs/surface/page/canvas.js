@@ -173,6 +173,12 @@ hooks.go = (address) => {
   openHere(`#/v?${addressOf(lens ?? home(), { ...rest, ...layout, ...(canvas && { canvas }) })}`);
 };
 
+/**
+ * Go to an island in the canvas in focus: its land in sight, whole if it reads so, else at the style's least readable
+ * size from its top left (e_wmqwkfdd: a press on an island that is on, in the island picker). False where it is not drawn.
+ */
+hooks.toIsland = (id) => typeof id === 'string' && /^e_[a-z0-9]{8}$/.test(id) && Boolean(current?.toItem(id));
+
 /** Whether the canvas in focus draws this item now. */
 export const canvasHas = (id) => Boolean(current?.has(id));
 /** Light this item in the canvas in focus (its page is open), or none. */
@@ -280,7 +286,9 @@ export function canvasIn(host, pane) {
       // The bar says the lens at once, and again with what its answer found (the names of the items it names, a cut).
       view.addEventListener('lens-answer', () => at?.view === view && current === c && barNow());
       if (current === c) barNow();
-      host.replaceChildren(view);
+      // Home with no island on says, where the canvas would be, how to put one on (e_cgg39chd); one on, it is gone.
+      const none = at.home && !isles.length;
+      host.replaceChildren(view, ...(none ? [h('div', { class: 'empty' }, 'Put an island on from the list, or Ctrl+K')] : []));
       // The first canvas a page draws is caught up from where its reader last looked (caughtUp).
       view.ready?.then(() => caughtUp(view.store)).catch(() => {});
     },
@@ -302,8 +310,18 @@ export function canvasIn(host, pane) {
     fit() {
       if (at?.kept) return;
       if (at) at.kept = null;
-      c.moves()?.fit(0, ...bars(host));
+      // Never smaller than reads (the style's plane_fit_least): a big island is panned, from its top left (e_5cp4fw78).
+      c.moves()?.fit(0, ...bars(host), true);
       if (at) at.fitted = c.moves()?.state();
+    },
+    /** This item's mark (an island's land, an item's box) in sight at a size that reads, kept there as a reader's move is. */
+    toItem(id) {
+      const moves = c.moves(), name = host.querySelector(`.lf-stage svg [data-item="${id}"]`);
+      const box = name && moves?.boxOf(name);
+      if (!box) return false;
+      moves.toBox(box, 0, ...bars(host));
+      if (at) at.kept = moves.state();
+      return true;
     },
     /** Stop: its picture is no longer kept current from the log. */
     close() {
