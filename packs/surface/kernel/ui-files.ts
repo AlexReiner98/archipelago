@@ -6,8 +6,26 @@ import { readFile, stat } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { join } from 'node:path';
 
-/** The app's own modules, each a part of the page (ui/app.js imports them), served at /<name>.js. */
-const APP_MODULES = ['doc-ref', 'base', 'signed-in', 'reads', 'words', 'body', 'home', 'held', 'held-card', 'diff-view', 'item-held', 'canvas', 'pinch', 'bar-band', 'menu-place', 'draft', 'note-count', 'item', 'page-schema', 'screens', 'query', 'query-base', 'style-code', 'backdrop', 'preview', 'pan-zoom', 'style-number', 'live', 'settle', 'workspace', 'workspace-cards', 'workspaces-card', 'members-card', 'agents-card', 'connect-agent', 'plates', 'theme', 'token-piece', 'token-ask', 'start', 'doc-lens', 'marks', 'marks-add', 'marks-toggle', 'reader-frame', 'view-frame', 'sheet-follow', 'layout', 'layout-asks', 'layout-tip', 'tip', 'surface', 'replica', 'narrow', 'narrow-picture', 'picture-name', 'pictures-kept', 'membership', 'thumbs', 'thumb-keep', 'thumb-still', 'canvas-wires', 'authorize', 'guest', 'sign-up', 'passkey', 'password', 'text', 'look', 'look-marks', 'panes', 'pane-route', 'pane-busy', 'pane-address', 'tabs', 'tab-bar', 'pane-land', 'item-link', 'way-back', 'part-bridge', 'part-going', 'part-host', 'part-check', 'part-render', 'part-fits', 'part-paint', 'dom', 'canvas-pick', 'frozen-page', 'frozen-chrome', 'lens-terms', 'part-lens', 'part-slots', 'part-menu', 'part-pane', 'part-drag', 'light-items', 'part-read', 'part-away', 'part-page', 'swatch', 'part-trace', 'replay', 'frozen-doc', 'beat-rows', 'screen-page', 'screen-rows', 'views-kept', 'part-input', 'item-share', 'item-reading', 'part-echo', 'part-order', 'part-code'];
+const PACKS = join(import.meta.dirname, '..', '..');
+/**
+ * Where the files are: each root pack's page/ (packs/roots.json), which changes only by a PR the owner merges. A file
+ * is served by its name alone, whichever folder holds it, so a name is in one folder only.
+ */
+export const UI_DIRS = [...(JSON.parse(readFileSync(join(PACKS, 'roots.json'), 'utf8')) as { roots: { id: string }[] }).roots.map((r) => join(PACKS, r.id, 'page')).filter((d) => existsSync(d))];
+const DIR_OF = new Map<string, string>();
+for (const dir of UI_DIRS)
+  for (const f of readdirSync(dir)) {
+    if (DIR_OF.has(f)) throw new Error(`${f} is in both ${DIR_OF.get(f)} and ${dir}: a file of the UI is served by its name, so it is in one folder.`);
+    DIR_OF.set(f, dir);
+  }
+
+/** Files kept as their authors build them: served as they are, never rewritten, loaded only when asked for, and at an address of their own. */
+const VENDORED = new Set(['three.module.min.js', 'codemirror.min.js']);
+/**
+ * The app's modules, each a part of the page: every .js in a root pack's page/, served at /<name>.js. Read off the
+ * folders, so a new module needs no entry here; nothing there is served that the owner has not merged.
+ */
+const APP_MODULES = [...DIR_OF.keys()].filter((f) => f.endsWith('.js') && !f.endsWith('.test.js') && !VENDORED.has(f)).map((f) => f.slice(0, -3));
 
 export const UI_FILES: Record<string, string> = {
   ...Object.fromEntries(APP_MODULES.map((m) => [`/${m}.js`, `${m}.js`])),
@@ -64,26 +82,14 @@ export const UI_FILES: Record<string, string> = {
   // CodeMirror 6 as one file (MIT, the owner, 14 Nov 2026), for code written in the sheet (part-code.js); loaded only when code is opened.
   '/codemirror.js': 'codemirror.min.js',
 };
-/** Files kept as their authors build them: served as they are, never rewritten, and loaded only when asked for. */
-const VENDORED = new Set(['three.module.min.js', 'codemirror.min.js']);
 /** Files of the UI that are not text: served as their bytes. */
 export const BINARY = /\.woff2$/;
 
-const PACKS = join(import.meta.dirname, '..', '..');
-/**
- * Where the files are: each root pack's page/ (packs/roots.json), where its hash
- * keeps them. A file is served by its name alone, whichever folder holds it, so a name is in one folder only.
- */
-export const UI_DIRS = [...(JSON.parse(readFileSync(join(PACKS, 'roots.json'), 'utf8')) as { roots: { id: string }[] }).roots.map((r) => join(PACKS, r.id, 'page')).filter((d) => existsSync(d))];
-const DIR_OF = new Map<string, string>();
-for (const dir of UI_DIRS)
-  for (const f of readdirSync(dir)) {
-    if (DIR_OF.has(f)) throw new Error(`${f} is in both ${DIR_OF.get(f)} and ${dir}: a file of the UI is served by its name, so it is in one folder.`);
-    DIR_OF.set(f, dir);
-  }
 /** Files served to the page from the kernel's source, as the page names them: TypeScript of erasable syntax only, its types stripped. */
 const FROM_SOURCE: Record<string, string> = { 'project.js': join(PACKS, 'log', 'kernel', 'project.ts'), 'css-check.js': join(PACKS, 'walls', 'kernel', 'css-check.ts') };
-const pathOf = (f: string) => FROM_SOURCE[f] ?? join(DIR_OF.get(f) ?? join(PACKS, 'surface', 'page'), f);
+/** Where a file the page names by its name alone is read from, as the server serves it; undefined if it is none of the UI's. */
+export const servedFrom = (f: string): string | undefined => FROM_SOURCE[f] ?? (DIR_OF.has(f) ? join(DIR_OF.get(f)!, f) : undefined);
+const pathOf = (f: string) =>FROM_SOURCE[f] ?? join(DIR_OF.get(f) ?? join(PACKS, 'surface', 'page'), f);
 const readText = async (f: string) => (FROM_SOURCE[f] ? stripTypeScriptTypes(await readFile(FROM_SOURCE[f], 'utf8')) : readFile(pathOf(f), 'utf8'));
 /** The pages a browser opens, and so asks for again on every visit; read whole, with the files they name versioned. */
 const PAGES = ['index.html', 'doc.html', 'public.html', 'draw.html'];
