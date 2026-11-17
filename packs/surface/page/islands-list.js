@@ -14,6 +14,9 @@ export const islandsIn = (query) => {
   return named === null ? null : clean(named.split(','));
 };
 
+/** Whether a map keeps islands (its schema's types that live on one declare the field island): a map with them off has none. */
+export const islandsOnMap = (schema) => (schema?.types ?? []).some((t) => t.fields?.island);
+
 /** Whether the page's address is Home: the canvas draws the person's own list. */
 export const atHome = (hash) => /^#?\/?(v)?$/.test(String(hash ?? ''));
 

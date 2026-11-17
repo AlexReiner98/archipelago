@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { atHome, capital, drawnAt, islandsIn, pressed, rankIslands, recentFirst } from '../packs/surface/page/islands-list.js';
+import { atHome, capital, drawnAt, islandsIn, islandsOnMap, pressed, rankIslands, recentFirst } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
@@ -96,4 +96,10 @@ test('islands found equally well stand together by name, a family with them', ()
   ], 'memory');
   assert.equal(found[0].title, 'Memory principles', 'the start of a name first');
   assert.deepEqual(found.slice(1).map((i: { title: string }) => i.title), ['xAI memory: marketing', 'xAI memory: positioning', 'xAI memory: technical', 'Zep memory: marketing']);
+});
+
+test('a map keeps islands when its types that live on one declare the field island; one with islands off has no bar', () => {
+  assert.equal(islandsOnMap({ types: [{ id: 'task', fields: { island: { type: 'string' }, cell: {} } }, { id: 'person', fields: {} }] }), true);
+  assert.equal(islandsOnMap({ types: [{ id: 'task', fields: { cell: {} } }] }), false);
+  assert.equal(islandsOnMap(undefined), false, 'no schema read yet: no islands assumed');
 });
