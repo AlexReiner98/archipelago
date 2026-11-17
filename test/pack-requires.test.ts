@@ -76,9 +76,8 @@ test('a name is has:, type:, event: or a pack id', () => {
 
 test('the public packs require names, and are active with core alone beside them', () => {
   const reg = new Registry(PACKS);
-  for (const id of ['automations', 'email', 'refine', 'replays']) assert.equal(reg.states.get(id)!.state, 'active', id);
+  for (const id of ['automations', 'email']) assert.equal(reg.states.get(id)!.state, 'active', id);
   for (const p of reg.found) for (const r of p.requires ?? []) assert.match(r, /^(has|type|event):/, `${p.id} requires ${r}: a name, not a pack`);
-  assert.ok(reachOf(reg, 'refine').has('replays'), 'what refine uses by type is in its reach');
 });
 
 test('taking out a provider sends its consumer to waiting, with why; adding it back wakes it', async () => {

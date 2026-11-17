@@ -236,9 +236,10 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
   const id = `m${++mounts}`;
   // A mark that stands for an item opens that item's page when pressed: the host's, so a part names items, never addresses.
   // One that stands for a view opens it, as the app or the one drawing the part says where.
+  // A press something in it has answered already (a canvas opening a step's page over itself) is not opened again.
   const opens = (ev) => {
     const at = ev.target.closest?.('[data-view], [data-item]');
-    if (!at || !body.contains(at) || at.closest('input, textarea') || (at.closest('button') && !at.dataset.view)) return;
+    if (!at || ev.defaultPrevented || !body.contains(at) || at.closest('input, textarea') || (at.closest('button') && !at.dataset.view)) return;
     if (at.dataset.view) return void (openView ?? hooks.openView)?.(at.dataset.view);
     location.hash = `#/e/${at.dataset.item}`;
   };

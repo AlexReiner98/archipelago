@@ -37,7 +37,8 @@ export async function serve(auth: 'off' | 'tokens', limits?: { open?: Limit; del
   const packsDir = typeof packs === 'string' ? packs : join(import.meta.dirname, '..', 'packs');
   // Every server here also draws the canvas as a flow by default, as the canvas pack did before it went to the hosted
   // service (test/fixtures/house/flowing): the look these browser tests were written against.
-  const more = [...(typeof packs === 'string' ? [] : packs), join(import.meta.dirname, 'fixtures', 'house')];
+  // And the tests' words (test/words), which a folder made by packsWith already holds.
+  const more = [...(typeof packs === 'string' ? [] : [...packs, join(import.meta.dirname, 'words')]), join(import.meta.dirname, 'fixtures', 'house')];
   const workspaces = new Workspaces({ dataDir: null, rootDir: join(root, 'workspaces'), packsDir, packDirs: [packsDir, ...more] });
   // The server checks the Host header against its port, so the port must be known first.
   const probe = createHttpServer(workspaces, 0);

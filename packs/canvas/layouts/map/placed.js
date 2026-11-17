@@ -45,10 +45,15 @@ export function placedOut(args, m, islandOf, heads) {
     right = Math.max(right, r);
   }
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
+  return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
+}
+
+/** The kit's graph `m` wired straight, from box edge to box edge, its boxes standing at `x`, `y`: its chains and ties. */
+export function straight(m, x, y) {
   const line = (w) => {
     const a = m.nodes.get(w.a), b = m.nodes.get(w.b), pa = [x.get(w.a), y.get(w.a)], pb = [x.get(w.b), y.get(w.b)];
     return { ...w, points: [edge(pa, a, pb), edge(pb, b, pa)] };
   };
   const drawn = (w) => m.nodes.has(w.a) && m.nodes.has(w.b) && w.a !== w.b;
-  return { m, nodes: m.nodes, x, y, chains: m.chains.filter(drawn).map(line), ties: m.ties.filter(drawn).map(line), islands, ports: [] };
+  return { chains: m.chains.filter(drawn).map(line), ties: m.ties.filter(drawn).map(line) };
 }

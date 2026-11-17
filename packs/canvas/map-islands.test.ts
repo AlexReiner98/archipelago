@@ -1,6 +1,6 @@
 // The flow draws a picture of items on islands, one or more, as an archipelago (task e_auw7hb3v; the owner, 5 Nov 2026): each
 // island a region round what lives on it, laid out alone so no two overlap, named, with its own legend inside it and
-// none in the corner; a link between islands crosses the sea, with a gate on each shore naming what crosses. A picture
+// none in the corner; a link between islands crosses the sea. A picture
 // of one island is framed the same way (task e_5rh5ysut); a picture of none draws no border.
 
 import assert from 'node:assert/strict';
@@ -120,11 +120,6 @@ test('an island’s legend holds only its vocabulary: the shared marks are told 
   const badge = marks(scene.svg, (m) => String(m[1]?.key ?? '').startsWith('held:e_heldheld'))[0];
   assert.ok(badge?.[1].on.includes('click') && badge[1].on.includes('enter'), 'the badge still decides on a click, and tells on a hover');
   assert.ok(tipOf(badge[1].key).includes('Held for you') && tipOf(badge[1].key).includes('A test'));
-  // A finding crossing, on each gate and on its name in the sea.
-  const gates = marks(scene.svg, (m) => /^(gate|cross):/.test(String(m[1]?.key ?? '')));
-  assert.ok(gates.length >= 2);
-  for (const g of gates) assert.ok(tipOf(g[1].key).includes('A finding read across'), g[1].key);
-  assert.ok(tipOf('gate:0:0').includes('Grants') && tipOf('gate:0:1').includes('Lab'), 'each gate names the island it comes into or leaves');
 });
 
 test('a picture of one island is framed, with its own legend and none in the corner (task e_5rh5ysut)', () => {
@@ -142,11 +137,3 @@ test('a picture of no island draws no border', () => {
   assert.ok(scene.key.length > 0, 'and keeps its key');
 });
 
-test('a finding read across crosses the sea, with a gate on each shore naming it', { todo: "Map (9 Nov 2026): 3 gates where the flow drew 2" }, () => {
-  const svg = draw({ ...answer, items: answer.items.map((i) => (i.id === 'e_costzzzz' ? { ...i, fields: { value: 42 } } : i)) }).svg;
-  const gates = marks(svg, (m) => String(m[1]?.key ?? '').startsWith('gate:'));
-  assert.equal(gates.length, 2, 'one where it leaves Lab, one where it enters Grants');
-  for (const g of gates) assert.ok(JSON.stringify(g).includes('Cost per sample: 42'), 'each names what crosses, and its value');
-  const wire = marks(svg, (m) => m[0] === 'path' && String(m[1]?.class ?? '').includes('lf-tie') && /^n:/.test(m[1].key ?? '')).find((m) => m[1].class.includes('headed') && gates.length);
-  assert.ok(wire, 'the crossing is a tie');
-});

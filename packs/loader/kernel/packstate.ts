@@ -26,7 +26,7 @@ import { actorId, needHuman } from '../../identity/kernel/actor-checks.ts';
 import type { Actor, Archipelago, Op } from '../../write/kernel/pelago.ts';
 import type { Tool } from '../../surface/kernel/tools.ts';
 import { syncTypes } from './typetable.ts';
-import { packTouches } from './pack-touches.ts';
+import { packTouches } from './pack-touches.ts'; import { packRunsCode } from './island-off.ts';
 /** The in-process tier, loaded when asked: the placement pack plans islands, the usage pack counts use (their answers). */
 const kernel = () => import('./kernel-context.ts');
 import { folderCode, keptHashes } from './pack-code.ts';
@@ -335,8 +335,7 @@ export async function setPack(l: Archipelago, actor: Actor, input: { pack: strin
 
 /** Whether a pack runs code on the server or reaches outside it: its kernel modules, handlers, actions, layouts or reach (hosts, the server). */
 function runsCode(l: Archipelago, pack: string): boolean {
-  const p = l.registry.found.find((f) => f.id === pack);
-  return Boolean(p && (p.kernel || p.handlers?.length || p.actions?.length || p.layouts?.length || p.reach));
+  return packRunsCode(l.registry, pack);
 }
 
 /**

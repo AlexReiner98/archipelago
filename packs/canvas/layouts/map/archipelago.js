@@ -1,7 +1,5 @@
-// The one layout on islands (hub e_9uhaqhwe): not each island alone and a sea between, but the whole picture in one
-// solve (./layout.js), its islands closed loops the wires cross at ports. Here each island's header is sized first
-// (./bands.js's rule: its name, its legend under it), so the relaxation leaves the room for it, and each island framed
-// as the solve placed it. Layer: metrics. Pure: the answer's parts in, the model the flow's scene draws out.
+// The layout on islands (hub e_9uhaqhwe): the whole picture laid out at once (./layout.js), each island's header sized
+// first (its name, its legend under it), so the layout leaves the room for it, and each island framed where it stands. Layer: metrics. Pure: the answer's parts in, the model the flow's scene draws out.
 
 import { finish } from './land.js';
 import { laidOut } from './layout.js';
@@ -37,7 +35,7 @@ function columned(widths, columns, gap, row) {
   return { at, w: widths.length ? x + wide : 0, h: Math.min(widths.length, per) * row };
 }
 
-/** The whole picture in one solve, each island framed where it stands with its name and legend over what it holds. */
+/** The whole picture laid out at once, each island framed where it stands with its name and legend over what it holds. */
 export function compose({ where, items, links, args }, { legends, names = new Map(), sizes }) {
   const z = (k) => sizes[`flow_island_${k}`], [PAD, ROOM, GAP, ROW, COLUMNS] = ['pad', 'name_room', 'legend_gap', 'legend_row', 'legend_columns'].map(z);
   const keys = new Map([...legends].map(([id, rows]) => [id, columned(rows, COLUMNS, GAP, ROW)]));
@@ -53,5 +51,5 @@ export function compose({ where, items, links, args }, { legends, names = new Ma
   });
   const done = finish({ nodes: a.nodes, x: a.x, y: a.y, chains: a.chains, ties: a.ties, potential: a.m.potential, margin: sizes.flow_margin, islands: shores });
   stage('finish', { chains: done.chains.map((w) => w.points), ties: done.ties.map((w) => w.points) });
-  return a.unwired ? Object.assign(done, { unwired: a.unwired }) : done;
+  return done;
 }

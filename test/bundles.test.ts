@@ -12,6 +12,7 @@ import { bundlesHere, packStates, packsOff, setPack, syncPacks } from '../packs/
 import { syncTypes } from '../packs/loader/kernel/typetable.ts';
 import { openDb } from '../packs/database/kernel/db.ts';
 import { human, packsWith, PACKS } from './map.ts';
+import type { PackFile } from '../packs/loader/kernel/packs.ts';
 
 async function mapOf(dir: string, only?: string[]) {
   const reg = new Registry(dir, only);
@@ -45,9 +46,22 @@ test('a bundle manifest has its own keys, two or more packs, and an id no pack h
   assert.deepEqual(expandBundles(['one', 'c', 'a'], bundles), ['a', 'b', 'c']);
 });
 
-test('refine and replays are the refinement bundle', () => {
-  const [b] = readBundles([PACKS], ['refine', 'replays']).filter((x) => x.id === 'refinement');
-  assert.deepEqual(b.packs, ['refine', 'replays']);
+/** The repository's packs with a bundle beside them: tide_words (a type) and tide_view (a view of it), as "tides". */
+function withTides(): string {
+  const dir = packsWith(
+    { id: 'tide_words', version: '0.1.0', title: 'Tide words', description: 'A reading of the tide.', types: [{ id: 'tide_words.reading', extends: 'record', title: 'Reading', description: 'A height of water.' }] } as unknown as PackFile,
+    { id: 'tide_view', version: '0.1.0', title: 'Tide view', description: 'The readings, as a list.' } as unknown as PackFile,
+  );
+  mkdirSync(join(dir, 'tides'));
+  writeFileSync(join(dir, 'tides', 'bundle.json'), JSON.stringify({ id: 'tides', title: 'Tides', description: 'Readings and their view, on and off together.', packs: ['tide_words', 'tide_view'] }));
+  return dir;
+}
+const PAIR = ['tide_view', 'tide_words'];
+
+test('a bundle in a folder of packs is read with its packs', () => {
+  const [b] = readBundles([withTides()], PAIR).filter((x) => x.id === 'tides');
+  assert.deepEqual(b.packs, ['tide_words', 'tide_view']);
+  assert.deepEqual(readBundles([PACKS], ['core']), [], 'the repository ships none');
 });
 
 /** Run with a distribution: what a new map starts with (the test runner starts with every pack). */
@@ -63,39 +77,39 @@ async function starting<T>(said: string, fn: () => Promise<T>): Promise<T> {
 }
 
 test('a bundle turns on and off as one, in one change set, by its id or a pack of it', async () => {
-  const l = await mapOf(packsWith());
+  const l = await mapOf(withTides());
   await starting('core', () => syncPacks(l));
-  assert.deepEqual((await packsOff(l)).filter((p) => p === 'refine' || p === 'replays').sort(), ['refine', 'replays'], 'both off on a new map');
-  assert.deepEqual(bundlesHere(l).map((b) => b.id), ['refinement']);
+  assert.deepEqual((await packsOff(l)).filter((p) => PAIR.includes(p)).sort(), PAIR, 'both off on a new map');
+  assert.deepEqual(bundlesHere(l).map((b) => b.id), ['tides']);
   const states = packStates(l);
-  for (const id of ['refine', 'replays']) assert.equal(states.find((p) => p.id === id)?.bundle?.id, 'refinement', `${id} names its bundle`);
+  for (const id of PAIR) assert.equal(states.find((p) => p.id === id)?.bundle?.id, 'tides', `${id} names its bundle`);
   assert.equal(states.find((p) => p.id === 'core')?.bundle, undefined);
 
   const before = await lastPos(l);
-  await setPack(l, human, { pack: 'refinement', on: true });
-  assert.ok(!(await packsOff(l)).some((p) => p === 'refine' || p === 'replays'), 'both on');
-  assert.equal((await saidAt(l, ['refine', 'replays'], '+', before)).length, 1, 'said in one change set');
-  assert.equal(l.registry.states.get('refine')!.state, 'active');
-  assert.equal(l.registry.states.get('replays')!.state, 'active');
+  await setPack(l, human, { pack: 'tides', on: true });
+  assert.ok(!(await packsOff(l)).some((p) => PAIR.includes(p)), 'both on');
+  assert.equal((await saidAt(l, PAIR, '+', before)).length, 1, 'said in one change set');
+  assert.equal(l.registry.states.get('tide_words')!.state, 'active');
+  assert.equal(l.registry.states.get('tide_view')!.state, 'active');
 
   const on = await lastPos(l);
-  await setPack(l, human, { pack: 'replays', on: false });
-  assert.deepEqual((await packsOff(l)).filter((p) => p === 'refine' || p === 'replays').sort(), ['refine', 'replays'], 'a pack of it takes the whole bundle out');
-  assert.equal((await saidAt(l, ['refine', 'replays'], '-', on)).length, 1);
-  await assert.rejects(setPack(l, { kind: 'agent', name: 'a' } as never, { pack: 'refinement', on: true }), /owner/);
+  await setPack(l, human, { pack: 'tide_words', on: false });
+  assert.deepEqual((await packsOff(l)).filter((p) => PAIR.includes(p)).sort(), PAIR, 'a pack of it takes the whole bundle out');
+  assert.equal((await saidAt(l, PAIR, '-', on)).length, 1);
+  await assert.rejects(setPack(l, { kind: 'agent', name: 'a' } as never, { pack: 'tides', on: true }), /owner/);
 });
 
 test("a bundle is offered only where the server's list offers all its packs; else its packs stand alone", async () => {
-  const l = await mapOf(packsWith(), ['core', 'refine']);
+  const l = await mapOf(withTides(), ['core', 'tide_view']);
   assert.deepEqual(bundlesHere(l), []);
-  assert.equal(packStates(l).find((p) => p.id === 'refine')?.bundle, undefined, 'refine stands alone here');
-  await setPack(l, human, { pack: 'refine', on: true });
-  assert.ok(!(await packsOff(l)).includes('refine'));
-  await assert.rejects(setPack(l, human, { pack: 'replays', on: true }), /not offered/);
-  await assert.rejects(setPack(l, human, { pack: 'refinement', on: true }), /No pack "refinement"/);
+  assert.equal(packStates(l).find((p) => p.id === 'tide_view')?.bundle, undefined, 'tide_view stands alone here');
+  await setPack(l, human, { pack: 'tide_view', on: true });
+  assert.ok(!(await packsOff(l)).includes('tide_view'));
+  await assert.rejects(setPack(l, human, { pack: 'tide_words', on: true }), /not offered/);
+  await assert.rejects(setPack(l, human, { pack: 'tides', on: true }), /No pack "tides"/);
 });
 
 test('a distribution names a bundle: a new map starts with its packs', async () => {
-  const l = await mapOf(packsWith());
-  assert.deepEqual((await starting('refinement', () => syncPacks(l))).map((f) => f[1]).sort(), ['pack:attention', 'pack:canvas', 'pack:claude_code', 'pack:core', 'pack:practice', 'pack:refine', 'pack:replays', 'pack:sessions', 'pack:views']);
+  const l = await mapOf(withTides());
+  assert.deepEqual((await starting('tides', () => syncPacks(l))).map((f) => f[1]).sort(), ['pack:attention', 'pack:canvas', 'pack:claude_code', 'pack:core', 'pack:practice', 'pack:sessions', 'pack:tide_view', 'pack:tide_words', 'pack:views']);
 });

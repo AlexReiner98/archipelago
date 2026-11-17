@@ -1,6 +1,12 @@
 {
+ "anatomy_sync": [],
  "aperture": [
   "aperture_setup"
+ ],
+ "calendar": [
+  "event",
+  "meeting",
+  "routine"
  ],
  "canvas": [],
  "code": [
@@ -30,11 +36,13 @@
   "tenet",
   "writeup"
  ],
+ "diagrams": [],
  "funding": [
   "could_fund",
   "program",
   "requires"
  ],
+ "islands": [],
  "outreach": [
   "came_out_of",
   "channel",
@@ -42,6 +50,10 @@
   "conversation",
   "goes_out_on",
   "post"
+ ],
+ "people": [
+  "company",
+  "works_at"
  ],
  "plan": [],
  "proof": [
@@ -51,6 +63,11 @@
   "rule",
   "test",
   "test_result"
+ ],
+ "refine": [],
+ "replays": [
+  "replays.brief",
+  "replays.set"
  ],
  "ridges": [
   "ridges_setup"
