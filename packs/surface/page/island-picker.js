@@ -4,7 +4,7 @@
 // one puts it on. Typed into, the bar lists what it finds best first (./islands-list.js, rankIslands): arrows move,
 // Enter puts the lit one on, Shift+Enter shows it alone.
 
-import { api, h } from './base.js';
+import { api, h, hooks } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
 import { atHome, byPack, capital, drawnAt, only, packMarks, rankIslands, turnedOn } from './islands-list.js';
 import { titles } from './words.js';
@@ -125,13 +125,11 @@ export function drawPicker() {
    * folded), not by a press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
    */
   let laidOn = null;
-  /** An island's row; in a group (`grouped`) it sits under the group's name with no mark of its own: the group says its pack. */
+  /** An island's row: a press on its name puts it on, or, on, brings the canvas to it. In a group (`grouped`) it sits under the group's name with no mark of its own: the group says its pack. */
   const row = (i, on, grouped = false) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
       grouped ? '' : packMark(i.pack),
-      on
-        ? h('span', { class: 'isl-name' }, i.title)
-        : h('button', { type: 'button', class: 'isl-name', onclick: () => putOn(i) }, i.title),
+      h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? hooks.toIsland?.(i.id) : putOn(i)) }, i.title),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its pack's mark, its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
