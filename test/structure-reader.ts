@@ -1,5 +1,5 @@
 // How the code is read: each file's imports, its pack and its header comment, as plain data. The structure test checks
-// the architecture with it and the anatomy sync maps it with it, so the check and the map read code alike. Text and
+// the architecture with it, so every structure check reads code alike. Text and
 // paths in, data out; the one walk of a folder (walkFiles) is the only read of the disk.
 
 import { existsSync, readdirSync, statSync } from 'node:fs';
