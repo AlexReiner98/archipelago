@@ -246,13 +246,28 @@ export function drawPicker() {
   });
   /** Lay the list out anew: what is on now goes under On. */
   const relay = () => ((laidOn = null), draw());
-  // Rows stay put while the pointer is in the bar, so the next press lands; once it leaves, what was taken off leaves
-  // On and what was put on joins it.
-  side.addEventListener('pointerleave', () => {
+  /**
+   * After a press the rows stand still for picker_settle ms, so a quick next press lands where it aims (each press starts
+   * the wait again); then what was put on moves into On and what was taken off leaves it, each row gliding from where it
+   * stood (motion_move ms), so the eye follows it. Leaving the bar moves them at once.
+   */
+  let settling;
+  const settled = () => {
+    clearTimeout(settling);
     if (input.value.trim() || !laidOn) return;
     const drawn = drawnNow();
-    if (drawn.length !== laidOn.size || drawn.some((id) => !laidOn.has(id))) relay();
-  });
+    if (drawn.length === laidOn.size && drawn.every((id) => laidOn.has(id))) return;
+    const was = new Map(rowsNow().map((r) => [r.dataset.id, r.getBoundingClientRect().top]));
+    relay();
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    for (const r of rowsNow()) {
+      const by = (was.get(r.dataset.id) ?? r.getBoundingClientRect().top) - r.getBoundingClientRect().top;
+      if (by) r.animate([{ transform: `translateY(${by}px)` }, { transform: 'none' }], { duration: numberOf(state.style, 'motion_move'), easing: 'ease-out' });
+    }
+  };
+  const settle = () => (clearTimeout(settling), (settling = setTimeout(settled, numberOf(state.style, 'picker_settle'))));
+  side.addEventListener('pointerleave', settled);
+  onDrawn(() => laidOn && settle());
   /** Lay it out anew once the list a press keeps has come back (a search's Enter: it was found, not pointed at). */
   let anew = false;
   input.addEventListener('input', () => ((lit = 0), relay()));

@@ -91,7 +91,9 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     assert.equal(went, made.quarry, 'the press asks the canvas for the island');
     // Under On, the island the canvas was brought to has the accent bar at its left edge.
     assert.equal(await page.evaluate<string | null>(`${quarry}.getAttribute('aria-current')`), 'location');
-    // Taken off, Harbour works stays under On while the pointer is in the bar, and leaves On once it leaves the bar.
+    // A moment after the press, with no more presses, Quarry moves into On on its own.
+    await until('Quarry moved into On', () => page.evaluate<boolean>(`Boolean(${quarry}.closest('.isl-sec-on'))`));
+    // Taken off, Harbour works leaves On, at once when the pointer leaves the bar.
     const harbourRow = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Harbour works')`;
     const underOn = `${harbourRow}.parentElement.previousElementSibling.textContent.startsWith('On')`;
     await page.evaluate(`${harbourRow}.querySelector('.isl-off').click()`);
