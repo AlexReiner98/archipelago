@@ -2,7 +2,7 @@
   "roots": [
     {
       "id": "core",
-      "hash": "3595f69bff1ebcbc715d796ba993b7c0157f492c003d04f499a797b1328b407b"
+      "hash": "b41f1729175b0b5cccd54a13bfe1ace161877faadd6aca1e24d52f48d644a151"
     },
     {
       "id": "database",
@@ -18,7 +18,7 @@
     },
     {
       "id": "kit",
-      "hash": "10374e3c935a58163c55860e492a16e725917ecd88d71259506df6ab67c7e87b"
+      "hash": "ed4783af39a7da707a3d29cf3e0df64d22a5554fef72da5e412c47dcc080a075"
     },
     {
       "id": "identity",
@@ -26,7 +26,7 @@
     },
     {
       "id": "walls",
-      "hash": "8e5bc6df8b9231408e785b1c56281e29539d58aa6db484d7c5266f9c46f9b1bd"
+      "hash": "492e702d39d02fc113cf08fd6e49fc0748a113001f431a97879f9c8379991a0a"
     },
     {
       "id": "loader",
@@ -42,7 +42,7 @@
     },
     {
       "id": "surface",
-      "hash": "798df14f204f738bd640733810d100b2de79dbec1ba2282d1597fa01320e0f0d"
+      "hash": "58f96dc13c782793d90be0bb30d94a268f7559a9a1d2b1eef08680c1b60b796f"
     },
     {
       "id": "panes",
@@ -58,7 +58,7 @@
     },
     {
       "id": "shell",
-      "hash": "657f0ee69398f352b9e57a3baceb0bcde94bfbcd9d0286f79b16850b7da0b8ee"
+      "hash": "01b6302f879149bea000033c40b326e413df6fa4ea13316da393e9240ae9ebfa"
     }
   ],
   "calls": {

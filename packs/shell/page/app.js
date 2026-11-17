@@ -9,6 +9,7 @@ import { otherWays, signInBack, signUpOffer, signUpPage } from './sign-up.js';
 import { SignInNeeded, api, tell, drawSlot, drawnNone, h, hooks, join, loadMay, may, main, part, showIdentity, signIn, state, store, ungate } from './base.js';
 import { canvasHas, mark, refreshCanvas } from './canvas.js';
 import { warmLayouts } from './layout.js';
+import { startLand } from './theme-land.js';
 import { mayLeave, newItem, unsaved } from './draft.js';
 import { home } from './home.js';
 import { entity } from './item.js';
@@ -42,6 +43,8 @@ startTips();
 // The frame drawings run in, and the drawing this browser drew last loaded in it, started before anything is read: the
 // worker is ready when the first answer comes.
 warmLayouts();
+// The theme's land, where it says it shows (packs/walls/page/theme-land.js).
+startLand();
 // A sheet opened where the address stays (the sign-in form, from Home) is shut by drawing that address again.
 const close = () => (location.hash === hrefNow() ? route() : (location.hash = hrefNow()));
 document.getElementById('sheet-close').addEventListener('click', close);

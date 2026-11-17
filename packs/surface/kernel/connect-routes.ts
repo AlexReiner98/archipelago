@@ -27,7 +27,7 @@ export interface ConnectRoutes extends OpenRoutes {
   /** An address in its one form (the mail pack's normalEmail). */
   email(given: unknown): string | undefined;
   /** The page's look before anyone is signed in (the styles pack's pageStyle). */
-  pageStyle(l: Archipelago): Promise<{ style: { theme?: unknown; lengths?: unknown } }>;
+  pageStyle(l: Archipelago): Promise<{ style: { theme?: unknown; lengths?: unknown; faces?: unknown; type?: unknown; emblem?: unknown; backdrop?: unknown } }>;
   /** A failure notice the relay hands over (the mail pack's bounces). */
   bounces: { fromRelay(authorization: string | undefined): boolean; failedFor(text: string): string[]; noteBounced(l: Archipelago, failed: string[]): Promise<unknown>; days: number };
   /** The connect pack's answers: the install pages, and a system's request for its token and its poll. */
@@ -78,7 +78,7 @@ export async function serveConnect(req: IncomingMessage, res: ServerResponse, pa
   if (req.method === 'GET' && path === '/connect/theme') {
     if (at.tooOften()) return;
     const { style } = await at.pageStyle((await at.workspaces.get(at.fallback)).pelago);
-    return reply(res, 200, { theme: style.theme ?? null, lengths: style.lengths ?? null });
+    return reply(res, 200, { theme: style.theme ?? null, lengths: style.lengths ?? null, faces: style.faces ?? null, type: style.type ?? null, emblem: style.emblem ?? null, backdrop: style.backdrop ?? null });
   }
   // The documents a person agrees to before they are signed in, for a page that asks for them first (a signup).
   if (req.method === 'GET' && path === '/connect/agreements') {
