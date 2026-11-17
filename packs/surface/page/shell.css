@@ -51,6 +51,18 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
    colour over that line, its top in the accent or its session's hue. No tab changes its size or controls when another
    comes into sight. */
 #tabs { align-self: stretch; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: calc(-1 * var(--space-4)); padding: 0 var(--space-3); overflow-x: auto; scrollbar-width: none; }
+/* A tab the panes pack's part draws (a box marked selected or not): no wider than the style's tab_most (else side_least), its name cut
+   short as the bar narrows, its × in sight on the tab in sight and under the pointer only, its room kept so no tab changes size. Tabs
+   side by side out of sight are parted by a short line, as an editor's are; the chats' tabs by a longer one from yours. */
+#tabs > .tabs-part, #tabs > .tabs-part > .part-body { min-width: 0; flex: 1 1 auto; }
+#tabs .pm-box[aria-selected] { position: relative; flex: 0 1 auto; min-width: var(--box-10); max-width: var(--tab-most, var(--side-least)); }
+#tabs .pm-box[aria-selected] > .pm-button-tab { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#tabs .pm-box[aria-selected]:hover > .pm-button-tab { color: var(--text); }
+#tabs .pm-box[aria-selected] > .pm-button-quiet { width: var(--box-7); padding: 0; }
+#tabs .pm-box[aria-selected="false"]:not(:hover, :focus-within) > .pm-button-quiet { visibility: hidden; }
+#tabs .pm-box[aria-selected="false"] + .pm-box[aria-selected="false"]::before { content: ''; position: absolute; left: 0; top: var(--space-5); bottom: var(--space-5); width: var(--border-1); background: var(--line); }
+#tabs .pm-box[aria-selected="false"]:hover::before, #tabs .pm-box[aria-selected="false"]:hover + .pm-box::before { display: none; }
+#tabs .pm-box[data-dock] > .pm-box:not([aria-selected]) { align-self: center; height: var(--box-5); margin: 0 var(--space-5); border-left: var(--border-1) solid var(--line); }
 #tabs > .tab { pointer-events: auto; flex: 0 1 auto; max-width: 40%; min-width: calc(var(--box-8) + 2 * var(--box-7) + var(--space-6)); box-sizing: border-box; display: inline-flex; align-items: center; gap: 0; height: var(--box-8); padding: 0 var(--space-1) 0 var(--space-6); background: none; border: var(--border-1) solid transparent; border-bottom: 0; border-radius: var(--radius-3) var(--radius-3) 0 0; color: var(--muted); font-size: var(--text-5); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
 #tabs > .tab:hover { color: var(--text); background: var(--accent-soft); }
 #tabs > .tab[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
