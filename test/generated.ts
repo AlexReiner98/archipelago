@@ -4,9 +4,11 @@
 // before a commit, not on the first push.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { made, OUT } from '../packs/claude_code/sync.mjs';
 import { DIRECTORY_ICON, PLUGIN_ICON, pluginFiles } from '../scripts/plugin.ts';
 import { LISTING } from '../packs/surface/kernel/listing.ts';
+
+// A plain module with no types: what the setup's maker gives.
+const { made, OUT } = (await import('../packs/claude_code/sync.mjs' as string)) as { made(): string; OUT: string };
 
 const ROOT = join(import.meta.dirname, '..');
 const at = (path: string) => join(ROOT, path);
