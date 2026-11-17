@@ -33,6 +33,27 @@ export function regex(pattern: string): RegExp | undefined {
   return patterns.get(pattern);
 }
 
+/**
+ * Problems with a rule that carries (then.carry): it is about one or more types (when.type), each of which has the field
+ * it fills; it reads by a role (as) and names the promised field it takes (read). Whether the item read promises that
+ * field is known only of what is read, so it is asked as the field is filled.
+ */
+function checkCarry(rule: RuleDef, at: string, reg: Pick<Registry, 'types'>): string[] {
+  const c = (rule.then as { carry?: { field?: unknown; as?: unknown; read?: unknown } }).carry;
+  const word = (v: unknown) => typeof v === 'string' && /^[a-z][a-z0-9_]*$/.test(v);
+  if (!c || !word(c.field) || !word(c.as) || !word(c.read)) return [`${at}: carry is { field, as, read }, each a field or role name`];
+  const types = list(rule.when?.type) ?? [];
+  if (!types.length) return [`${at}: a carry is about a type (when.type), whose field it fills`];
+  const problems: string[] = [];
+  for (const t of types) {
+    const type = reg.types.get(t);
+    if (!type) problems.push(`${at}: no type "${t}"`);
+    else if (!type.fields[c.field as string]) problems.push(`${at}: ${t} has no field "${c.field}" to carry into`);
+  }
+  if (Object.keys(rule.when ?? {}).some((k) => k !== 'type')) problems.push(`${at}: a carry is about its type alone: it fills on every write of one`);
+  return problems;
+}
+
 /** Problems with a pack's rules, given the registry it loads into. Empty means they can be enforced. */
 export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): string[] {
   const problems: string[] = [];
@@ -53,7 +74,11 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
       continue;
     }
     const then = rule.then;
-    if (then !== 'hold' && then !== 'refuse' && then !== 'spare' && !(typeof then === 'object' && Array.isArray(then.require))) problems.push(`${at}: then is hold, refuse, spare or { require: [fields] }`);
+    if (typeof then === 'object' && then !== null && 'carry' in then) {
+      problems.push(...checkCarry(rule, at, reg));
+      continue;
+    }
+    if (then !== 'hold' && then !== 'refuse' && then !== 'spare' && !(typeof then === 'object' && Array.isArray((then as { require?: unknown }).require))) problems.push(`${at}: then is hold, refuse, spare, { require: [fields] } or { carry: { field, as, read } }`);
     // A rule spares its own pack's bookkeeping from every rule, or an op from rules of its own pack it names (spares).
     const ids = new Set(rules.map((r) => r.id).filter(Boolean));
     if (rule.spares !== undefined && (then !== 'spare' || !Array.isArray(rule.spares) || !rule.spares.length || rule.spares.some((id) => typeof id !== 'string' || id === rule.id || !ids.has(id)))) problems.push(`${at}: spares names rules of its own pack, by id, for a rule whose then is spare`);
