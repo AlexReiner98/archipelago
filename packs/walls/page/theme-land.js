@@ -19,10 +19,23 @@ export function placeOf(body = document.body) {
   return body.dataset.sheet === 'open' ? 'sheet' : 'canvas';
 }
 
+/**
+ * Which gate page this is, as the theme's backdrop names its pages: its address's first word, sign-in for none; a new
+ * guest map's first moments (Making your map, then the card) are Try it's, so its land runs on unbroken.
+ */
+export function pageOf(body = document.body, hash = location.hash) {
+  const name = hash.replace(/^#\/?/, '').split(/[/?]/)[0];
+  if (body.dataset.first === 'wait' || (name === 'v' && body.dataset.gate !== undefined)) return 'try';
+  return name || 'sign-in';
+}
+
 /** The land a style would run in a place: its backdrop when it shows there and has its drawing, else none. */
 export function landFor(style, place) {
   const b = style?.backdrop;
-  return b && typeof b === 'object' && Array.isArray(b.on) && b.on.includes(place) && b.drawing?.hash ? b : null;
+  if (!(b && typeof b === 'object' && Array.isArray(b.on) && b.on.includes(place) && b.drawing?.hash)) return null;
+  // At the gate, the page's own beat: its setup over the land's, and its still.
+  const own = place === 'gate' ? b.pages?.[pageOf()] : undefined;
+  return own ? { ...b, setup: { ...b.setup, ...own.setup }, still: own.still ?? b.still } : b;
 }
 
 /** A drawing's modules, kept by their hash once sent, so a style read again without them still runs. */
@@ -32,7 +45,7 @@ let style = null, running = null;
 const LESS_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
 /** The still under a running land: its picture, shown at once and wherever the land cannot run. */
 let still = null;
-const STILL = /^data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+$/;
+const STILL = /^(?:data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]+|\/connect\/still\/(?:_|[a-z][a-z-]{0,30})\/(?:wide|narrow)\?v=[0-9a-f]{16})$/;
 
 /** The land's still put under its frame (before the map, so all of the page draws over it), or taken away with none. */
 function layStill(land) {
@@ -126,5 +139,7 @@ export function startLand() {
   if (globalThis.pelagoEarly?.theme) servedStyle();
   onTheme((next) => ((style = next), again()));
   LESS_MOTION.addEventListener('change', again);
+  // A new gate page opens on its own beat.
+  addEventListener('hashchange', again);
   new MutationObserver(again).observe(document.body, { attributes: true, attributeFilter: ['data-gate', 'data-sheet', 'data-first'] });
 }
