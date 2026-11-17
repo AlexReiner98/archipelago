@@ -1,7 +1,7 @@
 // The island picker in a real browser (packs/surface/page/island-picker.js; Alex, 17 Nov 2026): the side list at the
 // canvas's left edge, the islands changed lately first, then the rest by name. Ctrl+K folds it open with its search in focus; typed into, it lists
 // what it finds within the bar, Enter puts the lit island on and the canvas draws it; the list then has it among those on.
-// Folded, the bar is its rail alone, and the rail opens it again.
+// Put away, the bar is gone and the canvas has the width; its button in the tab bar brings it back.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
@@ -45,9 +45,9 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     assert.equal(await page.evaluate<string>(`(() => { const r = [...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name').textContent === 'Core'); return r ? String(r.querySelectorAll('.isl-pack').length) : 'no row'; })()`), '0');
     assert.match(await page.evaluate<string>(`document.querySelector('#islands .isl-head').textContent`), /On · 0/);
     assert.equal(await draws('Rebuild the pier again'), false, 'nothing on yet');
-    // Folded, the bar is its rail; Ctrl+K opens it with its search in focus, and nothing is drawn outside it.
-    await page.evaluate(`document.querySelector('#islands .isl-rail').click()`);
-    await until('folded to its rail', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && getComputedStyle(document.querySelector('#islands .isl-panel')).display === 'none'`));
+    // Put away by its button in the tab bar, the bar is gone; Ctrl+K brings it back with its search in focus.
+    await page.evaluate(`document.querySelector('#nav .isl-toggle').click()`);
+    await until('put away', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && getComputedStyle(document.getElementById('islands')).display === 'none'`));
     await key('k', { modifiers: 2 });
     await until('open, its search in focus', () => page.evaluate<boolean>(`document.body.dataset.islands === 'open' && document.activeElement?.classList.contains('isl-search')`));
     // A search that finds nothing says so, in one row.
@@ -70,20 +70,30 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the canvas draws it', () => draws('Rebuild the pier again'));
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
+    // The list is in parts, each a band: On on the canvas's ground, its names larger; every island on has its dot.
+    assert.ok(await page.evaluate<boolean>(`(() => { const on = document.querySelector('#islands .isl-sec-on'), rest = document.querySelector('#islands .isl-sec-recent, #islands .isl-sec-all'); return getComputedStyle(on).backgroundColor !== getComputedStyle(rest).backgroundColor && parseFloat(getComputedStyle(on.querySelector('.isl-name')).fontSize) > parseFloat(getComputedStyle(rest.querySelector('.isl-name')).fontSize); })()`), 'On stands apart');
     // A row under On is its name and ×, without its pack, so the name has the room.
     assert.equal(await page.evaluate<number>(`document.querySelector('#islands .isl-head').nextElementSibling.querySelectorAll('.isl-pack').length`), 0, 'no pack under On');
     // A press on an island under Recent puts it on where its row stands: the row lights and gains ×, and nothing moves.
     const quarry = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Quarry')`;
     await until('Quarry under Recent', () => page.evaluate<boolean>(`Boolean(${quarry}) && /^Recent/.test(${quarry}.parentElement.previousElementSibling.textContent)`));
+    // The canvas's way to an island, stood in for: it records where it is asked to go.
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; window.wentTo = []; hooks.toIsland = (id) => (wentTo.push(id), true); })()`);
     const before = await page.evaluate<number>(`Math.round(${quarry}.getBoundingClientRect().top)`);
     await page.evaluate(`${quarry}.querySelector('button.isl-name').click()`);
+    await until('Quarry on, its dot shown', () => page.evaluate<boolean>(`getComputedStyle(${quarry}, '::before').content.includes('•')`));
     await until('Quarry on, its row lit where it stood', () => page.evaluate<boolean>(`(() => { const r = ${quarry}; return r?.classList.contains('on') && Boolean(r.querySelector('.isl-off')) && Math.round(r.getBoundingClientRect().top) === ${before} && document.querySelector('#islands .isl-head').textContent.includes('On · 2'); })()`));
+    // Put on, the canvas is brought to it, and it is marked as where the canvas went.
+    await until('the canvas brought to Quarry', () => page.evaluate<boolean>(`wentTo.includes(${JSON.stringify(made.quarry)}) && ${quarry}.getAttribute('aria-current') === 'location'`));
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; delete hooks.toIsland; })()`);
     // A press on an island that is on brings the canvas to it (hooks.toIsland, the canvas's).
     const went = await page.evaluate<string>(`(async () => { const { hooks } = await ${pageModule('base.js')}; const had = hooks.toIsland; let to = ''; hooks.toIsland = (id) => ((to = id), true); ${quarry}.querySelector('button.isl-name').click(); hooks.toIsland = had; return to; })()`);
     assert.equal(went, made.quarry, 'the press asks the canvas for the island');
     // Under On, the island the canvas was brought to has the accent bar at its left edge.
     assert.equal(await page.evaluate<string | null>(`${quarry}.getAttribute('aria-current')`), 'location');
-    // Taken off, Harbour works stays under On while the pointer is in the bar, and leaves On once it leaves the bar.
+    // A moment after the press, with no more presses, Quarry moves into On on its own.
+    await until('Quarry moved into On', () => page.evaluate<boolean>(`Boolean(${quarry}.closest('.isl-sec-on'))`));
+    // Taken off, Harbour works leaves On, at once when the pointer leaves the bar.
     const harbourRow = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Harbour works')`;
     const underOn = `${harbourRow}.parentElement.previousElementSibling.textContent.startsWith('On')`;
     await page.evaluate(`${harbourRow}.querySelector('.isl-off').click()`);
@@ -100,15 +110,34 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the last row lit', () => page.evaluate<boolean>(`${lit} === [...document.querySelectorAll('#islands .isl-row[data-id]')].at(-1).dataset.id`));
     await key('Escape');
     await until('back to the search line', () => page.evaluate<boolean>(`document.activeElement?.classList.contains('isl-search') && !document.querySelector('#islands .isl-row[data-lit]')`));
+    // Found again while it is on, Quarry reads as on, and Enter goes to it rather than doing nothing.
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; window.wentTo = []; hooks.toIsland = (id) => (wentTo.push(id), true); })()`);
+    await page.evaluate(`document.querySelector('#islands .isl-search').focus()`);
+    await page.send('Input.insertText', { text: 'quarry' });
+    await until('Quarry found, on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-hit[aria-selected="true"]')?.classList.contains('on') ?? false`));
+    await key('Enter');
+    await until('Enter went to it', () => page.evaluate<boolean>(`wentTo.includes(${JSON.stringify(made.quarry)})`));
+    await page.evaluate(`(async () => { const { hooks } = await ${pageModule('base.js')}; delete hooks.toIsland; })()`);
+    // Dragged, the bar's edge widens it, the canvas beside it, and the width is kept; a double-click gives it back.
+    const width = `Math.round(document.getElementById('islands').getBoundingClientRect().width)`;
+    const was = await page.evaluate<number>(width);
+    const [rx, ry] = await page.evaluate<[number, number]>(`(() => { const r = document.querySelector('#islands .isl-edge').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+    await page.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: rx, y: ry, button: 'left', clickCount: 1 });
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: rx + 40, y: ry, button: 'left' });
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: rx + 80, y: ry, button: 'left' });
+    await page.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: rx + 80, y: ry, button: 'left', clickCount: 1 });
+    await until('the bar wider, still open', () => page.evaluate<boolean>(`document.body.dataset.islands === 'open' && Math.abs(${width} - ${was + 80}) <= 1 && JSON.parse(localStorage.getItem('pelago-islands-side:width')) > ${was}`));
+    await page.evaluate(`document.querySelector('#islands .isl-edge').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))`);
+    await until('the default width back', () => page.evaluate<boolean>(`${width} === ${was} && localStorage.getItem('pelago-islands-side:width') === 'null'`));
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');
-    await page.evaluate(`document.querySelector('#islands .isl-rail').click()`);
-    await until('beside the folded rail', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && ${beside}`));
-    // In a narrow window the bar opened lies over the canvas, which stays at the rail, and a press on the canvas folds it.
+    await page.evaluate(`document.querySelector('#nav .isl-toggle').click()`);
+    await until('the whole width, the bar away', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded' && ${beside}`));
+    // In a narrow window the bar opened lies over the canvas, which keeps the whole width, and a press on the canvas puts it away.
     await page.send('Emulation.setDeviceMetricsOverride', { width: 560, height: 800, deviceScaleFactor: 1, mobile: false });
     await until('narrow: the bar goes over', () => page.evaluate<boolean>(`document.body.dataset.islandsOver === 'on'`));
-    await page.evaluate(`document.querySelector('#islands .isl-rail').click()`);
+    await page.evaluate(`document.querySelector('#nav .isl-toggle').click()`);
     await until('open over the canvas', () => page.evaluate<boolean>(`(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return document.body.dataset.islands === 'open' && pane.left < bar.right - 1; })()`));
     await page.evaluate(`document.getElementById('canvas').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
     await until('a press on the canvas folds it', () => page.evaluate<boolean>(`document.body.dataset.islands === 'folded'`));

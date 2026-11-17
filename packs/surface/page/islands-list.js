@@ -43,7 +43,8 @@ const words = (s) => String(s ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filt
 /**
  * The one search the side list and the palette share: every island (`{ id, title, pack: { id, title } }`) whose name or
  * pack holds each word typed (a word's start), best first. A name matched before a pack, the start of the name first,
- * then a word of it, then the shorter name; with nothing typed, all of them by name.
+ * then a word of it; those that match equally well by name, so a family of islands stands together. With nothing
+ * typed, all of them by name.
  */
 export function rankIslands(islands, q) {
   const asked = words(q);
@@ -66,7 +67,7 @@ export function rankIslands(islands, q) {
     }
     if (score >= 0) scored.push([score, i]);
   }
-  return scored.sort(([a, x], [b, y]) => b - a || String(x.title).length - String(y.title).length || byName(x, y)).map(([, i]) => i);
+  return scored.sort(([a, x], [b, y]) => b - a || byName(x, y)).map(([, i]) => i);
 }
 
 /**
