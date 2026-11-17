@@ -58,6 +58,10 @@ export const css = `
 .lf-wire.held, .lf-tie.held { stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke); stroke-dasharray: var(--ln-flow-dash-held); }
 .lf-wire.held.mine, .lf-tie.held.mine { stroke: var(--ln-text); }
 .lf-head.held { fill: var(--ln-you); } .lf-head.held.mine { fill: var(--ln-text); }
+/* An item waiting on its pack (off or waiting on its island): faint at its cell, as a held change's new step is, its
+   outline dashed in the muted colour; why is in its tip. */
+.lf-step.waiting { opacity: var(--ln-flow-waiting); }
+.lf-step.waiting .lf-shape { stroke: var(--ln-muted); stroke-dasharray: var(--ln-flow-dash-held); }
 .lf-held { cursor: pointer; }
 .lf-held circle { fill: var(--ln-land); stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke); }
 .lf-held:hover circle { stroke-width: var(--ln-flow-stroke-lit); }

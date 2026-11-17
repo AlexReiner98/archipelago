@@ -20,9 +20,10 @@ export function saidOf(to) {
 /**
  * The islands' marks: `layer` (drawn first, under the wires), `gates` (drawn over them), the colour `rules` they read,
  * and `found`: the class each finding read across takes, by its id, for its outline in its island's colour.
- * `legends` holds each island's rows ({ glyph, label }, and `add` on the row that adds to it); `isHex` says what is a colour.
+ * `legends` holds each island's rows ({ glyph, label }, and `add` on the row that adds to it); `isHex` says what is a colour;
+ * `header(id, [x, y], name)` what an island's header shows after its name ({ marks, tips }: its packs, ./pack-marks.js).
  */
-export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex }) {
+export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex, header = () => null }) {
   if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map(), found: new Map() };
   const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
   const hues = given.filter(isHex);
@@ -36,6 +37,7 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     classes.set(isle.id, `lf-island ${cls}`);
   });
   const [PAD, CORNER, ROW, KEY_W, KEY_H, MARK_GAP] = ['island_pad', 'island_corner', 'island_legend_row', 'key_width', 'key_height', 'island_legend_mark_gap'].map(z);
+  const tips = new Map();
   const rectOf = (r) => ({ x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t, rx: CORNER });
   const layer = g.islands.map((isle) => {
     const rects = isle.land.map(rectOf);
@@ -44,6 +46,9 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     const shore = m('g', { class: 'lf-shore' }, ...rects.map((r) => m('rect', r)));
     const title = named.get(isle.id);
     const name = title && titled(m('a', { href: `#/e/${isle.id}`, class: 'lf-island-name' }, m('text', { x: isle.name[0] + z('island_name_x'), y: isle.name[1] }, title)), title);
+    // After its name, what the header shows of it: its pack and what that pack requires (./pack-marks.js).
+    const head = title ? header(isle.id, [isle.name[0] + z('island_name_x'), isle.name[1]], title) : null;
+    for (const [key, tip] of head?.tips ?? []) tips.set(key, tip);
     // Its legend: each row's mark, then its words.
     const legend = (legends.get(isle.id) ?? []).map((row, n) => {
       const [ex, ey] = isle.entries[n], [tag, attrs, ...inner] = row.glyph;
@@ -52,14 +57,14 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
       if (row.add) return titled(m('g', { key: `add:${row.add}`, item: row.add, on: ['add'], class: 'lf-island-key lf-island-add' }, ...key.slice(2)), row.tip);
       return key;
     });
-    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, land, shore, name, legend);
+    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, land, shore, name, head?.marks ?? [], legend);
   });
   // A gate on each shore a link between islands crosses: a bar across the wire in its island's colour, as long as the
   // port it marks. A finding
   // crossing is of the grammar every island shares, so no legend says what a gate is: each gate answers a hover with a
   // tip (`tips`, by the mark's key) saying what crosses and which way.
   const BAR = z('island_gate_bar');
-  const tips = new Map(), found = new Map();
+  const found = new Map();
   const tip = (key, said, what) => tips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, said), m('span', {}, what)));
   const islandOf = new Map(g.islands.flatMap((isle) => [...isle.steps].map((id) => [id, isle.id]))), barred = new Set();
   const gates = g.ties.filter((t) => t.crossing && t.gates.length).flatMap((t, n) => {

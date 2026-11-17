@@ -14,14 +14,14 @@ export { stages } from './stage.js';
  * A picture with no places, placed plainly: each island's boxes in rows inside its frame, the islands side by side in
  * shelves toward the picture's shape, and every link a straight wire, as a placed view draws it.
  */
-function plainly(args, m, islandOf, heads) {
+function plainly(args, m, islandOf, heads, wides = new Map()) {
   const { sizes } = args, GAP = sizes.flow_node_gap, PAD = sizes.flow_island_pad, SEA = sizes.flow_island_sea, M = sizes.flow_margin;
   const groups = new Map();
   for (const [id, n] of m.nodes) (groups.get(islandOf(id) ?? null) ?? groups.set(islandOf(id) ?? null, []).get(islandOf(id) ?? null)).push(n);
   const blocks = [...groups].map(([island, list]) => {
     const cw = Math.max(...list.map((n) => n.w)) + GAP, ch = Math.max(...list.map((n) => n.h)) + GAP, columns = Math.max(1, Math.round(Math.sqrt(list.length * ch / cw * 2)));
     const rows = Math.ceil(list.length / columns), pad = island === null ? 0 : PAD, top = pad + (island === null ? 0 : heads.get(island) ?? 0);
-    return { island, list, cw, ch, columns, top, pad, w: Math.min(columns, list.length) * cw - GAP + 2 * pad, h: top + rows * ch - GAP + pad };
+    return { island, list, cw, ch, columns, top, pad, w: Math.max(wides.get(island) ?? 0, Math.min(columns, list.length) * cw - GAP + 2 * pad), h: top + rows * ch - GAP + pad };
   });
   // Shelves as wide as the whole would be at the picture's shape.
   const area = blocks.reduce((s, b) => s + (b.w + SEA) * (b.h + SEA), 0), wide = Math.max(...blocks.map((b) => b.w), Math.sqrt(area * (args.aspect ?? 1.6)));
@@ -42,14 +42,14 @@ function plainly(args, m, islandOf, heads) {
 
 /**
  * The whole picture of `args` (as the flow's layout is given them): `islandOf(id)` where a step lives, `heads(island)`
- * how tall its name and legend stand over what it holds. Answers the model's `x`, `y`, `nodes`, `chains` and `ties`,
+ * how tall its name and legend stand over what it holds, `wides` how wide its header is (its frame is at least as wide). Answers the model's `x`, `y`, `nodes`, `chains` and `ties`,
  * and each island's frame.
  */
-export function laidOut(args, { islandOf = () => null, heads = new Map() } = {}) {
+export function laidOut(args, { islandOf = () => null, heads = new Map(), wides = new Map() } = {}) {
   const m = model(args);
   // A view that lists its islands draws them where agents placed them (./placed.js).
-  if (args.placed && m.nodes.size) return placedOut(args, m, islandOf, heads);
-  return plainly(args, m, islandOf, heads);
+  if (args.placed && m.nodes.size) return placedOut(args, m, islandOf, heads, wides);
+  return plainly(args, m, islandOf, heads, wides);
 }
 
 /** The model the flow's scene draws: the whole picture with no islands, or the kit's plain graph when only that is asked. */
