@@ -71,6 +71,8 @@ export async function opFacts(q: Q, reg: Registry, ops: { op: string }[], found:
     if ((op.op === 'create' || op.op === 'update') && typeof pinned === 'string' && isIsland(op.op === 'create' ? op.type : target?.type)) asked.add(pinned);
   }
   const counted = await pins(q, reg, [...asked]);
+  // The islands this change makes, by ref, and the pack each speaks.
+  const madeIslands = new Map<string | undefined, unknown>(given.filter((o) => o.op === 'create' && typeof o.ref === 'string' && isIsland(o.type)).map((o) => [o.ref as string, o.props?.pack]));
   return given.map((op) => {
     const target = op.id ? found.get(op.id) : undefined;
     const type = op.op === 'create' ? op.type : target?.type;
@@ -86,6 +88,11 @@ export async function opFacts(q: Q, reg: Registry, ops: { op: string }[], found:
       const version = reg.versions.get(pinned);
       facts.spreads = Boolean(version?.code && Object.keys(version.code).length) && (counted.get(pinned) ?? 0) >= 1;
     }
+    // An item of an island's own pack, made on that island in the change that makes it: islands.make's first item.
+    if (op.op === 'create' && type && madeIslands.get(refOf(op.props?.island)) === reg.types.get(type)?.pack) facts.own_island = true;
     return facts;
   });
 }
+
+/** A ref as a change's props name one: "{island}" or "island". */
+const refOf = (v: unknown) => (typeof v === 'string' ? v.replace(/^\{(.+)\}$/, '$1') : undefined);

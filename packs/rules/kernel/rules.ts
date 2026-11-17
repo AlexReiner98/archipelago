@@ -209,6 +209,7 @@ function capable(reg: Registry, type: string, wanted: string | Record<string, Re
 export interface OpFacts {
   part_trial?: boolean;
   spreads?: boolean;
+  /** It makes an item of an island's own pack on that island, in the change that makes the island: in reach of the pack making it. */ own_island?: boolean;
 }
 
 /** Whether a rule's when holds for one op written by this actor to these targets (none for a create). */
@@ -227,7 +228,7 @@ function applies(rule: RuleDef & { pack?: string }, reg: Registry, who: Who, w: 
   if (when.pack !== undefined && Boolean(who.pack) !== when.pack) return false;
   if (when.drawing !== undefined && Boolean(who.drawing) !== when.drawing) return false;
   if (when.bookkeeping !== undefined && (Boolean(who.bookkeeping) && who.bookkeeping === rule.pack) !== when.bookkeeping) return false;
-  if (when.reach === 'outside' && !(who.pack ? outsideReach(reg, who.pack, w, targets) : who.drawing && outsideLayout(reg, who.drawing.writes, w, targets))) return false;
+  if (when.reach === 'outside' && (facts.own_island || !(who.pack ? outsideReach(reg, who.pack, w, targets) : who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)))) return false;
   if (when.dormant !== undefined) {
     const asleep = [w.op === 'create' || w.op === 'link' ? w.type : undefined, ...targets.map((t) => t.type)].some((t) => t && (reg.types.get(t)?.dormant || reg.relations.get(t)?.dormant));
     if (asleep !== when.dormant) return false;
