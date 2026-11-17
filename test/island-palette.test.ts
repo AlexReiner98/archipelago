@@ -38,6 +38,10 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     ['keyDown', 'keyUp'].reduce((p, type) => p.then(() => page.send('Input.dispatchKeyEvent', { type, key: k, code: k.length === 1 ? `Key${k.toUpperCase()}` : k, windowsVirtualKeyCode: k.length === 1 ? k.toUpperCase().charCodeAt(0) : 13, ...more })), Promise.resolve() as Promise<unknown>);
   const draws = (words: string) => page.evaluate<boolean>(`document.querySelector('#canvas svg')?.textContent.includes(${JSON.stringify(words)}) ?? false`);
   try {
+    // A person who has chosen nothing sees every island on (islands-on.js, unchosen); this test starts from a choice of none.
+    await until('the side list', () => page.evaluate<boolean>(`Boolean(document.querySelector('#islands .isl-head'))`));
+    assert.match(await page.evaluate<string>(`document.querySelector('#islands .isl-head').textContent`), /On · [1-9]/, 'nothing chosen: the map’s islands are on');
+    await page.evaluate(`(localStorage.setItem('pelago-islands', '[]'), location.reload())`);
     // The side list is up: no pack groups, the islands changed lately first (both were just made), by latest.
     await until('the side list', () => page.evaluate<boolean>(`[...document.querySelectorAll('#islands .isl-head')].some((h) => /^Recent · [0-9]/.test(h.textContent))`));
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-group').length`), 0, 'no pack groups');

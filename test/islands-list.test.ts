@@ -34,7 +34,7 @@ test('the list read after a press is the new one, so Home drawn again draws what
   const { pathToFileURL } = await import('node:url');
   const store = new Map<string, string>();
   Object.assign(globalThis, { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) } });
-  const base = `data:text/javascript,${encodeURIComponent('export const api = async () => { throw new Error("no server"); }; export const whoami = async () => ({});')}`;
+  const base = `data:text/javascript,${encodeURIComponent('export const api = async (name) => { if (name === "search") return [{ id: "e_latest01" }, { id: "e_latest02" }]; throw new Error("no server"); }; export const whoami = async () => ({});')}`;
   const list = pathToFileURL('packs/surface/page/islands-list.js').href;
   const text = readFileSync('packs/surface/page/islands-on.js', 'utf8').replace("'./base.js'", `'${base}'`).replace("'./islands-list.js'", `'${list}'`);
   const on = await import(`data:text/javascript,${encodeURIComponent(text)}`);
@@ -42,6 +42,21 @@ test('the list read after a press is the new one, so Home drawn again draws what
   assert.deepEqual(await on.islandsOn(), ['e_xgrowth1']);
   await on.keepList(['e_xgrowth1', 'e_lightcor'], 'test');
   assert.deepEqual(await on.islandsOn(), ['e_xgrowth1', 'e_lightcor'], 'not the list as first read');
+});
+
+test('a person who has chosen no islands sees the map’s latest, until a press makes the list their own', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { pathToFileURL } = await import('node:url');
+  const store = new Map<string, string>();
+  Object.assign(globalThis, { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) } });
+  const base = `data:text/javascript,${encodeURIComponent('export const api = async (name) => { if (name === "search") return [{ id: "e_latest01" }, { id: "e_latest02" }]; throw new Error("no server"); }; export const whoami = async () => ({});')}`;
+  const list = pathToFileURL('packs/surface/page/islands-list.js').href;
+  // A copy of its own (the comment makes it another module), so its list is read afresh.
+  const text = readFileSync('packs/surface/page/islands-on.js', 'utf8').replace("'./base.js'", `'${base}'`).replace("'./islands-list.js'", `'${list}'`) + '// unchosen';
+  const on = await import(`data:text/javascript,${encodeURIComponent(text)}`);
+  assert.deepEqual(await on.islandsOn(), ['e_latest01', 'e_latest02'], 'nothing kept: the map’s latest islands');
+  await on.keepList(['e_latest01'], 'test');
+  assert.equal(store.get('pelago-islands'), JSON.stringify(['e_latest01']), 'a press keeps the list as theirs');
 });
 
 test('an address names islands and live reads only', () => {

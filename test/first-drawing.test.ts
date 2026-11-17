@@ -16,7 +16,7 @@ const RECORD = `{ window.reads = []; const was = window.fetch; window.fetch = (u
   // Reads asked together go as one /api/reads (packs/kit/page/reads.js): each is recorded as the read it is.
   const asked = String(url) === '/api/reads' ? (body?.calls ?? []).map((c) => ({ path: '/api/' + c.tool, body: c.input })) : [{ path: String(url), body }];
   const sent = performance.now();
-  const reads = asked.map(({ path, body }) => ({ path, name: body?.name, type: body?.type, walk: body?.params?.walk?.over, sent }));
+  const reads = asked.map(({ path, body }) => ({ path, name: body?.name, type: body?.type, islands: body?.islands, walk: body?.params?.walk?.over, sent }));
   if (String(url).startsWith('/api/')) window.reads.push(...reads);
   return was(url, init).then((res) => (reads.forEach((r) => (r.back = performance.now())), res));
 }; }`;
@@ -36,10 +36,10 @@ test('in a browser, a view is read and drawn before what the drawing does not ne
     await page.send('Page.addScriptToEvaluateOnNewDocument', { source: RECORD });
     await page.go(`${base}/#/v?find=id+${made.a}&over=depends_on&steps=1`);
     assert.ok(await page.until(`[...document.querySelectorAll('#canvas svg a')].some((a) => a.textContent.includes('Second step'))`), `the view is drawn: ${page.logs().join('\n')}`);
-    // The bar fills in after: the saved views and who is at work are read. The layouts are read only as the band's menu
-    // opens (the styles pack's layout switch).
-    const later = (r: any) => (r.path === '/api/view' && ['sessions', 'saved_views'].includes(r.name)) || (r.path === '/api/search' && r.type === 'lens') || (r.name === 'flat' && r.walk === 'all');
-    assert.ok(await page.until(`window.reads.filter(${later.toString()}).length >= 4`), `what waits is read once the view is drawn: ${JSON.stringify(await page.evaluate('window.reads'))}`);
+    // The rest fills in after: who is at work, and the islands for the side bar. The layouts are read only as the band's
+    // menu opens (the styles pack's layout switch).
+    const later = (r: any) => (r.path === '/api/view' && r.name === 'sessions') || (r.path === '/api/search' && r.islands === true);
+    assert.ok(await page.until(`window.reads.filter(${later.toString()}).length >= 2`), `what waits is read once the view is drawn: ${JSON.stringify(await page.evaluate('window.reads'))}`);
     const reads = await page.evaluate<any[]>('window.reads');
     const view = reads.find((r) => r.name === 'flat' && r.walk !== 'all');
     assert.ok(view?.back, 'the view is read');
