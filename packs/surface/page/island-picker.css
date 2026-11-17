@@ -17,7 +17,7 @@ body[data-islands="open"] #islands .isl-rail-count { display: none; }
 #islands .isl-key { flex: none; padding: 0 var(--space-3); color: var(--muted); font-size: var(--text-2); }
 #islands .isl-search:not(:placeholder-shown) + .isl-key { display: none; }
 #islands .isl-search { flex: 1; min-width: 0; box-sizing: border-box; height: var(--box-7); border: 0; background: none; padding: 0 var(--space-3); font: inherit; color: var(--text); outline: none; }
-#islands .isl-body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-3) 0 var(--space-9); }
+#islands .isl-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding: var(--space-3) 0 var(--space-9); }
 #islands .isl-head { padding: var(--space-5) var(--space-6) var(--space-3); color: var(--muted); font-size: var(--text-2); text-transform: uppercase; letter-spacing: var(--track-2); }
 #islands .isl-row { display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-7); padding: 0 var(--space-6); white-space: nowrap; }
 #islands .isl-row:hover { background: var(--accent-soft); }
