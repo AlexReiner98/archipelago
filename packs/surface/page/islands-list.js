@@ -72,12 +72,13 @@ export function rankIslands(islands, q) {
 /**
  * The islands as the side list lays them out (Alex, 17 Nov 2026, e_cr4haav9: recent first, then the rest by name; no
  * pack groups): those where work changed (`worked_at`: the latest change of an item on it) within `days` of `now`, the
- * latest first, then every other by name.
+ * latest first and `most` of them at most, then every other by name.
  */
-export function recentFirst(islands, now, days) {
+export function recentFirst(islands, now, days, most = Infinity) {
   const since = now - days * 86_400_000, at = (i) => Date.parse(i.worked_at ?? '') || 0;
-  const recent = islands.filter((i) => at(i) >= since).sort((a, b) => at(b) - at(a) || String(a.title).localeCompare(String(b.title)));
-  const rest = islands.filter((i) => at(i) < since).sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  const recent = islands.filter((i) => at(i) >= since).sort((a, b) => at(b) - at(a) || String(a.title).localeCompare(String(b.title))).slice(0, most);
+  const kept = new Set(recent);
+  const rest = islands.filter((i) => !kept.has(i)).sort((a, b) => String(a.title).localeCompare(String(b.title)));
   return { recent, rest };
 }
 

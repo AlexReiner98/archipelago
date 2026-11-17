@@ -65,4 +65,7 @@ test('the side list puts the islands worked on lately first, the latest first, t
   ], now, 7);
   assert.deepEqual(recent.map((i: { id: string }) => i.id), ['c', 'a'], 'within the days, the latest first');
   assert.deepEqual(rest.map((i: { title: string }) => i.title), ['Apple', 'Banana', 'Cherry'], 'every other by name, one with no time among them');
+  const capped = recentFirst([{ id: 'a', title: 'Zebra', worked_at: day(1) }, { id: 'c', title: 'Mango', worked_at: day(0.5) }, { id: 'b', title: 'Apple', worked_at: day(30) }], now, 7, 1);
+  assert.deepEqual(capped.recent.map((i: { id: string }) => i.id), ['c'], 'no more than the most, the latest kept');
+  assert.deepEqual(capped.rest.map((i: { title: string }) => i.title), ['Apple', 'Zebra'], 'the rest by name, the one left over among them');
 });
