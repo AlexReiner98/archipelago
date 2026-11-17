@@ -20,16 +20,18 @@ body[data-islands="open"] #islands .isl-rail-count { display: none; }
 #islands :is(.isl-row, .isl-group) { display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-7); padding: 0 var(--space-6); white-space: nowrap; }
 #islands .isl-group { margin-top: var(--space-3); border: 0; border-top: var(--border-1) solid var(--line); background: none; font: inherit; color: var(--muted); text-align: left; cursor: pointer; }
 #islands .isl-group:hover, #islands .isl-row:hover { background: var(--accent-soft); }
-#islands .isl-mark { flex: none; width: var(--space-9); color: var(--muted); text-align: center; }
+/* A group's islands sit one step in, their names under the group's name. */
+#islands .isl-in .isl-row { padding-left: calc(var(--space-6) + var(--space-11) + var(--space-5)); }
+#islands .isl-mark { flex: none; width: var(--space-11); overflow: hidden; color: var(--muted); text-align: center; }
 #islands .isl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
-#islands span.isl-name { cursor: default; }
 #islands .isl-group .isl-name { color: var(--muted); }
 #islands .isl-count { flex: none; color: var(--muted); }
 #islands .isl-off { flex: none; border: 0; background: none; padding: 0 var(--space-3); font: inherit; color: var(--muted); cursor: pointer; }
 #islands .isl-off:hover { color: var(--accent); }
 
 #islands .isl-hit { cursor: pointer; }
-#islands .isl-hit[aria-selected="true"] { background: var(--accent-soft); }
+/* The keyboard's row: the accent bar at its left edge, as the tab in sight has it at its top; a hover is the soft ground alone. */
+#islands .isl-hit[aria-selected="true"] { box-shadow: inset var(--border-3) 0 0 var(--accent); }
 #islands .isl-hit .isl-count { flex: 0 1 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 #islands .isl-row:not(.on, .isl-hit) .isl-name { color: var(--muted); }
 #islands .isl-row:not(.on, .isl-hit) .isl-name:hover { color: var(--text); }

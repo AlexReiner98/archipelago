@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { atHome, drawnAt, islandsIn, pressed } from '../packs/surface/page/islands-list.js';
+import { atHome, capital, drawnAt, islandsIn, packMarks, pressed } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
@@ -47,4 +47,15 @@ test('the list read after a press is the new one, so Home drawn again draws what
 test('an address names islands and live reads only', () => {
   assert.deepEqual(islandsIn('islands=e_aaaaaaaa,frontier,bad,e_aaaaaaaa'), ['e_aaaaaaaa', 'frontier']);
   assert.equal(islandsIn('find=x'), null);
+});
+
+test("a pack's mark tells it apart from every other pack's, and its title shows with a capital", () => {
+  const marks = packMarks([{ id: 'core', title: 'Core' }, { id: 'code', title: 'code' }, { id: 'arch', title: 'Architecture' }, { id: 'x', title: 'Glyphed', glyph: '◆' }, { id: 'core', title: 'Core' }]);
+  assert.equal(marks.get('x'), '◆', 'its glyph where it has one');
+  assert.equal(marks.get('arch'), 'Ar', 'else its first two letters');
+  assert.equal(new Set(['core', 'code'].map((id) => marks.get(id))).size, 2, 'code and Core apart');
+  assert.ok(['core', 'code'].every((id) => /^C[a-z]$/.test(marks.get(id))));
+  assert.deepEqual(packMarks([{ id: 'code', title: 'code' }, { id: 'core', title: 'Core' }]), packMarks([{ id: 'core', title: 'Core' }, { id: 'code', title: 'code' }]), 'the same whatever the order');
+  assert.equal(capital('ridges'), 'Ridges');
+  assert.equal(capital('Pack anatomy'), 'Pack anatomy');
 });

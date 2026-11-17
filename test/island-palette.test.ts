@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chrome, open } from './browser.ts';
+import { chrome, open, pageModule } from './browser.ts';
 import { serve } from './serve.ts';
 import { until as holds } from './wait.ts';
 
@@ -44,6 +44,10 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await page.send('Input.insertText', { text: 'harb' });
     await until('it finds the island', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-hit[aria-selected="true"] .isl-name')?.textContent === 'Harbour works'`));
     assert.equal(await page.evaluate<number>(`document.querySelectorAll('#islands .isl-hit').length`), 1, 'only what matches');
+    // No tooltip on a row whose name shows whole.
+    assert.equal(await page.evaluate<number>(`(() => { const n = document.querySelector('#islands .isl-hit .isl-name'); n.dispatchEvent(new PointerEvent('pointerover', { bubbles: true })); return document.querySelectorAll('#islands .isl-hit[title], #islands .isl-hit [title]').length; })()`), 0, 'no tooltip on a whole name');
+    // The keyboard's row has the accent bar at its left edge, not a hover's ground.
+    assert.match(await page.evaluate<string>(`getComputedStyle(document.querySelector('#islands .isl-hit[aria-selected="true"]')).boxShadow`), /inset/);
     assert.ok(await page.evaluate<boolean>(`(() => { const bar = document.getElementById('islands').getBoundingClientRect(); return [...document.querySelectorAll('#islands .isl-hit')].every((r) => r.getBoundingClientRect().right <= bar.right); })()`), 'within the bar');
     // Enter puts it on: the canvas draws it, and the side list has it among those on.
     await key('Enter');
@@ -51,12 +55,20 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
     // A press on an island in a group puts it on where its row stands: the row lights and gains ×, and nothing moves.
+    // A group says whether it is open: › folded, ⌄ open, in the mark's column.
+    assert.equal(await page.evaluate<string>(`[...document.querySelectorAll('#islands .isl-group')].find((g) => g.getAttribute('aria-expanded') === 'false')?.querySelector('.isl-fold')?.textContent`), '›');
     await page.evaluate(`[...document.querySelectorAll('#islands .isl-group')].find((g) => g.getAttribute('aria-expanded') === 'false')?.click()`);
+    await until('the group open, its mark turned', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-group[aria-expanded="true"] .isl-fold')?.textContent === '⌄'`));
     const quarry = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Quarry')`;
     await until('Quarry in its group', () => page.evaluate<boolean>(`Boolean(${quarry})`));
+    // It sits under its group's name, with no mark of its own.
+    assert.ok(await page.evaluate<boolean>(`(() => { const r = ${quarry}, g = r.closest('.isl-in').previousElementSibling; return !r.querySelector('.isl-mark') && Math.abs(r.querySelector('.isl-name').getBoundingClientRect().left - g.querySelector('.isl-name').getBoundingClientRect().left) < 1; })()`), 'under its group');
     const before = await page.evaluate<number>(`Math.round(${quarry}.getBoundingClientRect().top)`);
     await page.evaluate(`${quarry}.querySelector('button.isl-name').click()`);
     await until('Quarry on, its row lit where it stood', () => page.evaluate<boolean>(`(() => { const r = ${quarry}; return r?.classList.contains('on') && Boolean(r.querySelector('.isl-off')) && Math.round(r.getBoundingClientRect().top) === ${before} && document.querySelector('#islands .isl-head').textContent.includes('On · 2'); })()`));
+    // A press on an island that is on brings the canvas to it (hooks.toIsland, the canvas's).
+    const went = await page.evaluate<string>(`(async () => { const { hooks } = await ${pageModule('base.js')}; const had = hooks.toIsland; let to = ''; hooks.toIsland = (id) => (to = id); ${quarry}.querySelector('button.isl-name').click(); hooks.toIsland = had; return to; })()`);
+    assert.equal(went, made.quarry, 'the press asks the canvas for the island');
     // The canvas draws beside the bar, open or folded, never under it.
     const beside = `(() => { const bar = document.getElementById('islands').getBoundingClientRect(), pane = document.querySelector('#canvas .pm-pane').getBoundingClientRect(); return Math.abs(pane.left - bar.right) < 1; })()`;
     assert.ok(await page.evaluate<boolean>(beside), 'beside the open bar');

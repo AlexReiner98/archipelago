@@ -4,16 +4,22 @@
 // one puts it on. Typed into, the bar lists what it finds best first (./islands-list.js, rankIslands): arrows move,
 // Enter puts the lit one on, Shift+Enter shows it alone.
 
-import { api, h } from './base.js';
+import { api, h, hooks } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
-import { atHome, byPack, drawnAt, only, rankIslands, turnedOn } from './islands-list.js';
+import { atHome, byPack, capital, drawnAt, only, packMarks, rankIslands, turnedOn } from './islands-list.js';
 import { titles } from './words.js';
 
+/** Each pack's mark by its id, told apart from the others' (./islands-list.js, packMarks). */
+let marks = new Map();
 /** Every island on the map, each with its pack, read once a page. */
 let reading;
 export const allIslands = () =>
   (reading ??= api('search', { islands: true, limit: 2000 }).then(
-    (found) => found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, pack: e.pack ?? { id: '', title: '' } })),
+    (found) => {
+      const all = found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, pack: e.pack ?? { id: '', title: '' } }));
+      marks = packMarks(all.map((i) => i.pack));
+      return all;
+    },
     () => [],
   ));
 
@@ -39,8 +45,10 @@ export const takeOff = (i) => apply({ list: drawnNow().filter((x) => x !== i.id)
 /** Island `i` alone on the canvas. */
 export const showOnly = (i) => apply(only(location.hash, i.id), `${i.title} alone on the canvas`);
 
-/** A pack's mark: its glyph, else its initial. */
-export const packMark = (pack) => h('span', { class: 'isl-mark', 'aria-hidden': 'true' }, pack?.glyph || String(pack?.title || pack?.id || '·').slice(0, 1).toUpperCase());
+/** A pack's mark: its glyph, else two of its letters, unlike every other pack's. */
+export const packMark = (pack) => h('span', { class: 'isl-mark', 'aria-hidden': 'true' }, marks.get(pack?.id ?? '') ?? packMarks([pack]).get(pack?.id ?? ''));
+/** A pack's title as the list shows it. */
+const packTitle = (pack) => capital(pack?.title || pack?.id);
 
 /** What the side list keeps in this browser: whether it is open, which packs are unfolded. */
 const KEPT = 'pelago-islands-side';
@@ -64,25 +72,49 @@ export function drawPicker() {
   if (document.getElementById('islands')) return;
   const find = document.getElementById('find');
   if (find) find.hidden = true;
-  const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', autocomplete: 'off' });
+  const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // The rail along the bar's edge, its whole height a press that folds the bar to the edge or opens it again.
   const arrow = h('span', { class: 'isl-arrow', 'aria-hidden': 'true' });
   const count = h('span', { class: 'isl-rail-count' });
   const fold = h('button', { type: 'button', class: 'isl-rail' }, arrow, count);
   const body = h('div', { class: 'isl-body' });
+  // No tooltip on a row: a name cut short has the whole of it as its tooltip, the name alone.
+  body.addEventListener('pointerover', (ev) => {
+    const name = ev.target.closest?.('.isl-name');
+    if (name) name.scrollWidth > name.clientWidth ? (name.title = name.textContent) : name.removeAttribute('title');
+  });
   const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input), body), fold);
   document.body.append(side);
-  const open = (on) => {
+  /** Whether the bar was folded for an item's page, not by the person: it opens again when the page closes. */
+  let forPage = false;
+  /** Fold or open the bar; `kept`, as the person left it (a fold for a page is not). */
+  const open = (on, kept = true) => {
+    if (kept) forPage = false;
     document.body.dataset.islands = on ? 'open' : 'folded';
     arrow.textContent = on ? '‹' : '›';
     fold.title = on ? 'Fold the islands to the edge (Ctrl+K opens them again)' : 'Show the islands (Ctrl+K)';
     fold.setAttribute('aria-label', on ? 'Fold the islands' : 'Show the islands');
     fold.setAttribute('aria-expanded', String(on));
-    keep('open', on);
+    if (kept) keep('open', on);
     dispatchEvent(new Event('resize'));
   };
   fold.onclick = () => open(document.body.dataset.islands !== 'open');
   open(kept('open', true));
+  // An item's page takes the right: where the canvas left between it and the open bar would be narrower than the bar,
+  // the bar folds to its rail, and opens again as it was once the page is shut or the window has the room.
+  let wide = side.offsetWidth;
+  const room = () => {
+    const shown = document.body.dataset.islands === 'open';
+    if (shown) wide = side.offsetWidth || wide;
+    const page = document.body.dataset.sheet === 'open' ? (document.getElementById('sheet')?.offsetWidth ?? 0) : 0;
+    const cramped = page > 0 && innerWidth - page - wide < wide;
+    if (shown && cramped) open(false, false), (forPage = true);
+    else if (forPage && !cramped) (forPage = false), open(true, false);
+  };
+  new MutationObserver(room).observe(document.body, { attributes: true, attributeFilter: ['data-sheet'] });
+  // The window's own resizes, not the one a fold sends: a bar the person opened over a page stays open.
+  addEventListener('resize', (ev) => ev.isTrusted && requestAnimationFrame(room));
+  room();
   const unfolded = new Set(kept('packs', []));
 
   let islands = [];
@@ -93,19 +125,18 @@ export function drawPicker() {
    * folded), not by a press, so a row stays where it stands as it goes on or off and the next press hits what it aims at.
    */
   let laidOn = null;
-  const row = (i, on) =>
+  /** An island's row: a press on its name puts it on, or, on, brings the canvas to it. In a group (`grouped`) it sits under the group's name with no mark of its own: the group says its pack. */
+  const row = (i, on, grouped = false) =>
     h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem' },
-      packMark(i.pack),
-      on
-        ? h('span', { class: 'isl-name', title: `${i.title} · ${i.pack.title || i.pack.id}` }, i.title)
-        : h('button', { type: 'button', class: 'isl-name', title: `${i.title}: put on the canvas`, onclick: () => putOn(i) }, i.title),
+      grouped ? '' : packMark(i.pack),
+      h('button', { type: 'button', class: 'isl-name', onclick: () => (on ? hooks.toIsland?.(i.id) : putOn(i)) }, i.title),
       on ? h('button', { type: 'button', class: 'isl-off', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
   /** A row of what the search found: its pack's mark, its name, its pack (and whether it is on), lit as Enter would take it. */
   const hit = (i, n, drawn) =>
-    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), title: `${i.title}: Enter puts it on, Shift+Enter shows it alone`, onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i)) },
+    h('div', { class: 'isl-row isl-hit', role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (ev.shiftKey ? showOnly(i) : putOn(i)) },
       packMark(i.pack),
       h('span', { class: 'isl-name' }, i.title),
-      h('span', { class: 'isl-count' }, drawn.includes(i.id) ? `on · ${i.pack.title || i.pack.id}` : i.pack.title || i.pack.id));
+      h('span', { class: 'isl-count' }, drawn.includes(i.id) ? `on · ${packTitle(i.pack)}` : packTitle(i.pack)));
   const draw = () => {
     const drawn = drawnNow(), q = input.value.trim();
     count.textContent = drawn.length ? String(drawn.length) : '';
@@ -124,10 +155,10 @@ export function drawPicker() {
     const parts = [h('div', { class: 'isl-head' }, `On · ${drawn.length}`), h('div', { role: 'list' }, ...on.map((i) => row(i, drawn.includes(i.id))))];
     for (const g of byPack(rest)) {
       const shown = unfolded.has(g.id);
-      const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown), title: `${g.title}: ${g.islands.length} island${g.islands.length === 1 ? '' : 's'}` },
-        packMark(g.islands[0]?.pack), h('span', { class: 'isl-name' }, g.title || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
+      const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown) },
+        h('span', { class: 'isl-mark isl-fold', 'aria-hidden': 'true' }, shown ? '⌄' : '›'), h('span', { class: 'isl-name' }, capital(g.title) || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
       head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), relay());
-      parts.push(head, ...(shown ? [h('div', { role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id))))] : []));
+      parts.push(head, ...(shown ? [h('div', { class: 'isl-in', role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id), true)))] : []));
     }
     body.replaceChildren(...parts);
   };
