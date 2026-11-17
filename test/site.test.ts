@@ -39,7 +39,8 @@ test('a domain serves a workspace’s published pages at their address words, th
   assert.match(front.body, /<title>Welcome<\/title>/);
   assert.match(front.body, /<link rel="canonical" href="https:\/\/site\.test\/" \/>/);
   assert.match(front.body, /<meta property="og:url" content="https:\/\/site\.test\/" \/>/);
-  assert.match(front.body, /<meta property="og:site_name" content="Default" \/>/);
+  // A site is named by its front page's title, not its workspace's name.
+  assert.match(front.body, /<meta property="og:site_name" content="Welcome" \/>/);
   assert.equal((await visit(base, '/home', 'site.test')).headers.location, '/');
   const frontData = JSON.parse((await visit(base, '/data', 'site.test')).body);
   assert.equal(frontData.title, 'Welcome');
@@ -51,7 +52,7 @@ test('a domain serves a workspace’s published pages at their address words, th
   const page = JSON.parse((await visit(base, '/how-it-works/data', 'site.test')).body);
   assert.equal(page.title, 'How it works');
   // The way in: the app's own address, so a page can say Sign in.
-  assert.deepEqual(page.site, { name: 'Default', home: '/', pages: [{ title: 'How it works', href: '/how-it-works' }], host: 'site.test', app: base });
+  assert.deepEqual(page.site, { name: 'Welcome', home: '/', pages: [{ title: 'How it works', href: '/how-it-works' }], host: 'site.test', app: base });
   assert.deepEqual(page.paths, { [home]: 'home' });
   assert.match((await visit(base, '/how-it-works', 'site.test')).body, /<link rel="canonical" href="https:\/\/site\.test\/how-it-works" \/>/);
 
