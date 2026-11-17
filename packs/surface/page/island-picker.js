@@ -144,7 +144,7 @@ export function drawPicker() {
     for (const g of byPack(rest)) {
       const shown = unfolded.has(g.id);
       const head = h('button', { type: 'button', class: 'isl-group', 'aria-expanded': String(shown), title: `${g.title}: ${g.islands.length} island${g.islands.length === 1 ? '' : 's'}` },
-        packMark(g.islands[0]?.pack), h('span', { class: 'isl-name' }, g.title || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
+        h('span', { class: 'isl-mark isl-fold', 'aria-hidden': 'true' }, shown ? '⌄' : '›'), h('span', { class: 'isl-name' }, g.title || 'No pack'), h('span', { class: 'isl-count' }, String(g.islands.length)));
       head.onclick = () => (unfolded.has(g.id) ? unfolded.delete(g.id) : unfolded.add(g.id), keep('packs', [...unfolded]), relay());
       parts.push(head, ...(shown ? [h('div', { role: 'list' }, ...g.islands.map((i) => row(i, drawn.includes(i.id))))] : []));
     }

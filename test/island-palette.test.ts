@@ -51,7 +51,10 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
     // A press on an island in a group puts it on where its row stands: the row lights and gains ×, and nothing moves.
+    // A group says whether it is open: › folded, ⌄ open, in the mark's column.
+    assert.equal(await page.evaluate<string>(`[...document.querySelectorAll('#islands .isl-group')].find((g) => g.getAttribute('aria-expanded') === 'false')?.querySelector('.isl-fold')?.textContent`), '›');
     await page.evaluate(`[...document.querySelectorAll('#islands .isl-group')].find((g) => g.getAttribute('aria-expanded') === 'false')?.click()`);
+    await until('the group open, its mark turned', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-group[aria-expanded="true"] .isl-fold')?.textContent === '⌄'`));
     const quarry = `[...document.querySelectorAll('#islands .isl-row')].find((r) => r.querySelector('.isl-name')?.textContent === 'Quarry')`;
     await until('Quarry in its group', () => page.evaluate<boolean>(`Boolean(${quarry})`));
     const before = await page.evaluate<number>(`Math.round(${quarry}.getBoundingClientRect().top)`);
