@@ -101,20 +101,6 @@
         "PELAGO_UNSANDBOXED": "1"
       },
       "port": 3122
-    },
-    {
-      "name": "archipelago-looks",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": [
-        "run",
-        "dev"
-      ],
-      "env": {
-        "PELAGO_PORT": "3104",
-        "PELAGO_DATA": "runs/data-looks",
-        "PELAGO_UNSANDBOXED": "1"
-      },
-      "port": 3104
     }
   ]
 }
