@@ -28,9 +28,13 @@ test('in a browser, the band under the tabs holds the islands button, back and f
   /** Whether the islands button is the topmost thing where it stands, so a press reaches it. */
   const reachable = `(() => { const b = document.querySelector('#query .isl-toggle').getBoundingClientRect(); return document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest('.isl-toggle') != null; })()`;
   /** The side bar, open, stands under the band, which keeps the whole width: it is never pushed over by it. */
-  const under = `(() => { const q = document.getElementById('query').getBoundingClientRect(), s = document.getElementById('islands').getBoundingClientRect();
-    return document.body.dataset.islands === 'open' && q.left === 0 && Math.abs(q.width - innerWidth) < 1 && s.top >= q.bottom - 1; })()`;
+  const under = `(() => { const q = document.getElementById('query')?.getBoundingClientRect(), s = document.getElementById('islands')?.getBoundingClientRect();
+    return Boolean(q && s) && document.body.dataset.islands === 'open' && q.left === 0 && Math.abs(q.width - innerWidth) < 1 && s.top >= q.bottom - 1; })()`;
   try {
+    // Wide, the side bar is drawn and opened (a small window starts it folded), and it stands under the band.
+    await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
+    await until('the side bar and its button', () => page.evaluate<boolean>(`Boolean(document.getElementById('islands') && document.querySelector('#query .isl-toggle'))`));
+    await page.evaluate(`document.body.dataset.islands === 'open' || document.querySelector('#query .isl-toggle').click()`);
     await until('the side bar open under the band', () => page.evaluate<boolean>(under));
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false });
