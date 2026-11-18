@@ -9,9 +9,11 @@
 import type { Q } from '../../database/kernel/db.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import type { Keep } from '../../log/kernel/retention.ts';
-import { fieldInReach, inReach } from '../../loader/kernel/reach.ts';
+import { outsideLayout, outsideReach } from './reach-check.ts';
+export { outsideLayout, outsideReach } from './reach-check.ts';
 // What checks a pack's rules as it loads is the loader's; the words it checks by are read here too.
-import { COMPARE, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
+import { COMPARE, fillForms, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
+import { checkForms, checkUnless, holdsUnless, missingLinks, overMost, type AtMost, type FormOp, type MustLink, type Unless } from './rule-forms.ts';
 export { checkRules } from '../../loader/kernel/rule-check.ts';
 import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
 import { opFacts } from '../../loader/kernel/part-trial.ts';
@@ -93,8 +95,10 @@ export interface RuleDef {
   spares?: string[];
   /** Fields whose values together may belong to one item of the type only. */
   unique?: string[];
-  /** For unique: the type it holds within, flavours included. */
+  /** For unique, at_most and must_link: the type it holds within (of), flavours included. */
   type?: string;
+  /** At most n open links of a type into an item of the type; must_link: an item of the type holds a link; unless: what a walk from the item reaches, which spares it the rule where it holds (./rule-forms.ts). */
+  at_most?: AtMost; must_link?: MustLink; unless?: Unless;
   /** What a refusal says, and why a held change waits. {title} is the item's. */
   say?: string;
   /** What letting it through means, said in the answer of a change it did not hold (holds off, a lift): who sees it, what runs where, whether it can be undone. {title} as in say. */
@@ -186,7 +190,7 @@ export interface Who {
 /** The settings an owner lifts a rule by: each one an agent's token may read (packs/database/kernel/schema.ts, AGENT_CODE_READ). On is true, or "apply". */
 export const LIFTS = ['agent_changes', 'agent_code', 'agent_publish', 'agent_backups'];
 // The loader's slot loader.lifts: a pack's rule is checked against these as it loads (packs/loader/kernel/rule-check.ts).
-fillLifts(LIFTS);
+fillLifts(LIFTS); fillForms({ checkForms, checkUnless }); // and loader.rule_forms: the forms that read links, checked as a pack loads
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
 /** The lift by which agents' changes apply as they are made; a new workspace begins with it (beginApplying). */
 export const AGENT_CHANGES = 'agent_changes';
@@ -210,6 +214,7 @@ export interface OpFacts {
   part_trial?: boolean;
   spreads?: boolean; island_code?: boolean; /** Of an op that adds to an island past its cap, how far past (packs/loader/kernel/island-cap.ts). */ over_cap?: string;
   /** It makes an item of an island's own pack on that island, in the change that makes the island: in reach of the pack making it. */ own_island?: boolean;
+  /** The rules (by keyOf) whose unless holds of this op's item: they spare it (./rule-forms.ts, holdsUnless). */ unless?: Set<string>;
 }
 
 /** Whether a rule's when holds for one op written by this actor to these targets (none for a create). */
@@ -275,27 +280,6 @@ const rootPacks = (reg: Registry): Set<string> =>
 /** Whether any of these fields names a root pack. */
 const namesRoot = (reg: Registry, fields: string[], props: Record<string, unknown>) => { const roots = rootPacks(reg); return fields.some((f) => typeof props[f] === 'string' && roots.has(props[f] as string)); };
 
-/**
- * What an op writes outside a pack's reach, if anything: a type or link type it neither declares nor requires (nor
- * uses while that pack is active), or a field another pack outside its reach added to a type. Undefined when inside.
- */
-export function outsideReach(reg: Registry, pack: string, w: Written, targets: Target[]): string | undefined {
-  const types = w.op === 'create' || w.op === 'link' ? (w.type ? [w.type] : []) : targets.map((t) => t.type);
-  for (const t of types) {
-    if (!inReach(reg, pack, t)) return t;
-    for (const field of Object.keys(w.props ?? {})) if (!fieldInReach(reg, pack, t, field)) return `${t} (its field ${field})`;
-  }
-  return undefined;
-}
-
-/** What an op a drawing asked for writes outside the types its style declares (flavours included), if anything: a link is always outside. */
-export function outsideLayout(reg: Registry, writes: string[], w: Written, targets: Target[]): string | undefined {
-  if (w.op === 'link' || w.op === 'unlink') return w.type ?? 'a link';
-  const types = w.op === 'create' ? (w.type ? [w.type] : []) : targets.map((t) => t.type);
-  if (!types.length) return w.type ?? 'an item it cannot find';
-  return types.find((t) => !writes.some((x) => reg.isA(t, x)));
-}
-
 /** Whether a rule is lifted for this op, and by what: its setting, or where the workspace has not set it, the server's policy (server). */
 export type Lifted = (rule: RuleDef, op: string) => string | false;
 
@@ -318,7 +302,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   // A rule that names what it spares lets the op through those of its own pack's rules alone.
   const named = new Map(sparing.filter((r) => r.spares).flatMap((r) => r.spares!.map((id) => [`${r.pack}.${id}`, `${r.pack}.${r.id ?? ''}`] as const)));
   for (const rule of order) {
-    if (rule.unique || rule.stream || rule.on !== undefined || rule.then === 'spare' || carryOf(rule) || !applies(rule, reg, who, w, targets, held.length > 0, facts)) continue;
+    if (rule.unique || rule.at_most || rule.must_link || (rule.unless && facts.unless?.has(keyOf(rule))) || rule.stream || rule.on !== undefined || rule.then === 'spare' || carryOf(rule) || !applies(rule, reg, who, w, targets, held.length > 0, facts)) continue;
     if (letBy) { spared.push({ ...ruled(rule), lifted_by: letBy }); continue; }
     const spare = named.get(`${rule.pack}.${rule.id ?? ''}`);
     if (spare) { spared.push({ ...ruled(rule), lifted_by: spare }); continue; }
@@ -457,6 +441,13 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
   // What is read of each op beside it: a part's trial version, a version spread to another island (packs/loader/kernel/part-trial.ts).
   const facts = await opFacts(q, reg, ops, found);
+  // A rule that holds or refuses unless what a walk from the item reaches holds is spared where it does (./rule-forms.ts).
+  const unlessing = [...rules, ...runs.flat().flatMap((run) => (run ? under(run).rules : []))].filter((r) => r.unless);
+  if (unlessing.length) await Promise.all(ops.map(async (op, i) => {
+    const targets = on(op).flatMap((id) => found.get(id) ?? []), met = new Set<string>();
+    for (const r of unlessing) if (applies(r, reg, who, op, targets, false, facts[i]) && (await holdsUnless(q, reg, r.unless!, targets[0]?.id, ops as FormOp[]))) met.add(keyOf(r));
+    facts[i] = { ...facts[i], unless: met };
+  }));
   // With holds off, what a rule holds applies as made; a wait the change or its token asked for (asked, may) still holds.
   const off = who.human && !who.drawing ? false : await holdsOff(q);
   const askedFor = (r: Ruled) => { const when = every.get(keyOf(r))?.when; return when?.asked !== undefined || when?.may !== undefined; };
@@ -474,7 +465,8 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
     const passed = off ? held.filter((r) => !askedFor(r)) : [];
     return { held: held.filter((r) => !passed.includes(r)), spared: [...once(each.flatMap((e) => e.spared), keyOf), ...passed.map((r) => ({ ...r, lifted_by: HOLDS_OFF }))], passed: passed.length, refusers: once(each.flatMap((e) => e.refusers), keyOf), refused: [...new Set(each.flatMap((e) => e.refused))] };
   }));
-  const refused = judged.flatMap((j) => j.refused);
+  // At most n links into an item, and an item that must hold a link, are judged of the change as a whole (./rule-forms.ts).
+  const refused = [...judged.flatMap((j) => j.refused), ...(await overMost(q, reg, rules, ops as FormOp[], (r) => Boolean(r.lifted && lifted(r, 'link')))), ...(await missingLinks(q, reg, rules, ops as FormOp[]))];
   const held = judged.flatMap((j) => j.held);
   const particular = (r: Ruled) => Object.keys(every.get(keyOf(r))?.when ?? {}).length;
   const by = [...held].sort((a, b) => particular(b) - particular(a))[0];

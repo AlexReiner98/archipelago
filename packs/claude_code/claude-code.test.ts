@@ -14,6 +14,7 @@ test('a hook comes in as the kernel’s event and body; one the kernel does not 
   assert.deepEqual(hookIn({ event: 'session-start', body: null }), { event: 'session-start', body: { surface: 'claude-code' } }, 'a session starts recorded under its surface');
   assert.deepEqual(hookIn({ event: 'session-start', body: { session_id: 's1', surface: 'other' } }), { event: 'session-start', body: { session_id: 's1', surface: 'claude-code' } }, 'whatever the body says');
   assert.deepEqual(hookIn({ event: 'tool-used', body: {} }), {});
+  assert.deepEqual(hookIn({ event: 'push', body: { session_id: 's1', command: 'git push' } }), { event: 'push', body: { session_id: 's1', command: 'git push' } });
   assert.deepEqual(handler.hook_in({ event: 'stop', body: {} }), { answer: { event: 'stop', body: {} } }, 'the sandbox is answered under answer');
 });
 
@@ -22,6 +23,8 @@ test('a neutral answer goes out in Claude Code’s shape: told as additional con
   assert.deepEqual(hookOut({ event: 'session-start', answer: { told: 'y' } }).hookSpecificOutput.hookEventName, 'SessionStart');
   assert.deepEqual(hookOut({ event: 'file-used', answer: { told: 'z' } }).hookSpecificOutput.hookEventName, 'PostToolUse');
   assert.deepEqual(hookOut({ event: 'stop', answer: { go_on: 'why' } }), { decision: 'block', reason: 'why' });
+  assert.deepEqual(hookOut({ event: 'push', answer: { refuse: 'no' } }), { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: 'no' } }, 'a refused push is denied before it runs');
+  assert.deepEqual(hookOut({ event: 'push', answer: {} }), {}, 'one let through runs');
   assert.deepEqual(hookOut({ event: 'events', answer: { run: 'e_r', kept: 2 } }), { run: 'e_r', kept: 2 });
   assert.deepEqual(hookOut({ event: 'session-end', answer: {} }), {});
   assert.deepEqual(hookOut({ event: 'tool-used' }), {});

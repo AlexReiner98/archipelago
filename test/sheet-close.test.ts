@@ -24,7 +24,7 @@ test('in a browser, × shuts an item opened from a show or a link', { skip: !bro
   const until = async (what: string, ok: () => Promise<boolean>) => {
     if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${page.logs().join('\n')}`);
   };
-  const open_ = () => page.evaluate<boolean>(`document.body.dataset.sheet === 'open'`);
+  const open_ = () => page.evaluate<boolean>(`document.body?.dataset.sheet === 'open'`);
   const draws = (words: string) => page.evaluate<boolean>(`document.querySelector('#canvas svg')?.textContent.includes(${JSON.stringify(words)}) ?? false`);
   /** Open the page at `hash` fresh, see the sheet and the canvas under it, press ×, and see it shut and stay shut. */
   const closes = async (hash: string, drawn: string) => {

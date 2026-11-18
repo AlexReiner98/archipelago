@@ -3,10 +3,10 @@
 // what a headless `claude -p` prints is read here, one line at a time, into what the kernel records on its run.
 
 /** The kernel's hook events, which the hook script (scripts/pelago-hook.mjs) already calls by their own names. */
-const EVENTS = ['session-start', 'prompt', 'stop', 'session-end', 'file-used', 'events'];
+const EVENTS = ['session-start', 'prompt', 'stop', 'session-end', 'file-used', 'events', 'push'];
 
 /** Claude Code's name for the hook each event answers. */
-const HOOK_EVENT = { 'session-start': 'SessionStart', prompt: 'UserPromptSubmit', 'file-used': 'PostToolUse' };
+const HOOK_EVENT = { 'session-start': 'SessionStart', prompt: 'UserPromptSubmit', 'file-used': 'PostToolUse', push: 'PreToolUse' };
 
 const isObject = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
 
@@ -23,9 +23,13 @@ export function hookIn({ event, body }) {
   return { event, body: event === 'session-start' ? { ...said, surface: SURFACE } : said };
 }
 
-/** The kernel's neutral answer in Claude Code's shape: told as the hook's additional context, go_on as a Stop hook's block, the rest beside. */
+/**
+ * The kernel's neutral answer in Claude Code's shape: told as the hook's additional context, go_on as a Stop hook's
+ * block, refuse as a PreToolUse hook's deny (the command does not run, and the agent reads why), the rest beside.
+ */
 export function hookOut({ event, answer }) {
-  const { told, go_on, ...rest } = isObject(answer) ? answer : {};
+  const { told, go_on, refuse, ...rest } = isObject(answer) ? answer : {};
+  if (typeof refuse === 'string') return { hookSpecificOutput: { hookEventName: HOOK_EVENT[event] ?? event, permissionDecision: 'deny', permissionDecisionReason: refuse }, ...rest };
   if (typeof told === 'string') return { hookSpecificOutput: { hookEventName: HOOK_EVENT[event] ?? event, additionalContext: told }, ...rest };
   if (typeof go_on === 'string') return { decision: 'block', reason: go_on, ...rest };
   return rest;
