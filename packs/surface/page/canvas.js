@@ -11,7 +11,8 @@ import { wiresOn } from './canvas-wires.js';
 import { added, moved } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { cornersOf, corners, islandsOn, onIslands } from './islands-on.js';
-import { islandsOnMap } from './islands-list.js';
+import { AUTO, clean, islandsOnMap } from './islands-list.js';
+import { autoIslands, onAuto } from './islands-auto.js';
 import { unfollow } from './replica.js';
 import { drawBand } from './bar-band.js';
 import './sessions-open.js';
@@ -30,7 +31,7 @@ let islanded = true;
  */
 export const home = () =>
   islanded
-    ? islandsLens(listNow)
+    ? islandsLens(listNow.includes(AUTO) ? clean([...listNow, ...autoIslands()]) : listNow)
     : { filter: { find: ['frontier', 'waits_on me', ...(state.schema?.types ?? []).filter((t) => !t.dormant && t.altitude === 'project').map((t) => `type ${t.id}`)], not: ['done', 'kind system'] } };
 /** Home's list read, before Home is first drawn (ui/panes.js). */
 export const homeReady = () => ((islanded = islandsOnMap(state.schema)), islanded ? islandsOn().then((list) => (listNow = list)) : Promise.resolve());
@@ -38,6 +39,10 @@ export const homeReady = () => ((islanded = islandsOnMap(state.schema)), islande
 onIslands((list) => {
   listNow = list;
   for (const c of all) if (c.home) c.show(null, c.here, c.asked);
+});
+// What Auto has on changed as work moved: Home drawn again, where the person has Auto on.
+onAuto(() => {
+  if (listNow.includes(AUTO)) for (const c of all) if (c.home) c.show(null, c.here, c.asked);
 });
 /** The canvas an item's address opens when no lens is asked: the item and what it holds, depends on and waits on. */
 export const focusOn = (id) => ({ filter: { find: [`id ${id}`] }, walk: { over: FOCUS, steps: 1 } });

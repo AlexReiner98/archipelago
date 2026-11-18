@@ -42,6 +42,11 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 #islands .isl-sec-on { background: var(--bg); }
 #islands .isl-sec-on .isl-row { height: var(--box-8); font-size: var(--text-5); }
 #islands .isl-sec-on .isl-head { color: var(--text); }
+/* Auto, at the search line's right: a quiet word, its dot lit while it is on. */
+#islands .isl-auto { flex: none; border: 0; background: none; padding: 0 var(--space-3); font: inherit; font-size: var(--text-2); color: var(--muted); cursor: pointer; white-space: nowrap; }
+#islands .isl-auto::before { content: '○ '; }
+#islands .isl-auto[aria-pressed="true"] { color: var(--text); }
+#islands .isl-auto[aria-pressed="true"]::before { content: '● '; color: var(--ok); }
 #islands .isl-row { display: flex; align-items: center; gap: var(--space-5); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-7); padding: 0 var(--space-6); white-space: nowrap; }
 /* A mark for the state: a dot before every island that is on, wherever its row stands; an off one keeps the room. */
 #islands .isl-row::before { content: ''; flex: none; width: var(--space-5); color: var(--ok); font-size: var(--text-5); line-height: 1; text-align: center; }
