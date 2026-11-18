@@ -2,12 +2,14 @@
 // map asks for one surface over its picture (docs/layouts.md, surface) and each such island's look runs as a layout's
 // code runs, `default({ canvas, answer, style, theme, size, view, on, open, tip, cursor })`, on a canvas of its own the
 // size of the surface, with that island's items and links alone, and the map's camera on its island's frame (`view`).
-// Each frame the part of each canvas inside its island's frame is laid into the surface, and the surface is shown. The map keeps the frame, the header and the wires to other islands.
-// Nothing here reaches past the drawing's worker. The pointer over its island's land is handed to the look, in its
-// screen pixels (a move as pointermove, a click as a press and a lift there, leaving as pointerleave); what it says by
-// the pointer (tip) is shown beside a spot the map moves to that place, and the cursor it asks for is the land's. A look
-// that says where it draws each item (places) has the wires from outside carried on to them, from its frame's edge. A look's own frames are stopped when its picture ends: each look's animation frames carry the run that
-// asked for them, and a run that ended is not called again. Layer: marks.
+// Each frame the part of each canvas inside its island's frame is laid into the surface, and the surface is shown.
+// The map keeps the frame, the header and the wires to other islands. Nothing here reaches past the drawing's worker.
+// The pointer over its island's land is handed to the look, in its screen pixels (a move as pointermove, a click as a
+// press and a lift there, leaving as pointerleave); what it says by the pointer (tip) is shown beside a spot the map
+// moves to that place, and goes when it opens an item; the cursor it asks for is the land's. A look that says where it
+// draws each item (places) has the wires from outside carried on to them, from its frame's edge. A look's own frames
+// are stopped when its picture ends: each look's animation frames carry the run that asked for them, and a run that
+// ended is not called again. Layer: marks.
 
 /** How light a colour the page gives is: the sum of its channels, as rgb() writes them. */
 import { m } from './marks.js';
@@ -122,7 +124,7 @@ export function paintIslands({ islands, tools, wire }) {
       try {
         frames.as(r, () => isle.look.default({
           canvas: r.canvas, answer: isle.answer, style: isle.look.settings ?? {}, theme, size, hot: null, view: () => r.cam,
-          on: (name, fn) => r.heard.set(name, fn), open: (id) => tools.open?.(id), tip: (text, x, y) => tipAt(r, text, x, y), cursor: (name) => tools.patch?.([{ key: `paint:${r.id}`, toggle: { pointing: name === 'pointer' } }]),
+          on: (name, fn) => r.heard.set(name, fn), open: (id) => (tools.patch?.([{ tip: null }]), tools.open?.(id)), tip: (text, x, y) => tipAt(r, text, x, y), cursor: (name) => tools.patch?.([{ key: `paint:${r.id}`, toggle: { pointing: name === 'pointer' } }]),
           places: (fn) => (r.where = typeof fn === 'function' ? fn : null),
         }));
       } catch {
