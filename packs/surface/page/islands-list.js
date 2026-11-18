@@ -3,8 +3,13 @@
 
 /** The live reads a person may toggle on beside islands, by the name the list keeps. */
 export const READS = ['frontier', 'attention'];
-/** What the list may hold: an island's id or a live read's name. */
-const entry = (v) => typeof v === 'string' && (/^e_[a-z0-9]{8}$/.test(v) || READS.includes(v));
+/**
+ * Auto, kept in the list like a read (Alex, 18 Nov 2026): while it is there, Home also draws every island where work
+ * changed in the last few minutes (`changedWithin`), on and off by itself as work moves.
+ */
+export const AUTO = 'auto';
+/** What the list may hold: an island's id, a live read's name, or Auto. */
+const entry = (v) => typeof v === 'string' && (/^e_[a-z0-9]{8}$/.test(v) || READS.includes(v) || v === AUTO);
 /** A list as kept: its entries once each, nothing else. */
 export const clean = (v) => (Array.isArray(v) ? [...new Set(v.filter(entry))] : []);
 
@@ -90,6 +95,18 @@ export function recentFirst(islands, now, days, most = Infinity) {
   const rest = islands.filter((i) => !kept.has(i)).sort((a, b) => String(a.title).localeCompare(String(b.title)));
   return { recent, rest };
 }
+
+/**
+ * What Auto puts on: the ids of the islands where work changed (`worked_at`) within `minutes` of `now`, the latest
+ * first, `most` of them at most.
+ */
+export function changedWithin(islands, now, minutes, most = Infinity) {
+  const since = now - minutes * 60_000, at = (i) => Date.parse(i.worked_at ?? '') || 0;
+  return islands.filter((i) => at(i) >= since).sort((a, b) => at(b) - at(a) || String(a.id).localeCompare(String(b.id))).slice(0, most).map((i) => i.id);
+}
+
+/** The list with Auto turned the other way. */
+export const autoToggled = (list) => (list.includes(AUTO) ? list.filter((x) => x !== AUTO) : [...list, AUTO]);
 
 /** A pack's title as the list shows it: as the pack says it, its first letter a capital. */
 export const capital = (s) => String(s ?? '').replace(/^\p{Ll}/u, (c) => c.toUpperCase());
