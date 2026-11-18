@@ -147,8 +147,8 @@ test("the island's key toggles a type it shows, and counts each pack's other par
   const keyRow = (id: string) => keyed(svg, `pt:e_buildisl:${id}:key`)[0];
   assert.ok(keyRow('build.feature')[1].on.includes('toggle') && keyRow('build.feature')[1].pack === 'build.feature', 'a type in the key is a toggle naming its part');
   assert.match(keyRow('build.lane')[1].class, /\bst-off\b/, 'a type off here is drawn off in the key');
-  const count = `${house.pack_marks.kinds.rule} 0/1 · ${house.pack_marks.kinds.view} 1`;
-  assert.ok(texts(svg).includes(count), "a row for the pack's other parts, by kind, its mark the pack's glyph");
+  const count = '0/1 rule · 1 view';
+  assert.ok(texts(svg).includes(count), "a row for the pack's other parts, each kind counted in words, its mark the pack's glyph");
   assert.equal(keyed(draw(typed).scene.svg, 'pt:e_buildisl:build.feature:key')[0][1].pack, undefined, 'a reader toggles nothing');
 });
 
