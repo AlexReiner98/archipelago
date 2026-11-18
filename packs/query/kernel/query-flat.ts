@@ -205,6 +205,9 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
   // Each run sent says where its session stands (the runs pack's), read for all of them at once.
   const runs = items.filter((e) => ctx.registry.isA(e.type, 'run')).map((e) => e.id);
   const marks = runs.length ? (await ctx.call<unknown, { marks: Record<string, unknown> }>('answer.session_marks', { runs })).marks : {};
+  // And the open sessions on each of the rest, a mark every drawing draws its own way (the runs pack's, task e_7csnapar).
+  const rest = items.filter((e) => !ctx.registry.isA(e.type, 'run')).map((e) => e.id);
+  const on = rest.length ? (await ctx.call<unknown, { on: Record<string, unknown> }>('answer.sessions_on', { items: rest })).on : {};
   // Where each lives, on a map with islands on, and each island's name, in the order they come: a drawing draws each
   // island's border from them (task e_auw7hb3v). Each island's legend names the pack it speaks and what is used there.
   const islandOf = (e: Row) => (seeded.on_islands && typeof e.props?.island === 'string' ? (e.props.island as string) : undefined);
@@ -236,6 +239,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
         // Where it stands in its course, so every drawing reads one phase and keeps no registry.
         visibility: e.visibility, status: e.status, ...(type?.statuses.phases?.[e.status] && { phase: type.statuses.phases[e.status] }), open: e.is_open, owner: e.owner,
         ...(has(marks, e.id) && { session: marks[e.id] }),
+        ...(has(on, e.id) && { sessions: on[e.id] }),
         // Found by the frontier: why it needs attention now, the strongest first, each a word and its few words.
         ...(why?.has(e.id) && { reasons: why.get(e.id) }),
         created_at: e.created_at, updated_at: e.updated_at,

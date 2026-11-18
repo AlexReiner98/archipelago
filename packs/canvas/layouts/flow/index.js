@@ -1,23 +1,22 @@
-// A lens answer drawn as a flat graph on one plane, where depth is never drawn (e_ktdensts): every item a step showing its
-// name in its type's outline (the style's type_shapes, read through what the type is a flavour of: in the house style work a box, a question a diamond, an
-// occurrence a pill, a record a sheet with a wavy foot, the system's own a box with cut corners, an actor a hexagon, an
-// aim a flag, a place a box with a tab), where it stands in its course a dot (hollow, half or full, none for what only
-// stands: ./state.js), and colour only for what waits on you and what is in trouble (e_rnyqarfe), the order
-// (depends_on) read from the top down in wires at right angles from what is depended on to what depends on it, broken
-// where one passes under another, and every other link (part_of first) a quiet tie between the two it ties, with a
-// head where it points: every wire has one. A type the style lists headless (core's house style: part_of) is laid out
-// from what it ties to, the whole over its part, so its head points up into the whole.
-// What follows an open question is dashed, as a scenario. Hovering a step lights its wires and ties and shows a tip:
-// its title and the start of its note. Every wire is drawn all the time: the layout places them all, so a wire left out of
-// the picture hides what placed it. Drawn from the
-// flat lens's answer (items and links); the older lens's still draws, what each item is `inside` read as part_of. The
-// layout is ./layout.js, its model; this turns a model into the marks to draw (SVG and HTML as data), which the page checks
-// and mounts, so every name is in the page and every step a link, and two models into the patches between them. Its
-// look is ./look.js, in the lens's colours. A lens with steps tells the process as it happens (./story.js), the
-// conversation beside it. A place that holds parts may be a colour on them instead of a step (./places.js), as the
-// style says (place_hues). What is `pending` is a ghost: a change held for the owner, drawn where it would land (an
-// item faint, a link dashed, an edit marked on its step), each with a badge keyed `held:<proposal>` that the page
-// answers a click on by putting the change to the person; a link the person just drew (`mine`) is dashed until it is.
+// A lens answer drawn as a flat graph on one plane, where depth is never drawn (e_ktdensts): every item a step showing its name
+// in its type's outline (the style's type_shapes, read through what the type is a flavour of: in the house style work a box, a
+// question a diamond, an occurrence a pill, a record a sheet with a wavy foot, the system's own a box with cut corners, an actor
+// a hexagon, an aim a flag, a place a box with a tab), where it stands in its course a dot (hollow, half or full, none for what
+// only stands: ./state.js), and colour only for what waits on you and what is in trouble (e_rnyqarfe), the order (depends_on)
+// read from the top down in wires at right angles from what is depended on to what depends on it, broken where one passes under
+// another, and every other link (part_of first) a quiet tie between the two it ties, with a head where it points: every wire has
+// one. A session on a step rings it in the session's hue (./session-ring.js). A type the style lists headless (core's house
+// style: part_of) is laid out from what it ties to, the whole over its part, so its head points up into the whole. What follows
+// an open question is dashed, as a scenario. Hovering a step lights its wires and ties and shows a tip: its title and the start
+// of its note. Every wire is drawn all the time: the layout places them all, so a wire left out of the picture hides what placed
+// it. Drawn from the flat lens's answer (items and links); the older lens's still draws, what each item is `inside` read as
+// part_of. The layout is ./layout.js, its model; this turns a model into the marks to draw (SVG and HTML as data), which the page
+// checks and mounts, so every name is in the page and every step a link, and two models into the patches between them. Its look
+// is ./look.js, in the lens's colours. A lens with steps tells the process as it happens (./story.js), the conversation beside
+// it. A place that holds parts may be a colour on them instead of a step (./places.js), as the style says (place_hues). What is
+// `pending` is a ghost: a change held for the owner, drawn where it would land (an item faint, a link dashed, an edit marked on
+// its step), each with a badge keyed `held:<proposal>` that the page answers a click on by putting the change to the person; a
+// link the person just drew (`mine`) is dashed until it is.
 
 import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
@@ -38,6 +37,7 @@ import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
 import { css as sessionCss, hueRules, litStates, sessionItems, sessionMarks, sessionOf, stateMark, STATES, STATE_WORDS } from './session.js';
+import { css as ringCss, ringKey, ringLines, ringRules, sessionRings } from './session-ring.js';
 import { cut, longest } from './lines.js';
 import { reasonLines } from './reasons.js';
 
@@ -82,7 +82,6 @@ function outline(shape, x, y, w, hgt, rx, cut = 0) {
  * The graph: its steps, the wires and ties between them and what each choice is. `input` is what the page gives every
  * drawing (the answer, the style); `tools.measure(text, px, font, role)` is how wide a text is drawn, as one of the style's text roles when one is given.
  */
-/** The picture. */
 export function draw({ answer: given, style, reduced, width, height }, tools) {
   let answer = shownOnly(given);
   // A story lays out what its steps bring in, all of it, each mark hidden until a step shows it.
@@ -280,6 +279,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
       [...drawnAs.keys()].sort((a, b) => KEY_ORDER.indexOf(a) - KEY_ORDER.indexOf(b)).map((shape) => mark(m('g', { class: `lf-step${shape === 'end' ? ' scenario' : ''}` }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), [...drawnAs.get(shape)].join(', '))),
       Object.keys(PHASE_WORDS).filter((p) => phases.has(p)).map((p) => mark(dot(`ph-${p} ${markOf(p)}${p === 'trouble' ? ' trouble' : ''}`, markOf(p), G.x, G.y, G.r), PHASE_WORDS[p])),
       !story && STATES.filter((s) => uses((n) => !n.stub && marked(n.item) && sessionOf(n.item).state === s)).map((s) => mark(stateMark(m, s, sessions.get(s), G.x, G.y, G.r), STATE_WORDS[s])),
+      !local && !story && ringKey(st.filter((n) => !n.stub).map((n) => n.item), mark(m('g', { class: 'lf-step' }, m('g', { class: 'lf-sr' }, outline('box', G.x, G.y, G.w, G.h, CORNER))), 'A session on it')),
       uses((n) => !n.stub && heldUp(n.item)) && mark(dot('trouble hollow', 'hollow', G.x, G.y, G.r), 'Held up'),
       uses((n) => !n.stub && yours(n.item)) && mark(m('g', { class: 'lf-step you' }, outline('box', G.x, G.y, G.w, G.h, CORNER)), 'Waits on you'),
       shownAs.places.filter((p) => st.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', G.x, G.y, G.w, G.h, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
@@ -318,7 +318,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
-  const painting = canvases.length ? paintIslands({ tools, wire: { stroke: z('stroke'), head: [z('head_length'), z('head_half')] }, islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, wires: comingIn(c, { g, items: answer.items, painted: inPainted, endsOf, order: ORDER_TYPE }), answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
+  const painting = canvases.length ? paintIslands({ tools, wire: { stroke: z('stroke'), head: [z('head_length'), z('head_half')] }, rings: { width: z('session_ring'), gap: z('session_gap'), dash: String(style.sizes?.flow_dash_dormant ?? '').split(/\s+/).map(Number).filter((v) => v > 0), faded: style.numbers?.session_faded }, islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, wires: comingIn(c, { g, items: answer.items, painted: inPainted, endsOf, order: ORDER_TYPE }), answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
 
   // A read that ends on a finding's name has no head there: the wire from the name to the finding carries it.
   const tieHeads = g.ties.map((t) => heads(t, t.type)), chainHeads = g.chains.map((c) => heads(c, ORDER_TYPE));
@@ -385,9 +385,10 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus'].filter(Boolean).join(' ');
-    // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's.
-    const body = drawnBy.get(n.id)?.length ? [m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
-      outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
+    // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
+    const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
+    const body = drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
+      ring, outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
@@ -427,8 +428,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     ...(parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 })),
   ];
 
-  // What stays lit, as the style says: the rest dimmed. Where the lens's words found some of what is drawn and not all,
-  // what they found is lit.
+  // What stays lit, as the style says: the rest dimmed. Where the lens's words found some of what is drawn and not all, what they found is lit.
   const hits = answer.items.filter((i) => i.found?.includes('text')).length;
   const found = hits > 0 && hits < answer.items.length;
   const dimmed = (now) => [...dims.keys()].filter((id) => !lit(g.nodes.get(id).item, now, found, stateOf(g.nodes.get(id).item)));
@@ -442,7 +442,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
     const i = g.nodes.get(key.slice(2)).item, note = held(i.pending) ? `Held for you${i.pending.reason ? `: ${i.pending.reason}` : ''}` : opening(i);
-    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), i.waiting && m('span', { class: 'lf-tip-waiting' }, waitWords(i)), yours(i) && m('span', { class: 'lf-tip-you' }, 'Waits on you'), ...reasonLines(i).map((r) => m('span', {}, r)), (i.named ?? note) && m('span', {}, i.named ?? note));
+    return m('div', { class: 'lf-tip' }, m('b', {}, i.said ?? i.title), i.waiting && m('span', { class: 'lf-tip-waiting' }, waitWords(i)), yours(i) && m('span', { class: 'lf-tip-you' }, 'Waits on you'), ...reasonLines(i).map((r) => m('span', {}, r)), ...ringLines(i, words).map((r) => m('span', {}, r)), (i.named ?? note) && m('span', {}, i.named ?? note));
   };
   /** The tip of a shared mark (a dot, a held badge, a gate), by its key; none for any other. */
   const markTips = [dotTips, heldTips, isles.tips];
@@ -469,7 +469,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     size.width = width;
   }
   return {
-    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ringCss, ...ringRules(answer.items), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: () => (player?.end?.(), painting?.end()),
     viewport: (v) => (painting?.view(v), []),
     on(event) {
