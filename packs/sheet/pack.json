@@ -66,5 +66,12 @@
         "index.js": "parts/follow/index.js"
       }
     }
+  ],
+  "styles": [
+    {
+      "id": "sheet.rounds",
+      "title": "Rounds on a page",
+      "props": { "lengths": { "round_wide": 460, "round_narrow": 200, "round_gap": 10, "round_whole": "96vw", "round_whole_high": "94vh" } }
+    }
   ]
 }
