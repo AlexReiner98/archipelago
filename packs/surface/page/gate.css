@@ -32,7 +32,9 @@ body[data-land-emblem] .gate-mark { box-sizing: border-box; padding-left: var(--
 .gate-or::before, .gate-or::after { content: ''; flex: 1; border-top: var(--border-1) solid var(--line); }
 .gate-row[hidden] { display: none; }
 .gate-row > .gist { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.gate-others { display: flex; gap: var(--space-6); }
+/* Signed in before: one line of names, cut with an ellipsis where the column ends (a flex row would cut it bare). */
+.gate-others { display: block; }
+.gate-others > a + a { margin-left: var(--space-6); }
 .gate-error { color: var(--bad); text-align: center; }
 .gate-error:empty { display: none; }
 .gate-agree { display: flex; gap: var(--space-6); align-items: baseline; }
