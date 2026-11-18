@@ -12,6 +12,7 @@ import { asOwner, forgetIn, ownerRows } from './forget.ts';
 import type { Authority, ChangeInput, Op, SourceSpec } from './pelago-types.ts';
 import type { Archipelago } from './pelago.ts';
 import type { Verdict } from '../../rules/kernel/rules.ts';
+import { onceUnder } from './keyed.ts';
 
 type Props = Record<string, unknown>;
 
@@ -24,7 +25,7 @@ const privateTo = (map: Archipelago, visibility: string, to?: string | null): st
  * facts are appended to the fact stream as one change set in the same transaction. dry: the facts it would append and
  * the ids it would make, with nothing written; ids: those ids, to make the same ones again.
  */
-export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string>; privateTo?: string | null; followed?: Followed } = {}) {
+export async function applyChange(map: Archipelago, actor: string, input: ChangeInput, opts: { except?: string[]; approvedBy?: string; revised?: boolean; authority?: Authority; token?: string; rule?: Decision; dry?: boolean; ids?: Record<string, string>; privateTo?: string | null; followed?: Followed; keyed?: { changeset: string; proposal: string } } = {}) {
   // A reviewer's corrected ops may edit a code field too: the whole field it leaves is what applies (packs/write/kernel/edit.ts).
   const ops = (await editsResolved(map.registry, dropExcepted(input.ops, opts.except ?? []), async (id) => (await map.entity(id)) ?? null)).ops; await stillWritable(map.workspace); if (!opts.dry) await roomToStore(map.workspace);
   if (!ops.length) throw new Error('Nothing left to apply after exclusions.');
@@ -33,7 +34,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
   const { warnings } = await map.plan(ops);
   // A change judged with what followed it (write.follow): what follows it now must be the same, or the map moved.
   if (opts.followed?.length) await followedStill({ map, reg: map.registry }, ops, opts.followed);
-  const changeset = newId('c');
+  const changeset = opts.keyed?.changeset ?? newId('c'); // a keyed change takes the id its key names (./keyed.ts)
   const created: Record<string, string> = {};
   const reg = await typesAfter(map, ops);
   // Each id it makes is named by what makes it, so that a held change approved with nothing moved makes the same ones.
@@ -51,6 +52,7 @@ export async function applyChange(map: Archipelago, actor: string, input: Change
 
   await map.db.transaction(async (tx) => {
     // Facts first: each op is planned on the map as the ops before it left it, and its facts projected at once.
+    if (opts.keyed && !opts.dry) await onceUnder(tx, opts.keyed); // one of a key at a time, and none once it is in the log
     const when = await stamp(tx);
     const said = async (some: Fact[]) => { facts.push(...some); await projectFacts(tx, reg, when, some); };
     const fallback = await map.defaultVisibility(tx);

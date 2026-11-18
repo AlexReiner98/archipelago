@@ -127,6 +127,8 @@ export interface ChangeInput {
   part?: PartRef;
   /** The change set this one reverses: undo's own. */
   undoes?: string; /** The session it was made in (a run's id), kept in the log's entry: where it came from, never on whose authority. */ run?: string;
+  /** The sender's key for it: the same key sent again is answered with the first change, not applied twice (packs/write/kernel/keyed.ts). */
+  key?: string;
 }
 
 export interface Entity {
