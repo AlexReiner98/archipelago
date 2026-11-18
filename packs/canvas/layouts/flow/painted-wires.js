@@ -8,9 +8,10 @@
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 
 /**
- * What a look handed, checked: `said` { places: { id: [x, y, r?] } }, in the island's units from its frame's top left,
- * for the items of `own` alone. Moved to the picture by the frame's corner `at`. Answers { places: Map(id → [x, y, r]) },
- * or null where it gives no place.
+ * What a look handed, checked: `said` { places: { id: [x, y, r?] }, tags? }, in the island's units from its frame's top
+ * left, for the items of `own` alone. Moved to the picture by the frame's corner `at`. Answers { places: Map(id → [x, y,
+ * r]), tags }, or null where it gives no place: `tags` true where the look writes its rings' tags itself, in its own
+ * names' room (overlap e_jhqsvwwh), so the map draws the rings alone.
  */
 export function handedOf(said, own, [ax, ay]) {
   if (!said || typeof said !== 'object' || !said.places || typeof said.places !== 'object') return null;
@@ -18,7 +19,7 @@ export function handedOf(said, own, [ax, ay]) {
   for (const [id, at] of Object.entries(said.places)) {
     if (own.has(id) && Array.isArray(at) && num(at[0]) && num(at[1])) places.set(id, [ax + at[0], ay + at[1], num(at[2]) && at[2] > 0 ? at[2] : 0]);
   }
-  return { places };
+  return { places, tags: said.tags === true };
 }
 
 /** The model `g` without the links between two items of one painted island: those are its look's to draw. */

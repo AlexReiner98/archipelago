@@ -22,7 +22,7 @@ import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { effortOf } from './effort.js';
 import { css } from './look.js';
-import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
+import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { countRows, css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
@@ -315,7 +315,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
-  const painting = canvases.length ? paintIslands({ tools, placed: placer({ g, painted: inPainted, gap: z('session_gap'), draw: line, heads, order: ORDER_TYPE, over: style.numbers?.motion_move }), islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
+  const painting = canvases.length ? paintIslands({ tools, placed: placer({ g, painted: inPainted, gap: z('session_gap'), draw: line, heads, order: ORDER_TYPE, over: style.numbers?.motion_move }), islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, hue: islandHue(style, (h) => HEX.test(String(h)), g.islands.findIndex((i) => i.id === c.id)), tint: parseFloat(style.sizes?.flow_island_tint) / 100, answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
 
   // A read that ends on a finding's name has no head there: the wire from the name to the finding carries it.
   const tieHeads = g.ties.map((t) => heads(t, t.type)), chainHeads = g.chains.map((c) => heads(c, ORDER_TYPE));
