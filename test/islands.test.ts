@@ -112,7 +112,7 @@ test('a pack with a handler is refused on an island map and taken without it', (
 });
 
 test('core declares the shared set, so a pack on task and question is taken beside one that is not', () => {
-  const on = { types: [{ id: 'ontask_step', title: 'Step', extends: 'task' } as never, { id: 'ontask_call', title: 'Call', extends: 'question' } as never] };
+  const on = { types: [{ id: 'ontask_step', title: 'Step', extends: 'task' } as never, { id: 'ontask_call', title: 'Call', extends: 'question' } as never, { id: 'ontask_pick', title: 'Pick', extends: 'decision' } as never] }; // decision, the name question took over, reads as question
   const looks = { styles: [{ id: 'tinted.colours', title: 'Colours', props: {} }], types: [{ id: 'tinted_memo', title: 'Memo', extends: 'record' } as never] }; // both kinds
   const reg = new Registry(packsWith(island('ontask', on), island('tinted', looks)));
   for (const id of ['task', 'question']) assert.equal(reg.type(id)!.pack, 'core', `${id} is core’s`);
