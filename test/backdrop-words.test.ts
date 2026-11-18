@@ -52,9 +52,11 @@ test('in a browser, a backdrop is told a box for each block and its call to acti
     await page.go(`${base}/p/default/${made.d}`);
     assert.ok(await page.until(`document.querySelector('body > iframe.page-backdrop.drew') !== null`, 20000), `the backdrop has drawn: ${page.logs().join(' / ')}`);
     let said = await until(page, (s) => /^n\d+ f\d/.test(s));
-    // The blocks: the nav, the title, three paragraphs (the call to action's link alone), the list and the foot.
-    const blocks = (await page.evaluate(`(() => { const box = (el) => { const r = el.getBoundingClientRect(); return [r.left, r.top + scrollY, r.width, r.height].map(Math.round).join(','); }; return { n: [...document.querySelectorAll('nav.site-head, main > header, main div.text > *, main footer')].length, focus: box(document.querySelector('main p.action a')) }; })()`)) as { n: number; focus: string };
-    assert.ok(blocks.n >= 5, `the page has its blocks: ${blocks.n}`);
+    // Each item apart (the owner, 17 Nov 2026): each link of the nav, the title, three paragraphs (the call to action's
+    // link alone), each line of the list, and what the foot holds.
+    const blocks = (await page.evaluate(`(() => { const box = (el) => { const r = el.getBoundingClientRect(); return [r.left, r.top + scrollY, r.width, r.height].map(Math.round).join(','); }; const shown = (el) => el.getBoundingClientRect().height > 0; const into = (el) => (getComputedStyle(el).display === 'contents' ? [...el.children].flatMap(into) : !shown(el) ? [] : el.matches('nav.site-head, .site-pages, ul, ol, footer') ? [...el.children].flatMap(into) : [el]); return { n: [...document.querySelectorAll('nav.site-head, main > header, main div.text > *, main footer')].flatMap(into).length, lines: document.querySelectorAll('main div.text li').length, focus: box(document.querySelector('main p.action a')) }; })()`)) as { n: number; lines: number; focus: string };
+    assert.equal(blocks.lines, 40, 'the list has its forty lines');
+    assert.ok(blocks.n >= 45, `the page has its items: ${blocks.n}`);
     assert.equal(said.split(' ')[0], `n${blocks.n}`, `a box for each block: ${said}`);
     assert.equal(said.split(' ')[1], `f${blocks.focus}`, `its focus is the call to action's link: ${said}`);
     // Its look, worn on the page's root: the hex colours it named, lower case; the rest dropped.
