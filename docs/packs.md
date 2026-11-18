@@ -450,9 +450,12 @@ view or style the types it is on.
   pack and each it requires, `parts` (each with its state there and what it
   lacks), `provides`, `consumes` (each with the pack that gives it there) and
   `lacks` while waiting (`packs/loader/kernel/island-decl.ts`). The island's
-  header draws each pack's glyph; a click opens its parts as glyphs that
-  toggle, and the tip says what each gives, takes and lacks
-  (`packs/canvas/layouts/flow/pack-marks.js`).
+  header draws each pack's glyph, and its key toggles the types and link
+  types it shows. A click on a pack's glyph adds the term `parts <pack>
+  <island>` to the canvas query: the answer then holds the pack's parts as an
+  island of their own (`parts:<island>:<pack>`), placed by the layout among
+  the others, what acts wired to what it names, each part a toggle
+  (`packs/canvas/layouts/flow/parts-islands.js`, `ghost-parts.js`).
 
 ## A version on one island
 

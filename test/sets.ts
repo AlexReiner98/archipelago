@@ -44,6 +44,7 @@ export const SLOW: Record<string, string> = {
   'test/first-drawing.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
   'test/looks.test.ts': 'browser',
+  'test/look-press.test.ts': 'browser',
   'test/mcp-view-host.test.ts': 'browser',
   'test/kept-pictures.test.ts': 'browser',
   'test/narrow-picture.test.ts': 'browser',
@@ -57,6 +58,7 @@ export const SLOW: Record<string, string> = {
   'test/show-lights.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',
   'test/tips.test.ts': 'browser',
+  'test/marks-find.test.ts': 'browser',
   'test/transition-browser.test.ts': 'browser',
   // A whole map moved, backed up, restored, migrated or pulled: databases opened, filled and replayed from the log,
   // 8 to 29 seconds of one process each in CI. test:changed runs them for a change to what they import.

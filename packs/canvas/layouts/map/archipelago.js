@@ -36,13 +36,15 @@ function columned(widths, columns, gap, row) {
 }
 
 /** The whole picture laid out at once, each island framed where it stands with its name and legend over what it holds. */
-export function compose({ where, items, links, args }, { legends, names = new Map(), sizes }) {
+export function compose({ where, items, links, args }, { legends, names = new Map(), sizes, rooms = new Map(), follows = new Map() }) {
   const z = (k) => sizes[`flow_island_${k}`], [PAD, ROOM, GAP, ROW, COLUMNS] = ['pad', 'name_room', 'legend_gap', 'legend_row', 'legend_columns'].map(z);
   const keys = new Map([...legends].map(([id, rows]) => [id, columned(rows, COLUMNS, GAP, ROW)]));
   const heads = new Map([...keys].map(([id, key]) => [id, (names.get(id) ? ROOM : 0) + (key.h ? key.h + GAP : 0)]));
   // Its frame at least as wide as its header: its name (and what follows it, its packs) from its pad, and the pad after.
   const wides = new Map([...names].filter(([, w]) => typeof w === 'number').map(([id, w]) => [id, 2 * PAD + w - sizes.flow_island_name_x]));
-  const a = laidOut({ ...args, items, links }, { islandOf: (id) => where.get(id) ?? null, heads, wides });
+  // An island whose room is said (a pack's parts, ../flow/parts-islands.js) holds that room as its header, at least as wide.
+  for (const [id, r] of rooms) heads.set(id, r.h - PAD), wides.set(id, r.w);
+  const a = laidOut({ ...args, items, links }, { islandOf: (id) => where.get(id) ?? null, heads, wides, follows });
   const shores = a.islands.map((i) => {
     // The name and legend stand in the top left of the highest band of its land.
     const top = [...i.land].sort((p, q) => p.t - q.t || p.l - q.l)[0], [l, t] = [top.l, top.t], key = keys.get(i.id) ?? { at: [] }, named = names.get(i.id);

@@ -5,7 +5,8 @@
 //
 // A mark is [tag, attributes, ...what is in it], a string being text. Two attributes are not drawn: `key`, the name
 // a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click), or `add` or `toggle`, a
-// button the page answers itself (./marks-add.js, ./marks-toggle.js, the latter naming its pack by `pack`); a third, `pulse`, is kept on
+// button the page answers itself (./marks-add.js, ./marks-toggle.js, the latter naming its pack by `pack`), or `find`, a
+// button that adds a term to the canvas query or takes it away (./marks-find.js), naming it by `find`; a third, `pulse`, is kept on
 // the mark as words, for the page to run it along its line when they change (ui/transition.js). A mark says the item it
 // stands for with `item` (an id), which a link to the item says too: the page lights marks by it (packs/surface/page/light-items.js),
 // whatever drew them. Two tags are the page's own, made from an item's id alone: `reader`, a document as its reader
@@ -13,6 +14,7 @@
 
 import { cssProblem, uncommented } from './css-check.js';
 import { addable } from './marks-add.js';
+import { findable, findTerm } from './marks-find.js';
 import { togglable } from './marks-toggle.js';
 import { readerFrame } from './reader-frame.js';
 import { viewFrame } from './view-frame.js';
@@ -25,9 +27,9 @@ const ITEM_ID = /^e_[a-z0-9]{8}$/;
 const PACK_ID = /^[a-z][a-z0-9_.-]{0,63}$/;
 const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
 /** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight. A move and a click say where, in the picture's units (./layout.js). */
-const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', move: 'pointermove', seen: 'seen', add: 'add', toggle: 'toggle' };
+const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', move: 'pointermove', seen: 'seen', add: 'add', toggle: 'toggle', find: 'find' };
 /** The events the page answers in its own way: once in sight, and the add button. */
-const OWN = { seen: (el, key, tell) => seen(el, () => tell(key, 'seen')), add: addable, toggle: togglable };
+const OWN = { seen: (el, key, tell) => seen(el, () => tell(key, 'seen')), add: addable, toggle: togglable, find: findable };
 const seen = (el, fn) => {
   const sight = new IntersectionObserver((all) => all.some((e) => e.isIntersecting) && (sight.disconnect(), fn()), { threshold: 0.5 });
   sight.observe(el);
@@ -36,6 +38,8 @@ const seen = (el, fn) => {
 export const toldOfEnter = new WeakSet();
 /** The one address a drawing may link to: an item's page. */
 const ITEM = /^#\/e\/e_[a-z0-9]{8}$/;
+/** Each keyed element made, by its key: what a look presses finds a mark by (./look-press.js), never read by a drawing. */
+export const keyOf = new WeakMap();
 /** The most marks one drawing may make: past it, the drawing is stopped. */
 export const mostMarks = 60000;
 
@@ -48,6 +52,7 @@ function attribute(el, name, value) {
   if (name === 'item') return void (ITEM_ID.test(text) ? (el.dataset.item = text) : fail(`the item "${text.slice(0, 80)}"`));
   // What a pulse carries (ui/transition.js): words only, kept on the mark, never drawn.
   if (name === 'pulse') return void (el.dataset.pulse = text);
+  if (name === 'find') return void (findTerm(text) ? (el.dataset.find = findTerm(text)) : fail(`the term "${text.slice(0, 80)}"`));
   if (name === 'pack') return void (PACK_ID.test(text) ? (el.dataset.pack = text) : fail(`the pack "${text.slice(0, 80)}"`));
   if (!ATTRS.has(name)) fail(`the attribute "${name}"`);
   if (name === 'href' && !ITEM.test(text)) fail(`a link to "${text.slice(0, 80)}"`);
@@ -66,19 +71,19 @@ export function build(mark, keys, tell, svg = false, count = { n: 0 }) {
   const [tag, attrs = {}, ...kids] = mark;
   if (tag === 'reader' && !svg) {
     const el = readerFrame(attrs ?? {}, fail);
-    if (attrs?.key !== undefined) keys.set(String(attrs.key), el);
+    if (attrs?.key !== undefined) (keys.set(String(attrs.key), el), keyOf.set(el, String(attrs.key)));
     return el;
   }
   if (tag === 'view' && !svg) {
     const el = viewFrame(attrs ?? {}, fail);
-    if (attrs?.key !== undefined) keys.set(String(attrs.key), el);
+    if (attrs?.key !== undefined) (keys.set(String(attrs.key), el), keyOf.set(el, String(attrs.key)));
     return el;
   }
   const inSvg = svg || tag === 'svg';
   if (!(inSvg ? SVG_TAGS : HTML_TAGS).has(tag)) fail(`the tag "${tag}"`);
   const el = inSvg ? document.createElementNS(SVG, tag) : document.createElement(tag);
   for (const [name, value] of Object.entries(attrs ?? {})) {
-    if (name === 'key') keys.set(String(value), el);
+    if (name === 'key') (keys.set(String(value), el), keyOf.set(el, String(value)));
     else if (name === 'on') for (const e of Array.isArray(value) ? value : []) !EVENTS[e] ? fail(`the event "${e}"`) : OWN[e] ? OWN[e](el, String(attrs.key), tell) : (e === 'enter' && toldOfEnter.add(el), el.addEventListener(EVENTS[e], (ev) => tell(String(attrs.key), e, ev)));
     else attribute(el, name, value);
   }

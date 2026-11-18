@@ -196,6 +196,8 @@ export interface PieceDef {
   /** For a count: the field whose value picks the limit, and the limit for each value. */
   by?: string;
   limits?: Record<string, LimitDef>;
+  /** For rounds: the field that keeps them, [{ wide, narrow, commit?, at?, checks? }] oldest first. */
+  field?: string;
 }
 
 /** How long a counted text may be: `max` at most, best between `low` and `high`. `split: "paragraph"` counts each
@@ -387,6 +389,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       for (const r of piece.reasons ?? []) if (!(REASONS as readonly string[]).includes(r)) problems.push(`${at}: "${r}" is not a reason attention gives: one of ${REASONS.join(', ')}`);
       if (piece.lens && typeof piece.lens === 'object' && (typeof piece.lens.filter !== 'object' || !piece.lens.filter)) problems.push(`${at}: a view piece's lens is a flat lens: { filter, walk, limit }`);
       if (piece.by && !(screen.on ?? []).every((t) => types.get(t)?.fields[piece.by!])) problems.push(`${at}: a count's by is a field of every type it is on`);
+      if (piece.piece === 'rounds' && (!screen.on?.length || !screen.on.every((t) => types.get(t)?.fields[piece.field!]?.type === 'json'))) problems.push(`${at}: rounds are read from a json field of every type the screen is on`);
       for (const [value, l] of Object.entries(piece.limits ?? {})) if (!(l?.max > 0) || (l.split !== undefined && l.split !== 'paragraph')) problems.push(`${at}: the limit for "${value}" needs its max, and splits only by paragraph`);
       if (piece.style && typeof piece.style === 'object' && 'code' in piece.style) problems.push(`${at}: a view's style has no code: code runs only from a style kept on the map`);
     }
