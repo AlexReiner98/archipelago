@@ -18,14 +18,15 @@ const planeOf = (style) => Object.fromEntries(['zoom_least', 'zoom_most', 'open_
 /**
  * Where to stand to see the box [l, t, r, b] of a picture in a room `room` [left, top, width, height] of the frame,
  * `pad` kept round it: all of it, centred, when that is at least `least` a unit; else at `least`, from its top left, each
- * way it does not fit (a way it fits is still centred). Answers the view { s, x, y } and the scale that shows all of it.
+ * way it does not fit (a way it fits is still centred, or down from the room's top where `high`: a page read from its top).
+ * Answers the view { s, x, y } and the scale that shows all of it.
  */
-export function framed([l, t, r, b], [rl, rt, rw, rh], pad, least = 0) {
+export function framed([l, t, r, b], [rl, rt, rw, rh], pad, least = 0, high = false) {
   const w = Math.max(1, r - l), hh = Math.max(1, b - t);
   const whole = Math.min(1, (rw - pad) / w, (rh - pad) / hh);
   const s = Math.max(whole, least);
-  const along = (from, size, start, room) => (size * s <= room - pad ? from - (start + (room - size * s) / 2) / s : from - (start + pad / 2) / s);
-  return { s, x: along(l, w, rl, rw), y: along(t, hh, rt, rh), whole };
+  const along = (from, size, start, room, centred) => (centred && size * s <= room - pad ? from - (start + (room - size * s) / 2) / s : from - (start + pad / 2) / s);
+  return { s, x: along(l, w, rl, rw, true), y: along(t, hh, rt, rh, !high), whole };
 }
 
 /**
@@ -107,9 +108,10 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
    * All of it in sight, centred in the room beside what floats on the left and what covers the frame's right (`right`),
    * and between what floats over its top and its foot (`top`, `bottom`: the bars). `readable`: never smaller than the
    * style's least readable scale (`plane_fit_least`), what does not fit then reached by panning from its top left.
+   * `high`: standing at the top of the room, under the bars, not centred down it (the canvas, opened on its islands).
    */
-  const fit = (right = 0, top = 0, bottom = 0, readable = false) => {
-    fitted = toBox([0, 0, width, height], right, top, bottom, readable);
+  const fit = (right = 0, top = 0, bottom = 0, readable = false, high = false) => {
+    fitted = toBox([0, 0, width, height], right, top, bottom, readable, high);
   };
   /** The room the picture is seen in, beside and between what covers the frame. */
   const roomOf = (right, top, bottom) => {
@@ -117,8 +119,8 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     return [aside, top, Math.max(1, W - aside - right), Math.max(1, H - top - bottom)];
   };
   /** A box of the picture [l, t, r, b] in sight as fit puts all of it (an island, by whoever knows where it lies): the scale that shows all of it. */
-  const toBox = (box, right = 0, top = 0, bottom = 0, readable = true) => {
-    const { s, x, y, whole } = framed(box, roomOf(right, top, bottom), plane.fit_pad, readable ? plane.fit_least : 0);
+  const toBox = (box, right = 0, top = 0, bottom = 0, readable = true, high = false) => {
+    const { s, x, y, whole } = framed(box, roomOf(right, top, bottom), plane.fit_pad, readable ? plane.fit_least : 0, high);
     Object.assign(view, { s, x, y });
     now();
     return whole;

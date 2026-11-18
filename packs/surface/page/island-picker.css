@@ -15,7 +15,8 @@ body[data-islands="open"]:not([data-islands-over="on"]) { --active-left: min(var
 body[data-islands="folded"] #islands { display: none; }
 /* The band keeps the whole width: the bar opens under it, beside the canvas or over it, never pushing it. */
 body[data-islands] #query { left: 0; }
-body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip)); }
+/* Under the bar where it is a strip of its own (a pane alone); on a still page (a look) the bar is in the band, and the side bar starts at the band's line. */
+body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip)); }
 #islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* The bar's right edge: a strip to drag, drawn only as the line it already has, lit while pointed at. */
 #islands .isl-edge { position: absolute; top: 0; bottom: 0; right: 0; width: var(--space-4); cursor: col-resize; }

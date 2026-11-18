@@ -317,8 +317,10 @@ export function canvasIn(host, pane) {
     fit() {
       if (at?.kept) return;
       if (at) at.kept = null;
-      // Never smaller than reads (the style's plane_fit_least): a big island is panned, from its top left (e_5cp4fw78).
-      c.moves()?.fit(0, ...bars(host), true);
+      // Every island on in sight, at any width: the canvas opens on all of it, however small (the study "The canvas, by
+      // eye", screen e_sm4bdcs5), standing under the bars as a page does; the wheel zooms in from there. An item brought
+      // to (toItem) still opens at a size that reads.
+      c.moves()?.fit(0, ...bars(host), false, true);
       if (at) at.fitted = c.moves()?.state();
     },
     /** This item's mark (an island's land, an item's box) in sight at a size that reads, kept there as a reader's move is. */
@@ -409,7 +411,9 @@ const bars = (host) => {
   // The plane, which starts under the bars (ui/shell.css), else the canvas; a bar over another pane covers none of it.
   const box = (host.querySelector('.lf-stage') ?? host).getBoundingClientRect();
   const over = (id) => { const r = document.getElementById(id)?.getBoundingClientRect(); return r && r.right > box.left && r.left < box.right; };
-  const foot = (over('query') && edge('query', 'bottom')) || (over('nav') && edge('nav', 'bottom')) || box.top, find = over('find') ? edge('find', 'top') : undefined;
+  // The band's line (the page's ::before) is the least: on a still page (a look) the bar sits inside the band, its foot above that line.
+  const line = (() => { const b = getComputedStyle(document.body, '::before'); return b.content === 'none' ? 0 : (parseFloat(b.top) || 0) + (parseFloat(b.height) || 0); })();
+  const foot = Math.max(line, (over('query') && edge('query', 'bottom')) || (over('nav') && edge('nav', 'bottom')) || box.top), find = over('find') ? edge('find', 'top') : undefined;
   return [Math.max(0, foot - box.top), find === undefined ? 0 : Math.max(0, box.bottom - find)];
 };
 const fitAll = () => all.forEach((c) => c.fit());
