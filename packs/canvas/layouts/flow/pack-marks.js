@@ -2,10 +2,16 @@
 // one for each pack that pack requires, beside its name. Each mark is the pack's glyph (from its style preset, decision
 // e_e3ss8nqm; its initial where it has none) in a ring, in the colour the style gives its state on this island
 // (pack_marks: active, waiting, off), its tip the pack, its state, what it gives and takes, and why. A pack whose parts
-// the answer names (feature e_4r82mvf3) opens them on a click, as a row of smaller marks after its own, grouped by kind,
-// the first the switch for the whole pack; a click on a part turns it off or on for that island alone. A pack the answer
+// the answer names (feature e_4r82mvf3) opens them on a click: the switch for the whole pack after its mark, and its parts
+// as an island of their own (./ghost-parts.js), what acts wired to what it names; a click on a part there turns
+// it off or on for that island alone. Opening them is a find: the pack's mark asks the page to add the term
+// `parts <pack> <island>` to the canvas query, and the layout places the parts island it gives (./parts-islands.js).
+// The island's key toggles its types and links too (partInKey), and says each
+// pack's other parts as a count (countRows: study e_a4zcgpda, round three). A pack the answer
 // names no parts of is its own switch. Either switch is a button the page answers itself (packs/walls/page/marks-toggle.js),
 // as the island's add row is. Layer: marks. Pure: the answer's island and the style in, marks and colour rules out.
+
+import { css as ghostCss, ghostParts } from './ghost-parts.js';
 
 /** The states a pack may be in on an island, and how its tip says each. */
 export const PACK_STATES = { active: 'On here', waiting: 'Waiting', off: 'Off here' };
@@ -101,51 +107,81 @@ const kindGlyph = (style, kind) => glyphOf({ glyph: style?.pack_marks?.kinds?.[k
 /** What an island over its cap says after its packs (islands[].cap: { count, most }, most null for none): count/most, else nothing. */
 export const capText = (cap) => (Number.isInteger(cap?.count) && typeof cap?.most === 'number' && cap.count > cap.most ? `${cap.count}/${cap.most}` : '');
 
-/** How wide a pack's open row stands after its mark: the switch, then each part, an extra gap between kinds. */
-export const rowWidth = (p, z) => {
-  const parts = partsOf(p);
-  if (!parts.length) return 0;
-  const [d, gap, apart] = ['island_part_mark', 'island_part_gap', 'island_pack_gap'].map(z);
-  const kinds = new Set(parts.map((r) => r.kind)).size;
-  return apart + (parts.length + 1) * (d + gap) + kinds * (apart - gap);
-};
+/** A pack's parts by kind, in PART_KINDS's order: [kind, parts]. */
+export const kindsOf = (p) => [...partsOf(p).reduce((by, r) => by.set(r.kind, [...(by.get(r.kind) ?? []), r]), new Map())];
+
+/** What a kind's mark says after its glyph: how many there are, and how many of them are on where not all are. */
+export const countText = (parts) => ((on) => (on === parts.length ? String(parts.length) : `${on}/${parts.length}`))(parts.filter((r) => stateOf(r) === 'active').length);
+
+/** A kind's state as its mark shows it: waiting where any waits, off where any is off, else on. */
+const kindState = (parts) => (parts.some((r) => stateOf(r) === 'waiting') ? 'waiting' : parts.some((r) => stateOf(r) === 'off') ? 'off' : 'active');
+
+/** A kind's tip: how many of it, how many are off or wait, and what a click does. */
+export function kindTipOf(kind, parts, open) {
+  const n = (state) => parts.filter((r) => stateOf(r) === state).length, off = n('off'), waiting = n('waiting');
+  return [
+    `${parts.length} ${PART_KINDS[kind].toLowerCase()}${parts.length === 1 ? '' : 's'}`,
+    (off || waiting) && [off && `${off} off here`, waiting && `${waiting} waiting`].filter(Boolean).join(', '),
+    open ? 'Click to close the list' : 'Click to list them',
+  ].filter(Boolean);
+}
+
+/** How wide a pack's open row stands after its mark: its switch alone (its parts stand beside the island). */
+export const rowWidth = (p, z) => (kindsOf(p).length ? z('island_pack_gap') + z('island_part_mark') : 0);
+
+/** A part of an island's packs as its key shows it: its state, whether a click may turn it, and its tip; none where no pack here names it. */
+export function partInKey({ island, pack, id, partsOff = [], on = () => [] }) {
+  for (const p of packsOf(pack)) {
+    const part = partsOf(p).find((r) => r.id === id);
+    if (!part) continue;
+    const toggles = partTogglesHere(p, part, partsOff) && on(`pt:${island}:${id}`).includes('toggle');
+    return { state: stateOf(part), toggles, lines: partTipOf(p, part, toggles) };
+  }
+  return null;
+}
+
+/** The key's rows for what of each pack is not a type or link: one row a pack, its kinds' glyphs and counts ("Build: § 21/22 · ¶ 1"). */
+export function countRows({ pack, style, m, z }) {
+  const [W, H] = ['key_width', 'key_height'].map(z);
+  return packsOf(pack).flatMap((p) => {
+    const kinds = kindsOf(p).filter(([kind]) => kind !== 'type' && kind !== 'link');
+    if (!kinds.length) return [];
+    const said = kinds.map(([kind, parts]) => `${kindGlyph(style, kind)} ${countText(parts)}`).join(' · ');
+    // The row's mark is the pack's own glyph, so its words are the counts alone; the pack's name is in its tip.
+    return [{ glyph: m('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, m('text', { x: W / 2, y: H / 2, class: `lf-key-count st-${kinds.some(([, ps]) => ps.some((r) => stateOf(r) !== 'active')) ? 'some' : 'active'}` }, glyphOf(p))), label: said, tip: `${p.title ?? p.id}: ${kinds.map(([kind, parts]) => kindTipOf(kind, parts, false)[0]).join(', ')}` }];
+  });
+}
+
+/** Which packs are open: those whose parts island the answer holds for this island (a set), or an older drawing's one id. */
+const openSet = (open) => (open instanceof Set ? open : new Set(typeof open === 'string' ? [open] : open?.pack ? [open.pack] : []));
 
 /**
  * The marks of an island's packs, in a row from `[x, y]` (the middle of the first): `z` the style's sizes, `on(key)`
- * the gestures the session may make on a mark (['toggle'] where it may write), `open` the pack whose parts are open,
- * `partsOff` the island's parts_off. Answers { marks, tips, width }: one group, keyed `ph:<island>`, that a click
- * replaces whole; `tips` the tip of each mark, by its key, open or not, for the drawing to show on hover.
+ * the gestures the session may make on a mark (['toggle'] where it may write), `open` the packs whose parts are open as
+ * an island of the answer (./parts-islands.js), `partsOff` the island's parts_off. A pack with parts is a find: its
+ * click asks the page to add its term to the canvas query, or take it away (verdict e_xqmtjtpw). Answers
+ * { marks, tips, width }; `tips` the tip of each mark, by its key, for the drawing to show on hover.
  */
 export function packMarks({ island, pack, off = [], partsOff = [], open = null, style, at: [x, y], z, m, titled, on = () => [], cap, measure = () => 0 }) {
-  // A part's sizes are asked of the style only where the answer names parts.
-  const [D, GAP] = ['island_pack_mark', 'island_pack_gap'].map(z), [d, gap] = packsOf(pack).some((p) => partsOf(p).length) ? ['island_part_mark', 'island_part_gap'].map(z) : [0, 0];
-  const tips = new Map(), marks = [];
+  const [D, GAP] = ['island_pack_mark', 'island_pack_gap'].map(z), d = packsOf(pack).some((p) => partsOf(p).length) ? z('island_part_mark') : 0;
+  const tips = new Map(), marks = [], opened = openSet(open);
   const tip = (key, lines) => tips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, lines[0]), ...lines.slice(1).map((l) => m('span', { class: 'lf-tip-row' }, l))));
   const ring = (cx, r, glyph) => [m('circle', { cx, cy: y, r }), m('text', { x: cx, y }, glyph)];
   let cx = x + D / 2;
   for (const p of packsOf(pack)) {
-    const key = `pk:${island}:${p.id}`, parts = partsOf(p), opens = parts.length > 0, isOpen = opens && open === p.id;
+    const key = `pk:${island}:${p.id}`, opens = partsOf(p).length > 0, isOpen = opens && opened.has(p.id);
     const sw = `pw:${island}:${p.id}`, switches = togglesHere(p, off) && on(opens ? sw : key).includes('toggle');
     const lines = tipOf(p, switches, { opens, open: isOpen });
     tip(key, lines);
     const cls = `lf-pack st-${stateOf(p)}${p.own ? ' own' : ''}${!opens && switches ? ' toggles' : ''}${opens ? ' opens' : ''}${isOpen ? ' open' : ''}`;
-    const events = ['enter', 'leave', ...(opens ? ['click'] : switches ? ['toggle'] : [])];
-    marks.push(titled(m('g', { key, on: events, ...(!opens && switches && { item: island, pack: p.id }), class: cls }, ...ring(cx, D / 2, glyphOf(p))), lines.join('\n')));
-    // Its parts, each with its tip whether open or not, so a click that opens them has them to show.
-    if (!opens) { cx += D + GAP; continue; }
-    let px = cx + D / 2 + GAP + d / 2, kind = null;
-    const row = [];
-    const swLines = switchTipOf(p, switches);
-    tip(sw, swLines);
-    row.push(titled(m('g', { key: sw, on: ['enter', 'leave', ...(switches ? ['toggle'] : [])], ...(switches && { item: island, pack: p.id }), class: `lf-part whole st-${stateOf(p)}${switches ? ' toggles' : ''}` }, ...ring(px, d / 2, kindGlyph(style, 'pack'))), swLines.join('\n')));
-    for (const part of parts) {
-      px += d + gap + (part.kind !== kind ? GAP - gap : 0);
-      kind = part.kind;
-      const pk = `pt:${island}:${part.id}`, flips = partTogglesHere(p, part, partsOff) && on(pk).includes('toggle'), pl = partTipOf(p, part, flips);
-      tip(pk, pl);
-      row.push(titled(m('g', { key: pk, on: ['enter', 'leave', ...(flips ? ['toggle'] : [])], ...(flips && { item: island, pack: part.id }), class: `lf-part k-${part.kind} st-${stateOf(part)}${flips ? ' toggles' : ''}` }, ...ring(px, d / 2, kindGlyph(style, part.kind))), pl.join('\n')));
+    const events = ['enter', 'leave', ...(opens ? ['find'] : switches ? ['toggle'] : [])];
+    marks.push(titled(m('g', { key, on: events, ...(opens && { find: `parts ${p.id} ${island}` }), ...(!opens && switches && { item: island, pack: p.id }), class: cls }, ...ring(cx, D / 2, glyphOf(p))), lines.join('\n')));
+    // Open, the switch for the whole pack stands after its mark; its parts are an island of their own.
+    if (isOpen) {
+      const swLines = switchTipOf(p, switches);
+      tip(sw, swLines);
+      marks.push(titled(m('g', { key: sw, on: ['enter', 'leave', ...(switches ? ['toggle'] : [])], ...(switches && { item: island, pack: p.id }), class: `lf-part whole st-${stateOf(p)}${switches ? ' toggles' : ''}` }, ...ring(cx + D / 2 + GAP + d / 2, d / 2, kindGlyph(style, 'pack'))), swLines.join('\n')));
     }
-    if (isOpen) marks.push(...row);
     cx += D + GAP + (isOpen ? rowWidth(p, z) : 0);
   }
   // Over its cap, how many it holds against how many its look reads well at, after its packs.
@@ -154,25 +190,26 @@ export function packMarks({ island, pack, off = [], partsOff = [], open = null, 
   return { marks: marks.length ? [m('g', { key: `ph:${island}`, class: 'lf-packs' }, ...marks)] : [], tips, width: packsWidth(pack, z, cap, measure, open) - GAP };
 }
 
-/** How wide an island's packs stand after its name: each mark with its gap, the open one's row, then what over its cap says. */
-export const packsWidth = (pack, z, cap, measure = () => 0, open = null) => packsOf(pack).reduce((w, p) => w + z('island_pack_mark') + z('island_pack_gap') + (open === p.id ? rowWidth(p, z) : 0), 0) + ((t) => (t ? measure(t, z('island_pack_text')) + z('island_pack_gap') : 0))(capText(cap));
+/** How wide an island's packs stand after its name: each mark with its gap, an open one's switch, then what over its cap says. */
+export const packsWidth = (pack, z, cap, measure = () => 0, open = null) => packsOf(pack).reduce((w, p) => w + z('island_pack_mark') + z('island_pack_gap') + (openSet(open).has(p.id) ? rowWidth(p, z) : 0), 0) + ((t) => (t ? measure(t, z('island_pack_text')) + z('island_pack_gap') : 0))(capText(cap));
 
 /**
- * What a click on a pack's mark does: opens its parts, or closes them, by drawing the island's header again with
- * `header(island, open)` (the drawing's, which knows where it stands). Answers the patches, or null for another mark.
+ * A parts island's marks (./parts-islands.js): its pack's parts drawn by ./ghost-parts.js from its land's top left,
+ * each a toggle in the parts_off of the island it is of, where the session may write.
  */
-export function packOpener(header) {
-  const open = new Map();
-  return ({ name, key }) => {
-    const [, island, pack] = /^pk:(e_[a-z\d]+):(.+)$/.exec(String(key)) ?? [];
-    if (name !== 'click' || !island) return null;
-    open.set(island, open.get(island) === pack ? null : pack);
-    const head = header(island, open.get(island));
-    return head?.marks?.length ? [{ key: `ph:${island}`, mark: head.marks[0] }, { tip: null }] : [];
-  };
+export function partsIslandMarks({ of, pack, partsOff = [], at, style, z, m, titled, on = () => [], measure }) {
+  return ghostParts({ island: of, pack, at, z, m, titled, measure, glyph: (kind) => kindGlyph(style, kind), state: stateOf, toggles: (part) => partTogglesHere(pack, part, partsOff) && on(`pt:${of}:${part.id}`).includes('toggle'), tip: (part, flips) => partTipOf(pack, part, flips) });
 }
 
-export const css = `
+export const css = ghostCss + `
+/* A key row counting a pack's other parts. */
+.lf-key-count { fill: var(--ln-muted); font-size: var(--ln-flow-island-legend-text); text-anchor: middle; dominant-baseline: central; }
+.lf-key-count.st-some { fill: var(--ln-warn); }
+/* A key row that is a part: off, its mark dashed and its words muted; waiting, faded. */
+.lf-island-key.lf-key-part.toggles { cursor: pointer; pointer-events: auto; }
+.lf-island-key.lf-key-part.st-off :is(rect, path) { stroke-dasharray: var(--ln-flow-dash-held); }
+.lf-island-key.lf-key-part.st-off text, .lf-island-key.lf-key-part.st-waiting { opacity: var(--ln-flow-waiting); }
+.lf-island-key.lf-key-part.toggles:is(:hover, :focus-visible) text { text-decoration: underline; }
 /* An island's packs: each a ring with its glyph, in its state's colour (pack_marks); off, the ring dashed. */
 .lf-pack, .lf-part { pointer-events: auto; }
 .lf-pack circle, .lf-part circle { fill: var(--ln-land); stroke: var(--lf-pack, var(--ln-muted)); stroke-width: var(--ln-flow-island-pack-stroke); }
@@ -182,8 +219,15 @@ export const css = `
 .lf-part text { font-size: var(--ln-flow-island-part-text); }
 .lf-part.st-waiting { opacity: var(--ln-flow-waiting); }
 .lf-part.st-waiting circle { stroke-dasharray: var(--ln-flow-dash-held); }
-.lf-pack.open circle { stroke-width: var(--ln-flow-stroke-lit); }
+.lf-pack.open circle, .lf-kind.open circle { stroke-width: var(--ln-flow-stroke-lit); }
+/* A kind's count after its glyph; the list of its parts on a card of land, each row its ring and its id, one line. */
+.lf-part .lf-part-count { text-anchor: start; }
+.lf-kind { cursor: pointer; outline: none; }
+.lf-part-card { fill: var(--ln-land); stroke: var(--ln-line); stroke-width: var(--ln-rule); pointer-events: auto; }
+.lf-part-row .lf-part-name { text-anchor: start; font-size: var(--ln-flow-island-part-list-text); fill: var(--ln-text); }
+.lf-part-row.st-off .lf-part-name { fill: var(--ln-muted); }
 .lf-pack:is(.toggles, .opens), .lf-part.toggles { cursor: pointer; outline: none; }
+.lf-part-row.toggles:is(:hover, :focus-visible) .lf-part-name { text-decoration: underline; }
 .lf-pack:is(.toggles, .opens):is(:hover, :focus-visible) circle, .lf-part.toggles:is(:hover, :focus-visible) circle { stroke-width: var(--ln-flow-stroke-lit); }
 .lf-tip .lf-tip-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Over its cap: the count against the cap, in the colour of what is in trouble. */

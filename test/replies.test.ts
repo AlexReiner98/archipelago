@@ -78,7 +78,7 @@ test('a reply that did what a rule names is asked once a turn, the asking kept i
   await assert.rejects(callTool(l, owner, 'workspace_set', { lifted: { reply_nothing: true } }), /No rule here is turned off by "reply_nothing"/);
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true } });
   const info = (await callTool(l, owner, 'workspace_info', {})) as any;
-  assert.deepEqual(info.lifted, { reply_draw_answers: false, reply_record_findings: false, reply_show_changes: true });
+  assert.deepEqual(info.lifted, { reply_draw_answers: false, reply_record_findings: false, reply_show_changes: true, reply_unshown: false });
   assert.deepEqual(info.reply_rules.find((r: any) => r.rule === 'checks.show_changes'), { rule: 'checks.show_changes', say: SHOW.say, lifted: 'reply_show_changes', off: true, asked: 2 }, 'the owner’s switch, with how often it asked this week');
   assert.deepEqual(await stop(l, { session_id: 's1', turn: 'u4', reply: changed }), {}, 'turned off');
   await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: false } });
@@ -128,7 +128,7 @@ test('the hook counts what the reply did since the owner’s last message', asyn
   });
   server.close();
   assert.equal(got.turn, 'p2');
-  assert.deepEqual(got.reply, { read: 3, surveyed: 1, showed: 1, changed: 2, told: 2, worked: 4, edited: 1, committed: 1, pushed: 0 }, 'a get and a read of the tools are not surveys; every tool but a map’s is work, and another workspace’s server is a map’s');
+  assert.deepEqual(got.reply, { read: 3, surveyed: 1, showed: 1, changed: 2, told: 2, worked: 4, edited: 1, committed: 1, pushed: 0, looked: 0, shown: 0, unshown: 0 }, 'a get and a read of the tools are not surveys; every tool but a map’s is work, and another workspace’s server is a map’s');
   assert.ok(!got.touched.includes('e_elsewhre'), 'an item named on another workspace is not this map’s');
   assert.equal(got.stop_hook_active, false, 'what Claude Code said goes through');
   assert.deepEqual(JSON.parse(out), { decision: 'block', reason: 'asked' }, 'and the answer comes back to Claude Code');
@@ -197,4 +197,57 @@ test('the session-start text says the map, not the chat, is the record, and that
   const text = await sessionHookPack.hookSessionStart(ownContext(l, 'sessions'), ({ session_id: 'f2', cwd: tmpdir() }));
   assert.match(text, /The map is the record of this work, not the chat/);
   assert.match(text, /a reply that worked and told nothing is asked to/);
+});
+
+/** What the hook sends at a reply's end for a transcript of these lines. */
+async function sentFor(lines: unknown[]): Promise<any> {
+  const dir = mkdtempSync(join(tmpdir(), 'pelago-reply-'));
+  const transcript = join(dir, 'session.jsonl');
+  writeFileSync(transcript, lines.map((x) => JSON.stringify(x)).join('\n') + '\n');
+  let got: any;
+  const server = createServer((req, res) => {
+    let body = '';
+    req.on('data', (d) => (body += d));
+    req.on('end', () => (req.url === '/hooks/events' ? res.end('{}') : ((got = JSON.parse(body)), res.end('{}'))));
+  });
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
+  const port = (server.address() as { port: number }).port;
+  await new Promise<void>((done) => {
+    const child = spawn(process.execPath, [join(import.meta.dirname, '..', 'scripts', 'pelago-hook.mjs'), 'stop'], { env: { ...process.env, PELAGO_URL: `http://127.0.0.1:${port}`, PELAGO_AGENT_TOKEN: '' } });
+    child.on('close', () => done());
+    child.stdin.end(JSON.stringify({ session_id: 'i1', transcript_path: transcript, stop_hook_active: false }));
+  });
+  server.close();
+  return got;
+}
+
+test('the hook counts the images a reply looked at and those it showed, and the sessions pack asks it to show the rest', async () => {
+  const use = (id: string, name: string, input: unknown) => ({ type: 'assistant', message: { id, content: [{ type: 'tool_use', id, name, input }] } });
+  const image = { type: 'image', source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' } };
+  const answer = (id: string, content: unknown) => ({ type: 'user', uuid: `r-${id}`, message: { content: [{ type: 'tool_result', tool_use_id: id, content }] } });
+  const looked = [
+    { type: 'user', uuid: 'p1', message: { role: 'user', content: [{ type: 'text', text: 'Look at this' }, image] } },
+    use('c1', 'mcp__Claude_Browser__computer', { action: 'screenshot' }),
+    answer('c1', [{ type: 'text', text: 'Took it' }, image]),
+    use('c2', 'mcp__claude-in-chrome__computer', { action: 'zoom' }),
+    answer('c2', [image]),
+    use('c3', 'Read', { file_path: 'notes.md' }),
+    answer('c3', 'just words'),
+  ];
+  const one = await sentFor([...looked, use('s1', 'SendUserFile', { files: ['a.png', 'notes.md'], status: 'normal' })]);
+  assert.deepEqual([one.reply.looked, one.reply.shown, one.reply.unshown], [2, 1, 1], 'an image the owner sent is not one the agent looked at, nor a file that is not an image one shown');
+  const both = await sentFor([...looked, use('s1', 'SendUserFile', { files: ['a.png', 'b.JPG'], status: 'normal' })]);
+  assert.equal(both.reply.unshown, 0);
+  const shown = await sentFor([...looked, use('s2', 'mcp__pelago__report', { action: 'show', params: {} }), use('s3', 'mcp__pelago__draw', {})]);
+  assert.equal(shown.reply.unshown, 0, 'a show and a draw put one before the owner each');
+
+  const l = await map();
+  const rule = l.registry.rules.find((r) => r.pack === 'sessions' && r.id === 'show_what_you_saw')!;
+  assert.ok(rule && checkRules([rule], { types: new Map() }).length === 0, 'sessions ships it, checked as data');
+  await callTool(l, owner, 'workspace_set', { lifted: { reply_show_changes: true, reply_draw_answers: true, reply_record_findings: true } });
+  await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, { session_id: 'i1' });
+  assert.deepEqual(await stop(l, { session_id: 'i1', turn: 't1', reply: one.reply }), { decision: 'block', reason: rule.say });
+  assert.deepEqual(await stop(l, { session_id: 'i1', turn: 't2', reply: both.reply }), {}, 'every image shown');
+  await callTool(l, owner, 'workspace_set', { lifted: { reply_unshown: true } });
+  assert.deepEqual(await stop(l, { session_id: 'i1', turn: 't3', reply: one.reply }), {}, 'turned off');
 });

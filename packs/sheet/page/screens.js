@@ -10,6 +10,7 @@ import { startPiece } from './start.js';
 import { flatView } from './query.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
+import { roundsStrip } from './rounds.js';
 import { drawPart } from './part-host.js';
 import { pageIsA, pageSchema, pageType } from './page-schema.js';
 import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
@@ -129,6 +130,9 @@ async function rows(host, id, p) {
   }
 }
 
+/** A kept look's picture, as an address an image loads (query picture { look }). */
+const lookSrc = (s) => s.id && api('picture', { look: s.id }).then((p) => ((i) => (i?.data ? `data:${i.content_type};base64,${i.data}` : null))(p?.image ?? p));
+
 /**
  * A piece a pack places in the band (place: "lead") reads as band lines, not as a card under a header: each a label
  * and its value, the whole value kept for its tip. What is not set has no line.
@@ -198,6 +202,11 @@ const PIECES = {
     const node = h('div');
     return { node, later: () => heldPiece(node, p.title ?? p.screen.title) };
   },
+  // The pictures kept of the item round by round, from the field the piece names: a kept look is read with the token.
+  rounds: (ctx, p) => {
+    const strip = ctx.e && roundsStrip(ctx.e.props?.[p.field], { h, ago, src: lookSrc, limit: p.limit });
+    return strip?.count > 0 && { node: section(`rounds:${p.field}`, p.title ?? p.screen.title, strip.count, strip.node), later: strip.at };
+  },
   // Drawn with the note: the item's page reads them by name.
   figure: () => null,
 };
@@ -251,7 +260,7 @@ const draw = (ctx, p) => (Object.hasOwn(PIECES, p.piece) ? PIECES[p.piece](ctx, 
 const PAGES = {};
 
 /** A piece that draws something of an item has nothing to draw on a screen of its own. */
-const OF_ITEM = ['fields', 'token', 'button', 'count', 'turns', 'findings'];
+const OF_ITEM = ['fields', 'token', 'button', 'count', 'turns', 'findings', 'rounds'];
 
 /** The column a screen of its own draws: its pieces, with no item. */
 export function drawScreen(screen, redraw) {
@@ -328,7 +337,7 @@ const drawnOn = (data, pieces, lead = false) =>
     })
     .filter(Boolean);
 /** The pieces the bare page draws as sections of its own. */
-const SECTIONS = ['turns', 'findings', 'picture', 'view'];
+const SECTIONS = ['turns', 'findings', 'picture', 'view', 'rounds'];
 /** The count a screen on this item declares: it stands at the foot of its note while it is written (packs/sheet/page/note-count.js). */
 export const countOn = (data) => piecesOn(data).find((p) => p.piece === 'count');
 

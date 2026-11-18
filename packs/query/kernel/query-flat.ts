@@ -138,6 +138,8 @@ interface Seeded {
   on_islands: boolean;
   /** Each island as the read gives it, passed to the answer whole: only its pack is built here (bug e_e5vwnpg6). */
   islands: IslandRow[];
+  /** The islands of a pack's parts Find asked for (`parts <pack> <island>`), each placed after the island it is of. */
+  parts_islands?: { id: string; parts_of: { island: string; pack: string }; [field: string]: unknown }[];
   /** Why an item waits: its type's pack is not active on its island (decision e_57bjxy2x), by item. */
   waiting?: Record<string, { pack: string; why: string }>;
   cut?: boolean;
@@ -257,10 +259,12 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
     links: seeded.links.map((r) => ({ id: r.id, type: r.type, ...(flavourOf(ctx.registry, r.type).length && { is: flavourOf(ctx.registry, r.type) }), from: r.from_id, to: r.to_id, ...(r.props && Object.keys(r.props).length && { props: r.props }) })),
     // Each island passes through whole; its pack (an id at the source) becomes its legend and what it declares there:
     // its state, what it requires, what turning it off would send waiting. `decl` is folded into it, not sent apart.
-    ...(seeded.islands.length && { islands: seeded.islands.map(({ pack: packId, decl, ...isle }) => {
+    ...(seeded.islands.length && { islands: seeded.islands.flatMap(({ pack: packId, decl, ...isle }) => {
       const legend = packId ? islandPack(ctx.registry, packId, usedOn(isle.id)) : undefined;
       const pack = legend || decl ? { id: packId!, title: packId!, types: [] as { id: string; title: string }[], links: [] as { id: string; title: string }[], ...legend, ...decl } : undefined;
-      return { ...isle, ...(pack && { pack }) };
+      // A pack's parts the lens asked for come as islands of their own, after the island they are of (lane e_nfapxupx).
+      const row = { ...isle, ...(pack && { pack }) };
+      return [row, ...((seeded.parts_islands ?? []).filter((p) => p.parts_of.island === isle.id) as unknown as (typeof row)[])];
     }) }),
     ...(filed && { lanes: filed.lanes, streams: filed.streams }),
     ...(seeded.cut && { cut: true }),

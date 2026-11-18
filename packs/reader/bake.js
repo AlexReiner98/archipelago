@@ -33,7 +33,8 @@ export function svgOf(mark, count = { n: 0 }) {
   if (!SVG_TAGS.has(tag)) refuse(`the tag "${tag}"`);
   const said = [];
   for (const [name, value] of Object.entries(attrs ?? {})) {
-    if (name === 'key' || name === 'on' || name === 'pulse' || value === null || value === undefined || value === false) continue;
+    // What a person does with a mark (its gestures, and the query term a find asks for) means nothing in a baked picture.
+    if (name === 'key' || name === 'on' || name === 'pulse' || name === 'find' || value === null || value === undefined || value === false) continue;
     const text = String(value);
     if (name === 'item') {
       if (!ID.test(text)) refuse(`the item "${text.slice(0, 80)}"`);

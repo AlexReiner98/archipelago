@@ -12,7 +12,8 @@
     "surface.replies": "reply-rules.ts#replyWords"
   } },
   "rules": [
-    { "id": "bookkeeping", "when": { "bookkeeping": true }, "then": "spare", "say": "A session's own record of itself (it began, was named, waits, ended) is bookkeeping: it applies as it is made, as the agent it is for." }
+    { "id": "bookkeeping", "when": { "bookkeeping": true }, "then": "spare", "say": "A session's own record of itself (it began, was named, waits, ended) is bookkeeping: it applies as it is made, as the agent it is for." },
+    { "id": "show_what_you_saw", "on": "reply_ended", "when": { "reply": { "unshown": 1 } }, "then": "ask", "lifted": "reply_unshown", "say": "You looked at images the owner has not seen: show each of them (SendUserFile, or report, action show) before you stop." }
   ],
   "views": [
     { "form": "screen", "id": "core.run_worked", "title": "Worked on", "on": ["run"], "pieces": [{ "piece": "picture", "lens": { "filter": { "find": ["worked {here}"] }, "limit": 50 }, "style": { "shape": "map" } }] }

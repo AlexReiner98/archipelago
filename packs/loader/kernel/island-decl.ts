@@ -13,7 +13,7 @@ import type { PackFile, Registry } from './packs.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** A part of a pack as an island's header names it: its state there, and what it lacks while it waits (feature e_4r82mvf3). */
-export interface DeclaredPart { id: string; kind: PartKind; state: PackState['state']; lacks?: string[] }
+export interface DeclaredPart { id: string; kind: PartKind; state: PackState['state']; lacks?: string[]; /** The type and link type ids it names. */ needs?: string[] }
 /** A name a pack requires, and the pack active on the island that gives it, if one does. */
 export interface Consumed { name: string; by?: string }
 /**
@@ -58,8 +58,9 @@ function partsOn(map: Registry, run: Registry, id: string, state: PackState['sta
   const seen = new Set<string>();
   return named.filter((p) => !seen.has(p.id) && seen.add(p.id)).map((p) => {
     const ps = run.partStates.get(p.id);
-    if (ps?.pack === id) return { id: p.id, kind: p.kind, state: ps.state, ...(ps.state === 'waiting' && { lacks: ps.lacks }) };
-    return { id: p.id, kind: p.kind, state };
+    const needs = p.needs.length ? { needs: p.needs } : {}; // what it names, for a drawing that wires a pack's parts (packs/canvas/layouts/flow/ghost-parts.js)
+    if (ps?.pack === id) return { id: p.id, kind: p.kind, state: ps.state, ...(ps.state === 'waiting' && { lacks: ps.lacks }), ...needs };
+    return { id: p.id, kind: p.kind, state, ...needs };
   });
 }
 
@@ -83,6 +84,14 @@ function declared(map: Registry, run: Registry, id: string, sources?: Sources): 
     parts: partsOn(map, run, id, s.state), provides: providesOn(here), consumes: consumesOn(run, pack),
     ...(s.state === 'waiting' && s.lacks?.length && { lacks: s.lacks }),
   };
+}
+
+/**
+ * A pack as an island runs it, for the island of its parts a query asks for (`parts <pack> <island>`, lane e_nfapxupx):
+ * the same as the island's own answer gives it (its state, parts, what it gives and takes), read for that pack alone.
+ */
+export async function packOnIsland(map: Archipelago, island: string, pack: string, given?: Sources): Promise<Declared> {
+  return declared(map.registry, await islandRegistry(map, island), pack, given ?? (await styleSources(map)));
 }
 
 /** The packs a pack requires, by the packs that provide each (an active one first), the kernel's own left out: it is on every island. */

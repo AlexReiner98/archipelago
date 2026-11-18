@@ -7,6 +7,7 @@
 // drawn past LATE_MS: a page that never yields is answered for, not waited on. Chrome is started on the first and
 // stopped when none has come for IDLE_MS.
 
+import { checksOf, PROBE, type Check, type Probe } from './checks.ts';
 import { openBrowser, type Browser, type Tab } from './chrome.ts';
 
 /** A catch that says what failed and answers `fallback` (as src/logged.ts does): a drawing's extras never fail it. */
@@ -27,6 +28,10 @@ const WAIT_MS = 60_000;
 const LATE_MS = 45_000;
 /** Past this a PNG is sent as a JPEG instead: a picture is for reading, not for keeping. */
 const PNG_MOST = 400_000;
+/** The longest a press is given to settle: the page unchanged for QUIET_MS, else taken as it stands. */
+const PRESS_MS = 3000;
+/** How long the page must go unchanged for a press to have settled. */
+const QUIET_MS = 300;
 /** Past this a drawing's marks are not sent: the picture is, as for a drawing with no marks. */
 const MARKS_MOST = 1_500_000;
 
@@ -49,6 +54,11 @@ export interface Drawn {
   drew?: unknown[];
   /** A dry run's: what its drawings said went wrong, each once, the first first. */
   errors?: string[];
+  /** A pressed look's: the keys found and pressed, in order, and those no mark had (or none could be reached). */
+  pressed?: string[];
+  missing?: string[];
+  /** What the drawn page breaks of the rules a machine reads (./checks.ts): empty when nothing does. */
+  checks: Check[];
 }
 
 /** Code not yet saved, drawn in place of a field the map holds (packs/surface/kernel/tool-preview.ts, Preview): the page's tries, set before its code runs. */
@@ -103,10 +113,10 @@ async function turn(): Promise<() => void> {
 }
 
 /** Draw `address` (the app's page in look mode, or a document's preview) at this size, once it has a turn. */
-export async function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks = false, tries?: Try[]): Promise<Drawn> {
+export async function drawLook(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks = false, tries?: Try[], press?: string[]): Promise<Drawn> {
   const done = await turn();
   try {
-    return await drawNow(address, pass, width, height, scheme, marks, tries);
+    return await drawNow(address, pass, width, height, scheme, marks, tries, press);
   } finally {
     done();
   }
@@ -165,7 +175,46 @@ export function errorsOf(state: Drawn['state'], why: string | undefined, shown: 
   return [...new Set(out.map((e) => e.slice(0, 300)))];
 }
 
-async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks: boolean, tries?: Try[]): Promise<Drawn> {
+/** Wait until the page has gone QUIET_MS without a change (packs/walls/page/look-press.js counts them), at most PRESS_MS. */
+async function settle(tab: Tab) {
+  const count = () => tab.evaluate<number>('window.lookChanges ? window.lookChanges() : 0').catch(() => 0);
+  let last = await count(), still = Date.now();
+  for (const until = Date.now() + PRESS_MS; Date.now() < until; await wait(50)) {
+    const now = await count();
+    if (now !== last) (last = now), (still = Date.now());
+    else if (Date.now() - still >= QUIET_MS) return;
+  }
+}
+
+/** A click at (x, y) as a person's pointer makes it: moved there, pressed, let go. */
+async function click(tab: Tab, x: number, y: number) {
+  await tab.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+  await tab.send('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', buttons: 1, clickCount: 1 });
+  await tab.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', buttons: 0, clickCount: 1 });
+}
+
+/**
+ * Press each mark by its key, in order, from the trusted side: the page says where the mark stands (look mode's
+ * lookPlace), and this tab clicks there, so the drawing hears it as it hears a person's click. After each, the pointer
+ * goes back to the corner (a tip it raised is let go) and the page is let settle.
+ */
+export async function pressAll(tab: Tab, keys: string[]): Promise<{ pressed: string[]; missing: string[] }> {
+  const pressed: string[] = [], missing: string[] = [];
+  for (const key of keys) {
+    const at = await tab.evaluate<{ x: number; y: number } | null>(`window.lookPlace ? window.lookPlace(${JSON.stringify(key)}) : null`).catch(() => null);
+    if (!at) {
+      missing.push(key);
+      continue;
+    }
+    await click(tab, at.x, at.y);
+    await tab.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 0, y: 0 });
+    await settle(tab);
+    pressed.push(key);
+  }
+  return { pressed, missing };
+}
+
+async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks: boolean, tries?: Try[], press?: string[]): Promise<Drawn> {
   clearTimeout(idle);
   const began = Date.now();
   const tab = await (await getBrowser()).tab();
@@ -188,6 +237,8 @@ async function drawNow(address: string, pass: string, width: number, height: num
       if (said.state && said.state !== 'drawing') break;
     }
     const state = (['drawn', 'empty', 'error'].includes(String(said.state)) ? said.state : 'late') as Drawn['state'];
+    // Pressed first, once it has drawn: a view that never drew has no marks to press.
+    const presses = press?.length ? (state === 'drawn' ? await pressAll(tab, press) : { pressed: [], missing: [...press] }) : undefined;
     const shot = async (format: 'png' | 'jpeg') => Buffer.from((await tab.send('Page.captureScreenshot', { format, ...(format === 'jpeg' && { quality: 80 }) })).data, 'base64');
     // Settled: the same picture twice, a moment apart; a drawing that moves is taken as it stands on the third.
     let last = await shot('png'), settled = false;
@@ -200,10 +251,12 @@ async function drawNow(address: string, pass: string, width: number, height: num
     const jpeg = last.length > PNG_MOST;
     const made = marks && state === 'drawn' ? await tab.evaluate<Marks | null>('window.lookMarks()').catch(logged(`look ${address}: its marks could not be read`, null)) : null;
     const fell_back = await facesOf(tab).catch(logged(`look ${address}: its faces could not be read`));
+    // Read off the page as it was taken: a probe that fails is said, and the look answers with no checks.
+    const checks = checksOf(await tab.evaluate<Probe>(PROBE).catch(logged(`look ${address}: its checks could not be read`, null)));
     const drew = await tab.evaluate<unknown[] | null>('window.lookDrew ? window.lookDrew() : null').catch(logged(`look ${address}: what it drew with could not be read`, null));
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
     const errors = tries?.length ? errorsOf(state, why, (await tab.evaluate<string[]>(SHOWN_ERRORS).catch(logged(`look ${address}: its errors could not be read`, []))) ?? []) : undefined;
-    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(errors && { errors }) };
+    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, checks, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(errors && { errors }), ...presses };
   } catch (err) {
     throw Date.now() - began >= LATE_MS ? new Error(`The view had not drawn within ${LATE_MS / 1000} s, and its page stopped answering: it was closed.`) : err;
   } finally {

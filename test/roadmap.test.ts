@@ -52,7 +52,7 @@ test('a picture is drawn in the styles kept for it, nearest last; hubs, code and
   // The packs' presets first: with nothing kept on the map, a view is drawn in the house style (canvas's, moved from core with its id), with the
   // marks of a session's state over it.
   const house = { id: 'core.house', title: 'House style', preset: 'core.house' };
-  const added = [{ id: 'core.sessions_look', title: "A session's state", preset: 'core.sessions_look' }];
+  const added = [{ id: 'core.sessions_look', title: "A session's state", preset: 'core.sessions_look' }, { id: 'sheet.rounds', title: 'Rounds on a page', preset: 'sheet.rounds' }];
   const whole = await run();
   assert.deepEqual([whole.style.shape, whole.style.lit, whole.style.open, whole.used], ['map', 'all', 1, [house, ...added]]);
   // Kept on the map: the workspace's style (about nothing), then those about what the picture is of, then one named.
