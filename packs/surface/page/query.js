@@ -351,7 +351,9 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     const { answer } = was;
     const ctx = { viewer: answer.viewer, typeKnown: (t) => types.has(t), systemType: (t) => Boolean(types.get(t)?.system) };
     const first = narrowedFrom(was.lens, lens, answer, was.raw.lens, ctx);
-    if (!first) return;
+    // An edit it cannot draw early (a term added: a pack's parts opened) shows the picture before it until the answer
+    // is drawn, never an empty canvas: the drawing replaces it then (e_m5x8pmwu).
+    if (!first) return void body.replaceChildren(...was.body.childNodes);
     const held = new Set(answer.items.map((i) => i.id));
     // What is held for the owner stays drawn where it would land; the server's answer says it again.
     const old = was.shown;

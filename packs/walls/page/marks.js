@@ -6,7 +6,8 @@
 // A mark is [tag, attributes, ...what is in it], a string being text. Two attributes are not drawn: `key`, the name
 // a patch uses for it, and `on`, the events the drawing is told of (enter, leave, click), or `add` or `toggle`, a
 // button the page answers itself (./marks-add.js, ./marks-toggle.js, the latter naming its pack by `pack`), or `find`, a
-// button that adds a term to the canvas query or takes it away (./marks-find.js), naming it by `find`; a third, `pulse`, is kept on
+// button that adds a term to the canvas query or takes it away (./marks-find.js), naming it by `find` (and by `shows`
+// the key of the mark to bring into sight once it is drawn); a third, `pulse`, is kept on
 // the mark as words, for the page to run it along its line when they change (ui/transition.js). A mark says the item it
 // stands for with `item` (an id), which a link to the item says too: the page lights marks by it (packs/surface/page/light-items.js),
 // whatever drew them. Two tags are the page's own, made from an item's id alone: `reader`, a document as its reader
@@ -53,6 +54,8 @@ function attribute(el, name, value) {
   // What a pulse carries (ui/transition.js): words only, kept on the mark, never drawn.
   if (name === 'pulse') return void (el.dataset.pulse = text);
   if (name === 'find') return void (findTerm(text) ? (el.dataset.find = findTerm(text)) : fail(`the term "${text.slice(0, 80)}"`));
+  // The mark a find brings into sight once the canvas draws what it found (./marks-find.js): another mark's key, words only.
+  if (name === 'shows') return void (findTerm(text) ? (el.dataset.shows = findTerm(text)) : fail(`the mark "${text.slice(0, 80)}"`));
   if (name === 'pack') return void (PACK_ID.test(text) ? (el.dataset.pack = text) : fail(`the pack "${text.slice(0, 80)}"`));
   if (!ATTRS.has(name)) fail(`the attribute "${name}"`);
   if (name === 'href' && !ITEM.test(text)) fail(`a link to "${text.slice(0, 80)}"`);

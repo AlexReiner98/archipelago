@@ -19,12 +19,15 @@ const has = (query, term) => (query?.filter?.find ?? []).some((t) => findTerm(t)
 /** The term exactly as the query has it, so taking it away takes that one. */
 const asHad = (query, term) => (query?.filter?.find ?? []).find((t) => findTerm(t)?.toLowerCase() === term.toLowerCase());
 
-/** Add `term` to the canvas query's Find, or take it away where the query has it. */
-export function toggleFind(term) {
+/**
+ * Add `term` to the canvas query's Find, or take it away where the query has it. The picture stays where the reader
+ * is looking (`stay`), and what it adds, named by the key of its mark (`shows`), is brought into sight once drawn.
+ */
+export function toggleFind(term, shows) {
   const t = findTerm(term);
   if (!t) return;
   const query = hooks.address?.()?.query ?? null;
-  hooks.go?.(has(query, t) ? { take: { part: 'find', value: asHad(query, t) } } : { add: { find: t } });
+  hooks.go?.(has(query, t) ? { take: { part: 'find', value: asHad(query, t) }, stay: true } : { add: { find: t }, stay: true, ...(findTerm(shows) && { shows: findTerm(shows) }) });
 }
 
 /** Make `el` a button that adds its term to the canvas query, or takes it away. */
@@ -34,7 +37,7 @@ export function findable(el) {
   const go = (ev) => {
     ev.preventDefault();
     ev.stopPropagation();
-    toggleFind(el.dataset.find);
+    toggleFind(el.dataset.find, el.dataset.shows);
   };
   el.addEventListener('click', go);
   el.addEventListener('keydown', (ev) => (ev.key === 'Enter' || ev.key === ' ') && go(ev));
