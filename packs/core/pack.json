@@ -73,7 +73,7 @@
       "capabilities": { "owned": true, "lead": "none" },
       "altitude": "step",
       "title": "Record",
-      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. A starter type of the work: a pack's type may extend it, or extend nothing.",
+      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. A starter type of the work: a pack's type may extend it, or extend nothing. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["superseded"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -114,7 +114,7 @@
     {
       "id": "system",
       "title": "System",
-      "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked: its types carry the kernel flag. Only the kernel's packs declare types of it.",
+      "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked: its types carry the kernel flag. Only the kernel's packs declare types of it. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "capabilities": { "kernel": true, "lead": "none" },
       "fields": {
@@ -157,6 +157,7 @@
     {
       "id": "lens",
       "extends": "system",
+      "capabilities": { "lead": { "form": "picture" } },
       "title": "View",
       "description": "A view kept on the map: a query (a filter, a walk and a limit, as query flat takes them) and how it is drawn, its layout with its settings, so a person opens it anywhere and it draws the same. About a project or item (an about link), it is a view of that thing; about nothing, the workspace's. where things sit on it is kept in the places stream under its id, apart from the map's. Named for the question it answers, its note's first line says what it shows; an agent reuses a view already there with the same name or query about the same items, rather than make it twice. Its life is its status: working (an agent's, about its task, until the owner keeps it; while what it is about is closed, it is retired with it), kept (Save in the app, or an agent that keeps it), retired. Home lists them; a document line holding its id draws it there; report show with its id opens one.",
       "moved_from": ["canvas"],
@@ -179,7 +180,7 @@
       "id": "style",
       "extends": "system",
       "title": "Style",
-      "description": "How the map looks: colours, type and sizes, and how a page reads. About nothing, the workspace's; on kinds or types (on), how every such item's page looks. What one view needs is not a style: a view holds its own layout and settings (its style field), so a style about a view draws nothing. How a view is drawn as code is not a style: that is a layout. A field left empty comes from the level below. The defaults are styles too: a pack ships them as presets, and one kept on the map with the preset's id (preset) is the owner's version of it, its fields over the preset's; retired, the preset is not used. Read only by the page that draws.",
+      "description": "How the map looks: colours, type and sizes, and how a page reads. About nothing, the workspace's; on kinds or types (on), how every such item's page looks. What one view needs is not a style: a view holds its own layout and settings (its style field), so a style about a view draws nothing. How a view is drawn as code is not a style: that is a layout. A field left empty comes from the level below. The defaults are styles too: a pack ships them as presets, and one kept on the map with the preset's id (preset) is the owner's version of it, its fields over the preset's; retired, the preset is not used. Read only by the page that draws. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "shape": { "type": "string", "description": "The layout: map is the one that comes built in, used when the style has no code of its own; rails is the map with a walk through it: its items as stops in the view’s order, for a page read by scrolling. map: the whole graph made plane at once, islands and their ports with it (rings broken, trunks of one type and one way), given right angles with the fewest bends, then its distances relaxed keeping that shape. time is a calendar of what the view places in time: a column per day, hours running down, a lane per person (layout bars: a row per lane). A shape no pack draws (one retired: list, flow, strips, rows, cola, grid, architecture, pages, planar) is drawn as map. Any other look is code of its own. map unless said." },
@@ -256,7 +257,7 @@
       "id": "part",
       "extends": "system",
       "title": "Part",
-      "description": "A part of the app's page, as code: what a map pack draws in one slot (the canvas, the sheet, a piece of a screen), walled in a worker and answering with marks the host checks before it draws them. A pack declares its parts in its manifest (parts); one kept here with a part's id (preset) is the owner's version of it, its code over the pack's module by module; retired, the pack's part is not drawn. Its pack, slot and fields say what it is, so a map of the code reads them. Written by an agent, its code waits for the human.",
+      "description": "A part of the app's page, as code: what a map pack draws in one slot (the canvas, the sheet, a piece of a screen), walled in a worker and answering with marks the host checks before it draws them. A pack declares its parts in its manifest (parts); one kept here with a part's id (preset) is the owner's version of it, its code over the pack's module by module; retired, the pack's part is not drawn. Its pack, slot and fields say what it is, so a map of the code reads them. Written by an agent, its code waits for the human. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["working", "kept"], "closed": ["retired"], "phases": { "working": "under_way", "kept": "standing", "retired": "ended" } },
       "fields": {
         "pack": { "type": "string", "description": "The pack whose part it is, by id." },
@@ -284,6 +285,7 @@
     {
       "id": "instruction",
       "extends": "system",
+      "capabilities": { "lead": { "form": "line", "value": "for" } },
       "title": "Instruction",
       "description": "What agents are told, in its note, and where (for): as a style is how things look, an instruction is what an agent is asked to do. A pack ships them as presets; one kept on the map with the preset's id (preset) is the owner's version of it, its note and fields over the preset's; retired, the preset is not said. One kept about a repository is said only to sessions there, and over the workspace's of the same preset. A name in braces ({run}) is filled in by where it is said.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
@@ -298,7 +300,7 @@
       "id": "type",
       "extends": "system",
       "title": "Type",
-      "description": "A type of item, kept on the map: as a style is how things look, a type is what an item is. A pack ships its types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's, its fields added to the preset's; retired, no new item is made of it, and those there are stay. One with a name and no preset is a type of this workspace's own, named local.<name>, extending a kind or a type of one.",
+      "description": "A type of item, kept on the map: as a style is how things look, a type is what an item is. A pack ships its types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's, its fields added to the preset's; retired, no new item is made of it, and those there are stay. One with a name and no preset is a type of this workspace's own, named local.<name>, extending a kind or a type of one. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "preset": { "type": "string", "description": "The id of the pack's type this is the owner's version of, e.g. task." },
@@ -313,7 +315,7 @@
       "id": "link_type",
       "extends": "system",
       "title": "Link type",
-      "description": "A type of link, kept on the map. A pack ships its link types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's; retired, no new link is made of it, and those there are stay. One with a name and no preset is a link type of this workspace's own, named local.<name>, a flavour of a link type it extends.",
+      "description": "A type of link, kept on the map. A pack ships its link types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's; retired, no new link is made of it, and those there are stay. One with a name and no preset is a link type of this workspace's own, named local.<name>, a flavour of a link type it extends. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "preset": { "type": "string", "description": "The id of the pack's link type this is the owner's version of, e.g. depends_on." },
@@ -342,7 +344,7 @@
       "id": "screen",
       "extends": "system",
       "title": "Screen",
-      "description": "A page the kernel draws as one column of pieces: a picture (a query in a style), rows from a pack's view, an action's form, an item's fields, a short note. On kinds or types (on), it is shown on the page of every such item; given a place in the nav (nav), it is a page of its own there; on Home (home), it is drawn there after the screens before it. A pack ships screens as presets; one kept on the map with the preset's id (preset) is the owner's version of it, and retired, the preset is not shown. Only a person changes a screen: an agent's change waits for them.",
+      "description": "A page the kernel draws as one column of pieces: a picture (a query in a style), rows from a pack's view, an action's form, an item's fields, a short note. On kinds or types (on), it is shown on the page of every such item; given a place in the nav (nav), it is a page of its own there; on Home (home), it is drawn there after the screens before it. A pack ships screens as presets; one kept on the map with the preset's id (preset) is the owner's version of it, and retired, the preset is not shown. Only a person changes a screen: an agent's change waits for them. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "pieces": { "type": "json", "description": "The column, in order: each {piece, ...what it needs}. picture: lens (a kept view's id, or a query { filter, walk, limit }, \"{here}\" in its ids, link terms or within the item the page is of), only (the types it draws of what that finds) and style (a style's id, or its fields, code aside); view: view (a pack's view of rows) and item (the input the item's id goes in); action: action (a pack's action); fields: fields (a list of the item's fields); note: text; count: section (a heading of the note), by (a field) and limits (for each of its values: max, low, high, split, emoji, link). Left empty, the preset's." },
@@ -359,7 +361,7 @@
       ],
       "extends": "system",
       "title": "Source",
-      "description": "The original input a fact came from: a file, an email, a commit, a conversation.",
+      "description": "The original input a fact came from: a file, an email, a commit, a conversation. It opens on no band: its title and marks say it.",
       "statuses": {
         "open": [
           "recorded"
@@ -547,7 +549,7 @@
       ],
       "extends": "system",
       "title": "Notification",
-      "description": "A message for the human, from an agent, an automation or the system.",
+      "description": "A message for the human, from an agent, an automation or the system. It opens on no band: its title and marks say it.",
       "statuses": {
         "open": [
           "unread"
@@ -580,7 +582,7 @@
       ],
       "extends": "system",
       "title": "Automation",
-      "description": "Something done when a time comes or a query starts to match, about the item it serves: it lives on that item's island and is as visible as it. The kernel's clock says when it is due; the automations pack does it. Only fires while its status is enabled.",
+      "description": "Something done when a time comes or a query starts to match, about the item it serves: it lives on that item's island and is as visible as it. The kernel's clock says when it is due; the automations pack does it. Only fires while its status is enabled. It opens on no band: its title and marks say it.",
       "capabilities": { "when": { "repeat": { "from": "at", "days": "days" } }, "subject": { "link": "about" } },
       "statuses": {
         "open": [
@@ -658,7 +660,7 @@
         "sys.shared_document"
       ],
       "extends": "record",
-      "capabilities": { "kernel": true },
+      "capabilities": { "lead": { "form": "line", "value": "from_workspace" }, "kernel": true },
       "public": true,
       "title": "Shared document",
       "deliverable": true,
