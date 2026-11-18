@@ -23,7 +23,7 @@ import { layout } from './layout.js';
 import { effortOf } from './effort.js';
 import { css } from './look.js';
 import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
-import { countRows, css as packCss, packMarks, packOpener, packRules, packsWidth, partInKey } from './pack-marks.js';
+import { countRows, css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { looks as kept } from './island-looks.js';
@@ -133,7 +133,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const sessions = sessionMarks(style);
   // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
   const foci = new Set((answer.islands ?? []).filter((i) => i.focus).map((i) => i.id));
-  answer = { ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) };
+  answer = withPartsIslands({ ...answer, items: sessionItems(answer.items, sessions, (t) => cut(t, z('max_text'), (s) => measure(s, z('text')))) }); // a pack's parts as an island of the query (./parts-islands.js)
   // One budget for the whole picture (./effort.js): what it spends on looking better, at every level, it spends from this.
   const effort = effortOf(z('picture_work'));
   // An island with a look of its own is asked how what it holds stands and looks (../map/looks.js), by the code the frame hands over.
@@ -303,13 +303,13 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const [KW, KH] = ['key_width', 'key_height'].map(z);
   // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id }] : []);
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...(packOf(p.id) ? countRows({ pack: packOf(p.id), style, m, z }) : []), ...addRow(p.id)]]));
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...(packOf(p.id) ? countRows({ pack: packOf(p.id), style, m, z }) : []), ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
-  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
+  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort, rooms: partsRoom(answer, (pack) => ghostSize(pack, z, (t, px) => measure(t, px))) });
   // Islands whose look paints (./painted.js): their items are painted on the surface, not drawn as steps, nor the wires among them.
-  const canvases = (g.islands ?? []).filter((i) => i.canvas), inPainted = new Set(answer.items.filter((i) => canvases.some((c) => c.id === i.island)).map((i) => i.id));
+  const canvases = (g.islands ?? []).filter((i) => i.canvas), inPainted = new Set(answer.items.filter((i) => i.ghost || canvases.some((c) => c.id === i.island)).map((i) => i.id)); // a parts island's placeholder is never drawn
   if (inPainted.size) g = { ...g, all: g.all.filter((n) => !inPainted.has(n.id)), chains: g.chains.filter((w) => !inPainted.has(w.a) || !inPainted.has(w.b)), ties: g.ties.filter((w) => !inPainted.has(w.a) || !inPainted.has(w.b)) };
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
@@ -370,9 +370,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // Its header after its name: its pack and what that pack requires, each a mark (./pack-marks.js).
   // The packs (parts) this island turned off, as the answer's island says (packs_off, parts_off), else its item where the answer holds it.
   const offOn = (id, f = 'packs_off') => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.[f] ?? answer.items.find((i) => i.id === id)?.fields?.[f]);
-  // A click on a pack opens its parts (packOpener): the header drawn again where it first stood.
-  const headAt = new Map(), header = (id, [x, y], title, open = null, frame) => (headAt.set(id, [[x, y], title, open, frame]), packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), partsOff: offOn(id, 'parts_off'), open, style, at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], frame, z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) }));
-  const opens = packOpener((id, open) => headAt.has(id) && ((h) => header(id, h[0], h[1], open, h[3]))(headAt.get(id)));
+  // A parts island draws its pack's parts from its land's top left (./parts-islands.js, ./pack-marks.js partsIslandMarks).
+  const headAt = new Map(), header = (id, [x, y], title, open = null, frame) => (headAt.set(id, [[x, y], title, open, frame]), isParts(id) ? ((g) => g && partsIslandMarks({ of: g.of, pack: g.pack, partsOff: offOn(g.of, 'parts_off'), at: [frame.left, frame.top], style, z, m, titled, on: gestures.on, measure: (t, px) => measure(t, px) }))(partsIslands(answer).find((p) => p.id === id)) : packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), partsOff: offOn(id, 'parts_off'), open: open ?? openParts(answer, id), style, at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], frame, z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) }));
   const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header, part: (id, part) => packOf(id) && partInKey({ island: id, pack: packOf(id), id: part, partsOff: offOn(id, 'parts_off'), on: gestures.on }) });
   const drawnBy = new Map((g.islands ?? []).flatMap((isle) => [...(isle.look?.items ?? [])]));
   const stepLayer = steps.map((n) => {
@@ -473,7 +472,6 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);
-      for (const opened of [!story && opens(event)]) if (opened) return opened;
       if (String(key).startsWith('paint:')) return painting?.pointer(String(key).replace(/^paint:/, ''), name, event.at) ?? [];
       // A shared mark's tip, over the step's while the pointer is on the mark; off it, back to the step it is on, if any.
       if (!story && markTip(String(key))) {

@@ -10,6 +10,16 @@
 /** Which column a kind stands in: what is written on the left, what acts on it on the right. */
 const LEFT = new Set(['type', 'link']);
 
+/** How much room a pack's parts take, as an island of their own: each column's width, and the whole width and height. */
+export function ghostSize(pack, z, measure) {
+  const [d, gap, row, text, pad, apart] = ['island_part_mark', 'island_part_gap', 'island_part_row', 'island_part_list_text', 'island_part_list_pad', 'island_part_column_gap'].map(z);
+  const parts = Array.isArray(pack?.parts) ? pack.parts : [];
+  const left = parts.filter((p) => LEFT.has(p.kind)), right = parts.filter((p) => !LEFT.has(p.kind));
+  const wide = (col) => (col.length ? d + gap * 2 + Math.max(...col.map((p) => measure(p.id, text))) : 0);
+  const [lw, rw] = [wide(left), wide(right)];
+  return { lw, rw, width: pad * 2 + lw + (lw && rw ? apart : 0) + rw, height: pad * 2 + row + row * Math.max(left.length, right.length) };
+}
+
 /**
  * The ghost island of `pack` with its top left at `[x, y]`: { marks, tips, width, height }. `glyph(kind)` is a kind's
  * glyph, `state(part)` its state, `toggles(part)` whether the session may turn it, `tip(part, toggles)` its tip's lines.
@@ -21,10 +31,8 @@ export function ghostParts({ island, pack, at: [x, y], z, m, titled, measure, gl
   // What acts stands beside what it names: sorted by the first part on the left it needs, those naming none last.
   const first = (p) => ((k) => (k < 0 ? left.length : k))(left.findIndex((q) => (p.needs ?? []).includes(q.id)));
   const right = parts.filter((p) => !LEFT.has(p.kind)).map((p, k) => [p, k]).sort(([a, i], [b, j]) => first(a) - first(b) || i - j).map(([p]) => p);
-  const wide = (col) => (col.length ? d + gap * 2 + Math.max(...col.map((p) => measure(p.id, text))) : 0);
-  const [lw, rw] = [wide(left), wide(right)];
+  const { lw, rw, width, height } = ghostSize(pack, z, measure);
   const head = row, top = y + pad + head;
-  const width = pad * 2 + lw + (lw && rw ? apart : 0) + rw, height = pad * 2 + head + row * Math.max(left.length, right.length);
   const lx = x + pad, rx = lx + lw + (lw && rw ? apart : 0);
   const place = new Map();
   const tips = new Map();

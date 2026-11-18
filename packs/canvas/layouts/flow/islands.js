@@ -47,10 +47,12 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
       ? m('g', { key: `paint:${isle.id}`, on: ['move', 'leave', 'click'], class: 'lf-land lf-painted' }, ...rects.map((r) => m('rect', r)), m('rect', { key: `spot:${isle.id}`, class: 'lf-spot', x: isle.canvas.at[0], y: isle.canvas.at[1], width: 1, height: 1 }))
       : m('g', { class: 'lf-land' }, ...rects.map((r) => m('rect', r)));
     const shore = m('g', { class: 'lf-shore' }, ...rects.map((r) => m('rect', r)));
-    const title = named.get(isle.id);
+    // A pack's parts as an island of the query (./parts-islands.js) is its parts' drawing alone: no land, shore, name or key of its own.
+    const ghost = String(isle.id).startsWith('parts:'), title = ghost ? null : named.get(isle.id);
     const name = title && titled(m('a', { href: `#/e/${isle.id}`, class: 'lf-island-name' }, m('text', { x: isle.name[0] + z('island_name_x'), y: isle.name[1] }, title)), title);
     // After its name, what the header shows of it: its pack and what that pack requires (./pack-marks.js).
-    const head = title ? header(isle.id, [isle.name[0] + z('island_name_x'), isle.name[1]], title, null, { right: Math.max(...isle.land.map((r) => r.r)), top: Math.min(...isle.land.map((r) => r.t)) }) : null;
+    const frame = { left: Math.min(...isle.land.map((r) => r.l)), right: Math.max(...isle.land.map((r) => r.r)), top: Math.min(...isle.land.map((r) => r.t)) };
+    const head = title || ghost ? header(isle.id, [isle.name[0] + z('island_name_x'), isle.name[1]], title, null, frame) : null;
     for (const [key, tip] of head?.tips ?? []) tips.set(key, tip);
     // Its legend: each row's mark, then its words.
     const legend = (legends.get(isle.id) ?? []).map((row, n) => {
@@ -65,7 +67,7 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     });
     // What its own look paints (../map/looks.js), over its land and under what it holds.
     const painted = isle.look?.paint.length ? m('g', { class: 'lf-look', transform: `translate(${isle.look.at[0]} ${isle.look.at[1]})` }, ...isle.look.paint) : null;
-    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, land, shore, painted, name, head?.marks ?? [], legend);
+    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, ...(ghost ? [] : [land, shore]), painted, name, head?.marks ?? [], ...(ghost ? [] : [legend]));
   });
   // A gate on each shore a link between islands crosses: a bar across the wire in its island's colour, as long as the
   // port it marks. A finding
