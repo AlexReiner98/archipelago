@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { drawnKey, hear, holds, narrowed, unheard, workedOut } from '../packs/surface/page/narrow.js';
+import { drawnKey, hear, holds, narrowed, opened, unheard, workedOut } from '../packs/surface/page/narrow.js';
 
 const item = (id: string, title: string, at: string, more: Record<string, unknown> = {}): Record<string, unknown> & { id: string } => ({ id, type: 'task', title, status: 'todo', open: true, owner: null, updated_at: at, ...more });
 const link = (id: string, type: string, from: string, to: string) => ({ id, type, from, to });
@@ -96,4 +96,19 @@ test('two answers alike are said alike, whatever order their links and fields ca
   const b = { lens: { find: ['y'] }, items: [{ type: 't', title: 'A', id: 'e_1' }], links: [link('r_1', 'x', 'e_1', 'e_1'), link('r_2', 'x', 'e_1', 'e_1')] };
   assert.equal(drawnKey(a), drawnKey(b));
   assert.notEqual(drawnKey(a), drawnKey({ ...b, items: [{ ...b.items[0], title: 'B' }] }));
+  const aged = (age: number) => ({ ...b, items: [{ ...b.items[0], sessions: [{ run: 'e_run00001', age }] }, ...b.items.slice(1)] });
+  assert.equal(drawnKey(aged(35)), drawnKey(aged(36)), 'a session a minute older draws alike');
+});
+
+test("a pack's parts opened on an island the answer holds are answered here, as the server makes them (e_m5x8pmwu)", () => {
+  const build = { id: 'build', title: 'Build', state: 'active', parts: [{ id: 'build.lane', kind: 'type', state: 'active' }], provides: ['type:build.lane'], consumes: [], types: [], links: [], requires: [{ id: 'runs', title: 'Runs', state: 'waiting', parts: [] }], off_would_wait: 2 };
+  const held = { ...answer, islands: [{ id: 'e_isle0001', title: 'An island', pack: build }, { id: 'e_isle0002', title: 'Another' }] };
+  const out = opened(was, { ...was, filter: { find: [...was.filter.find, 'parts  build e_isle0001'] } }, held, said);
+  assert.deepEqual(out.islands.map((i: { id: string }) => i.id), ['e_isle0001', 'parts:e_isle0001:build', 'e_isle0002'], 'after the island it is of');
+  assert.deepEqual(out.islands[1], { id: 'parts:e_isle0001:build', title: 'Build: its parts', parts_of: { island: 'e_isle0001', pack: 'build' }, pack: { id: 'build', title: 'Build', state: 'active', parts: build.parts, provides: build.provides, consumes: [] } });
+  assert.deepEqual(out.items, held.items, 'the same items');
+  assert.deepEqual(out.lens.find, [...said.find, 'parts build e_isle0001']);
+  assert.equal(opened(was, { ...was, filter: { find: [...was.filter.find, 'parts runs e_isle0001'] } }, held, said).islands[1].pack.id, 'runs', 'a pack it requires');
+  for (const find of [['parts build e_isle0002'], ['parts build e_nothere0'], ['type decision'], []]) assert.equal(opened(was, { ...was, filter: { find: [...was.filter.find, ...find] } }, held, said), null, `not for ${find.join(', ') || 'no term added'}`);
+  assert.equal(opened(was, { ...was, filter: { find: [...was.filter.find, 'parts build e_isle0001'], only: ['type task'] } }, held, said), null, 'nor with anything else changed');
 });

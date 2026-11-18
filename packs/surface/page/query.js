@@ -7,7 +7,7 @@ import { coded as hasCode, drawCode } from './style-code.js';
 import { markTry, onTries, triedOn, tryOn } from './preview.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles, types } from './words.js';
-import { drawnKey, narrowed as narrowedFrom, unheard } from './narrow.js';
+import { drawnKey, narrowed as narrowedFrom, opened, unheard } from './narrow.js';
 import { indexNow, indexWhenIdle, narrowPicture } from './narrow-picture.js';
 import { islandsIn } from './islands-list.js';
 import { islandsLens, islandsOfLens } from './islands-lens.js';
@@ -350,13 +350,13 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     if (!was || was.made !== host.made) return;
     const { answer } = was;
     const ctx = { viewer: answer.viewer, typeKnown: (t) => types.has(t), systemType: (t) => Boolean(types.get(t)?.system) };
-    const first = narrowedFrom(was.lens, lens, answer, was.raw.lens, ctx);
-    // An edit it cannot draw early (a term added: a pack's parts opened) shows the picture before it until the answer
-    // is drawn, never an empty canvas: the drawing replaces it then (e_m5x8pmwu).
-    // What it was drawn in goes in whole, on the page, so its drawing goes on (what a look paints is its worker's, gone
-    // when it ends), keeps its stylesheet (data-drawing) and pans as it did; it ends once the new picture replaces it.
-    // It stands where it stood: the frame's own room (padding, clip) is this one's.
-    if (!first) return void (Object.assign(was.body.style, { padding: '0', clipPath: 'none' }), body.replaceChildren(was.body));
+    const first = narrowedFrom(was.lens, lens, answer, was.raw.lens, ctx) ?? opened(was.lens, lens, answer, was.raw.lens);
+    // An edit it cannot draw early shows the picture before it until the answer is drawn, never an empty canvas
+    // (e_m5x8pmwu). What it was drawn in goes in whole, on the page, so its drawing goes on (what a look paints is its
+    // worker's, gone when it ends), keeps its stylesheet (data-drawing) and pans as it did; it ends once the new picture
+    // replaces it. It stands where it stood: the frame's own room (padding, clip) is this one's.
+    const keepOld = () => (Object.assign(was.body.style, { padding: '0', clipPath: 'none' }), body.replaceChildren(was.body));
+    if (!first) return void keepOld();
     const held = new Set(answer.items.map((i) => i.id));
     // What is held for the owner stays drawn where it would land; the server's answer says it again.
     const old = was.shown;
@@ -371,7 +371,8 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     const early = () => ((host.drawingEarly = true), draw(first, shown));
     // The picture on screen narrowed at once (packs/walls/page/narrow-picture.js), and the drawing asked to lay out the
     // new answer once the frame that shows it is painted, unless the server's answer is drawn first.
-    if (!narrowPicture(body, was.body, new Set(old.items.map((i) => i.id).filter((id) => !ids.has(id))))) return early();
+    // Nothing taken out (a pack's parts opened): the picture before stays whole until the new one is drawn.
+    if (!narrowPicture(body, was.body, new Set(old.items.map((i) => i.id).filter((id) => !ids.has(id))))) return void (keepOld(), early());
     host.earlyDraw = early;
     requestAnimationFrame(() => setTimeout(() => host.earlyDraw === early && early()));
   }
