@@ -23,7 +23,7 @@ import { layout } from './layout.js';
 import { effortOf } from './effort.js';
 import { css } from './look.js';
 import { css as islandCss, islandMarks, nameOf, saidOf } from './islands.js';
-import { css as packCss, packMarks, packRules, packsWidth } from './pack-marks.js';
+import { css as packCss, packMarks, packOpener, packRules, packsWidth } from './pack-marks.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { looks as kept } from './island-looks.js';
@@ -201,7 +201,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const dims = new Map(), keyed = new Map(), tipped = new Set(), stepBadges = new Map();
   // The gesture of the drawing tools (packs/walls/page/draw-marks.js), where the session may write: a button in an island's legend
   // that adds an item there (./islands.js), answered by the page. Not while a story plays.
-  const gestures = !story && tools.gestures ? tools.gestures({ island: (key) => (/^i:e_/.test(key) ? key.slice(2) : null), pack: (key) => key.startsWith('pk:') }) : { on: () => [] };
+  const gestures = !story && tools.gestures ? tools.gestures({ island: (key) => (/^i:e_/.test(key) ? key.slice(2) : null), pack: (key) => /^p[ktw]:/.test(key) }) : { on: () => [] };
   // Ties under everything, then wires, each broken where it passes under, then the steps over all, then what each choice is.
   const drawIn = story ? { pathLength: 1, 'stroke-dasharray': 1, 'stroke-dashoffset': 1 } : {};
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
@@ -368,9 +368,11 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // On an archipelago each island a region round what lives on it, under everything, and a gate where a link crosses its
   // shore; a finding read across outlined in its island's colour (./islands.js).
   // Its header after its name: its pack and what that pack requires, each a mark (./pack-marks.js).
-  // The packs this island turned off, as the answer's island says (packs_off), else its item where the answer holds it.
-  const offOn = (id) => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.packs_off ?? answer.items.find((i) => i.id === id)?.fields?.packs_off);
-  const header = (id, [x, y], title) => packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) });
+  // The packs (parts) this island turned off, as the answer's island says (packs_off, parts_off), else its item where the answer holds it.
+  const offOn = (id, f = 'packs_off') => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.[f] ?? answer.items.find((i) => i.id === id)?.fields?.[f]);
+  // A click on a pack opens its parts (packOpener): the header drawn again where it first stood.
+  const headAt = new Map(), header = (id, [x, y], title, open = null) => (headAt.set(id, [[x, y], title]), packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), partsOff: offOn(id, 'parts_off'), open, style, at: [x + measure(title, z('island_text'), 'region') + z('island_pack_gap'), y], z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) }));
+  const opens = packOpener((id, open) => headAt.has(id) && header(id, ...headAt.get(id), open));
   const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header });
   const drawnBy = new Map((g.islands ?? []).flatMap((isle) => [...(isle.look?.items ?? [])]));
   const stepLayer = steps.map((n) => {
@@ -471,6 +473,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);
+      for (const opened of [!story && opens(event)]) if (opened) return opened;
       if (String(key).startsWith('paint:')) return painting?.pointer(String(key).replace(/^paint:/, ''), name, event.at) ?? [];
       // A shared mark's tip, over the step's while the pointer is on the mark; off it, back to the step it is on, if any.
       if (!story && markTip(String(key))) {
