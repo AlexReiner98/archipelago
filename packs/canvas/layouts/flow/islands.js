@@ -85,7 +85,14 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     });
     // What its own look paints (../map/looks.js), over its land and under what it holds.
     const painted = isle.look?.paint.length ? m('g', { class: 'lf-look', transform: `translate(${isle.look.at[0]} ${isle.look.at[1]})` }, ...isle.look.paint) : null;
-    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, ...(ghost ? [] : [land, shore]), painted, name, head?.marks ?? [], ...(ghost ? [] : [legend]));
+    // Its header (name, packs, legend) keeps its size on screen as the camera zooms out (study e_unru8ftt: drawn in the
+    // island's units, it read 11 px on a small island and 7 on a large one): scaled from the land's corner by
+    // .lf-head-scale, which reads the camera's scale off the frame, within the style's flow_island_head_least and _most.
+    // A parts island's drawing is what it holds, not a header: it is drawn as it is.
+    const headed = [name, ...(head?.marks ?? []), ...(ghost ? [] : legend)].filter(Boolean);
+    const corner = [frame.left, frame.top];
+    const top = ghost ? headed : headed.length ? [m('g', { transform: `translate(${corner[0]} ${corner[1]})` }, m('g', { class: 'lf-head-scale' }, m('g', { transform: `translate(${-corner[0]} ${-corner[1]})` }, ...headed)))] : [];
+    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, ...(ghost ? [] : [land, shore]), painted, ...top);
   });
   // A gate on each shore a link between islands crosses: a bar across the wire in its island's colour, as long as the
   // port it marks. A finding
@@ -132,7 +139,10 @@ export const css = `
 .lf-add-mark { stroke: currentColor; stroke-width: var(--ln-flow-stroke-hover); fill: none; }
 .lf-shore rect { fill: none; stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-island-stroke); }
 .lf-island-name { pointer-events: auto; cursor: pointer; }
-.lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-lit-mix)); font-size: var(--ln-flow-island-text); font-family: var(--type-region-family, var(--ln-font)); font-weight: var(--type-region-weight, 400); font-style: var(--type-region-style, normal); text-transform: var(--type-region-case, none); letter-spacing: var(--type-region-track, 0); dominant-baseline: central; }
+/* Its name in the plain face, near the text's colour: the region's small-caps serif read as a whisper at this size (study e_unru8ftt). */
+.lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-island-name-mix)); font-size: var(--ln-flow-island-text); font-family: var(--ln-font); dominant-baseline: central; }
+/* Its header kept at its size on screen: 1 over the camera's scale (--ln-plane-scale, set on the frame), within the style's least and most. */
+.lf-head-scale { transform-box: view-box; transform-origin: 0 0; transform: scale(clamp(var(--ln-flow-island-head-least), calc(1 / var(--ln-plane-scale)), var(--ln-flow-island-head-most))); }
 .lf-island-key text { fill: var(--ln-muted); font-size: var(--ln-flow-island-legend-text); font-family: var(--ln-font); dominant-baseline: central; }
 /* A gate: a bar on the shore in the island's colour. A finding read across: its outline in its island's colour. */
 .lf-gate-bar { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-gate-stroke); stroke-linecap: round; }

@@ -140,15 +140,16 @@ export function partInKey({ island, pack, id, partsOff = [], on = () => [] }) {
   return null;
 }
 
-/** The key's rows for what of each pack is not a type or link: one row a pack, its kinds' glyphs and counts ("Build: § 21/22 · ¶ 1"). */
+/** The key's rows for what of each pack is not a type or link: one row a pack, its kinds counted in words ("21/22 rules · 1 instruction"). */
 export function countRows({ pack, style, m, z }) {
   const [W, H] = ['key_width', 'key_height'].map(z);
   return packsOf(pack).flatMap((p) => {
     const kinds = kindsOf(p).filter(([kind]) => kind !== 'type' && kind !== 'link');
     if (!kinds.length) return [];
-    const said = kinds.map(([kind, parts]) => `${kindGlyph(style, kind)} ${countText(parts)}`).join(' · ');
+    // Each kind in words, its count first ("10 rules · 1 view"): a glyph per kind read as soup (study e_unru8ftt).
+    const said = kinds.map(([kind, parts]) => `${countText(parts)} ${PART_KINDS[kind].toLowerCase()}${parts.length === 1 ? '' : 's'}`).join(' · ');
     // The row's mark is the pack's own glyph, so its words are the counts alone; the pack's name is in its tip.
-    return [{ glyph: m('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, m('text', { x: W / 2, y: H / 2, class: `lf-key-count st-${kinds.some(([, ps]) => ps.some((r) => stateOf(r) !== 'active')) ? 'some' : 'active'}` }, glyphOf(p))), label: said, tip: `${p.title ?? p.id}: ${kinds.map(([kind, parts]) => kindTipOf(kind, parts, false)[0]).join(', ')}` }];
+    return [{ group: 'count', glyph: m('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, m('text', { x: W / 2, y: H / 2, class: `lf-key-count st-${kinds.some(([, ps]) => ps.some((r) => stateOf(r) !== 'active')) ? 'some' : 'active'}` }, glyphOf(p))), label: said, tip: `${p.title ?? p.id}: ${kinds.map(([kind, parts]) => kindTipOf(kind, parts, false)[0]).join(', ')}` }];
   });
 }
 

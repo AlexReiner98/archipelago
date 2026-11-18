@@ -60,10 +60,11 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     const lx = l + PAD, ly = t + PAD + top, rest = (look ? items.filter((n) => !look.places.has(n.id)) : items).filter((n) => n !== fn), after = look ? look.width + GAP : 0;
     const dx = fn && fat === 'corner' ? fn.w + GAP : 0, dy = fn && fat === 'top' ? fn.h + GAP : 0;
     if (look) for (const n of items) if (look.places.has(n.id)) x.set(n.id, lx + look.places.get(n.id)[0]), y.set(n.id, ly + look.places.get(n.id)[1]);
-    const unplaced = rest.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0;
-    const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + n.w / 2), y.set(n.id, ly + dy + r * ch + n.h / 2));
-    // Row by row across the block, so the order they came in reads left to right, then down.
-    unplaced.forEach((n, k) => at(n, [k % shift, Math.floor(k / shift)]));
+    const unplaced = rest.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0, block = blockOf(unplaced, m, shift);
+    // Each box in the middle of its cell, so a column of mixed kinds (a decision is wider than a task) keeps one line.
+    const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + (cw - GAP) / 2), y.set(n.id, ly + dy + r * ch + (ch - GAP) / 2));
+    // Row by row across the block, what is linked together kept together (blockOf).
+    for (const [n, cell] of block) at(n, cell);
     for (const n of rest) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
     // Over the rest it stands in the middle of their width; in the corner, first.
     const wide = Math.max(fn?.w ?? 0, ...rest.map((n) => x.get(n.id) + n.w / 2 - lx));
@@ -76,6 +77,41 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   }
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
   return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
+}
+
+/**
+ * The cells of `nodes` in a block `columns` wide: each group of items linked together (in `m`'s chains and ties) in
+ * a run of its own, from its most linked item outward, so a wire stays short; a group of more than one starts a row,
+ * so where one group ends and the next begins is a row's edge, not the middle of one (study e_unru8ftt: a gap that said
+ * nothing, wires across the whole island). Items linked to nothing here come last, together. Answers [node, [c, r]].
+ */
+export function blockOf(nodes, m, columns) {
+  const ids = new Set(nodes.map((n) => n.id)), near = new Map(nodes.map((n) => [n.id, []]));
+  for (const w of [...(m.chains ?? []), ...(m.ties ?? [])]) if (ids.has(w.a) && ids.has(w.b) && w.a !== w.b) near.get(w.a).push(w.b), near.get(w.b).push(w.a);
+  const order = new Map(nodes.map((n, k) => [n.id, k])), seen = new Set(), groups = [];
+  const most = (list) => [...list].sort((a, b) => near.get(b.id).length - near.get(a.id).length || order.get(a.id) - order.get(b.id))[0];
+  for (const n of nodes) {
+    if (seen.has(n.id)) continue;
+    const members = [], queue = [n.id];
+    seen.add(n.id);
+    while (queue.length) for (const id of near.get(queue.shift())) if (!seen.has(id)) seen.add(id), queue.push(id), members.push(id);
+    members.push(n.id);
+    // From its most linked item, outward: each one's neighbours in the order they came.
+    const from = most(members.map((id) => nodes[order.get(id)])), run = [from.id], put = new Set(run);
+    for (let k = 0; k < run.length; k++) for (const id of [...near.get(run[k])].sort((a, b) => order.get(a) - order.get(b))) if (!put.has(id)) put.add(id), run.push(id);
+    groups.push(run);
+  }
+  const lone = groups.filter((g) => g.length === 1).flat(), linked = groups.filter((g) => g.length > 1).sort((a, b) => b.length - a.length);
+  const cells = [];
+  let c = 0, r = 0;
+  for (const run of [...linked, lone]) {
+    if (c) (c = 0), r++;
+    for (const id of run) {
+      cells.push([nodes[order.get(id)], [c, r]]);
+      if (++c === columns) (c = 0), r++;
+    }
+  }
+  return cells;
 }
 
 /** How many columns `n` boxes of cells `cw` by `ch` take to stand in a block of `aspect` (width over height): one with no aspect. */

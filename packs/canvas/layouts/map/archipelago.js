@@ -23,25 +23,39 @@ export function islandModels({ items, links, run }) {
   return { groups, where, items, links, args: all.args };
 }
 
-/** Entries of the given widths in `columns` columns, a row each: each one's top left, and the size of all. */
-function columned(widths, columns, gap, row) {
-  const per = Math.max(1, Math.ceil(widths.length / columns)), at = [];
-  let x = 0, wide = 0;
-  widths.forEach((w, k) => {
-    if (k && k % per === 0) (x += wide + gap), (wide = 0);
-    at.push([x, (k % per) * row]);
+/**
+ * Entries of the given widths, a row each: each one's top left, and the size of all. Entries that say their group
+ * ({ w, group }: its types, its links, its counts) stand a column a group, in the order they come, so a link type never
+ * stands under the types (study e_unru8ftt); a group after the first that is not the add row starts a column. Bare
+ * widths stand in `columns` columns of even length.
+ */
+export function columned(entries, columns, gap, row) {
+  const ws = entries.map((e) => (typeof e === 'number' ? e : e?.w ?? 0)), groups = entries.map((e) => (typeof e === 'number' ? null : e?.group ?? null));
+  const grouped = groups.some((g) => g !== null), per = Math.max(1, Math.ceil(ws.length / columns)), at = [];
+  let x = 0, wide = 0, y = 0, tall = 0;
+  ws.forEach((w, k) => {
+    const breaks = grouped ? k > 0 && groups[k] !== groups[k - 1] && groups[k] !== 'add' : k && k % per === 0;
+    if (breaks) (x += wide + gap), (wide = 0), (y = 0);
+    at.push([x, y * row]);
     wide = Math.max(wide, w);
+    tall = Math.max(tall, ++y);
   });
-  return { at, w: widths.length ? x + wide : 0, h: Math.min(widths.length, per) * row };
+  return { at, w: ws.length ? x + wide : 0, h: tall * row };
 }
 
 /** The whole picture laid out at once, each island framed where it stands with its name and legend over what it holds. */
-export function compose({ where, items, links, args }, { legends, names = new Map(), sizes, rooms = new Map(), follows = new Map() }) {
+export function compose({ where, items, links, args }, { legends, names = new Map(), sizes, numbers = {}, rooms = new Map(), follows = new Map() }) {
   const z = (k) => sizes[`flow_island_${k}`], [PAD, ROOM, GAP, ROW, COLUMNS] = ['pad', 'name_room', 'legend_gap', 'legend_row', 'legend_columns'].map(z);
+  // The header grows on the land up to the style's flow_island_head_most as the camera zooms out (../flow/islands.js,
+  // .lf-head-scale), from the land's corner: the room under it and beside it is kept for it at that size.
+  const MOST = Number.isFinite(numbers.flow_island_head_most) && numbers.flow_island_head_most > 0 ? numbers.flow_island_head_most : null;
+  const grown = (d) => (MOST ? (PAD + d) * MOST - PAD : d);
   const keys = new Map([...legends].map(([id, rows]) => [id, columned(rows, COLUMNS, GAP, ROW)]));
-  const heads = new Map([...keys].map(([id, key]) => [id, (names.get(id) ? ROOM : 0) + (key.h ? key.h + GAP : 0)]));
+  const heads = new Map([...keys].map(([id, key]) => [id, grown((names.get(id) ? ROOM : 0) + (key.h ? key.h + GAP : 0))]));
   // Its frame at least as wide as its header: its name (and what follows it, its packs) from its pad, and the pad after.
-  const wides = new Map([...names].filter(([, w]) => typeof w === 'number').map(([id, w]) => [id, 2 * PAD + w - sizes.flow_island_name_x]));
+  const wides = new Map([...names].filter(([, w]) => typeof w === 'number').map(([id, w]) => [id, PAD + grown(PAD + w - sizes.flow_island_name_x)]));
+  // And at least as wide as its legend, a column a group of it.
+  for (const [id, key] of keys) if (key.w) wides.set(id, Math.max(wides.get(id) ?? 0, PAD + grown(PAD + key.w)));
   // An island whose room is said (a pack's parts, ../flow/parts-islands.js) holds that room as its header, at least as wide.
   for (const [id, r] of rooms) heads.set(id, r.h - PAD), wides.set(id, r.w);
   const a = laidOut({ ...args, items, links }, { islandOf: (id) => where.get(id) ?? null, heads, wides, follows });
