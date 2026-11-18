@@ -1,5 +1,5 @@
 // A view that lists its islands (feature e_u52abqr4): each item stands at the cell an agent set for it, each island at
-// the corner the view keeps, with no solve; what no one placed stands in a block at its island's left edge.
+// the corner the view keeps, with no solve; what no one placed takes the free cells round them.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -30,8 +30,9 @@ test('each item stands at its cell, each island at its corner', () => {
   const g = draw(placed);
   const [ax, ay, bx, by] = [g.x.get('e_aaaaaaaa'), g.y.get('e_aaaaaaaa'), g.x.get('e_bbbbbbbb'), g.y.get('e_bbbbbbbb')];
   assert.ok(bx > ax && by > ay, 'a cell two right and one down stands right of and below the first');
-  // The unplaced item takes the island's left column, so the placed ones stand one column to its right.
-  assert.ok(g.x.get('e_cccccccc') < ax, 'what no one placed stands left of what was');
+  // The unplaced item takes a free cell round the placed ones, within their span: none stands a block's width off.
+  const [cx, cy] = [g.x.get('e_cccccccc'), g.y.get('e_cccccccc')];
+  assert.ok(cx <= bx && !(cx === ax && cy === ay) && !(cx === bx && cy === by), 'what no one placed takes a free cell among what was');
   assert.ok(g.x.get('e_dddddddd') > bx, 'the second island stands at its corner, to the right');
 });
 
@@ -64,17 +65,16 @@ test('a big island with nothing placed wraps to a block the pane’s shape, not 
   assert.ok(wide / tall > 0.8, `shaped to the pane, not a column: ${Math.round(wide)} by ${Math.round(tall)}`);
 });
 
-test('a placed item linked to nothing joins the block of the unplaced, at its edge, not a block’s width off (e_x7c54w7k)', () => {
-  const free = Array.from({ length: 7 }, (_, k) => item(`e_free${String(k).padStart(4, '0')}`, 'e_islanddd'));
-  const lone = [item('e_lonea000', 'e_islanddd', [2, 2]), item('e_loneb000', 'e_islanddd', [2, 1])];
-  const tied = [item('e_tieda000', 'e_islanddd', [0, 0]), item('e_tiedb000', 'e_islanddd', [1, 0])];
-  const all = [...free, ...lone, ...tied], wires = [{ id: 'r_2', type: 'depends_on', from: 'e_tiedb000', to: 'e_tieda000' }];
+test('a placed item stands at its own cell, not a block’s width off, and the unplaced fill the cells round it (e_x7c54w7k)', () => {
+  const free = Array.from({ length: 9 }, (_, k) => item(`e_free${String(k).padStart(4, '0')}`, 'e_islanddd'));
+  const lone = [item('e_lonea000', 'e_islanddd', [2, 1]), item('e_loneb000', 'e_islanddd', [1, 2])];
   const run = (part: any) => layout({ ...part, undrawn: [], headless: house.headless, measure, sizes: house.sizes, aspect: 1.6, shapes: { type: {} }, placed: { e_islanddd: [0, 0] } });
-  const g = compose(islandModels({ items: all, links: wires, run }), { legends: new Map(), names: new Map(), sizes: house.sizes });
-  const right = Math.max(...free.map((i) => g.x.get(i.id))), last = Math.max(...free.map((i) => g.y.get(i.id)));
-  for (const i of lone) assert.ok(g.x.get(i.id) <= right && g.y.get(i.id) >= last, `${i.id} stands in the block's last rows, within its width`);
-  // In its cell's reading order: the one a row up comes first.
-  const at = (id: string) => [g.y.get(id), g.x.get(id)];
-  assert.ok(at('e_loneb000')[0] < at('e_lonea000')[0] || (at('e_loneb000')[0] === at('e_lonea000')[0] && at('e_loneb000')[1] < at('e_lonea000')[1]), 'the loner placed higher reads first');
-  for (const i of tied) assert.ok(g.x.get(i.id) > right, `${i.id}, linked, keeps its cell beside the block`);
+  const g = compose(islandModels({ items: [...free, ...lone], links: [], run }), { legends: new Map(), names: new Map(), sizes: house.sizes });
+  const xs = [...new Set(free.map((i) => g.x.get(i.id)))].sort((p, q) => p - q), ys = [...new Set(free.map((i) => g.y.get(i.id)))].sort((p, q) => p - q);
+  assert.equal(g.x.get('e_lonea000'), xs[2], 'the cell two right stands in the third column');
+  assert.equal(g.y.get('e_lonea000'), ys[1], 'and in the second row');
+  assert.equal(g.x.get('e_loneb000'), xs[1]);
+  assert.equal(g.y.get('e_loneb000'), ys[2]);
+  const at = new Set([...free, ...lone].map((i) => `${g.x.get(i.id)},${g.y.get(i.id)}`));
+  assert.equal(at.size, free.length + lone.length, 'no two items share a cell');
 });
