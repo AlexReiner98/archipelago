@@ -5,6 +5,7 @@ import { drawWith, layouts, warmLayouts } from './layout.js';
 import { dress, layered } from './query-base.js';
 import { coded as hasCode, drawCode } from './style-code.js';
 import { markTry, onTries, triedOn, tryOn } from './preview.js';
+import { islandTries } from './island-looks.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles, types } from './words.js';
 import { drawnKey, narrowed as narrowedFrom, unheard } from './narrow.js';
@@ -246,6 +247,7 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   const draw = (answer, shown, refreshing) => {
     host.earlyDraw = null;
     host.drawnWith = [answer, shown];
+    host.islandsTried = islandTries(shown);
     if (only) [answer, shown] = [answer, shown].map(narrowed(only));
     if (extra) [answer, shown] = [answer, shown].map((a) => ({ ...a, ...extra, ...(extra.steps && { steps: phased(extra.steps, a.items) }) }));
     if (nest) shown = nested(shown, typeof nest === 'string' ? nest : undefined);
@@ -407,7 +409,11 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   onTries(host, () => {
     if (!host.drawnWith || !look) return;
     const now = triedOn({ ...chosen, ...host.untried }, look.coder)?.at;
-    if (now === host.tried) return;
+    // An island's own look tried, or a try of one dropped: the same answer, drawn again with what its islands now draw with.
+    const isles = islandTries(host.drawnWith[1]);
+    if (now === host.tried && isles === host.islandsTried) return;
+    host.islandsTried = isles;
+    if (now === host.tried) return void draw(...host.drawnWith);
     if (now === undefined) return void ((host.said = undefined), load(true));
     draw(...host.drawnWith);
   });
