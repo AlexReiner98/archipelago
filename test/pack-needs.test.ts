@@ -37,9 +37,9 @@ test('a pack reading a field its provider lacks waits, saying what the type lack
   const found = new Map(reg.found.map((p) => [p.id, p]));
   found.set('wants', { id: 'wants', version: '0.1.0', title: 'Wants', requires: ['field:size@plain.thing'] });
   const { states } = orderPacks(found, new Map(), 'local');
-  assert.deepEqual(states.get('wants'), { state: 'waiting', why: 'needs field:size@plain.thing: plain.thing as plain declares it has no field size' });
+  assert.deepEqual(states.get('wants'), { state: 'waiting', why: 'needs field:size@plain.thing: plain.thing as plain declares it has no field size', lacks: ['field:size@plain.thing'] });
   found.set('nobody', { id: 'nobody', version: '0.1.0', title: 'Nobody', requires: ['status:done@nowhere'] });
-  assert.deepEqual(orderPacks(found, new Map(), 'local').states.get('nobody'), { state: 'waiting', why: 'needs status:done@nowhere: no pack here declares nowhere' });
+  assert.deepEqual(orderPacks(found, new Map(), 'local').states.get('nobody'), { state: 'waiting', why: 'needs status:done@nowhere: no pack here declares nowhere', lacks: ['status:done@nowhere'] });
 });
 
 test('a need names its type: <what>@<type> for field, status and phase alone', () => {

@@ -49,7 +49,7 @@ test('an island pack: vocabulary, views and instructions on the shared set', () 
   const said = (m: Manifest) => islandProblems(m, shared).join('; ');
   assert.match(said(island('w', { requires: ['core', 'fine'] })), /requires fine/);
   assert.match(said(island('o', { types: [ADDS] })), /adds fields to person/);
-  assert.match(said(island('n', { types: [{ id: 'n_memo', title: 'Memo', extends: 'fine_thing' } as never] })), /names fine_thing, not its own nor in the shared set/);
+  assert.match(said(island('n', { types: [{ id: 'n_memo', title: 'Memo', extends: 'fine_thing' } as never] })), /names fine_thing, not its own, in the shared set .* nor required by name/);
   assert.match(said(island('l', { links: [{ id: 'l_r', extends: 'fine_answers', title: 'r', inverse: 'r', from: ['*'], to: ['*'], description: '' }] })), /extend another pack's \(l_r extends fine_answers\)/);
   assert.deepEqual(islandProblems(core(), shared), [], 'the kernel’s own pack is not judged');
   assert.equal(packKind(core(), shared), 'kernel');

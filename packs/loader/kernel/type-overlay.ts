@@ -5,7 +5,8 @@
 // name and no preset is the workspace's own, in the local pack. The registry checks the result as it checks any pack;
 // what reads the items from the map is packs/loader/kernel/type-items.ts.
 
-import type { FieldDef, PackFile, RelationDef, TypeDef } from './packs.ts';
+import { CELL, CELL_FIELD, CORNER, CORNER_FIELD, FOCUS, FOCUS_FIELD, ISLAND, ISLAND_FIELD, livesOnIsland, mayBeFocus, OFF_FIELDS } from './island-items.ts';
+import type { FieldDef, PackFile, RelationDef, ResolvedType, TypeDef } from './packs.ts';
 
 export const TYPE_ITEM = 'type';
 export const LINK_ITEM = 'link_type';
@@ -61,4 +62,15 @@ export function ownPack(before: PackFile | undefined, items: TypeItem[], id: str
   }));
   const base = before ?? { id, version: '0.1.0', title: 'Local', description: 'Types defined in this workspace.' };
   return { ...base, types: [...(base.types ?? []), ...types], links: [...(base.links ?? []), ...links] } as PackFile;
+}
+
+/**
+ * A type's fields as they are laid over it wherever it is written: its own, its columns, and those the islands lay
+ * over a type that lives on one (island, cell; a focus's corner, packs_off and parts_off), whether islands are on yet or not. A
+ * rule names a field by these (packs/loader/kernel/rule-check.ts): a registry is first loaded before it knows the map
+ * has islands, so a rule on island must hold then too (e_t2tcbw2t). Where islands are off no item has the field.
+ */
+export function fieldsAsLaidOver(t: Pick<ResolvedType, 'fields' | 'columns' | 'system' | 'lineage' | 'capabilities'>): Record<string, FieldDef> {
+  const lives = livesOnIsland(t) || Boolean(t.capabilities?.subject);
+  return { ...t.columns, ...t.fields, ...(lives && { [ISLAND]: ISLAND_FIELD, [CELL]: CELL_FIELD, ...(mayBeFocus(t) && { [FOCUS]: FOCUS_FIELD, [CORNER]: CORNER_FIELD, ...OFF_FIELDS }) }) };
 }

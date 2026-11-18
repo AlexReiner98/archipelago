@@ -9,7 +9,7 @@
 // type marked `crosses` (core's reading) may end across islands only on what that island marks published. An island's
 // pack is fixed once it is made. Off is the default: with the setting off, nothing here is asked.
 
-import { sharedOf } from './islands.ts';
+import { sharedOf, spokenWith } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Op } from '../../write/kernel/pelago-types.ts';
@@ -34,6 +34,9 @@ export const CORNER_FIELD: FieldDef = { type: 'json', cell: true, shown: true, d
 /** The field of an island (or a focus) that names the packs turned off there alone (task e_hr4qvr9u, packs/loader/kernel/island-off.ts). */
 export const PACKS_OFF = 'packs_off';
 export const PACKS_OFF_FIELD: FieldDef = { type: 'json', shown: true, description: 'The packs turned off on this island alone, by id (["build"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack.' };
+/** The field of an island (or a focus) that names the parts of packs turned off there alone (feature e_4r82mvf3, packs/loader/kernel/island-parts.ts), and both off fields as a focus is given them. */
+export const PARTS_OFF_FIELD: FieldDef = { type: 'json', shown: true, description: 'The parts of packs turned off on this island alone, by id (["build.overlap"]): a type, link type, rule, view, instruction, lens or style. What needs one waits here, saying what it lacks; items of a type off stay, editable, with no new one made here. Never a part of the kernel’s own pack.' };
+export const OFF_FIELDS: Record<string, FieldDef> = { [PACKS_OFF]: PACKS_OFF_FIELD, parts_off: PARTS_OFF_FIELD };
 /** Whether an item of a type may be a focus: one that lives on an island and whose pack marks it so (capability focus). */
 export const mayBeFocus = (t: { system: boolean; lineage: string[]; capabilities?: { focus?: boolean } }) => livesOnIsland(t) && t.capabilities?.focus === true;
 
@@ -74,7 +77,7 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
   const moved = new Map<string, Where>(); // id or ref -> where this change puts it
   const cut = ops.flatMap((op) => (op.op === 'unlink' ? [op.relation] : [])); // links this change takes away
   const crosses = [...reg.relations.values()].filter((r) => (r as { crosses?: boolean }).crosses).map((r) => r.id); // the link types that may join two islands
-  const fits = (t: ResolvedType, pack: string) => t.pack === pack || shared.has(t.id);
+  const fits = (t: ResolvedType, pack: string) => t.pack === pack || shared.has(t.id) || spokenWith(pack, reg.packs).has(t.pack); // an island holds the types of the packs its pack extends (islands.ts)
   const refs = new Set(ops.flatMap((op, i) => (op.op === 'create' ? [op.ref ?? `#${i + 1}`] : [])));
   /** An island as props.island names it, as the key this check reads: an island made in this change is named {ref}, which the apply loop turns into its id. */
   const islandKey = (value: unknown): unknown => {
@@ -148,7 +151,7 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
     }
     const { pack, why } = await packOf(island);
     if (why) return `${where}: ${why}`;
-    if (!fits(type, pack!)) return `${where}: a ${type.id} is ${type.pack}’s, and the island ${island} speaks ${pack}: an item there is of ${pack}’s types or the shared set`;
+    if (!fits(type, pack!)) return `${where}: a ${type.id} is ${type.pack}’s, and the island ${island} speaks ${pack}: an item there is of ${pack}’s types, those of the packs it extends, or the shared set`;
   };
 
   for (const [i, op] of ops.entries()) {

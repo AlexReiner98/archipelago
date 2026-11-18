@@ -10,6 +10,7 @@ import { itemLink } from '../../identity/kernel/members.ts';
 import { actorId } from '../../write/kernel/pelago.ts';
 import { befell, importAudit, recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './session-calls.ts';
 import { point, sessionOpened, sessionTookUp, whose } from './tool-change.ts';
+import { putShownOn } from './show-islands.ts';
 import { slotted } from './surface-slots.ts';
 import { rechecked } from './recheck.ts';
 import { backupNow, restartNow } from './tool-config.ts';
@@ -46,7 +47,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     description:
       'Answer the human with a view on their canvas: a kept view (entity: a view (type lens), a saved canvas) or a query and layout of your own, or open an item\'s page or the workspace. ' +
       'Or frame a web page in a pane (url: a dev server\'s build, a sketch, a page), so they watch it beside the map: it reloads only when you show it again. A site that refuses to be framed (X-Frame-Options or frame-ancestors, as most sign-in pages and large sites do) stays blank, and the pane\'s ↗ opens it in a window of its own; a plain http address frames only on localhost or 127.0.0.1, and this server\'s own pages are shown by entity, not url. ' +
-      'It never moves their view (decision e_mnuthcap): an item on an island puts that island on their canvas and lights the item in their side bar, where a press takes them to it; anything else is not drawn on their page. The answer says how many of their pages are open and how many take your shows (pages), and whether they are looking at it (sight: looking, and where, in a line); when they are not, tell them where to look. Add a short note saying what it is. ' +
+      'It never moves their view (decision e_mnuthcap): the islands it names, and an item’s island, are put on their canvas at once, kept in their own list (put_on says which were new), and an item is lit in their side bar, where a press takes them to it; anything else is not drawn on their page. The answer says how many of their pages are open and how many take your shows (pages), and whether they are looking at it (sight: looking, and where, in a line); when they are not, tell them where to look. Add a short note saying what it is. ' +
       'A change moves nothing on their page: show what is worth watching. ' +
       'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page). ' +
       'For the person reading a chat, call draw.',
@@ -81,10 +82,12 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const item = /^e\/(e_[a-z0-9]{8})(?:\?|$)/.exec(hash)?.[1];
       const island = item ? (await l.entity(item))?.props.island : undefined;
       const at = await point(l, actor, 'show', hash, input.note, input.pane, input.run, typeof island === 'string' ? island : undefined, input.watch);
+      // The islands it names are put on their canvas at once, kept on their person item (./show-islands.ts).
+      const putOn = input.url ? [] : await putShownOn(l, actor, hash, island, input.run);
       // Whether the owner is looking at it (the presence pack's answer.sight); nothing brings it into sight.
       const { pages, sight } = await callAs<{ pages: unknown; sight: unknown }>(l, 'answer.sight', { whose: whose(l), actor: actor.name, run: input.run, focus: false });
       const size = { width: input.width, height: input.height, scheme: input.scheme, fresh: input.fresh };
-      return { ...at, pages, sight, ...(input.look && (await callAs<Record<string, unknown>>(l, 'answer.look', { whose: whose(l), actor: actor.name, hash, size }))) };
+      return { ...at, pages, sight, ...(putOn.length && { put_on: putOn }), ...(input.look && (await callAs<Record<string, unknown>>(l, 'answer.look', { whose: whose(l), actor: actor.name, hash, size }))) };
     },
   },
   claim: {

@@ -7,6 +7,7 @@ import { checkRetention } from '../../log/kernel/retention.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts';
 import type { Registry } from './packs.ts';
 import { checkOnEvent } from './rule-events.ts';
+import { fieldsAsLaidOver } from './type-overlay.ts';
 
 type OneOrMany = string | string[];
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
@@ -19,6 +20,13 @@ const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.
 let lifts: readonly string[] | undefined;
 export const fillLifts = (filled: readonly string[]): void => void (lifts = filled);
 export const liftsNamed = (): readonly string[] => lifts ?? [];
+/** The slot loader.rule_forms: the rules' checks of the forms that read links (packs/rules/kernel/rule-forms.ts), filled as they load. */
+type FormCheck = (rule: RuleDef, at: string, reg: Pick<Registry, 'types'> & Partial<Pick<Registry, 'relations'>>) => string[];
+let forms: { checkForms: FormCheck; checkUnless: FormCheck } | undefined;
+export const fillForms = (filled: NonNullable<typeof forms>): void => void (forms = filled);
+/** The slot loader.rule_apart: the rules' check of apart (packs/rules/kernel/apart.ts), filled as it loads. */
+let apart: FormCheck | undefined;
+export const fillApart = (filled: FormCheck): void => void (apart = filled);
 /** A rule's comparison: a field, an operator, and a number or a field. */
 export const COMPARE = /^\s*([a-z_][a-z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?|[a-z_][a-z0-9_]*)\s*$/;
 
@@ -55,7 +63,7 @@ function checkCarry(rule: RuleDef, at: string, reg: Pick<Registry, 'types'>): st
 }
 
 /** Problems with a pack's rules, given the registry it loads into. Empty means they can be enforced. */
-export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): string[] {
+export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'> & Partial<Pick<Registry, 'relations'>>): string[] {
   const problems: string[] = [];
   const known = (t: string) => reg.types.has(t);
   for (const [i, rule] of rules.entries()) {
@@ -70,9 +78,12 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'>): stri
     }
     if (rule.unique) {
       if (!rule.type || !known(rule.type)) problems.push(`${at}: unique needs a type it holds within`);
-      else for (const f of rule.unique) if (!reg.types.get(rule.type)!.fields[f]) problems.push(`${at}: ${rule.type} has no field "${f}"`);
+      else for (const f of rule.unique) if (!fieldsAsLaidOver(reg.types.get(rule.type)!)[f]) problems.push(`${at}: ${rule.type} has no field "${f}"`);
       continue;
     }
+    if (rule.apart !== undefined) { problems.push(...(apart?.(rule, at, reg) ?? [`${at}: apart is the rules' form, not loaded`])); continue; }
+    if (rule.at_most !== undefined || rule.must_link !== undefined) { problems.push(...(forms?.checkForms(rule, at, reg) ?? [`${at}: at_most and must_link are the rules' forms, not loaded`])); continue; }
+    if (rule.unless !== undefined) problems.push(...(forms?.checkUnless(rule, at, reg) ?? [`${at}: unless is the rules' form, not loaded`]));
     const then = rule.then;
     if (typeof then === 'object' && then !== null && 'carry' in then) {
       problems.push(...checkCarry(rule, at, reg));

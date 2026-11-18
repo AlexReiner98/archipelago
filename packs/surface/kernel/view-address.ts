@@ -9,7 +9,7 @@ import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 /** What names a view, as show and query look take it. */
 export const VIEW_INPUT = {
-  islands: z.array(z.string().regex(/^(?:e_[a-z0-9]{8}|frontier|attention)$/)).max(50).optional().describe('Islands to draw, by id, each at its corner (and the live reads frontier and attention by name); the person\'s own list stays as it is. With entity, under that item\'s page.'),
+  islands: z.array(z.string().regex(/^(?:e_[a-z0-9]{8}|frontier|attention)$/)).max(50).optional().describe('Islands to draw, by id, each at its corner (and the live reads frontier and attention by name); a show also puts them on the person\'s own list (a look or a draw does not). With entity, under that item\'s page.'),
   entity: z.string().optional().describe('An item id: its page; a view kept on the map (type lens, a saved canvas) is drawn as the canvas it is, its query in the query bar.'),
   query: z
     .record(z.string(), z.unknown())

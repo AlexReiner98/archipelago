@@ -278,7 +278,8 @@
       "fields": {
         "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." },
         "pack_version": { "type": "string", "description": "A version of its pack to try here, by the id of a pack item that is one (version_of): its types, rules and instructions are this island's while the rest of the map keeps the pack as it is. Unset, it runs the map's: unsetting it rolls the trial back." },
-        "packs_off": { "type": "json", "shown": true, "description": "The packs turned off on this island alone, by id ([\"build\"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack." }
+        "packs_off": { "type": "json", "shown": true, "description": "The packs turned off on this island alone, by id ([\"build\"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack." },
+        "parts_off": { "type": "json", "shown": true, "description": "The parts of packs turned off on this island alone, by id ([\"build.overlap\"]): a type, link type, rule, view, instruction, lens or style. What needs one waits here, saying what it lacks; items of a type off stay, editable, with no new one made here. Never a part of the kernel’s own pack." }
       }
     },
     {
@@ -1028,11 +1029,11 @@
     },
     {
       "id": "agent_island_pack",
-      "when": { "actor": "agent", "op": ["create", "update"], "fields": ["packs_off"] },
+      "when": { "actor": "agent", "op": ["create", "update"], "fields": ["packs_off", "parts_off"] },
       "then": "hold",
       "lifted": "agent_changes",
-      "stake": "A pack turned on or off on \"{title}\" alone: its types and rules come or go there; its items stay, waiting while it is off, and the rest of the map keeps it.",
-      "say": "Turning a pack on or off on an island is the owner’s here: it applies for agents once they let agents’ changes apply (Settings, under Agents)."
+      "stake": "A pack, or a part of one, turned on or off on \"{title}\" alone: its types and rules come or go there; its items stay, waiting while it is off, and the rest of the map keeps it.",
+      "say": "Turning a pack or a part of one on or off on an island is the owner’s here: it applies for agents once they let agents’ changes apply (Settings, under Agents)."
     },
     {
       "id": "agent_island_code",
