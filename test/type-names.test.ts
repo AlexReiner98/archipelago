@@ -10,7 +10,7 @@ import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 test('a type and a link type are named by what they are, whichever pack ships them', async () => {
   const l = await fresh();
   assert.equal(l.registry.type('task')!.pack, 'core', 'task is of the shared set, in core (e_rf6q3q34)');
-  assert.equal(l.registry.type('decision')!.pack, 'core');
+  assert.equal(l.registry.type('question')!.pack, 'core');
   assert.equal(l.registry.relations.get('reads')!.root, 'uses');
   assert.equal(l.registry.relations.get('lives_in')!.pack, 'core', "software.lives_in folded into core's");
 });

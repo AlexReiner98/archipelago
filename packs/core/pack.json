@@ -2,15 +2,16 @@
   "id": "core",
   "version": "0.1.0",
   "title": "Core",
-  "description": "The starter types (the seven of the work, and system), task and decision (the shared set every pack may build on), the root links every link type extends, and the system tier.",
+  "description": "The starter types (the seven of the work, and system), task (the shared set every pack may build on), the root links every link type extends, and the system tier.",
   "uses": ["slot:piece.document"],
-  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision", "finding"],
+  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task"],
   "types": [
     {
       "id": "actor",
       "title": "Actor",
       "description": "Holds authority, owns work and is waited on: a person, a company, an agent. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
+      "capabilities": { "lead": { "form": "actor", "link": "waits_on" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "confidence": { "type": "number", "column": true, "description": "0 to 1: how sure the author is that this is true. Kept in the item's row." },
@@ -19,7 +20,7 @@
     },
     {
       "id": "aim",
-      "capabilities": { "owned": true },
+      "capabilities": { "owned": true, "lead": { "form": "aim", "link": "serves" } },
       "altitude": "workspace",
       "title": "Aim",
       "description": "Why work exists: what work is for, such as a goal or a principle (a pack names its own). A starter type of the work: a pack's type may extend it, or extend nothing.",
@@ -33,7 +34,7 @@
     },
     {
       "id": "work",
-      "capabilities": { "owned": true, "actionable": true, "plannable": true, "lead": { "form": "alert", "unless": "seen_working", "says": "to_see" } },
+      "capabilities": { "owned": true, "actionable": true, "plannable": true, "lead": { "form": "done", "link": "part_of", "unless": "seen_working", "says": "to_see" } },
       "altitude": "step",
       "title": "Work",
       "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. A starter type of the work: a pack's type may extend it, or extend nothing.",
@@ -49,24 +50,30 @@
     },
     {
       "id": "question",
-      "capabilities": { "owned": true, "actionable": true, "focus": true },
+      "moved_from": ["decision", "work.decision"],
+      "capabilities": { "owned": true, "actionable": true, "focus": true, "bound": { "field": "due", "limit": "today" }, "lead": { "form": "choices" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
       "altitude": "step",
-      "title": "Question",
-      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. A starter type of the work: a pack's type may extend it, or extend nothing.",
-      "statuses": { "open": ["open"], "closed": ["settled", "dropped"], "phases": { "open": "not_started", "settled": "finished" } },
+      "title": "Decision",
+      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. The title is the question; once settled, outcome holds the answer. Questions and decisions are one type since 18 Nov 2026 (decision e_5yrdf8aq): a decision's items are this one's. A starter type of the work: a pack's type may extend it, or extend nothing.",
+      "statuses": { "open": ["open"], "closed": ["decided", "settled", "reversed", "dropped"], "phases": { "open": "not_started", "decided": "finished", "settled": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "owner": { "type": "string", "column": true, "description": "Id of the person or agent responsible. Kept in the item's row." },
         "confidence": { "type": "number", "column": true, "description": "0 to 1: how sure the author is that this is true. Kept in the item's row." },
-        "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
+        "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." },
+        "due": { "type": "date" },
+        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
+        "outcome": { "type": "string", "description": "The answer: what was chosen, in a line. Set when it is settled, not left in the note.", "shown": true },
+        "rationale": { "type": "string", "description": "Why." },
+        "decided_on": { "type": "date" }
       }
     },
     {
       "id": "record",
-      "capabilities": { "owned": true },
+      "capabilities": { "owned": true, "lead": "none" },
       "altitude": "step",
       "title": "Record",
-      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. A starter type of the work: a pack's type may extend it, or extend nothing.",
+      "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. A starter type of the work: a pack's type may extend it, or extend nothing. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["superseded"] },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
@@ -78,7 +85,7 @@
     },
     {
       "id": "occurrence",
-      "capabilities": { "owned": true },
+      "capabilities": { "owned": true, "lead": { "form": "occurrence" } },
       "altitude": "step",
       "title": "Occurrence",
       "description": "Happens at a time, and can be a gate: an event, a meeting, a release. A starter type of the work: a pack's type may extend it, or extend nothing.",
@@ -93,7 +100,7 @@
     {
       "id": "place",
       "moved_from": ["resource"],
-      "capabilities": { "capacity": { "field": "exclusive" } },
+      "capabilities": { "capacity": { "field": "exclusive" }, "lead": { "form": "place", "link": "holds", "waits": "needs" } },
       "title": "Place",
       "description": "Exists somewhere, physical or not; work lives in it or uses it: a repository, a file, a machine, a licence. One that says exclusive is a resource: work that needs it claims it, one holder at a time when exclusive is true. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["available", "unavailable"], "closed": ["retired"], "phases": { "unavailable": "trouble" } },
@@ -107,9 +114,9 @@
     {
       "id": "system",
       "title": "System",
-      "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked: its types carry the kernel flag. Only the kernel's packs declare types of it.",
+      "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked: its types carry the kernel flag. Only the kernel's packs declare types of it. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
-      "capabilities": { "kernel": true },
+      "capabilities": { "kernel": true, "lead": "none" },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
@@ -148,39 +155,9 @@
       }
     },
     {
-      "id": "decision",
-      "moved_from": ["work.decision"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
-      "extends": "question",
-      "title": "Decision",
-      "description": "Something decided, or still open, with its reasoning. The title is the question.",
-      "statuses": { "open": ["open"], "closed": ["decided", "reversed"] },
-      "fields": {
-        "due": { "type": "date" },
-        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
-        "outcome": { "type": "string", "description": "What was chosen.", "shown": true },
-        "rationale": { "type": "string", "description": "Why." },
-        "decided_on": { "type": "date" }
-      }
-    },
-    {
-      "id": "finding",
-      "extends": "record",
-      "capabilities": { "promised": { "fields": ["value", "as_of"], "published": "published" }, "lead": { "form": "measure", "value": "value", "unit": "unit", "as_of": "as_of" } },
-      "title": "Finding",
-      "description": "What an island has found, read in one line: the claim, its value, how sure, as of when. Marked published, it is what the island stands by, and only then may another island read it; the rest are its working findings. The title is the claim as a short sentence (\"Peak load is 42 kW\", not \"Peak load\"); the value is the fact, with its unit; confidence says how sure; as_of when it was true. The note says how it was found, three lines at most. An option is an alternative, a bug is a bug, working research stays research: none is a finding. Its readers read it (reads); a new value keeps the old one in the log.",
-      "statuses": { "open": ["current"], "closed": ["superseded", "withdrawn"] },
-      "fields": {
-        "value": { "type": "json", "typed_by": "value_type", "shown": true, "description": "The fact itself, never left out: 557, true, 2026-11-05, or a few words of text. A number takes its unit in unit; text says its own." },
-        "value_type": { "type": "enum", "values": ["text", "number", "boolean", "date"], "shown": true, "description": "What sort of value it is: text, number, boolean or date. A measure is a number." },
-        "published": { "type": "boolean", "shown": true, "description": "true: the island stands by it, and other islands may read it. Left out or false, it is a working finding, read on its own island only." },
-        "unit": { "type": "string", "shown": true, "description": "What a number counts, read after it: s, kW, EUR, requests a minute." },
-        "as_of": { "type": "date", "shown": true, "description": "When the value was true: the day it was found or measured." }
-      }
-    },
-    {
       "id": "lens",
       "extends": "system",
+      "capabilities": { "lead": { "form": "picture" } },
       "title": "View",
       "description": "A view kept on the map: a query (a filter, a walk and a limit, as query flat takes them) and how it is drawn, its layout with its settings, so a person opens it anywhere and it draws the same. About a project or item (an about link), it is a view of that thing; about nothing, the workspace's. where things sit on it is kept in the places stream under its id, apart from the map's. Named for the question it answers, its note's first line says what it shows; an agent reuses a view already there with the same name or query about the same items, rather than make it twice. Its life is its status: working (an agent's, about its task, until the owner keeps it; while what it is about is closed, it is retired with it), kept (Save in the app, or an agent that keeps it), retired. Home lists them; a document line holding its id draws it there; report show with its id opens one.",
       "moved_from": ["canvas"],
@@ -203,7 +180,7 @@
       "id": "style",
       "extends": "system",
       "title": "Style",
-      "description": "How the map looks: colours, type and sizes, and how a page reads. About nothing, the workspace's; on kinds or types (on), how every such item's page looks. What one view needs is not a style: a view holds its own layout and settings (its style field), so a style about a view draws nothing. How a view is drawn as code is not a style: that is a layout. A field left empty comes from the level below. The defaults are styles too: a pack ships them as presets, and one kept on the map with the preset's id (preset) is the owner's version of it, its fields over the preset's; retired, the preset is not used. Read only by the page that draws.",
+      "description": "How the map looks: colours, type and sizes, and how a page reads. About nothing, the workspace's; on kinds or types (on), how every such item's page looks. What one view needs is not a style: a view holds its own layout and settings (its style field), so a style about a view draws nothing. How a view is drawn as code is not a style: that is a layout. A field left empty comes from the level below. The defaults are styles too: a pack ships them as presets, and one kept on the map with the preset's id (preset) is the owner's version of it, its fields over the preset's; retired, the preset is not used. Read only by the page that draws. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "shape": { "type": "string", "description": "The layout: map is the one that comes built in, used when the style has no code of its own; rails is the map with a walk through it: its items as stops in the view’s order, for a page read by scrolling. map: the whole graph made plane at once, islands and their ports with it (rings broken, trunks of one type and one way), given right angles with the fewest bends, then its distances relaxed keeping that shape. time is a calendar of what the view places in time: a column per day, hours running down, a lane per person (layout bars: a row per lane). A shape no pack draws (one retired: list, flow, strips, rows, cola, grid, architecture, pages, planar) is drawn as map. Any other look is code of its own. map unless said." },
@@ -266,6 +243,7 @@
       "title": "Layout",
       "description": "How a view is drawn, as code: a drawing kept on the map. It draws only where a view names it (its style field's style) or, about an item, on the pictures of that item; never as the workspace's. With code (code), it is a drawing of its own; with a pack drawing's id (preset) and modules, the owner's version of that drawing, its modules over the pack's; retired, the pack's drawing is not used. Its settings are the style fields it draws with unless the style or the view says otherwise. Written by an agent, its code waits for the human.",
       "statuses": { "open": ["working", "kept"], "closed": ["retired"], "phases": { "working": "under_way", "kept": "standing", "retired": "ended" } },
+      "capabilities": { "lead": { "form": "picture" } },
       "fields": {
         "code": { "type": "string", "large": true, "code": true, "files": true, "description": "The layout itself: one JavaScript module, or files by path ({ \"index.js\": ..., \"physics.js\": ... }) entered at index.js, one importing another as './name.js' (an edit of one file logs that file alone). The entry is the module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the query view answered; style is what it is drawn with: its settings, under the style and the view's own; theme is the page's colours by what each is for, as colors says (sea is the ground, so take accent for what must stand out on it; land, inner, line, text, muted, blocked, you, session, done, warn) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl, id, kind }: id tells two fingers apart, kind is mouse, touch or pen) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer; field(key, { x, y, width, height, value, placeholder, title }) puts a text field the page draws over the canvas (null takes it away), and on('field') hears { key, value, done }, never a key; change(ops, reason) asks the page to send ops as the person looking and resolves to { status, created, proposal, held } or { error }: it applies where it writes only the types in writes, and waits for that person otherwise; on('answer') hears the query answer again as the map changes (code that does not listen is started again); its types are DrawInput in packs/walls/page/draw.d.ts. With code, shape is not used; a nearer style that names a shape and has no code (a view's own, one about the item, one named outright) clears it, so it draws only where nothing nearer says how." },
         "writes": { "type": "json", "description": "The types this layout's code may change by itself, as a list, e.g. [\"local.ridges_setup\"]: what its layout asks for (a preset saved, one deleted) the page sends as the person looking, and it applies where it writes only these types; anything else waits for that person (core's drawing_* rules). Written by an agent, it waits for the human, as code does." },
@@ -279,7 +257,7 @@
       "id": "part",
       "extends": "system",
       "title": "Part",
-      "description": "A part of the app's page, as code: what a map pack draws in one slot (the canvas, the sheet, a piece of a screen), walled in a worker and answering with marks the host checks before it draws them. A pack declares its parts in its manifest (parts); one kept here with a part's id (preset) is the owner's version of it, its code over the pack's module by module; retired, the pack's part is not drawn. Its pack, slot and fields say what it is, so a map of the code reads them. Written by an agent, its code waits for the human.",
+      "description": "A part of the app's page, as code: what a map pack draws in one slot (the canvas, the sheet, a piece of a screen), walled in a worker and answering with marks the host checks before it draws them. A pack declares its parts in its manifest (parts); one kept here with a part's id (preset) is the owner's version of it, its code over the pack's module by module; retired, the pack's part is not drawn. Its pack, slot and fields say what it is, so a map of the code reads them. Written by an agent, its code waits for the human. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["working", "kept"], "closed": ["retired"], "phases": { "working": "under_way", "kept": "standing", "retired": "ended" } },
       "fields": {
         "pack": { "type": "string", "description": "The pack whose part it is, by id." },
@@ -296,7 +274,7 @@
       "id": "island",
       "extends": "system",
       "title": "Island",
-      "description": "A cluster of work that speaks one pack's vocabulary and the shared set, below a project or across projects. On a map with islands on, every item but the kernel's own and actors lives on exactly one island (its field island), its type the island's pack's or of the shared set, and no link joins items on two islands: findings are how islands meet. The query term island <island> is what lives on it.",
+      "description": "A cluster of work that speaks one pack's vocabulary and the shared set, below a project or across projects. On a map with islands on, every item but the kernel's own and actors lives on exactly one island (its field island), its type the island's pack's or of the shared set, and no link joins items on two islands but a reading (reads) of what an item promises. The query term island <island> is what lives on it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." },
@@ -308,6 +286,7 @@
     {
       "id": "instruction",
       "extends": "system",
+      "capabilities": { "lead": { "form": "line", "value": "for" } },
       "title": "Instruction",
       "description": "What agents are told, in its note, and where (for): as a style is how things look, an instruction is what an agent is asked to do. A pack ships them as presets; one kept on the map with the preset's id (preset) is the owner's version of it, its note and fields over the preset's; retired, the preset is not said. One kept about a repository is said only to sessions there, and over the workspace's of the same preset. A name in braces ({run}) is filled in by where it is said.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
@@ -322,7 +301,7 @@
       "id": "type",
       "extends": "system",
       "title": "Type",
-      "description": "A type of item, kept on the map: as a style is how things look, a type is what an item is. A pack ships its types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's, its fields added to the preset's; retired, no new item is made of it, and those there are stay. One with a name and no preset is a type of this workspace's own, named local.<name>, extending a kind or a type of one.",
+      "description": "A type of item, kept on the map: as a style is how things look, a type is what an item is. A pack ships its types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's, its fields added to the preset's; retired, no new item is made of it, and those there are stay. One with a name and no preset is a type of this workspace's own, named local.<name>, extending a kind or a type of one. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "preset": { "type": "string", "description": "The id of the pack's type this is the owner's version of, e.g. task." },
@@ -337,7 +316,7 @@
       "id": "link_type",
       "extends": "system",
       "title": "Link type",
-      "description": "A type of link, kept on the map. A pack ships its link types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's; retired, no new link is made of it, and those there are stay. One with a name and no preset is a link type of this workspace's own, named local.<name>, a flavour of a link type it extends.",
+      "description": "A type of link, kept on the map. A pack ships its link types as presets; one kept here with the preset's id (preset) is the owner's version of it: its title and note over the preset's; retired, no new link is made of it, and those there are stay. One with a name and no preset is a link type of this workspace's own, named local.<name>, a flavour of a link type it extends. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "preset": { "type": "string", "description": "The id of the pack's link type this is the owner's version of, e.g. depends_on." },
@@ -366,7 +345,7 @@
       "id": "screen",
       "extends": "system",
       "title": "Screen",
-      "description": "A page the kernel draws as one column of pieces: a picture (a query in a style), rows from a pack's view, an action's form, an item's fields, a short note. On kinds or types (on), it is shown on the page of every such item; given a place in the nav (nav), it is a page of its own there; on Home (home), it is drawn there after the screens before it. A pack ships screens as presets; one kept on the map with the preset's id (preset) is the owner's version of it, and retired, the preset is not shown. Only a person changes a screen: an agent's change waits for them.",
+      "description": "A page the kernel draws as one column of pieces: a picture (a query in a style), rows from a pack's view, an action's form, an item's fields, a short note. On kinds or types (on), it is shown on the page of every such item; given a place in the nav (nav), it is a page of its own there; on Home (home), it is drawn there after the screens before it. A pack ships screens as presets; one kept on the map with the preset's id (preset) is the owner's version of it, and retired, the preset is not shown. Only a person changes a screen: an agent's change waits for them. It opens on no band: its title and marks say it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "pieces": { "type": "json", "description": "The column, in order: each {piece, ...what it needs}. picture: lens (a kept view's id, or a query { filter, walk, limit }, \"{here}\" in its ids, link terms or within the item the page is of), only (the types it draws of what that finds) and style (a style's id, or its fields, code aside); view: view (a pack's view of rows) and item (the input the item's id goes in); action: action (a pack's action); fields: fields (a list of the item's fields); note: text; count: section (a heading of the note), by (a field) and limits (for each of its values: max, low, high, split, emoji, link). Left empty, the preset's." },
@@ -383,7 +362,7 @@
       ],
       "extends": "system",
       "title": "Source",
-      "description": "The original input a fact came from: a file, an email, a commit, a conversation.",
+      "description": "The original input a fact came from: a file, an email, a commit, a conversation. It opens on no band: its title and marks say it.",
       "statuses": {
         "open": [
           "recorded"
@@ -571,7 +550,7 @@
       ],
       "extends": "system",
       "title": "Notification",
-      "description": "A message for the human, from an agent, an automation or the system.",
+      "description": "A message for the human, from an agent, an automation or the system. It opens on no band: its title and marks say it.",
       "statuses": {
         "open": [
           "unread"
@@ -604,7 +583,7 @@
       ],
       "extends": "system",
       "title": "Automation",
-      "description": "Something done when a time comes or a query starts to match, about the item it serves: it lives on that item's island and is as visible as it. The kernel's clock says when it is due; the automations pack does it. Only fires while its status is enabled.",
+      "description": "Something done when a time comes or a query starts to match, about the item it serves: it lives on that item's island and is as visible as it. The kernel's clock says when it is due; the automations pack does it. Only fires while its status is enabled. It opens on no band: its title and marks say it.",
       "capabilities": { "when": { "repeat": { "from": "at", "days": "days" } }, "subject": { "link": "about" } },
       "statuses": {
         "open": [
@@ -682,7 +661,7 @@
         "sys.shared_document"
       ],
       "extends": "record",
-      "capabilities": { "kernel": true },
+      "capabilities": { "lead": { "form": "line", "value": "from_workspace" }, "kernel": true },
       "public": true,
       "title": "Shared document",
       "deliverable": true,
@@ -854,7 +833,7 @@
       "inverse": "is borne on by",
       "from": ["*"],
       "to": ["question"],
-      "description": "Evidence on a question: a result, a test or a finding that helps settle it."
+      "description": "Evidence on a question: a result, a test or a measure that helps settle it."
     },
     {
       "id": "link",
@@ -884,7 +863,7 @@
       "inverse": "is read by",
       "from": ["*"],
       "to": ["has:promised"],
-      "description": "Relies on what an item promises its readers (a finding's value, or the fields of any type with the promised capability), from this island or another: the one link that crosses between islands. Its readers are who is told when a promised field moves; when it was made, with the item's history, says which value was read. props.expects names the type the reading relies on: a target not of it is refused."
+      "description": "Relies on what an item promises its readers (the fields of a type with the promised capability), from this island or another: the one link that crosses between islands. Its readers are who is told when a promised field moves; when it was made, with the item's history, says which value was read. props.expects names the type the reading relies on: a target not of it is refused."
     },
     {
       "id": "works_on",
@@ -1303,7 +1282,7 @@
       "shape": "data",
       "lens": {},
       "answer": "flat",
-      "description": "The query: a filter, a walk and a limit, answered as items and the links among them; the page names its parts Find, Only, Not, Walk and Limit. The filter is { find, only, not }, three lists of the same terms, each a set of items written as words: text <words> (the search read's own: words in any form in titles and notes, or as typed in a title, else titles nearly what was typed; the best match first, and matched says how many they found in all), type <t> (flavours included), held (what a change held for you would touch), moved (what reads a finding that moved since it was last changed or said still true), id <item>, in <item> (what is part of it, at any depth, not the item itself), related <item> (any link to it, either way), <link type> <item> (\"tagged Urgent\", \"waits_on me\": what has that link to it), <link type>< <item> (what it links to), owner me|<person>, kind <k>, and the words that can only be checked of what is found: done, blocked (depends on something open, waits on someone, or needs a resource not free, as attention says), status <s>, no owner, over estimate (tokens used over tokens estimated), changed since|before <7d|date>, made since|before <7d|date> (a since and a before together are a range, a date its day in the workspace's zone), by owner and by agent (on whose authority its status was last set). An item is an id or a name. find adds its sets to pick the seeds, and takes neither kind nor those words; only keeps the seeds in every set, types being one set; not takes its sets away from everything, an item named by id and what the walk reaches included, and the walk does not pass through what it takes away: kind system unless not is given. A filter whose find holds nothing is refused. The walk follows the link types named (over, or \"all\"), each the way it is written: \"depends_on>\" out along the link (what an item depends on), \"depends_on<\" in to it (what depends on the item), \"depends_on\" either way. A part links to what holds it, so from a project \"part_of<\" walks down (what is in it) and \"part_of>\" up (what it is in); \"part_of\" either way climbs to the parent and comes back down through all of it; for steps steps (1 when over is named; at most 6). The limit is the most items sent (500; at most 2000), seeds first, and cut says it cut. Each item is its head (id, kind, type, title, the start of its note (with notes \"whole\", the whole of it, for the first 100 sent, named in whole), visibility, status, open, owner, times) the fields its type marks shown (with fields true, every field its type declares that has a value, and its note whole, for every item sent, all named in whole: one read of a whole island, up to the limit), and why it is there: found (the sorts of term that found it: text, type, id, link, in) and terms (those terms, as the query says them) or step (the step of the walk that reached it); each link its id, type, from, to and props. With preview ({ part: find, only or not, terms, ids }), it answers only { preview }: for each term, at most 80, the items find would add it finds, or which of ids (what is drawn) only or not would leave out. With time ({ from, to }: dates, today, or days from today as -6d or 7d), a window it finds nothing more by: each item says where it falls in it (time, its spans; a session where it was at work) whose lane it is in (lane: the person who holds it, what no one holds the workspace owner's, each session its own) and what it counts toward (stream: the outermost item its work sits in; a session's spans each their own, with on_title), the lanes and streams in order (lanes, streams), for a layout along a time axis. Params: filter ({ find, only, not }), walk ({ over, steps }), limit, time, notes, fields."
+      "description": "The query: a filter, a walk and a limit, answered as items and the links among them; the page names its parts Find, Only, Not, Walk and Limit. The filter is { find, only, not }, three lists of the same terms, each a set of items written as words: text <words> (the search read's own: words in any form in titles and notes, or as typed in a title, else titles nearly what was typed; the best match first, and matched says how many they found in all), type <t> (flavours included), held (what a change held for you would touch), moved (what reads a promised item that moved since it was last changed or said still true), id <item>, in <item> (what is part of it, at any depth, not the item itself), related <item> (any link to it, either way), <link type> <item> (\"tagged Urgent\", \"waits_on me\": what has that link to it), <link type>< <item> (what it links to), owner me|<person>, kind <k>, and the words that can only be checked of what is found: done, blocked (depends on something open, waits on someone, or needs a resource not free, as attention says), status <s>, no owner, over estimate (tokens used over tokens estimated), changed since|before <7d|date>, made since|before <7d|date> (a since and a before together are a range, a date its day in the workspace's zone), by owner and by agent (on whose authority its status was last set). An item is an id or a name. find adds its sets to pick the seeds, and takes neither kind nor those words; only keeps the seeds in every set, types being one set; not takes its sets away from everything, an item named by id and what the walk reaches included, and the walk does not pass through what it takes away: kind system unless not is given. A filter whose find holds nothing is refused. The walk follows the link types named (over, or \"all\"), each the way it is written: \"depends_on>\" out along the link (what an item depends on), \"depends_on<\" in to it (what depends on the item), \"depends_on\" either way. A part links to what holds it, so from a project \"part_of<\" walks down (what is in it) and \"part_of>\" up (what it is in); \"part_of\" either way climbs to the parent and comes back down through all of it; for steps steps (1 when over is named; at most 6). The limit is the most items sent (500; at most 2000), seeds first, and cut says it cut. Each item is its head (id, kind, type, title, the start of its note (with notes \"whole\", the whole of it, for the first 100 sent, named in whole), visibility, status, open, owner, times) the fields its type marks shown (with fields true, every field its type declares that has a value, and its note whole, for every item sent, all named in whole: one read of a whole island, up to the limit), and why it is there: found (the sorts of term that found it: text, type, id, link, in) and terms (those terms, as the query says them) or step (the step of the walk that reached it); each link its id, type, from, to and props. With preview ({ part: find, only or not, terms, ids }), it answers only { preview }: for each term, at most 80, the items find would add it finds, or which of ids (what is drawn) only or not would leave out. With time ({ from, to }: dates, today, or days from today as -6d or 7d), a window it finds nothing more by: each item says where it falls in it (time, its spans; a session where it was at work) whose lane it is in (lane: the person who holds it, what no one holds the workspace owner's, each session its own) and what it counts toward (stream: the outermost item its work sits in; a session's spans each their own, with on_title), the lanes and streams in order (lanes, streams), for a layout along a time axis. Params: filter ({ find, only, not }), walk ({ over, steps }), limit, time, notes, fields."
     },
     {
       "id": "core.hubs",

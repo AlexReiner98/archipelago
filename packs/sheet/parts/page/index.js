@@ -11,7 +11,7 @@
 import { label, typeOf } from './words.js';
 import { fieldEvent, fieldsMarks } from './fields.js';
 import { choicesOf, headEvent, headMarks, section, settleOps, sourceMarks } from './sections.js';
-import { leadEvent, leadFields, leadMarks } from './lead.js';
+import { leadEvent, leadFields, leadMarks, pressEvent } from './lead.js';
 import { blank, barMarks, codeChanges, draftEvent, noteMarks, saveOps, titleMarks, unsaved } from './draft.js';
 import { linkEvent, linkMarks } from './links.js';
 
@@ -33,7 +33,7 @@ const HEAD = ['status', 'owner', 'confidence', 'visibility', 'source'];
 export const pageTold = (now, told) => (told?.name === 'page' && told.item?.id ? { ...now, item: told.item, views: { ...(now?.views ?? {}), ...(told.views ?? {}) }, piece: { ...(now?.piece ?? {}), ...(told.count && { count: told.count }), folds: told.folds ?? [] } } : now);
 
 /** The page's state as one value: what is open, what is written, what is asked, what was said. */
-const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) }, from: { ...(kept?.draft?.from ?? {}) } }, open: new Set(), files: {}, emptyOpen: false, writing: false, finding: false, picked: null, asking: undefined, why: '', saving: false, said: undefined, moved: false });
+const fresh = (kept) => ({ draft: { ...blank(), ...(kept?.draft && typeof kept.draft === 'object' ? kept.draft : {}), fields: { ...(kept?.draft?.fields ?? {}) }, from: { ...(kept?.draft?.from ?? {}) } }, open: new Set(), files: {}, emptyOpen: false, writing: false, finding: false, picked: null, asking: undefined, why: '', adding: undefined, saving: false, said: undefined, moved: false });
 
 /** The whole page as marks. */
 export function pageMarks(input, s) {
@@ -67,7 +67,7 @@ export function pageMarks(input, s) {
     s.archiving && ['box', { look: 'sunk', flow: 'row', gap: 2, pad: 2 }, ['text', {}, `Archive "${item.title}"? It leaves every view but stays in the history.`], ['button', { key: 'archive-yes', look: 'main', tone: 'bad' }, 'Archive'], ['button', { key: 'archive-no', look: 'quiet' }, 'Cancel']],
     ['slot', { key: 'slot-bands', name: 'sheet.bands' }],
     // What it is for, before what it is: the band its type declares (decision e_ktr4vbcd).
-    leadMarks(item, type, c, { writes, asking: s.asking, waits: view.waits, me: view.me }),
+    leadMarks(item, type, c, { writes, asking: s.asking, adding: s.adding, waits: view.waits, me: view.me, links: view.incoming, words: input.words }),
     section('note', 'Note', 0, noteMarks(item, s.draft, { writes, writing: s.writing, count, voice: view.voice })),
     fold('fields', 'Fields', 'Its fields', () => section('fields', 'Fields', 0, fieldsMarks(item, type.fields, { writes, open: s.open, kept: s.draft.fields, emptyOpen: s.emptyOpen, skip: [...HEAD, ...(c ? [c.field] : []), ...leadFields(item, type, c)], titles: view.titles ?? {}, files: s.files }) ?? ['text', { look: 'muted' }, 'None'])),
     fold('source', 'Source', 'Where its facts came from', () => sourceMarks(view.source)),
@@ -175,6 +175,14 @@ export default function page(input, tools) {
       if (f.bad) return undefined;
       if (f.save) return on({ key: 'draft:save', name: 'press' });
       if (f.pick) return (s.open.delete(f.pick[0]), await change({ ops: [{ op: 'update', id: it.id, props: { [f.pick[0]]: f.pick[1] } }], reason: `${label(f.pick[0])} set in the UI` }), draw());
+    }
+    // The band's one likely press (lead.js): what waits on a person drawn on the canvas, or work added to an aim, named
+    // in place and made as one change on the person's word.
+    const p = pressEvent(event, it, type(), { links: now.views?.item?.incoming, words: now.words, adding: s.adding });
+    if (p) {
+      if (p.go) return void tools.go?.(p.go);
+      if ('adding' in p) return ((s.adding = p.adding), event.name === 'edit' ? undefined : draw());
+      if (p.ops) return ((s.adding = undefined), await change(p), draw());
     }
     // The head: its status and who may see it.
     const h = headEvent(event, it) ?? leadEvent(event, it, type());

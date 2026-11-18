@@ -61,13 +61,35 @@ test('a lead names a form the page draws and fields of the kinds it reads', () =
   assert.equal(checkCapabilities({ lead: { form: 'chart' } } as never, fields, new Set()).length, 1);
 });
 
+test('a lead may be "none", and the forms that count linked items name a link there is', () => {
+  const links = new Set(['serves', 'part_of', 'holds', 'needs', 'waits_on']);
+  const fields = { seen: { type: 'boolean' }, to_see: { type: 'string' } } as never;
+  assert.deepEqual(checkCapabilities({ lead: 'none' }, fields, links), []);
+  for (const lead of [{ form: 'aim', link: 'serves' }, { form: 'done', link: 'part_of', unless: 'seen', says: 'to_see' }, { form: 'place', link: 'holds', waits: 'needs' }, { form: 'actor', link: 'waits_on' }, { form: 'occurrence' }, { form: 'picture' }, { form: 'choices' }] as const)
+    assert.deepEqual(checkCapabilities({ lead }, fields, links), [], lead.form);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'aim' } } as never, fields, links), ['a aim lead names its link']);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'actor', link: 'befriends' } }, fields, links), ['lead.link follows "befriends", which is no relation']);
+  assert.equal(checkCapabilities({ lead: 'some' } as never, fields, links).length, 1);
+});
+
+test('a line names one field of any kind with words, or a link there is: one of them', () => {
+  const links = new Set(['about']);
+  const fields = { for: { type: 'json' }, from: { type: 'string' }, at: { type: 'url' }, seen: { type: 'boolean' } } as never;
+  for (const lead of [{ form: 'line', value: 'for' }, { form: 'line', value: 'from' }, { form: 'line', value: 'at' }, { form: 'line', link: 'about' }] as const)
+    assert.deepEqual(checkCapabilities({ lead }, fields, links), [], JSON.stringify(lead));
+  assert.deepEqual(checkCapabilities({ lead: { form: 'line' } }, fields, links), ['a line lead names its value or its link, one of them']);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'line', value: 'from', link: 'about' } }, fields, links), ['a line lead names its value or its link, one of them']);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'line', value: 'seen' } }, fields, links), ['lead.value reads "seen", a boolean, not a number or json or string or url or date or datetime']);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'line', link: 'befriends' } }, fields, links), ['lead.link follows "befriends", which is no relation']);
+});
+
 test('every core deadline is a bound, and a flavour inherits its parent capabilities', async () => {
   const l = await map(SHOP);
   assert.deepEqual(l.registry.type('task')!.capabilities.bound, { field: 'due', limit: 'today' });
-  assert.deepEqual(l.registry.type('decision')!.capabilities.bound, { field: 'due', limit: 'today' });
+  assert.deepEqual(l.registry.type('question')!.capabilities.bound, { field: 'due', limit: 'today' });
   assert.deepEqual(l.registry.type('shop.order')!.capabilities.bound, { field: 'due', limit: 'today' });
   assert.equal(l.registry.type('event')!.capabilities.when?.start, 'at');
-  assert.deepEqual(l.registry.having('settles').filter((t) => ['core', 'shop'].includes(l.registry.type(t)!.pack)).sort(), ['decision', 'shop.verdict']);
+  assert.deepEqual(l.registry.having('settles').filter((t) => ['core', 'shop'].includes(l.registry.type(t)!.pack)).sort(), ['question', 'shop.verdict']);
 });
 
 test('at risk is what crosses its bound, whatever the field is called', async () => {

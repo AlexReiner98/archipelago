@@ -11,7 +11,7 @@ import { flatView } from './query.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { drawPart } from './part-host.js';
-import { pageIsA, pageSchema } from './page-schema.js';
+import { pageIsA, pageSchema, pageType } from './page-schema.js';
 import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
 
 /** One section of an item's page: a heading, a count where it has one, and what it holds. */
@@ -121,12 +121,25 @@ async function rows(host, id, p) {
     // A list with nothing in it is not drawn (on Home, on an item's page), but on a nav page of its own it says so.
     if (!list.length && !p.screen.nav) return host.remove();
     const content = list.length ? h('ul', { class: 'rows' }, list.map(viewRow)) : h('div', { class: 'empty' }, 'Nothing here.');
-    // On an item's page, a section of it as its turns are; on a screen of its own, a fold.
+    // In the band, its rows alone; on an item's page, a section of it as its turns are; on a screen of its own, a fold.
+    if (p.lead) return host.replaceWith(h('ul', { class: 'rows lead-piece' }, list.map(viewRow)));
     host.replaceWith(id ? section(p.screen.id, p.title ?? p.screen.title, list.length, content) : fold(id, p.screen.id, p.screen.title, list.length, true, content));
   } catch (err) {
     host.replaceChildren(h('div', { class: 'error' }, err.message));
   }
 }
+
+/**
+ * A piece a pack places in the band (place: "lead") reads as band lines, not as a card under a header: each a label
+ * and its value, the whole value kept for its tip. What is not set has no line.
+ */
+export const leadLines = (props, fields, name) =>
+  (fields ?? [])
+    .filter((f) => props?.[f] !== undefined && props[f] !== null && props[f] !== '')
+    .map((f) => ({ field: f, label: name(f), value: typeof props[f] === 'boolean' ? (props[f] ? 'yes' : 'no') : typeof props[f] === 'object' ? JSON.stringify(props[f]) : String(props[f]) }));
+/** Band lines, one line each and cut with an ellipsis where they do not fit; nothing when there are none. */
+const bandLines = (lines) =>
+  lines.length > 0 && { node: h('div', { class: 'lead-piece' }, lines.map((l) => h('div', { class: 'lead-piece-line', 'data-field': l.field }, h('span', { class: 'lead-piece-label' }, l.label), h('span', { class: 'lead-piece-value', title: l.value }, l.value)))) };
 
 /**
  * Each piece the kernel draws. A piece answers what goes in the column at once; what must be fetched fills it
@@ -135,7 +148,7 @@ async function rows(host, id, p) {
 const PIECES = {
   view: (ctx, p) => {
     const node = h('div');
-    return { node, later: () => rows(node, ctx.id, p) };
+    return { node, later: () => rows(node, ctx.id, ctx.lead ? { ...p, lead: true } : p) };
   },
   action: (ctx, p) => {
     const tool = (pageSchema()?.pack_tools ?? []).find((t) => t.action === p.action);
@@ -154,10 +167,12 @@ const PIECES = {
     for (const k of ['find', 'only', 'not']) if (filter[k]) filter[k] = filter[k].map(here);
     if (Object.values(filter).some((v) => Array.isArray(v) && v.includes(null))) return null;
     const view = typeof p.lens === 'string' ? hooks.keptView(p.lens, { key, style }) : flatView({ lens: { ...p.lens, filter }, style, of: ctx.id, key, only: p.only, quiet: true });
+    if (ctx.lead) return { node: h('div', { class: 'lead-piece lens-card' }, view) };
     return { node: h('section', { class: 'card wide lens-card', style: 'margin-bottom: var(--space-8)' }, h('header', {}, h('h2', {}, p.title ?? p.screen.title)), view) };
   },
-  // Some of the item's fields, together under the screen's name.
+  // Some of the item's fields, together under the screen's name; in the band, a line each.
   fields: (ctx, p) => {
+    if (ctx.lead) return bandLines(leadLines(ctx.e?.props, p.fields, label));
     const set = (p.fields ?? []).filter((f) => ctx.e && ctx.e.props[f] !== undefined && ctx.e.props[f] !== null && ctx.e.props[f] !== '');
     return set.length > 0 && { node: h('section', { class: 'card wide' }, h('header', {}, h('h2', {}, p.screen.title)), h('dl', { class: 'fields' }, set.map((f) => [h('dt', {}, label(f)), h('dd', { class: 'gist', title: String(ctx.e.props[f]) }, String(ctx.e.props[f]))]))) };
   },
@@ -217,7 +232,8 @@ const unknownPiece = (p) => {
  */
 const partPiece = (ctx, p) => {
   const body = h('div');
-  const node = ctx.e ? section(p.piece, p.title ?? p.screen?.title ?? p.piece, 0, body) : h('div', {}, body);
+  // In the band, what the part draws with no heading over it.
+  const node = ctx.lead ? h('div', { class: 'lead-piece', 'data-piece': p.piece }, body) : ctx.e ? section(p.piece, p.title ?? p.screen?.title ?? p.piece, 0, body) : h('div', {}, body);
   const later = async () => {
     const drawn = await drawPart(body, { slot: `piece.${p.piece}`, item: ctx.e, piece: p, redraw: () => ctx.redraw?.() ?? hooks.route?.() });
     if (!drawn) {
@@ -286,12 +302,27 @@ export const sectionsOn = (data) => drawnOn(data, piecesOn(data).filter((p) => p
  * What the screens on this item stand in its band, under its title (`place: "lead"`, decision e_x89zp8uz): any piece,
  * the kernel's or one a pack's part draws (piece.<name>), drawn there in place of below the source.
  */
-export const leadsOn = (data) => drawnOn(data, piecesOn(data).filter((p) => p.place === 'lead' && p.piece !== 'button'));
-/** Pieces drawn for an item's page, each a node, filled once it is read. */
-const drawnOn = (data, pieces) =>
+export const leadsOn = (data) => [leadPicture(data), ...drawnOn(data, piecesOn(data).filter((p) => p.place === 'lead' && p.piece !== 'button'), true)].filter(Boolean);
+/**
+ * A type whose band is a picture of what it draws (its lead's form, packs/loader/kernel/capabilities.ts): the picture
+ * kept for it, small, once it is read; nothing while none is kept. The rest of its band is the page part's (lead.js).
+ */
+function leadPicture(data) {
+  if (pageType(data.entity.type)?.capabilities?.lead?.form !== 'picture') return null;
+  // Hidden until its picture is read, and for good when none is kept: the read may answer before the band is on the
+  // page, where a remove does nothing and an empty band would stand as blank space.
+  const node = h('div', { class: 'lead-picture', hidden: true });
+  api('picture', { result: data.entity.id }).then(
+    (p) => p?.data && (node.replaceChildren(h('img', { src: `data:${p.content_type};base64,${p.data}`, alt: '', title: data.entity.title })), (node.hidden = false)),
+    () => {},
+  );
+  return node;
+}
+/** Pieces drawn for an item's page, each a node, filled once it is read: in its band (lead), each as band lines. */
+const drawnOn = (data, pieces, lead = false) =>
   pieces
     .map((p) => {
-      const d = draw({ e: data.entity, id: data.entity.id }, p);
+      const d = draw({ e: data.entity, id: data.entity.id, lead }, p);
       Promise.resolve(d?.later?.()).catch((err) => d.node.isConnected && d.node.replaceChildren(h('div', { class: 'error' }, err.message)));
       return d?.node;
     })

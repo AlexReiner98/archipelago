@@ -193,8 +193,8 @@ export class Registry {
       }
     }
 
-    const types = new Map<string, ResolvedType>();
-    const resolve = (id: string, trail: string[]): ResolvedType => {
+    const types = new Map<string, ResolvedType>(), took = new Map([...raw.values()].flatMap((d) => (d.moved_from ?? []).filter((o) => !raw.has(o)).map((o) => [o, d.id] as const))); // what a type took over (moved_from) is extended by its new name
+    const resolve = (named: string, trail: string[], id = took.get(named) ?? named): ResolvedType => {
       const done = types.get(id);
       if (done) return done;
       const def = raw.get(id);

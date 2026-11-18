@@ -18,6 +18,6 @@ test('every type of every pack gives each status a phase, as its pack says', () 
   assert.deepEqual(of('run'), { running: 'under_way', waiting: 'under_way', finished: 'finished', failed: 'trouble', cancelled: 'ended' });
   assert.equal(of('task')!.todo, 'not_started');
   assert.equal(of('person')!.active, 'standing');
-  assert.equal(of('decision')!.open, 'not_started');
+  assert.equal(of('question')!.open, 'not_started');
   assert.deepEqual(of('aim'), { active: 'standing', achieved: 'finished', retired: 'ended' }, 'an aim achieved is finished, as its pack says');
 });

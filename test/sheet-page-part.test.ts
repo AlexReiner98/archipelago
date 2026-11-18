@@ -113,12 +113,13 @@ test('a page opens on the band its type declares: choices, answer, measure, aler
   assert.ok(settled.includes('A: refresh the weights') && settled.includes('B: refresh only') && !settled.includes('"A: refresh + four"'), 'the answer, and only the choice not taken set aside, matched by its label');
   const measured = marks({ type: 'finding', props: { value: 147, unit: 's', as_of: '2026-11-17' } });
   assert.doesNotThrow(() => checkMarks(noSlots(measured), { kinds }));
-  assert.ok(JSON.stringify(measured).includes('"size":9') && !JSON.stringify(measured).includes('field-row:value'), 'the number large, and not again among the fields');
+  assert.ok(JSON.stringify(measured).includes('"key":"lead-figure"') && JSON.stringify(measured).includes('"147 s"') && !JSON.stringify(measured).includes('field-row:value'), 'the number large, and not again among the fields');
   assert.ok(lead({ type: 'work', props: { seen_working: false, to_see: 'Open the page' } }), 'built and not seen working');
-  assert.ok(!lead({ type: 'work', props: { seen_working: true } }) && !lead({ type: 'work', props: {} }), 'seen, or nothing said: no band');
+  assert.ok(lead({ type: 'work', props: {} }), 'never said: not seen, so the alert');
+  assert.ok(!lead({ type: 'work', props: { seen_working: true } }), 'seen: no band');
   const told = marks({ type: 'run', props: { story: Array.from({ length: 8 }, (_, i) => ({ n: i + 1, at: '2026-11-17T21:00:00Z', said: `Beat ${i + 1}` })) } });
   assert.doesNotThrow(() => checkMarks(noSlots(told), { kinds }));
-  assert.ok(JSON.stringify(told).includes('2 earlier') && JSON.stringify(told).includes('Beat 8') && !JSON.stringify(told).includes('Beat 2"'), 'the latest beats, the rest counted');
+  assert.ok(JSON.stringify(told).includes('Beat 6') && JSON.stringify(told).includes('Beat 8') && !JSON.stringify(told).includes('Beat 5"'), 'the latest three beats: a band is three lines at most');
   assert.ok(!lead({ type: 'task', props: {} }), 'a type that declares no lead opens as before');
   // What befell a run is marked by its glyph, a refusal as a warning; its own words are not marked.
   const befell = marks({ type: 'run', props: { story: [{ n: 1, said: 'Mine' }, { n: 2, said: 'Claimed Rig', did: 'claimed' }, { n: 3, said: 'Change refused', did: 'refused', by: 'write' }] } });
@@ -148,6 +149,24 @@ test('the alert\'s press makes its field true, as one change', async () => {
   const p = page({ item: w, words: lw, views: {} }, { change: async (ops: unknown[]) => (sent.push({ ops }), { status: 'applied' }), keep: () => {}, state: () => {} });
   await p.on({ key: 'lead-yes', name: 'press' });
   assert.deepEqual(sent[0].ops, [{ op: 'update', id: w.id, props: { seen_working: true } }]);
+});
+
+test("the band's press: Light them moves the canvas, Add work names work in place and makes it in one change", async () => {
+  const lw = { ...words, types: { ...words.types, person: { title: 'Person', capabilities: { lead: { form: 'actor', link: 'waits_on' } } }, aim: { title: 'Aim', capabilities: { lead: { form: 'aim', link: 'serves' } } }, work: { title: 'Work', capabilities: { plannable: true } }, job: { of: 'work', title: 'Job', fields: { tokens_estimated: { type: 'number' } } } } };
+  const went: unknown[] = [], sent: { ops: unknown[] }[] = [];
+  const tools = { go: (a: unknown) => went.push(a), change: async (ops: unknown[]) => (sent.push({ ops }), { status: 'applied' }), keep: () => {}, state: () => {} };
+  const who = { ...task, id: 'e_pppppppp', type: 'person', props: {} };
+  const p = page({ item: who, words: lw, views: { item: { incoming: [{ type: 'waits_on', root: 'waits_on', id: 'e_wwwwwwww', title: 'W', open: true }] } } }, tools);
+  assert.ok(JSON.stringify(p.marks).includes('Light them'));
+  await p.on({ key: 'lead-light', name: 'press' });
+  assert.deepEqual((went[0] as { query: { filter: { find: string[] } } }).query.filter.find, ['id e_pppppppp', 'waits_on e_pppppppp']);
+  assert.equal(sent.length, 0);
+  const a = page({ item: { ...task, id: 'e_aaaaaaab', type: 'aim', props: {} }, words: lw, views: { item: { incoming: [] } } }, tools);
+  const asked = await a.on({ key: 'lead-add', name: 'press' });
+  assert.ok(JSON.stringify(asked).includes('lead-add-title'));
+  assert.equal(await a.on({ key: 'lead-add-title', name: 'edit', value: 'Undo it' }), undefined, 'typing is not drawn again');
+  await a.on({ key: 'lead-add-go', name: 'press' });
+  assert.deepEqual(sent[0].ops, [{ op: 'create', ref: 'work', type: 'job', title: 'Undo it' }, { op: 'link', type: 'serves', from: 'work', to: 'e_aaaaaaab' }]);
 });
 
 test('Save sends the note and the fields written as one change, and lets the kept words go', async () => {

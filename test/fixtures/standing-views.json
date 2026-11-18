@@ -88,7 +88,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "decision"
+     "type": "question"
     },
     {
      "changed": "<time>",
@@ -112,7 +112,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "decision"
+     "type": "question"
     },
     {
      "changed": "<time>",
@@ -372,7 +372,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "decision"
+     "type": "question"
     },
     {
      "changed": "<time>",
@@ -400,7 +400,7 @@
       "id": "<business>",
       "title": "Business"
      },
-     "type": "decision"
+     "type": "question"
     },
     {
      "changed": "<time>",
@@ -451,7 +451,7 @@
       "id": "<app>",
       "title": "App"
      },
-     "type": "decision"
+     "type": "question"
     },
     {
      "changed": "<time>",
@@ -815,7 +815,7 @@
       "owner": "<me>",
       "status": "open",
       "title": "Which certificate?",
-      "type": "decision"
+      "type": "question"
      },
      "why": "depends_on"
     }
@@ -856,7 +856,7 @@
      "owner": "<me>",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     }
    ],
    "task": {
@@ -865,21 +865,21 @@
     "title": "Sign the package",
     "type": "task"
    },
-   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (decision, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is about\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.",
+   "text": "# Sign the package\nTask, todo. Archipelago id: <sign>\n\nPart of: Installer > Add-in > App\n\n## Blocked\nThis cannot finish until:\n- Which certificate? (question, open)\n\n## Needs\n- Live lane: available (exclusive: claim it before use, release it after)\n\n## Is about\n- One live lane. (decided) Only one session drives the CAD app.\n\n## Is linked to\n- Is the cert enough? (open)\n\n## Reporting\nRegister with pelago (capture, action session_start, task <sign>, with your git branch), note anything worth knowing with report, action session_update, and call report, action session_end, with a summary when done.",
    "ties": [
     {
      "id": "<rule>",
      "relation": "about",
      "status": "decided",
      "title": "One live lane.",
-     "type": "decision"
+     "type": "question"
     },
     {
      "id": "<q>",
      "relation": "link",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     }
    ]
   },
@@ -1203,11 +1203,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -1265,22 +1265,22 @@
      "created": "<time>",
      "id": "<q>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
      "created": "<time>",
      "id": "<pricing>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "What does it cost?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -1444,11 +1444,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -1473,11 +1473,11 @@
      "created": "<time>",
      "id": "<q>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": true,
@@ -1685,11 +1685,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -1714,11 +1714,11 @@
      "created": "<time>",
      "id": "<q>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": true,
@@ -1846,11 +1846,11 @@
      "created": "<time>",
      "id": "<pricing>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "What does it cost?",
-     "type": "decision"
+     "type": "question"
     }
    ],
    "preset": "all"
@@ -1961,11 +1961,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -1983,11 +1983,11 @@
      "created": "<time>",
      "id": "<q>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -2207,11 +2207,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -2236,11 +2236,11 @@
      "created": "<time>",
      "id": "<q>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": true,
@@ -2493,11 +2493,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -2538,11 +2538,11 @@
      "created": "<time>",
      "id": "<q>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     }
    ],
    "preset": "structure"
@@ -2925,11 +2925,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -2969,22 +2969,22 @@
      "created": "<time>",
      "id": "<pricing>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "What does it cost?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
      "created": "<time>",
      "id": "<q>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -3148,11 +3148,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -3170,11 +3170,11 @@
      "created": "<time>",
      "id": "<pricing>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "What does it cost?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": true,
@@ -3571,11 +3571,11 @@
      "created": "<time>",
      "id": "<cert>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Which certificate?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
@@ -3593,22 +3593,22 @@
      "created": "<time>",
      "id": "<pricing>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "What does it cost?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": false,
      "created": "<time>",
      "id": "<q>",
      "open": true,
-     "root": "decision",
+     "root": "question",
      "starter": "question",
      "status": "open",
      "title": "Is the cert enough?",
-     "type": "decision"
+     "type": "question"
     },
     {
      "blocked": true,

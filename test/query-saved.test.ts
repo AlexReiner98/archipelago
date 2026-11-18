@@ -156,7 +156,7 @@ test('views that kept types inside an item draw only what they drew under the ol
   assert.deepEqual(now, { oq: old.oq, fe: ['F1', 'P'], td: ['I deep', 'P', 'T1', 'T2 direct'] });
   assert.deepEqual([moved.lost[m.oq], moved.lost[m.fe], moved.lost[m.td]], [undefined, ['what its links reach of the types it kept (event)'], ['what its links reach of the types it kept (task, record)']]);
   assert.deepEqual((await l.entity(m.fe))!.props.filter, { find: [`part_of ${m.p}`], only: ['event'], not: ['done', 'kind system'] }, 'one step down: only those types of what is part of it');
-  assert.deepEqual((await l.entity(m.oq))!.props.filter, { find: ['type decision', 'type aim'], only: [`in ${m.p}`], not: ['done', 'kind system'] }, 'every step down: those types within it');
+  assert.deepEqual((await l.entity(m.oq))!.props.filter, { find: ['type question', 'type aim'], only: [`in ${m.p}`], not: ['done', 'kind system'] }, 'every step down: those types within it');
 });
 
 test('a view kept in the old words is said in terms once, and the log keeps what it said', async () => {

@@ -95,15 +95,27 @@ export interface Subject {
 }
 
 /**
- * What its page opens on, under its title: one band in a form the page draws, filled
- * from the fields named. A measure is its number large (value, unit, as of); an alert is said while a boolean field is
- * false (unless), with what would clear it (says); a timeline is the beats a json field keeps ({ at, said }), each
- * marked by the value of its own key `mark` when it has one: the glyph `marks` gives that value, drawn as a warning
- * when `warn` names it (a session's story marks what befell it: a claim, a refusal). A
- * question that settles opens on its choices, or its answer once settled, with no lead declared.
+ * What its page opens on, under its title: one band in a form the page draws, filled from the fields and links named,
+ * saying only what its title and status marks cannot (decision e_65cnpc2b). Every starter declares one, or "none" when
+ * the title is the point, and a flavour inherits it or says its own (decision e_khf3pf8g; test/structure-lead.test.ts).
+ * - measure: its number large (value, unit, as of).
+ * - alert: said while a boolean field is not true, false or never said (unless), with what would clear it (says).
+ * - timeline: the beats a json field keeps ({ at, said }), each marked by the value of its own key `mark` when it has
+ *   one: the glyph `marks` gives that value, drawn as a warning when `warn` names it.
+ * - choices: a question that settles opens on its choices, one line each, the recommended one marked (`recommended:
+ *   true` on it, or its says saying so), at most three in sight and the rest behind a count; or on its answer once
+ *   settled (capability settles).
+ * - aim: what serves it (`link`, into it), how much of that is done, or that nothing does yet.
+ * - done: work's own: how many of its parts (`link`, into it) are done, and the alert of unless and says.
+ * - occurrence: when it next happens, large, read from its when.
+ * - place: who holds it (`link`, into it) and how many need it (`waits`, into it).
+ * - actor: how many wait on them (`link`, into them).
+ * - picture: what it draws, small.
+ * - line: one field (`value`), or the far ends of a link into it (`link`), as one line named by it and cut where it
+ *   does not fit; no band while it is empty.
  */
 export interface Lead {
-  form: 'measure' | 'alert' | 'timeline';
+  form: LeadForm;
   value?: string;
   unit?: string;
   as_of?: string;
@@ -116,11 +128,20 @@ export interface Lead {
   marks?: Record<string, string>;
   /** A timeline's: the values of a beat's mark drawn as a warning. */
   warn?: string[];
+  /** An aim's, work's done, a place's or an actor's: the link type whose items, linked into it, the band counts. A line's: whose far ends it names. */
+  link?: string;
+  /** A place's: the link type of what needs it, linked into it. */
+  waits?: string;
 }
+
+/** The forms a band is drawn in, and what each must name. */
+export const LEAD_FORMS = { measure: ['value'], alert: ['unless'], timeline: ['beats'], choices: [], aim: ['link'], done: ['link'], occurrence: [], place: ['link'], actor: ['link'], picture: [], line: [] } as const;
+export type LeadForm = keyof typeof LEAD_FORMS;
 
 export interface Capabilities {
   subject?: Subject;
-  lead?: Lead;
+  /** The band its page opens on, or "none". */
+  lead?: Lead | 'none';
   bound?: Bound;
   when?: When;
   where?: Where;
@@ -208,19 +229,23 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     for (const s of [watch.up, watch.down, ...(watch.also ?? []), ...(watch.idle ? [watch.idle] : [])]) if (!statuses.includes(s)) problems.push(`watch names "${s}", which is no status of it`);
     has('watch.commit', watch.commit, ['string']);
   }
-  if (lead) {
-    const needs = { measure: ['value'], alert: ['unless'], timeline: ['beats'] }[lead.form];
-    if (!needs) problems.push('lead.form is "measure", "alert" or "timeline"');
-    for (const key of needs ?? []) if (!lead[key as keyof Lead]) problems.push(`a ${lead.form} lead names its ${key}`);
-    has('lead.value', lead.value, ['number', 'json', 'string']);
-    has('lead.unit', lead.unit, ['string']);
-    has('lead.as_of', lead.as_of, DATES);
-    has('lead.unless', lead.unless, ['boolean']);
-    has('lead.says', lead.says, ['string']);
-    has('lead.beats', lead.beats, ['json']);
-    if (lead.mark !== undefined && (typeof lead.mark !== 'string' || lead.form !== 'timeline')) problems.push('lead.mark is the key of a beat that marks it, on a timeline');
-    if (lead.marks !== undefined && (!lead.mark || typeof lead.marks !== 'object' || Object.values(lead.marks).some((g) => typeof g !== 'string' || !g || g.length > 2))) problems.push('lead.marks gives a glyph (a character or two) for each value of lead.mark');
-    if (lead.warn !== undefined && (!lead.mark || !Array.isArray(lead.warn) || lead.warn.some((w) => typeof w !== 'string'))) problems.push('lead.warn lists values of lead.mark');
+  if (lead !== undefined && lead !== 'none') {
+    const needs = typeof lead === 'object' && lead ? (LEAD_FORMS as Record<string, readonly string[]>)[lead.form] : undefined;
+    if (!needs) problems.push(`lead is "none" or a form: ${Object.keys(LEAD_FORMS).join(', ')}`);
+    else {
+      for (const key of needs) if (!lead[key as keyof Lead]) problems.push(`a ${lead.form} lead names its ${key}`);
+      if (lead.form === 'line' && Boolean(lead.value) === Boolean(lead.link)) problems.push('a line lead names its value or its link, one of them');
+      has('lead.value', lead.value, lead.form === 'line' ? ['number', 'json', 'string', 'url', ...DATES] : ['number', 'json', 'string']);
+      has('lead.unit', lead.unit, ['string']);
+      has('lead.as_of', lead.as_of, DATES);
+      has('lead.unless', lead.unless, ['boolean']);
+      has('lead.says', lead.says, ['string']);
+      has('lead.beats', lead.beats, ['json']);
+      for (const key of ['link', 'waits'] as const) if (lead[key] !== undefined && !relations.has(lead[key])) problems.push(`lead.${key} follows "${lead[key]}", which is no relation`);
+      if (lead.mark !== undefined && (typeof lead.mark !== 'string' || lead.form !== 'timeline')) problems.push('lead.mark is the key of a beat that marks it, on a timeline');
+      if (lead.marks !== undefined && (!lead.mark || typeof lead.marks !== 'object' || Object.values(lead.marks).some((g) => typeof g !== 'string' || !g || g.length > 2))) problems.push('lead.marks gives a glyph (a character or two) for each value of lead.mark');
+      if (lead.warn !== undefined && (!lead.mark || !Array.isArray(lead.warn) || lead.warn.some((w) => typeof w !== 'string'))) problems.push('lead.warn lists values of lead.mark');
+    }
   }
   for (const flag of ['owned', 'actionable', 'plannable', 'kernel'] as const) if (caps[flag] !== undefined && caps[flag] !== true) problems.push(`${flag} is true, or left out`);
   if (caps.subject && !relations.has(caps.subject.link)) problems.push(`subject is linked by "${caps.subject.link}", which is no relation`);

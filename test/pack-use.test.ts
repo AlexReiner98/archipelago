@@ -17,7 +17,7 @@ const PINNED = [
   'core/rules/Asked: 1 (held 1 change in 30 days)',
   'core/shared/Question: 1 (1 item here, 1 made in 30 days)',
   'core/shared/Task: 2 (2 items here, 2 made in 30 days)',
-  'core/types/Question: 1 (1 item here, 1 made in 30 days)',
+  'core/types/Decision: 1 (1 item here, 1 made in 30 days)',
   'core/types/Task: 2 (2 items here, 2 made in 30 days)',
   'core/views/Frontier: 3 (read 3 times in 30 days)',
   'findings/rules/Finding value: 1 (refused 1 change in 30 days)',

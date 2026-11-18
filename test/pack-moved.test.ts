@@ -11,13 +11,14 @@ import { packsOff, setPack, syncPacks } from '../packs/loader/kernel/packstate.t
 import { declaredIds, holdsMoved } from '../packs/loader/kernel/pack-moved.ts';
 import { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { syncTypes } from '../packs/loader/kernel/typetable.ts';
-import { human, packsWith } from './map.ts';
+import { human, packsWith, WORDS } from './map.ts';
 
 const registries: Registry[] = [];
 after(() => registries.forEach((r) => hostFor(r).stop()));
 
 const ROOT = join(import.meta.dirname, '..');
-const read = (pack: string) => JSON.parse(readFileSync(join(ROOT, 'packs', pack, 'pack.json'), 'utf8')) as Record<string, unknown[]>;
+/** A pack's file: the findings pack, gone from the product (decision e_guzfg5rg), is kept in the tests' words. */
+const read = (pack: string) => JSON.parse(readFileSync(pack === 'findings' ? join(WORDS, pack, 'pack.json') : join(ROOT, 'packs', pack, 'pack.json'), 'utf8')) as Record<string, unknown[]>;
 
 /** The packs as they were before the findings pack: its rules, views and styles back in core, and no findings folder. */
 function before(): string {
@@ -26,6 +27,7 @@ function before(): string {
   const back = (id: unknown) => (typeof id === 'string' ? id.replace(/^findings\./, 'core.') : id);
   // Its screen of an island's findings stays out: that piece is the findings pack's part now, which no core holds.
   const ofPart = (d: unknown) => ((d as { pieces?: { piece: string }[] }).pieces ?? []).some((p) => p.piece === 'findings');
+  core.types = [...core.types, ...(findings.types ?? [])]; // core still declared finding then
   for (const key of ['rules', 'views', 'styles'] as const) core[key] = [...core[key], ...(findings[key] ?? []).filter((d) => !ofPart(d)).map((d) => ({ ...(d as object), id: back((d as { id: unknown }).id) }))];
   writeFileSync(join(dir, 'core', 'pack.json'), JSON.stringify(core));
   rmSync(join(dir, 'findings'), { recursive: true });

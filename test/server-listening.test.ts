@@ -76,7 +76,7 @@ test('an agent hears what the human does: by waiting for it, and with the owner\
   assert.equal((await call('/api/tail')).result.listening, 0);
 
   const told = await call('/hooks/prompt', undefined, { session_id: 's1' });
-  assert.match(told.hookSpecificOutput.additionalContext, /entity\.update decision "Which\?".*props\.outcome: nothing -> "This one"/s);
+  assert.match(told.hookSpecificOutput.additionalContext, /entity\.update question "Which\?".*props\.outcome: nothing -> "This one"/s);
   assert.deepEqual(await call('/hooks/prompt', undefined, { session_id: 's1' }), { status: 200 }, 'told once');
 
   // A session that began before this server did has lived through a restart: it is told, once, that its tools may be old.

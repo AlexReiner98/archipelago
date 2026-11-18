@@ -36,7 +36,7 @@ test('every item has its kind in its row: written with it, or filled by the data
   assert.equal((await l.entity(t))!.kind, 'work');
   assert.equal((await l.entity(v))!.kind, 'system');
   // A row the app before this one writes has no kind: the database fills it from the type table.
-  await l.db.query(`insert into entity (id, type, title, status, is_open) values ('e_oldapp01', 'decision', 'Which slab?', 'open', true)`);
+  await l.db.query(`insert into entity (id, type, title, status, is_open) values ('e_oldapp01', 'question', 'Which slab?', 'open', true)`);
   assert.equal((await l.entity('e_oldapp01'))!.kind, 'question');
 });
 
@@ -53,7 +53,7 @@ test('an undeclared field, a head field its kind lacks, and a large value on the
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'lens', title: 'Sure?', confidence: 0.5 }] }), /lens has no field "confidence"/);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: t, props: { owner: p } }] }), /task has no field "owner"/);
   const big = 'x'.repeat(LARGE + 1);
-  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: b, props: { outcome: big } }] }), /decision.outcome is too large/);
+  await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'update', id: b, props: { outcome: big } }] }), /question.outcome is too large/);
   await assert.rejects(l.change(human, { reason: 'test', ops: [{ op: 'create', type: 'decision', title: 'Big', props: { outcome: big } }] }), /too large/);
   // A system item's field declared large holds it.
   await make(l, [{ op: 'update', id: s, props: { code: `export default () => [] // ${big}` } }]);

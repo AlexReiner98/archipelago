@@ -60,8 +60,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       'The only way to change the map: a list of ops with a reason. ' +
       'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
       'Change part of a note with append or replace, of code with edit, not the whole. An update of only the id says it is still true. ' +
-      'A plan or findings are items with a view, not one note. ' +
-      'A published finding (type finding) is one line: title the claim as a sentence, value the fact with its unit, confidence, as_of; note how it was found, three lines at most. ' +
+      'A plan or research are items with a view, not one note: a finding is evidence, an item that bears_on the question it helps settle. ' +
       'Checked whole, then applied or held for a human, by policy. ' +
       'With holds off it applies at once: public reaches anyone, code runs for all who open it, forget is for good; stakes say what it reached. A refused change is kept a few minutes under a name the refusal gives: send retry and fixes (the wrong ops, by number). A settled decision is put to the owner later (attention, to_confirm).',
     input: {

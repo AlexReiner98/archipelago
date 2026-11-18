@@ -150,7 +150,7 @@ test('a relation a pack took over takes its links with it, and the brief still r
   const synced = await syncTypes(now);
   assert.deepEqual([synced.moved['old.guess'], synced.moved['old.leans_on']], [1, 1]);
   assert.equal((await now.entity(made.created.h))!.type, 'guess');
-  assert.deepEqual((await now.entity(made.created.lens))!.props, { filter: { find: ['leans_on me', 'type decision', 'type guess'], only: [] }, walk: { over: ['leans_on', 'depends_on'], steps: 1 } }, 'a view that named them names them still, in its order');
+  assert.deepEqual((await now.entity(made.created.lens))!.props, { filter: { find: ['leans_on me', 'type question', 'type guess'], only: [] }, walk: { over: ['leans_on', 'depends_on'], steps: 1 } }, 'a view that named them names them still, in its order');
   assert.deepEqual((await now.entity(made.created.quiet))!.props.filter, { find: ['type task'], only: [], not: ['type guess'] });
   const { rows } = await db.query<{ type: string }>(`select type from relation where from_id = $1 and to_id = $2`, [made.created.t, made.created.h]);
   assert.deepEqual(rows.map((r) => r.type), ['leans_on']);

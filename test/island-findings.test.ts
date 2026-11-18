@@ -15,7 +15,7 @@ test('the brief of an island is what it publishes, most read first, its working 
   const l = await fresh();
   await setIslands(l, human, true);
   const { a, b } = await make(l, [
-    { op: 'create', ref: 'a', type: 'island', title: 'Costs', props: { pack: 'core' } },
+    { op: 'create', ref: 'a', type: 'island', title: 'Costs', props: { pack: 'findings' } },
     { op: 'create', ref: 'b', type: 'island', title: 'Plans', props: { pack: 'core' } },
   ]);
   const { host, dark, draft, gone, budget } = await make(l, [

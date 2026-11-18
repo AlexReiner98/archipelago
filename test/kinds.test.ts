@@ -31,8 +31,7 @@ test('every shipped type comes from one of core’s starter types, the system ti
   }
   assert.equal(reg.type('task')!.starter, 'work');
   assert.equal(reg.type('connection')!.starter, 'place');
-  assert.equal(reg.type('finding')!.starter, 'record');
-  assert.deepEqual(reg.ancestry('decision'), { root: 'decision', starter: 'question' });
+  assert.deepEqual(reg.ancestry('question'), { root: 'question', starter: 'question' });
   assert.deepEqual(reg.ancestry('run'), { root: 'run', starter: 'system' });
 });
 

@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Type bands</title>
+<!-- A sketch, not the app (task e_masvg7c3): every starter's sheet opens on one band of three slots, in the same
+     order and places: its state, its point, its next act. Data is the Focus map's, 18 Nov 2026, except where a card
+     says it is an example (no item of that type on Focus). Question and decision are drawn as one type. -->
+<style>
+  :root {
+    --bg: #141614; --sheet: #181a18; --line: #2a2d2a; --text: #e6e6e1; --muted: #8b8f88; --faint: #5d615b;
+    --accent: #7fb685; --warn: #d9a441; --soft: rgba(127, 182, 133, .10); --warn-soft: rgba(217, 164, 65, .10);
+    --head: Georgia, Gelasio, "Noto Serif", serif; --body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--body); }
+  header.key { max-width: 1400px; margin: 0 auto; padding: 22px 16px 0; display: flex; gap: 28px; align-items: baseline; flex-wrap: wrap; color: var(--muted); font-size: 13px; }
+  header.key h2 { margin: 0; font: 600 17px var(--head); color: var(--text); }
+  header.key span b { color: var(--text); font-weight: 500; }
+  header.key i { font-style: normal; display: inline-block; width: 18px; height: 3px; vertical-align: 3px; margin-right: 6px; }
+  main { display: flex; flex-wrap: wrap; gap: 24px; padding: 20px 16px 48px; justify-content: center; max-width: 1400px; margin: 0 auto; }
+  .cap { width: 420px; max-width: 100%; }
+  .cap > small { display: flex; gap: 8px; color: var(--faint); font-size: 12px; margin: 0 0 6px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cap > small b { color: var(--muted); font-weight: 600; }
+  .cap > small em { font-style: normal; color: var(--warn); }
+  .sheet { background: var(--sheet); border-left: 1px solid var(--line); padding: 18px 20px 14px; min-height: 380px; }
+
+  .top { display: flex; gap: 12px; align-items: flex-start; }
+  .top h1 { flex: 1; min-width: 0; margin: 0; font: 600 18px/1.3 var(--head); overflow-wrap: anywhere; }
+  .top a { color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; padding-top: 3px; }
+  .marks { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 12.5px; margin: 6px 0 12px; white-space: nowrap; overflow: hidden; }
+  .marks .st { color: var(--text); }
+  .marks .st::after { content: " ▾"; color: var(--faint); font-size: 10px; }
+  .glyph { display: inline-block; width: 11px; height: 11px; border: 1.4px solid var(--muted); vertical-align: -1px; flex: none; }
+  .glyph.dia { transform: rotate(45deg) scale(.8); }
+  .glyph.tick { border-radius: 0 3px 3px 0; border-left-style: dashed; }
+  .glyph.hex { border-radius: 3px; }
+  .glyph.ring { border-radius: 50%; }
+  .glyph.tri { border: 0; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 11px solid var(--muted); }
+  .glyph.cal { border-top-width: 3px; }
+  .glyph.pin { border-radius: 50% 50% 50% 0; transform: rotate(-45deg) scale(.85); }
+
+  /* The band: three slots, always in this order and in these places. */
+  .band { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+  .slot { position: relative; padding-left: 12px; }
+  .slot::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 2px; border-radius: 1px; }
+  .state { display: flex; gap: 8px; align-items: baseline; padding: 9px 0 9px 12px; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+  .state::before { background: var(--faint); }
+  .state.you { color: var(--warn); }
+  .state.you::before { background: var(--warn); }
+  .state b { font-weight: 600; flex: none; }
+  .state span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .state .who { color: var(--text); flex: none; }
+  .point { padding: 6px 0 12px 12px; }
+  .point::before { background: var(--accent); top: 8px; }
+  .act { display: flex; gap: 12px; align-items: center; padding: 9px 0 10px 12px; border-top: 1px dashed var(--line); font-size: 13px; white-space: nowrap; }
+  .act::before { background: var(--text); opacity: .5; }
+  .act .hint { color: var(--faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .act .go { margin-left: auto; color: var(--accent); text-decoration: none; font-weight: 600; flex: none; }
+  .act .go.quiet { color: var(--muted); font-weight: 400; }
+  .key .k1 { background: var(--faint); } .key .k2 { background: var(--accent); } .key .k3 { background: var(--text); opacity: .5; }
+
+  /* The point's forms. */
+  .opt { display: grid; grid-template-columns: 16px 1fr auto; gap: 0 8px; align-items: baseline; padding: 5px 8px; margin: 0 -8px; border-radius: 4px; }
+  .opt:hover { background: var(--soft); }
+  .opt .k { color: var(--faint); font-size: 12px; text-align: right; }
+  .opt .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opt .s { grid-column: 2 / 4; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opt .tag { color: var(--accent); font-size: 11.5px; font-weight: 400; }
+  .opt.rec .k { color: var(--accent); }
+  .opt.gone { opacity: .45; padding-top: 2px; padding-bottom: 2px; }
+  .opt.gone .t { font-weight: 400; text-decoration: line-through; text-decoration-color: var(--faint); }
+
+  .answer { font: 600 17px/1.35 var(--head); margin: 2px 0 4px; display: flex; gap: 10px; }
+  .answer::before { content: "✓"; color: var(--accent); font-family: var(--body); }
+  .claim { font: 600 17px/1.35 var(--head); margin: 2px 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sub.in { margin-left: 24px; }
+  .empty { color: var(--faint); font-size: 13px; padding: 4px 0; }
+  .empty b { color: var(--muted); font-weight: 500; }
+
+  .big { display: flex; align-items: baseline; gap: 10px; }
+  .big .n { font: 600 44px/1 var(--head); letter-spacing: -.5px; }
+  .big .u { color: var(--muted); font-size: 18px; }
+  .big .vs { color: var(--muted); font-size: 13px; margin-left: auto; text-align: right; line-height: 1.35; }
+  .bar { position: relative; height: 6px; background: var(--line); border-radius: 3px; margin: 12px 0 6px; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 3px; }
+  .bar i.w { background: var(--warn); }
+  .bar b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--muted); }
+  .scale { display: flex; justify-content: space-between; color: var(--faint); font-size: 11.5px; }
+
+  .segs { display: flex; gap: 3px; margin: 10px 0 6px; }
+  .segs i { flex: 1; height: 6px; border-radius: 2px; background: var(--line); }
+  .segs i.d { background: var(--accent); }
+  .segs i.w { background: var(--warn); }
+  .segs i.g { background: var(--muted); opacity: .5; }
+
+  .beats { list-style: none; margin: 0; padding: 0; counter-reset: b; }
+  .beats li { display: grid; grid-template-columns: 16px 1fr auto; gap: 8px; padding: 4px 0; counter-increment: b; }
+  .beats li::before { content: counter(b); color: var(--faint); font-size: 12px; text-align: right; }
+  .beats span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .beats time { color: var(--faint); font-size: 12px; }
+
+  .unseen { display: flex; gap: 10px; align-items: baseline; padding: 8px 10px; background: var(--warn-soft); border-left: 2px solid var(--warn); margin-top: 8px; }
+  .unseen p { margin: 0; min-width: 0; }
+  .unseen strong { display: block; font-weight: 600; font-size: 13px; }
+  .unseen span { color: var(--muted); font-size: 12.5px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .when { display: flex; align-items: baseline; gap: 12px; }
+  .when .d { font: 600 30px/1 var(--head); }
+  .when .t { color: var(--muted); font-size: 15px; }
+  .when .in { margin-left: auto; color: var(--accent); font-size: 13px; }
+
+  .count { display: flex; gap: 18px; align-items: baseline; }
+  .count .n { font: 600 44px/1 var(--head); color: var(--warn); }
+  .count .of { color: var(--muted); font-size: 13px; line-height: 1.5; }
+  .count .of b { color: var(--text); font-weight: 500; }
+
+  .preview { height: 132px; border: 1px solid var(--line); border-radius: 4px; background: radial-gradient(circle at 30% 40%, rgba(127,182,133,.18), transparent 40%), radial-gradient(circle at 70% 60%, rgba(217,164,65,.12), transparent 35%), #101210; position: relative; overflow: hidden; }
+  .preview svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .page { height: 132px; border: 1px solid var(--line); border-radius: 4px; background: #f3f1ea; color: #1d1f1c; padding: 14px 16px; overflow: hidden; }
+  .page h3 { margin: 0 0 6px; font: 600 17px var(--head); }
+  .page p { margin: 0 0 6px; font-size: 11.5px; color: #4b4e48; }
+  .page i { display: block; height: 5px; background: #d9d5c8; margin: 5px 0; border-radius: 2px; }
+
+  .fold { display: flex; gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; }
+  .fold::before { content: "▸"; color: var(--faint); font-size: 10px; }
+  .fold b { color: var(--text); font-weight: 500; letter-spacing: .04em; font-size: 11px; text-transform: uppercase; }
+  .fold span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+<header class="key">
+  <h2>One band, every type</h2>
+  <span><i class="k1"></i><b>State</b> · status, who it waits on</span>
+  <span><i class="k2"></i><b>Point</b> · what the type is for</span>
+  <span><i class="k3"></i><b>Next act</b> · one press, always bottom right</span>
+</header>
+<main>
+
+  <!-- QUESTION: open, with options. Question and decision drawn as one type. -->
+  <section class="cap">
+    <small><b>question</b> open, options · choices</small>
+    <div class="sheet">
+      <div class="top"><h1>How does a pack lay out its island?</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph dia"></span><span>Question</span><span class="st">open</span><span>19 h</span></div>
+      <div class="band">
+        <div class="slot state you"><b>↩ Waits on you</b><span>once the options are drawn on real islands</span></div>
+        <div class="slot point">
+          <div class="opt rec"><span class="k">1</span><span class="t">Named arrangements <span class="tag">recommended</span></span><span></span><span class="s">The canvas pack keeps a short list; a pack's look names one</span></div>
+          <div class="opt"><span class="k">2</span><span class="t">An island module</span><span></span><span class="s">A map pack ships code that arranges one island, in the sandbox</span></div>
+          <div class="opt"><span class="k">3</span><span class="t">Cells only</span><span></span><span class="s">Agents keep placing items by cell; a pack gives where unplaced start</span></div>
+        </div>
+        <div class="slot act"><span class="hint">1–3 to choose · t in your own words</span><a class="go" href="#">Settle it</a></div>
+      </div>
+      <div class="fold"><b>Note</b><span>Why · Tried (17 Nov)</span></div>
+      <div class="fold"><b>Fields</b><span>Island · Cell 1·0</span></div>
+    </div>
+  </section>
+
+  <!-- QUESTION: open, no options yet. The case the map has most of. -->
+  <section class="cap">
+    <small><b>question</b> open, no options · the question itself</small>
+    <div class="sheet">
+      <div class="top"><h1>Plan the rest on an architecture island?</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph dia"></span><span>Question</span><span class="st">open</span><span>1 d</span></div>
+      <div class="band">
+        <div class="slot state"><b>Waits on no one</b><span>· nobody is asked</span></div>
+        <div class="slot point">
+          <div class="opt"><span class="k">1</span><span class="t">Yes</span><span></span></div>
+          <div class="opt"><span class="k">2</span><span class="t">No</span><span></span></div>
+          <div class="empty"><b>No options named:</b> a yes-or-no question gets these two</div>
+        </div>
+        <div class="slot act"><span class="hint">Yes · No · in words</span><a class="go" href="#">Answer</a></div>
+      </div>
+      <div class="fold"><b>Fields</b><span>Island · Cell 0·11</span></div>
+    </div>
+  </section>
+
+  <!-- QUESTION: settled. Its answer is a field (moved out of the note, task e_h7bb4cmg). -->
+  <section class="cap">
+    <small><b>question</b> settled · answer <em>after the move into fields</em></small>
+    <div class="sheet">
+      <div class="top"><h1>Each option carries its consequence?</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph dia"></span><span>Question</span><span class="st">settled</span><span>18 Nov</span></div>
+      <div class="band">
+        <div class="slot state"><b>Settled</b><span>· Alex · 18 Nov · 15 h after it was asked</span></div>
+        <div class="slot point">
+          <p class="answer">Yes: each option carries a consequence</p>
+          <p class="sub in">Shown on the question's page; thin reasoning draws a warning, not a refusal</p>
+        </div>
+        <div class="slot act"><span class="hint">1 task depends on it</span><a class="go quiet" href="#">Reopen</a></div>
+      </div>
+      <div class="fold"><b>Note</b><span>In Codecast · Here</span></div>
+      <div class="fold"><b>Source</b><span>Codecast: features, documentation, blog and README</span></div>
+    </div>
+  </section>
+
+  <!-- WORK: a feature with steps. Progress of what it depends on; who it waits on. -->
+  <section class="cap">
+    <small><b>work</b> build.feature, steps · progress</small>
+    <div class="sheet">
+      <div class="top"><h1>Build islands plan sessions and one PR</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph sq"></span><span>Feature</span><span class="st">building</span><span>1 h</span></div>
+      <div class="band">
+        <div class="slot state you"><b>↩ Waits on you</b><span>approving the split: lanes 1 and 2 share rule-check.ts</span></div>
+        <div class="slot point">
+          <div class="big"><span class="n">5</span><span class="u">of 10</span><span class="vs">4 lanes working<br>1 integration waiting</span></div>
+          <div class="segs"><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="d"></i><i class="w"></i><i class="g"></i><i class="g"></i><i class="g"></i><i></i></div>
+          <p class="sub">Done when: built only once its tasks sit in lanes, handed back, one PR merged</p>
+        </div>
+        <div class="slot act"><span class="hint">Lanes 1 and 2 overlap</span><a class="go" href="#">Approve the split</a></div>
+      </div>
+      <div class="fold"><b>Note</b><span>Done when · Why · How it grows</span></div>
+      <div class="fold"><b>Sessions</b><span>4 at work</span></div>
+    </div>
+  </section>
+
+  <!-- WORK: a task built, not yet seen working. -->
+  <section class="cap">
+    <small><b>work</b> task, not seen working · what would show it</small>
+    <div class="sheet">
+      <div class="top"><h1>A link across islands is never refused outright</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph sq"></span><span>Task</span><span class="st">doing</span><span>high</span></div>
+      <div class="band">
+        <div class="slot state"><b>Blocked</b><span>· by Promote a step, leaving a port</span></div>
+        <div class="slot point">
+          <p class="claim">Two tasks on two islands link by depends_on</p>
+          <div class="unseen"><p><strong>Nobody has seen it working</strong><span>Once #446 is live: it applies and draws as a wire between the islands</span></p></div>
+        </div>
+        <div class="slot act"><span class="hint">#446 merged</span><a class="go" href="#">Seen it</a></div>
+      </div>
+      <div class="fold"><b>Note</b><span>What changed · Left</span></div>
+    </div>
+  </section>
+
+  <!-- RECORD: a finding with a value, and a baseline field. -->
+  <section class="cap">
+    <small><b>record</b> finding, value + baseline · measure</small>
+    <div class="sheet">
+      <div class="top"><h1>PR #435's CI run took 147 s</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph tick"></span><span>Finding</span><span class="st">current</span><span>as of 17 Nov</span></div>
+      <div class="band">
+        <div class="slot state"><b>Current</b><span>· sure · read by nothing</span></div>
+        <div class="slot point">
+          <div class="big"><span class="n">147</span><span class="u">s</span><span class="vs">median 166 s<br>−19 s · −11%</span></div>
+          <div class="bar"><i style="width:73.5%"></i><b style="left:83%"></b></div>
+          <div class="scale"><span>0</span><span>median</span><span>200 s</span></div>
+        </div>
+        <div class="slot act"><span class="hint">Bears on How do we make CI fast again?</span><a class="go quiet" href="#">New value</a></div>
+      </div>
+      <div class="fold"><b>Note</b><span>How it was found</span></div>
+    </div>
+  </section>
+
+  <!-- RECORD: a finding with no value: the claim is the point. -->
+  <section class="cap">
+    <small><b>record</b> finding, no value · the claim</small>
+    <div class="sheet">
+      <div class="top"><h1>A layout about an island also draws its pictures</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph tick"></span><span>Finding</span><span class="st">current</span><span>17 Nov</span></div>
+      <div class="band">
+        <div class="slot state"><b>Current</b><span>· sure · on its island only</span></div>
+        <div class="slot point">
+          <div class="big"><span class="n">Sure</span><span class="u">1.0</span><span class="vs">no value:<br>the title is the claim</span></div>
+          <div class="bar"><i style="width:100%"></i></div>
+          <p class="sub">Read in styleFor: about picks a layout for the item and its pictures alike</p>
+        </div>
+        <div class="slot act"><span class="hint">Bears on How does a look name its island?</span><a class="go quiet" href="#">Give it a value</a></div>
+      </div>
+      <div class="fold"><b>Fields</b><span>Island · Cell 5·7</span></div>
+    </div>
+  </section>
+
+  <!-- AIM: what serves it, done of all. -->
+  <section class="cap">
+    <small><b>aim</b> · what serves it</small>
+    <div class="sheet">
+      <div class="top"><h1>Recover from an agent's mistake</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph tri"></span><span>Aim</span><span class="st">active</span><span>15 h</span></div>
+      <div class="band">
+        <div class="slot state"><b>Active</b><span>· no one answers for it</span></div>
+        <div class="slot point">
+          <p class="claim">See exactly what an agent changed, and put it back in one step</p>
+          <div class="empty"><b>Nothing serves it yet.</b></div>
+        </div>
+        <div class="slot act"><span class="hint">0 of 0 done</span><a class="go" href="#">Add work for it</a></div>
+      </div>
+      <div class="fold"><b>Note</b><span>An agent changed many things wrongly…</span></div>
+    </div>
+  </section>
+
+  <!-- OCCURRENCE: when. -->
+  <section class="cap">
+    <small><b>occurrence</b> · when <em>example: none on Focus</em></small>
+    <div class="sheet">
+      <div class="top"><h1>Weekly review of bumps</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph cal"></span><span>Occurrence</span><span class="st">upcoming</span></div>
+      <div class="band">
+        <div class="slot state"><b>Upcoming</b><span>· involves <span class="who">Alex</span> and 2 agents</span></div>
+        <div class="slot point">
+          <div class="when"><span class="d">Mon 23 Nov</span><span class="t">10:00–10:30</span><span class="in">in 5 days</span></div>
+          <p class="sub" style="margin-top:8px">Bumps deduped into problems, watched a week</p>
+        </div>
+        <div class="slot act"><span class="hint">Weekly</span><a class="go quiet" href="#">Move it</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLACE: free or held. -->
+  <section class="cap">
+    <small><b>place</b> connection · free or held <em>example: none on Focus</em></small>
+    <div class="sheet">
+      <div class="top"><h1>The hosted server's deploy</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph pin"></span><span>Place</span><span class="st">unavailable</span><span>exclusive</span></div>
+      <div class="band">
+        <div class="slot state"><b>Held</b><span>· by <span class="who">Integrate round two as one PR</span> · 12 min</span></div>
+        <div class="slot point">
+          <div class="big"><span class="n">1</span><span class="u">waits for it</span><span class="vs">held 12 min<br>usually 6 min</span></div>
+          <div class="bar"><i class="w" style="width:100%"></i></div>
+        </div>
+        <div class="slot act"><span class="hint">Lane 3 is next</span><a class="go quiet" href="#">Release it</a></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ACTOR: how many wait on them. A state, not a list (decision e_xj9cs33u). -->
+  <section class="cap">
+    <small><b>actor</b> person · what waits on them, counted</small>
+    <div class="sheet">
+      <div class="top"><h1>alex@aperture.tools</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph hex"></span><span>Person</span><span class="st">active</span><span>6 islands on</span></div>
+      <div class="band">
+        <div class="slot state"><b>Active</b><span>· owner of the map</span></div>
+        <div class="slot point">
+          <div class="count"><span class="n">8</span><span class="of">wait on you<br><b>5</b> questions to settle · <b>3</b> works to act on</span></div>
+        </div>
+        <div class="slot act"><span class="hint">Oldest: 1 d</span><a class="go" href="#">Light them</a></div>
+      </div>
+      <div class="fold"><b>Islands</b><span>Parallel sessions · Strip Archipelago +4</span></div>
+    </div>
+  </section>
+
+  <!-- SYSTEM: a layout; its picture. -->
+  <section class="cap">
+    <small><b>system</b> layout · its picture</small>
+    <div class="sheet">
+      <div class="top"><h1>Field</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph ring"></span><span>Layout</span><span class="st">working</span><span>1,264 lines</span></div>
+      <div class="band">
+        <div class="slot state"><b>Working</b><span>· draws 2 islands</span></div>
+        <div class="slot point">
+          <div class="preview"><svg viewBox="0 0 400 132" aria-hidden="true"><g fill="#7fb685" opacity=".75"><circle cx="90" cy="52" r="2"/><circle cx="104" cy="44" r="2"/><circle cx="98" cy="64" r="2"/><circle cx="118" cy="58" r="2"/><circle cx="84" cy="72" r="2"/><circle cx="110" cy="74" r="2"/></g><g fill="#d9a441" opacity=".7"><circle cx="270" cy="82" r="2"/><circle cx="286" cy="72" r="2"/><circle cx="262" cy="96" r="2"/><circle cx="300" cy="90" r="2"/></g><g fill="#e6e6e1" opacity=".5"><circle cx="190" cy="34" r="2"/><circle cx="206" cy="42" r="2"/><circle cx="196" cy="54" r="2"/></g><g stroke="#8b8f88" stroke-width=".6" opacity=".4" fill="none"><path d="M104 44 L190 34 M118 58 L196 54 L270 82 M206 42 L286 72"/></g></svg></div>
+        </div>
+        <div class="slot act"><span class="hint">70 dials</span><a class="go" href="#">Use here</a></div>
+      </div>
+      <div class="fold"><b>Dials</b><span>Dt, Hud, Bend k +67</span></div>
+      <div class="fold"><b>Code</b><span>1,264 lines</span></div>
+    </div>
+  </section>
+
+  <!-- SYSTEM: a run; its story. -->
+  <section class="cap">
+    <small><b>system</b> run · its story</small>
+    <div class="sheet">
+      <div class="top"><h1>Type sheets UI polish</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph hex"></span><span>Harris</span><span class="st">running</span><span>164k tokens</span></div>
+      <div class="band">
+        <div class="slot state"><b>At work</b><span>· on Sketch a band for every starter</span></div>
+        <div class="slot point">
+          <ol class="beats">
+            <li><span>The lead band shipped for four forms only</span><time>12:44</time></li>
+            <li><span>Questions and decisions are used as one thing</span><time>12:51</time></li>
+          </ol>
+          <p class="sub" style="margin-top:6px">claude/band-sketch · 0 unpushed · 1 dirty</p>
+        </div>
+        <div class="slot act"><span class="hint">Your chat</span><a class="go quiet" href="#">Open it</a></div>
+      </div>
+      <div class="fold"><b>Worked on</b><span>13 items</span></div>
+    </div>
+  </section>
+
+  <!-- A pack's own type, its piece placed lead: the pack tier in use. -->
+  <section class="cap">
+    <small><b>record</b> site.page · a pack's piece in the point</small>
+    <div class="sheet">
+      <div class="top"><h1>You stay in charge</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph sq"></span><span>Page</span><span class="st">draft</span><span>/in-charge</span></div>
+      <div class="band">
+        <div class="slot state"><b>Draft</b><span>· for People who build with agents</span></div>
+        <div class="slot point">
+          <div class="page"><h3>You stay in charge</h3><p>Every change an agent makes waits for your word, or is let through by a rule you set.</p><i style="width:92%"></i><i style="width:78%"></i><i style="width:85%"></i></div>
+        </div>
+        <div class="slot act"><span class="hint">Not published</span><a class="go" href="#">Publish</a></div>
+      </div>
+      <div class="fold"><b>Note</b><span>The page's words</span></div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>

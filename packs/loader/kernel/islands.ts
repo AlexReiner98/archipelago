@@ -31,6 +31,8 @@ export interface Shared {
   types: Set<string>;
   links: Set<string>;
   actors?: Set<string>;
+  /** An old name a shared type took over (its moved_from: decision is question since 18 Nov 2026), read as that type. */
+  renamed?: Map<string, string>;
 }
 
 /** The two kinds of pack, and the kernel's own. */
@@ -38,7 +40,9 @@ export type PackKind = 'kernel' | 'island' | 'map';
 
 /** The shared set as the kernel's packs declare it: types core itself declares (task and decision moved there from Work, the owner, 5 Nov 2026, e_rf6q3q34), so a pack on an island map always finds them. */
 export function sharedOf(kernel: Manifest[]): Shared {
-  return { types: new Set(kernel.flatMap((m) => m.shared ?? [])), links: new Set(kernel.flatMap((m) => parts(m).relations.map((r) => r.id))), actors: actorsOf(kernel) };
+  const types = new Set(kernel.flatMap((m) => m.shared ?? []));
+  const renamed = new Map(kernel.flatMap((m) => parts(m).types.filter((t) => types.has(t.id)).flatMap((t) => (t.moved_from ?? []).map((old) => [old, t.id] as const))));
+  return { types, links: new Set(kernel.flatMap((m) => parts(m).relations.map((r) => r.id))), actors: actorsOf(kernel), renamed };
 }
 
 /** The types of these packs that are actors: actor and every type whose line of `extends` reaches it. */
@@ -109,7 +113,7 @@ export function islandProblems(m: Manifest, shared: Shared): string[] {
   // A type or link type another pack declares is the pack's to name when it requires it by name (`type:build.feature`,
   // decision e_rdfvhra7): as a type's parent, a link's end or parent, a rule's type. With its provider off it waits.
   const required = new Set((m.requires ?? []).map(needOf).filter((n) => n.by === 'type').map((n) => n.name));
-  const fine = (name: string) => name === '*' || own.has(name) || shared.types.has(name) || capabilityOf(name) !== undefined;
+  const fine = (name: string) => name === '*' || own.has(name) || shared.types.has(shared.renamed?.get(name) ?? name) || capabilityOf(name) !== undefined;
   const fineHere = (name: string) => fine(name) || required.has(name);
   const named = new Set<string>();
   for (const t of p.types) if (t.extends && !fineHere(t.extends)) named.add(t.extends);

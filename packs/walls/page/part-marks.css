@@ -203,3 +203,26 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 .pm-input[data-code] { display: block; width: 100%; min-width: 0; }
 .pm-input[data-code][data-loading] { min-height: var(--code-fold); }
 .pm-input[data-code][data-failed] { color: var(--bad); }
+
+/* The band an item's page opens on (packs/sheet/parts/page/lead.js): its number large and its progress a thin bar,
+   each a length the style names (lead_figure, lead_bar, lead_bar_most), else a step of its scale. */
+.pm-box[data-key="lead-figure"] > .pm-text { font-size: var(--lead-figure, var(--text-9)); line-height: 1; }
+.pm-box[data-key="lead-bar"] { align-self: center; max-width: var(--lead-bar-most, var(--progress-col)); }
+.pm-box[data-key="lead-bar"] > .pm-box { flex: 1 1 0; height: var(--lead-bar, var(--border-4)); background: currentColor; border-radius: var(--radius-1); }
+/* A press that takes the room left on a line of the band (a decision's option) is cut where it does not fit, as words are. */
+.pm-box[data-key="lead"] .pm-grow > .pm-button { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A band that is a picture of what it draws (packs/sheet/page/screens.js, leadPicture): small, as high as the style's lead_picture. */
+.lead-picture { border-bottom: var(--border-1) solid var(--line); padding-bottom: var(--space-5); }
+.lead-picture img { display: block; width: 100%; height: var(--lead-picture, var(--thumb-still)); object-fit: cover; border-radius: var(--radius-1); }
+/* A band's one likely press (lead-press, packs/sheet/parts/page/lead.js): at the end of the line it acts on, in the
+   accent; Seen working (lead-yes) is pressed the same. */
+.pm-box[data-key="lead-press"] { margin-left: auto; flex: none; }
+.pm-box[data-key="lead-press"] > .pm-button, .pm-box[data-key="lead"] .pm-button[data-key="lead-yes"] { color: var(--accent); font-weight: 600; }
+
+/* lead-piece (Lane 7): a piece a pack places in the band (screens.js, bandLines), a line each, its label and its value
+   cut with an ellipsis, the whole value in its tip; and a picture band that has no picture takes no room. */
+.lead-piece { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding-bottom: var(--space-5); border-bottom: var(--border-1) solid var(--line); }
+.lead-piece-line { display: flex; align-items: baseline; gap: var(--space-4); min-width: 0; white-space: nowrap; }
+.lead-piece-label { flex: none; color: var(--muted); }
+.lead-piece-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lead-picture:empty { display: none; }
