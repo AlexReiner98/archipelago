@@ -55,8 +55,21 @@ export function sessionItems(items, marks, cut) {
   return items.map((i) => {
     if (!place.has(i.id)) return i;
     const said = String(sessionOf(i).line || i.title);
-    return { ...i, title: cut(said), said, named: i.title, place: place.get(i.id) };
+    const asks = askedOf(sessionOf(i));
+    return { ...i, title: cut(said), said, named: i.title, place: place.get(i.id), ...(asks && { asks }) };
   });
+}
+
+/** A held change named by its id in what a run asks of you (its line), as a word of its own. */
+const ASKED_CHANGE = /(?:^|\W)(p_[a-z\d]+)(?!\w)/;
+/**
+ * The held change a run's question puts to you, where its line names one and the run waits on you (waiting, your_move):
+ * its step is then where that change is decided, its click keyed `held:<proposal>` (docs/layouts.md, Ghosts), and the
+ * page puts it to the person if it is still held, else opens the run.
+ */
+export function askedOf(session) {
+  if (!session || !['waiting', 'your_move'].includes(session.state)) return null;
+  return ASKED_CHANGE.exec(String(session.line ?? ''))?.[1] ?? null;
 }
 
 /** The mark of a state, centred on cx, cy, as big as a dot of radius r. */

@@ -91,3 +91,30 @@ test('a state the style names no mark for keeps its title and dot', () => {
   assert.equal(marks(step).find((x) => x[0] === 'title').slice(2).join(''), runs[0].title);
   assert.ok(!step[1].class.split(' ').includes('you'));
 });
+
+test('a run asking you to decide a held change is where it is decided', () => {
+  const asking = { ...run('your_move', 7), id: 'e_runasks1', session: { state: 'your_move', line: 'Approve p_a4knhcvf on the map, then have me check Field and Lines live?', since: '2026-11-03T07:00:00Z' } };
+  const naming = { ...run('idle', 8), id: 'e_runidle1', session: { state: 'idle', line: 'Proposed p_a4knhcvf for Alex', since: '2026-11-03T08:00:00Z' } };
+  const { scene } = picture({ answer: { items: [...answer.items, asking, naming], links: answer.links }, style: house }, tools);
+  const all = marks(scene.svg);
+  // Its click is keyed for the change, as a ghost's is, and it is no link to the run's page.
+  const keyed = all.find((x) => x[1]?.key === 'held:p_a4knhcvf:e_runasks1');
+  assert.ok(keyed && keyed[1].on.includes('click'), 'its click puts the change to you');
+  assert.ok(!stepOf(scene.svg, 'e_runasks1'), 'it does not lead to the run');
+  assert.ok(marks(keyed).some((x) => String(x[1].class ?? '').split(' ').includes('lf-step')), 'it is drawn as its step');
+  assert.match(marks(keyed).find((x) => x[0] === 'title').slice(2).join(''), /Yours to decide/);
+  // A run that is not waiting on you, though its line names a change, stays a link to its page; so does one that names none.
+  assert.ok(stepOf(scene.svg, 'e_runidle1'), 'an idle run leads to its page');
+  assert.ok(!all.some((x) => String(x[1]?.key ?? '').startsWith('held:p_a4knhcvf:e_runidle1')));
+  assert.ok(stepOf(scene.svg, runs[1].id), 'a run whose question names no change leads to its page');
+});
+
+test('only a held change named as a word of its own is what a run asks', async () => {
+  const { askedOf } = await import(pathToFileURL(join(laid, 'session.js')).href);
+  assert.equal(askedOf({ state: 'waiting', line: 'Approve p_a4knhcvf?' }), 'p_a4knhcvf');
+  assert.equal(askedOf({ state: 'your_move', line: '(p_abcd1234) then merge' }), 'p_abcd1234');
+  assert.equal(askedOf({ state: 'your_move', line: 'Merge top_abcd1234?' }), null);
+  assert.equal(askedOf({ state: 'your_move', line: 'Approve p_abcd1234x_y?' }), null);
+  assert.equal(askedOf({ state: 'working', line: 'Approve p_a4knhcvf?' }), null);
+  assert.equal(askedOf(null), null);
+});
