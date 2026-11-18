@@ -25,7 +25,8 @@ import type { PackFile, TypeDef } from './packs.ts';
 import { kernelOf, meets, providedBy } from './services.ts';
 import { HOST_SLOTS, slotsOpenedBy } from './slots.ts';
 
-export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string };
+/** A pack's state here. A waiting pack's `lacks` is every name it requires that has no active provider (or whose provider's service does not meet its shape); `why` says each in a sentence. */
+export type PackState = { state: 'active' | 'waiting' | 'off'; why?: string; lacks?: string[] };
 
 /**
  * The pack of words every map starts with: the kinds, root relations and the shared set. Never off. Which packs run in
@@ -171,6 +172,7 @@ export function orderPacks(found: Map<string, PackFile>, off: Map<string, string
     if (held.has(pack.id)) return set(pack, { state: 'waiting', why: held.get(pack.id) });
     if (trail.includes(pack.id)) return set(pack, { state: 'waiting', why: `in a cycle: ${[...trail, pack.id].join(' -> ')}` });
     if (pack.id !== local) {
+      const lacking: { name: string; why: string }[] = [];
       for (const name of pack.requires ?? []) {
         const providers = providersOf(name, found.values());
         if (providers.includes(pack.id)) continue; // it provides what it requires itself
@@ -181,14 +183,15 @@ export function orderPacks(found: Map<string, PackFile>, off: Map<string, string
           // Checked by shape: what the caller declared it calls the name with, against what its provider declares.
           const said = kernelOf(pack).calls?.[need.name];
           const why = said && meets(kernelOf(found.get(live.id)!).provides?.[need.name] ?? {}, said);
-          if (why) return set(pack, { state: 'waiting', why: `needs ${name} as it calls it, and ${live.id}'s ${why}` });
+          if (why) { lacking.push({ name, why: `needs ${name} as it calls it, and ${live.id}'s ${why}` }); continue; }
         }
         if (live) continue;
-        const why = need.by === 'pack' ? `needs ${name}, which is ${states[0]?.state ?? 'not on this server'}`
+        lacking.push({ name, why: need.by === 'pack' ? `needs ${name}, which is ${states[0]?.state ?? 'not on this server'}`
           : !providers.length ? `needs ${name}: ${need.of ? shapeMissing(need, [...found.values()]) : 'no pack here provides it'}`
-          : `needs ${name}, which ${states.map((s) => `${s.id} is ${s.state}`).join(', ')}`;
-        return set(pack, { state: 'waiting', why });
+          : `needs ${name}, which ${states.map((s) => `${s.id} is ${s.state}`).join(', ')}` });
       }
+      // Every name it lacks, not only the first (e_puhgbg9u), so what it waits on is read whole.
+      if (lacking.length) return set(pack, { state: 'waiting', why: lacking.map((l) => l.why).join('; '), lacks: lacking.map((l) => l.name) });
       // One owner per name: a pack declaring a type or link type, providing a service or opening a slot, another active pack owns waits until that one goes.
       const taken = namesOf(pack).filter((n) => owners.has(n));
       if (taken.length) return set(pack, { state: 'waiting', why: `${taken.map((n) => `${n} is ${owners.get(n)}'s`).join(', ')}: one pack owns a name` });

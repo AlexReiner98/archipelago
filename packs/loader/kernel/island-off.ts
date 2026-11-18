@@ -7,7 +7,7 @@
 // code, as agent_pack_set and agent_pack_code judge pack_set). The kernel's own pack is never turned off.
 
 import { FOCUS, ISLAND, PACKS_OFF } from './island-items.ts';
-import { isRequired } from './manifest.ts';
+import { isRequired } from './manifest.ts'; import { PARTS_OFF, partsOffProblems } from './island-parts.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import type { Registry } from './packs.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
@@ -43,19 +43,24 @@ function cannotTurnOff(reg: Registry, pack: string): string | undefined {
   return undefined;
 }
 
-/** Why ops that set an island's packs_off cannot be kept, as sentences: no island, no list of pack ids, or a pack never turned off. */
+/** Why ops that set an island's packs_off or parts_off cannot be kept, as sentences: no island, no list of ids, or a pack or part never turned off (packs/loader/kernel/island-parts.ts). */
 export async function offRefusals(map: Archipelago, reg: Registry, ops: Op[]): Promise<string[]> {
   const errors: string[] = [];
   for (const [i, op] of ops.entries()) {
-    const set = op.op === 'create' || op.op === 'update' ? op.props?.[PACKS_OFF] : undefined;
-    if (set === undefined || set === null) continue;
+    const props = op.op === 'create' || op.op === 'update' ? op.props : undefined;
+    const packs = props?.[PACKS_OFF], partsSet = props?.[PARTS_OFF];
+    if ((packs === undefined || packs === null) && (partsSet === undefined || partsSet === null)) continue;
     const where = `op ${i + 1} (${op.op})`;
     const island = op.op === 'create' ? { type: op.type, props: op.props ?? {} } : await map.entity((op as { id: string }).id);
     if (!island) continue;
-    const merged = { ...island, props: { ...island.props, ...(op as { props?: Record<string, unknown> }).props } };
-    if (!isIslandItem(reg, merged)) { errors.push(`${where}: ${PACKS_OFF} is an island's: this item is no island (an island, or a focus)`); continue; }
-    if (!Array.isArray(set) || set.some((p) => typeof p !== 'string')) { errors.push(`${where}: ${PACKS_OFF} is a list of pack ids, e.g. ["build"]`); continue; }
-    for (const pack of new Set(set as string[])) { const why = cannotTurnOff(reg, pack); if (why) errors.push(`${where}: ${why}`); }
+    const merged = { ...island, props: { ...island.props, ...props } };
+    const field = packs !== undefined && packs !== null ? PACKS_OFF : PARTS_OFF;
+    if (!isIslandItem(reg, merged)) { errors.push(`${where}: ${field} is an island's: this item is no island (an island, or a focus)`); continue; }
+    if (packs !== undefined && packs !== null) {
+      if (!Array.isArray(packs) || packs.some((p) => typeof p !== 'string')) errors.push(`${where}: ${PACKS_OFF} is a list of pack ids, e.g. ["build"]`);
+      else for (const pack of new Set(packs as string[])) { const why = cannotTurnOff(reg, pack); if (why) errors.push(`${where}: ${why}`); }
+    }
+    if (partsSet !== undefined && partsSet !== null) for (const why of partsOffProblems(reg.found, partsSet)) errors.push(`${where}: ${why}`);
   }
   return errors;
 }

@@ -79,7 +79,7 @@ test('a pack waits while what it requires is missing, and what names a pack it u
   const dir = packsWith(CLOCK, tally, { id: 'needy', version: '1', title: 'Needy', requires: ['core', 'nowhere'] });
   const reg = new Registry(dir);
   registries.push(reg);
-  assert.deepEqual(reg.states.get('needy'), { state: 'waiting', why: 'needs nowhere, which is not on this server' });
+  assert.deepEqual(reg.states.get('needy'), { state: 'waiting', why: 'needs nowhere, which is not on this server', lacks: ['nowhere'] });
   assert.ok(reg.relations.has('tally.counts') && reg.type('clock.entry')!.fields.tally, 'with clock active, what names it is registered');
   reg.turnOff(['clock']);
   assert.equal(reg.states.get('tally')!.state, 'active', 'a pack it only uses is not one it waits for');

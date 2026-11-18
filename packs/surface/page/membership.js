@@ -67,7 +67,7 @@ export function reads(lens) {
  * op, link?: { type, from, to }, made?: true, island? }; `made`: how many items the tail says were made anywhere.
  */
 /** The field on an island that lists the packs turned off there (core's island and focus types). */
-const PACKS_OFF = 'packs_off';
+const PACKS_OFF = 'packs_off', PARTS_OFF = 'parts_off';
 
 export function mayMove(view, touches, made = 0) {
   const r = view.reads ?? reads(view.lens);
@@ -87,9 +87,9 @@ export function mayMove(view, touches, made = 0) {
       if (r.unanchored && (!r.islands.size || onIsland)) return true;
       continue;
     }
-    // The packs turned off on an island it holds or looks at (the island's packs_off) change what the server derives
+    // The packs or parts turned off on an island it holds or looks at (its packs_off, parts_off) change what the server derives
     // of the answer (each pack's state there, what waits): asked again, whatever the query reads.
-    if (t.field === PACKS_OFF && (near(t.id) || islands.has(t.id))) return true;
+    if ((t.field === PACKS_OFF || t.field === PARTS_OFF) && (near(t.id) || islands.has(t.id))) return true;
     if (!(near(t.id) || onIsland)) continue;
     // A session it holds that ends leaves it.
     if (r.sessions && t.field === 'status' && view.sessions?.has(t.id)) return true;
