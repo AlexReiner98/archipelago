@@ -49,6 +49,12 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 #islands .isl-sec-on .isl-row:not(.on) .isl-name { color: var(--muted); }
 #islands .isl-row:hover { background: var(--accent-soft); }
 #islands .isl-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+/* What a chat works on, after its name: quieter, and the first cut when the row narrows (e_vr7tpgxp). */
+/* A chat's row is drawn from pieces (./session-pieces.js): a word a piece adds is quieter than the name, the first cut
+   when the row narrows, in the piece's hue where it has one; the name is the one that grows. */
+#islands .isl-chat .isl-piece:not(.isl-chat-mark) { flex: 0 2 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--session-hue, var(--muted)); }
+#islands .isl-chat .isl-piece.isl-name { flex: 1 1 auto; }
+#islands .isl-chat-on { margin-left: var(--space-4); }
 #islands .isl-off { flex: none; border: 0; background: none; padding: 0 var(--space-3); font: inherit; color: var(--muted); cursor: pointer; }
 #islands .isl-off:hover { color: var(--accent); }
 
