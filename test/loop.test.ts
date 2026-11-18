@@ -113,9 +113,12 @@ test('the core loop, as a stranger meets it: install, write, read, correct, reme
   // 4. Correct: the person edits a step and adds one; a change the agent held is approved. The agent hears all of it.
   await person('change', { reason: 'Email must be unique', ops: [{ op: 'update', id: ids.table, title: 'User table, email unique' }] });
   const added = ((await person('change', { reason: 'Add a step', ops: [{ op: 'create', ref: 'reset', type: 'task', title: 'Password reset' }, { op: 'link', type: 'part_of', from: 'reset', to: ids.hub }] })) as { created: Record<string, string> }).created.reset;
+  // A new workspace begins with holds off, where a hold is not kept: the person turns them on to be asked, and off again.
+  await person('workspace_set', { holds_off: false });
   const held = (await agent('change', { run: run1, reason: 'Start the table', hold: true, ops: [{ op: 'update', id: ids.table, status: 'doing' }] })) as { status: string; proposal: string };
   assert.equal(held.status, 'proposed');
   await person('decide', { proposal: held.proposal, approve: true });
+  await person('workspace_set', { holds_off: true });
   const heard = await hook('prompt', { session_id: 'loop-1', cwd: project, prompt: 'go on' });
   assert.match(heard.context, /owner did this in the map/, `the agent hears the person: ${heard.context.slice(0, 600)}`);
   assert.match(heard.context, /approved/, 'and that its held change was approved');

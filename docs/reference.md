@@ -375,7 +375,8 @@ and remove the link once they have); `needs` is a resource.
 In a change, a title or note can name an item the same change makes: `{ref}`
 becomes that item's id when the change is applied. An agent can ask for its
 own change to wait for a human with `hold: true`, even where agents' changes
-are applied as made.
+are applied as made. Where the owner has turned holds off, it is not kept: the
+change applies as made, and its answer says so (`hold`).
 
 A handoff is read off the map, so it does not go stale between sessions and
 nobody writes it: the last push, what is open, and what has happened in the
