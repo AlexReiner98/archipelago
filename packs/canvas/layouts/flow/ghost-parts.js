@@ -17,7 +17,10 @@ const LEFT = new Set(['type', 'link']);
 export function ghostParts({ island, pack, at: [x, y], z, m, titled, measure, glyph, state, toggles, tip }) {
   const [d, gap, row, text, pad, apart] = ['island_part_mark', 'island_part_gap', 'island_part_row', 'island_part_list_text', 'island_part_list_pad', 'island_part_column_gap'].map(z);
   const parts = Array.isArray(pack.parts) ? pack.parts : [];
-  const left = parts.filter((p) => LEFT.has(p.kind)), right = parts.filter((p) => !LEFT.has(p.kind));
+  const left = parts.filter((p) => LEFT.has(p.kind));
+  // What acts stands beside what it names: sorted by the first part on the left it needs, those naming none last.
+  const first = (p) => ((k) => (k < 0 ? left.length : k))(left.findIndex((q) => (p.needs ?? []).includes(q.id)));
+  const right = parts.filter((p) => !LEFT.has(p.kind)).map((p, k) => [p, k]).sort(([a, i], [b, j]) => first(a) - first(b) || i - j).map(([p]) => p);
   const wide = (col) => (col.length ? d + gap * 2 + Math.max(...col.map((p) => measure(p.id, text))) : 0);
   const [lw, rw] = [wide(left), wide(right)];
   const head = row, top = y + pad + head;
@@ -33,9 +36,12 @@ export function ghostParts({ island, pack, at: [x, y], z, m, titled, measure, gl
       m('circle', { cx: cx + d / 2, cy, r: d / 2 }), m('text', { x: cx + d / 2, y: cy }, glyph(p.kind)), m('text', { x: cx + d + gap * 2, y: cy, class: 'lf-part-name' }, p.id)), lines.join('\n'));
   };
   const rows = [...left.map((p, k) => rowOf(p, k, lx)), ...right.map((p, k) => rowOf(p, k, rx))];
-  // A wire from each part on the right to each part on the left it names: out of its mark, across the gap, into the end of the name it needs.
+  // A wire from each part on the right to each part on the left it names: out of its mark, across the gap in the channel
+  // of the part it names (one channel a part on the left, so no two parts' wires share a stretch), into the end of its name.
+  const named = left.filter((q) => right.some((p) => (p.needs ?? []).includes(q.id)));
+  const channel = (n) => (lx + lw) + (apart * (named.findIndex((q) => q.id === n) + 1)) / (named.length + 1);
   const wires = right.flatMap((p) => (Array.isArray(p.needs) ? p.needs : []).filter((n) => place.has(n) && LEFT.has(parts.find((q) => q.id === n)?.kind)).map((n) => {
-    const a = place.get(p.id), b = place.get(n), from = a.x - gap, to = lx + lw, mid = to + apart / 2;
+    const a = place.get(p.id), b = place.get(n), from = a.x - gap, to = lx + lw, mid = channel(n);
     return m('path', { d: `M${from} ${a.y}H${mid}V${b.y}H${to}`, class: `lf-ghost-wire st-${state(p)}` });
   }));
   const frame = m('rect', { x, y, width, height, rx: pad, class: 'lf-ghost' });

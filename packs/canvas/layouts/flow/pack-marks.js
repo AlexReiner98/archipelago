@@ -145,7 +145,8 @@ export function countRows({ pack, style, m, z }) {
     const kinds = kindsOf(p).filter(([kind]) => kind !== 'type' && kind !== 'link');
     if (!kinds.length) return [];
     const said = kinds.map(([kind, parts]) => `${kindGlyph(style, kind)} ${countText(parts)}`).join(' · ');
-    return [{ glyph: m('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, m('text', { x: W / 2, y: H / 2, class: `lf-key-count st-${kinds.some(([, ps]) => ps.some((r) => stateOf(r) !== 'active')) ? 'some' : 'active'}` }, kindGlyph(style, kinds[0][0]))), label: `${p.title ?? p.id}: ${said}`, tip: kinds.map(([kind, parts]) => kindTipOf(kind, parts, false)[0]).join(', ') }];
+    // The row's mark is the pack's own glyph, so its words are the counts alone; the pack's name is in its tip.
+    return [{ glyph: m('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, m('text', { x: W / 2, y: H / 2, class: `lf-key-count st-${kinds.some(([, ps]) => ps.some((r) => stateOf(r) !== 'active')) ? 'some' : 'active'}` }, glyphOf(p))), label: said, tip: `${p.title ?? p.id}: ${kinds.map(([kind, parts]) => kindTipOf(kind, parts, false)[0]).join(', ')}` }];
   });
 }
 
