@@ -17,6 +17,7 @@ test('as many islands from the first as read whole together open', () => {
   assert.equal(got.n, 2, 'the third would take it under the least');
   assert.deepEqual(got.box, [0, 0, 900, 400]);
   assert.equal(got.across, false);
+  assert.equal(got.beside, true, 'the third stands beside them');
 });
 
 test('a first island too big to read whole opens whole across down to its own floor (option C)', () => {
@@ -35,7 +36,21 @@ test('an island wholly out of the room is named on the edge toward it, in readin
   assert.deepEqual(out, [['b', [1, 0], false], ['c', [0, 1], false], ['d', [0, 1], false]], 'a is in sight; b to the right; c and d below, in order');
 });
 
-test('an island cut by the edge is named on each edge it runs past: it goes on there', () => {
+test('an island cut by the edge is named once, on the edge it runs furthest past: it goes on there', () => {
   assert.deepEqual(outOfSight([['a', [900, 60, 1400, 300]]], ROOM, { x: 0, y: 0, s: 1 }), [['a', [1, 0], true]]);
-  assert.deepEqual(outOfSight([['a', [10, 400, 1400, 900]]], ROOM, { x: 0, y: 0, s: 1 }), [['a', [1, 0], true], ['a', [0, 1], true]]);
+  // 400 of 1390 across runs past the right, 52 of 400 down past the foot: named at the right alone.
+  assert.deepEqual(outOfSight([['a', [10, 400, 1400, 800]]], ROOM, { x: 0, y: 0, s: 1 }), [['a', [1, 0], true]]);
+  // Even both ways, the foot is the one.
+  assert.deepEqual(outOfSight([['a', [500, 248, 1500, 1248]]], ROOM, { x: 0, y: 0, s: 1 }), [['a', [0, 1], true]]);
+});
+
+test('one too big to open with the first is passed over, and a later one that fits opens with it', () => {
+  const got = leading([[0, 0, 400, 300], [0, 400, 3000, 2000], [420, 0, 800, 300]], ROOM, 16, 0.7);
+  assert.equal(got.n, 2);
+  assert.deepEqual(got.box, [0, 0, 800, 300]);
+});
+
+test('one left out beside the first stands it at their top left; one only below leaves them centred', () => {
+  assert.equal(leading([[0, 0, 500, 400], [600, 0, 3000, 400]], ROOM, 16, 0.7).beside, true);
+  assert.equal(leading([[0, 0, 500, 400], [0, 500, 3000, 3000]], ROOM, 16, 0.7).beside, false);
 });
