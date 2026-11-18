@@ -180,7 +180,8 @@ function connect() {
   // session's record and its checkout before it says so: it asks for half a minute.
   // A wait asked for (Notification), a turn ended in an error (StopFailure) and a tool that ran once a wait was
   // answered (tool-used) only tell events; tool-used runs after every tool, so it runs beside the session (async).
-  for (const [event, name, matcher, timeout, async] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end', undefined, 30], ['PostToolUse', 'file-used', 'Read|Edit|Write|MultiEdit|NotebookEdit'], ['Notification', 'notification'], ['StopFailure', 'stop-failure'], ['PostToolUse', 'tool-used', undefined, 10, true]]) {
+  // Before every Bash command (push) the hook asks about one that sends work out; a rule on a push may stop it.
+  for (const [event, name, matcher, timeout, async] of [['SessionStart', 'session-start', 'startup|resume|clear'], ['UserPromptSubmit', 'prompt'], ['Stop', 'stop'], ['SessionEnd', 'session-end', undefined, 30], ['PostToolUse', 'file-used', 'Read|Edit|Write|MultiEdit|NotebookEdit'], ['Notification', 'notification'], ['StopFailure', 'stop-failure'], ['PostToolUse', 'tool-used', undefined, 10, true], ['PreToolUse', 'push', 'Bash', 15]]) {
     const list = (settings.hooks[event] ??= []);
     const command = `node ${HOOK} ${name}`;
     const named = (hook) => typeof hook.command === 'string' && ourHook.test(hook.command) && hook.command.trim().endsWith(` ${name}`);
