@@ -62,12 +62,15 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     const lx = l + PAD, ly = t + PAD + top, rest = (look ? items.filter((n) => !look.places.has(n.id)) : items).filter((n) => n !== fn), after = look ? look.width + GAP : 0;
     const dx = fn && fat === 'corner' ? fn.w + GAP : 0, dy = fn && fat === 'top' ? fn.h + GAP : 0;
     if (look) for (const n of items) if (look.places.has(n.id)) x.set(n.id, lx + look.places.get(n.id)[0]), y.set(n.id, ly + look.places.get(n.id)[1]);
-    const unplaced = rest.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0, block = blockOf(unplaced, m, shift, [cw, ch]);
+    // A placed item stands at its own cell, the same in every view (the field cell); what no agent placed takes the free
+    // cells round them, in a block as wide as all of them would make the pane's shape (round 2, verdict on e_x7c54w7k).
+    const unplaced = rest.filter((n) => !cellBy.get(n.id)), taken = new Set(rest.filter((n) => cellBy.get(n.id)).map((n) => String(cellBy.get(n.id))));
+    const block = unplaced.length ? blockOf(unplaced, m, columns(rest.length, args.aspect, cw, ch), [cw, ch], taken) : [];
     // Each box in the middle of its cell, so a column of mixed kinds (a decision is wider than a task) keeps one line.
     const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + (cw - GAP) / 2), y.set(n.id, ly + dy + r * ch + (ch - GAP) / 2));
     // Row by row across the block, what is linked together kept together (blockOf).
     for (const [n, cell] of block) at(n, cell);
-    for (const n of rest) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
+    for (const n of rest) if (cellBy.get(n.id)) at(n, cellBy.get(n.id));
     // Over the rest it stands in the middle of their width; in the corner, first.
     const wide = Math.max(fn?.w ?? 0, ...rest.map((n) => x.get(n.id) + n.w / 2 - lx));
     if (fn) x.set(fn.id, fat === 'top' ? lx + wide / 2 : lx + fn.w / 2), y.set(fn.id, ly + fn.h / 2);
@@ -86,9 +89,10 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
  * The cells of `nodes` in a block `columns` wide: each group of items linked together (in `m`'s chains and ties) in
  * a block of its own rows, round its most linked item, so a wire stays short (`cell` the cells' width and height); each starts a row,
  * so where one group ends and the next begins is a row's edge, not the middle of one (study e_unru8ftt: a gap that said
- * nothing, wires across the whole island). Items linked to nothing here come last, together. Answers [node, [c, r]].
+ * nothing, wires across the whole island). Items linked to nothing here come last, together, in the free cells in
+ * reading order. No item takes a cell in `taken` (each "c,r", placed by an agent). Answers [node, [c, r]].
  */
-export function blockOf(nodes, m, columns, cell = [1, 1]) {
+export function blockOf(nodes, m, columns, cell = [1, 1], taken = new Set()) {
   const ids = new Set(nodes.map((n) => n.id)), near = new Map(nodes.map((n) => [n.id, []]));
   for (const w of [...(m.chains ?? []), ...(m.ties ?? [])]) if (ids.has(w.a) && ids.has(w.b) && w.a !== w.b) near.get(w.a).push(w.b), near.get(w.b).push(w.a);
   const order = new Map(nodes.map((n, k) => [n.id, k])), seen = new Set(), groups = [];
@@ -110,8 +114,10 @@ export function blockOf(nodes, m, columns, cell = [1, 1]) {
   // A linked group stands round its most linked item, in the middle of its rows; each next one in the free cell nearest
   // the ones it links to (verdict e_a4efymfc: a wire ran the length of a row into the item it bears on).
   for (const run of linked) {
-    const rows = Math.ceil(run.length / columns), free = [];
-    for (let y = 0; y < rows; y++) for (let x = 0; x < columns; x++) free.push([x, y]);
+    // As many whole rows as hold the group round the cells already taken.
+    const free = [];
+    let rows = 0;
+    for (; free.length < run.length; rows++) for (let x = 0; x < columns; x++) if (!taken.has(`${x},${r + rows}`)) free.push([x, rows]);
     const at = new Map(), [cw, ch] = cell;
     const far = ([x, y], [px, py]) => ((x - px) * cw) ** 2 + ((y - py) * ch) ** 2;
     for (const id of run) {
@@ -124,7 +130,7 @@ export function blockOf(nodes, m, columns, cell = [1, 1]) {
     }
     r += rows;
   }
-  lone.forEach((id, k) => cells.push([nodes[order.get(id)], [k % columns, r + Math.floor(k / columns)]]));
+  for (let k = 0, at = r * columns; k < lone.length; at++) if (!taken.has(`${at % columns},${Math.floor(at / columns)}`)) cells.push([nodes[order.get(lone[k++])], [at % columns, Math.floor(at / columns)]]);
   return cells;
 }
 
