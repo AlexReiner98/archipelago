@@ -1,9 +1,12 @@
 // Parallel sessions that cannot collide, on the write path: a change sent again with its key applies once (task
-// e_x265z5tk), an update made from a stale read is refused with what moved (e_5r9bxyh9).
+// e_x265z5tk), an update made from a stale read is refused with what moved (e_5r9bxyh9), and the first answer after a
+// restart says what became of the change it cut off (e_86qhrtzy).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Actor, Archipelago } from '../packs/write/kernel/pelago.ts';
 import { callTool } from '../packs/surface/kernel/tools.ts';
+import { transientOf } from '../packs/surface/kernel/root-transient.ts';
+import { seedOf } from '../packs/surface/kernel/restart-said.ts';
 import { fresh } from './map.ts';
 
 const owner: Actor = { kind: 'human', name: 'owner', admin: true };
@@ -72,4 +75,33 @@ test('an update naming the position it read is refused with what moved, and goes
   const retried = (await callTool(l, agent, 'change', { retry: name, fixes: [{ at: 1, op: { op: 'update', id, status: 'done', as_of: now.as_of } }] })) as Answer;
   assert.equal(retried.status, 'applied');
   assert.equal((await l.entity(id))!.status, 'done');
+});
+
+test('the first answer after a restart says when, and whether the change it cut off applied', async () => {
+  const l = await fresh();
+  await callTool(l, owner, 'workspace_set', { agent_changes: 'apply' });
+  const store = (ask: Parameters<typeof transientOf>[1]) => transientOf({ caller: 'surface', map: l }, ask);
+  const who = `${l.workspace}:`;
+  const earlier = '2000-01-01T00:00:00.000Z';
+  const made = (await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Something to read' }] })) as Answer;
+  const ask = () => callTool(l, agent, 'get', { id: made.created.t }) as Promise<Answer>;
+  assert.equal((await ask()).restarted, undefined, 'the first a sender hears from any server is no restart');
+
+  // The server restarted while a change was in flight, before it applied.
+  const cut = async (key: string) => {
+    await store({ keep: { key: `heard:${who}`, value: { started: earlier }, ms: 60_000 } });
+    await store({ keep: { key: `last:${who}`, value: { key, seed: seedOf(agent), at: earlier, reason: 'Make the cut task', given: true }, ms: 60_000 } });
+  };
+  await cut('k-cut');
+  assert.ok(Array.isArray(await callTool(l, agent, 'search', { q: 'nothing' })), 'a list cannot carry it');
+  const told = await ask();
+  assert.equal(told.restarted.last_change.status, 'not applied');
+  assert.match(told.restarted.note, /restarted at .*not applied: send it again with key "k-cut"/);
+  assert.equal((await ask()).restarted, undefined, 'said once');
+
+  // Sent again with its key, it applies; were it cut after applying, the next answer says so.
+  const sent = (await callTool(l, agent, 'change', { reason: 'Make the cut task', key: 'k-cut', ops: [{ op: 'create', type: 'task', title: 'The cut task' }] })) as Answer;
+  await cut('k-cut');
+  const after = await ask();
+  assert.deepEqual(after.restarted.last_change, { status: 'applied', changeset: sent.changeset, reason: 'Make the cut task' });
 });

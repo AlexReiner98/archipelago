@@ -15,6 +15,7 @@ import { covering } from '../../write/kernel/withdraw.ts'; import { proposals } 
 import { holdsOff } from '../../rules/kernel/rules.ts';
 import { logged } from '../../../src/logged.ts';
 import { KEY_MAX } from '../../write/kernel/keyed.ts';
+import { changeBegun } from './restart-said.ts';
 
 /** Where an agent last pointed the human's screen (the presence pack's Focus). */
 type Focus = { at: number; hash: string; actor: string; note?: string };
@@ -152,6 +153,13 @@ export const WRITE_TOOLS: Record<string, Tool> = {
           if (!run) throw new Error(`Change rejected:
 - run: no open session "${input.run}". Send the run id session_start gave, or leave it out.`);
           input = { ...input, run: run.id };
+        }
+        // Kept as this sender's last change before it is judged, under its key (one is made when none is given), so that
+        // after a restart cut its answer off the next answer says whether it applied (./restart-said.ts).
+        if (actor.kind === 'agent') {
+          const key = input.key ?? `auto-${Math.random().toString(36).slice(2, 12)}`;
+          await changeBegun(l, actor, key, input.reason, Boolean(input.key));
+          input = { ...input, key };
         }
         result = await l.change(actor, input);
       } catch (err) {
