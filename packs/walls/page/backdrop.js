@@ -5,6 +5,8 @@
 // What its code hears, with on('page', fn), and is handed first as `page`:
 //   { visible: true, width, height, scroll, margin, view: { width, height }, clear: [{ x, y, w, h }, ...], reducedMotion }
 //   { visible: false, reducedMotion }, when the tab is hidden: it pauses itself until it hears the page again.
+//   and `leaving: true` once the page is about to take it away (leave(), below): code that can lets its land go by
+//   its own motion; the page takes the frame away when it has waited as long as its caller says.
 //   and `focus: { x, y, w, h } | null`, the box of the page's call to action (the link of its first p.action).
 // Coordinates are the page's own (from its top left); `view` is the window less its scrollbar, as the frame is; `clear`
 // holds a box for each item of its words (pageWords: each link of the nav, the title, each paragraph, list item and figure, each field and button of a gate),
@@ -37,11 +39,11 @@ export function wordsSaid(doc = document, win = window) {
 }
 
 /** The page as its backdrop is told it: numbers and boxes, rounded, nothing else. `words` are wordsSaid's, kept. */
-export function pageSaid(reducedMotion, words) {
-  if (document.hidden) return { visible: false, reducedMotion };
+export function pageSaid(reducedMotion, words, leaving = false) {
+  if (document.hidden) return { visible: false, reducedMotion, ...(leaving && { leaving }) };
   const root = document.documentElement;
   // Half a window above and below it: as far as a fast scroll goes before the next frame.
-  return { visible: true, reducedMotion, width: n(root.clientWidth), height: n(root.scrollHeight), scroll: n(scrollY), margin: n(root.clientHeight / 2), view: { width: n(root.clientWidth), height: n(root.clientHeight) }, clear: words().clear, focus: words().focus };
+  return { visible: true, reducedMotion, width: n(root.clientWidth), height: n(root.scrollHeight), scroll: n(scrollY), margin: n(root.clientHeight / 2), view: { width: n(root.clientWidth), height: n(root.clientHeight) }, clear: words().clear, focus: words().focus, ...(leaving && { leaving }) };
 }
 
 /** The colours a backdrop may tell its page, each set on the page as `--backdrop-<name>`. */
@@ -65,15 +67,17 @@ export function wear(look, root = document.documentElement) {
  * start; the frame is then taken away. Only one backdrop runs on a page: a second replaces the first, unless
  * `replace` is false (a theme's land fading in over the last, which its caller stops). `under`: the element it is put
  * before, so what follows it on the page is drawn over it (the app's map); else it is put last. The answer, stop, takes
- * it away; stop({ quiet: true }) leaves the page's look as it is (worn by the land that follows it).
+ * it away; stop({ quiet: true }) leaves the page's look as it is (worn by the land that follows it). stop.leave() tells
+ * its code the page is leaving (page.leaving), before the stop. `held`: started out of sight, so it is ready when it is
+ * shown (stop.show()); until then the look its code tells is kept, not worn, so the page does not change early.
  */
-export function runBackdrop({ code, answer, style, dressed, under, replace = true, drew = () => {}, failed = () => {} }) {
+export function runBackdrop({ code, answer, style, dressed, under, replace = true, held = false, drew = () => {}, failed = () => {} }) {
   if (replace) document.querySelector('body > iframe.page-backdrop')?.remove();
   const frame = h('iframe', { class: 'page-backdrop', sandbox: frameSandbox(), src: '/draw.html', title: 'The page’s backdrop', 'aria-hidden': 'true', tabindex: '-1' });
   const colours = Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(dressed).getPropertyValue(`--ln-${name}`).trim()]));
   const theme = { ...colours, dark: matchMedia('(prefers-color-scheme: dark)').matches };
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
-  let pending = 0, done = false, scrolls = false, refit = false, words = null, worn = '{}';
+  let pending = 0, done = false, scrolls = false, refit = false, words = null, worn = '{}', leaving = false, kept_ = null;
   const kept = () => (words ??= wordsSaid());
   // A frame that scrolls with the page is as tall as the page without it, and says where its top stands on the page.
   const fit = () => {
@@ -83,7 +87,7 @@ export function runBackdrop({ code, answer, style, dressed, under, replace = tru
     frame.style.height = `${document.documentElement.scrollHeight}px`;
     frame.contentWindow?.postMessage({ type: 'scrolling', top: frame.getBoundingClientRect().top + scrollY }, '*');
   };
-  const tell = () => frame.isConnected && frame.contentWindow?.postMessage({ type: 'page', page: pageSaid(motion.matches, kept) }, '*');
+  const tell = () => frame.isConnected && frame.contentWindow?.postMessage({ type: 'page', page: pageSaid(motion.matches, kept, leaving) }, '*');
   // Told at most once a frame, however often the page scrolls or moves.
   const soon = () => pending || (pending = requestAnimationFrame(() => ((pending = 0), refit && fit(), tell())));
   // The page changed size or content: its words are read again, once, when it is next told.
@@ -115,7 +119,7 @@ export function runBackdrop({ code, answer, style, dressed, under, replace = tru
     // Its code tells the page its look (look() in its worker): checked again here, and worn only when it changes.
     else if (said.type === 'look') {
       const look = lookOf(said.look), key = JSON.stringify(look);
-      if (key !== worn) ((worn = key), wear(look));
+      if (key !== worn) ((worn = key), held ? (kept_ = look) : wear(look));
     }
     // A backdrop that stops is taken away, and what the page showed before it stays.
     else if (said.type === 'error') (stop(), failed(String(said.message ?? '').slice(0, 300)));
@@ -132,5 +136,11 @@ export function runBackdrop({ code, answer, style, dressed, under, replace = tru
   content.observe(document.querySelector('main') ?? document.body, { childList: true, subtree: true, characterData: true });
   if (under?.parentNode === document.body) document.body.insertBefore(frame, under);
   else document.body.append(frame);
+  stop.leave = () => ((leaving = true), tell());
+  // Out of sight by an opacity just above none: a frame hidden or at none is not rendered (Chrome), so its code would
+  // not run until shown.
+  // Shown at once, with no fade: it is already under way.
+  if (held) (frame.style.opacity = '0.001'), (frame.style.transition = 'none');
+  stop.show = () => ((held = false), frame.style.removeProperty('opacity'), kept_ && wear(kept_));
   return stop;
 }
