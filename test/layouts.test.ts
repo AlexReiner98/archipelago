@@ -82,7 +82,7 @@ test('in a browser, a drawing that tries what it may not is stopped, and reaches
   }
 });
 
-test('in a browser, a drawing that asks for a surface paints pixels over its picture, and reaches nothing more', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a drawing that asks for a surface paints pixels under its picture, moved by the page camera, and reaches nothing more', { skip: !browser && 'no Chrome here (set CHROME)' }, async () => {
   const { base } = await serve('off');
   const page = await open(`${base}/`);
   try {
@@ -95,7 +95,7 @@ test('in a browser, a drawing that asks for a surface paints pixels over its pic
         const three = typeof (await s.three()).WebGLRenderer;
         tools.patch([{ key: 's', toggle: { ['got-' + s.canvas.constructor.name]: true, ['doc-' + typeof document]: true, ['three-' + three]: true, ['sized-' + (s.size.width > 0)]: true } }]);
       }, 10);
-      return { scene: { svg: ['svg', { width: 40, height: 40 }], surface: { key: 's' } } };
+      return { scene: { svg: ['svg', { width: 40, height: 40 }], size: { width: 40, height: 40 }, surface: { key: 's' } } };
     }`;
     const plain = `export async function picture(input, tools) { setTimeout(async () => { const s = await tools.surface(); tools.patch([{ key: 'svg', toggle: { ['none-' + (s === null)]: true } }]); }, 10); return { scene: { svg: ['svg', { key: 'svg' }] } }; }`;
     const got: any = await page.evaluate(`(async () => {
@@ -112,11 +112,19 @@ test('in a browser, a drawing that asks for a surface paints pixels over its pic
       const c = a.querySelector('canvas.lf-surface'), seen = document.createElement('canvas');
       seen.width = seen.height = 4;
       seen.getContext('2d').drawImage(c, 0, 0, 4, 4);
-      return { cls: c?.className, inside: a.contains(c), pixel: [...seen.getContext('2d').getImageData(1, 1, 1, 1).data], said: a.textContent, plain: b.querySelector('svg')?.getAttribute('class'), surfaces: b.querySelectorAll('canvas').length };
+      // The page's camera moves the paint at once, from where it was painted, before the drawing paints again.
+      const still = c.style.transform;
+      a.moves.zoomBy(2);
+      for (let n = 0; n < 2; n++) await new Promise((r) => requestAnimationFrame(r));
+      const under = getComputedStyle(c).zIndex + ' ' + getComputedStyle(c.parentElement).isolation;
+      return { still, moved: c.style.transform, under, cls: c?.className, inside: a.contains(c), pixel: [...seen.getContext('2d').getImageData(1, 1, 1, 1).data], said: a.textContent, plain: b.querySelector('svg')?.getAttribute('class'), surfaces: b.querySelectorAll('canvas').length };
     })()`);
     assert.doesNotMatch(got.said, /This drawing stopped/, 'the painter was not stopped');
     for (const cls of ['got-OffscreenCanvas', 'doc-undefined', 'three-function', 'sized-true']) assert.ok(got.cls.includes(cls), `${cls} in ${got.cls}`);
     assert.ok(got.inside, 'the surface is inside the picture');
+    assert.equal(got.still, '', 'painted where the camera stands, it is not moved');
+    assert.match(got.moved, /scale\(2\)/, `zoomed in twice, the paint is drawn twice as large at once: ${got.moved}`);
+    assert.match(got.under, /^-1 isolate/, `the surface lies under the marks: ${got.under}`);
     assert.deepEqual(got.pixel, [255, 0, 0, 255], 'what it painted is shown');
     assert.match(got.plain, /none-true/);
     assert.equal(got.surfaces, 0);
