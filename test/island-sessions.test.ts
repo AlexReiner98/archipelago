@@ -17,7 +17,7 @@ test('in a browser, the side bar lists the chats at work and the band counts tho
   await call('/api/workspace_set', undefined, { islands: true });
   const made = (await call('/api/change', undefined, { reason: 'test', ops: [{ op: 'create', ref: 'harbour', type: 'island', title: 'Harbour works', props: { pack: 'core' } }, { op: 'create', ref: 'pier', type: 'task', title: 'Rebuild the pier', props: { island: '{harbour}' } }] })).result.created as Record<string, string>;
   const titles = ['Pick the signup copy', 'Rebalance CI shards for faster tests with a title that runs on and on'];
-  for (const [n, title] of titles.entries()) await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: `side-${n}`, title, surface: 'codex' } });
+  for (const [n, title] of titles.entries()) await call('/agent/capture', undefined, { actor: agent, action: 'session_start', params: { session_id: `side-${n}`, title, surface: 'codex', ...(n === 1 && { task: made.pier }) } });
   // The first chat's turn ended on a question: its move is the owner's.
   const at = new Date().toISOString();
   await call('/hooks/events', undefined, { session_id: 'side-0', source: 'claude-code', events: [{ at, kind: 'turn.start', turn: 't1', by: 'person' }, { at, kind: 'turn.end', turn: 't1', ended: 'asked', question: 'Which copy?' }] });
@@ -46,6 +46,15 @@ test('in a browser, the side bar lists the chats at work and the band counts tho
     }
     await page.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
     await page.evaluate(`document.body.dataset.islands === 'open' || document.querySelector('#query .isl-toggle').click()`);
+    // Who is on a task, seen where it stands (e_vr7tpgxp): a chat's row names its work after its name, and pointing at
+    // the row lights that work on the canvas.
+    const second = `document.querySelectorAll('#islands .isl-chat')[1]`;
+    assert.equal(await page.evaluate<string>(`${second}.querySelector('.isl-chat-on')?.textContent`), 'Rebuild the pier');
+    assert.match(await page.evaluate<string>(`${second}.title`), /, on Rebuild the pier: /);
+    await page.evaluate(`${second}.dispatchEvent(new PointerEvent('pointerenter'))`);
+    await until('its work lit', () => page.evaluate<boolean>(`Boolean(document.querySelector('[data-lighting]'))`));
+    await page.evaluate(`${second}.dispatchEvent(new PointerEvent('pointerleave'))`);
+    await until('the lighting off', () => page.evaluate<boolean>(`!document.querySelector('[data-lighting]')`));
     // A show lights the island it added: its row is marked, the view not moved; a press goes there and clears it.
     const version = `new URL(document.querySelector('link[href^="/base.js"]').href).search`;
     const before = await page.evaluate<string>('location.hash');
