@@ -32,7 +32,7 @@ import { arrowHead, drawn, middleOf } from './polyline.js';
 import { carried } from './carried.js';
 import { shapedBy, shapeIn, SHAPES } from './steps.js';
 import { focusOf } from './focus.js';
-import { css as paintedCss, paintedBody, paintIslands, placer } from './painted.js';
+import { css as paintedCss, paintedBody, paintIslands, placer, shoreOnly } from './painted.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
@@ -308,8 +308,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
   if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
-  // Islands whose look paints (./painted.js): their items painted on the surface, and marked by the map where the look hands their places, as are the wires to them.
+  // Islands whose look paints (./painted.js): their items and the links among them painted by it; the map marks each item, and ends the wires from other islands, where the look hands its place.
   const canvases = (g.islands ?? []).filter((i) => i.canvas), inPainted = new Set(answer.items.filter((i) => canvases.some((c) => c.id === i.island)).map((i) => i.id)), unplaced = (w) => (inPainted.has(w.a) || inPainted.has(w.b) ? ' unplaced' : '');
+  g = shoreOnly(g, (id) => g.nodes.get(id)?.item?.island, inPainted);
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
@@ -400,7 +401,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     if (n.stub) return titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nA choice nothing follows yet`);
     // Held for the owner: a new item is a faint step that opens its change; an edit is marked on its step. Either way a badge on its corner.
     if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
-    tipped.add(key);
+    if (!inPainted.has(n.id)) tipped.add(key); // one a look paints says what it is in its look's own tip (./painted.js)
     if (ghost) return m('g', { key: `held:${i.pending.proposal}:${n.id}`, on: ['click'] }, titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`));
     const el = titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), [i.said ?? i.title, i.waiting && waitWords(i)].filter(Boolean).join('\n'));
     dims.set(n.id, el);
@@ -475,7 +476,6 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
       for (const opened of [!story && opens(event)]) if (opened) return opened;
       if (String(key).startsWith('paint:')) return painting?.pointer(String(key).replace(/^paint:/, ''), name, event.at) ?? [];
       // A shared mark's tip, over the step's while the pointer is on the mark; off it, back to the step it is on, if any.
-      // An item a look paints is lit by its look too, as the pointer comes to it and leaves (below).
       if (!story && markTip(String(key))) {
         if (name === 'enter') return [{ tip: { key, mark: markTip(String(key)) } }];
         if (name !== 'leave') return [];

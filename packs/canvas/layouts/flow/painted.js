@@ -4,15 +4,19 @@
 // size of the surface, with that island's items and links alone, and the map's camera on its island's frame (`view`).
 // Each frame the part of each canvas inside its island's frame is laid into the surface, and the surface is shown: the
 // raster carries the look's paint alone. A look runs to rest and then hands each item's place, once, and again only when
-// its answer changes (`hand`, decision e_jfctpqza): the map then draws every line, ring, light and hit area there as its
-// own marks (decision e_a6kbgg8c; ./painted-wires.js), and the look's paint goes on moving round still items. The map
-// keeps the frame, the header, hover and tips. Nothing here reaches past the drawing's worker. The pointer over its
+// its answer changes (`hand`, decision e_jfctpqza): the map then ends each wire from another island there and draws the
+// session rings, ghosts, held badges and each item's click target as its own marks (./painted-wires.js), while the look
+// draws everything else on its island, its own lines and hover included (decision e_a6kbgg8c, revised), and its paint
+// goes on moving round still items. The map keeps the frame and the header. Nothing here reaches past the drawing's worker. The pointer over its
 // island's land is handed to the look, in its screen pixels (a move as pointermove, a click as a press and a lift there,
 // leaving as pointerleave), and so is the map's hover on an item it placed, as a move to where it stands; the cursor it
 // asks for is the land's. A look's own frames are stopped when its picture ends: each look's animation frames carry the
 // run that asked for them, and a run that ended is not called again. Layer: marks.
 
-import { handedOf, routeFor, wirePatches } from './painted-wires.js';
+import { handedOf, wirePatches } from './painted-wires.js';
+import { m as mark } from './marks.js';
+
+export { shoreOnly } from './painted-wires.js';
 import { hueClass, opacityOf, sessionsOn } from './session-ring.js';
 
 /**
@@ -40,33 +44,23 @@ export const itemPatches = (placed, items, gap, over = 0) => [...placed].flatMap
  * What the map does with what each look hands: `g` the composed model (its nodes, places, chains and ties), `painted`
  * the ids looks draw, `gap` the style's session gap, `draw` and `heads` the map's own path and heads of a wire, `order`
  * the type the chains are of, `over` how long a move takes. Answers (island, handed) => patches: the items it placed
- * stood there and shown, every wire touching them routed to them, and the lines with both ends on that island in its
- * look's style. A place handed again moves there.
+ * stood there and shown, and every wire from another island ended on them. A place handed again moves there.
  */
 export function placer({ g, painted, gap, draw, heads, order, over }) {
-  const placed = new Map(), looks = new Map(), items = new Map([...g.nodes].map(([id, n]) => [id, n.item]));
+  const placed = new Map(), items = new Map([...g.nodes].map(([id, n]) => [id, n.item]));
   const boxes = new Map([...g.nodes].filter(([id]) => !painted.has(id)).map(([id, n]) => [id, { at: [g.x.get(id), g.y.get(id)], w: n.w, h: n.h }]));
   const wires = [...g.chains.map((w, n) => ({ key: `w:${n}`, head: `h:${n}`, w, type: order })), ...g.ties.map((w, n) => ({ key: `n:${n}`, head: `nh:${n}`, w, type: w.type }))];
-  /** The island both ends of a wire are on, where that island's look handed its lines. */
-  const lookOf = (w) => ((a, b) => (a && a === b ? looks.get(a) : null))(items.get(w.a)?.island, items.get(w.b)?.island);
-  const styleOf = (w, type) => ((h) => (h ? { ...h.lines, ...h.types[type] } : {}))(lookOf(w));
-  const routeOf = (w) => ((h) => (h ? routeFor(h.routes, w.a, w.b) : null))(lookOf(w));
   return (isle, handed) => {
     const again = [...handed.places.keys()].some((id) => placed.has(id)), changed = new Set(handed.places.keys());
     for (const [id, at] of handed.places) placed.set(id, at);
-    looks.set(isle, handed);
-    // A wire whose look styles it is patched again too, though its ends stayed where they were.
-    for (const { w } of wires) if (items.get(w.a)?.island === isle && items.get(w.b)?.island === isle) changed.add(w.a);
     const moving = again ? over : 0;
-    return [...itemPatches(handed.places, items, gap, moving), ...wirePatches({ wires, boxes, placed, painted, changed, styleOf, routeOf, draw, heads, over: moving })];
+    return [...itemPatches(handed.places, items, gap, moving), ...wirePatches({ wires, boxes, placed, painted, changed, draw, heads, over: moving })];
   };
 }
 
 export const css = `
 .lf-step.unplaced, .lf-wire.unplaced, .lf-tie.unplaced, .lf-head.unplaced { visibility: hidden; pointer-events: none; }
 .lf-step .lf-sr circle.lf-shape { fill: none; }
-.lw-wide { stroke-width: calc(2 * var(--ln-flow-stroke)); } .lw-bold { stroke-width: calc(3 * var(--ln-flow-stroke)); }
-.lf-wire.glow, .lf-tie.glow { filter: drop-shadow(0 0 var(--ln-flow-stroke-hover) var(--lf-link, var(--ln-muted))); }
 `;
 
 /** How light a colour the page gives is: the sum of its channels, as rgb() writes them. */
@@ -113,13 +107,18 @@ export function paintIslands({ islands, tools, placed }) {
   const runs = [];
   const frames = framesByRun();
   const mounted = new Promise((resolve) => (begun = resolve));
+  /** What a look says by the pointer, beside the item the pointer is on: its first line bold, the rest under it. */
+  const tipOn = (r, text) => {
+    const [head, ...rest] = String(text ?? '').split('\n');
+    tools.patch?.([{ tip: text == null || !r.hot ? null : { key: `s:${r.hot}`, mark: mark('div', { class: 'lf-tip' }, mark('b', {}, head), ...rest.map((t) => mark('span', {}, t))) } }]);
+  };
   (async () => {
     await mounted;
     const surface = over ? null : await tools.surface?.();
     if (!surface || over) return;
     const ctx = surface.canvas.getContext('2d');
     const size = { width: 1, height: 1, dpr: 1 };
-    for (const isle of islands) runs.push({ id: isle.id, ended: false, canvas: new OffscreenCanvas(1, 1), w: isle.size[0], h: isle.size[1], at: isle.at, cam: { width: isle.size[0], height: isle.size[1], k: 1, tx: 0, ty: 0 }, heard: new Map(), own: new Set((isle.answer.items ?? []).map((i) => i.id)), places: new Map() });
+    for (const isle of islands) runs.push({ id: isle.id, ended: false, canvas: new OffscreenCanvas(1, 1), w: isle.size[0], h: isle.size[1], at: isle.at, cam: { width: isle.size[0], height: isle.size[1], k: 1, tx: 0, ty: 0 }, heard: new Map(), hot: null, own: new Set((isle.answer.items ?? []).map((i) => i.id)), places: new Map() });
     /** Where each island's frame lands on screen now, in the surface's own pixels (not the device's); 'view' told where it moved. */
     const place = () => {
       const k = size.width / Math.max(1, view.width);
@@ -144,7 +143,7 @@ export function paintIslands({ islands, tools, placed }) {
       try {
         frames.as(r, () => isle.look.default({
           canvas: r.canvas, answer: isle.answer, style: isle.look.settings ?? {}, theme, size, hot: null, view: () => r.cam,
-          on: (name, fn) => r.heard.set(name, fn), open: (id) => (tools.patch?.([{ tip: null }]), tools.open?.(id)), tip: () => {}, cursor: (name) => tools.patch?.([{ key: `paint:${r.id}`, toggle: { pointing: name === 'pointer' } }]),
+          on: (name, fn) => r.heard.set(name, fn), open: (id) => (tools.patch?.([{ tip: null }]), tools.open?.(id)), tip: (text) => tipOn(r, text), cursor: (name) => tools.patch?.([{ key: `paint:${r.id}`, toggle: { pointing: name === 'pointer' } }]),
           // Its items' places, once it has settled: the map's tip, hover and lines are drawn there.
           hand: (said) => {
             const handed = !r.ended && handedOf(said, r.own, r.at);
@@ -185,6 +184,7 @@ export function paintIslands({ islands, tools, placed }) {
   /** The map's hover on an item a look placed, told to that look as the pointer coming to where it stands, or leaving. */
   const item = (id, on) => {
     const r = runs.find((x) => x.places.has(id));
+    if (r) r.hot = on ? id : null;
     return r ? pointer(r.id, on ? 'move' : 'leave', r.places.get(id)) : [];
   };
   return { view: (v) => ((view = v), begun()), end: () => ((over = true), begun(), runs.forEach((r) => (r.ended = true))), pointer, item, painted: (id) => runs.some((r) => r.own.has(id)) };

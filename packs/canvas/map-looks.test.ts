@@ -122,8 +122,8 @@ test('a look that paints is given its island’s frame and a surface, its items 
   (globalThis as any).OffscreenCanvas ??= class { width: number; height: number; constructor(w: number, h: number) { this.width = w; this.height = h; } getContext() { return {}; } };
   const links = [{ from: 'e_dddddddd', to: 'e_aaaaaaaa', type: 'depends_on' }, { from: 'e_aaaaaaaa', to: 'e_bbbbbbbb', type: 'bears_on' }];
   let handed: any = null;
-  // A look that settles at once and hands two of its items' places, a line style, and a route for the link between them.
-  const field = { default: ({ hand }: any) => (handed = hand)({ places: { e_aaaaaaaa: [20, 30, 6], e_bbbbbbbb: [80, 30, 6] }, lines: { width: 'bold' }, routes: { 'e_aaaaaaaa>e_bbbbbbbb': [[50, 60]] } }) };
+  // A look that settles at once and hands two of its items' places.
+  const field = { default: ({ hand }: any) => (handed = hand)({ places: { e_aaaaaaaa: [20, 30, 6], e_bbbbbbbb: [80, 30, 6] } }) };
   const answer = { items, links, islands: [{ id: 'e_islandaa', title: 'Here', look: { id: 'e_look0000', kind: 'layout', coded: true } }, { id: 'e_islandbb', title: 'There' }] };
   const patches: any[] = [];
   const surface = { canvas: { width: 1, height: 1, getContext: () => ({ clearRect() {}, drawImage() {} }) }, size: { width: 1200, height: 800, dpr: 1 }, colours: {}, show() {} };
@@ -138,14 +138,11 @@ test('a look that paints is given its island’s frame and a surface, its items 
   const at = patches.find((p) => p.key === 'at:e_aaaaaaaa')?.set.transform.match(/[\d.]+/g).map(Number);
   assert.ok(at, 'the item stands where the look handed it');
   assert.ok(patches.some((p) => p.key === 's:e_aaaaaaaa' && p.toggle.unplaced === false), 'and is shown');
+  assert.doesNotMatch(svg, /"key":"n:/, 'the link between its own items is its look’s, not the map’s');
   const wires = patches.filter((p) => /^[wn]:/.test(p.key));
-  assert.equal(wires.length, 2, 'the wire in from the other island and the link between its items, both the map’s');
+  assert.equal(wires.length, 1, 'the wire in from the other island');
   const into = wires.find((p) => p.key.startsWith('w:')).set.d.match(/-?[\d.]+/g).map(Number);
   const off = (x: number, y: number) => Math.abs(Math.hypot(x - at[0], y - at[1]) - 6);
   assert.ok(Math.min(off(into[0], into[1]), off(into.at(-2), into.at(-1))) < 0.01, `the wire in ends on the item’s edge, where the look draws it: ${into} at ${at}`);
-  const among = wires.find((p) => p.key.startsWith('n:'));
-  assert.equal(among.toggle['lw-bold'], true, 'the link among its items in the look’s width');
-  assert.equal(among.set.d.split('L').length, 3, 'along the look’s route');
-  assert.equal(wires.find((p) => p.key.startsWith('w:')).toggle['lw-bold'], false, 'a wire across the shore in the map’s own');
   out.end?.();
 });
