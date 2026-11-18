@@ -36,3 +36,35 @@ export function lookOut(look, { island, nodes, links, sizes, numbers, measure, m
 
 /** Whether a look paints its island on a canvas (a layout's code: its default draws on one) rather than placing marks. */
 export const paints = (look) => typeof look?.default === 'function' && typeof look?.island !== 'function';
+
+/**
+ * The shape a look that paints says it draws once laid out (its `frame({ answer, style })`, asked with what its island
+ * holds and its settings, as `default` is given them): { width, height } in the island's units, or { aspect } (width
+ * over height) alone. Answers the one it says, or null where it says nothing usable (or has no `frame`).
+ */
+export function frameOut(look, { island, nodes, links }) {
+  if (typeof look?.frame !== 'function') return null;
+  let said;
+  try {
+    said = look.frame({ answer: { items: nodes.map((n) => n.item), links: links ?? [], islands: island ? [island] : [] }, style: look.settings ?? {} });
+  } catch {
+    return null;
+  }
+  const width = size(said?.width), height = size(said?.height), aspect = size(said?.aspect);
+  if (width && height) return { width, height };
+  return aspect ? { aspect } : null;
+}
+
+/**
+ * The frame [w, h] of an island whose look paints: `block` [w, h] what its items would take standing in a block, `said`
+ * what its look says (frameOut), held within the style's bounds: an aspect no further from square than
+ * flow_look_aspect_most, an area from flow_look_area_least to flow_look_area_most times the block's. A look that says
+ * only an aspect keeps the block's area; one that says nothing, the block.
+ */
+export function framed([bw, bh], said, sizes) {
+  if (!said || !(bw > 0 && bh > 0)) return [bw, bh];
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v)), most = sizes.flow_look_aspect_most, area = bw * bh;
+  const aspect = clamp(said.aspect ?? said.width / said.height, 1 / most, most);
+  const a = clamp(said.width ? said.width * said.height : area, area * sizes.flow_look_area_least, area * sizes.flow_look_area_most);
+  return [Math.sqrt(a * aspect), Math.sqrt(a / aspect)];
+}

@@ -6,7 +6,7 @@
 // below all.
 // Wires are straight, from box edge to box edge. Layer: metrics. Pure: the layout's args in, the model out.
 
-import { lookOut, paints } from './looks.js';
+import { frameOut, framed, lookOut, paints } from './looks.js';
 
 /** A place [column, row] of whole cells, or nothing. */
 const cellOf = (v) => (Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0) ? v : null);
@@ -42,10 +42,12 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     // An island with a look of its own (./looks.js) stands where its look puts what it holds; what the look leaves
     // unplaced is placed by cell beside it.
     const given = args.looks?.get(id), look = given && lookOut(given.look, { ...given, nodes: items, sizes, measure: args.measure });
-    // A look that paints (Field: code that draws on a canvas of its own, ./looks.js) is given a frame the size its items
-    // would take in a block, and paints all of them there: each stands at its middle, where a wire from another island ends.
+    // A look that paints (Field: code that draws on a canvas of its own, ./looks.js) is given a frame of the shape it says
+    // it draws (its `frame`), within bounds, else the size its items would take in a block, and paints all of them there:
+    // each stands at its middle, where a wire from another island ends, until the look hands its place.
     if (!look && given && paints(given.look)) {
-      const k = columns(items.length, args.aspect, cw, ch), w = k * cw - GAP, h = Math.ceil(items.length / k) * ch - GAP, lx = l + PAD, ly = t + PAD + top;
+      const k = columns(items.length, args.aspect, cw, ch), block = [k * cw - GAP, Math.ceil(items.length / k) * ch - GAP];
+      const [w, h] = framed(block, frameOut(given.look, { ...given, nodes: items }), sizes), lx = l + PAD, ly = t + PAD + top;
       for (const n of items) x.set(n.id, lx + w / 2), y.set(n.id, ly + h / 2);
       const r = Math.max(l + (wides.get(id) ?? 0), lx + w + PAD), b = ly + h + PAD;
       islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }], canvas: { at: [lx, ly], size: [w, h] } });
