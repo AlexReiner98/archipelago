@@ -119,3 +119,18 @@ test('only a held change named as a word of its own is what a run asks', async (
   assert.equal(askedOf({ state: 'working', line: 'Approve p_a4knhcvf?' }), null);
   assert.equal(askedOf(null), null);
 });
+
+test('a run whose session rings a step is told by the ring\'s tag, not again as a step', () => {
+  // Task 3 is worked on by the working run and by the waiting one; each rings it.
+  const on = (r: any, hue: string) => ({ run: r.id, title: r.title, hue, state: r.session.state, since: null, age: 1, fresh: 1, dormant: false });
+  const [waiting, , , working] = runs;
+  const ringed = { ...task(3), sessions: [on(working, '#2f5fb3'), on(waiting, '#b23a48')] };
+  const { scene } = picture({ answer: { items: [ringed, working, waiting], links: answer.links.filter((l) => l.to === ringed.id || l.from === waiting.id) }, style: house }, tools);
+  assert.ok(!stepOf(scene.svg, working.id), 'the working run is its tag, not a step in the sea');
+  assert.ok(stepOf(scene.svg, waiting.id), 'a run waiting on you stays a step, to be answered');
+  const tags = marks(stepOf(scene.svg, ringed.id)).filter((x) => x[0] === 'text' && String(x[1].class ?? '').includes('lf-sr-tag'));
+  assert.deepEqual(tags.map(text), ['Working · Run working', 'Waiting · Run waiting'], 'each tag says what and who');
+  assert.equal(tags[0][1].dy, undefined, 'the first tag sits on the rings');
+  assert.equal(tags[1][1].dy, `${-house.numbers.session_tag_leading}em`, 'the next stands over it, in its own em');
+  assert.match(scene.css, /lf-sr-tag \{[^}]*var\(--ln-plane-scale, 1\)/, 'a tag keeps its screen size at any zoom');
+});

@@ -35,18 +35,20 @@ export function sessionRings({ item, shape, x, y, w, h, corner, bevel, z, outlin
   const gap = z('session_gap'), tags = tagSizes(style);
   return m('g', { class: 'lf-srs', 'aria-hidden': 'true' }, ...on.map((s, k) => {
     const out = gap * (k + 1), faint = opacityOf(s, style);
-    // The tags stand one over another, the first session's nearest its step, each clear of the outermost ring.
-    const top = tags && y - h / 2 - gap * on.length - tags.lift - tags.text * k;
+    // The tags stand one over another, the first session's nearest its step, each clear of the outermost ring. A tag
+    // keeps its size on the screen at any zoom (its CSS divides by the plane's scale), so they are spaced in its own em.
+    const top = tags && y - h / 2 - gap * on.length - tags.lift;
     return m('g', { class: `lf-sr ${hueClass(s.hue)}${s.dormant ? ' dormant' : ''}`, ...(faint !== undefined && { opacity: faint }) },
       outline(shape, x, y, w + 2 * out, h + 2 * out, corner + out, bevel),
-      tags && m('text', { class: 'lf-sr-tag', x: x - w / 2, y: top }, tagOf(s, item, style, tags.letters)));
+      tags && m('text', { class: 'lf-sr-tag', x: x - w / 2, y: top, ...(k && { dy: `${-k * tags.leading}em` }) }, tagOf(s, item, style, tags.letters)));
   }));
 }
 
-/** The tag's sizes, where the style names them: its text, its lift over the rings, and the most letters it says. */
+/** The tag's sizes, where the style names them: its text, its lift over the rings, its leading (in its em), and the most letters it says. */
 export function tagSizes(style) {
-  const text = style.sizes?.flow_session_tag_text, lift = style.sizes?.flow_session_tag_lift, letters = style.numbers?.session_tag_letters;
-  return [text, lift, letters].every((v) => typeof v === 'number' && v > 0) ? { text, lift, letters } : null;
+  const text = style.sizes?.flow_session_tag_text, lift = style.sizes?.flow_session_tag_lift;
+  const leading = style.numbers?.session_tag_leading, letters = style.numbers?.session_tag_letters;
+  return [text, lift, leading, letters].every((v) => typeof v === 'number' && v > 0) ? { text, lift, leading, letters } : null;
 }
 
 /** The word the style gives a state (session_marks, its `word`), else the canvas's own. */
@@ -77,5 +79,5 @@ export const ringKey = (items, glyph) => items.some((i) => sessionsOn(i).length)
 export const css = `
 .lf-step .lf-sr .lf-shape, .lf-step:hover .lf-sr .lf-shape { fill: none; stroke: var(--lf-sr, var(--ln-session)); stroke-width: var(--ln-flow-session-ring); }
 .lf-step .lf-sr.dormant .lf-shape { stroke-dasharray: var(--ln-flow-dash-dormant); }
-.lf-step .lf-sr text.lf-sr-tag { fill: var(--lf-sr, var(--ln-session)); font-size: var(--ln-flow-session-tag-text); dominant-baseline: auto; pointer-events: none; }
+.lf-step .lf-sr text.lf-sr-tag { fill: var(--lf-sr, var(--ln-session)); font-size: calc(var(--ln-flow-session-tag-text) / var(--ln-plane-scale, 1)); dominant-baseline: auto; pointer-events: none; }
 `;

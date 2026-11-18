@@ -45,6 +45,11 @@ export const litStates = (marks) => new Set([...marks].filter(([, s]) => s.lit).
  * first, in the states' order, each oldest `since` first (`place`, which the steps are sorted by).
  */
 export function sessionItems(items, marks, cut) {
+  // A run whose session rings an item drawn here is told by its ring's tag, beside what it works on (./session-ring.js),
+  // not again as a step of its own in the sea under the island (verdict e_kefj5n2c); one the style lights, waiting on
+  // you, stays a step, for its click is where you answer it.
+  const ringed = new Set(items.flatMap((i) => (Array.isArray(i?.sessions) ? i.sessions.map((s) => s?.run) : [])));
+  items = items.filter((i) => !(ringed.has(i.id) && marks.has(sessionOf(i)?.state) && !marks.get(sessionOf(i).state).lit));
   const runs = items.filter((i) => marks.has(sessionOf(i)?.state));
   if (!runs.length) return items;
   const rank = (i) => {

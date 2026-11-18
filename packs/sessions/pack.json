@@ -24,6 +24,6 @@
     { "id": "core.sessions", "type": "lens", "title": "Sessions", "props": { "filter": { "find": ["type run"], "not": ["done"] }, "walk": { "over": ["works_on>", "started_from>"], "steps": 1 }, "style": {} }},
     { "id": "core.sessions_look", "title": "A session's state", "props": { "session_marks": { "waiting": { "shape": "inbox", "hue": "you", "lit": true, "word": "Waiting" }, "your_move": { "shape": "inbox", "hue": "you", "lit": true, "word": "Your move" }, "blocked": { "shape": "square", "hue": "blocked", "word": "Blocked" }, "working": { "shape": "half", "hue": "session", "word": "Working" }, "quiet": { "shape": "ring", "hue": "warn", "word": "Quiet" }, "idle": { "shape": "ring", "hue": "muted", "word": "Idle" }, "done": { "shape": "disc", "hue": "done", "word": "Done" } },
       "sizes": { "flow_session_tag_text": 11, "flow_session_tag_lift": 4 },
-      "numbers": { "session_tag_letters": 30 } } }
+      "numbers": { "session_tag_letters": 30, "session_tag_leading": 1.2 } } }
   ]
 }
