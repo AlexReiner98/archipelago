@@ -353,7 +353,10 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     const first = narrowedFrom(was.lens, lens, answer, was.raw.lens, ctx);
     // An edit it cannot draw early (a term added: a pack's parts opened) shows the picture before it until the answer
     // is drawn, never an empty canvas: the drawing replaces it then (e_m5x8pmwu).
-    if (!first) return void body.replaceChildren(...was.body.childNodes);
+    // What it was drawn in goes in whole, on the page, so its drawing goes on (what a look paints is its worker's, gone
+    // when it ends), keeps its stylesheet (data-drawing) and pans as it did; it ends once the new picture replaces it.
+    // It stands where it stood: the frame's own room (padding, clip) is this one's.
+    if (!first) return void (Object.assign(was.body.style, { padding: '0', clipPath: 'none' }), body.replaceChildren(was.body));
     const held = new Set(answer.items.map((i) => i.id));
     // What is held for the owner stays drawn where it would land; the server's answer says it again.
     const old = was.shown;
