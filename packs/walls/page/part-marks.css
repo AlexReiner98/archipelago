@@ -212,3 +212,6 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 /* A band that is a picture of what it draws (packs/sheet/page/screens.js, leadPicture): small, as high as the style's lead_picture. */
 .lead-picture { border-bottom: var(--border-1) solid var(--line); padding-bottom: var(--space-5); }
 .lead-picture img { display: block; width: 100%; height: var(--lead-picture, var(--thumb-still)); object-fit: cover; border-radius: var(--radius-1); }
+/* A band's one likely press (lead-press, packs/sheet/parts/page/lead.js): at the end of the line it acts on, in the accent. */
+.pm-box[data-key="lead-press"] { margin-left: auto; flex: none; }
+.pm-box[data-key="lead-press"] > .pm-button { color: var(--accent); font-weight: 600; }

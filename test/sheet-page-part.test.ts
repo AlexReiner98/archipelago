@@ -151,6 +151,24 @@ test('the alert\'s press makes its field true, as one change', async () => {
   assert.deepEqual(sent[0].ops, [{ op: 'update', id: w.id, props: { seen_working: true } }]);
 });
 
+test("the band's press: Light them moves the canvas, Add work names work in place and makes it in one change", async () => {
+  const lw = { ...words, types: { ...words.types, person: { title: 'Person', capabilities: { lead: { form: 'actor', link: 'waits_on' } } }, aim: { title: 'Aim', capabilities: { lead: { form: 'aim', link: 'serves' } } }, work: { title: 'Work', capabilities: { plannable: true } }, job: { of: 'work', title: 'Job', fields: { tokens_estimated: { type: 'number' } } } } };
+  const went: unknown[] = [], sent: { ops: unknown[] }[] = [];
+  const tools = { go: (a: unknown) => went.push(a), change: async (ops: unknown[]) => (sent.push({ ops }), { status: 'applied' }), keep: () => {}, state: () => {} };
+  const who = { ...task, id: 'e_pppppppp', type: 'person', props: {} };
+  const p = page({ item: who, words: lw, views: { item: { incoming: [{ type: 'waits_on', root: 'waits_on', id: 'e_wwwwwwww', title: 'W', open: true }] } } }, tools);
+  assert.ok(JSON.stringify(p.marks).includes('Light them'));
+  await p.on({ key: 'lead-light', name: 'press' });
+  assert.deepEqual((went[0] as { query: { filter: { find: string[] } } }).query.filter.find, ['id e_pppppppp', 'waits_on e_pppppppp']);
+  assert.equal(sent.length, 0);
+  const a = page({ item: { ...task, id: 'e_aaaaaaab', type: 'aim', props: {} }, words: lw, views: { item: { incoming: [] } } }, tools);
+  const asked = await a.on({ key: 'lead-add', name: 'press' });
+  assert.ok(JSON.stringify(asked).includes('lead-add-title'));
+  assert.equal(await a.on({ key: 'lead-add-title', name: 'edit', value: 'Undo it' }), undefined, 'typing is not drawn again');
+  await a.on({ key: 'lead-add-go', name: 'press' });
+  assert.deepEqual(sent[0].ops, [{ op: 'create', ref: 'work', type: 'job', title: 'Undo it' }, { op: 'link', type: 'serves', from: 'work', to: 'e_aaaaaaab' }]);
+});
+
 test('Save sends the note and the fields written as one change, and lets the kept words go', async () => {
   const sent: { ops: unknown[] }[] = [];
   const keeps: unknown[] = [], states: unknown[] = [];
