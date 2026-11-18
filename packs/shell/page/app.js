@@ -67,6 +67,8 @@ async function route(pulse = false) {
   // Sign up to save a guest map, and what Google or GitHub sends back to it or to the sign-in page (packs/identity/page/sign-up.js).
   if (name === 'sign-up') return void signUpPage(query);
   if (name === 'sign-in' && signInBack(query)) return;
+  // Sign in asked for by name, from Sign up on a guest map: the sign-in page, though the browser holds the guest's token.
+  if (name === 'sign-in' && store.token) return signIn();
   if (['home', 'activity', 'review', 'projects', 'today', 'map', 'automations'].includes(name)) return void (location.hash = '#/');
   if (name === 'graph') return void (location.hash = arg ? `#/v?from=${arg}` : `#/v?${query}`);
   if (name === 'roadmap' || name === 'questions') return void (location.hash = arg ? `#/e/${arg}` : '#/');

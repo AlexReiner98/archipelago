@@ -1,14 +1,15 @@
 /* A page for whoever is not in a workspace yet (gate, packs/kit/page/base.js): sign in, sign up, agree, Allow a client. One column
    in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
-body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
+body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #islands, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
 body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; display: flex; flex-direction: column; }
 body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
 /* In the middle of the page both ways, a little above centre, as most sign-in pages sit; the mark and title centred over it. */
-.gate { box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: auto; padding-bottom: var(--space-14); display: flex; flex-direction: column; gap: var(--space-7); }
+/* On a short window the mark and the room under the column shrink with its height, so the form keeps the window's middle. */
+.gate { --mark-now: clamp(var(--box-9), calc(25dvh - 2 * var(--box-10)), var(--gate-mark, var(--box-10))); box-sizing: border-box; width: 100%; max-width: var(--dialog); margin: auto; padding-bottom: clamp(var(--space-9), calc(14dvh - var(--space-14)), var(--space-14)); display: flex; flex-direction: column; gap: var(--space-7); }
 /* While a land runs whose page has its own emblem (theme-land.js), the gate's mark wears it, as the bar's does: its own
    picture pushed out of its box by a padding as wide as the box, the emblem drawn as its ground. */
-body[data-land-emblem] .gate-mark { box-sizing: border-box; padding-left: var(--gate-mark, var(--box-10)); min-height: var(--gate-mark, var(--box-10)); background: var(--emblem) center / contain no-repeat; }
-.gate-mark { align-self: center; width: var(--gate-mark, var(--box-10)); height: var(--gate-mark, var(--box-10)); border-radius: var(--radius-2); }
+body[data-land-emblem] .gate-mark { box-sizing: border-box; padding-left: var(--mark-now); min-height: var(--mark-now); background: var(--emblem) center / contain no-repeat; }
+.gate-mark { align-self: center; width: var(--mark-now); height: var(--mark-now); border-radius: var(--radius-2); }
 .gate h1 { margin: 0 0 var(--space-4); text-align: center; }
 .gate-row { display: flex; align-items: center; gap: var(--space-6); min-width: 0; white-space: nowrap; }
 .gate-row > input { flex: 1; min-width: 0; }
@@ -39,20 +40,22 @@ body[data-land-emblem] .gate-mark { box-sizing: border-box; padding-left: var(--
 /* The first moments on a new guest map (packs/identity/page/guest.js, firstMoments): until the agent has drawn the work,
    one card in the middle, and nothing of the app; then the map, with Sign up, the
    menu and find around it and none of the view's tools or legend, until the map is saved. */
-body[data-first] #query, body[data-first] #canvas .lf-legend, body[data-first] #canvas .lf-island-key, body[data-first] #canvas .lf-island-name { display: none; }
+body[data-first] #query, body[data-first] #islands, body[data-first] #canvas .lf-legend, body[data-first] #canvas .lf-island-key, body[data-first] #canvas .lf-island-name { display: none; }
 body[data-first="wait"] #find, body[data-first="wait"] #more, body[data-first="wait"] #nav > :not(.brand):not(.grow) { display: none; }
 body[data-first="wait"] #canvas, body[data-first="wait"] #sheet { visibility: hidden; }
 .first { transition: opacity 0.6s ease; }
 .first.first-gone { opacity: 0; pointer-events: none; }
 .first { position: fixed; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; padding: var(--space-9); background: var(--bg); overflow: auto; }
-.first-card { position: relative; box-sizing: border-box; width: 100%; max-width: var(--sheet); padding: var(--space-13) var(--space-12); display: flex; flex-direction: column; gap: var(--space-9); background: var(--panel); border: var(--border-1) solid var(--line); border-radius: var(--radius-4); box-shadow: 0 var(--space-9) var(--space-14) var(--bg); }
-.first-card h1 { margin: 0; font-size: var(--text-9); line-height: 1.25; }
-.first-promise { margin: 0; color: var(--muted); font-size: var(--text-6); line-height: 1.45; }
-.first-prompt { padding: var(--space-7) var(--space-8); border-left: var(--border-3) solid var(--accent); background: var(--bg); font-size: var(--text-5); line-height: 1.45; }
-.first-copy { align-self: stretch; padding: var(--space-7); font-size: var(--text-7); }
-.first-steps { margin: 0; padding-left: var(--space-11); display: flex; flex-direction: column; gap: var(--space-4); font-size: var(--text-5); }
+/* No panel: the card is the gate's column, its words standing on the clearings the land leaves round each of them, as the
+   sign-in form's do. */
+.first-card { position: relative; box-sizing: border-box; width: 100%; max-width: var(--sheet); padding: var(--space-9) 0; display: flex; flex-direction: column; gap: var(--space-9); color: var(--c-ink, var(--text)); }
+.first-card h1 { margin: 0; text-align: center; }
+.first-promise { margin: 0; color: var(--muted); line-height: 1.45; text-align: center; }
+.first-prompt { padding: var(--space-5) var(--space-8); border-left: var(--border-3) solid var(--c-ink, var(--text)); font-size: var(--text-5); line-height: 1.45; }
+.first-copy { align-self: stretch; }
+.first-steps { margin: 0; padding-left: var(--space-11); display: flex; flex-direction: column; gap: var(--space-4); }
 .first-steps li::marker { color: var(--muted); }
-.first-status { display: flex; align-items: center; gap: var(--space-6); padding-top: var(--space-8); border-top: var(--border-1) solid var(--line); color: var(--ok); font-size: var(--text-5); }
+.first-status { display: flex; align-items: center; justify-content: center; gap: var(--space-6); color: var(--ok); font-size: var(--text-5); }
 .first-status::before { content: ''; flex: none; width: var(--box-3); height: var(--box-3); border-radius: 50%; background: currentColor; animation: first-beat 1.6s ease-in-out infinite; }
 @keyframes first-beat { 50% { opacity: 0.25; } }
 
@@ -61,11 +64,6 @@ body[data-first="wait"] #canvas, body[data-first="wait"] #sheet { visibility: hi
 body[data-land] > iframe.page-backdrop { color-scheme: light; position: fixed; inset: 0; width: 100%; height: 100%; border: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity var(--motion-slow, 0.6s) ease; }
 body[data-land] > iframe.page-backdrop.drew { opacity: 1; }
 :root body[data-land="gate"] :is(#sheet, #canvas, .first), :root body[data-land="sheet"] #sheet, :root body[data-land="canvas"] #canvas { background: transparent; }
-/* A land's still (theme-land.js): its picture, at its own size in the middle of the window (the words it was baked round
-   stand there too), the narrow one on a window taller than wide; gone once the land has gathered, kept where it cannot run. */
-body > .land-still { position: fixed; inset: 0; z-index: 0; pointer-events: none; background: var(--land-still-wide, var(--land-still-narrow)) center / auto no-repeat; transition: opacity var(--motion-slow, 0.6s) ease; }
-@media (max-aspect-ratio: 3/4) { body > .land-still { background-image: var(--land-still-narrow, var(--land-still-wide)); } }
-body > .land-still.gone { opacity: 0; }
 /* A new guest map's first card is on the gate's paper, so the page it came from (Making your map) and it are one sheet. */
 body[data-first="wait"] { background: var(--chart-ground, var(--bg)); }
 /* Making your map gives way to the card in place: the sheet it stood on is put away at once, never slid. */
