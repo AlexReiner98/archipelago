@@ -55,7 +55,7 @@ export async function planChange(map: Archipelago, ops: Op[], who?: Who): Promis
         if (op.owner) await checkOwner(reg.type(op.type) && op.type, op.owner, where);
         const type = here.type(op.type);
         if (!type) break; if (type.retired) errors.push(`${where}: ${op.type} is retired here: no new item is made of it`);
-        else if (type.dormant && here !== reg && !reg.type(op.type)?.dormant) errors.push(`${where}: ${op.type} waits on this island: its pack ${type.pack} is ${here.states.get(type.pack)?.state ?? 'off'} here${here.states.get(type.pack)?.why ? ` (${here.states.get(type.pack)!.why})` : ''}, so no new item of it is made here`); // an island's packs off (packs/loader/kernel/island-off.ts)
+        else if (type.dormant && here !== reg && !reg.type(op.type)?.dormant) errors.push(here.partStates.has(op.type) ? `${where}: ${op.type} waits on this island: ${here.partStates.get(op.type)!.state === 'off' ? 'it is turned off on this island' : `it lacks ${here.partStates.get(op.type)!.lacks.join(', ')} here`}, so no new item of it is made here` : `${where}: ${op.type} waits on this island: its pack ${type.pack} is ${here.states.get(type.pack)?.state ?? 'off'} here${here.states.get(type.pack)?.why ? ` (${here.states.get(type.pack)!.why})` : ''}, so no new item of it is made here`); // an island's packs or parts off (packs/loader/kernel/island-off.ts)
         if (op.visibility === 'public' && !type.public) errors.push(`${where}: a ${op.type} cannot be public. Only these can: ${publicTypes(reg).join(', ')}.`);
         errors.push(...[...typedProblems(op.type, type.fields, op.props ?? {}), ...undeclaredColumns(type, op)].map((p) => `${where}: ${p}`));
         if (op.ref) {

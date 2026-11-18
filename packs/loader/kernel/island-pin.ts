@@ -16,6 +16,7 @@ import { actorsOf, packKind, sharedOf } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import type { PackVersion } from './pack-items.ts';
 import type { Registry } from './packs.ts';
+import type { IslandRun } from '../../rules/kernel/rules.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Op } from '../../write/kernel/pelago-types.ts';
 
@@ -103,6 +104,19 @@ export async function islandRegistry(map: Archipelago, island: unknown, reg: Reg
   const version = pinned && !(versionRegistry(reg, pinned) instanceof Error) ? pinned : undefined;
   const run = offRegistry(reg, version, offOn(reg, found ?? undefined), found && isIslandItem(reg, found) ? partsOffOn(found) : []);
   return run instanceof Error ? (version ? (versionRegistry(reg, version) as Registry) : reg) : run;
+}
+
+/** What an island runs, as the rules read it (packs/loader/kernel/island-rules.ts): the version it pins and the packs and parts it has off, with their registry; undefined where it runs the map's. */
+export async function islandRun(map: Archipelago, island: unknown, reg: Registry = map.registry): Promise<IslandRun | undefined> {
+  if (typeof island !== 'string' || !island) return undefined;
+  const found = await map.entity(island);
+  if (!found) return undefined;
+  const pinned = pinOf(reg, found), base = pinned ? versionRegistry(reg, pinned) : undefined;
+  const version = pinned && base && !(base instanceof Error) ? { item: pinned, of: reg.versions.get(pinned)!.of } : undefined;
+  const packs = offOn(reg, found), parts = isIslandItem(reg, found) ? partsOffOn(found) : [];
+  const run = packs.length || parts.length ? offRegistry(reg, version?.item, packs, parts) : undefined;
+  if (run && !(run instanceof Error)) return { registry: run, ...(version && { version }), off: true };
+  return version ? { registry: base as Registry, version } : undefined;
 }
 
 /** Why ops that set an island's version cannot be kept, as sentences: it names no version, one of another pack, or one that does not load. */

@@ -142,10 +142,10 @@ export interface Ruled {
   version?: string;
 }
 
-/** A version of a pack an island runs, as decide reads it: its registry, its pack item and the pack it is of. */
+/** What an island runs, as decide reads it: its registry, the version of a pack it pins (its item and the pack it is of), and whether it has packs or parts off (packs/loader/kernel/island-parts.ts). */
 export interface IslandRun {
   registry: Registry;
-  version: { item: string; of: string };
+  version?: { item: string; of: string }; off?: boolean;
 }
 
 /** An item a change is written to, as it is before the change. */
@@ -417,13 +417,14 @@ export interface Verdict {
 const keyOf = (r: { rule?: string; id?: string; pack: string; version?: string }) => `${r.pack}.${r.rule ?? r.id ?? ''}.${r.version ?? ''}`;
 
 /**
- * The rules an op on an island that runs a version is under: the version's for the pack it is of, the map's for every
- * other. Core's own (agent_changes, settle, forget...) are always the map's: a version is never of the kernel's packs.
+ * The rules an op on an island is under: a version's for the pack it is of, the map's for every other, less those of a
+ * pack or a part the island turned off (a pack here whose rule its registry lacks). Core's own (agent_changes, settle,
+ * forget...) are always the map's: a version is never of the kernel's packs, and they are never off.
  */
 function rulesUnder(base: Rule[], run: IslandRun): Rule[] {
-  const of = run.version.of;
-  if (KERNEL_PACKS.includes(of)) return base;
-  return [...base.filter((r) => r.pack !== of), ...run.registry.rules.filter((r) => r.pack === of).map((r) => ({ ...r, version: run.version.item }))];
+  const of = run.version?.of, mine = (r: Rule) => run.registry.rules.some((x) => x.pack === r.pack && x.id === r.id);
+  const swapped = !of || KERNEL_PACKS.includes(of) ? base : [...base.filter((r) => r.pack !== of), ...run.registry.rules.filter((r) => r.pack === of).map((r) => ({ ...r, version: run.version!.item }))];
+  return run.off ? swapped.filter((r) => KERNEL_PACKS.includes(r.pack) || r.pack === of || !run.registry.found.some((p) => p.id === r.pack) || mine(r)) : swapped;
 }
 
 /**
@@ -457,7 +458,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
     const each = await Promise.all((runs[i]?.length ? runs[i] : [undefined]).map(async (run) => {
       const { rules: these, registry } = under(run);
       // A rule of a version names it: the held change says which version of the pack held it.
-      const mark = (r: Ruled) => (run && r.pack === run.version.of && !KERNEL_PACKS.includes(r.pack) ? { ...r, version: run.version.item } : r);
+      const mark = (r: Ruled) => (run?.version && r.pack === run.version.of && !KERNEL_PACKS.includes(r.pack) ? { ...r, version: run.version!.item } : r);
       const one = judge(these, registry, who, op, targets, lifted, facts[i]);
       return { held: one.held.map(mark), spared: one.spared.map(mark), refusers: one.refusers.map(mark), refused: [...one.refused, ...(one.letBy ? [] : await clashes(q, registry, op, targets[0]))] };
     }));
