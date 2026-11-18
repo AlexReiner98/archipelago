@@ -44,6 +44,18 @@ export function sessionRings({ item, shape, x, y, w, h, corner, bevel, z, outlin
   }));
 }
 
+/**
+ * A ring's tag on an item a painted island's look draws (./painted.js): centred over its rings, in a group (`tag:<id>:<k>`)
+ * that stands at the outermost ring's top and moves out with the radius the look hands; its lift and leading are its own.
+ * None where the style names no tag size.
+ */
+export function paintedTag({ s, item, k, rings, gap, style, m }) {
+  const tags = tagSizes(style);
+  if (!tags) return null;
+  return m('g', { key: `tag:${item.id}:${k}`, transform: `translate(0 ${-gap * rings})` },
+    m('text', { class: 'lf-sr-tag mid', x: 0, y: -tags.lift, ...(k && { dy: `${-k * tags.leading}em` }) }, tagOf(s, item, style, tags.letters)));
+}
+
 /** The tag's sizes, where the style names them: its text, its lift over the rings, its leading (in its em), and the most letters it says. */
 export function tagSizes(style) {
   const text = style.sizes?.flow_session_tag_text, lift = style.sizes?.flow_session_tag_lift;
@@ -80,4 +92,5 @@ export const css = `
 .lf-step .lf-sr .lf-shape, .lf-step:hover .lf-sr .lf-shape { fill: none; stroke: var(--lf-sr, var(--ln-session)); stroke-width: var(--ln-flow-session-ring); }
 .lf-step .lf-sr.dormant .lf-shape { stroke-dasharray: var(--ln-flow-dash-dormant); }
 .lf-step .lf-sr text.lf-sr-tag { fill: var(--lf-sr, var(--ln-session)); font-size: calc(var(--ln-flow-session-tag-text) / var(--ln-plane-scale, 1)); dominant-baseline: auto; pointer-events: none; }
+.lf-step .lf-sr text.lf-sr-tag.mid { text-anchor: middle; }
 `;

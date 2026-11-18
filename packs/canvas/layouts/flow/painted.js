@@ -17,27 +17,32 @@ import { handedOf, wirePatches } from './painted-wires.js';
 import { m as mark } from './marks.js';
 
 export { shoreOnly } from './painted-wires.js';
-import { hueClass, opacityOf, sessionsOn } from './session-ring.js';
+import { hueClass, opacityOf, paintedTag, sessionsOn } from './session-ring.js';
 
 /**
  * An item a look draws, as the map marks it: where it stands (`at:<id>`, moved when the look hands its place), the
- * rings of the sessions on it and the area that takes the pointer, each sized round the radius the look hands.
+ * rings of the sessions on it, each ring's tag over them (./session-ring.js), and the area that takes the pointer, each
+ * sized round the radius the look hands.
  * Hidden (`unplaced`) until then.
  */
 export function paintedBody({ item, x, y, gap, style, m }) {
   const on = sessionsOn(item), id = item.id;
   return m('g', { key: `at:${id}`, transform: `translate(${x} ${y})` },
     on.length && m('g', { class: 'lf-srs', 'aria-hidden': 'true' }, ...on.map((s, k) => ((faint) => m('g', { class: `lf-sr ${hueClass(s.hue)}${s.dormant ? ' dormant' : ''}`, ...(faint !== undefined && { opacity: faint }) },
-      m('circle', { key: `ring:${id}:${k}`, class: 'lf-shape', r: gap * (k + 1) })))(opacityOf(s, style)))),
+      m('circle', { key: `ring:${id}:${k}`, class: 'lf-shape', r: gap * (k + 1) }),
+      paintedTag({ s, item, k, rings: on.length, gap, style, m })))(opacityOf(s, style)))),
     m('circle', { key: `hit:${id}`, class: 'lf-hit', r: gap }));
 }
 
-/** The patches that stand a placed item where its look drew it, its rings and pointer area round its radius. */
+/** The patches that stand a placed item where its look drew it, its rings, their tags and pointer area round its radius. */
 export const itemPatches = (placed, items, gap, over = 0) => [...placed].flatMap(([id, [x, y, r]]) => [
   { key: `s:${id}`, toggle: { unplaced: false } },
   { key: `at:${id}`, set: { transform: `translate(${x} ${y})` }, ...(over && { over }) },
   { key: `hit:${id}`, set: { r: Math.max(r, gap) } },
-  ...sessionsOn(items.get(id)).map((_, k) => ({ key: `ring:${id}:${k}`, set: { r: r + gap * (k + 1) } })),
+  ...sessionsOn(items.get(id)).flatMap((_, k, on) => [
+    { key: `ring:${id}:${k}`, set: { r: r + gap * (k + 1) } },
+    { key: `tag:${id}:${k}`, set: { transform: `translate(0 ${-(r + gap * on.length)})` } },
+  ]),
 ]);
 
 /**
