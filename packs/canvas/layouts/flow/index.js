@@ -32,7 +32,7 @@ import { arrowHead, drawn, middleOf } from './polyline.js';
 import { carried } from './carried.js';
 import { shapedBy, shapeIn, SHAPES } from './steps.js';
 import { focusOf } from './focus.js';
-import { comingIn, paintIslands } from './painted.js';
+import { css as paintedCss, paintedBody, paintIslands, placer } from './painted.js';
 import { play } from './play.js';
 import { css as storyCss, everyNamed, reveal, statesOf } from './story.js';
 import { statesOf as standing } from './state.js';
@@ -308,26 +308,25 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
   if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map(entryWidth)])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, effort });
-  // Islands whose look paints (./painted.js): their items are painted on the surface, not drawn as steps, nor the wires among them.
-  const canvases = (g.islands ?? []).filter((i) => i.canvas), inPainted = new Set(answer.items.filter((i) => canvases.some((c) => c.id === i.island)).map((i) => i.id));
-  if (inPainted.size) g = { ...g, all: g.all.filter((n) => !inPainted.has(n.id)), chains: g.chains.filter((w) => !inPainted.has(w.a) || !inPainted.has(w.b)), ties: g.ties.filter((w) => !inPainted.has(w.a) || !inPainted.has(w.b)) };
+  // Islands whose look paints (./painted.js): their items painted on the surface, and marked by the map where the look hands their places, as are the wires to them.
+  const canvases = (g.islands ?? []).filter((i) => i.canvas), inPainted = new Set(answer.items.filter((i) => canvases.some((c) => c.id === i.island)).map((i) => i.id)), unplaced = (w) => (inPainted.has(w.a) || inPainted.has(w.b) ? ' unplaced' : '');
   const steps = g.all.filter((n) => !n.dummy);
   if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
-  const painting = canvases.length ? paintIslands({ tools, wire: { stroke: z('stroke'), head: [z('head_length'), z('head_half')] }, rings: { width: z('session_ring'), gap: z('session_gap'), dash: String(style.sizes?.flow_dash_dormant ?? '').split(/\s+/).map(Number).filter((v) => v > 0), faded: style.numbers?.session_faded }, islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, wires: comingIn(c, { g, items: answer.items, painted: inPainted, endsOf, order: ORDER_TYPE }), answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
+  const painting = canvases.length ? paintIslands({ tools, placed: placer({ g, painted: inPainted, gap: z('session_gap'), draw: line, heads, order: ORDER_TYPE, over: style.numbers?.motion_move }), islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
 
   // A read that ends on a finding's name has no head there: the wire from the name to the finding carries it.
   const tieHeads = g.ties.map((t) => heads(t, t.type)), chainHeads = g.chains.map((c) => heads(c, ORDER_TYPE));
   const tieKeys = (n) => (tieHeads[n] ? [`n:${n}`, `nh:${n}`] : [`n:${n}`]);
   const tieLayer = g.ties.map((t, n) => {
-    const cls = `${kind(t.type)}${onYou(t)}${pend(t.pending)}`;
+    const cls = `${kind(t.type)}${onYou(t)}${pend(t.pending)}${unplaced(t)}`;
     const path = m('path', { key: `n:${n}`, d: line(t), class: `lf-tie${t.type === 'part_of' ? ' near' : ''}${headless.has(t.type) ? '' : ' headed'}${t.dashed ? ' dashed' : ''}${cls}`, ...drawIn, ...hidden });
     return tieHeads[n] ? [path, m('path', { key: `nh:${n}`, d: tieHeads[n], class: `lf-head${cls}`, ...hidden })] : path;
   });
   const wireLayer = g.chains.map((c, n) => {
     // A wire that ends on a trunk (a bundle's, ./bundle.js) has no head of its own: the trunk's wire carries it.
-    const wire = m('path', { key: `w:${n}`, d: line(c), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}`, ...drawIn, ...hidden });
-    return chainHeads[n] ? [wire, m('path', { key: `h:${n}`, d: chainHeads[n], class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}`, ...hidden })] : [wire];
+    const wire = m('path', { key: `w:${n}`, d: line(c), class: `lf-wire${kind(ORDER_TYPE)}${c.dashed ? ' dashed' : ''}${pend(c.pending)}${unplaced(c)}`, ...drawIn, ...hidden });
+    return chainHeads[n] ? [wire, m('path', { key: `h:${n}`, d: chainHeads[n], class: `lf-head${kind(ORDER_TYPE)}${pend(c.pending)}${unplaced(c)}`, ...hidden })] : [wire];
   });
   // A wire cut onto a trunk goes on along it (./carried.js): that stretch drawn over the trunk, seen only while lit, so a
   // step hovered lights its way all the way to what it shares and not the other branches of the trunk.
@@ -382,10 +381,10 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
     const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus'].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
-    const body = drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
+    const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
       ring, outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
@@ -467,7 +466,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     size.width = width;
   }
   return {
-    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ringCss, ...ringRules(answer.items), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ringCss, ...(painting ? [paintedCss] : []), ...ringRules(answer.items), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: () => (player?.end?.(), painting?.end()),
     viewport: (v) => (painting?.view(v), []),
     on(event) {
@@ -476,12 +475,14 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
       for (const opened of [!story && opens(event)]) if (opened) return opened;
       if (String(key).startsWith('paint:')) return painting?.pointer(String(key).replace(/^paint:/, ''), name, event.at) ?? [];
       // A shared mark's tip, over the step's while the pointer is on the mark; off it, back to the step it is on, if any.
+      // An item a look paints is lit by its look too, as the pointer comes to it and leaves (below).
       if (!story && markTip(String(key))) {
         if (name === 'enter') return [{ tip: { key, mark: markTip(String(key)) } }];
         if (name !== 'leave') return [];
         const on = String(key).startsWith('p:') ? `s:${String(key).slice(2)}` : null;
         return on && tipped.has(on) ? [{ tip: { key: on, mark: tipFor(on) } }] : [{ tip: null }];
       }
+      if (inPainted.has(keyed.get(key))) painting?.item(keyed.get(key), name === 'enter');
       if (name === 'leave') return [...light(null), { tip: null }];
       if (!keyed.has(key)) return [];
       // A step says what it is in a tip, while a story plays too.

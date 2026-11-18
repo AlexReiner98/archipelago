@@ -118,14 +118,34 @@ test('a view that says its islands are plain draws none by its own look or layer
   assert.doesNotMatch(JSON.stringify(find(JSON.parse(plain), (k: any) => k[1]?.href === '#/e/e_bbbbbbbb')), /"path"/, 'nor the island’s outlines');
 });
 
-test('a look that paints is given its island’s frame and a surface, its items left to it', () => {
-  const field = { default: () => {} };
-  const answer = { items, links: [], islands: [{ id: 'e_islandaa', title: 'Here', look: { id: 'e_look0000', kind: 'layout', coded: true } }, { id: 'e_islandbb', title: 'There' }] };
-  const tools = { measure, looks: new Map([['e_islandaa', field]]), gestures: () => ({ on: () => [] }), frame: () => new Promise(() => {}) };
+test('a look that paints is given its island’s frame and a surface, its items marked where it hands their places', async () => {
+  (globalThis as any).OffscreenCanvas ??= class { width: number; height: number; constructor(w: number, h: number) { this.width = w; this.height = h; } getContext() { return {}; } };
+  const links = [{ from: 'e_dddddddd', to: 'e_aaaaaaaa', type: 'depends_on' }, { from: 'e_aaaaaaaa', to: 'e_bbbbbbbb', type: 'bears_on' }];
+  let handed: any = null;
+  // A look that settles at once and hands two of its items' places, a line style, and a route for the link between them.
+  const field = { default: ({ hand }: any) => (handed = hand)({ places: { e_aaaaaaaa: [20, 30, 6], e_bbbbbbbb: [80, 30, 6] }, lines: { width: 'bold' }, routes: { 'e_aaaaaaaa>e_bbbbbbbb': [[50, 60]] } }) };
+  const answer = { items, links, islands: [{ id: 'e_islandaa', title: 'Here', look: { id: 'e_look0000', kind: 'layout', coded: true } }, { id: 'e_islandbb', title: 'There' }] };
+  const patches: any[] = [];
+  const surface = { canvas: { width: 1, height: 1, getContext: () => ({ clearRect() {}, drawImage() {} }) }, size: { width: 1200, height: 800, dpr: 1 }, colours: {}, show() {} };
+  const tools = { measure, looks: new Map([['e_islandaa', field]]), gestures: () => ({ on: () => [] }), frame: () => new Promise(() => {}), surface: async () => surface, patch: (list: any[]) => patches.push(...list) };
   const out = draw({ answer, style: { ...house, placed }, reduced: true, width: 1200, height: 800 }, tools);
   assert.deepEqual(out.scene.surface, { key: 'islands-painted' }, 'the scene asks for a surface');
   const svg = JSON.stringify(out.scene.svg);
-  assert.ok(!svg.includes('#/e/e_aaaaaaaa'), 'its items are not drawn as steps');
-  assert.ok(svg.includes('#/e/e_dddddddd'), 'the other island’s are');
+  assert.match(svg, /"key":"s:e_aaaaaaaa"[^}]*"class":"lf-step[^"]*painted unplaced/, 'its items are marked, hidden until placed');
+  assert.ok(svg.includes('#/e/e_dddddddd'), 'the other island’s are drawn as steps');
+  out.viewport({ x: 0, y: 0, width: 1200, height: 800 });
+  for (let k = 0; k < 5 && !handed; k++) await new Promise((r) => setTimeout(r));
+  const at = patches.find((p) => p.key === 'at:e_aaaaaaaa')?.set.transform.match(/[\d.]+/g).map(Number);
+  assert.ok(at, 'the item stands where the look handed it');
+  assert.ok(patches.some((p) => p.key === 's:e_aaaaaaaa' && p.toggle.unplaced === false), 'and is shown');
+  const wires = patches.filter((p) => /^[wn]:/.test(p.key));
+  assert.equal(wires.length, 2, 'the wire in from the other island and the link between its items, both the map’s');
+  const into = wires.find((p) => p.key.startsWith('w:')).set.d.match(/-?[\d.]+/g).map(Number);
+  const off = (x: number, y: number) => Math.abs(Math.hypot(x - at[0], y - at[1]) - 6);
+  assert.ok(Math.min(off(into[0], into[1]), off(into.at(-2), into.at(-1))) < 0.01, `the wire in ends on the item’s edge, where the look draws it: ${into} at ${at}`);
+  const among = wires.find((p) => p.key.startsWith('n:'));
+  assert.equal(among.toggle['lw-bold'], true, 'the link among its items in the look’s width');
+  assert.equal(among.set.d.split('L').length, 3, 'along the look’s route');
+  assert.equal(wires.find((p) => p.key.startsWith('w:')).toggle['lw-bold'], false, 'a wire across the shore in the map’s own');
   out.end?.();
 });

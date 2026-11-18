@@ -10,7 +10,7 @@ import { HEX } from './marks.js';
 export const sessionsOn = (i) => (Array.isArray(i?.sessions) ? i.sessions.filter((s) => s && typeof s === 'object' && HEX.test(String(s.hue))) : []);
 
 /** The class that gives a ring its hue: a drawing sets no style on a mark. */
-const hueClass = (hex) => `lf-sr-${hex.slice(1).toLowerCase()}`;
+export const hueClass = (hex) => `lf-sr-${hex.slice(1).toLowerCase()}`;
 
 /** How see-through a ring is, by how fresh its session is: whole while fresh, down to the style's session_faded. */
 export function opacityOf(s, style) {
