@@ -28,7 +28,7 @@ test('in a browser, the side bar lists the chats at work and the band counts tho
   /** The pieces each chat's row is drawn from, in the order drawn. */
   const pieces = `[...document.querySelectorAll('#islands .isl-chat')].map((r) => [...r.children].map((c) => c.dataset.piece))`;
   /** The chats' rows: their state, mark and name, and whether each stands on one line. */
-  const chats = `[...document.querySelectorAll('#islands .isl-chat')].map((r) => ({ state: r.dataset.state, mark: r.querySelector('.isl-chat-mark.on-you') && getComputedStyle(r.querySelector('.isl-chat-mark')).maskImage.includes('inbox.svg') ? 'inbox' : r.querySelector('.isl-chat-mark').textContent, name: r.querySelector('.isl-name').textContent, line: r.scrollHeight <= r.clientHeight + 1 && r.querySelector('.isl-name').scrollWidth >= r.querySelector('.isl-name').clientWidth }))`;
+  const chats = `[...document.querySelectorAll('#islands .isl-chat')].map((r) => ({ state: r.dataset.state, mark: ((k) => k.classList.contains('on-you') && getComputedStyle(k).maskImage.includes('inbox.svg') ? 'inbox' : /shape-([a-z]+)/.exec(k.className)?.[1] ?? '')(r.querySelector('.isl-chat-mark')), name: r.querySelector('.isl-name').textContent, line: r.scrollHeight <= r.clientHeight + 1 && r.querySelector('.isl-name').scrollWidth >= r.querySelector('.isl-name').clientWidth }))`;
   try {
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -36,9 +36,9 @@ test('in a browser, the side bar lists the chats at work and the band counts tho
       await page.evaluate(`document.body.dataset.islands === 'open' || document.querySelector('#query .isl-toggle').click()`);
       await until(`the chats at ${width} px`, () => page.evaluate<boolean>(`document.querySelectorAll('#islands .isl-chat .isl-name').length === 2`)); // filled once its pieces have loaded
       const rows = await page.evaluate<{ state: string; mark: string; name: string; line: boolean }[]>(chats);
-      // The one waiting on the owner first, by its mark; every row on one line.
+      // The one waiting on the owner first, each marked as the canvas marks its state (session_marks): every row on one line.
       // (A run's title is cut at 60 characters when it is made: its start is compared.)
-      assert.deepEqual(rows.map((r) => [r.state, r.mark, r.name.slice(0, 30)]), [['your_move', 'inbox', titles[0]], ['idle', '', titles[1].slice(0, 30)]], `at ${width} px`);
+      assert.deepEqual(rows.map((r) => [r.state, r.mark, r.name.slice(0, 30)]), [['your_move', 'inbox', titles[0]], ['idle', 'ring', titles[1].slice(0, 30)]], `at ${width} px`);
       assert.ok(rows.every((r) => r.line), `one line a row at ${width} px`);
       // Each part of a row is a piece (./session-pieces.js), in the house style's order (rows.sessions).
       assert.deepEqual(await page.evaluate(pieces), [['inbox', 'name'], ['state', 'name', 'on']], `pieces at ${width} px`);

@@ -1,12 +1,13 @@
-// A piece of a chat's row (./session-pieces.js): its state as a mark before its name, one at work a dot, one blocked a
-// square, one resting none (the room kept). What waits on the owner is the inbox's piece (./session-piece-inbox.js).
+// A piece of a chat's row (./session-pieces.js): its state as a mark before its name, in the shape and colour the style
+// names for that state (session_marks), as the canvas marks it, so the bar and the canvas never mark one state two ways.
+// What waits on the owner is the inbox's piece (./session-piece-inbox.js).
 
 import { YOURS } from './sessions-open.js';
-
-const MARKS = { working: '•', blocked: '■' };
+import { markOf } from './session-pieces.js';
 
 export default function state(s) {
   const at = s.session?.state ?? 'idle';
   if (YOURS[at]) return null;
-  return { mark: MARKS[at] ?? '', cls: 'isl-chat-mark', tip: s.session?.line || at };
+  const mark = markOf(at);
+  return { mark: '', cls: `isl-chat-mark${mark ? ` shape-${mark.shape}` : ''}`, ...(mark && { hue: mark.hue }), tip: s.session?.line || at };
 }

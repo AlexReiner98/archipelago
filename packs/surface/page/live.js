@@ -226,6 +226,9 @@ export async function checkTail() {
     // What changes touched, for whoever follows items as they are tied (ui/canvas.js).
     if (touched) hooks.touched?.(touched);
     if (touched?.made) hooks.made?.(touched);
+    // An island made or changed is listed anew in the side bar (./island-picker.js).
+    // The first answer touches nothing it can name, but may say items were made since the page read: read anew too.
+    hooks.islandsTouched?.(touched ?? { ids: [], made: beat.made ?? 0 });
   } catch {
     return;
   }

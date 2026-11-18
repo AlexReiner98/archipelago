@@ -31,3 +31,17 @@ export function drawn(line, gaps = [], half = 0) {
   });
   return d;
 }
+
+/** An arrowhead at the end of `points`, pointing the way its line comes in: from the last point before the tip that is not the tip. */
+export function arrowHead(points, length, half) {
+  const tip = points.at(-1), from = points.slice(0, -1).reverse().find((p) => p[0] !== tip[0] || p[1] !== tip[1]) ?? [tip[0], tip[1] - 1];
+  const dx = tip[0] - from[0], dy = tip[1] - from[1], l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l;
+  const bx = tip[0] - ux * length, by = tip[1] - uy * length, [nx, ny] = dx ? [-uy, ux] : [-1, 0];
+  return `M${tip[0]} ${tip[1]}L${bx + nx * half} ${by + ny * half}L${bx - nx * half} ${by - ny * half}Z`;
+}
+
+/** The middle of a line's middle stretch: where a wire's badge goes. */
+export function middleOf(points) {
+  const k = Math.max(0, Math.floor((points.length - 2) / 2)), [a, b] = [points[k], points[k + 1] ?? points[k]];
+  return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+}

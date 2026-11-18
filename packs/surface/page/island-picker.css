@@ -6,6 +6,8 @@ body[data-islands="open"] :is(#canvas, #canvas > .pane) { left: var(--active-lef
 body[data-islands="folded"] :is(#canvas, #canvas > .pane), body[data-islands-over="on"] :is(#canvas, #canvas > .pane) { left: 0; }
 /* The canvas's frame, which find and the bar are laid out by: below the band, beside the bar while it is open. */
 body[data-panes="1"] { --active-top: var(--band); }
+/* With the bar under the band, the two stand one above the other over the canvas: what it keeps clear is both. */
+body[data-panes="1"]:has(#query:not([hidden])) #canvas { --safe-top: calc(var(--band) + var(--strip) + var(--space-4)); }
 /* An open sheet takes its room from the canvas, so whatever draws it stands beside it. */
 body[data-panes="1"][data-sheet="open"] { --active-right: min(var(--sheet), 50%); }
 body[data-panes="1"] #canvas > .pane { right: var(--active-right, 0); }
@@ -72,9 +74,16 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 
 /* The chats at work (./island-sessions.js): a row each, its state a mark in the room the island rows keep for their dot. */
 #islands .isl-chat::before { display: none; }
-#islands .isl-chat-mark { flex: none; width: var(--space-5); color: var(--muted); text-align: center; }
-#islands .isl-chat:is([data-state="waiting"], [data-state="your_move"]) .isl-chat-mark { color: var(--warn); width: var(--text-5); height: var(--text-5); }
-#islands .isl-chat[data-state="working"] .isl-chat-mark { color: var(--ok); }
+/* Its mark is the canvas's for that state (session_marks): a shape in the state's colour, as ./session-piece-state.js
+   names them; the inbox in its state's colour. */
+#islands .isl-chat-mark { flex: none; display: inline-grid; place-items: center; width: var(--text-6); }
+#islands .isl-chat-mark[class*="shape-"]::before { content: ''; box-sizing: border-box; width: var(--space-5); height: var(--space-5); background: var(--session-hue); }
+#islands .isl-chat-mark:is(.shape-disc, .shape-ring, .shape-half)::before { border-radius: 50%; }
+#islands .isl-chat-mark:is(.shape-ring, .shape-half)::before { border: thin solid var(--session-hue); background: none; }
+#islands .isl-chat-mark.shape-half::before { background: linear-gradient(90deg, var(--session-hue) 50%, transparent 50%); }
+#islands .isl-chat-mark.shape-diamond::before { transform: rotate(45deg) scale(0.8); }
+#islands .isl-chat-mark.shape-triangle::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+#islands .isl-chat-mark.on-you { color: var(--session-hue, var(--warn)); }
 #islands .isl-chat .isl-name { color: var(--text); }
 /* An island a show added: its row on the soft ground and its name bold until it is pressed (decision e_mnuthcap). */
 #islands .isl-row.shown { background: var(--accent-soft); }
