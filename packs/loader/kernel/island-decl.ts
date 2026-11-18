@@ -86,6 +86,14 @@ function declared(map: Registry, run: Registry, id: string, sources?: Sources): 
   };
 }
 
+/**
+ * A pack as an island runs it, for the island of its parts a query asks for (`parts <pack> <island>`, lane e_nfapxupx):
+ * the same as the island's own answer gives it (its state, parts, what it gives and takes), read for that pack alone.
+ */
+export async function packOnIsland(map: Archipelago, island: string, pack: string, given?: Sources): Promise<Declared> {
+  return declared(map.registry, await islandRegistry(map, island), pack, given ?? (await styleSources(map)));
+}
+
 /** The packs a pack requires, by the packs that provide each (an active one first), the kernel's own left out: it is on every island. */
 export function requiredBy(run: Registry, id: string): string[] {
   const pack = run.found.find((p) => p.id === id);
