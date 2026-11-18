@@ -84,3 +84,15 @@ export function surfaceOf(picture, port, colours) {
     end: () => (watch.disconnect(), moved.disconnect()),
   };
 }
+
+/**
+ * What `host` showed before, laid over the picture drawn in its place until `surface` shows its first frame
+ * (packs/surface/page/flow.css, .lf-was): else what its drawing paints is gone for a frame or more, a flicker on each
+ * edit (e_m5x8pmwu). None without a surface, or with no picture before.
+ */
+export function heldOver(host, surface) {
+  if (!surface || !host.querySelector('.lf-stage')) return null;
+  const was = h('div', { class: 'lf-was', 'aria-hidden': 'true' }, ...host.childNodes);
+  surface.first.then(() => was.remove());
+  return was;
+}

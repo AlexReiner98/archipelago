@@ -23,7 +23,7 @@ import { build, cssFor, patch, step } from './marks.js';
 import { readerAsks, stillReading } from './reader-frame.js';
 import { followSheet, sheetAside } from './sheet-follow.js';
 import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './query-base.js';
-import { surfaceOf } from './surface.js';
+import { heldOver, surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
 import { relations, types as registry, typeTitle } from './words.js';
 import { panZoom } from './pan-zoom.js';
@@ -438,7 +438,7 @@ export function drawWith(host, answer, style, keep) {
     }
     const lit = litSwitch(answer.viewer, style, keep, redraw);
     const stage = h('div', { class: 'lf-stage' }, picture, over, legend);
-    host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
+    host.replaceChildren(...[before, beside(stage), after, heldOver(host, surface)].filter(Boolean));
     if (input.height > 0) followShape(scene);
     const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, beside: sheetAside, told: (now) => (begun ? toDrawing({ type: 'viewport', view: now }) : (view = now)) }));
     const zoom = h(

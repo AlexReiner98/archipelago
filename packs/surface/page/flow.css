@@ -32,6 +32,8 @@
    by the page's camera from where it was painted (its transform, from its corner). The stage is its own stack, so the
    surface lies over the sea and under the marks. */
 .lf-stage { isolation: isolate; }
+/* The picture drawn before, over the new one until the new one's surface has painted (packs/walls/page/layout.js). */
+.lf-was { position: absolute; inset: 0; padding: inherit; pointer-events: none; z-index: 1; }
 .lf-surface { position: absolute; display: block; pointer-events: none; z-index: -1; transform-origin: 0 0; }
 /* The frame drawings run in: drawn, with no size, so the browser does not slow it as a frame that is not drawn. */
 .drawing-sandbox { position: fixed; left: 0; top: 0; width: 0; height: 0; border: 0; pointer-events: none; }
