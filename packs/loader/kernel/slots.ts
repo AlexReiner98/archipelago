@@ -33,7 +33,7 @@ export const PAGES: string[] = ['doc', 'public'];
  * - `tabs.land`       a decision, not marks: where a show lands among the tabs and panes (packs/surface/page/part-decide.js)
  * - `tabs.life`       a decision: which kept tabs' sessions have ended or rested
  * - `ghosts`          a decision: what the changes held would look like on the canvas, read back into its answer
- * - `canvas`, `traces` the canvas itself, and the overlay of traces over it
+ * - `canvas`          the canvas itself
  * - `sheet`           the sheet over the canvas, an item's one page, handed where the documents beside it are read
  *                     (`reading`), so a part decides which page is shown; `item.menu` what is done rarely to that item
  * - `find`            find at the canvas's foot; `home` the page with no query up; `nav` what the menu leads to
@@ -51,7 +51,6 @@ export const FRAME_SLOTS = {
   'bar.find.rows': ['query', 'home', 'answer', 'names'],
   'bar.layouts': ['current', 'layout'],
   canvas: ['query', 'layout'],
-  traces: ['query'],
   sheet: ['reading'],
   'item.menu': [],
   find: ['query', 'shapes'],

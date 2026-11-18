@@ -31,7 +31,7 @@ test('in a browser, agents at work never move the reader’s pane; a show lands 
     ],
   })).result.created as Record<string, string>;
   const page = await open(`${base}/#/v?find=id+${made.a}`);
-  const show = (actor: string, params: Record<string, unknown>) => call('/agent/report', undefined, { actor, action: 'show', params: { focus: false, ...params } }).then((r) => r.result);
+  const show = (actor: string, params: Record<string, unknown>) => call('/agent/report', undefined, { actor, action: 'show', params }).then((r) => r.result);
   const change = (actor: string, ops: object[]) => call('/agent/change', undefined, { actor, reason: 'test', ops });
   /** The panes of the tab in sight: each one's name, and whether it is the one the bar acts on. */
   const panes = `JSON.stringify([...document.querySelectorAll('#canvas .pm-pane')].map((p) => [p.querySelector('.pm-pane-strip .pm-text').textContent, p.getAttribute('aria-selected') === 'true']))`;

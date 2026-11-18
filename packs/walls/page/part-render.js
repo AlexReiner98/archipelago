@@ -22,7 +22,6 @@ import { fits, fitOnce } from './part-fits.js';
 import { menuSteps } from './part-menu.js';
 import { buildPane, frameWeb, layPanes, paneBody, paneGone, sashes } from './part-pane.js';
 import { draggable } from './part-drag.js';
-import { traceGone, traceMark } from './part-trace.js';
 import { setsField } from './part-echo.js';
 import { codeAt, codeField, codeSet, codeText } from './part-code.js';
 import { boxOfLines, fit, oneLine } from './part-lines.js';
@@ -44,7 +43,6 @@ const sent = new WeakMap();
  * said)` draws a canvas at a pane's address in `el` (said(name, value) tells the part what is done in it), answering
  * with a way to stop it; `hue(words)` is a session's hue named by words; `swatch(preset, el)` paints a style preset's
  * colours into `el`, and `tryTheme(preset)` paints this screen alone in one ('' the workspace's own again);
- * `replay({ at, steps } | null)` shows the canvas under the part the missed steps up to `at`, or the map as it is now;
  * `ghosts(list)` is handed the ghosts each answer holds (each mark's attributes), for the canvas to draw where they land;
  * `slot(name, el, piece)` draws the parts that fill a slot this part opens into `el`, handed `piece` when the mark gives one. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
@@ -52,8 +50,8 @@ const sent = new WeakMap();
  * `draw(node, seen)` for each answer the part gives, `seen` the number of the last message the part had heard when it
  * gave it (what `tell` answers each event with), and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {}, slot = async () => 0, preview } = {}) {
-  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts, slot, preview };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, ghosts = () => {}, slot = async () => 0, preview } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, ghosts, slot, preview };
   let ended = false;
   return {
     draw(node, seen) {
@@ -113,10 +111,8 @@ function build(node, ctx) {
   else if (node.mark === 'web') el = make('div', 'pm-web');
   else if (node.mark === 'pane') el = buildPane(ctx.tell);
   else if (node.mark === 'panes') el = make('div', 'pm-panes');
-  else if (node.mark === 'trace') (el = make('span', 'pm-trace')), (el.hidden = true);
   else if (node.mark === 'slot') el = make('div', 'pm-slot');
   else if (node.mark === 'ghost') (el = make('span', 'pm-ghost')), (el.hidden = true);
-  else if (node.mark === 'replay') (el = make('span', 'pm-replay')), (el.hidden = true), (el.pmReplay = ctx.replay);
   else if (node.mark === 'swatch') {
     // A swatch is pressed as a button is: the part hears it by its key.
     el = make('button', 'pm-swatch');
@@ -270,12 +266,9 @@ function update(el, node, ctx, fresh = false) {
   // Text in a session's hue is that session, marked as every session is (its dot, ui/style.css .who-session).
   if (node.mark === 'text') hued(el, at.hue !== undefined ? ctx.hue(at.hue) : undefined, at.hue !== undefined);
   if (node.mark === 'web') frameWeb(el, at.url, at.reload ?? '');
-  if (node.mark === 'trace') return (traceMark(el, node, ctx), el);
   // A slot the part opens: the parts that fill it are drawn in it by whoever hosts this one, again only for another slot.
   if (node.mark === 'slot' && (fresh || was.at.name !== at.name || JSON.stringify(was.at.piece ?? null) !== JSON.stringify(at.piece ?? null))) (el.replaceChildren(), (el.dataset.slot = at.name), ctx.slot(at.name, el, at.piece));
   if (node.mark === 'slot') return el;
-  // A replay: the canvas under the part shows the missed steps up to `at`; the host holds the store, the part the timer.
-  if (node.mark === 'replay') return (ctx.replay({ at: at.at, steps: at.steps }), el);
   // A swatch is painted by the host from the preset it names, again only for another preset.
   if (node.mark === 'swatch' && (fresh || was.at.preset !== at.preset)) ctx.swatch(at.preset, el.firstElementChild);
   if (node.mark === 'swatch') (el.lastElementChild.textContent = at.label ?? '', at.on ? (el.dataset.on = at.on) : delete el.dataset.on);
@@ -443,9 +436,6 @@ function drawnOnPlane(node) {
 function gone(el) {
   for (const s of [el, ...el.querySelectorAll('.pm-paint')]) surfaces.get(s)?.stop();
   for (const p of [el, ...el.querySelectorAll('.pm-pane')]) if (p.classList?.contains('pm-pane')) paneGone(p);
-  for (const t of [el, ...el.querySelectorAll('.pm-trace')]) traceGone(t);
-  // A replay no longer said: the canvas is the map as it is now.
-  for (const r of [el, ...el.querySelectorAll('.pm-replay')]) r.pmReplay?.(null);
 }
 
 /** What a box, a button or a pane may be when it stands for something moved or picked between: listened for once, when made. */

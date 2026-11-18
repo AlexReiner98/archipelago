@@ -41,7 +41,9 @@ test('in a browser, the page tip waits for the drawing over a step', { skip: !br
       return null;
     })()`);
 
-    // Resting on the stage its title is up; moved onto the step, that tip must not follow there, not for one sample.
+    // Resting on the stage its title is up; moved onto the step, that tip must not follow there, not for one sample. The
+    // stage says nothing of its own (Alex, 17 Nov 2026: no "scroll to zoom" tip), so the test gives it a title to say.
+    await page.evaluate(`document.querySelector('#canvas .lf-stage').title = 'The frame'`);
     await mouse(...empty);
     assert.ok(await page.until(up(pageTip)), 'the frame says what it says');
     await page.evaluate(`(() => {

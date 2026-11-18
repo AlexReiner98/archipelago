@@ -6,31 +6,15 @@
 // which lens is up, lights the item whose page is open, and is fitted on every change until the reader moves it
 // themselves (a page opened or shut then leaves it be).
 
-import { api, drawnNone, drawSlots, h, hooks, idsOf, state, whoami } from './base.js';
+import { api, drawnNone, h, hooks, idsOf, state } from './base.js';
 import { wiresOn } from './canvas-wires.js';
 import { added, moved } from './query-base.js';
 import { FOCUS, addressOf, flatView, readAddress } from './query.js';
 import { cornersOf, corners, islandsOn, onIslands } from './islands-on.js';
 import { islandsOnMap } from './islands-list.js';
 import { unfollow } from './replica.js';
-
-/** The trace overlay over the canvases: the catch_up pack's parts, drawn once a page in a node of their own. */
-let overlay;
-const actorOf = (a) => (typeof a === 'string' ? a : a?.kind ? `${a.kind}:${a.name}` : undefined);
-/**
- * Catch the first canvas up from where its reader last looked: the overlay (the slot `traces`, handed the person as
- * `me`) is mounted and told what was missed (hooks.tellMissed, packs/surface/page/live.js), which it traces and offers
- * to play.
- */
-async function caughtUp(view) {
-  if (!overlay) {
-    overlay = h('div', { id: 'traces' });
-    document.body.append(overlay);
-    const me = await whoami().then((j) => actorOf(j?.actor), () => undefined);
-    await drawSlots(overlay, { slot: 'traces', piece: { ...(me && { me }) } });
-  }
-  return hooks.tellMissed?.(view);
-}
+import { drawBand } from './bar-band.js';
+import './sessions-open.js';
 
 /** What lives on these islands (a list as a person keeps it: islands by id, live reads by name, which are not islands). */
 export const islandsLens = (list) => ({ filter: { find: list.filter((x) => /^e_/.test(x)).map((id) => `island ${id}`) }, walk: { over: [], steps: 0 } });
@@ -68,17 +52,23 @@ const canvasOf = (asked) => `${asked?.canvas ?? ''}@${asked?.shape && asked.shap
 /** Every canvas drawn now, and the one the bar and find act on: the pane in focus (decision e_h2pqjy2q). */
 const all = new Set();
 let current = null;
-/** The store of the canvas drawn round `node` (a part over it, a replay: ./replay.js), by name so nothing imports this file for it. */
-// The overlay of traces stands over no one canvas: it plays on the one whose store holds what was missed (live.js).
-hooks.storeUnder = (node) => ([...all].find((c) => c.host?.contains(node)) ?? [...all].find((c) => c.view?.store?.store?.missed))?.view?.store?.store ?? null;
 /** Make this canvas the one the bar acts on. */
 export function activate(c) {
   if (current && current !== c) hooks.partsAway?.();
   current = c;
   barNow();
 }
-/** The canvas in focus moved: what follows its address is told. */
-const barNow = () => hooks.addressMoved?.();
+/**
+ * The canvas in focus moved: the band under the tabs is drawn for it (./bar-band.js), and what follows its address is
+ * told. The band holds the island side bar's button, if the map has islands, the count of chats waiting on the
+ * owner (./sessions-open.js), and the pane's back and forward.
+ */
+function barNow() {
+  if (current?.view) drawBand(current.lens, current.view, h('span', { class: 'q-part q-canvas' }, ...[hooks.islandsButton?.(), hooks.waitingButton?.(), ...(hooks.paneButtons?.() ?? [])].filter(Boolean)));
+  hooks.addressMoved?.();
+}
+/** Draw the band again, as a part of it came (the side bar's button, once the side bar is drawn). */
+hooks.drawBand = () => barNow();
 /** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */
 hooks.answer = () => (current?.view ? { answer: current.view.answer, failed: current.view.failed } : null);
 /** The lens Home draws, handed where no query is up. */
@@ -300,8 +290,6 @@ export function canvasIn(host, pane) {
       host.replaceChildren(view, ...(none ? [h('div', { class: 'empty' }, 'Put an island on from the list, or Ctrl+K')] : []));
       // Nothing to draw is drawn at once: what waits for the first drawing (the island list among it) goes on.
       if (none) drawnNone();
-      // The first canvas a page draws is caught up from where its reader last looked (caughtUp).
-      view.ready?.then(() => caughtUp(view.store)).catch(() => {});
     },
     mark(here) {
       if (!at || at.here === here) return;

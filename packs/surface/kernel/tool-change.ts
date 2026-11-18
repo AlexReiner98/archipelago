@@ -25,9 +25,9 @@ export const whose = (l: Archipelago) => ({ workspace: l.workspace, ...(l.viewer
 const took = (l: Archipelago, step: Record<string, unknown>) => callAs(l, 'act.report.took', { whose: whose(l), step });
 
 // Where an agent pointed the screen and the steps it took are kept for any server to read (the presence pack's act.report.point).
-export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string, focus?: boolean, watch?: boolean): Promise<Focus> {
+export async function point(l: Archipelago, actor: Actor, kind: 'show' | 'change', hash: string, note?: string, pane?: string, run?: string, island?: string, watch?: boolean): Promise<Focus> {
   const next = { at: Date.now(), hash, actor: actor.name, note };
-  const step = { kind, actor: actor.name, did: note, hash, ...(pane && { pane }), ...(run && { run }), ...(focus && { focus }), ...(watch && { watch }) };
+  const step = { kind, actor: actor.name, did: note, hash, ...(pane && { pane }), ...(run && { run }), ...(island && { island }), ...(watch && { watch }) };
   await callAs(l, 'act.report.point', { whose: whose(l), focus: next, step });
   return next;
 }

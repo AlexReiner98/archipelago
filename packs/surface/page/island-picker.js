@@ -9,6 +9,8 @@ import { islandsOn, keepList, onIslands } from './islands-on.js';
 import { atHome, capital, drawnAt, islandsOnMap, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
 import { numberOf } from './style-number.js';
 import { ago, titles } from './words.js';
+import { onOpen, openNow } from './sessions-open.js';
+import { sessionsPart } from './island-sessions.js';
 
 /** Every island on the map, each with its pack, read once a page. */
 let reading;
@@ -68,6 +70,15 @@ const keep = (key, v) => {
   }
 };
 
+/** The side bar's mark, as an editor draws its own: a window with its left panel, filled while the bar is open (the CSS). */
+function sideMark() {
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => Object.entries(attrs).reduce((e, [k, v]) => (e.setAttribute(k, v), e), document.createElementNS(NS, tag));
+  const svg = el('svg', { viewBox: '0 0 16 16', class: 'isl-mark', 'aria-hidden': 'true' });
+  svg.append(el('rect', { x: '1.5', y: '2.5', width: '13', height: '11', rx: '1.5', class: 'isl-mark-frame' }), el('rect', { x: '1.5', y: '2.5', width: '4.5', height: '11', rx: '1.5', class: 'isl-mark-side' }));
+  return svg;
+}
+
 /** Draw the side list, once a page; the foot strip of the find bar is put away. */
 export function drawPicker() {
   if (document.getElementById('islands')) return;
@@ -78,10 +89,10 @@ export function drawPicker() {
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // Its shortcut, at the line's right while nothing is typed.
   const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
-  // The bar's button, in the tab bar before the tabs: a press shows the islands or puts them away; how many are on is
-  // its count.
+  // The bar's button, first in the band under the tabs (./canvas.js): a press shows the islands or puts them away; how
+  // many are on is its count.
   const count = h('span', { class: 'isl-toggle-count' });
-  const fold = h('button', { type: 'button', class: 'isl-toggle' }, 'Islands', count);
+  const fold = h('button', { type: 'button', class: 'isl-toggle', 'aria-label': 'Islands' }, sideMark(), count);
   // The bar's right edge: dragged, it sets the bar's width.
   const edge = h('div', { class: 'isl-edge', 'aria-hidden': 'true', title: 'Drag to widen; double-click for the usual width' });
   // The list is one stop for Tab, worked with arrows (see `keys` below); its rows' presses are for the pointer.
@@ -93,8 +104,8 @@ export function drawPicker() {
   });
   const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), edge);
   document.body.append(side);
-  const nav = document.getElementById('nav');
-  nav?.insertBefore(fold, document.getElementById('tabs'));
+  hooks.islandsButton = () => fold;
+  hooks.drawBand?.();
   /** Whether the bar was folded for an item's page, not by the person: it opens again when the page closes. */
   let forPage = false;
   /** Fold or open the bar; `kept`, as the person left it (a fold for a page is not). */
@@ -172,6 +183,11 @@ export function drawPicker() {
   let laidOn = null;
   /** The island the canvas was last brought to from the bar: marked under On while it stays on. */
   let here = null;
+  /**
+   * Islands a show added, each with the item it showed and who showed it (decision e_mnuthcap): a show never moves the
+   * view; its island's row is lit until it is pressed, which brings the canvas to the island and lights the item.
+   */
+  const shown = new Map();
   /** Bring the canvas to island `i`, where the canvas can (hooks.toIsland, the canvas's), and mark it. */
   const goTo = (i) => hooks.toIsland?.(i.id) && ((here = i.id), draw(), true);
   /**
@@ -192,10 +208,29 @@ export function drawPicker() {
    * On nothing, where the name needs the room beside ×.
    */
   const row = (i, on, at) =>
-    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
-      h('button', { type: 'button', class: 'isl-name', tabindex: '-1', onclick: () => (on ? goTo(i) : putOnAndGo(i), done()) }, i.title),
+    h('div', { class: `isl-row${on ? ' on' : ''}${shown.has(i.id) ? ' shown' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
+      h('button', { type: 'button', class: 'isl-name', tabindex: '-1', ...(shown.has(i.id) && { title: shownSaid(i) }), onclick: () => (seeShown(i, on), done()) }, i.title),
       at === 'recent' ? h('span', { class: 'isl-when' }, ago(i.worked_at)) : at === 'all' ? packOf(i) : '',
       on ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
+  /** What a lit row's tooltip says: who showed what there. */
+  const shownSaid = (i) => {
+    const { item, by } = shown.get(i.id);
+    return `${by ? `${by} showed` : 'Shown'}: ${hooks.nameSaid?.(item, draw) ?? item}`;
+  };
+  /** A press on an island's row: to it (put on first if it is off), and the item a show lit there lit on the canvas. */
+  const seeShown = (i, on) => {
+    const lit = shown.get(i.id);
+    shown.delete(i.id);
+    if (on) goTo(i);
+    else putOnAndGo(i);
+    if (lit) hooks.lights?.([lit.item]);
+    draw();
+  };
+  /**
+   * A show's island (packs/panes/parts/life.js, by name so nothing imports this file for it): its row lit for the
+   * person to press when they want to go there, `item` what it showed and `by` who showed it, a session's name.
+   */
+  hooks.lightIsland = (island, item, by) => (shown.set(island, { item, by }), draw());
   /** A row of what the search found: its dot if it is on, its name, its pack; lit as Enter would take it. */
   const hit = (i, n, drawn) =>
     h('div', { class: `isl-row isl-hit${drawn.includes(i.id) ? ' on' : ''}`, role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (press(i, ev.shiftKey), done()) },
@@ -221,7 +256,8 @@ export function drawPicker() {
     // Each part a band of its own, under a head with its count: On first, on the canvas's own ground, then Recent and All.
     const part = (at, head, all, count = all.length) =>
       h('div', { class: `isl-sec isl-sec-${at}` }, h('div', { class: 'isl-head' }, `${head} · ${count}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id), at))));
-    body.replaceChildren(part('on', 'On', on, drawn.length), ...(recent.length ? [part('recent', 'Recent', recent)] : []), ...(others.length ? [part('all', 'All', others)] : []));
+    // The chats at work after On (./island-sessions.js): they were tabs.
+    body.replaceChildren(part('on', 'On', on, drawn.length), ...sessionsPart(openNow(), done), ...(recent.length ? [part('recent', 'Recent', recent)] : []), ...(others.length ? [part('all', 'All', others)] : []));
     light();
   };
   /** The row the keyboard is on in the list (an island's id), lit while the list has the focus. */
@@ -293,6 +329,8 @@ export function drawPicker() {
     input.select();
   });
   onDrawn(() => (anew ? ((anew = false), relay()) : draw()));
+  // The chats read again: the list drawn again only once it is laid out, so On is laid out from what the canvas drew.
+  onOpen(() => laidOn && draw());
   // Read once the first view is drawn, as the bar read its saved views: the drawing goes first (test/first-drawing.test.ts).
   firstDrawn.then(() => Promise.all([islandsOn(), allIslands()])).then(([now, all]) => ((mine = now), (islands = all), draw()));
 }

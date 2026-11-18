@@ -9,6 +9,16 @@ import { api, drawFrame, h, state, whoami } from './base.js';
 import { drawingActs, drawingAsked } from './layout-asks.js';
 import { tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
+
+/** Where a pointer event is in the picture's units: in its mark's outermost svg, rounded to a tenth; null off a picture. */
+function pictureAt(ev) {
+  let svg = ev?.currentTarget?.ownerSVGElement ?? null;
+  while (svg?.ownerSVGElement) svg = svg.ownerSVGElement;
+  const m = svg?.getScreenCTM?.();
+  if (!m || !Number.isFinite(ev.clientX)) return null;
+  const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse());
+  return [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10];
+}
 import { build, cssFor, patch, step } from './marks.js';
 import { readerAsks, stillReading } from './reader-frame.js';
 import { followSheet, sheetAside } from './sheet-follow.js';
@@ -232,10 +242,14 @@ export function drawWith(host, answer, style, keep) {
   // Every event is told as it is. A click on a mark keyed for a held change (`held:<proposal>…`, HELD) also asks the page to put that change to
   // the person, where it is drawn (`drawing-held` on the host): the drawing only says where; the page says what it is.
   // A drop says which mark it came from (`from`).
+  // A move or a click says where the pointer is, in the picture's units (its outermost svg's); moves at most once a frame.
+  let moved = null;
   const tell = (key, name, ev, from) => {
     const held = name === 'click' && HELD.exec(key);
     if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1] } }));
-    send({ key, name, ...(from !== undefined && { from: String(from) }) });
+    const at = (name === 'move' || name === 'click') && pictureAt(ev);
+    if (name === 'move') return void (moved ? (moved.key = key, moved.at = at) : ((moved = { key, at }), requestAnimationFrame(() => ((moved.at && send({ key: moved.key, name, at: moved.at })), (moved = null)))));
+    send({ key, name, ...(at && { at }), ...(from !== undefined && { from: String(from) }) });
   };
   const run = (now) => step(moving, now) && requestAnimationFrame(run);
   // What a drawing patches: its marks, and its tip (layout-tip.js), whose marks are checked as every mark is.
@@ -423,7 +437,7 @@ export function drawWith(host, answer, style, keep) {
       return host.replaceChildren(...[before, legend, beside(h('div', { class: 'lf-stage still' }, picture, over)), after].filter(Boolean));
     }
     const lit = litSwitch(answer.viewer, style, keep, redraw);
-    const stage = h('div', { class: 'lf-stage', title: 'Scroll to zoom, drag to move' }, picture, over, legend);
+    const stage = h('div', { class: 'lf-stage' }, picture, over, legend);
     host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
     if (input.height > 0) followShape(scene);
     const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, beside: sheetAside, told: (now) => (begun ? toDrawing({ type: 'viewport', view: now }) : (view = now)) }));

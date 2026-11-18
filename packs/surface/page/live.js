@@ -1,11 +1,10 @@
-import { api, h, hooks, main, route, state, whoami } from './base.js';
-import { project } from './project.js';
-import { beatRows, missedRows } from './beat-rows.js';
+import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { still } from './look.js';
-import { hear, sessionOf } from './pane-route.js';
+import { hear, nameOf, sessionOf } from './pane-route.js';
 import { numberOf } from './query-base.js';
 import { front, landsIn, poppedTab } from './tabs.js';
+import { islandsOn, keepList } from './islands-on.js';
 import { relations, starterOf, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
@@ -19,86 +18,6 @@ import { relations, starterOf, types } from './words.js';
 export let uiFiles;
 export let outdated = false;
 
-// ---- what changed, handed to the trace overlay as data (the slot `traces`, the catch_up pack's parts) -------------
-//
-// The runtime holds the store and the projector; the parts decide what a change was and what to trace or play. So each
-// beat is told as the rows it touched, as they stood before it and after (./beat-rows.js), worked out only while a part
-// is mounted on `traces` (hooks.slotFilled).
-
-/** Where the log stood when the person last looked, kept in this browser for each workspace: read once, as the page opens. */
-const lookedKey = whoami().then((j) => `pelago-looked-${j?.workspace?.id ?? 'default'}`, () => 'pelago-looked-default');
-const lookedAt = lookedKey.then((k) => {
-  try {
-    const v = Number(localStorage.getItem(k));
-    return Number.isFinite(v) && v > 0 ? v : undefined;
-  } catch {
-    return undefined;
-  }
-});
-/** The person has looked at the map as it stands at `pos`: kept for the next page, only while it is in sight. */
-function looked(pos) {
-  if (document.hidden || pos === undefined) return;
-  lookedAt.then(() => lookedKey).then((k) => {
-    try {
-      localStorage.setItem(k, String(pos));
-    } catch {
-      // Without storage a page opened later has nothing to catch up from.
-    }
-  });
-}
-
-/** What a view held before `entries`, from what it holds now and every fact said of their rows up to then (`was`). */
-function rowsBefore(view, kinds, was, entries) {
-  const at = { items: new Map(), links: new Map() };
-  for (const e of was) project(at, kinds, e.at, e.facts);
-  const out = { items: new Map(view.items), links: new Map(view.links) };
-  const made = new Set(entries.flatMap((e) => e.facts.filter((f) => f[0] === '+' && (f[2] === 'type' || f[2] === 'link')).map((f) => f[1])));
-  for (const e of entries) for (const f of e.facts) {
-    const key = f[1].startsWith('r_') ? 'links' : 'items';
-    const row = at[key].get(f[1]);
-    const held = view[key];
-    if (row && held.has(f[1])) out[key].set(f[1], held.get(f[1])?.session ? { ...row, session: held.get(f[1]).session } : row);
-    else if (made.has(f[1])) out[key].delete(f[1]);
-  }
-  return out;
-}
-
-let missedTold = false;
-/**
- * Tell the trace overlay what changed on a canvas's store since the person last looked, once a page: the whole span
- * as a beat (traced until seen), and each entry with its rows (`missed`, played by catch_up.replay). The view's store
- * keeps where it was (`store.missed`), so a replay mark can take it back there.
- */
-export async function tellMissed(view) {
-  if (missedTold || !view?.store || !hooks.slotFilled?.('traces')) return;
-  missedTold = true;
-  const from = await lookedAt;
-  const to = view.pos;
-  if (from === undefined || !(from < to)) return;
-  const most = numberOf(state.style, 'catch_up_entries_most');
-  const ids = [...view.ids, ...view.links.keys()];
-  const entries = [];
-  let gone = [];
-  for (let after = from; after < to; ) {
-    const beat = await api('tail', { after, ids });
-    entries.push(...(beat.entries ?? []).filter((e) => e.pos <= to));
-    gone = [...gone, ...(beat.gone ?? [])];
-    if (entries.length > most) return;
-    if (!beat.more || beat.pos <= after) break;
-    after = beat.pos;
-  }
-  if (!entries.length) return;
-  const touched = [...new Set(entries.flatMap((e) => e.facts.map((f) => f[1])))];
-  const { was } = await api('tail', { was: from, ids: touched });
-  const { kinds } = view;
-  const then = rowsBefore(view, kinds, was.entries ?? [], entries);
-  view.store.missed = { view, then, entries, from, to };
-  const islands = Object.fromEntries([...then.items].map(([id, r]) => [id, r.props?.island ?? '']));
-  hooks.tellSlot?.('traces', { name: 'missed', from, to, entries: missedRows(then, kinds, entries), islands });
-  hooks.tellSlot?.('traces', { name: 'beat', ...beatRows(then, kinds, entries, { after: from, gone }) });
-}
-// The canvas asks for it by name (packs/surface/page/canvas.js), never by importing this file.
-hooks.tellMissed = tellMissed;
 // Refresh throws away words not yet saved, so it asks first: the sheet's draft says so by name (packs/sheet/page/draft.js).
 const refresh = async () => {
   if (!(await (hooks.mayLeave?.() ?? true))) return;
@@ -151,6 +70,25 @@ const seenBefore = () => {
   }
 };
 
+/** Islands shows asked on, put on the canvas by a page in sight only, so two of the owner's pages never write their list at once. */
+const putting = new Map();
+async function putOnShown() {
+  if (document.visibilityState !== 'visible' || !putting.size) return;
+  const asked = [...putting.entries()];
+  putting.clear();
+  const on = await islandsOn();
+  const adding = asked.filter(([id]) => !on.includes(id));
+  if (adding.length) await keepList([...on, ...adding.map(([id]) => id)], `${adding.map(([, why]) => why).join('; ')}: put on the canvas by a show`).catch((err) => console.warn(err.message));
+}
+addEventListener('visibilitychange', () => void putOnShown());
+/** A show of an item on an island: the island on the canvas, the item lit in the side bar (the picker's lightIsland). */
+function light(s) {
+  const item = /^e\/(e_[a-z0-9]{8})(?:\?|$)/.exec(s.hash)?.[1] ?? s.island;
+  putting.set(s.island, s.did || (s.title ?? s.actor ?? 'A session'));
+  void putOnShown();
+  hooks.lightIsland?.(s.island, item, nameOf(sessionOf(s)));
+}
+
 export function follow(steps = []) {
   // A look's page, and a popped-out tab, leave what agents show to the main page.
   if (still || poppedTab) return;
@@ -175,10 +113,16 @@ export function follow(steps = []) {
   if (moved.length) hooks.sessionsTold?.(moved);
   // A chat renamed is named anew on its tab.
   if (fresh.some((s) => s.did === 'titled')) hooks.drawStrip?.();
-  // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed; so does its tab brought into sight.
+  // A show of an item on an island never moves the view (decision e_mnuthcap): its island goes on the canvas and the
+  // item is lit in the side bar. Any other show lands in its session's tab, out of sight and marked; a later one takes
+  // the place of what waits, and its tab of its own, if it was owed one, stays owed.
   for (const s of fresh) if (s.kind === 'show' && s.hash) {
+    if (s.island) {
+      light(s);
+      continue;
+    }
     const was = waiting.get(sessionOf(s));
-    waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens, focus: s.focus || was?.focus });
+    waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens });
   }
   if (document.querySelector('dialog[open]')) return;
   // A part on `tabs` is told each show, and keeps what waits itself (it decides where a show lands, task e_dswpuaft).
@@ -270,8 +214,7 @@ export async function checkTail() {
   let more = false;
   try {
     // From the furthest back of the page and its store, on everything it holds and the islands its views touch.
-    // A store being played from where its reader last looked is left alone until it ends (the replay mark: ./replay.js).
-    const following = store.views.size > 0 && !store.playing;
+    const following = store.views.size > 0;
     const at = [state.pos, ...(following ? [store.pos] : [])].filter((pos) => pos !== undefined);
     const from = at.length ? Math.min(...at) : undefined;
     const ids = [...new Set([...shownIds(), ...(following ? store.ids() : [])])];
@@ -280,11 +223,7 @@ export async function checkTail() {
     // Only an answer that read the facts moves the store: one that says only where the log stands would skip them.
     if (beat.entries && following) {
       try {
-        // What the facts changed of what the store held, worked out before they are folded in, once: told to the trace
-        // overlay as rows, which catch_up.changes traces until seen.
-        const told = hooks.slotFilled?.('traces') ? beatRows(store, kinds, store.fresh(beat.entries), { after: store.pos, gone: beat.gone }) : undefined;
         store.apply(beat);
-        if (told?.rows.length) hooks.tellSlot('traces', { name: 'beat', ...told });
       } catch (err) {
         console.error(err);
       }
@@ -293,7 +232,6 @@ export async function checkTail() {
     touched = state.pos === undefined ? undefined : touchedBy(beat, state.pos);
     now = `${beat.pos}.${beat.seq}.${beat.queue}`;
     state.pos = beat.pos;
-    looked(beat.pos);
     state.seq = beat.seq;
     more = Boolean(beat.more);
     // The page's own files changed on the server: load them, unless that would
