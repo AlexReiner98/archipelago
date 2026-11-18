@@ -31,12 +31,13 @@ const load = (name) => {
 
 /**
  * How the canvas marks a session's state, as the style names it (session_marks, the sessions pack's): its shape, and its
- * colour as the theme's by name; null where the style names none. A piece draws its mark with it (./island-picker.css).
+ * colour as the theme's by name, and the word it says for the state (the study e_unru8ftt: a mark with no word); null
+ * where the style names none. A piece draws its mark with it (./island-picker.css).
  */
 export const markOf = (at) => {
   const s = state.style?.session_marks?.[at];
   if (!s || typeof s !== 'object') return null;
-  return { shape: /^[a-z]+$/.test(s.shape) ? s.shape : 'disc', hue: `var(--ln-${/^[a-z]+$/.test(s.hue ?? '') ? s.hue : 'text'})` };
+  return { shape: /^[a-z]+$/.test(s.shape) ? s.shape : 'disc', hue: `var(--ln-${/^[a-z]+$/.test(s.hue ?? '') ? s.hue : 'text'})`, ...(typeof s.word === 'string' && s.word.trim() && { word: s.word.trim() }) };
 };
 
 /** The pieces the style names for a chat's row, in its order. */
