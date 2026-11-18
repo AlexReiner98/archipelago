@@ -116,7 +116,7 @@ body[data-gate] .gate :is(button, .primary, input), body[data-first] .first-card
 /* The one way forward before an account, one button wherever it stands: a link alone on its line on a site (p.action),
    the gate's primary, and a new map's Copy the prompt. A chart label on the land: the ink of the palette the land is in
    (the backdrop says it, --backdrop-*, packs/walls/page/backdrop.js), light type and rule, a dark collar parting the land
-   under it; the light fills it when pointed at. With no land it is the page's own ink and ground. */
+   under it; the light fills it when pointed at. */
 :where(main:has(> nav.site-head)) p.action > a,
 body:is([data-gate], [data-first]) :is(.gate, .first-card) .primary {
   --way-ink: var(--backdrop-ink, var(--c-ink));
@@ -137,6 +137,14 @@ body:is([data-gate], [data-first]) :is(.gate, .first-card) .primary {
   max-width: 100%;
   box-shadow: 0 0 0 var(--space-4) color-mix(in srgb, var(--way-ink) 72%, transparent), 0 var(--space-6) var(--box-8) color-mix(in srgb, var(--way-ink) 55%, transparent);
   transition: background 0.5s, color 0.5s, border-color 0.5s, box-shadow 0.5s;
+}
+/* With no land it is dark with light type in either scheme, as the front page's is, so a land arriving does not flip it. */
+@media (prefers-color-scheme: dark) {
+  :where(main:has(> nav.site-head)) p.action > a,
+  body:is([data-gate], [data-first]) :is(.gate, .first-card) .primary {
+    --way-ink: var(--backdrop-ink, var(--c-ground));
+    --way-light: var(--backdrop-light, var(--c-ink));
+  }
 }
 :where(main:has(> nav.site-head)) p.action > a:hover,
 body:is([data-gate], [data-first]) :is(.gate, .first-card) .primary:hover:not(:disabled) {
