@@ -6,7 +6,8 @@
 //   worked <run> (what a session changed, touched or worked on) · moved (what reads a finding that moved since, the
 //   attention pack's) · text <words> · type <t> (or the type alone) · kind <k> · id <item> · in <item> · related <item> ·
 //   <link> <item> · island <island> (what lives on it) · <link>< <item> (what the item links to) · owner me|<person> ·
-//   and Only's words (./query-only.ts)
+//   parts <pack> <island> (Find's alone: no items, an island of that pack's parts as that island runs them, lane
+//   e_nfapxupx) · and Only's words (./query-only.ts)
 //
 // An end is an id or a name. A word's set can only be checked of items in hand, so a word is no term of Find.
 //
@@ -27,6 +28,7 @@ export type Term =
   | { sort: 'in'; end: string }
   | { sort: 'related'; end: string }
   | { sort: 'island'; end: string }
+  | { sort: 'parts'; pack: string; end: string }
   | { sort: 'held' }
   | { sort: 'moved' }
   | { sort: 'frontier' }
@@ -47,6 +49,8 @@ const KIND = /^kind\s+(.+)$/i;
 const SAID = /^(text|type|id|in|related|island|owner|worked)\s+(.+)$/i;
 const LINK = /^(\S+?)(<?)\s+(.+)$/;
 const SERVED = /^([a-z][a-z0-9_]*)(?:\s+(.+))?$/i;
+/** A pack's parts on an island: the pack by its id, the island by its id or name. */
+const PARTS = /^parts\s+([a-z][a-z0-9_.-]{0,63})\s+(.+)$/i;
 
 /** What a term is read against, for this context: its registry and the term words provided here. */
 export const termsOf = (ctx: KernelContext): Terms => ({ registry: ctx.registry, served: new Set(ctx.provided('term')) });
@@ -65,6 +69,12 @@ export function readTerm(at: Terms, raw: unknown, part: string): Term {
   if (/^held$/i.test(s)) return { sort: 'held' };
   if (/^moved$/i.test(s)) return { sort: 'moved' };
   if (/^frontier$/i.test(s)) return { sort: 'frontier' };
+  if (/^parts(?:\s|$)/i.test(s)) {
+    const [, pack, end] = PARTS.exec(s) ?? [];
+    if (!pack) throw new Error(`filter.${part}: "${s}" names a pack's parts on an island as parts <pack> <island> (e.g. parts build e_bvzsz8kd)`);
+    if (part !== 'find') throw new Error(`filter.${part}: "${s}" adds an island of a pack's parts and finds no items: it is a term of find`);
+    return { sort: 'parts', pack: pack.toLowerCase(), end };
+  }
   const kind = KIND.exec(s)?.[1];
   if (kind) return { sort: 'kind', kind };
   const [, head, rest] = SAID.exec(s) ?? [];
@@ -87,7 +97,7 @@ export function readTerm(at: Terms, raw: unknown, part: string): Term {
   if (reg.types.has(reg.canonical(s))) return { sort: 'type', type: s };
   const served = servedTerm(at, s);
   if (served) return served;
-  throw new Error(`filter.${part}: "${s}" is no term: held, moved, frontier, worked <session>, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, island <island>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent)`);
+  throw new Error(`filter.${part}: "${s}" is no term: held, moved, frontier, worked <session>, text <words>, a type, kind <k>, id <item>, in <item>, related <item>, island <island>, parts <pack> <island>, <link type> <item>, owner <person>, or one of Only's words (done, blocked, status <s>, no owner, over estimate, changed since|before <7d|date>, made since|before <7d|date>, by owner, by agent)`);
 }
 
 /** A term as words again, its end now the id it was found to be. */
@@ -99,6 +109,7 @@ export function sayTerm(t: Term): string {
   if (t.sort === 'in') return `in ${t.end}`;
   if (t.sort === 'related') return `related ${t.end}`;
   if (t.sort === 'island') return `island ${t.end}`;
+  if (t.sort === 'parts') return `parts ${t.pack} ${t.end}`;
   if (t.sort === 'held') return 'held';
   if (t.sort === 'moved') return 'moved';
   if (t.sort === 'frontier') return 'frontier';
@@ -146,7 +157,7 @@ const hasEnd = (t: Term): t is Extract<Term, { end: string }> => 'end' in t && t
 /** The types an end may name: what the link takes at that end, an island, a session; any (null) for the rest. */
 function takes(reg: Registry, t: Extract<Term, { end: string }>): string[] | null {
   const def = t.sort === 'link' ? reg.relations.get(reg.canonical(t.link))! : null;
-  const types = def ? (t.sort === 'link' && t.back ? def.from : def.to) : t.sort === 'island' ? [ISLAND] : t.sort === 'worked' ? ['run'] : ['*'];
+  const types = def ? (t.sort === 'link' && t.back ? def.from : def.to) : t.sort === 'island' || t.sort === 'parts' ? [ISLAND] : t.sort === 'worked' ? ['run'] : ['*'];
   return types.includes('*') ? null : types;
 }
 

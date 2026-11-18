@@ -87,3 +87,44 @@ test('an island speaking Design holds Build’s types too, and an item of a type
   const study = answer.items.find((i: { type: string }) => i.type === 'design.study');
   assert.equal(study.waiting, undefined, 'what is still on does not wait');
 });
+
+// A pack's parts on the query (lane e_nfapxupx): `parts <pack> <island>` adds no items, only an island of that pack's
+// parts as the island runs them, placed after the island it is of, and only where that island is in the answer.
+const flat = (l: Archipelago, find: string[], more: Record<string, unknown> = {}) => queryFlatPack.flatRead(kernelContext(l, 'query'), { filter: { find, ...more } }) as Promise<any>;
+
+test('parts <pack> <island>: an island of the pack’s parts, with their states and needs, after its island', async () => {
+  const { l, isle } = await map();
+  await make(l, [{ op: 'update', id: isle, props: { parts_off: ['build.overlap'] } }]);
+  const plain = await flat(l, [`island ${isle}`]);
+  const answer = await flat(l, [`island ${isle}`, 'parts build Studio']);
+  assert.deepEqual(answer.items.map((i: { id: string }) => i.id), plain.items.map((i: { id: string }) => i.id), 'it adds no items');
+  assert.ok(answer.lens.find.includes(`parts build ${isle}`), 'the island named goes back in the lens as its id');
+  assert.deepEqual(answer.islands.map((i: { id: string }) => i.id), [isle, `parts:${isle}:build`]);
+  const got = answer.islands[1];
+  assert.equal(got.title, 'Build: its parts');
+  assert.deepEqual(got.parts_of, { island: isle, pack: 'build' });
+  const own = plain.islands[0].pack.requires.find((r: { id: string }) => r.id === 'build');
+  assert.deepEqual(got.pack.parts, own.parts, 'the parts as the island’s own answer gives them');
+  assert.deepEqual(part(got.pack, 'build.overlap'), { id: 'build.overlap', kind: 'type', state: 'off', needs: ['work'] });
+  assert.deepEqual(part(got.pack, 'build.touches'), { id: 'build.touches', kind: 'link', state: 'waiting', lacks: ['type:build.overlap'], needs: ['build.overlap', 'build.feature', 'about'] });
+  assert.deepEqual(got.pack.provides, ['type:build.feature']);
+  assert.deepEqual(got.pack.consumes, [{ name: 'core', by: 'core' }]);
+  assert.equal(got.items, undefined);
+});
+
+test('parts of an island not in the answer: nothing', async () => {
+  const { l, isle } = await map();
+  const { other } = await make(l, [{ op: 'create', ref: 'other', type: 'island', title: 'Elsewhere', props: { pack: 'design' } }]);
+  await make(l, [{ op: 'create', type: 'design.study', title: 'Over there', props: { island: other } }]);
+  const answer = await flat(l, [`island ${other}`, `parts build ${isle}`]);
+  assert.deepEqual(answer.islands.map((i: { id: string }) => i.id), [other]);
+});
+
+test('a bad parts term is refused, saying how it is written', async () => {
+  const { l, isle } = await map();
+  await assert.rejects(flat(l, [`island ${isle}`, 'parts build']), /parts <pack> <island>/);
+  await assert.rejects(flat(l, [`island ${isle}`, `parts nosuch ${isle}`]), /no pack "nosuch"/);
+  await assert.rejects(flat(l, [`island ${isle}`], { only: [`parts build ${isle}`] }), /a term of find/);
+  // An island no one is named, as with every term's end, finds nothing: no island of parts.
+  assert.deepEqual((await flat(l, [`island ${isle}`, 'parts build Nowhere'])).islands.map((i: { id: string }) => i.id), [isle]);
+});

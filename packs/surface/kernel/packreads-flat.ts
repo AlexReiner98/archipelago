@@ -10,7 +10,7 @@
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { kernelTypes, SYSTEM, WRAPS } from '../../loader/kernel/head.ts';
 import { ISLAND, onIslands } from '../../loader/kernel/island-items.ts';
-import { islandDeclarations } from '../../loader/kernel/island-decl.ts';
+import { islandDeclarations, packOnIsland } from '../../loader/kernel/island-decl.ts';
 import { islandLooks } from '../../loader/kernel/island-look.ts';
 import { islandStands } from '../../loader/kernel/island-cap.ts';
 import { islandStyles, styleSources } from '../../loader/kernel/island-style.ts';
@@ -32,6 +32,7 @@ export type FlatTerm = (
   | { sort: 'kind'; kind: string }
   | { sort: 'id'; id: string }
   | { sort: 'in' | 'related' | 'island' | 'worked'; end: string }
+  | { sort: 'parts'; pack: string; end: string }
   | { sort: 'held' | 'moved' | 'frontier' }
   | { sort: 'link'; link: string; end: string; back: boolean; owner?: boolean }
   | { sort: 'word'; word: Word; said: string }
@@ -193,6 +194,8 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
   if (!Number.isInteger(lens.walk?.steps) || lens.walk.steps < 0 || lens.walk.steps > MAX_STEPS) throw new Error(`walk.steps must be a whole number from 0 to ${MAX_STEPS}`);
   if (lens.walk.over !== 'all') for (const t of lens.walk.over) knownLink(l, wayOf(t).link);
   if (!lens.preview && (!lens.find.length || lens.find.some((t) => t.sort === 'word' || t.sort === 'kind'))) throw new Error('A lens includes something (filter.find): a filter that includes nothing would read the whole map.');
+  // A pack's parts (lane e_nfapxupx) name a pack this server has, active or not: else the term is refused, saying so.
+  for (const t of lens.find) if (t.sort === 'parts' && !l.registry.found.some((p) => p.id === t.pack)) throw new Error(`filter.find: "${t.as}": this server has no pack "${t.pack}"`);
   const since = lens.since === undefined ? undefined : new Date(Date.parse(lens.since)).toISOString();
   const inWindow = since ? `(e.is_open or e.updated_at >= '${since}'::timestamptz)` : null;
   let heldRead: Promise<string[]> | undefined;
@@ -380,13 +383,32 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
   // How many items each holds against its look's cap (decision e_bgw2u5aw): the header marks one past it.
   const caps = await islandStands(l.db, l.registry, islandIds);
   const styled = await islandStyles(l, isles, sources);
+  const parts = await partsIslands(l, lens.find, islandIds, sources);
   return {
     items, links, whole: ((w) => items.filter((e) => w.has(e.id)).map((e) => e.id))(new Set(wholeIds)),
     found: Object.fromEntries(foundBy), terms: Object.fromEntries(termsBy), step: Object.fromEntries(stepOf),
     on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id), ...(decls.has(id) && { decl: decls.get(id) }), ...(looks.has(id) && { look: looks.get(id) }), ...(styled.has(id) && { style: styled.get(id) }), ...(caps.has(id) && { cap: caps.get(id) }) })),
     ...(waiting.size && { waiting: Object.fromEntries(waiting) }),
+    ...(parts.length && { parts_islands: parts }),
     ...(cut && { cut: true }), ...(matched !== undefined && { matched }),
   };
+}
+
+/**
+ * The islands of a pack's parts Find asks for (`parts <pack> <island>`, lane e_nfapxupx), each only where its island is
+ * in the answer: no items of its own, the pack as that island runs it, for a drawing to place among the others.
+ */
+async function partsIslands(l: Archipelago, finds: FlatTerm[], islandIds: string[], sources?: Awaited<ReturnType<typeof styleSources>>) {
+  const out: { id: string; title: string; parts_of: { island: string; pack: string }; pack: Awaited<ReturnType<typeof packOnIsland>> }[] = [];
+  for (const t of finds) {
+    if (t.sort !== 'parts') continue;
+    const island = (t.at ?? []).find((id) => islandIds.includes(id));
+    const id = island && `parts:${island}:${t.pack}`;
+    if (!island || out.some((x) => x.id === id)) continue;
+    const pack = await packOnIsland(l, island, t.pack, sources);
+    out.push({ id: id!, title: `${pack.title}: its parts`, parts_of: { island, pack: t.pack }, pack });
+  }
+  return out;
 }
 
 /** An island's list of what it turned off, as the answer gives it: the ids, none where it names none. */
