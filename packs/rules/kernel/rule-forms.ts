@@ -7,14 +7,18 @@
 import type { Q } from '../../database/kernel/db.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import type { RuleDef } from './rules.ts';
+import { checkLinkSpec, checkScope, inScope, islandOf, linksHeld, named, type LinkSpec, type Scope } from './rule-links.ts';
 
 type OneOrMany = string | string[];
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
 
 /** At most n open links of a type (flavours included) into an item of the rule's type; a link from a closed or archived item holds nothing. */
 export interface AtMost { link: string; n: number }
-/** An item of the rule's type holds a link of a type: out to an item of `to`, or in from an item of `from` ("*" for any). Neither: out, to anything. */
-export interface MustLink { link: string; to?: string; from?: string }
+/**
+ * An item of the rule's type holds a link of a type: out to an item of `to`, or in from an item of `from` ("*" for any),
+ * at least n of them (1 left out). Neither: out, to anything. With `on`, only an item on an island in that scope is held to it.
+ */
+export interface MustLink extends LinkSpec { on?: Scope }
 /** What a walk from the item reaches, and what must hold of it: `every` (the default) item, `some`, or `none`. */
 export interface Unless {
   /** A link type and its way: "part_of<" the items linked into it, "depends_on>" (or bare) the items it links to. */
@@ -23,7 +27,8 @@ export interface Unless {
   steps?: number;
   /** Only the items of this type (flavours included) count. */
   type?: string;
-  holds: { status?: OneOrMany; fields?: Record<string, unknown> };
+  /** What each item reached must have: a status, fields, a link it holds (as must_link's, at least n), or more than one. */
+  holds: { status?: OneOrMany; fields?: Record<string, unknown>; link?: LinkSpec };
   count?: 'every' | 'some' | 'none';
 }
 
@@ -46,10 +51,8 @@ export function checkForms(rule: RuleDef, at: string, reg: Checked): string[] {
     if (!Number.isInteger(n) || n < 1) problems.push(`${at}: at_most.n is a whole number, at least 1`);
   }
   if (rule.must_link) {
-    const { link, to, from } = rule.must_link;
-    if (!knownLink(reg, link)) problems.push(`${at}: must_link.link is a link type the packs define`);
-    if (to !== undefined && from !== undefined) problems.push(`${at}: must_link goes to an item or comes from one, not both`);
-    for (const t of [to, from]) if (t !== undefined && t !== '*' && !reg.types.has(t)) problems.push(`${at}: no type "${t}"`);
+    problems.push(...checkLinkSpec(rule.must_link, `${at}: must_link`, reg));
+    if (rule.must_link.on !== undefined) problems.push(...checkScope(rule.must_link.on, `${at}: must_link.on`, reg));
   }
   return problems;
 }
@@ -63,10 +66,11 @@ export function checkUnless(rule: RuleDef, at: string, reg: Checked): string[] {
   if (u?.steps !== undefined && (!Number.isInteger(u.steps) || u.steps < 1 || u.steps > MAX_STEPS)) problems.push(`${at}: unless.steps is 1 to ${MAX_STEPS}`);
   if (u?.type !== undefined && !reg.types.has(u.type)) problems.push(`${at}: no type "${u.type}"`);
   const holds = u?.holds;
-  if (!holds || typeof holds !== 'object' || (holds.status === undefined && holds.fields === undefined)) problems.push(`${at}: unless.holds says a status or fields each item reached must have`);
+  if (!holds || typeof holds !== 'object' || (holds.status === undefined && holds.fields === undefined && holds.link === undefined)) problems.push(`${at}: unless.holds says a status, fields or a link each item reached must have`);
   else {
     if (holds.status !== undefined && !(list(holds.status) ?? []).every((s) => typeof s === 'string' && s)) problems.push(`${at}: unless.holds.status is a status, a list of them, "open" or "closed"`);
     if (holds.fields !== undefined && (typeof holds.fields !== 'object' || Array.isArray(holds.fields))) problems.push(`${at}: unless.holds.fields is { field: value }`);
+    if (holds.link !== undefined) problems.push(...checkLinkSpec(holds.link, `${at}: unless.holds.link`, reg));
   }
   if (u?.count !== undefined && !['every', 'some', 'none'].includes(u.count)) problems.push(`${at}: unless.count is every, some or none`);
   if (rule.then !== 'hold' && rule.then !== 'refuse') problems.push(`${at}: unless spares a rule that holds or refuses`);
@@ -118,43 +122,50 @@ export async function overMost(q: Q, reg: Registry, rules: RuleDef[], ops: FormO
   return out;
 }
 
-/** What must_link refuses: an item of the rule's type made, or left by an unlink, without the link it must hold. */
+/**
+ * What must_link refuses: an item of the rule's type made, or left by an unlink, holding fewer links of the kind than it
+ * must (n, 1 left out), on an island in the rule's scope (on) where it names one. {missing} in its say is the item's title.
+ */
 export async function missingLinks(q: Q, reg: Registry, rules: RuleDef[], ops: FormOp[]): Promise<string[]> {
   const these = rules.filter((r) => r.must_link && r.type);
   if (!these.length) return [];
   const unlinks = ops.filter((o) => o.op === 'unlink' && o.relation).map((o) => o.relation!);
   const cut = unlinks.length ? (await q.query<{ id: string; type: string; from_id: string; to_id: string }>(`select id, type, from_id, to_id from relation where id = any($1::text[]) and valid_to is null`, [unlinks])).rows : [];
-  const ends = [...ops.filter((o) => o.op === 'link').flatMap((o) => [o.from ?? '', o.to ?? '']), ...cut.flatMap((r) => [r.from_id, r.to_id])].filter(Boolean);
-  const items = await itemsOf(q, ends);
+  const items = await itemsOf(q, cut.flatMap((r) => [r.from_id, r.to_id]));
   const archived = new Set(ops.filter((o) => o.op === 'archive' && o.id).map((o) => o.id!));
   const out: string[] = [];
   for (const rule of these) {
-    const { link, to, from } = rule.must_link!;
+    const spec = rule.must_link!;
+    const { link, to, from } = spec;
+    const n = spec.n ?? 1;
     const family = reg.relationFamily(link);
     const inward = from !== undefined;
     const other = inward ? from : to;
-    const fits = (t: string | undefined) => other === undefined || other === '*' || (t !== undefined && reg.isA(t, other));
-    // Whether the change itself gives the item such a link.
-    const given = (item: string) => ops.some((o) => o.op === 'link' && o.type && family.includes(reg.canonical(o.type)) && (inward ? o.to === item && fits(typeOf(ops, items, o.from)) : o.from === item && fits(typeOf(ops, items, o.to))));
-    const needs = (title: string) => said(rule, `"{title}" needs a ${link} link${other && other !== '*' ? ` ${inward ? 'from' : 'to'} a ${other}` : ''}`, { title });
-    for (const o of ops) if (o.op === 'create' && o.type && reg.isA(o.type, rule.type!) && !given(o.ref ?? '')) out.push(needs(String(o.title ?? o.type)));
+    const needs = (title: string) => said(rule, `"{title}" needs ${n > 1 ? `${n} ${link} links` : `a ${link} link`}${other && other !== '*' ? ` ${inward ? 'from' : 'to'} a ${other}` : ''}`, { title, missing: `"${title}"` });
+    // The items to judge: each one made of the rule's type, and each one of it an unlink in the change leaves.
+    const judged = new Map<string, { title: string; props?: Record<string, unknown> }>();
+    for (const [i, o] of ops.entries()) if (o.op === 'create' && o.type && reg.isA(o.type, rule.type!)) judged.set(o.ref ?? `#${i}`, { title: String(o.title ?? o.type), props: o.props });
     for (const r of cut) {
-      if (!family.includes(r.type)) continue;
       const item = inward ? r.to_id : r.from_id;
-      const held = items.get(item);
-      if (!held || held.archived_at || archived.has(item) || !reg.isA(held.type, rule.type!) || !fits(items.get(inward ? r.from_id : r.to_id)?.type) || given(item)) continue;
-      const { rows } = await q.query<{ id: string; type: string }>(
-        `select r.id, e.type from relation r join entity e on e.id = ${inward ? 'r.from_id' : 'r.to_id'} where r.${inward ? 'to_id' : 'from_id'} = $1 and r.type = any($2::text[]) and r.valid_to is null and e.archived_at is null limit 200`,
-        [item, family],
-      );
-      if (!rows.some((x) => !unlinks.includes(x.id) && fits(x.type))) out.push(needs(held.title));
+      const held = items.get(item), far = items.get(inward ? r.from_id : r.to_id)?.type;
+      // Only a cut of a link the rule counts leaves an item short: one made before the rule is not judged by another link.
+      const counted = other === undefined || other === '*' || (far !== undefined && reg.isA(far, other));
+      if (counted && family.includes(r.type) && held && !held.archived_at && !archived.has(item) && reg.isA(held.type, rule.type!)) judged.set(item, { title: held.title, props: held.props });
+    }
+    for (const [item, { title, props }] of judged) {
+      if (spec.on && !(await inScope(q, reg, spec.on, islandOf(ops, item, props), ops))) continue;
+      if ((await linksHeld(q, reg, item, spec, ops)) < n) out.push(needs(title));
     }
   }
   return [...new Set(out)];
 }
 
-/** Whether what a walk from `start` reaches holds as the rule's unless says, the change's own updates laid over what is stored. */
-export async function holdsUnless(q: Q, reg: Registry, u: Unless, start: string | undefined, ops: FormOp[]): Promise<boolean> {
+/**
+ * Whether what a walk from `start` reaches holds as the rule's unless says, the change's own updates and links laid over
+ * what is stored; and where it does not, what fails it ({missing} in the rule's say): with every, the items that do not
+ * hold; with none, those that do.
+ */
+export async function holdsUnless(q: Q, reg: Registry, u: Unless, start: string | undefined, ops: FormOp[]): Promise<{ holds: boolean; missing: string }> {
   const count = u.count ?? 'every';
   const [, link, way] = WALK.exec(u.walk)!;
   const family = reg.relationFamily(link);
@@ -174,8 +185,15 @@ export async function holdsUnless(q: Q, reg: Registry, u: Unless, start: string 
     .map((r) => ops.filter((o) => o.op === 'update' && o.id === r.id).reduce((x, o) => ({ ...x, status: o.status ?? x.status, props: { ...x.props, ...o.props } }), r))
     .filter((r) => !u.type || reg.isA(r.type, u.type));
   const statuses = list(u.holds.status);
-  const fits = (r: Row) =>
-    (!statuses || statuses.some((s) => s === r.status || (s === 'open' && reg.isOpen(r.type, r.status)) || (s === 'closed' && !reg.isOpen(r.type, r.status)))) &&
-    Object.entries(u.holds.fields ?? {}).every(([f, v]) => JSON.stringify(r.props?.[f] ?? null) === JSON.stringify(v));
-  return count === 'every' ? reached.every(fits) : count === 'some' ? reached.some(fits) : !reached.some(fits);
+  const has = u.holds.link;
+  const fit = new Map<string, boolean>();
+  for (const r of reached) {
+    fit.set(r.id,
+      (!statuses || statuses.some((s) => s === r.status || (s === 'open' && reg.isOpen(r.type, r.status)) || (s === 'closed' && !reg.isOpen(r.type, r.status)))) &&
+      Object.entries(u.holds.fields ?? {}).every(([f, v]) => JSON.stringify(r.props?.[f] ?? null) === JSON.stringify(v)) &&
+      (!has || (await linksHeld(q, reg, r.id, has, ops)) >= (has.n ?? 1)));
+  }
+  const failing = reached.filter((r) => (count === 'none' ? fit.get(r.id) : !fit.get(r.id)));
+  const holds = count === 'some' ? reached.some((r) => fit.get(r.id)) : !failing.length;
+  return { holds, missing: holds || count === 'some' ? '' : named(failing.map((r) => r.title)) };
 }
