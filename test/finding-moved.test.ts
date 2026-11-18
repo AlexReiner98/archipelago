@@ -14,7 +14,7 @@ async function twoIslands() {
   const l = await fresh();
   await setIslands(l, human, true);
   const { a, b, ann } = await make(l, [
-    { op: 'create', ref: 'a', type: 'island', title: 'Costs', props: { pack: 'core' } },
+    { op: 'create', ref: 'a', type: 'island', title: 'Costs', props: { pack: 'findings' } },
     { op: 'create', ref: 'b', type: 'island', title: 'Plans', props: { pack: 'core' } },
     { op: 'create', ref: 'ann', type: 'person', title: 'Ann' },
   ]);

@@ -14,12 +14,13 @@ import { freshWith, human, make } from './map.ts';
 import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 import { blockGraph } from '../packs/surface/kernel/blocking.ts';
 
-/** A pack with a type that may be a focus and one that may not. */
+/** A pack with a type that may be a focus, one that may not, and one that promises its value to its readers. */
 const pack = (id: string) => ({
   id, version: '1', title: id, requires: ['core'],
   types: [
     { id: `${id}_feature`, title: 'Feature', extends: 'work', capabilities: { focus: true } },
     { id: `${id}_thing`, title: 'Thing', extends: 'work' },
+    { id: `${id}_measure`, title: 'Measure', extends: 'record', capabilities: { promised: { fields: ['value'], published: 'published' } }, fields: { value: { type: 'number' }, published: { type: 'boolean' } } },
   ],
 });
 
@@ -92,13 +93,13 @@ test('a step that reads another island’s head waits on it while it is open (de
   const { s, n, f } = await make(l, [
     { op: 'create', ref: 's', type: 'task', title: 'Bill at the new prices', props: { island: a } },
     { op: 'create', ref: 'n', type: 'task', title: 'Note the plan', props: { island: a } },
-    { op: 'create', ref: 'f', type: 'finding', title: 'A seat costs 9 EUR', props: { island: b, value: 9, value_type: 'number', unit: 'EUR', published: true } },
+    { op: 'create', ref: 'f', type: 'plain_measure', title: 'A seat costs 9 EUR', props: { island: b, value: 9, published: true } },
   ]);
   await make(l, [{ op: 'link', type: 'reads', from: s, to: b }, { op: 'link', type: 'reads', from: n, to: f }, { op: 'link', type: 'reads', from: n, to: a }]);
   let graph = await blockGraph(l);
   assert.ok(graph.isBlocked(s), 'it waits on the head it reads across islands');
   assert.deepEqual(graph.roots(s), [b]);
-  assert.ok(!graph.isBlocked(n), 'a read of a published finding, or of its own island’s head, is no wait');
+  assert.ok(!graph.isBlocked(n), 'a read of a published measure, or of its own island’s head, is no wait');
   assert.ok((await blockGraph(l, [s])).isBlocked(s), 'asked of it alone, the walk follows the read');
   await make(l, [{ op: 'update', id: b, status: 'done' }]);
   graph = await blockGraph(l);

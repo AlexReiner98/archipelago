@@ -16,7 +16,7 @@ import * as sessionsPack from '../packs/sessions/kernel/sessions.ts';
 import { callTool } from '../packs/surface/kernel/tools.ts';
 import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 import { timed, timing } from '../src/timing.ts';
-import { freshWith, human } from './map.ts';
+import { freshWith, human, WORDS } from './map.ts';
 
 const agent: Actor = { kind: 'agent', name: 'test' };
 
@@ -26,6 +26,7 @@ const asked = <T>(fn: () => Promise<T>) => timed(async () => ({ answer: await fn
 test('the frontier read at once answers as it does read by read, every reason alike', async () => {
   const packs = mkdtempSync(join(tmpdir(), 'pelago-frontier-once-'));
   cpSync(join(import.meta.dirname, '..', 'packs'), packs, { recursive: true });
+  cpSync(WORDS, packs, { recursive: true }); // finding, a type that promises, is the tests' words now
   const l = await freshWith(new Registry(packs));
   await callTool(l, human, 'init', { name: 'Alex' });
   await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"') on conflict (key) do update set value = excluded.value`);
