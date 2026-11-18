@@ -12,7 +12,6 @@ export const ROOT = join(import.meta.dirname, '..');
  */
 export const SLOW: Record<string, string> = {
   // A headless Chrome each, and the page loaded and driven in it: seconds per test, most of a core under load.
-  'test/agents-beside.test.ts': 'browser',
   // A layout's code baked in its frame: one Chrome page, and a wait out the quiet that ends a bake that never says bake.
   'test/bake-frame.test.ts': 'browser',
   // A page's frame baked at three widths and published: a Chrome page that bakes, then the page read at two widths.
@@ -51,17 +50,10 @@ export const SLOW: Record<string, string> = {
   'test/panes.test.ts': 'browser',
   'test/island-palette.test.ts': 'browser',
   'test/band.test.ts': 'browser',
-  'test/tab-strip.test.ts': 'browser',
   'test/island-sessions.test.ts': 'browser',
   'test/published-frames.test.ts': 'browser',
-  'test/show-lands.test.ts': 'browser',
   'test/show-lights.test.ts': 'browser',
-  'test/show-tab-life.test.ts': 'browser',
-  'test/show-web.test.ts': 'browser',
   'test/stable-page.test.ts': 'browser',
-  'test/tabs.test.ts': 'browser',
-  'test/tabs-busy.test.ts': 'browser',
-  'test/tabs-canvas.test.ts': 'browser',
   'test/tips.test.ts': 'browser',
   'test/transition-browser.test.ts': 'browser',
   // A whole map moved, backed up, restored, migrated or pulled: databases opened, filled and replayed from the log,

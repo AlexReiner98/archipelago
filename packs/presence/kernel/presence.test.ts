@@ -52,7 +52,8 @@ test('what the owner looks at is read as the agent sees the map', async () => {
   const s = (await seenNow(ctx, w))!;
   assert.deepEqual(await seeing(ctx, s), { view: 'What blocks', lens: 'e_lens0001', item: { id: 'e_task0001', title: 'Draw the ridges', type: 'task' }, ago: 0, tab: { chat: 'e_run00001', own: false, yours: false } });
   assert.match((await seeingLine(ctx, w))!, /the view What blocks \(e_lens0001\), with task "Draw the ridges" \(e_task0001\) open/);
-  assert.deepEqual(await inSight(ctx, w, 'e_run00001', 1), { looking: true, where: 'In the tab they are looking at.' });
+  // A show moves no view (decision e_mnuthcap): never looking, only whether a page is open to light it.
+  assert.deepEqual(await inSight(ctx, w, 'e_run00001', 1), { looking: false, where: 'Their view stays where it is: an item on an island is lit in their side bar, its island put on their canvas; anything else is not drawn. Tell them where to look.' });
   assert.equal((await inSight(ctx, w, 'e_run00001', 0)).looking, false, 'no page open');
 });
 
@@ -66,7 +67,7 @@ test('what the tool surface asks by name: a show pointed, a told beat, a page po
   assert.equal(given.focus?.hash, 'e/e_y');
   assert.deepEqual(given.steps.map((s) => s.kind), ['show', 'story']);
   assert.ok(given.told > 0, 'a told beat moves the stamp');
-  assert.deepEqual(await sightAnswer(ctx, { whose, actor: 'robot', focus: true }), { pages: { open: 1, following: 1 }, sight: { looking: true, where: 'In the tab they are looking at.' } });
+  assert.deepEqual(await sightAnswer(ctx, { whose, actor: 'robot', focus: true }), { pages: { open: 1, following: 1 }, sight: { looking: false, where: 'Their view stays where it is: an item on an island is lit in their side bar, its island put on their canvas; anything else is not drawn. Tell them where to look.' } });
 });
 
 test("two maps of one workspace in one process keep their own steps: one's show never lands on the other's screen", async () => {

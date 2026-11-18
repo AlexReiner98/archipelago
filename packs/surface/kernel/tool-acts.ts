@@ -46,7 +46,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
     description:
       'Answer the human with a view on their canvas: a kept view (entity: a view (type lens), a saved canvas) or a query and layout of your own, or open an item\'s page or the workspace. ' +
       'Or frame a web page in a pane (url: a dev server\'s build, a sketch, a page), so they watch it beside the map: it reloads only when you show it again. A site that refuses to be framed (X-Frame-Options or frame-ancestors, as most sign-in pages and large sites do) stays blank, and the pane\'s ↗ opens it in a window of its own; a plain http address frames only on localhost or 127.0.0.1, and this server\'s own pages are shown by entity, not url. ' +
-      'It never moves their view (decision e_mnuthcap): an item on an island puts that island on their canvas and lights the item in their side bar, where a press takes them to it; anything else lands in a tab of your session’s own, out of sight and marked. The answer says how many of their pages are open and how many take your shows (pages), and whether they are looking at it (sight: looking, and where, in a line); when they are not, tell them where to look. Add a short note saying what it is. ' +
+      'It never moves their view (decision e_mnuthcap): an item on an island puts that island on their canvas and lights the item in their side bar, where a press takes them to it; anything else is not drawn on their page. The answer says how many of their pages are open and how many take your shows (pages), and whether they are looking at it (sight: looking, and where, in a line); when they are not, tell them where to look. Add a short note saying what it is. ' +
       'A change moves nothing on their page: show what is worth watching. ' +
       'With look: true, the answer also carries the picture of it, as an image: drawn by the server as you see the map, whether or not a page of theirs is open (query look takes one without moving their page). ' +
       'For the person reading a chat, call draw.',
@@ -54,8 +54,6 @@ export const ACT_TOOLS: Record<string, Tool> = {
       ...VIEW_INPUT,
       screen: z.enum(['workspace', 'you']).optional().describe('The workspace sheet, or what waits for them.'),
       url: WEB_URL.optional().describe('A web page to frame in a pane, in place of a view: http or https (plain http on localhost only).'),
-      // Taken and ignored, so sessions with the tools as they were are not refused; goes with the tabs (task e_e76h6hst).
-      focus: z.boolean().optional().describe('Ignored: a show never moves their view.'),
       note: z.string().max(200).optional().describe('One line, kept on your pane as its tooltip.'),
       watch: z.boolean().optional().describe('true once the owner has approved the plan you show and its sessions are starting: the tab it lands in watches it, so each session working on anything in it is drawn there on its step and shows its work in that tab, not a tab of its own. Show a view that walks works_on< from the plan’s steps and leaves out no run (not: []), so its sessions are drawn on it.'),
       look: z.boolean().optional().describe('Also answer with a picture of it, drawn by the server (as query look draws it).'),
@@ -118,7 +116,7 @@ export const ACT_TOOLS: Record<string, Tool> = {
   session_start: {
     begins: true,
     within: { task: 'take it on' },
-    description: 'Register this agent session in the map so the human can see it: their page opens it a tab of its own, named by your chat’s title, and closes it when the chat ends (report session_end with reason; a chat that goes quiet for 12 hours is ended for it). Safe to call again on resume: the same session_id takes up the same session. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Its answer names the workspace your token acts in (workspace: id and name): check it is the one you mean before you write. Takes effect at once.',
+    description: 'Register this agent session in the map so the human can see it: their side bar lists it under Sessions, named by your chat’s title, until the chat ends (report session_end with reason; a chat that goes quiet for 12 hours is ended for it). Safe to call again on resume: the same session_id takes up the same session. Give the task you are working on if there is one: any exclusive resource that task needs is claimed for you, or you are told who holds it, and how to say in a commit that you finished it. Give the git branch you work on, so a push to it is read against your task. Its answer names the workspace your token acts in (workspace: id and name): check it is the one you mean before you write. Takes effect at once.',
     input: {
       title: z.string().optional().describe('What your chat is called, as your client shows it; else a few words on what this session is for. Renamed later: report session_update with title.'),
       task: z.string().optional().describe('Id of the item being worked on.'),

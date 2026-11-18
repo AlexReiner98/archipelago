@@ -49,7 +49,7 @@ export { h };
 const runtime = () => hooks.partsRuntime?.() ?? Promise.reject(new Error('This page draws no parts'));
 export const drawSlot = (node, asked) => runtime().then((m) => m.drawPart(node, asked));
 export const drawSlots = (node, asked) => runtime().then((m) => m.drawParts(node, asked));
-/** Ask the part that fills a decision slot (`tabs.land`, `tabs.life`) to decide on `input`: its value, or undefined when none does. */
+/** Ask the part that fills a decision slot (`ghosts`) to decide on `input`: its value, or undefined when none does. */
 export const askSlot = (slot, input) => runtime().then((m) => m.askSlot(slot, input));
 
 /**

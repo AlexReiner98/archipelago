@@ -115,22 +115,17 @@ export async function seeingLine(ctx: KernelContext, w: Whose, run?: string): Pr
 
 /** Whether the owner sees a show of session `run` land, said to the agent that showed it. */
 export interface Sight {
-  /** true: it lands in the tab in sight; false: in a tab out of sight, marked, or on no page at all. */
+  /** Never true since the tabs went (decision e_mnuthcap): a show moves no view. Kept so the answer keeps its shape. */
   looking: boolean;
   /** Where it lands, in a line. */
   where: string;
 }
 
 /**
- * Whether a show of session `run` lands where the owner looks: a page of theirs is open and in sight (`open`, from the
- * pages counted in the last few seconds), and the tab in sight is the one its shows go to (`lands`, which the page says).
+ * Where a show of session `run` reaches the owner: a show never moves their view (decision e_mnuthcap), so it is only
+ * whether a page of theirs is open (`open`, from the pages counted in the last few seconds) to light it.
  */
-export async function inSight(ctx: KernelContext, w: Whose, run: string | undefined, open: number): Promise<Sight> {
+export async function inSight(_ctx: KernelContext, _w: Whose, _run: string | undefined, open: number): Promise<Sight> {
   if (!open) return { looking: false, where: 'No page of theirs is open in sight: it lands when they open one within ten minutes; later, show it again.' };
-  const s = await seenNow(ctx, w);
-  if (!s || Date.now() - s.said > NOW_MS) return { looking: false, where: 'Their page has not said which tab is in sight.' };
-  if (run && s.lands?.includes(run)) return { looking: true, where: 'In the tab they are looking at.' };
-  const chat = s.tab && s.tab.chat !== run ? await itemOf(ctx, s.tab.chat) : undefined;
-  const there = chat ? `another chat’s tab ("${chat.title}")` : 'a tab of their own';
-  return { looking: false, where: `In a tab out of sight, marked; their page shows ${there}. Tell them where to look.` };
+  return { looking: false, where: 'Their view stays where it is: an item on an island is lit in their side bar, its island put on their canvas; anything else is not drawn. Tell them where to look.' };
 }

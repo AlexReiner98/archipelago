@@ -1,6 +1,6 @@
 // What a browser test reads of an item's page, now that the sheet root's walled part draws it (packs/sheet/parts/page,
-// task e_zhxd9bhb): its marks by their keys, inside the part's body. One place for the selectors, as the panes tests
-// keep theirs (./tab-page.ts), so a change to what the part draws is one change here.
+// task e_zhxd9bhb): its marks by their keys, inside the part's body. One place for the selectors, as the agents' tests
+// keep theirs (./agent-page.ts), so a change to what the part draws is one change here.
 
 /** The page part's body, drawn in the sheet. */
 export const PAGE = `#sheet [data-part-id="sheet.page"]`;

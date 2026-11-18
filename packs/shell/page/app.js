@@ -19,8 +19,7 @@ import { stale } from './live.js';
 import { drawNav, screenPage } from './screen-page.js';
 import { loadSchema, typeChoice, types, workType } from './words.js';
 import { atOf } from './pane-address.js';
-import { startTabs } from './pane-land.js';
-import { hrefNow, toAddress } from './panes.js';
+import { hrefNow, startCanvas, toAddress } from './panes.js';
 import { startTips } from './tip.js';
 import { workspace } from './workspace.js';
 import { drawPicker } from './island-picker.js';
@@ -91,7 +90,7 @@ async function route(pulse = false) {
   signUpOffer();
   // A map made a moment ago opens on Making your map until its land has gathered: nothing more is drawn yet.
   if (firstMoments() === 'making') return;
-  startTabs();
+  startCanvas();
   const params = new URLSearchParams(query);
   // The canvas: the pane in focus draws the lens the address says (the bar pack's parts show it); an item's page with none
   // keeps what is up when it draws the item, and else opens on the item.

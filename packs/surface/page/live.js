@@ -1,9 +1,9 @@
 import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { still } from './look.js';
-import { hear, nameOf, sessionOf } from './pane-route.js';
+import { hear, hearOpen, nameOf, sessionOf } from './pane-route.js';
+import { onOpen } from './sessions-open.js';
 import { numberOf } from './query-base.js';
-import { front, landsIn, poppedTab } from './tabs.js';
 import { islandsOn, keepList } from './islands-on.js';
 import { relations, starterOf, types } from './words.js';
 
@@ -30,25 +30,17 @@ main.addEventListener('input', (e) => {
   if (e.target.matches?.('textarea, [contenteditable], input:not([type=range], [type=checkbox], [type=radio], [type=color])')) state.dirty = true;
 });
 
-// Agents on the page: what a session shows lands in a pane of its own, or a tab of its own, and the pane's strip or the
-// tab's mark says so; where is ui/pane-route.js. Nothing else an agent does is said here: a change reaches the page from
-// the log, a story is on its session's page (the owner, 30 Oct 2026).
+// Agents on the page: what a session shows of an item on an island puts that island on the canvas and lights the item in
+// the side bar, never moving the view (decision e_mnuthcap). Nothing else an agent does is said here: a change reaches
+// the page from the log, a story is on its session's page (the owner, 30 Oct 2026).
 /** This page, among the owner's open pages: the server counts those a show can land in, so an agent's show says whether it did. */
 const pageId = Math.random().toString(36).slice(2, 14);
-// A page the server draws for an agent's look is no page of the owner's: it is not counted. Any other takes a show: a
-// chat with no tab here is opened one. Where it stands goes with it: the address of the pane in focus, and the chat whose
-// tab is in sight, so an agent knows what the owner is looking at and whether it is its own tab (packs/presence/kernel/seeing.ts). A
-// popped-out tab is the main page's too.
-const thisPage = () => {
-  if (still) return undefined;
-  const t = front();
-  const chat = t?.chat ?? (/^e_[a-z0-9]{8}$/.test(t?.follows ?? '') ? t.follows : undefined);
-  const lands = landsIn(t);
-  return { page: pageId, on: true, where: location.hash.slice(2, 2002), ...(chat && { tab: { chat, own: Boolean(t.chat) } }), ...(lands.length && { lands }) };
-};
+// A page the server draws for an agent's look is no page of the owner's: it is not counted. Any other takes a show.
+// Where it stands goes with it, the page's address, so an agent knows what the owner is looking at (packs/presence/kernel/seeing.ts).
+// The chats open now are heard too, so a show lit in the side bar is named by its chat's title.
+onOpen(hearOpen);
+const thisPage = () => (still ? undefined : { page: pageId, on: true, where: location.hash.slice(2, 2002) });
 let seenStep;
-/** Each session's last show not yet landed: it waits while a question is open over the page, or the reader is busy in its tab. */
-const waiting = new Map();
 /**
  * How long a step waits for a page to open, as the style says (show_waits_ms): one sent while none was (e_d8djfzmk)
  * lands when the next opens, within this. A style not yet read lets none wait.
@@ -90,8 +82,8 @@ function light(s) {
 }
 
 export function follow(steps = []) {
-  // A look's page, and a popped-out tab, leave what agents show to the main page.
-  if (still || poppedTab) return;
+  // A look's page leaves what agents show to the owner's own pages.
+  if (still) return;
   // The first answer follows what came while no page here was open, back to the last step this browser followed and
   // no further than the style lets a step wait; what is older only says where things stand.
   const since = seenStep ?? Math.max(seenBefore(), Date.now() - waitsFor());
@@ -101,35 +93,16 @@ export function follow(steps = []) {
     localStorage.setItem(seenKey, String(Math.max(seenStep, seenBefore())));
   } catch {}
   for (const s of steps) hear(s);
-  // What a session does may move its state, which the tab bar counts (ui/tab-bar.js).
+  // What a session does may move its state, which the side bar and the band's count read (./sessions-open.js).
   if (fresh.some((s) => s.run)) hooks.sessionsMoved?.();
-  // A chat that ended closes its tab here (ui/tab-life.js).
-  // The part on `tabs` is told the same, as data (hooks.tellSlot, packs/surface/page/part-host.js), where one is mounted.
-  for (const s of fresh) if (s.ends && s.run) (hooks.sessionEnded?.(s.run, s.did), hooks.tellSlot?.('tabs', { name: 'ended', run: s.run, why: s.did ?? null }));
-  // One gone quiet or waiting lets its tab go too, until it next shows something.
-  for (const s of fresh) if (s.rests && s.run) (hooks.sessionRested?.(s.run), hooks.tellSlot?.('tabs', { name: 'rested', run: s.run }));
   // A beat told, or a session gone quiet, waiting or ended, moves its node on every canvas that draws it.
   const moved = [...new Set(fresh.filter((s) => s.run && (s.kind === 'story' || s.rests || s.ends)).map((s) => s.run))];
   if (moved.length) hooks.sessionsTold?.(moved);
-  // A chat renamed is named anew on its tab.
-  if (fresh.some((s) => s.did === 'titled')) hooks.drawStrip?.();
-  // A show of an item on an island never moves the view (decision e_mnuthcap): its island goes on the canvas and the
-  // item is lit in the side bar. Any other show lands in its session's tab, out of sight and marked; a later one takes
-  // the place of what waits, and its tab of its own, if it was owed one, stays owed.
-  for (const s of fresh) if (s.kind === 'show' && s.hash) {
-    if (s.island) {
-      light(s);
-      continue;
-    }
-    const was = waiting.get(sessionOf(s));
-    waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens });
-  }
-  if (document.querySelector('dialog[open]')) return;
-  // A part on `tabs` is told each show, and keeps what waits itself (it decides where a show lands, task e_dswpuaft).
-  for (const [session, s] of waiting) if (hooks.tellSlot?.('tabs', { name: 'land', step: s })) waiting.delete(session);
-  if (!hooks.land) return;
-  // One the reader is busy where it would land stays, and is tried again at the next look.
-  for (const [session, s] of waiting) if (hooks.land(s) !== 'later') waiting.delete(session);
+  // A chat renamed is named anew in the side bar.
+  if (fresh.some((s) => s.did === 'titled')) hooks.sessionsMoved?.();
+  // A show never moves the view (decision e_mnuthcap): one of an item on an island puts its island on the canvas and
+  // lights the item in the side bar. One of no island (a lens, a web page) leaves the page as it is.
+  for (const s of fresh) if (s.kind === 'show' && s.hash && s.island) light(s);
 }
 
 /** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */

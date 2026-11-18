@@ -1,7 +1,6 @@
 // The chats open now (the `sessions` view, docs/sessions.md), read once for the page and handed to what draws them: the
-// island side bar's Sessions part (./island-sessions.js), the count of those waiting on the owner in the band under
-// the tabs (e_82rggead), and the tabs while they last (packs/panes/page/tab-bar.js). Read once the first view has
-// drawn, again a second after a session is heard from (one read for a burst), and on coming back to the page.
+// island side bar's Sessions part (./island-sessions.js), the count of those waiting on the owner in the band
+// (e_82rggead), and the names a show is lit under (./pane-route.js). Read once the first view has drawn, again a second after a session is heard from (one read for a burst), and on coming back to the page.
 
 import { api, firstDrawn, h, hooks } from './base.js';
 
@@ -42,7 +41,7 @@ hooks.sessionsMoved = () => {
 firstDrawn.then(readOpen);
 document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && readOpen());
 
-// ---- The count of those waiting on the owner, in the band under the tabs beside the islands button: an inbox (the
+// ---- The count of those waiting on the owner, in the band beside the islands button: an inbox (the
 // page's one mark for what waits on you, inbox.svg), its count a badge on it, as a mail app's (Alex, 17 Nov 2026).
 
 const badge = h('span', { class: 'q-waiting-badge', 'aria-hidden': 'true' });

@@ -24,14 +24,10 @@ export const PAGES: string[] = ['doc', 'public'];
  * (its `piece`, as `drawPart` is given it: packs/surface/page/part-host.js). What is in the bar and in the panes spans
  * islands, so it is drawn at the map's version (decision e_5b32vdsg).
  *
- * - `panes`, `tabs`   the panes of the page and the bar of tabs across them (the panes root pack)
- * - `tab.mark`        a mark on one tab: whose it is, how much it holds
  * - `bar`             the bar over the canvas; `bar.views` what its view button opens, `bar.find` find's input and its
  *                     terms, `bar.find.rows` the query's rows above find, shown while find publishes `find_open`,
  *                     `bar.layouts` the layout a view is drawn in. The bar's find slots are handed the canvas's lens
  *                     (Home's when no query is up) with `said`, the answer in brief and the `names` of the items it names
- * - `tabs.land`       a decision, not marks: where a show lands among the tabs and panes (packs/surface/page/part-decide.js)
- * - `tabs.life`       a decision: which kept tabs' sessions have ended or rested
  * - `ghosts`          a decision: what the changes held would look like on the canvas, read back into its answer
  * - `canvas`          the canvas itself
  * - `sheet`           the sheet over the canvas, an item's one page, handed where the documents beside it are read
@@ -42,9 +38,6 @@ export const PAGES: string[] = ['doc', 'public'];
  * - `workspace.card`  a card on the workspace page, one pack's say on this workspace
  */
 export const FRAME_SLOTS = {
-  panes: [],
-  tabs: ['tabs', 'current', 'page'],
-  'tab.mark': ['tab', 'current'],
   bar: ['current', 'home'],
   'bar.views': ['current', 'home'],
   'bar.find': ['query', 'home', 'answer', 'names'],
@@ -58,8 +51,6 @@ export const FRAME_SLOTS = {
   nav: [],
   look: ['drawn', 'why'],
   'workspace.card': ['workspace', 'section'],
-  'tabs.land': ['step', 'tabs', 'drawable'],
-  'tabs.life': ['open', 'tabs'],
   ghosts: ['held', 'drawn', 'loose'],
 } as const satisfies Record<string, readonly string[]>;
 
@@ -67,7 +58,7 @@ export const FRAME_SLOTS = {
  * The slots whose part answers a decision rather than marks (`decide(input)` in the part, `askSlot` in the page): the
  * part decides and the root that asked applies it, so the runtime keeps one way in (a mounted part) and two ways out.
  */
-export const DECISION_SLOTS: readonly string[] = ['tabs.land', 'tabs.life', 'ghosts'];
+export const DECISION_SLOTS: readonly string[] = ['ghosts'];
 
 /** Slots drawn only while a page state another part publishes is set: the rows above find while find is open. */
 export const SHOWN_WHILE: Readonly<Record<string, string>> = { 'bar.find.rows': 'find_open' };

@@ -1,6 +1,6 @@
 // The chats at work, as a part of the island side bar (./island-picker.js; decision e_mnuthcap, Alex, 17 Nov 2026): one
 // row a chat, its state a mark before its name, those waiting on the owner first, as the sessions view orders them.
-// A press opens the chat's page. They were tabs; the tabs go once this and the island a show adds have taken their place.
+// A press opens the chat's page. They were tabs, which went on 18 Nov 2026.
 
 import { h } from './base.js';
 import { YOURS } from './sessions-open.js';

@@ -70,7 +70,7 @@ export async function viewsOf(part, item, piece) {
  * long as the page.
  */
 const keptMost = 100000;
-// A part on an item keeps by the item; one that stands on none (the tabs, find) by the workspace, so two maps keep apart.
+// A part on an item keeps by the item; one that stands on none (find) by the workspace, so two maps keep apart.
 export const keptKey = (part, item, name = '') => `pelago-part:${part.id}:${item?.id ?? `ws.${state.workspace?.id ?? '-'}`}:${name}`;
 export function keepFor(part, item, name, value) {
   try {
