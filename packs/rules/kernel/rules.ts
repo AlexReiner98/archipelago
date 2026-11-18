@@ -14,6 +14,7 @@ export { outsideLayout, outsideReach } from './reach-check.ts';
 // What checks a pack's rules as it loads is the loader's; the words it checks by are read here too.
 import { COMPARE, fillForms, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
 import { checkForms, checkUnless, holdsUnless, missingLinks, overMost, type AtMost, type FormOp, type MustLink, type Unless } from './rule-forms.ts';
+import { apartRefused, type Apart } from './apart.ts';
 export { checkRules } from '../../loader/kernel/rule-check.ts';
 import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
 import { opFacts } from '../../loader/kernel/part-trial.ts';
@@ -99,6 +100,7 @@ export interface RuleDef {
   type?: string;
   /** At most n open links of a type into an item of the type; must_link: an item of the type holds a link; unless: what a walk from the item reaches, which spares it the rule where it holds (./rule-forms.ts). */
   at_most?: AtMost; must_link?: MustLink; unless?: Unless;
+  /** Items of the type on one island whose field of globs meets another's, unless both link to one item of a type (./apart.ts). */ apart?: Apart;
   /** What a refusal says, and why a held change waits. {title} is the item's. */
   say?: string;
   /** What letting it through means, said in the answer of a change it did not hold (holds off, a lift): who sees it, what runs where, whether it can be undone. {title} as in say. */
@@ -214,7 +216,7 @@ export interface OpFacts {
   part_trial?: boolean;
   spreads?: boolean; island_code?: boolean; /** Of an op that adds to an island past its cap, how far past (packs/loader/kernel/island-cap.ts). */ over_cap?: string;
   /** It makes an item of an island's own pack on that island, in the change that makes the island: in reach of the pack making it. */ own_island?: boolean;
-  /** The rules (by keyOf) whose unless holds of this op's item: they spare it (./rule-forms.ts, holdsUnless). */ unless?: Set<string>;
+  /** The rules (by keyOf) whose unless holds of this op's item: they spare it (./rule-forms.ts, holdsUnless); of the others, what fails each ({missing}). */ unless?: Set<string>; missing?: Map<string, string>;
 }
 
 /** Whether a rule's when holds for one op written by this actor to these targets (none for a create). */
@@ -291,7 +293,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const refusers: Ruled[] = [];
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
   const said = (rule: Rule, fallback: string) =>
-    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{over_cap}', facts.over_cap ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
+    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{over_cap}', facts.over_cap ?? '').replaceAll('{missing}', () => facts.missing?.get(keyOf(rule)) ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
   const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`), ...(rule.stake && { stake: said({ ...rule, say: rule.stake }, rule.stake) }) });
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
@@ -445,9 +447,9 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   // A rule that holds or refuses unless what a walk from the item reaches holds is spared where it does (./rule-forms.ts).
   const unlessing = [...rules, ...runs.flat().flatMap((run) => (run ? under(run).rules : []))].filter((r) => r.unless);
   if (unlessing.length) await Promise.all(ops.map(async (op, i) => {
-    const targets = on(op).flatMap((id) => found.get(id) ?? []), met = new Set<string>();
-    for (const r of unlessing) if (applies(r, reg, who, op, targets, false, facts[i]) && (await holdsUnless(q, reg, r.unless!, targets[0]?.id, ops as FormOp[]))) met.add(keyOf(r));
-    facts[i] = { ...facts[i], unless: met };
+    const targets = on(op).flatMap((id) => found.get(id) ?? []), met = new Set<string>(), missing = new Map<string, string>();
+    for (const r of unlessing) if (applies(r, reg, who, op, targets, false, facts[i])) { const u = await holdsUnless(q, reg, r.unless!, targets[0]?.id, ops as FormOp[]); if (u.holds) met.add(keyOf(r)); else missing.set(keyOf(r), u.missing); }
+    facts[i] = { ...facts[i], unless: met, missing };
   }));
   // With holds off, what a rule holds applies as made; a wait the change or its token asked for (asked, may) still holds.
   const off = who.human && !who.drawing ? false : await holdsOff(q);
@@ -468,6 +470,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   }));
   // At most n links into an item, and an item that must hold a link, are judged of the change as a whole (./rule-forms.ts).
   const refused = [...judged.flatMap((j) => j.refused), ...(await overMost(q, reg, rules, ops as FormOp[], (r) => Boolean(r.lifted && lifted(r, 'link')))), ...(await missingLinks(q, reg, rules, ops as FormOp[]))];
+  refused.push(...(await apartRefused(q, reg, rules, ops as FormOp[]))); // files that must not meet (./apart.ts)
   const held = judged.flatMap((j) => j.held);
   const particular = (r: Ruled) => Object.keys(every.get(keyOf(r))?.when ?? {}).length;
   const by = [...held].sort((a, b) => particular(b) - particular(a))[0];
