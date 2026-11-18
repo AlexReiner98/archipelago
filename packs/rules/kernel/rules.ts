@@ -14,6 +14,7 @@ export { outsideLayout, outsideReach } from './reach-check.ts';
 // What checks a pack's rules as it loads is the loader's; the words it checks by are read here too.
 import { COMPARE, fillForms, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
 import { checkForms, checkUnless, holdsUnless, missingLinks, overMost, type AtMost, type FormOp, type MustLink, type Unless } from './rule-forms.ts';
+import { apartRefused, type Apart } from './apart.ts';
 export { checkRules } from '../../loader/kernel/rule-check.ts';
 import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
 import { opFacts } from '../../loader/kernel/part-trial.ts';
@@ -99,6 +100,7 @@ export interface RuleDef {
   type?: string;
   /** At most n open links of a type into an item of the type; must_link: an item of the type holds a link; unless: what a walk from the item reaches, which spares it the rule where it holds (./rule-forms.ts). */
   at_most?: AtMost; must_link?: MustLink; unless?: Unless;
+  /** Items of the type on one island whose field of globs meets another's, unless both link to one item of a type (./apart.ts). */ apart?: Apart;
   /** What a refusal says, and why a held change waits. {title} is the item's. */
   say?: string;
   /** What letting it through means, said in the answer of a change it did not hold (holds off, a lift): who sees it, what runs where, whether it can be undone. {title} as in say. */
@@ -467,6 +469,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   }));
   // At most n links into an item, and an item that must hold a link, are judged of the change as a whole (./rule-forms.ts).
   const refused = [...judged.flatMap((j) => j.refused), ...(await overMost(q, reg, rules, ops as FormOp[], (r) => Boolean(r.lifted && lifted(r, 'link')))), ...(await missingLinks(q, reg, rules, ops as FormOp[]))];
+  refused.push(...(await apartRefused(q, reg, rules, ops as FormOp[]))); // files that must not meet (./apart.ts)
   const held = judged.flatMap((j) => j.held);
   const particular = (r: Ruled) => Object.keys(every.get(keyOf(r))?.when ?? {}).length;
   const by = [...held].sort((a, b) => particular(b) - particular(a))[0];
