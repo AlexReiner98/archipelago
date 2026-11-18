@@ -12,6 +12,7 @@ import { isAbsolute, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { Manifest } from '../../loader/kernel/manifest.ts';
 import { isLink, type TypesRead } from './project.ts';
+import { KEPT_FIELDS } from './operational.ts';
 import type { Db, Q } from '../../database/kernel/db.ts';
 import type { Fact } from './log.ts';
 import type { KernelContext } from '../../loader/kernel/kernel-context.ts';
@@ -27,7 +28,7 @@ export interface ProjectedItem { id: string; type: string; title: string; body: 
 
 /** What a projector writes with: its own tables only. */
 export interface ProjectRows {
-  /** An item as the root projection left it, read whole whoever is writing. */
+  /** An item as the root projection left it, read whole whoever is writing, less the fields kept beside the log. */
   item(id: string): Promise<ProjectedItem | undefined>;
   /** The rows of one of its tables that name `id` in `column`, replaced by these. */
   replace(table: string, column: string, id: string, rows: Row[]): Promise<void>;
@@ -114,7 +115,9 @@ function rowsFor(tx: Q, p: Projector, as: ReturnType<typeof owner>): ProjectRows
   return {
     async item(id) {
       await as.become();
-      const { rows } = await tx.query<ProjectedItem>(`select id, type, title, body, props from entity where id = $1`, [id]);
+      // Its fields as the log has them: what is kept beside the log (a run's story, its heartbeat) is no fact, so a
+      // projection made from it would differ from one made again from the log.
+      const { rows } = await tx.query<ProjectedItem>(`select id, type, title, body, props - $2::text[] as props from entity where id = $1`, [id, KEPT_FIELDS]);
       return rows[0];
     },
     async replace(t, column, id, rows) {
