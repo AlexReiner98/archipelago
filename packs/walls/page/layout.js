@@ -246,7 +246,7 @@ export function drawWith(host, answer, style, keep) {
   let moved = null;
   const tell = (key, name, ev, from) => {
     const held = name === 'click' && HELD.exec(key);
-    if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1] } }));
+    if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1], key } }));
     const at = (name === 'move' || name === 'click') && pictureAt(ev);
     if (name === 'move') return void (moved ? (moved.key = key, moved.at = at) : ((moved = { key, at }), requestAnimationFrame(() => ((moved.at && send({ key: moved.key, name, at: moved.at })), (moved = null)))));
     send({ key, name, ...(at && { at }), ...(from !== undefined && { from: String(from) }) });

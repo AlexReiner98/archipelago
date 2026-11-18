@@ -399,13 +399,13 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const key = `s:${n.id}`;
     keyed.set(key, i.id);
     if (n.stub) return titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nA choice nothing follows yet`);
-    // Held for the owner: a new item is a faint step that opens its change; an edit is marked on its step. Either way a badge on its corner.
+    // Held for the owner: a new item is a faint step that opens its change; an edit is marked on its step, with a badge on its corner. A run asking you to decide one (./session.js, askedOf) is where it is decided: its click puts it to you (packs/write/page/canvas-wires.js).
     if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
     if (!inPainted.has(n.id)) tipped.add(key); // one a look paints says what it is in its look's own tip (./painted.js)
-    if (ghost) return m('g', { key: `held:${i.pending.proposal}:${n.id}`, on: ['click'] }, titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nHeld for you`));
-    const el = titled(m('a', { key, on: ['enter', 'leave'], href: `#/e/${i.id}`, class: cls, ...hidden }, body), [i.said ?? i.title, i.waiting && waitWords(i)].filter(Boolean).join('\n'));
-    dims.set(n.id, el);
-    return el;
+    const decides = ghost ? i.pending.proposal : i.asks, step = m(decides ? 'g' : 'a', { key, on: ['enter', 'leave'], ...(!decides && { href: `#/e/${i.id}` }), class: cls, ...hidden }, body);
+    if (!ghost) dims.set(n.id, step);
+    titled(step, ghost ? `${i.title}\nHeld for you` : [i.said ?? i.title, i.asks && 'Yours to decide', i.waiting && waitWords(i)].filter(Boolean).join('\n'));
+    return decides ? m('g', { key: `held:${decides}:${n.id}`, on: ['click'] }, step) : step;
   });
   // What each choice is, written once beside the question's drop, halfway to its track; a pill already says it.
   const said = new Map();
