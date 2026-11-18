@@ -148,16 +148,21 @@ export function bakeCode({ code, answer, style, theme, width, height }) {
 /**
  * Where a page's words stand, in the page's own coordinates: its hero (the section it opens on), what stands above it
  * (its nav, a title), its name where it shows one, and its column (everything else in its main, a new guest map's first card, and its foot), as one
- * box. A page's frame is baked around them (pageAt). A backdrop is told each block on its own instead (`blocks`: the
- * nav, the title, each paragraph, list and figure, the foot) and the page's call to action (`focus`, the link of its
+ * box. A page's frame is baked around them (pageAt). A backdrop is told each item on its own instead (`blocks`: each
+ * link of the nav, the title, each paragraph, list item and figure, each field and button of a gate, the foot's) and the page's call to action (`focus`, the link of its
  * first p.action), so its land may come between them (packs/walls/page/backdrop.js).
  */
+/** What holds items, opened so each is told apart (pageWords). */
+const OPENED = 'div.text, div.doc-band, div.band-pictures, section, ul, ol, nav.site-head, .site-pages, footer, .gate, .gate-row, .gate-ways, .first-card, .first-steps';
+
 export function pageWords(doc, win) {
   const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top + win.scrollY, w: r.width, h: r.height }; };
   const shows = (el) => { const r = el.getBoundingClientRect(); return r.height > 0 && r.width > 0; };
   // The section it opens on, of those shown (a backdrop's own is taken away).
   const seen = (el) => (el && el.getBoundingClientRect().height > 0 ? el : null);
-  const lead = seen(doc.querySelector('main section.lead')) ?? [...doc.querySelectorAll('main section')].find(seen) ?? null;
+  // A page with a lead section whose backdrop took it away has no hero: the next section (a picture) is not one.
+  const leadEl = doc.querySelector('main section.lead');
+  const lead = leadEl ? seen(leadEl) : ([...doc.querySelectorAll('main section')].find(seen) ?? null);
   // What stands above the hero (the site's nav, a title) is kept clear where it is; the rest below it is the column.
   const heroFoot = lead ? box(lead).y + box(lead).h : 0;
   const shown = [...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('.first-card'), ...doc.querySelectorAll('footer')].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead) && el.getBoundingClientRect().height > 0).map(box);
@@ -166,11 +171,20 @@ export function pageWords(doc, win) {
   // The page's name, where it shows it (its title over the hero, or a heading in it): kept clear, and the drawing draws no name of its own.
   const namedEls = [...doc.querySelectorAll('main h1, main section.lead h2, main .wordmark')].filter((el) => el.getBoundingClientRect().height > 0);
   const named = namedEls.map(box);
-  // Each block apart: what holds blocks (words, a band, a section) is opened, and a call to action is its link alone.
-  const into = (el) => (!shows(el) ? [] : el.matches('div.text, div.doc-band, div.band-pictures, section') ? [...el.children].flatMap(into) : el.matches('p.action') ? [el.querySelector('a') ?? el].filter(shows) : [el]);
+  // Each item apart (the owner, 17 Nov 2026: a clearing is the union of each item's, never one box round them): what holds
+  // items (words, a band, a section, a list, the nav, a gate and its rows) is opened, and a call to action is its link alone.
+  const into = (el) => (win.getComputedStyle(el).display === 'contents' ? [...el.children].flatMap(into) : !shows(el) ? [] : el.matches(OPENED) ? [...el.children].flatMap(into) : el.matches('p.action') ? [el.querySelector('a') ?? el].filter(shows) : [el]);
+  // An item's box is its words where it holds words (a row's span that grows is wider than what it says), else its own.
+  const itemBox = (el) => {
+    if (el.matches('input, button, select, textarea, img, svg, canvas, iframe, figure') || !el.textContent.trim()) return box(el);
+    const range = doc.createRange();
+    range.selectNodeContents(el);
+    const r = range.getBoundingClientRect();
+    return r.width > 0 && r.height > 0 ? { x: r.left, y: r.top + win.scrollY, w: r.width, h: r.height } : box(el);
+  };
   const tops = new Set([...doc.querySelectorAll('nav.site-head'), ...doc.querySelectorAll('main > *'), ...doc.querySelectorAll('.first-card'), ...doc.querySelectorAll('footer')]);
   const blockEls = [...tops].filter((el) => el !== lead && !lead?.contains(el) && !el.contains(lead)).flatMap(into);
-  const blocks = [...blockEls, ...namedEls.filter((el) => !blockEls.some((b) => b.contains(el)))].map(box);
+  const blocks = [...blockEls, ...namedEls.filter((el) => !blockEls.some((b) => b.contains(el)))].map(itemBox);
   // A gate's own card (a new guest map's, the sign-in column) is its call to action too: the land gathers round all of it.
   const action = [...doc.querySelectorAll('main p.action a, .first-card, main > .gate')].find(shows);
   return { hero: lead && box(lead), above, named, column: parts.length ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null, blocks, focus: action ? box(action) : null };

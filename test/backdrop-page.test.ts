@@ -15,7 +15,7 @@ const browser = chrome();
 const LIVE = (api: string) => `export default async function draw({ canvas, page, reducedMotion, on, tip }) {
   const gl = canvas.getContext('webgl2');
   let heard = 0, last = page, reached = 'blocked';
-  const big = (p) => [...(p?.clear ?? [])].sort((a, b) => b.w * b.h - a.w * a.h).slice(0, 1).map((b) => [b.x, b.y, b.w, b.h].join(',')).join('') || '-';
+  const big = (p) => [...(p?.clear ?? [])].sort((a, b) => b.y + b.h - (a.y + a.h)).slice(0, 3).map((b) => [b.x, b.y, b.w, b.h].join(',')).join(';') || '-';
   try { await fetch(${JSON.stringify(api)}, { method: 'POST' }); reached = 'reached'; } catch {}
   const paint = () => { if (!gl) return; gl.viewport(0, 0, canvas.width, canvas.height); gl.clearColor(1, 0, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT); };
   const say = () => tip([gl ? 'gl2' : 'nogl', canvas.constructor.name, typeof document, typeof parent, reached, String(!!page), heard, last?.visible, last?.scroll, last?.clear?.length, last?.width, last?.view?.width, String(reducedMotion), big(last)].join(' '), 1, 1);
@@ -74,10 +74,10 @@ test('in a browser, a page published with a backdrop runs its layout behind its 
       assert.equal(Number(viewWidth), at.inner, said);
       assert.ok(Number(pageWidth) > 0 && Number(pageWidth) <= width, said);
       assert.deepEqual(await shown(page), [255, 0, 255, 255], `at ${width} what its code painted with WebGL2 is shown`);
-      // The boxes it is told hold the page's words: the column's lines are in the largest.
-      const [x, y, w, h] = said.split(' ').at(-1)!.split(',').map(Number);
-      const line = (await page.evaluate(`(() => { const r = [...document.querySelectorAll('main li')].at(-1).getBoundingClientRect(); return [r.left, r.top + scrollY, r.right, r.bottom + scrollY]; })()`)) as number[];
-      assert.ok(line[0] >= x - 1 && line[1] >= y - 1 && line[2] <= x + w + 1 && line[3] <= y + h + 1, `the last line ${line} is in the column ${[x, y, w, h]}`);
+      // The boxes it is told are each item's own, its words' (the lowest three said): the column's last line is one of them.
+      const boxes = said.split(' ').at(-1)!.split(';').map((b) => b.split(',').map(Number));
+      const line = (await page.evaluate(`(() => { const range = document.createRange(); range.selectNodeContents([...document.querySelectorAll('main li')].at(-1)); const r = range.getBoundingClientRect(); return [r.left, r.top + scrollY, r.right, r.bottom + scrollY]; })()`)) as number[];
+      assert.ok(boxes.some(([x, y, w, h]) => line[0] >= x - 1 && line[1] >= y - 1 && line[2] <= x + w + 1 && line[3] <= y + h + 1), `the last line ${line} is in a box: ${boxes.join(' ')}`);
       // Scrolled, it hears where the page is.
       await page.evaluate(`scrollTo(0, 300)`);
       for (let n = 0; n < 50 && !said.includes(' true 300 '); n++) (said = await tipOf(page)), await new Promise((r) => setTimeout(r, 100));

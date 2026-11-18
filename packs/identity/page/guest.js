@@ -171,29 +171,33 @@ export function firstMoments() {
     }, 2000);
 }
 
-/** #/try: make a guest map and open it on its install note. */
+/** #/try: make a guest map and open it on its install note; #/try?then=sign-up, on Sign up (from the sign-in page). */
 export async function tryPage(query = '') {
   const from = new URLSearchParams(query).get('from') ?? undefined;
+  const signUp = !from && new URLSearchParams(query).get('then') === 'sign-up';
   if (making) return;
   making = true;
   const error = h('div', { class: 'error gate-error' });
-  gate(TITLE, gateRow(h('span', { class: 'muted grow' }, from ? 'Copying the map…' : 'Making your map…')), error);
+  const title = signUp ? 'Sign up' : TITLE;
+  gate(title, gateRow(h('span', { class: 'muted grow' }, from ? 'Copying the map…' : signUp ? 'Getting ready…' : 'Making your map…')), error);
   try {
     const res = await postJson('/guest', from ? { from } : {});
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error ?? 'That did not work.');
     const { workspace, page_token } = body.result;
-    // A new map opens on the card (firstMoments), over the canvas the agent draws on; a copy, on the copy.
-    keepLanding(workspace.id, `#/v?${from ? QUERY : FIRST_QUERY}`);
-    if (!from) keepFirst({ ws: workspace.id, prompt: body.result.prompt, stage: 'wait', fresh: true });
     // The page token is this browser's sign-in, remembered as any workspace is: signing in to keep the map
     // (packs/identity/page/authorize.js, /oauth/authorize opened by the agent's installer) finds the guest by it.
     store.token = page_token;
     known.remember(workspace);
+    // On to Sign up with no reload: nothing of the map is drawn on it, and its land runs on from this page, unbroken.
+    if (signUp) return void ((making = false), location.replace('#/sign-up?new=1'));
+    // A new map opens on the card (firstMoments), over the canvas the agent draws on; a copy, on the copy.
+    keepLanding(workspace.id, `#/v?${from ? QUERY : FIRST_QUERY}`);
+    if (!from) keepFirst({ ws: workspace.id, prompt: body.result.prompt, stage: 'wait', fresh: true });
     enter(page_token);
   } catch (err) {
     making = false;
     error.textContent = err.message;
-    gate(TITLE, gateRow(h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => tryPage(query) }, 'Try again')), error);
+    gate(title, gateRow(h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => tryPage(query) }, 'Try again')), error);
   }
 }
