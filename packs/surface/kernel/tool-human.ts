@@ -17,7 +17,7 @@ import { UI_DIRS } from './ui-files.ts';
 import { backupNow, needAdmin } from './tool-config.ts';
 import { op } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
-import { eventsAfter, factsAfter, factsUpTo, HELD_MOST, headPos, ISLANDS_MOST, madeAfter } from '../../log/kernel/tail.ts';
+import { eventsAfter, factsAfter, HELD_MOST, headPos, ISLANDS_MOST, madeAfter } from '../../log/kernel/tail.ts';
 import { typeItemsIn, typesTaken } from '../../loader/kernel/type-items.ts';
 import { movesAgain, syncTypes } from '../../loader/kernel/typetable.ts';
 
@@ -35,7 +35,6 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       seq: z.number().int().nonnegative().optional().describe('The `seq` of the last answer: what other events after it touched is said.'),
       ids: z.array(z.string()).max(HELD_MOST).optional().describe('The items and links the page holds. Facts are read only on these, the links made touching them, and what those bring.'),
       islands: z.array(z.string()).max(ISLANDS_MOST).optional().describe('The islands the page’s views touch, by id: facts on what lives on them are read too, so a view hears what may change what its query finds.'),
-      was: z.number().int().nonnegative().optional().describe('A position: every fact said of the `ids` up to it, for the page to fold into what they were then (`was`), where its reader last looked.'),
       page: z
         .object({ page: z.string().max(40), on: z.boolean(), where: z.string().max(2000).optional(), tab: z.object({ chat: z.string().max(40), own: z.boolean() }).optional(), lands: z.array(z.string().max(60)).max(24).optional() })
         .optional()
@@ -43,7 +42,7 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       tries: z.number().int().nonnegative().optional().describe('The `at` of the last tries heard (0 for none): answered with only the tries of code the person looking sent (packs/surface/kernel/tool-preview.ts), once they move after it.'),
       wait: z.number().int().min(0).max(25).optional().describe('With tries: seconds to wait for them to move.'),
     },
-    run: async (l, _actor, { after, seq, ids = [], islands = [], page, was, tries, wait }) => {
+    run: async (l, _actor, { after, seq, ids = [], islands = [], page, tries, wait }) => {
       // The tries a page waits for, apart from the rest: one call held open until they move.
       if (tries !== undefined) return { tries: await triesAfter(l, tries, wait) };
       // The page says it is open and where it stands, and is given what its screen shows (the presence pack's act.report.screen).
@@ -51,11 +50,10 @@ export const HUMAN_TOOLS: Record<string, Tool> = {
       const [queue, { told, ...seen }, pos] = await Promise.all([l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending' -- index proposal_status`), screen, headPos(l.db)]);
       const stand = { queue: `${queue.rows[0].n}.${told}`, ...seen, ui: uiStamp() };
       const events = await eventsAfter(l.db, { seq, ids });
-      const then = was === undefined ? {} : { was: await factsUpTo(l.db, { pos: was, ids }) };
-      if (after === undefined) return { ...stand, pos, seq: events.seq, ...then };
+      if (after === undefined) return { ...stand, pos, seq: events.seq };
       // Holding nothing, the page is still told how many items were made: a view of a type on an empty map asks again.
       const facts = ids.length ? await factsAfter(l.db, { after, ids, islands }) : { pos, entries: [], gone: [], made: await madeAfter(l.db, after, pos) };
-      return { ...stand, ...facts, seq: events.seq, events: events.ids, ...then };
+      return { ...stand, ...facts, seq: events.seq, events: events.ids };
     },
   },
   import_backup: {

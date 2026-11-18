@@ -15,6 +15,8 @@ const DAY = /^(\d{4})-(\d{2})-(\d{2})/;
 const WEB = /^https?:\/\/\S+$/i;
 /** A field's name, as a key may carry it. */
 const NAME = /^[A-Za-z0-9_.-]{1,60}$/;
+/** How many of a set's names its folded line says. */
+const SAID = 3;
 
 const plain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const scalar = (v) => v === null || typeof v !== 'object';
@@ -44,12 +46,15 @@ export function one(v, { fold = 80 } = {}) {
 /** What a value with parts says, folded to one line. */
 function summary(v) {
   if (Array.isArray(v)) return `${v.length} ${v.length === 1 ? 'row' : 'rows'}`;
-  return Object.keys(v).map(label).join(', ');
+  // A button keeps its width, so a long set of names would push the row past the page: a few, then how many more.
+  const names = Object.keys(v).map(label);
+  return names.length > SAID ? `${names.slice(0, SAID).join(', ')} +${names.length - SAID}` : names.join(', ');
 }
 
 /** A value with parts, open: a list's entries side by side, rows one under another, names with their values. */
 function opened(v) {
-  if (Array.isArray(v) && v.every(scalar)) return ['box', { flow: 'row', gap: 2, wrap: true }, ...v.map((x) => one(x))];
+  // Entries side by side read as one: [1, 0] is not ten.
+  if (Array.isArray(v) && v.every(scalar)) return ['box', { flow: 'row', gap: 2, wrap: true }, ...v.flatMap((x, i) => (i ? [['text', { look: 'muted' }, '·'], one(x)] : [one(x)]))];
   if (Array.isArray(v)) return ['list', { look: 'rows' }, ...v.map((row) => (plain(row) ? ['box', { flow: 'row', gap: 3 }, ...Object.entries(row).map(([k, x]) => ['text', { tip: label(k) }, scalar(x) ? String(x ?? '—') : JSON.stringify(x)])] : one(JSON.stringify(row))))];
   return ['list', {}, ...Object.entries(v).map(([k, x]) => ['box', { flow: 'row', gap: 3 }, ['text', { look: 'muted' }, label(k)], scalar(x) ? one(x) : ['text', { look: 'code' }, JSON.stringify(x)]])];
 }
@@ -59,8 +64,8 @@ function code(name, v, open) {
   const text = typeof v === 'string' ? v : Object.entries(v).map(([k, x]) => `// ${k}\n${x}`).join('\n\n');
   const lines = text.split('\n').length;
   return open
-    ? ['box', { flow: 'column', gap: 1 }, ['button', { key: `field-fold:${name}`, look: 'quiet', tip: 'Fold it' }, `${lines.toLocaleString()} lines`], ['text', { look: 'code' }, text]]
-    : ['button', { key: `field-fold:${name}`, look: 'quiet', tip: 'Open it' }, `${lines.toLocaleString()} lines`];
+    ? ['box', { flow: 'column', gap: 1 }, ['button', { key: `field-fold:${name}`, look: 'quiet', tip: 'Fold it' }, `${lines.toLocaleString()} ${lines === 1 ? 'line' : 'lines'}`], ['text', { look: 'code' }, text]]
+    : ['button', { key: `field-fold:${name}`, look: 'quiet', tip: 'Open it' }, `${lines.toLocaleString()} ${lines === 1 ? 'line' : 'lines'}`];
 }
 
 /** A field's value as it reads, by its declared kind, else its shape. `open`: what has parts is shown whole. */

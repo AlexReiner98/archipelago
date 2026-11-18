@@ -5,11 +5,11 @@
 /** The page part's body, drawn in the sheet. */
 export const PAGE = `#sheet [data-part-id="sheet.page"]`;
 
-/** A mark of the page part by its key: `walk` (Walk from it), `link-start` (Link), `section:history`... An input carries no key on the page. */
+/** A mark of the page part by its key: `walk` (Walk from it), `link-start` (Link), `section:source`... An input carries no key on the page. */
 export const mark = (key: string) => `${PAGE} [data-key="${key}"]`;
 
 /** An expression: the page's title, as written in its title's box or read where it may not be written. */
-export const title = `(document.querySelector('${PAGE} input.pm-input-title')?.value ?? document.querySelector('${PAGE} .pm-text')?.textContent ?? '')`;
+export const title = `(document.querySelector('${PAGE} .pm-input-title')?.value ?? document.querySelector('${PAGE} .pm-text')?.textContent ?? '')`;
 
 /** An expression: whether the page part draws the mark with this key. */
 export const has = (key: string) => `Boolean(document.querySelector('${mark(key)}'))`;

@@ -281,9 +281,15 @@ const piecesOn = (data) => {
 /** The buttons the screens on this item declare: they stand in its page's head (packs/sheet/page/item.js), not in the column. */
 export const buttonsOn = (data) => piecesOn(data).filter((p) => p.piece === 'button');
 /** What the screens on this item add to its bare page (packs/sheet/page/item.js), as sections of it: each a node, filled once it is read. */
-export const sectionsOn = (data) =>
-  piecesOn(data)
-    .filter((p) => SECTIONS.includes(p.piece))
+export const sectionsOn = (data) => drawnOn(data, piecesOn(data).filter((p) => p.place !== 'lead' && SECTIONS.includes(p.piece)));
+/**
+ * What the screens on this item stand in its band, under its title (`place: "lead"`, decision e_x89zp8uz): any piece,
+ * the kernel's or one a pack's part draws (piece.<name>), drawn there in place of below the source.
+ */
+export const leadsOn = (data) => drawnOn(data, piecesOn(data).filter((p) => p.place === 'lead' && p.piece !== 'button'));
+/** Pieces drawn for an item's page, each a node, filled once it is read. */
+const drawnOn = (data, pieces) =>
+  pieces
     .map((p) => {
       const d = draw({ e: data.entity, id: data.entity.id }, p);
       Promise.resolve(d?.later?.()).catch((err) => d.node.isConnected && d.node.replaceChildren(h('div', { class: 'error' }, err.message)));

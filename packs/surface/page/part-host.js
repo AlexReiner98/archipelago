@@ -30,8 +30,6 @@ import { hearAway, tellAway } from './part-away.js';
 import { focusWindow, goHash, hearPage, openWindow, pageOf } from './part-page.js';
 import { AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
 import { paintSwatch, tryTheme } from './swatch.js';
-import { replayIn } from './replay.js';
-import { project } from './project.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -285,8 +283,6 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
     // A style preset's colours, and a theme tried on this screen alone: the page's, as a part paints no colour.
     swatch: (preset, el) => paintSwatch(preset, el),
     tryTheme: (preset) => tryTheme(preset),
-    // What the person missed, played on the canvas the part stands over (its store, hooks.storeUnder: ./canvas.js).
-    replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
     // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
     ghosts: (list) => hooks.ghosts?.(node, list),
     // A `slot` mark: a slot this part opens, filled by its parts in the mark's node, unseen by the holder; a few deep at most.
@@ -309,9 +305,6 @@ addEventListener('storage', (ev) => {
   if (!ev.key?.startsWith('pelago-part:')) return;
   for (const { m } of mountedNow()) if (ev.key.startsWith(keptKey(m.part, m.item))) void m.refresh();
 });
-
-/** Whether a part is mounted on a slot now: what is worked out only for one (the beat's rows for `traces`) waits on it. */
-hooks.slotFilled = (slot) => [...mountedNow()].some(({ m }) => m.part.slot === slot && m.node.isConnected);
 
 /** Hand every part on these slots its input again. */
 const refreshOn = (slots) => { for (const { m } of mountedNow()) if (slots.includes(m.part.slot)) void m.refresh(); };

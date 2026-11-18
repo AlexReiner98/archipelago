@@ -184,6 +184,8 @@ export interface PieceDef {
   page?: string;
   /** Its own heading, where the screen's title is not it. */
   title?: string;
+  /** On an item's page: "lead" stands it in the band under the title, before the head and the note (decision e_x89zp8uz); left out, it is a section below the source. */
+  place?: 'lead';
   /** For attention: whose ("me", or nobody for everyone) and which reasons; on an item's page, only what is that item's. */
   person?: string;
   reasons?: string[];
@@ -378,6 +380,7 @@ export function checkDeclared(pack: PackFile, types: Map<string, ResolvedType>, 
       for (const key of needs ?? []) if (!piece[key as keyof PieceDef]) problems.push(`${at}: a ${piece.piece} piece names its ${key}`);
       if (piece.view && !parts(pack).views.some((v) => v.id === piece.view && v.shape === 'rows')) problems.push(`${at}: the pack declares no view "${piece.view}" of rows`);
       if (piece.action && !parts(pack).actions.some((a) => a.id === piece.action)) problems.push(`${at}: the pack declares no action "${piece.action}"`);
+      if (piece.place !== undefined && (piece.place !== 'lead' || !screen.on?.length || piece.piece === 'button')) problems.push(`${at}: place is "lead", on a screen on an item's types, for a piece that is not a button`);
       if (piece.piece === 'button' && !piece.action === !piece.draw) problems.push(`${at}: a button does one thing: its pack's action, or draw`);
       if (piece.draw && !Object.keys(piece.draw).every((k) => ['style', 'shape'].includes(k))) problems.push(`${at}: a button's draw says "style" or "shape"`);
       if (piece.page && !pages.includes(piece.page)) problems.push(`${at}: the kernel draws no page "${piece.page}": one of ${PAGES.join(', ')}, or one its pack provides or requires as service:page.<name>`);

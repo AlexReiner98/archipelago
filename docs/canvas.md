@@ -166,7 +166,16 @@ value from a menu, a day, yes or no, an item) is a change at once, and words
 page's one Save (decided 26 Oct 2026, e_mvzugyga). System fields are only
 read. What a field means beyond its kind comes from capabilities: a question
 whose type declares `settles.choices` (and `chosen`, `why`, `on`) is settled
-by picking one, as one change (e_xyxct9nq). A note is written in one dialect (`packs/kit/page/text.js`: titles,
+by picking one, as one change (e_xyxct9nq). The page opens on one band under its
+title, before its head (decision e_ktr4vbcd, `packs/sheet/parts/page/lead.js`): a question that settles
+on its choices, or its answer once settled; any other type on what its capability `lead` declares, as
+data a pack ships: a `measure` (its `value` large, with `unit` and `as_of`), an `alert` while the boolean
+`unless` is false (with `says`, and a press that makes it true), or a `timeline` of the beats a json
+`beats` field keeps. Fields the band shows are not shown again below it. The head is one line of marks under the title (type, status as a
+pick, age, who may see it, the owner, how sure only when not sure: e_x3h4vbe7). An item that waits on the
+person looking says so in the band, with what for (a state, not a listed link: e_xj9cs33u). A screen's
+piece with `place: "lead"` stands in the band too, the kernel's own or one a pack's part draws as
+`piece.<name>` (e_x89zp8uz). A note is written in one dialect (`packs/kit/page/text.js`: titles,
 lists, checklists, callouts, tables, code, emphasis, links, items by id),
 read the same by the sheet and the published reader; ticking a checklist is a
 change to that line. How it looks is the style's `notes` (callout colours, the
@@ -328,10 +337,10 @@ out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
   the pane the reader is in or touched last (the owner, 28 and 29 Oct 2026);
   in a tab that follows the session alone every pane is its own. A page that
   is not a canvas opens over a pane only there, else in a tab of its own;
-- a show brings its tab into sight (the owner, 4 Nov 2026: "the tab you
-  open should automatically take focus", e_uh7qu8ts). Only a show sent with
-  `focus: false` is drawn in a tab out of sight, where its mark rings
-  (e_xjrpyysn); a change, a tell or a session's tab opening brings none;
+- a show never moves the reader's view (the owner, 17 Nov 2026, decision
+  e_mnuthcap, in place of e_uh7qu8ts): a show of an item on an island puts
+  that island on their canvas and lights the item in the side bar; any other
+  is drawn in a tab out of sight, where its mark rings (e_xjrpyysn);
 - a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
   in the last twenty seconds, text selected there, or words typed in the
   sheet and not saved; moving the pointer or turning a dial is not busy) is

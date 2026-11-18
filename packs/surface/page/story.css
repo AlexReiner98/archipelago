@@ -11,5 +11,3 @@
 .beat-more { padding: var(--space-2) var(--space-8) var(--space-6) calc(var(--space-8) + var(--rhythm-8) + var(--space-5)); max-width: var(--measure); }
 .beat-more p { margin: 0 0 var(--space-4); }
 .beat-items { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-7); font-size: var(--text-4); }
-/* The overlay of traces over the canvases (the catch_up pack's parts): what changed since the person last looked, offered to play, stands where the old band stood. */
-#traces { position: fixed; right: var(--space-9); top: calc(var(--box-8) + var(--space-9)); z-index: 5; white-space: nowrap; }

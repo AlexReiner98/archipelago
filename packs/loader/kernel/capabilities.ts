@@ -94,8 +94,25 @@ export interface Subject {
   link: string;
 }
 
+/**
+ * What its page opens on, under its title: one band in a form the page draws, filled
+ * from the fields named. A measure is its number large (value, unit, as of); an alert is said while a boolean field is
+ * false (unless), with what would clear it (says); a timeline is the beats a json field keeps ({ at, said }). A
+ * question that settles opens on its choices, or its answer once settled, with no lead declared.
+ */
+export interface Lead {
+  form: 'measure' | 'alert' | 'timeline';
+  value?: string;
+  unit?: string;
+  as_of?: string;
+  unless?: string;
+  says?: string;
+  beats?: string;
+}
+
 export interface Capabilities {
   subject?: Subject;
+  lead?: Lead;
   bound?: Bound;
   when?: When;
   where?: Where;
@@ -115,7 +132,7 @@ export interface Capabilities {
   focus?: boolean;
 }
 
-export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'promised', 'owned', 'actionable', 'plannable', 'kernel', 'subject', 'focus'] as const;
+export const CAPABILITIES = ['bound', 'when', 'where', 'capacity', 'settles', 'watch', 'promised', 'owned', 'actionable', 'plannable', 'kernel', 'subject', 'focus', 'lead'] as const;
 
 const DATES = ['date', 'datetime'];
 
@@ -132,7 +149,7 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     else if (!types.includes(def.type)) problems.push(`${what} reads "${field}", a ${def.type}, not a ${types.join(' or ')}`);
   };
   for (const name of Object.keys(caps)) if (!(CAPABILITIES as readonly string[]).includes(name) && !opened.includes(name)) problems.push(`"${name}" is not a capability: one of ${CAPABILITIES.join(', ')}, or one its pack provides or requires as service:capability.<name>`);
-  const { bound, when, where, capacity, settles, watch, promised } = caps;
+  const { bound, when, where, capacity, settles, watch, promised, lead } = caps;
   if (bound) {
     if (!bound.field) problems.push('bound needs a field');
     if (bound.limit !== undefined && bound.below !== undefined) problems.push('bound has a limit or a field it stays above, not both');
@@ -182,6 +199,17 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     has('watch', watch.field, ['url', 'string']);
     for (const s of [watch.up, watch.down, ...(watch.also ?? []), ...(watch.idle ? [watch.idle] : [])]) if (!statuses.includes(s)) problems.push(`watch names "${s}", which is no status of it`);
     has('watch.commit', watch.commit, ['string']);
+  }
+  if (lead) {
+    const needs = { measure: ['value'], alert: ['unless'], timeline: ['beats'] }[lead.form];
+    if (!needs) problems.push('lead.form is "measure", "alert" or "timeline"');
+    for (const key of needs ?? []) if (!lead[key as keyof Lead]) problems.push(`a ${lead.form} lead names its ${key}`);
+    has('lead.value', lead.value, ['number', 'json', 'string']);
+    has('lead.unit', lead.unit, ['string']);
+    has('lead.as_of', lead.as_of, DATES);
+    has('lead.unless', lead.unless, ['boolean']);
+    has('lead.says', lead.says, ['string']);
+    has('lead.beats', lead.beats, ['json']);
   }
   for (const flag of ['owned', 'actionable', 'plannable', 'kernel'] as const) if (caps[flag] !== undefined && caps[flag] !== true) problems.push(`${flag} is true, or left out`);
   if (caps.subject && !relations.has(caps.subject.link)) problems.push(`subject is linked by "${caps.subject.link}", which is no relation`);

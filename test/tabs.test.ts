@@ -29,7 +29,7 @@ test('in a browser, every chat that shows something has a tab named by its title
   const until = async (what: string, ok: () => Promise<boolean>) => {
     if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${JSON.stringify(await strip())} ${page.logs().join('\n')}`);
   };
-  const show = (n: number, item: string) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[item], run: sessions[n].run, focus: false } });
+  const show = (n: number, item: string) => call('/agent/report', undefined, { actor: agent, action: 'show', params: { entity: made[item], run: sessions[n].run } });
   /** The tab named `name`, as an expression of the page. */
   const tabNamed = (name: string) => `[...document.querySelectorAll('${TAB}')].find((t) => t.querySelector('[data-key^="front:"]').textContent === ${JSON.stringify(name)})`;
   /** Its name, as a selector to press. */

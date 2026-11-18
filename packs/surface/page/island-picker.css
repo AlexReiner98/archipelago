@@ -57,3 +57,25 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 /* Recent: where work is now, named in full colour, when at its right. */
 #islands .isl-sec-recent .isl-row .isl-name { color: var(--text); }
 #islands .isl-row:not(.on, .isl-hit) .isl-name:hover { color: var(--text); }
+
+/* The chats at work (./island-sessions.js): a row each, its state a mark in the room the island rows keep for their dot. */
+#islands .isl-chat::before { display: none; }
+#islands .isl-chat-mark { flex: none; width: var(--space-5); color: var(--muted); text-align: center; }
+#islands .isl-chat:is([data-state="waiting"], [data-state="your_move"]) .isl-chat-mark { color: var(--warn); width: var(--text-5); height: var(--text-5); }
+#islands .isl-chat[data-state="working"] .isl-chat-mark { color: var(--ok); }
+#islands .isl-chat .isl-name { color: var(--text); }
+/* An island a show added: its row on the soft ground and its name bold until it is pressed (decision e_mnuthcap). */
+#islands .isl-row.shown { background: var(--accent-soft); }
+#islands .isl-row.shown .isl-name { color: var(--text); font-weight: 600; }
+/* The count of chats waiting on the owner, in the band beside the islands button: an inbox, its count raised at its
+   top right in the warning's colour, a word and no capsule. */
+#query .q-waiting { position: relative; flex: none; display: inline-grid; place-items: center; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: 0; background: none; font: inherit; color: var(--text); cursor: pointer; }
+#query .q-waiting[hidden] { display: none; }
+#query .q-waiting:hover { background: var(--accent-soft); }
+#query .q-waiting-badge { position: absolute; top: 0; right: 0; color: var(--warn); font-size: var(--text-1); font-weight: 700; line-height: 1; }
+
+/* What waits on the owner, wherever it is drawn: the inbox (inbox.svg), painted in the colour of what holds it. A tab's
+   mark (the sessions pack's part, toned accent for a session waiting on the owner) is painted the same, its glyph hidden. */
+.on-you, #tabs [data-slot="tab.mark"] .pm-text-mark.pm-tone-accent::before { display: inline-block; width: var(--text-6); height: var(--text-6); vertical-align: middle; background: currentColor; -webkit-mask: url(/inbox.svg) center / contain no-repeat; mask: url(/inbox.svg) center / contain no-repeat; }
+#tabs [data-slot="tab.mark"] .pm-text-mark.pm-tone-accent { font-size: 0; color: var(--warn); }
+#tabs [data-slot="tab.mark"] .pm-text-mark.pm-tone-accent::before { content: ''; }

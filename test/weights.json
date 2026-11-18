@@ -103,7 +103,6 @@
   "test/bake-record.test.ts": { "pglite": 0, "postgres": 0 },
   "test/baked.test.ts": { "pglite": 0, "postgres": 0 },
   "test/bar-query.test.ts": { "pglite": 0.1, "postgres": 0 },
-  "test/beat-rows.test.ts": { "pglite": 0.1, "postgres": 0.1 },
   "test/blocking.test.ts": { "pglite": 5.1, "postgres": 2.2 },
   "test/bookkeeping-log.test.ts": { "pglite": 2.7, "postgres": 1.2 },
   "test/boot.test.ts": { "pglite": 0.1, "postgres": 0.1 },

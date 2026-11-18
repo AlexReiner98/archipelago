@@ -73,7 +73,7 @@ async function readBody(req: IncomingMessage, most = BODY_MAX): Promise<Buffer> 
 const bodies = new WeakMap<IncomingMessage, Promise<unknown>>(); // read once: a person token's call is routed by what its body names
 const readJson = (req: IncomingMessage, most = BODY_MAX): Promise<unknown> => bodies.get(req) ?? (bodies.set(req, readBody(req, most).then((b) => { const text = b.toString('utf8'); try { return text ? JSON.parse(text) : undefined; } catch { throw new Refused(400, 'The body is not JSON.'); } })), bodies.get(req)!);
 
-const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css', woff2: 'font/woff2' };
+const MIME: Record<string, string> = { html: 'text/html', js: 'text/javascript', css: 'text/css', woff2: 'font/woff2', svg: 'image/svg+xml' };
 
 class Refused extends Error {
   readonly status: number;

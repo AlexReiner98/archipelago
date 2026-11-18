@@ -9,7 +9,7 @@ export const STATES = ['waiting', 'your_move', 'blocked', 'working', 'quiet', 'i
 /** What the key calls each state. */
 export const STATE_WORDS = { waiting: 'Waiting', your_move: 'Your move', blocked: 'Blocked', working: 'Working', quiet: 'Quiet', idle: 'Idle', done: 'Done' };
 /** The shapes a state's mark may take. */
-export const SHAPES = ['disc', 'ring', 'half', 'square', 'diamond', 'triangle'];
+export const SHAPES = ['disc', 'ring', 'half', 'square', 'diamond', 'triangle', 'inbox'];
 const NAMED = /^[a-z]+$/;
 
 /** A run's session, where the answer gives one. */
@@ -66,6 +66,14 @@ export function stateMark(m, state, mark, cx, cy, r) {
   if (mark.shape === 'half') return m('g', { class: cls }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-ss-fill' }));
   if (mark.shape === 'square') return m('rect', { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r, class: cls });
   if (mark.shape === 'diamond') return m('path', { d: `M${cx} ${cy - r}L${cx + r} ${cy}L${cx} ${cy + r}L${cx - r} ${cy}Z`, class: cls });
+  // What waits on the owner, as the page draws it everywhere (packs/surface/page/inbox.svg): a tray open at the top, its
+  // lip dipping in the middle, its points that drawing's in parts of the dot's radius.
+  if (mark.shape === 'inbox') {
+    const at = (x, y) => `${cx + x * r} ${cy + y * r}`;
+    const tray = `M${at(-1, 0.25)}L${at(-0.7, -0.75)}L${at(0.7, -0.75)}L${at(1, 0.25)}L${at(1, 0.75)}L${at(-1, 0.75)}Z`;
+    const lip = `M${at(-1, 0.25)}L${at(-0.42, 0.25)}L${at(-0.25, 0.5)}L${at(0.25, 0.5)}L${at(0.42, 0.25)}L${at(1, 0.25)}`;
+    return m('g', { class: cls }, m('path', { d: tray }), m('path', { d: lip }));
+  }
   return m('path', { d: `M${cx} ${cy - r}L${cx + r} ${cy + r}L${cx - r} ${cy + r}Z`, class: cls });
 }
 
@@ -74,5 +82,6 @@ export const hueRules = (marks) => [...marks].map(([state, s]) => `.lf-ss-${stat
 
 export const css = `
 .lf-ss { fill: var(--lf-ss); stroke: var(--lf-ss); stroke-width: var(--ln-flow-dot-ring); }
-.lf-ss.ring, .lf-ss.half circle { fill: none; } .lf-ss-fill { fill: var(--lf-ss); stroke: none; }
+.lf-ss.ring, .lf-ss.half circle, .lf-ss.inbox { fill: none; } .lf-ss-fill { fill: var(--lf-ss); stroke: none; }
+.lf-ss.inbox { stroke-linejoin: round; }
 `;

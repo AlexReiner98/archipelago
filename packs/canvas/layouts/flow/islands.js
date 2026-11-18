@@ -42,7 +42,10 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
   const layer = g.islands.map((isle) => {
     const rects = isle.land.map(rectOf);
     // The land a tint of the island's colour, its shore a line of it round the frame.
-    const land = m('g', { class: 'lf-land' }, ...rects.map((r) => m('rect', r)));
+    // A painted island's land hears the pointer for its look (./painted.js), and holds a spot its look's tip stands beside.
+    const land = isle.canvas
+      ? m('g', { key: `paint:${isle.id}`, on: ['move', 'leave', 'click'], class: 'lf-land lf-painted' }, ...rects.map((r) => m('rect', r)), m('rect', { key: `spot:${isle.id}`, class: 'lf-spot', x: isle.canvas.at[0], y: isle.canvas.at[1], width: 1, height: 1 }))
+      : m('g', { class: 'lf-land' }, ...rects.map((r) => m('rect', r)));
     const shore = m('g', { class: 'lf-shore' }, ...rects.map((r) => m('rect', r)));
     const title = named.get(isle.id);
     const name = title && titled(m('a', { href: `#/e/${isle.id}`, class: 'lf-island-name' }, m('text', { x: isle.name[0] + z('island_name_x'), y: isle.name[1] }, title)), title);
@@ -92,6 +95,10 @@ export const css = `
 /* An island: its shore its frame's outline in its colour, its land a tint of it over the sea, under every wire. */
 .lf-island { --lf-land: color-mix(in srgb, var(--lf-island, var(--ln-line)) var(--ln-flow-island-tint), var(--ln-sea)); }
 .lf-region { pointer-events: none; }
+/* A painted island's land takes the pointer for its look, which says when it points at something; its tip's spot is never seen. */
+.lf-region .lf-painted { pointer-events: all; }
+.lf-painted.pointing { cursor: pointer; }
+.lf-spot { fill: none; stroke: none; pointer-events: none; }
 .lf-land rect { fill: var(--lf-land); stroke: none; }
 /* The add row: a button the page answers (ui/marks-add.js), lit as the pointer comes to it. */
 .lf-island-add { pointer-events: auto; cursor: pointer; color: var(--ln-muted); outline: none; }
