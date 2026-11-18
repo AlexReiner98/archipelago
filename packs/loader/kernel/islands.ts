@@ -135,3 +135,24 @@ export function islandsOff(found: Iterable<Manifest>, local: string): Map<string
   }
   return off;
 }
+
+/**
+ * The packs whose types an island speaking `pack` holds (feature e_4r82mvf3, decision e_rdfvhra7): the pack itself and,
+ * along each type or link type it requires by name, the pack that declares it, and so on up, so a Design island holds
+ * Build's lanes beneath Design's own types. Read from the packs active on the map.
+ */
+export function spokenWith(pack: string, packs: readonly Manifest[]): Set<string> {
+  const declares = new Map(packs.flatMap((m) => [...parts(m).types, ...parts(m).relations].map((t) => [t.id, m.id] as const)));
+  const byId = new Map(packs.map((m) => [m.id, m]));
+  const out = new Set<string>();
+  for (let front = [pack]; front.length;) {
+    const next: string[] = [];
+    for (const id of front) {
+      if (out.has(id)) continue;
+      out.add(id);
+      for (const r of byId.get(id)?.requires ?? []) { const n = needOf(r); const by = n.by === 'type' ? declares.get(n.name) : undefined; if (by && !KERNEL_PACKS.includes(by)) next.push(by); }
+    }
+    front = next;
+  }
+  return out;
+}

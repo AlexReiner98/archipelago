@@ -76,3 +76,14 @@ test('Build off on the island: Design waits, lacking what Build gave', async () 
   assert.ok(b.parts.every((p: { state: string }) => p.state === 'off'), 'and of a pack off, is off');
   assert.equal(b.lacks, undefined, 'a pack off lacks nothing: it is off');
 });
+
+test('an island speaking Design holds Build’s types too, and an item of a type turned off there waits saying so', async () => {
+  const { l, isle } = await map();
+  const { o } = await make(l, [{ op: 'create', ref: 'o', type: 'build.overlap', title: 'Tokens meet layout', props: { island: isle } }]);
+  await make(l, [{ op: 'update', id: isle, props: { parts_off: ['build.overlap'] } }]);
+  const answer = (await queryFlatPack.flatRead(kernelContext(l, 'query'), { filter: { find: [`island ${isle}`] } })) as any;
+  const item = answer.items.find((i: { id: string }) => i.id === o);
+  assert.deepEqual(item.waiting, { pack: 'build', why: 'build.overlap is turned off on this island' });
+  const study = answer.items.find((i: { type: string }) => i.type === 'design.study');
+  assert.equal(study.waiting, undefined, 'what is still on does not wait');
+});

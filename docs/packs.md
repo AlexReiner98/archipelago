@@ -372,12 +372,21 @@ The island rules, for an island pack:
   `title`, `description`, `requires`, `types`, `links`, `rules`, `views` and
   `styles`. Of `views`, only what the kernel draws (trees, screens,
   attention); of `styles`, only instructions and lenses, no looks.
-- **The shared set alone.** `requires` names capabilities and shared types
-  (`has:`, `type:`), and no pack but core and no event, `uses`
+- **The shared set, and what it requires.** `requires` names capabilities
+  and types (`has:`, `type:`), and no pack but core and no event, `uses`
   is not there, no `types` entry has `of`, and its types, link ends and rules
   name only its own types, the shared set (core's `shared`: the eight starter
-  types, task, decision and finding), a capability or `*`. Its links extend
-  core's or its own.
+  types, task, decision and finding), a type or link type it requires by name,
+  a capability or `*`. Its links extend core's, its own or one it requires.
+- **Extending.** An island pack extends another by requiring the other's
+  types by name (decision e_rdfvhra7; no key names the pack, as decision
+  e_f9ybsuce has it): Design requires `type:build.feature`, `type:build.lane`
+  and `type:build.in_lane` and its `design.study` extends `build.feature`.
+  Whichever active pack declares those is the parent, so another could stand
+  in. An island speaking Design holds the parent's types too, and theirs up
+  the line (`spokenWith`, `packs/loader/kernel/islands.ts`). With the parent
+  off there, Design waits, its `lacks` naming each name no active pack gives
+  (`PackState.lacks`, `packs/loader/kernel/packorder.ts`).
 - A shared type no pack taken there declares (task and decision, while work
   is not taken) cannot be built on: a pack that does waits.
 
@@ -419,6 +428,31 @@ pack's (0.1.0 unless said), and its `manifest` what it declares, as a
   an edit to it is said there again. An agent's edit of one, or bringing one
   back, waits for the owner (core's rule `agent_packs`). Retired or archived,
   it leaves the registry and its items turn dormant.
+
+## Parts on one island
+
+Every declaration of a pack is a part, by its id: a type, a link type, a rule,
+a view, an instruction, a lens, a style (feature e_4r82mvf3,
+`packs/loader/kernel/island-parts.ts`). What a part needs is read off what it
+names: a type its parent, a link type its ends, a rule the types it judges, a
+view or style the types it is on.
+
+- **The island turns them off.** An island or focus lists the parts it has off
+  in `parts_off`, beside `packs_off`; a pack never drops another's parts
+  (decision e_8cfbg5qm). Its registry is the map's with those taken out before
+  the packs are ordered, and every part that needs one (across packs) with
+  them, waiting (decision e_vqf2abmw). A type off is kept dormant: its items
+  stay and wait, saying so, and no new one is made there; a rule off judges
+  nothing there; a pack that requires a name a part off gave waits.
+- **Never the kernel's.** Core's parts are never turned off; an agent's change
+  to `parts_off` is judged as one to `packs_off` is.
+- **What the answer says.** The island answer gives `parts_off`, and for its
+  pack and each it requires, `parts` (each with its state there and what it
+  lacks), `provides`, `consumes` (each with the pack that gives it there) and
+  `lacks` while waiting (`packs/loader/kernel/island-decl.ts`). The island's
+  header draws each pack's glyph; a click opens its parts as glyphs that
+  toggle, and the tip says what each gives, takes and lacks
+  (`packs/canvas/layouts/flow/pack-marks.js`).
 
 ## A version on one island
 

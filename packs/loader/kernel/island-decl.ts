@@ -100,11 +100,14 @@ export function requiredBy(run: Registry, id: string): string[] {
 /** The pack an item's type is of, as the island's registry has it, else the map's. */
 const packOf = (map: Registry, run: Registry, type: string) => (run.type(type) ?? map.type(type))?.pack;
 
-/** Why an item of a type waits on an island that runs `run`, or undefined while its pack is active there. */
+/** Why an item of a type waits on an island that runs `run`, or undefined while its pack and its type are on there. */
 export function waitingOf(map: Registry, run: Registry, type: string): Waiting | undefined {
   const pack = packOf(map, run, type);
   if (!pack) return undefined;
   const s = run.states.get(pack);
+  // Its pack on, the type itself may be a part the island turned off, or one that waits on such a part (packs/loader/kernel/island-parts.ts).
+  const part = run.partStates.get(type);
+  if (s?.state === 'active' && part) return { pack, why: part.state === 'off' ? `${type} is turned off on this island` : `${type} waits: it lacks ${part.lacks.join(', ')}` };
   if (s?.state === 'active') return undefined;
   return { pack, why: s?.why ?? 'its pack is not on this server' };
 }

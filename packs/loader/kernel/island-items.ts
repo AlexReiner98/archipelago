@@ -9,7 +9,7 @@
 // type marked `crosses` (core's reading) may end across islands only on what that island marks published. An island's
 // pack is fixed once it is made. Off is the default: with the setting off, nothing here is asked.
 
-import { sharedOf } from './islands.ts';
+import { sharedOf, spokenWith } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Op } from '../../write/kernel/pelago-types.ts';
@@ -77,7 +77,7 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
   const moved = new Map<string, Where>(); // id or ref -> where this change puts it
   const cut = ops.flatMap((op) => (op.op === 'unlink' ? [op.relation] : [])); // links this change takes away
   const crosses = [...reg.relations.values()].filter((r) => (r as { crosses?: boolean }).crosses).map((r) => r.id); // the link types that may join two islands
-  const fits = (t: ResolvedType, pack: string) => t.pack === pack || shared.has(t.id);
+  const fits = (t: ResolvedType, pack: string) => t.pack === pack || shared.has(t.id) || spokenWith(pack, reg.packs).has(t.pack); // an island holds the types of the packs its pack extends (islands.ts)
   const refs = new Set(ops.flatMap((op, i) => (op.op === 'create' ? [op.ref ?? `#${i + 1}`] : [])));
   /** An island as props.island names it, as the key this check reads: an island made in this change is named {ref}, which the apply loop turns into its id. */
   const islandKey = (value: unknown): unknown => {
@@ -151,7 +151,7 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
     }
     const { pack, why } = await packOf(island);
     if (why) return `${where}: ${why}`;
-    if (!fits(type, pack!)) return `${where}: a ${type.id} is ${type.pack}’s, and the island ${island} speaks ${pack}: an item there is of ${pack}’s types or the shared set`;
+    if (!fits(type, pack!)) return `${where}: a ${type.id} is ${type.pack}’s, and the island ${island} speaks ${pack}: an item there is of ${pack}’s types, those of the packs it extends, or the shared set`;
   };
 
   for (const [i, op] of ops.entries()) {
