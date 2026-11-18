@@ -78,8 +78,9 @@ function target() {
 }
 
 function wear() {
-  // A land dissipating is let go whole before anything else runs: it is worn again once it has.
-  if (going) return;
+  // A land dissipating is let go whole before anything else runs: it is worn again once it has. Parked: the page is
+  // about to load again (landLeave), and no land is started that the load would cut off.
+  if (going || parked) return;
   const t = target();
   if (!t) return;
   // The same land in the same place runs on; a move between places it shows in keeps it running too.
@@ -143,12 +144,22 @@ function letGo(land, next) {
   const early = ms > 0 && land.stop.leave && next?.code && !next.calm ? start(next, true) : null;
   const done = () => {
     land.stop();
+    // The next page not drawn yet (it waits on the server): the sea stays bare under the last page's words until it
+    // asks (landTurn), at most wait.ready ms, so the emblem and the land never come before the words.
+    if (going.asked || !(wait?.ready > 0)) return show();
+    let shown = false;
+    going.show = () => shown || ((shown = true), show());
+    setTimeout(going.show, wait.ready);
+  };
+  const show = () => {
     going = null;
     // The page moved on again meanwhile, or the next one could not run: worn afresh for where the page is now.
     if (!early || early.failed || target()?.key !== early.key) {
       early?.stop();
       delete document.body.dataset.land;
       delete document.body.dataset.landDrew;
+      // Parked for a load: the page already wears the emblem of where it is going, as it will once loaded.
+      if (parked) wearEmblem(target()?.land ?? null);
       wear();
       return void finish();
     }
@@ -179,13 +190,29 @@ function letGo(land, next) {
  * Null where there is nothing to wait for.
  */
 export function landTurn() {
-  if (going) return going.done;
+  const g = going;
+  if (g) return ((g.asked = true), g.show?.(), g.done);
   const t = target();
   if (!t?.turns) return null;
   // The next page's emblem is fetched while the last land goes, so it is there the moment the page changes.
   if (typeof t.land.emblem === 'string' && EMBLEM.test(t.land.emblem)) new Image().src = t.land.emblem;
   letGo(running, t);
+  // The page asking is the one waiting: shown as soon as the land is ready.
+  if (going) going.asked = true;
   return going?.done ?? null;
+}
+
+/**
+ * Let the land shown dissolve and start none after it: before the page loads again (Try it, entering the map it made),
+ * so the land is not cut off mid-motion and none is started only to be thrown away. Resolves once it has gone.
+ */
+let parked = false;
+export function landLeave() {
+  parked = true;
+  if (going) return going.done;
+  if (!running || running.still) return Promise.resolve();
+  letGo(running, null);
+  return going?.done ?? Promise.resolve();
 }
 
 let soon = 0;
@@ -217,6 +244,9 @@ export function landShown(since) {
 export function startLand() {
   hooks.landShown = landShown;
   hooks.landTurn = landTurn;
+  hooks.landLeave = landLeave;
+  // The load did not come (the map could not be made): the page wears its land again.
+  hooks.landBack = () => ((parked = false), again());
   // Asked already where the page opens before a workspace (packs/surface/page/early.js): taken now, so the land starts at once.
   if (globalThis.pelagoEarly?.theme) servedStyle();
   onTheme((next) => ((style = next), again()));
