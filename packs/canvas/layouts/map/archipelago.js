@@ -46,25 +46,30 @@ export function columned(entries, columns, gap, row) {
 /** The whole picture laid out at once, each island framed where it stands with its name and legend over what it holds. */
 export function compose({ where, items, links, args }, { legends, names = new Map(), sizes, numbers = {}, rooms = new Map(), follows = new Map() }) {
   const z = (k) => sizes[`flow_island_${k}`], [PAD, ROOM, GAP, ROW, COLUMNS] = ['pad', 'name_room', 'legend_gap', 'legend_row', 'legend_columns'].map(z);
-  // The header grows on the land up to the style's flow_island_head_most as the camera zooms out (../flow/islands.js,
-  // .lf-head-scale), from the land's corner: the room under it and beside it is kept for it at that size.
-  const MOST = Number.isFinite(numbers.flow_island_head_most) && numbers.flow_island_head_most > 0 ? numbers.flow_island_head_most : null;
+  // The header grows up to the style's flow_island_head_most as the camera zooms out (../flow/islands.js,
+  // .lf-head-scale), from its foot: up into the sea, the island's top rising with it, never down over what it holds
+  // (verdict e_enzjk53r: no band of empty land under it). Its room on the land is its size at 1; beside it, at its most;
+  // above every island, the sea it may rise into (`rise`).
+  const MOST = Number.isFinite(numbers.flow_island_head_most) && numbers.flow_island_head_most > 1 ? numbers.flow_island_head_most : null;
   const grown = (d) => (MOST ? (PAD + d) * MOST - PAD : d);
   const keys = new Map([...legends].map(([id, rows]) => [id, columned(rows, COLUMNS, GAP, ROW)]));
-  const heads = new Map([...keys].map(([id, key]) => [id, grown((names.get(id) ? ROOM : 0) + (key.h ? key.h + GAP : 0))]));
+  const heads = new Map([...keys].map(([id, key]) => [id, (names.get(id) ? ROOM : 0) + (key.h ? key.h + GAP : 0)]));
+  const rise = MOST ? Math.max(0, ...[...heads.values()].map((h) => (MOST - 1) * (PAD + h))) : 0;
   // Its frame at least as wide as its header: its name (and what follows it, its packs) from its pad, and the pad after.
   const wides = new Map([...names].filter(([, w]) => typeof w === 'number').map(([id, w]) => [id, PAD + grown(PAD + w - sizes.flow_island_name_x)]));
   // And at least as wide as its legend, a column a group of it.
   for (const [id, key] of keys) if (key.w) wides.set(id, Math.max(wides.get(id) ?? 0, PAD + grown(PAD + key.w)));
   // An island whose room is said (a pack's parts, ../flow/parts-islands.js) holds that room as its header, at least as wide.
   for (const [id, r] of rooms) heads.set(id, r.h - PAD), wides.set(id, r.w);
-  const a = laidOut({ ...args, items, links }, { islandOf: (id) => where.get(id) ?? null, heads, wides, follows });
+  const a = laidOut({ ...args, items, links, rise }, { islandOf: (id) => where.get(id) ?? null, heads, wides, follows });
   const shores = a.islands.map((i) => {
     // The name and legend stand in the top left of the highest band of its land.
     const top = [...i.land].sort((p, q) => p.t - q.t || p.l - q.l)[0], [l, t] = [top.l, top.t], key = keys.get(i.id) ?? { at: [] }, named = names.get(i.id);
     return {
       id: i.id, land: i.land, ...(i.look && { look: i.look }), ...(i.canvas && { canvas: i.canvas }), name: named ? [l + PAD - sizes.flow_island_name_x, t + PAD + ROOM / 2] : [l, t],
-      entries: key.at.map(([ex, ey]) => [l + PAD + ex, t + PAD + (named ? ROOM : 0) + ey]), steps: new Set(items.filter((it) => where.get(it.id) === i.id).map((it) => it.id)),
+      entries: key.at.map(([ex, ey]) => [l + PAD + ex, t + PAD + (named ? ROOM : 0) + ey]),
+      // The header's foot, where it grows from, on a land of one band (one with more keeps it at its size).
+      ...(i.land.length === 1 && heads.has(i.id) && !rooms.has(i.id) && { foot: t + PAD + heads.get(i.id) }), steps: new Set(items.filter((it) => where.get(it.id) === i.id).map((it) => it.id)),
     };
   });
   const done = finish({ nodes: a.nodes, x: a.x, y: a.y, chains: a.chains, ties: a.ties, potential: a.m.potential, margin: sizes.flow_margin, islands: shores });
