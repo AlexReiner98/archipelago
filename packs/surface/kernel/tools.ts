@@ -23,6 +23,8 @@ import { actionsOf, listedChange, movedTo, route, surfaceNames, surfaceTools, ty
 import { packAct } from './surface-slots.ts';
 import { ACT_TOOLS } from './tool-acts.ts';
 import { WRITE_TOOLS } from './tool-change.ts';
+import { restartSaid } from './restart-said.ts';
+import { logged } from '../../../src/logged.ts';
 import { devMode } from './tool-config.ts';
 import { HUMAN_TOOLS } from './tool-human.ts';
 import { PREVIEW_TOOLS } from './tool-preview.ts';
@@ -173,6 +175,8 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   // An agent whose token is within some items is held to them here, whatever the tool; what it writes, where every change is checked.
   const limited = actor.kind === 'agent' && Boolean(actor.within?.length);
   if (limited && !surface) await withinScope(l, actor, name, parsed.data as Record<string, unknown>, tool.within);
+  // The first answer from a server started since this agent last heard from one says so, and what became of its last change (./restart-said.ts).
+  const restarted = name === 'hook' ? undefined : await restartSaid(l, actor).catch(logged('a restart could not be said'));
   const answer = inProcess
     ? await inProcess(l, actor, parsed.data)
     : pack && !TOOLS[name] && limited
@@ -187,5 +191,8 @@ export async function callTool(l: Archipelago, actor: Actor, given: string, inpu
   const begun = tool.begins && typeof (answer as { run?: unknown })?.run === 'string' ? { run: (answer as { run: string }).run } : {};
   if (actor.kind === 'agent' && !surface) await step(l, actor, name, { ...(parsed.data as Record<string, unknown>), ...begun }, tool).catch((err) => console.error(`${name}: the session's step could not be kept: ${(err as Error).message}`));
   await guestAfter(l, name, answer).catch((err: Error) => console.error(`guest map: its first item could not be noted: ${err.message}`));
-  return answer;
+  // Said once, on an answer that can carry it: a list cannot, so the next answer says it.
+  const carries = answer !== null && typeof answer === 'object' && !Array.isArray(answer);
+  if (restarted && (carries || !restarted.said)) await restarted.heard().catch(logged('a restart could not be marked told'));
+  return restarted?.said && carries ? { ...(answer as object), restarted: restarted.said } : answer;
 }

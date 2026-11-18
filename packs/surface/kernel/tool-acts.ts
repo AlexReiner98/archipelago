@@ -8,7 +8,7 @@ import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { keepRunsWith, stopLaunched } from './launcher.ts';
 import { itemLink } from '../../identity/kernel/members.ts';
 import { actorId } from '../../write/kernel/pelago.ts';
-import { importAudit, recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './session-calls.ts';
+import { befell, importAudit, recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './session-calls.ts';
 import { point, sessionOpened, sessionTookUp, whose } from './tool-change.ts';
 import { slotted } from './surface-slots.ts';
 import { rechecked } from './recheck.ts';
@@ -96,7 +96,19 @@ export const ACT_TOOLS: Record<string, Tool> = {
       for: z.string().optional().describe('Id of the task it is being held for; that task is then not shown as blocked.'),
       reason: z.string().min(1),
     },
-    run: async (l, actor, input) => l.claim(actor, input),
+    run: async (l, actor, input) => {
+      // What befell the session that holds it is told on its story, taken or refused (the sessions pack's beats).
+      const about = [input.resource, ...(input.for ? [input.for] : [])];
+      const named = async () => (await l.entity(input.resource))?.title ?? input.resource;
+      try {
+        const got = await l.claim(actor, input);
+        if (got.status === 'claimed') await befell(l, { run: input.holder, did: 'claimed', said: `Claimed ${await named()}: ${input.reason}`, about, by: 'surface.claim' });
+        return got;
+      } catch (err) {
+        await befell(l, { run: input.holder, did: 'refused', said: `Could not claim ${await named()}: ${(err as Error).message}`, about: [], by: 'surface.claim' });
+        throw err;
+      }
+    },
   },
   release: {
     description: 'Give a resource back when done. Takes effect at once.',
@@ -105,7 +117,14 @@ export const ACT_TOOLS: Record<string, Tool> = {
       holder: z.string().optional().describe('Release only this holder\'s claim. Omit to release all.'),
       reason: z.string().min(1),
     },
-    run: async (l, actor, input) => l.release(actor, input),
+    run: async (l, actor, input) => {
+      // Whom it is given back from, read before: a release of all names none.
+      const { rows } = await l.db.query<{ from_id: string }>(`select from_id from relation where type = 'holds' and to_id = $1 and valid_to is null and ($2::text is null or from_id = $2)`, [input.resource, input.holder ?? null]);
+      const out = await l.release(actor, input);
+      const title = (await l.entity(input.resource))?.title ?? input.resource;
+      for (const r of rows) await befell(l, { run: r.from_id, did: 'released', said: `Gave back ${title}: ${input.reason}`, about: [input.resource], by: 'surface.release' });
+      return out;
+    },
   },
   withdraw: {
     description:
@@ -228,7 +247,9 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const result = await sessionEnd(l, actor, { ...input, outcome, reconcile: actor.kind === 'agent', chat_goes_on: actor.kind === 'agent' && !input.reason });
       if ('ended' in result) return result;
       // If this server started the session's process, stop that too.
-      return { ...result, process_stopped: stopLaunched(result.run) };
+      const stopped = stopLaunched(result.run);
+      if (stopped) await befell(l, { run: result.run, did: 'stopped', said: `Its process was stopped as it ended (${result.status})`, by: 'surface.launcher' });
+      return { ...result, process_stopped: stopped };
     },
   },
   notify: {

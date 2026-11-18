@@ -108,7 +108,8 @@ export function drawPicker() {
   const body = h('div', { class: 'isl-body', tabindex: '0', 'aria-label': 'Islands' });
   // No tooltip on a row: a name cut short has the whole of it as its tooltip, the name alone.
   body.addEventListener('pointerover', (ev) => {
-    const name = ev.target.closest?.('.isl-name');
+    // A chat's row has its tooltip of its own (./island-sessions.js): who it is, what it is on, its line.
+    const name = ev.target.closest?.('.isl-name:not(.isl-chat .isl-name)');
     if (name) name.scrollWidth > name.clientWidth ? (name.title = name.textContent) : name.removeAttribute('title');
   });
   const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), edge);

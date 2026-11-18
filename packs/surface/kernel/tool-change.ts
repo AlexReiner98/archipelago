@@ -10,10 +10,12 @@ import { transientOf } from './root-transient.ts';
 import { op, source, TITLE_MAX } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { undo } from '../../write/kernel/undo.ts';
-import { closeOffers, resolveRun } from './session-calls.ts';
+import { befell, closeOffers, resolveRun } from './session-calls.ts';
 import { covering } from '../../write/kernel/withdraw.ts'; import { proposals } from './map-reads.ts';
 import { holdsOff } from '../../rules/kernel/rules.ts';
 import { logged } from '../../../src/logged.ts';
+import { KEY_MAX } from '../../write/kernel/keyed.ts';
+import { changeBegun } from './restart-said.ts';
 
 /** Where an agent last pointed the human's screen (the presence pack's Focus). */
 type Focus = { at: number; hash: string; actor: string; note?: string };
@@ -59,17 +61,17 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
       'Change part of a note with append or replace, of code with edit, not the whole. An update of only the id says it is still true. ' +
       'A plan or findings are items with a view, not one note. ' +
-      'A published finding (type finding) is one line: its title the claim as a sentence, value the fact with its unit, confidence, as_of; its note how it was found, three lines at most. ' +
-      'Checked as a whole, then applied or held as a proposal for a human, by policy. ' +
-      'With holds off it applies at once: public reaches anyone, code runs for all who open it, forget is for good; stakes say what it reached. A refused change is kept for a few minutes under a name the refusal gives: send retry and fixes (the ops that were wrong, by number), not all of it again. A settled decision is put to the owner later (attention, to_confirm).',
+      'A published finding (type finding) is one line: title the claim as a sentence, value the fact with its unit, confidence, as_of; note how it was found, three lines at most. ' +
+      'Checked whole, then applied or held for a human, by policy. ' +
+      'With holds off it applies at once: public reaches anyone, code runs for all who open it, forget is for good; stakes say what it reached. A refused change is kept a few minutes under a name the refusal gives: send retry and fixes (the wrong ops, by number). A settled decision is put to the owner later (attention, to_confirm).',
     input: {
       ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
-      reason: z.string().min(1).optional().describe('Why, as the activity log shows it. Needed, except with retry.'),
+      reason: z.string().min(1).optional().describe('Why, as the log shows it. Needed, except with retry.'),
       retry: z.string().optional().describe('The name the refusal gave. Send only retry and fixes.'),
       fixes: z
         .array(z.object({ at: z.number().int().positive().describe('The op’s number in the refusal, from 1.'), op: z.record(z.string(), z.unknown()).nullable().describe('The whole op, as in ops; null to leave it out.') }))
         .optional()
-        .describe('With retry: the ops that replace those that were wrong.'),
+        .describe('With retry: the ops replacing the wrong ones.'),
       source: source.optional().describe('Where these facts came from.'),
       authority: z
         .object({
@@ -78,9 +80,10 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         })
         .optional()
         .describe('On whose authority. Left out, your own judgment.'),
-      hold: z.boolean().optional().describe('true to wait for the human even where agents\u2019 changes apply as made.'),
+      hold: z.boolean().optional().describe('true to wait for the human even where agents\u2019 changes apply.'),
       drawing: z.string().optional().describe('Sent by the page alone.'),
       run: z.string().optional().describe('The run id from session_start, or the session id.'),
+      key: z.string().min(1).max(KEY_MAX).optional().describe('Your uuid: sent again, it applies once, answered with the first.'),
     },
     run: async (l, actor, { retry, fixes, ...given }) => {
       // Whose it is: the token's, not the name a session gives itself, which it may leave out the second time.
@@ -151,6 +154,13 @@ export const WRITE_TOOLS: Record<string, Tool> = {
 - run: no open session "${input.run}". Send the run id session_start gave, or leave it out.`);
           input = { ...input, run: run.id };
         }
+        // Kept as this sender's last change before it is judged, under its key (one is made when none is given), so that
+        // after a restart cut its answer off the next answer says whether it applied (./restart-said.ts).
+        if (actor.kind === 'agent') {
+          const key = input.key ?? `auto-${Math.random().toString(36).slice(2, 12)}`;
+          await changeBegun(l, actor, key, input.reason, Boolean(input.key));
+          input = { ...input, key };
+        }
         result = await l.change(actor, input);
       } catch (err) {
         const message = (err as Error).message;
@@ -158,6 +168,9 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         // A refused change is kept, so that what is wrong with one op is all that has to be sent again.
         const name = retry ?? `k_${Math.random().toString(36).slice(2, 10)}`;
         await store(l, { keep: { key: `refused:${name}`, value: { who, input } satisfies Refused, ms: REFUSED_MINUTES * 60_000 } });
+        // Told on the session's story too, with why: the first thing the refusal names (the sessions pack's beats).
+        const why = message.replace(/^Change rejected:?\s*/, '').split('\n').map((s) => s.replace(/^-\s*/, '').trim()).find(Boolean);
+        if (input.run) await befell(l, { run: input.run, did: 'refused', said: `Change refused (${input.reason ?? 'no reason'}): ${why ?? 'see the answer'}`, by: 'write' });
         throw new Error(
           `${message}\nNothing was changed. The change is kept for ${REFUSED_MINUTES} minutes as "${name}": to correct it, send change with only retry: "${name}" and fixes: [{ at: <the op’s number>, op: <the whole op as it should be> }]. Every other op is sent as it was.`,
         );
@@ -170,6 +183,8 @@ export const WRITE_TOOLS: Record<string, Tool> = {
       // they talk to (attention, reason to_confirm, and the handoff), all of them in one list, not a notification for each.
       // The human's screen follows an agent's change: to Review when it waits
       // there, otherwise to the first thing it made or touched.
+      // A keyed change sent again changed nothing: its answer says where the first went, and the screen stays.
+      if ('again' in result) return result;
       if (actor.kind === 'agent') {
         const made = 'created' in result ? Object.values(result.created as Record<string, string>)[0] : undefined;
         const touched = (input.ops as { id?: string }[]).find((o) => o.id)?.id;

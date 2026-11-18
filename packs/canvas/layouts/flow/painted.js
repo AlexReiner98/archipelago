@@ -7,12 +7,14 @@
 // The pointer over its island's land is handed to the look, in its screen pixels (a move as pointermove, a click as a
 // press and a lift there, leaving as pointerleave); what it says by the pointer (tip) is shown beside a spot the map
 // moves to that place, and goes when it opens an item; the cursor it asks for is the land's. A look that says where it
-// draws each item (places) has the wires from outside carried on to them, from its frame's edge. A look's own frames
+// draws each item (places) has the wires from outside carried on to them, from its frame's edge, and each item a session
+// is on ringed there in the session's hue, faded by its age and dashed while it sleeps (./session-ring.js). A look's own frames
 // are stopped when its picture ends: each look's animation frames carry the run that asked for them, and a run that
 // ended is not called again. Layer: marks.
 
 /** How light a colour the page gives is: the sum of its channels, as rgb() writes them. */
 import { m } from './marks.js';
+import { opacityOf, sessionsOn } from './session-ring.js';
 
 export { comingIn } from './painted-wires.js';
 
@@ -53,7 +55,7 @@ function framesByRun() {
  * view comes once the page has mounted the scene, which is what makes the surface; asked sooner, the page has none to
  * give, and says so for good.
  */
-export function paintIslands({ islands, tools, wire }) {
+export function paintIslands({ islands, tools, wire, rings }) {
   let over = false, view = null, begun;
   const runs = [];
   const frames = framesByRun();
@@ -93,13 +95,35 @@ export function paintIslands({ islands, tools, wire }) {
     }
     ctx.restore();
   };
+  /** The rings of the sessions on each item the look says it draws, round where it draws it, one outside another. */
+  const ringSessions = (ctx, r, d) => {
+    if (!rings) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(r.cam.tx * d, r.cam.ty * d, r.w * r.cam.k * d, r.h * r.cam.k * d);
+    ctx.clip();
+    ctx.lineWidth = rings.width * d;
+    for (const i of r.items) {
+      const on = sessionsOn(i), at = on.length ? r.where(i.id) : null;
+      if (!at) continue;
+      on.forEach((s, k) => {
+        ctx.globalAlpha = opacityOf(s, { numbers: { session_faded: rings.faded } }) ?? 1;
+        ctx.strokeStyle = s.hue;
+        ctx.setLineDash(s.dormant ? rings.dash.map((v) => v * d) : []);
+        ctx.beginPath();
+        ctx.arc(at[0] * d, at[1] * d, ((at[2] ?? 0) + rings.gap * (k + 1)) * d, 0, 2 * Math.PI);
+        ctx.stroke();
+      });
+    }
+    ctx.restore();
+  };
   (async () => {
     await mounted;
     const surface = over ? null : await tools.surface?.();
     if (!surface || over) return;
     const ctx = surface.canvas.getContext('2d');
     const size = { width: 1, height: 1, dpr: 1 };
-    for (const isle of islands) runs.push({ id: isle.id, ended: false, canvas: new OffscreenCanvas(1, 1), w: isle.size[0], h: isle.size[1], at: isle.at, cam: { width: isle.size[0], height: isle.size[1], k: 1, tx: 0, ty: 0 }, heard: new Map(), wires: isle.wires ?? [], where: null });
+    for (const isle of islands) runs.push({ id: isle.id, ended: false, canvas: new OffscreenCanvas(1, 1), w: isle.size[0], h: isle.size[1], at: isle.at, cam: { width: isle.size[0], height: isle.size[1], k: 1, tx: 0, ty: 0 }, heard: new Map(), wires: isle.wires ?? [], items: isle.answer.items ?? [], where: null });
     /** Where each island's frame lands on screen now, in the surface's own pixels (not the device's); 'view' told where it moved. */
     const place = () => {
       const k = size.width / Math.max(1, view.width);
@@ -144,6 +168,7 @@ export function paintIslands({ islands, tools, wire }) {
         const x1 = Math.min(r.canvas.width, surface.canvas.width, Math.ceil((r.cam.tx + r.w * r.cam.k) * d)), y1 = Math.min(r.canvas.height, surface.canvas.height, Math.ceil((r.cam.ty + r.h * r.cam.k) * d));
         if (x1 > x0 && y1 > y0) ctx.drawImage(r.canvas, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
         if (r.wires.length && r.where) carryWires(ctx, r, size.dpr, theme);
+        if (r.where) ringSessions(ctx, r, size.dpr);
       }
       surface.show();
     }

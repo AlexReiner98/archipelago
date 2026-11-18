@@ -2,6 +2,7 @@
 // for an item, and listening for what the owner does. Agents reach each of them through query.
 
 import { z } from 'zod';
+import { headOf } from '../../log/kernel/log.ts';
 import { lastSeq, readEvents } from '../../log/kernel/eventlog.ts';
 import { askView, viewList, viewsSaid } from './view-words.ts';
 import { showingIn } from './public-views.ts';
@@ -264,10 +265,12 @@ export const READ_TOOLS: Record<string, Tool> = {
     },
   },
   get: {
-    description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass), the public views that show it (public_views, frozen when shared: one marked behind has changed since, so tell the person, whose act sharing it again is), who last wrote its note (note_by, an actor) and its links in both directions. Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
+    description: 'One item in full: its fields, the source it came from, where it sits (trail: what it is part of, outermost first, each with the views kept about it), what names it in its text or fields (mentioned_in), the views it is drawn in (shown_in: views kept about what it sits in, with the documents that bring them in, and steps_wrong where the steps of a view no longer pass), the public views that show it (public_views, frozen when shared: one marked behind has changed since, so tell the person, whose act sharing it again is), who last wrote its note (note_by, an actor) its links in both directions, and as_of (where the map stood as it was read: an update naming it is refused if what it sets has moved since). Its last few changes too, when asked for with history: true, each long value cut to its start: the item says what it is now, and the whole record is the log’s (events, with target and full: true).',
     input: { id: z.string(), bare: z.boolean().optional().describe('true for only what a page draws of it: the item, its source, its links, what names it and the public views that show it; no trail, views it is drawn in or recent changes.'), history: z.boolean().optional().describe('true to be given its last few changes as well (recent_events).'), full: z.boolean().optional().describe(`true for all of it whole. Past ${GET_LISTED} links in a direction, an agent is given those and a count by type (links_cut); of what names it the first ${GET_MENTIONS}; of what holds it the number of views about each; and of a large field (a layout's code) its first lines and size. The whole record is in events, with full: true.`) },
     run: async (l, actor, input) => {
       // Its recent events are the activity log's (packs/log/kernel/eventlog.ts), read beside the item as get read them.
+      // Where the map stood as it was read, before it was: an update naming it (as_of) is refused if what it sets moved since.
+      const as_of = (await headOf(l.db)).pos;
       const [item_, read_, noteBy] = await Promise.all([getItem(l, input.id, input.bare), input.bare ? [] : readEvents(l.db, { target: input.id, limit: 8 }), noteAuthor(l, input.id)]);
       // A change to its code is said as a line diff (./code-diffs.ts), as the history is anywhere.
       const events_ = input.full ? read_ : eventsWithDiffs(l, read_, actor.kind === 'agent');
@@ -282,13 +285,14 @@ export const READ_TOOLS: Record<string, Tool> = {
       const { recent_events, ...item } = found;
       const recent = shortHistory(recent_events, actor.kind !== 'human', 'query events, with full: true, has all of it');
       const said = actor.kind === 'human' || input.history ? { ...item, recent_events: recent } : item;
-      if (actor.kind !== 'agent' || input.full) return said;
+      if (actor.kind !== 'agent') return said;
+      if (input.full) return { ...said, as_of };
       const [out, into] = [fewLinks(item.outgoing as { type: string }[]), fewLinks(item.incoming as { type: string }[])];
       // What holds it, with the number of views kept about each (shown_in names those it is drawn in), and the first
       // few that name it: a fifth of what get answered an agent was these two lists.
       const trail = said.trail.map(({ views, ...t }) => ({ ...t, ...(views.length && { views: views.length }) }));
       const mentioned = said.mentioned_in;
-      return { ...said, entity: cutLarge(said.entity), trail, mentioned_in: mentioned.slice(0, GET_MENTIONS), ...(mentioned.length > GET_MENTIONS && { mentioned_count: mentioned.length }), outgoing: out.links, incoming: into.links, ...((out.counted || into.counted) && { links_cut: { outgoing: out.counted, incoming: into.counted, how: 'get with full: true has them all.' } }) };
+      return { ...said, entity: cutLarge(said.entity), trail, mentioned_in: mentioned.slice(0, GET_MENTIONS), ...(mentioned.length > GET_MENTIONS && { mentioned_count: mentioned.length }), outgoing: out.links, incoming: into.links, ...((out.counted || into.counted) && { links_cut: { outgoing: out.counted, incoming: into.counted, how: 'get with full: true has them all.' } }), as_of };
     },
   },
   view: {

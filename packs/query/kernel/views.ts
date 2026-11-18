@@ -32,10 +32,10 @@ async function changedSince(ctx: KernelContext, input: { since?: string; limit?:
 const STALE_MINUTES = 30;
 
 /** A run's state as the runs pack answers it (answer.session_states), and the mark the sessions view carries of it. */
-interface State { state: string; for?: string; line: string; since: string | null; turn?: unknown; turns: number }
+interface State { state: string; for?: string; line: string; did?: string; since: string | null; turn?: unknown; turns: number }
 /** The states in the order they ask for attention: what waits on a person first (the runs pack's order, copied). */
 const ATTENTION = ['waiting', 'your_move', 'blocked', 'quiet', 'working', 'idle', 'done'];
-const markOf = ({ state, for: f, line, since }: State) => ({ state, ...(f && { for: f }), line, since });
+const markOf = ({ state, for: f, line, did, since }: State) => ({ state, ...(f && { for: f }), line, ...(did && { did }), since });
 function byAttention(a: State, b: State): number {
   const rank = (s: State) => (ATTENTION.includes(s.state) ? ATTENTION.indexOf(s.state) : ATTENTION.length);
   const when = (s: State) => (s.since ? Date.parse(s.since) : Infinity);

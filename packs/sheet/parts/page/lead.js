@@ -77,17 +77,29 @@ function alert(item, lead, { writes }) {
 /** How many beats a timeline shows: the latest; the rest are counted. */
 const BEATS = 6;
 
-/** A timeline: the beats its field keeps, numbered, each a line, with when. */
+/** A beat's mark, when its type's lead marks beats (mark, marks, warn): its glyph, and whether it warns. */
+function markOfBeat(b, lead) {
+  const value = lead.mark ? b[lead.mark] : undefined;
+  if (typeof value !== 'string' || !value) return null;
+  return { glyph: lead.marks?.[value] ?? '·', warns: Boolean(lead.warn?.includes(value)), value };
+}
+
+/** A timeline: the beats its field keeps, numbered, each a line, with when; a marked beat with its glyph before it, its words muted, or as a warning. */
 function timeline(item, lead, now) {
   const beats = item.props[lead.beats].filter((b) => b && typeof b.said === 'string');
   const shown = beats.slice(-BEATS);
   return band(
     beats.length > shown.length && ['text', { look: 'muted', size: 2 }, `${beats.length - shown.length} earlier`],
-    ['list', { look: 'plain' }, ...shown.map((b, i) => ['box', { flow: 'row', gap: 2 },
+    ['list', { look: 'plain' }, ...shown.map((b, i) => {
+      const m = markOfBeat(b, lead);
+      const look = m ? (m.warns ? { tone: 'bad' } : { look: 'muted' }) : {};
+      return ['box', { flow: 'row', gap: 2 },
       ['text', { look: 'muted', size: 2 }, String(b.n ?? beats.length - shown.length + i + 1)],
+      ...(m ? [['text', { ...look, tip: tip(`${m.value}${b.by ? `, told by ${b.by}` : ''}`) }, m.glyph]] : []),
       // The words take what room is left, so the number and the time keep theirs.
-      ['box', { flow: 'row', grow: true }, ['text', { tip: tip(b.said) }, b.said]],
-      ...(b.at ? [['text', { look: 'muted', size: 2, tip: String(b.at) }, ago(b.at, now)]] : [])])]);
+      ['box', { flow: 'row', grow: true }, ['text', { ...look, tip: tip(b.said) }, b.said]],
+      ...(b.at ? [['text', { look: 'muted', size: 2, tip: String(b.at) }, ago(b.at, now)]] : [])];
+    })]);
 }
 
 /**
