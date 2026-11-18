@@ -36,10 +36,10 @@ test('in a browser, a view is read and drawn before what the drawing does not ne
     await page.send('Page.addScriptToEvaluateOnNewDocument', { source: RECORD });
     await page.go(`${base}/#/v?find=id+${made.a}&over=depends_on&steps=1`);
     assert.ok(await page.until(`[...document.querySelectorAll('#canvas svg a')].some((a) => a.textContent.includes('Second step'))`), `the view is drawn: ${page.logs().join('\n')}`);
-    // The rest fills in after: who is at work, and the islands for the side bar. The layouts are read only as the band's
-    // menu opens (the styles pack's layout switch).
+    // The rest fills in after: who is at work, and the islands for the side bar where the map has islands (this one has
+    // none, so no side bar reads them). The layouts are read only as the band's menu opens (the styles pack's layout switch).
     const later = (r: any) => (r.path === '/api/view' && r.name === 'sessions') || (r.path === '/api/search' && r.islands === true);
-    assert.ok(await page.until(`window.reads.filter(${later.toString()}).length >= 2`), `what waits is read once the view is drawn: ${JSON.stringify(await page.evaluate('window.reads'))}`);
+    assert.ok(await page.until(`window.reads.some((r) => r.path === '/api/view' && r.name === 'sessions')`), `what waits is read once the view is drawn: ${JSON.stringify(await page.evaluate('window.reads'))}`);
     const reads = await page.evaluate<any[]>('window.reads');
     const view = reads.find((r) => r.name === 'flat' && r.walk !== 'all');
     assert.ok(view?.back, 'the view is read');

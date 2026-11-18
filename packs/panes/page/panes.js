@@ -173,8 +173,15 @@ export function startCanvas() {
     // One pane: the page's own rules lay it out alone (packs/surface/page/shell.css, island-picker.css: body[data-panes]).
     document.body.dataset.panes = '1';
     // The sheet or the side bar opened or shut moves the canvas's frame: what fits itself to it (find, the drawing) is told.
+    // Only a frame that moved: the same state said again (the sheet as it was) is no new room, and a pan goes on.
+    let frame = '';
     let soon;
-    new MutationObserver(() => (clearTimeout(soon), (soon = setTimeout(() => dispatchEvent(new Event('resize')), 30)))).observe(document.body, { attributes: true, attributeFilter: ['data-sheet', 'data-islands', 'data-islands-over'] });
+    const moved = () => {
+      const r = body.getBoundingClientRect();
+      const now = [r.left, r.right, r.top, r.bottom].join(' ');
+      if (now !== frame) ((frame = now), dispatchEvent(new Event('resize')));
+    };
+    new MutationObserver(() => (clearTimeout(soon), (soon = setTimeout(moved, 30)))).observe(document.body, { attributes: true, attributeFilter: ['data-sheet', 'data-islands', 'data-islands-over'] });
     const button = (label, title, mark, onclick) => h('button', { type: 'button', class: 'q-save q-travel', title, 'aria-label': label, onclick }, mark);
     hooks.paneButtons = () => [button('Back', 'Back to what the canvas drew before', '‹', () => history.back()), button('Forward', 'Forward again', '›', () => history.forward())];
   }
