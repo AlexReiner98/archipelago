@@ -300,11 +300,11 @@ export interface MarkAttributes {
   [attribute: string]: unknown;
 }
 
-export type MarkEventName = 'enter' | 'leave' | 'click' | 'seen' | 'add';
+export type MarkEventName = 'enter' | 'leave' | 'click' | 'move' | 'seen' | 'add';
 
 /** What a drawing is told: an event on a keyed mark, or what the page lit on a surface. */
 export type PictureEvent =
-  | { name: 'enter' | 'leave' | 'click' | 'seen'; key: string; from?: string }
+  | { name: 'enter' | 'leave' | 'click' | 'move' | 'seen'; key: string; from?: string; /** A move's or a click's place, in the picture's units. */ at?: [number, number] }
   | { name: 'light'; ids: ItemId[] | null };
 
 /** A key row: what one mark the picture uses means. */

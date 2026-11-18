@@ -24,8 +24,8 @@ const ITEM_ID = /^e_[a-z0-9]{8}$/;
 /** A pack's id, as a toggle names the pack it turns off or on (./marks-toggle.js). */
 const PACK_ID = /^[a-z][a-z0-9_.-]{0,63}$/;
 const ATTRS = new Set(['class', 'd', 'x', 'y', 'x1', 'x2', 'y1', 'y2', 'cx', 'cy', 'r', 'rx', 'ry', 'dx', 'dy', 'width', 'height', 'viewBox', 'points', 'transform', 'text-anchor', 'dominant-baseline', 'pathLength', 'offset', 'preserveAspectRatio', 'role', 'aria-label', 'aria-hidden', 'title', 'hidden', 'href', 'stroke-dasharray', 'stroke-dashoffset', 'aria-live', 'opacity', 'fill-opacity', 'stroke-opacity', 'gradientUnits']);
-/** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight. */
-const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', seen: 'seen', add: 'add', toggle: 'toggle' };
+/** The events a drawing may be told of, by the page's name for each; `seen` is told once, when the mark is first scrolled into sight. A move and a click say where, in the picture's units (./layout.js). */
+const EVENTS = { enter: 'mouseenter', leave: 'mouseleave', click: 'click', move: 'pointermove', seen: 'seen', add: 'add', toggle: 'toggle' };
 /** The events the page answers in its own way: once in sight, and the add button. */
 const OWN = { seen: (el, key, tell) => seen(el, () => tell(key, 'seen')), add: addable, toggle: togglable };
 const seen = (el, fn) => {
