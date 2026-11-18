@@ -2,9 +2,9 @@
   "id": "core",
   "version": "0.1.0",
   "title": "Core",
-  "description": "The starter types (the seven of the work, and system), task and decision (the shared set every pack may build on), the root links every link type extends, and the system tier.",
+  "description": "The starter types (the seven of the work, and system), task (the shared set every pack may build on), the root links every link type extends, and the system tier.",
   "uses": ["slot:piece.document"],
-  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision", "finding"],
+  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "finding"],
   "types": [
     {
       "id": "actor",
@@ -50,16 +50,22 @@
     },
     {
       "id": "question",
-      "capabilities": { "owned": true, "actionable": true, "focus": true, "lead": { "form": "choices" } },
+      "moved_from": ["decision", "work.decision"],
+      "capabilities": { "owned": true, "actionable": true, "focus": true, "bound": { "field": "due", "limit": "today" }, "lead": { "form": "choices" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
       "altitude": "step",
-      "title": "Question",
-      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. A starter type of the work: a pack's type may extend it, or extend nothing.",
-      "statuses": { "open": ["open"], "closed": ["settled", "dropped"], "phases": { "open": "not_started", "settled": "finished" } },
+      "title": "Decision",
+      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. The title is the question; once settled, outcome holds the answer. Questions and decisions are one type since 18 Nov 2026 (decision e_5yrdf8aq): a decision's items are this one's. A starter type of the work: a pack's type may extend it, or extend nothing.",
+      "statuses": { "open": ["open"], "closed": ["decided", "settled", "reversed", "dropped"], "phases": { "open": "not_started", "decided": "finished", "settled": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "owner": { "type": "string", "column": true, "description": "Id of the person or agent responsible. Kept in the item's row." },
         "confidence": { "type": "number", "column": true, "description": "0 to 1: how sure the author is that this is true. Kept in the item's row." },
-        "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
+        "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." },
+        "due": { "type": "date" },
+        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
+        "outcome": { "type": "string", "description": "The answer: what was chosen, in a line. Set when it is settled, not left in the note.", "shown": true },
+        "rationale": { "type": "string", "description": "Why." },
+        "decided_on": { "type": "date" }
       }
     },
     {
@@ -146,22 +152,6 @@
         "recurrence": { "type": "string", "description": "How often it repeats, in plain words or an RRULE." },
         "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects this to take, one number: input and output together, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
         "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
-      }
-    },
-    {
-      "id": "decision",
-      "moved_from": ["work.decision"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
-      "extends": "question",
-      "title": "Decision",
-      "description": "Something decided, or still open, with its reasoning. The title is the question.",
-      "statuses": { "open": ["open"], "closed": ["decided", "reversed"] },
-      "fields": {
-        "due": { "type": "date" },
-        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
-        "outcome": { "type": "string", "description": "What was chosen.", "shown": true },
-        "rationale": { "type": "string", "description": "Why." },
-        "decided_on": { "type": "date" }
       }
     },
     {

@@ -5,7 +5,6 @@
 // marks do not already say, opens with no band (decision e_65cnpc2b): a band is three lines at most, its status only
 // in the marks, and only the press the person likely makes now in sight, at the end of the line it acts on.
 
-import { isChosen } from './sections.js';
 import { ago, label } from './words.js';
 
 /** Words cut to what a tip holds. */
@@ -14,12 +13,25 @@ const tip = (s) => String(s ?? '').slice(0, 200);
 const band = (...marks) => ['box', { key: 'lead', look: 'band', flow: 'column', gap: 2, pad: 2 }, ...marks.filter(Boolean)];
 
 /**
- * The lead an item opens on, or null: `{ form, ... }`. A question with choices: `choices` while it is open, `answer`
- * once settled by one; else what its type declares, when what it names is there to show.
+ * A settled question's answer, or null: what was chosen (its type's settles.chosen, outcome in core) once it is closed,
+ * whether or not it had choices to pick from, and why.
+ */
+export function answerOf(item, type) {
+  const settles = type?.capabilities?.settles;
+  const props = item?.props ?? {};
+  const said = (f) => (f && typeof props[f] === 'string' ? props[f].trim() : '');
+  if (!settles || item?.is_open !== false || !said(settles.chosen)) return null;
+  return { chosen: settles.chosen, why: settles.why, picked: said(settles.chosen), reason: said(settles.why) };
+}
+
+/**
+ * The lead an item opens on, or null: `{ form, ... }`. A question: `answer` once settled with its answer kept,
+ * `choices` while it has choices; else what its type declares, when what it names is there to show.
  */
 export function leadOf(item, type, c) {
   const props = item?.props ?? {};
-  if (c) return item.is_open === false && typeof c.picked === 'string' && c.picked.trim() ? { form: 'answer' } : { form: 'choices' };
+  if (answerOf(item, type)) return { form: 'answer' };
+  if (c) return { form: 'choices' };
   const lead = type?.capabilities?.lead;
   if (!lead?.form) return null;
   if (lead.form === 'measure') return props[lead.value] === undefined || props[lead.value] === null || props[lead.value] === '' ? null : lead;
@@ -44,17 +56,11 @@ function choices(c, { writes, asking }) {
       ['box', { flow: 'row', gap: 2 }, ['button', { key: 'choice-settle', look: 'main' }, 'Settle it'], ['button', { key: 'choice-cancel', look: 'quiet' }, 'Cancel']]]);
 }
 
-/** A settled question: what was chosen, why, when; the choices not taken, set aside. */
-function answer(item, c) {
-  const props = item.props ?? {};
-  const why = c.why && typeof props[c.why] === 'string' ? props[c.why] : '';
-  const on = c.on && typeof props[c.on] === 'string' ? props[c.on] : '';
-  const others = c.list.filter((x) => !isChosen(c.picked, x));
+/** A settled question, as the marks cannot say it: the answer, and why in a line. Who settled it and when are its marks. */
+function answer(a) {
   return band(
-    ['box', { flow: 'row', gap: 2 }, ['text', { tone: 'ok', size: 6 }, '✓'], ['text', { look: 'title', size: 6, tip: tip(c.picked) }, c.picked]],
-    why && ['text', { look: 'muted', tip: tip(why) }, why],
-    on && ['text', { look: 'muted', size: 2, tip: on }, on],
-    others.length > 0 && others.length < c.list.length && ['list', { look: 'plain' }, ...others.map((x) => ['text', { tone: 'closed', tip: tip(x) }, x])]);
+    ['box', { flow: 'row', gap: 2 }, ['text', { tone: 'ok' }, '✓'], ['box', { flow: 'row', grow: true }, ['text', { bold: true, tip: tip(a.picked) }, a.picked]]],
+    a.reason && ['text', { look: 'muted', tip: tip(a.reason) }, a.reason]);
 }
 
 /** One line of the band: its words cut where they do not fit, a press at its end. */
@@ -177,7 +183,7 @@ export function leadMarks(item, type, c, { writes = false, asking, now, waits, m
   const lead = leadOf(item, type, c);
   const mine = waitsOnMe(item, waits, me);
   if (lead?.form === 'choices' || lead?.form === 'answer') {
-    const body = lead.form === 'choices' ? choices(c, { writes: writes && item.is_open !== false, asking }) : answer(item, c);
+    const body = lead.form === 'choices' ? choices(c, { writes: writes && item.is_open !== false, asking }) : answer(answerOf(item, type));
     return mine ? [body[0], body[1], waitsLine(mine), ...body.slice(2)] : body;
   }
   const room = LINES - (mine ? 1 : 0);
@@ -206,7 +212,8 @@ export function leadEvent(event, item, type) {
 /** The fields the band shows, so the fields below do not say them again. */
 export function leadFields(item, type, c) {
   const lead = leadOf(item, type, c);
-  if (!lead || lead.form === 'choices' || lead.form === 'answer') return [];
+  if (lead?.form === 'answer') { const a = answerOf(item, type); return [a.chosen, a.reason && a.why].filter(Boolean); }
+  if (!lead || lead.form === 'choices') return [];
   // An alert's field is said only while it is false; once true it stays among the fields.
   if ((lead.form === 'alert' || lead.form === 'done') && item?.props?.[lead.unless] !== false) return [];
   return [lead.value, lead.unit, lead.as_of, lead.unless, lead.says, lead.beats].filter(Boolean);
