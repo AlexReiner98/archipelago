@@ -1,11 +1,11 @@
-// A Claude Code hook that tells Archipelago about the session: started, a prompt
-// sent, ended. Claude Code hands the hook its input as JSON on stdin and
-// reads the answer from stdout; this passes both through to the Archipelago
-// server the machine is connected to (PELAGO_URL and PELAGO_AGENT_TOKEN,
-// the same two that .mcp.json reads), or to the one on this machine when
-// those are not set.
+// A Claude Code hook that tells Archipelago about the session: started, a prompt sent, ended. Claude Code hands the
+// hook its input as JSON on stdin and reads the answer from stdout; this passes both through to the Archipelago server
+// the machine is connected to (PELAGO_URL and PELAGO_AGENT_TOKEN, as .mcp.json), or to this machine's when not set.
 //
-//   node scripts/pelago-hook.mjs session-start | prompt | stop | session-end | file-used
+//   node scripts/pelago-hook.mjs session-start | prompt | stop | session-end | file-used | push
+//
+// Before a Bash command (push) it asks the server only about one that sends work out (git push, gh pr create, gh pr
+// merge), with where the checkout stands: a rule on a push may refuse it, and Claude Code then does not run it.
 //
 // At the start it also says which repository the folder is a checkout of (its
 // origin), so the map knows the session's repository on any machine.
@@ -32,9 +32,8 @@
 // (CLAUDE_CODE_SESSION_ID), so a commit made in the session names its run, and one made by anybody else does not:
 // several sessions in one checkout each find their own.
 //
-// Beside it, the process of the Claude Code that runs the session (CLAUDE_PID, pelago-runs/<session id>.pid). A chat
-// archived or closed may be stopped before its SessionEnd hook is heard: the next hook in the checkout finds its
-// process gone and ends its run for it.
+// Beside it, the process of the Claude Code that runs the session (CLAUDE_PID, pelago-runs/<session id>.pid): a chat
+// archived or closed before its SessionEnd hook is heard has its run ended by the next hook that finds it gone.
 //
 // After a file is read or changed (file-used) it sends the file's path alone, never what is in it, and the
 // instructions the session has been told about files already, kept beside its run (pelago-runs/<session id>.said):
@@ -75,7 +74,7 @@ const ITEM = /\be_[a-z0-9]{8}\b/g;
 // A git command, past the options that come before its subcommand (git -C dir commit, git -c a=b push).
 const GIT = (sub) => new RegExp(String.raw`(^|[\s;&|(])git(\s+(-[Cc]\s+("[^"]*"|'[^']*'|\S+)|--?[\w-]+(=\S+)?))*\s+` + sub + String.raw`(?![\w-])`);
 const COMMIT = GIT('commit');
-const PUSH = GIT('push');
+const PUSH = GIT('push'), PR = /(^|[\s;&|(])gh\s+pr\s+(create|merge)(?![\w-])/;
 // The reads that are not about several items: one item, what the tools take, where a session starts, how a page looks.
 const NOT_SURVEYS = new Set(['get', 'document', 'actions', 'schema', 'watch', 'picture', 'packs', 'style', 'story', 'published', 'publish_plan', 'backup_download', 'share_figure', 'brief', 'handoff', 'frontier']);
 // The tools that write a file.
@@ -315,6 +314,10 @@ if (name === 'session-start') {
   } catch {
     process.exit(0);
   }
+} else if (name === 'push') {
+  const said = (() => { try { return JSON.parse(body); } catch { return {}; } })(), command = said.tool_input?.command;
+  if (typeof command !== 'string' || !(PUSH.test(command) || PR.test(command))) process.exit(0);
+  body = JSON.stringify({ session_id: said.session_id, cwd: said.cwd, command, stands: gitState(said.cwd) });
 } else {
   try {
     const said = JSON.parse(body);

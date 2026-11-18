@@ -7,6 +7,7 @@
 
 import type { KernelContext } from '#pelago/kernel';
 import { askOnReply } from './replies.ts';
+import { pushAnswer } from './push-rules.ts';
 import { hookWithin, labelled, promptNamed, recordUsage, resolveRun, sessionBegan, sessionHeard, sessionPrompted } from './sessions.ts';
 import { HOOK_AGENT as HOOK_ACTOR, hookSessionEnd, hookSessionStart, sessionIsland, toldAt } from './session-hook.ts';
 import { addTouched } from './touched.ts';
@@ -41,6 +42,8 @@ export interface HookBody {
   stands?: unknown;
   /** What stands was called until 10 Nov 2026, still sent by hooks set up before then: read as stands. */
   git?: unknown;
+  /** At a push: the command about to run (packs/sessions/kernel/push-rules.ts). */
+  command?: unknown;
   /** At the events route: the adapter's batch of raw events, in the vocabulary of docs/sessions.md (packs/sessions/kernel/session-events.ts). */
   events?: unknown;
 }
@@ -129,6 +132,8 @@ export async function sessionAnswer(ctx: KernelContext, event: string, call: Hoo
     const said = await fileSaid(ctx, body).catch((err) => void console.error(`hook file: ${(err as Error).message}`));
     return said ? told(said.text, { said: said.ids }) : {};
   }
+  // A command about to send work out (git push, gh pr create, gh pr merge): the rules on a push may refuse it (./push-rules.ts). One that fails lets it through.
+  if (event === 'push') return (await pushAnswer(ctx, body).catch((err) => void console.error(`hook push: ${(err as Error).message}`))) ?? {};
   // An adapter's batch of what the session did, kept as raw events on its run.
   if (event === 'events') return (await takeEvents(ctx, body)) as Neutral;
   // Said in the server's log, so "did the hook run?" has an answer.
