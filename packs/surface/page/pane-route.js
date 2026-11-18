@@ -1,6 +1,5 @@
-// The sessions this page has heard from, and what each is called (packs/surface/page/live.js hears every step): the count
-// of sessions waiting on the owner beside the tabs names them so. Where a show lands is the panes part's own rule
-// (packs/panes/parts/route.js), worked out with no page.
+// The sessions this page has heard from, and what each is called (packs/surface/page/live.js hears every step and the
+// chats open now): a show lit in the island side bar names its session so.
 
 /** Whose a step is: its session, when the server knows it, else the agent that took it. */
 export const sessionOf = (step) => step.run ?? step.actor;
@@ -8,7 +7,7 @@ export const sessionOf = (step) => step.run ?? step.actor;
 /** The sessions heard from while the page is open, by key: what to call each one, and when it last took a step. */
 export const heard = new Map();
 /**
- * Hear a step: its session is among those a tab can follow, called by what its chat is called (`title`, the run's, which
+ * Hear a step: its session is heard, called by what its chat is called (`title`, the run's, which
  * follows a rename), else by its agent's name. `name` is its word, never shown: the key to its hue (ui/words.js).
  */
 export function hear(step) {
@@ -19,7 +18,7 @@ export function hear(step) {
 }
 /**
  * Hear the sessions open now (the `sessions` view): one this page has heard nothing from can be followed too, and one
- * not among them has ended. It stays heard, since a tab or a pane may still name it, but its word can be another's now.
+ * not among them has ended. It stays heard, since the side bar may still name it, but its word can be another's now.
  */
 export function hearOpen(open) {
   const now = new Set(open.map((s) => s.id));
@@ -29,7 +28,7 @@ export function hearOpen(open) {
     heard.set(s.id, { name: s.name ?? was?.name ?? s.title, called: s.title, at: Math.max(Date.parse(s.last_seen), was?.at ?? 0), run: s.id, ended: false, quiet: Boolean(s.stale) });
   }
 }
-/** A session as a tab or a pane says it: what it is called, with its run when another session goes by the same. */
+/** A session as the page says it: what it is called, with its run when another session goes by the same. */
 export function nameOf(key) {
   const one = heard.get(key);
   if (!one) return key.startsWith('e_') ? key : key.split(/[/:]/).at(-1);

@@ -1,18 +1,24 @@
 /* The island picker (packs/surface/page/island-picker.js): a list at the canvas's left edge, folded to it or open, the canvas beside it. */
 #islands { position: fixed; z-index: 3; top: var(--band); bottom: 0; left: 0; display: flex; box-sizing: border-box; width: min(var(--isl-width, var(--side-least)), 60%); border-right: var(--border-1) solid var(--line); background: var(--panel); font-size: var(--text-4); }
 #islands[hidden] { display: none; }
-/* The canvas, and the panes in it (fixed to the window, packs/walls/page/part-marks.css), start at the bar's edge; put away, the bar is gone and the canvas has the width. */
-body[data-islands="open"] :is(#canvas, #canvas .pm-panes) { left: min(var(--isl-width, var(--side-least)), 60%); }
-body[data-islands="folded"] :is(#canvas, #canvas .pm-panes), body[data-islands-over="on"] :is(#canvas, #canvas .pm-panes) { left: 0; }
+/* The canvas, and its pane (fixed to the window, packs/surface/page/shell.css), start at the bar's edge; put away, the bar is gone and the canvas has the width. */
+body[data-islands="open"] :is(#canvas, #canvas > .pane) { left: var(--active-left); }
+body[data-islands="folded"] :is(#canvas, #canvas > .pane), body[data-islands-over="on"] :is(#canvas, #canvas > .pane) { left: 0; }
+/* The canvas's frame, which find and the bar are laid out by: below the band, beside the bar while it is open. */
+body[data-panes="1"] { --active-top: var(--band); }
+/* An open sheet takes its room from the canvas, so whatever draws it stands beside it. */
+body[data-panes="1"][data-sheet="open"] { --active-right: min(var(--sheet), 50%); }
+body[data-panes="1"] #canvas > .pane { right: var(--active-right, 0); }
+body[data-islands="open"]:not([data-islands-over="on"]) { --active-left: min(var(--isl-width, var(--side-least)), 60%); }
 body[data-islands="folded"] #islands { display: none; }
-/* The band under the tabs keeps the whole width: the bar opens under it, beside the canvas or over it, never pushing it. */
+/* The band keeps the whole width: the bar opens under it, beside the canvas or over it, never pushing it. */
 body[data-islands] #query { left: 0; }
 body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip)); }
 #islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* The bar's right edge: a strip to drag, drawn only as the line it already has, lit while pointed at. */
 #islands .isl-edge { position: absolute; top: 0; bottom: 0; right: 0; width: var(--space-4); cursor: col-resize; }
 #islands .isl-edge:hover { background: var(--line); }
-/* Its button, first in the band under the tabs: its mark and how many are on, lit while the bar is open. */
+/* Its button, first in the band: its mark and how many are on, lit while the bar is open. */
 #query .isl-toggle { flex: none; display: flex; align-items: center; gap: var(--space-4); align-self: stretch; border: 0; border-bottom: var(--border-3) solid transparent; border-radius: 0; background: none; padding: 0 var(--space-7); font: inherit; color: var(--muted); cursor: pointer; }
 #query .isl-toggle:is(:hover, :focus-visible) { color: var(--text); outline: none; }
 #query .isl-toggle[aria-expanded="true"] { color: var(--text); border-bottom-color: var(--accent); }
@@ -74,8 +80,5 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 #query .q-waiting:hover { background: var(--accent-soft); }
 #query .q-waiting-badge { position: absolute; top: 0; right: 0; color: var(--warn); font-size: var(--text-1); font-weight: 700; line-height: 1; }
 
-/* What waits on the owner, wherever it is drawn: the inbox (inbox.svg), painted in the colour of what holds it. A tab's
-   mark (the sessions pack's part, toned accent for a session waiting on the owner) is painted the same, its glyph hidden. */
-.on-you, #tabs [data-slot="tab.mark"] .pm-text-mark.pm-tone-accent::before { display: inline-block; width: var(--text-6); height: var(--text-6); vertical-align: middle; background: currentColor; -webkit-mask: url(/inbox.svg) center / contain no-repeat; mask: url(/inbox.svg) center / contain no-repeat; }
-#tabs [data-slot="tab.mark"] .pm-text-mark.pm-tone-accent { font-size: 0; color: var(--warn); }
-#tabs [data-slot="tab.mark"] .pm-text-mark.pm-tone-accent::before { content: ''; }
+/* What waits on the owner, wherever it is drawn: the inbox (inbox.svg), painted in the colour of what holds it. */
+.on-you { display: inline-block; width: var(--text-6); height: var(--text-6); vertical-align: middle; background: currentColor; -webkit-mask: url(/inbox.svg) center / contain no-repeat; mask: url(/inbox.svg) center / contain no-repeat; }

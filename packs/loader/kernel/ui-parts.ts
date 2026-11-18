@@ -137,7 +137,7 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
     else if (!open.includes(part.slot)) problems.push(`${at} fills "${part.slot}", which is not open to it: a slot of the host (${HOST_SLOTS.filter((s) => !s.includes('.')).join(', ')}, piece.<name>, page.<name>), one its pack's parts open, or one it asks for as slot:${part.slot}`);
     for (const s of part.opens ?? []) {
       if (typeof s !== 'string' || !SLOT.test(s)) { problems.push(`${at}: opens names slots`); continue; }
-      // A root pack is the host: its part may open a slot of the host's frame (panes holds each tab's `tab.mark`).
+      // A root pack is the host: its part may open a slot of the host's frame.
       const rootFrame = (pack.kernel as { trust?: string } | undefined)?.trust === 'root' && FRAME.includes(s);
       if (HOST_SLOTS.includes(s)) rootFrame || problems.push(`${at} opens "${s}", which the host draws: one name, one owner (the step that moves it takes it off the host's list)`);
       else if (!ownsId(pack, s) && !/^(?:piece|page)\.[a-z][a-z0-9_-]*$/.test(s)) problems.push(`${at} opens "${s}": a slot it opens is named "${pack.id}.<name>", or is a piece or page (piece.<name>, page.<name>)`);
@@ -178,7 +178,7 @@ export function checkParts(pack: Manifest, types: Map<string, ResolvedType>, fol
       else if (personal.has(a)) problems.push(`${at} sends "${a}", which only a person may call: a part never sends it`);
     }
     // By shape alone: whether the host draws them is asked where the part is drawn, so a host's change never refuses the pack.
-    // A part that only publishes page state, or only answers a decision (a slot that asks one: tabs.land), draws
+    // A part that only publishes page state, or only answers a decision (a slot that asks one: ghosts), draws
     // nothing, so it may name no mark; every other part names at least one.
     const decides = typeof part.slot === 'string' && DECISION_SLOTS.includes(part.slot);
     const draws = !decides && !(Array.isArray(part.state) && part.state.length && Array.isArray(part.marks) && !part.marks.length);

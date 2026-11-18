@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import { chrome, open } from './browser.ts';
 import { serve } from './serve.ts';
 import { until as holds } from './wait.ts';
-import { agent } from './tab-page.ts';
+import { agent } from './agent-page.ts';
 
 const browser = chrome();
 

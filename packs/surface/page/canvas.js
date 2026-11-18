@@ -59,7 +59,7 @@ export function activate(c) {
   barNow();
 }
 /**
- * The canvas in focus moved: the band under the tabs is drawn for it (./bar-band.js), and what follows its address is
+ * The canvas in focus moved: the band is drawn for it (./bar-band.js), and what follows its address is
  * told. The band holds the island side bar's button, if the map has islands, the count of chats waiting on the
  * owner (./sessions-open.js), and the pane's back and forward.
  */

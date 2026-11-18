@@ -89,7 +89,7 @@ export function drawPicker() {
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // Its shortcut, at the line's right while nothing is typed.
   const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
-  // The bar's button, first in the band under the tabs (./canvas.js): a press shows the islands or puts them away; how
+  // The bar's button, first in the band (./canvas.js): a press shows the islands or puts them away; how
   // many are on is its count.
   const count = h('span', { class: 'isl-toggle-count' });
   const fold = h('button', { type: 'button', class: 'isl-toggle', 'aria-label': 'Islands' }, sideMark(), count);

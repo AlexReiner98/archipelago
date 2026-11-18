@@ -1,5 +1,5 @@
 // A show of an item on an island never moves the reader's view (decision e_mnuthcap): the island goes on their canvas
-// and the item is lit in the side bar (hooks.lightIsland, the picker's), and no tab is opened or brought into sight
+// and the item is lit in the side bar (hooks.lightIsland, the picker's), and the canvas stays where it was
 // (packs/surface/page/live.js, light). In a file of its own: the steps a server keeps outlive a test in one process.
 
 import assert from 'node:assert/strict';
@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { chrome, open, pageModule } from './browser.ts';
 import { until as holds } from './wait.ts';
 import { serve } from './serve.ts';
-import { TAB, agent, ready } from './tab-page.ts';
+import { PANE, agent, ready } from './agent-page.ts';
 
 const browser = chrome();
 
@@ -36,7 +36,7 @@ test('in a browser, a show of an item on an island puts the island on and lights
     assert.equal(shown.sight.looking, false, 'nothing brought into sight');
     await until('the item is lit', () => page.evaluate<boolean>(`JSON.stringify(window.lit) === ${JSON.stringify(JSON.stringify([[made.harbour, made.pier, 'Lights']]))}`));
     await until('its island is on the canvas', () => page.evaluate<boolean>(`(async () => (await (await ${pageModule('islands-on.js')}).islandsOn()).includes(${JSON.stringify(made.harbour)}))()`));
-    assert.equal(await page.evaluate<number>(`document.querySelectorAll('${TAB}').length`), 1, 'no tab opened for it');
+    assert.equal(await page.evaluate<number>(`document.querySelectorAll('${PANE}').length`), 1, 'no canvas opened for it');
     assert.equal(await page.evaluate<string>('location.hash'), where, 'the view stays where it was');
   } finally {
     await page.close();
