@@ -11,6 +11,16 @@
 /** An island's name as its header says it: its title, and the pack it speaks. */
 export const nameOf = (i) => (i?.focus ? i?.pack?.title ?? '' : `${i?.title ?? ''}${i?.pack?.title ? ` · ${i.pack.title}` : ''}`);
 
+/**
+ * The colour of the `k`th island the picture draws: the style's island_hues, else its hues, each a colour (`isHex`),
+ * in turn; null where it gives none. Exported so a drawing on an island (./painted.js) takes the same hue.
+ */
+export function islandHue(style, isHex, k) {
+  const given = Array.isArray(style?.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style?.hues) ? style.hues : [];
+  const hues = given.filter(isHex);
+  return hues.length ? hues[k % hues.length] : null;
+}
+
 /** What a link across names: what it points to, and its value. */
 export function saidOf(to) {
   const value = to?.fields?.value;
@@ -37,12 +47,10 @@ export const cutOf = (r, [ax, ay], [aw, ah]) => {
  */
 export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex, header = () => null, part = () => null }) {
   if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map(), found: new Map() };
-  const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
-  const hues = given.filter(isHex);
   const named = new Map(islands.map((i) => [i.id, nameOf(i)]));
   const rules = new Set(), classes = new Map();
   g.islands.forEach((isle, k) => {
-    const hex = hues.length ? hues[k % hues.length] : null;
+    const hex = islandHue(style, isHex, k);
     if (!hex) return classes.set(isle.id, 'lf-island');
     const cls = `lf-i-${hex.slice(1).toLowerCase()}`;
     rules.add(`.${cls} { --lf-island: ${hex}; }`);
