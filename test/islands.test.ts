@@ -34,9 +34,9 @@ const island = (id: string, more: Partial<Manifest> = {}): Manifest => ({
 /** The packs, with more beside them. */
 const core = () => readManifest(readFileSync(join(ROOT, 'packs', 'core', 'pack.json'), 'utf8'), 'core');
 
-test('the shared set is core’s list: the eight starter types, task, decision and finding', () => {
+test('the shared set is core’s list: the eight starter types, task and decision', () => {
   const shared = sharedOf([core()]);
-  assert.deepEqual([...shared.types].sort(), ['actor', 'aim', 'decision', 'finding', 'occurrence', 'place', 'question', 'record', 'system', 'task', 'work']);
+  assert.deepEqual([...shared.types].sort(), ['actor', 'aim', 'decision', 'occurrence', 'place', 'question', 'record', 'system', 'task', 'work']);
   assert.ok(!shared.types.has('person'), 'a flavour core does not list is not shared');
   assert.ok(shared.links.has('bears_on') && shared.links.has('depends_on'), 'the kernel’s link types are what a link extends');
   assert.throws(() => readManifest(JSON.stringify({ id: 'x', version: '1', title: 'X', shared: ['task'] }), 'x'), /only the kernel's pack declares it/);

@@ -60,15 +60,16 @@ test('a reader reads a finding; reads points at a finding only, and crosses', as
   assert.ok(!l.registry.relations.get('uses')?.crosses, 'what it extends does not');
 });
 
-test('a finding is in the shared set: a pack on an island map may build on it', () => {
+test('finding is no core type: the shared set keeps reads, and a pack builds on a type of its own that promises', () => {
   const core = readManifest(readFileSync(join(PACKS, 'core', 'pack.json'), 'utf8'), 'core');
   const shared = sharedOf([core]);
-  assert.ok(shared.types.has('finding'));
+  assert.ok(!shared.types.has('finding'), 'findings fold into decisions and evidence (decision e_guzfg5rg)');
+  assert.ok(!core.types?.some((t) => (t as { id: string }).id === 'finding'));
   assert.ok(shared.links.has('reads'));
   const pack: Manifest = {
     id: 'finance', version: '1', title: 'Finance', requires: ['core'],
-    types: [{ id: 'cost_line', title: 'Cost line', description: 'A cost from a date.', extends: 'finding' } as never],
-    links: [{ id: 'counts', extends: 'reads', title: 'counts', inverse: 'is counted by', from: ['*'], to: ['finding'], description: 'Counts it in a budget.' }],
+    types: [{ id: 'cost_line', title: 'Cost line', description: 'A cost from a date.', extends: 'record', capabilities: { promised: { fields: ['amount'] } }, fields: { amount: { type: 'number' } } } as never],
+    links: [{ id: 'counts', extends: 'reads', title: 'counts', inverse: 'is counted by', from: ['*'], to: ['cost_line'], description: 'Counts it in a budget.' }],
   } as Manifest;
   assert.deepEqual(islandProblems(pack, shared), []);
 });

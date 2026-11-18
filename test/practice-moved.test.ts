@@ -55,13 +55,13 @@ test('a map that had core before the move is given practice, once, and is still 
   assert.ok(!now.registry.rules.some((r) => r.pack === 'core' && rules.includes(r.id ?? '')), 'core declares none of them now');
 });
 
-test('the rules file says every turned-on pack’s working rules: practice’s and the findings line, beside core’s', () => {
+test('the rules file says every turned-on pack’s working rules: practice’s, beside core’s', () => {
   const file = workingRules();
-  for (const title of ['Keep the map true', 'Say on whose authority', 'A name is a few words', 'Search before you create', 'A result is items and a view', 'A finding is what an island stands by, in one line', 'Say who is waited on with a link'])
+  for (const title of ['Keep the map true', 'Say on whose authority', 'A name is a few words', 'Search before you create', 'A result is items and a view', 'Say who is waited on with a link'])
     assert.equal(file.split(`- **${title}.**`).length, 2, `"${title}" once`);
-  assert.ok(file.indexOf('A result is items and a view') < file.indexOf('A finding is what an island stands by'), 'in the order the packs give');
+  assert.ok(file.indexOf('Keep the map true') < file.indexOf('Say who is waited on with a link'), 'in the order the packs give');
   assert.match(shippedRules(), /Keep the map true/, 'and the plugin ships them');
-  const only = serverPacks(checkoutPacks(), ['findings']).map((p) => p.id);
-  assert.deepEqual(only, ['core', 'findings'], 'a server that names its packs: the kernel and those');
-  assert.doesNotMatch(workingRules(serverPacks(checkoutPacks(), ['findings'])), /Keep the map true/, 'a pack the server does not turn on says nothing');
+  const only = serverPacks(checkoutPacks(), ['turns']).map((p) => p.id);
+  assert.deepEqual(only, ['core', 'turns'], 'a server that names its packs: the kernel and those');
+  assert.doesNotMatch(workingRules(serverPacks(checkoutPacks(), ['turns'])), /Keep the map true/, 'a pack the server does not turn on says nothing');
 });

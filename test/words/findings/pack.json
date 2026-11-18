@@ -1,0 +1,152 @@
+{
+  "id": "findings",
+  "version": "0.2.0",
+  "title": "Findings",
+  "description": "A finding: a claim with its value, read in one line, and what an agent's finding must carry. Words only. The product no longer ships it (findings fold into decisions and evidence, decision e_guzfg5rg, 18 Nov 2026); the tests keep it as a type that promises its fields.",
+  "types": [
+    {
+      "id": "finding",
+      "extends": "record",
+      "capabilities": {
+        "promised": {
+          "fields": [
+            "value",
+            "as_of"
+          ],
+          "published": "published"
+        },
+        "lead": {
+          "form": "measure",
+          "value": "value",
+          "unit": "unit",
+          "as_of": "as_of"
+        }
+      },
+      "title": "Finding",
+      "description": "What an island has found, read in one line: the claim, its value, how sure, as of when. Marked published, it is what the island stands by, and only then may another island read it; the rest are its working findings. The title is the claim as a short sentence (\"Peak load is 42 kW\", not \"Peak load\"); the value is the fact, with its unit; confidence says how sure; as_of when it was true. The note says how it was found, three lines at most. An option is an alternative, a bug is a bug, working research stays research: none is a finding. Its readers read it (reads); a new value keeps the old one in the log.",
+      "statuses": {
+        "open": [
+          "current"
+        ],
+        "closed": [
+          "superseded",
+          "withdrawn"
+        ]
+      },
+      "fields": {
+        "value": {
+          "type": "json",
+          "typed_by": "value_type",
+          "shown": true,
+          "description": "The fact itself, never left out: 557, true, 2026-11-05, or a few words of text. A number takes its unit in unit; text says its own."
+        },
+        "value_type": {
+          "type": "enum",
+          "values": [
+            "text",
+            "number",
+            "boolean",
+            "date"
+          ],
+          "shown": true,
+          "description": "What sort of value it is: text, number, boolean or date. A measure is a number."
+        },
+        "published": {
+          "type": "boolean",
+          "shown": true,
+          "description": "true: the island stands by it, and other islands may read it. Left out or false, it is a working finding, read on its own island only."
+        },
+        "unit": {
+          "type": "string",
+          "shown": true,
+          "description": "What a number counts, read after it: s, kW, EUR, requests a minute."
+        },
+        "as_of": {
+          "type": "date",
+          "shown": true,
+          "description": "When the value was true: the day it was found or measured."
+        }
+      }
+    }
+  ],
+  "rules": [
+    {
+      "id": "finding_value",
+      "when": {
+        "actor": "agent",
+        "op": "create",
+        "type": "finding"
+      },
+      "then": {
+        "require": [
+          "value"
+        ]
+      },
+      "say": "\"{title}\": a finding carries its value (props.value: a number with its unit, true or false, a date, or a few words). With nothing found yet, it is research or a question, not a finding."
+    },
+    {
+      "id": "finding_note",
+      "when": {
+        "actor": "agent",
+        "op": [
+          "create",
+          "update"
+        ],
+        "type": "finding",
+        "matches": {
+          "body": "^(?:[\\s\\S]{401}|(?:[^\n]*\\S[^\n]*\n+){3}[^\n]*\\S)"
+        }
+      },
+      "then": "refuse",
+      "say": "\"{title}\": a finding's note says how it was found, in three lines and 400 characters at most. Put the rest in research or a record the finding rests on (based_on)."
+    },
+    {
+      "id": "finding_option",
+      "when": {
+        "actor": "agent",
+        "op": [
+          "create",
+          "update"
+        ],
+        "type": "finding",
+        "matches": {
+          "title": "^(?:[Oo]ption|[Aa]lternative)\\b"
+        }
+      },
+      "then": "refuse",
+      "say": "\"{title}\": an option is weighed, not found. Make it a question part_of the decision it answers (on a design island, a concept alternative_for it)."
+    },
+    {
+      "id": "finding_bug",
+      "when": {
+        "actor": "agent",
+        "op": [
+          "create",
+          "update"
+        ],
+        "type": "finding",
+        "matches": {
+          "title": "^(?:[Bb]ug|BUG|[Ii]ssue)\\b"
+        }
+      },
+      "then": "refuse",
+      "say": "\"{title}\": a fault is not a finding. Make it the work that fixes it (a bug, where the map has one; else a task), part_of what it is in."
+    },
+    {
+      "id": "finding_claim",
+      "when": {
+        "actor": "agent",
+        "op": [
+          "create",
+          "update"
+        ],
+        "type": "finding",
+        "matches": {
+          "title": ", as .+ reads it$"
+        }
+      },
+      "then": "refuse",
+      "say": "\"{title}\": a finding's title is the claim itself, as a sentence (\"Peak load is 42 kW\"), not who reads it."
+    }
+  ]
+}

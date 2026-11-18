@@ -1,12 +1,12 @@
-// A published finding reads in one line (task e_cg5y8qdy): the findings pack's rules refuse, from an agent, a finding with no
+// A published finding reads in one line (task e_cg5y8qdy): the findings words' rules (test/words/findings; the product's findings pack is gone) refuse, from an agent, a finding with no
 // value, a note past three lines, an option, a bug or a placeholder title, and each refusal says what to send instead.
 import assert from 'node:assert/strict';
-import { join } from 'node:path';
 import { test } from 'node:test';
 import { Registry } from '../packs/loader/kernel/packs.ts';
+import { PACKS, WORDS } from './map.ts';
 import { checkRules, judge, type Target, type Who, type Written } from '../packs/rules/kernel/rules.ts';
 
-const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
+const reg = new Registry([PACKS, WORDS]); // the findings words keep the rules the product's findings pack had
 const agent: Who = { human: false };
 const person: Who = { human: true };
 const finding = (title: string, props: Record<string, unknown> = { value: 42, value_type: 'number', unit: 'kW' }, body?: string) =>

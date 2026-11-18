@@ -4,7 +4,7 @@
   "title": "Core",
   "description": "The starter types (the seven of the work, and system), task and decision (the shared set every pack may build on), the root links every link type extends, and the system tier.",
   "uses": ["slot:piece.document"],
-  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision", "finding"],
+  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision"],
   "types": [
     {
       "id": "actor",
@@ -164,21 +164,6 @@
       }
     },
     {
-      "id": "finding",
-      "extends": "record",
-      "capabilities": { "promised": { "fields": ["value", "as_of"], "published": "published" }, "lead": { "form": "measure", "value": "value", "unit": "unit", "as_of": "as_of" } },
-      "title": "Finding",
-      "description": "What an island has found, read in one line: the claim, its value, how sure, as of when. Marked published, it is what the island stands by, and only then may another island read it; the rest are its working findings. The title is the claim as a short sentence (\"Peak load is 42 kW\", not \"Peak load\"); the value is the fact, with its unit; confidence says how sure; as_of when it was true. The note says how it was found, three lines at most. An option is an alternative, a bug is a bug, working research stays research: none is a finding. Its readers read it (reads); a new value keeps the old one in the log.",
-      "statuses": { "open": ["current"], "closed": ["superseded", "withdrawn"] },
-      "fields": {
-        "value": { "type": "json", "typed_by": "value_type", "shown": true, "description": "The fact itself, never left out: 557, true, 2026-11-05, or a few words of text. A number takes its unit in unit; text says its own." },
-        "value_type": { "type": "enum", "values": ["text", "number", "boolean", "date"], "shown": true, "description": "What sort of value it is: text, number, boolean or date. A measure is a number." },
-        "published": { "type": "boolean", "shown": true, "description": "true: the island stands by it, and other islands may read it. Left out or false, it is a working finding, read on its own island only." },
-        "unit": { "type": "string", "shown": true, "description": "What a number counts, read after it: s, kW, EUR, requests a minute." },
-        "as_of": { "type": "date", "shown": true, "description": "When the value was true: the day it was found or measured." }
-      }
-    },
-    {
       "id": "lens",
       "extends": "system",
       "title": "View",
@@ -296,7 +281,7 @@
       "id": "island",
       "extends": "system",
       "title": "Island",
-      "description": "A cluster of work that speaks one pack's vocabulary and the shared set, below a project or across projects. On a map with islands on, every item but the kernel's own and actors lives on exactly one island (its field island), its type the island's pack's or of the shared set, and no link joins items on two islands: findings are how islands meet. The query term island <island> is what lives on it.",
+      "description": "A cluster of work that speaks one pack's vocabulary and the shared set, below a project or across projects. On a map with islands on, every item but the kernel's own and actors lives on exactly one island (its field island), its type the island's pack's or of the shared set, and no link joins items on two islands but a reading (reads) of what an item promises. The query term island <island> is what lives on it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
       "fields": {
         "pack": { "type": "string", "description": "The pack it speaks, by id (core for the shared set alone), fixed once the island is made." },
@@ -853,7 +838,7 @@
       "inverse": "is borne on by",
       "from": ["*"],
       "to": ["question"],
-      "description": "Evidence on a question: a result, a test or a finding that helps settle it."
+      "description": "Evidence on a question: a result, a test or a measure that helps settle it."
     },
     {
       "id": "link",
@@ -883,7 +868,7 @@
       "inverse": "is read by",
       "from": ["*"],
       "to": ["has:promised"],
-      "description": "Relies on what an item promises its readers (a finding's value, or the fields of any type with the promised capability), from this island or another: the one link that crosses between islands. Its readers are who is told when a promised field moves; when it was made, with the item's history, says which value was read. props.expects names the type the reading relies on: a target not of it is refused."
+      "description": "Relies on what an item promises its readers (the fields of a type with the promised capability), from this island or another: the one link that crosses between islands. Its readers are who is told when a promised field moves; when it was made, with the item's history, says which value was read. props.expects names the type the reading relies on: a target not of it is refused."
     },
     {
       "id": "works_on",
@@ -1302,7 +1287,7 @@
       "shape": "data",
       "lens": {},
       "answer": "flat",
-      "description": "The query: a filter, a walk and a limit, answered as items and the links among them; the page names its parts Find, Only, Not, Walk and Limit. The filter is { find, only, not }, three lists of the same terms, each a set of items written as words: text <words> (the search read's own: words in any form in titles and notes, or as typed in a title, else titles nearly what was typed; the best match first, and matched says how many they found in all), type <t> (flavours included), held (what a change held for you would touch), moved (what reads a finding that moved since it was last changed or said still true), id <item>, in <item> (what is part of it, at any depth, not the item itself), related <item> (any link to it, either way), <link type> <item> (\"tagged Urgent\", \"waits_on me\": what has that link to it), <link type>< <item> (what it links to), owner me|<person>, kind <k>, and the words that can only be checked of what is found: done, blocked (depends on something open, waits on someone, or needs a resource not free, as attention says), status <s>, no owner, over estimate (tokens used over tokens estimated), changed since|before <7d|date>, made since|before <7d|date> (a since and a before together are a range, a date its day in the workspace's zone), by owner and by agent (on whose authority its status was last set). An item is an id or a name. find adds its sets to pick the seeds, and takes neither kind nor those words; only keeps the seeds in every set, types being one set; not takes its sets away from everything, an item named by id and what the walk reaches included, and the walk does not pass through what it takes away: kind system unless not is given. A filter whose find holds nothing is refused. The walk follows the link types named (over, or \"all\"), each the way it is written: \"depends_on>\" out along the link (what an item depends on), \"depends_on<\" in to it (what depends on the item), \"depends_on\" either way. A part links to what holds it, so from a project \"part_of<\" walks down (what is in it) and \"part_of>\" up (what it is in); \"part_of\" either way climbs to the parent and comes back down through all of it; for steps steps (1 when over is named; at most 6). The limit is the most items sent (500; at most 2000), seeds first, and cut says it cut. Each item is its head (id, kind, type, title, the start of its note (with notes \"whole\", the whole of it, for the first 100 sent, named in whole), visibility, status, open, owner, times) the fields its type marks shown (with fields true, every field its type declares that has a value, and its note whole, for every item sent, all named in whole: one read of a whole island, up to the limit), and why it is there: found (the sorts of term that found it: text, type, id, link, in) and terms (those terms, as the query says them) or step (the step of the walk that reached it); each link its id, type, from, to and props. With preview ({ part: find, only or not, terms, ids }), it answers only { preview }: for each term, at most 80, the items find would add it finds, or which of ids (what is drawn) only or not would leave out. With time ({ from, to }: dates, today, or days from today as -6d or 7d), a window it finds nothing more by: each item says where it falls in it (time, its spans; a session where it was at work) whose lane it is in (lane: the person who holds it, what no one holds the workspace owner's, each session its own) and what it counts toward (stream: the outermost item its work sits in; a session's spans each their own, with on_title), the lanes and streams in order (lanes, streams), for a layout along a time axis. Params: filter ({ find, only, not }), walk ({ over, steps }), limit, time, notes, fields."
+      "description": "The query: a filter, a walk and a limit, answered as items and the links among them; the page names its parts Find, Only, Not, Walk and Limit. The filter is { find, only, not }, three lists of the same terms, each a set of items written as words: text <words> (the search read's own: words in any form in titles and notes, or as typed in a title, else titles nearly what was typed; the best match first, and matched says how many they found in all), type <t> (flavours included), held (what a change held for you would touch), moved (what reads a promised item that moved since it was last changed or said still true), id <item>, in <item> (what is part of it, at any depth, not the item itself), related <item> (any link to it, either way), <link type> <item> (\"tagged Urgent\", \"waits_on me\": what has that link to it), <link type>< <item> (what it links to), owner me|<person>, kind <k>, and the words that can only be checked of what is found: done, blocked (depends on something open, waits on someone, or needs a resource not free, as attention says), status <s>, no owner, over estimate (tokens used over tokens estimated), changed since|before <7d|date>, made since|before <7d|date> (a since and a before together are a range, a date its day in the workspace's zone), by owner and by agent (on whose authority its status was last set). An item is an id or a name. find adds its sets to pick the seeds, and takes neither kind nor those words; only keeps the seeds in every set, types being one set; not takes its sets away from everything, an item named by id and what the walk reaches included, and the walk does not pass through what it takes away: kind system unless not is given. A filter whose find holds nothing is refused. The walk follows the link types named (over, or \"all\"), each the way it is written: \"depends_on>\" out along the link (what an item depends on), \"depends_on<\" in to it (what depends on the item), \"depends_on\" either way. A part links to what holds it, so from a project \"part_of<\" walks down (what is in it) and \"part_of>\" up (what it is in); \"part_of\" either way climbs to the parent and comes back down through all of it; for steps steps (1 when over is named; at most 6). The limit is the most items sent (500; at most 2000), seeds first, and cut says it cut. Each item is its head (id, kind, type, title, the start of its note (with notes \"whole\", the whole of it, for the first 100 sent, named in whole), visibility, status, open, owner, times) the fields its type marks shown (with fields true, every field its type declares that has a value, and its note whole, for every item sent, all named in whole: one read of a whole island, up to the limit), and why it is there: found (the sorts of term that found it: text, type, id, link, in) and terms (those terms, as the query says them) or step (the step of the walk that reached it); each link its id, type, from, to and props. With preview ({ part: find, only or not, terms, ids }), it answers only { preview }: for each term, at most 80, the items find would add it finds, or which of ids (what is drawn) only or not would leave out. With time ({ from, to }: dates, today, or days from today as -6d or 7d), a window it finds nothing more by: each item says where it falls in it (time, its spans; a session where it was at work) whose lane it is in (lane: the person who holds it, what no one holds the workspace owner's, each session its own) and what it counts toward (stream: the outermost item its work sits in; a session's spans each their own, with on_title), the lanes and streams in order (lanes, streams), for a layout along a time axis. Params: filter ({ find, only, not }), walk ({ over, steps }), limit, time, notes, fields."
     },
     {
       "id": "core.hubs",

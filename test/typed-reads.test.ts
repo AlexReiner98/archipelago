@@ -22,13 +22,14 @@ const STORES = {
 async function twoIslands() {
   const l = await freshWith(new Registry(packsWith(STORES)));
   await setIslands(l, human, true);
-  const { a, b } = await make(l, [
+  const { a, b, c } = await make(l, [
     { op: 'create', ref: 'a', type: 'island', title: 'Stores', props: { pack: 'stores' } },
+    { op: 'create', ref: 'c', type: 'island', title: 'Sales', props: { pack: 'findings' } }, // finding is the tests' words now
     { op: 'create', ref: 'b', type: 'island', title: 'Orders', props: { pack: 'core' } },
   ]);
   const { s, f, away } = await make(l, [
     { op: 'create', ref: 's', type: 'stock', title: 'Oak dowel stock', props: { sku: 'OAK-12', qty: 40, island: a } },
-    { op: 'create', ref: 'f', type: 'finding', title: 'Dowels sell 10 a week', props: { value: 10, value_type: 'number', published: true, island: a } },
+    { op: 'create', ref: 'f', type: 'finding', title: 'Dowels sell 10 a week', props: { value: 10, value_type: 'number', published: true, island: c } },
     { op: 'create', ref: 'away', type: 'task', title: 'Plan the next order', props: { island: b } },
   ]);
   return { l, s: s!, f: f!, away: away! };
