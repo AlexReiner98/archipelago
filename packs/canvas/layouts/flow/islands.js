@@ -11,6 +11,16 @@
 /** An island's name as its header says it: its title, and the pack it speaks. */
 export const nameOf = (i) => (i?.focus ? i?.pack?.title ?? '' : `${i?.title ?? ''}${i?.pack?.title ? ` · ${i.pack.title}` : ''}`);
 
+/**
+ * The colour of the `k`th island the picture draws: the style's island_hues, else its hues, each a colour (`isHex`),
+ * in turn; null where it gives none. Exported so a drawing on an island (./painted.js) takes the same hue.
+ */
+export function islandHue(style, isHex, k) {
+  const given = Array.isArray(style?.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style?.hues) ? style.hues : [];
+  const hues = given.filter(isHex);
+  return hues.length ? hues[k % hues.length] : null;
+}
+
 /** What a link across names: what it points to, and its value. */
 export function saidOf(to) {
   const value = to?.fields?.value;
@@ -29,20 +39,25 @@ export const cutOf = (r, [ax, ay], [aw, ah]) => {
   return rr > l && b > t ? `M${l} ${t}V${b}H${rr}V${t}Z` : '';
 };
 
+/** The shore of `r` below `foot`: down its left side, round its foot, up its right side, open above. */
+export const shoreBelow = ({ l, r, b }, foot, q) => `M${l} ${foot}V${b - q}A${q} ${q} 0 0 0 ${l + q} ${b}H${r - q}A${q} ${q} 0 0 0 ${r} ${b - q}V${foot}`;
+
+/** The shore of `r` above `foot`, its top corners round: up its left side, across its top, down its right side. */
+export const crownOf = ({ l, t, r }, foot, q) => `M${l} ${foot}V${t + q}A${q} ${q} 0 0 1 ${l + q} ${t}H${r - q}A${q} ${q} 0 0 1 ${r} ${t + q}V${foot}`;
+
 /**
  * The islands' marks: `layer` (drawn first, under the wires), `gates` (drawn over them), the colour `rules` they read,
  * and `found`: the class each finding read across takes, by its id, for its outline in its island's colour.
  * `legends` holds each island's rows ({ glyph, label }, and `add` on the row that adds to it); `isHex` says what is a colour;
  * `header(id, [x, y], name)` what an island's header shows after its name ({ marks, tips }: its packs, ./pack-marks.js).
  */
+
 export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex, header = () => null, part = () => null }) {
   if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map(), found: new Map() };
-  const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
-  const hues = given.filter(isHex);
   const named = new Map(islands.map((i) => [i.id, nameOf(i)]));
   const rules = new Set(), classes = new Map();
   g.islands.forEach((isle, k) => {
-    const hex = hues.length ? hues[k % hues.length] : null;
+    const hex = islandHue(style, isHex, k);
     if (!hex) return classes.set(isle.id, 'lf-island');
     const cls = `lf-i-${hex.slice(1).toLowerCase()}`;
     rules.add(`.${cls} { --lf-island: ${hex}; }`);
@@ -50,6 +65,8 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
   });
   const [PAD, CORNER, ROW, KEY_W, KEY_H, MARK_GAP] = ['island_pad', 'island_corner', 'island_legend_row', 'key_width', 'key_height', 'island_legend_mark_gap'].map(z);
   const tips = new Map();
+  // What scales about the point [x, y] by a class's transform (its origin the point: a group moved there, and back inside it).
+  const grownFrom = ([x, y], cls, ...inner) => m('g', { transform: `translate(${x} ${y})` }, m('g', { class: cls }, m('g', { transform: `translate(${-x} ${-y})` }, ...inner)));
   const rectOf = (r) => ({ x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t, rx: CORNER });
   const layer = g.islands.map((isle) => {
     const rects = isle.land.map(rectOf);
@@ -64,7 +81,11 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
           m('g', { key: `paint:${isle.id}`, on: ['move', 'leave', 'click'], class: 'lf-painted' }, ...rects.map((r) => m('rect', r))),
         )
       : m('g', { class: 'lf-land' }, ...rects.map((r) => m('rect', r)));
-    const shore = m('g', { class: 'lf-shore' }, ...rects.map((r) => m('rect', r)));
+    // A land of one band whose header grows (its `foot`, ../map/archipelago.js) rises with it: its shore drawn below the
+    // header's foot as it is, and above it as a crown scaled up from the foot as the header is (.lf-crown-scale).
+    const crowned = Number.isFinite(isle.foot) && rects.length === 1 && !String(isle.id).startsWith('parts:');
+    const shore = crowned ? m('g', { class: 'lf-shore' }, m('path', { d: shoreBelow(isle.land[0], isle.foot, CORNER) })) : m('g', { class: 'lf-shore' }, ...rects.map((r) => m('rect', r)));
+    const crown = crowned ? grownFrom([isle.land[0].l, isle.foot], 'lf-crown-scale', m('path', { d: crownOf(isle.land[0], isle.foot, CORNER) + 'Z', class: 'lf-crown-land' }), m('path', { d: crownOf(isle.land[0], isle.foot, CORNER), class: 'lf-crown-shore' })) : null;
     // A pack's parts as an island of the query (./parts-islands.js) is its parts' drawing alone: no land, shore, name or key of its own.
     const ghost = String(isle.id).startsWith('parts:'), title = ghost ? null : named.get(isle.id);
     const name = title && titled(m('a', { href: `#/e/${isle.id}`, class: 'lf-island-name' }, m('text', { x: isle.name[0] + z('island_name_x'), y: isle.name[1] }, title)), title);
@@ -85,7 +106,15 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     });
     // What its own look paints (../map/looks.js), over its land and under what it holds.
     const painted = isle.look?.paint.length ? m('g', { class: 'lf-look', transform: `translate(${isle.look.at[0]} ${isle.look.at[1]})` }, ...isle.look.paint) : null;
-    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, ...(ghost ? [] : [land, shore]), painted, name, head?.marks ?? [], ...(ghost ? [] : [legend]));
+    // Its header (name, packs, legend) keeps its size on screen as the camera zooms out (study e_unru8ftt: drawn in the
+    // island's units, it read 11 px on a small island and 7 on a large one): scaled by .lf-head-scale, which reads the
+    // camera's scale off the frame, within the style's flow_island_head_least and _most; from its foot, so it grows up
+    // into the sea with its crown (verdict e_enzjk53r), else from the land's corner.
+    // A parts island's drawing is what it holds, not a header: it is drawn as it is.
+    const headed = [name, ...(head?.marks ?? []), ...(ghost ? [] : legend)].filter(Boolean);
+    const from = crowned ? [frame.left, isle.foot] : [frame.left, frame.top];
+    const top = ghost ? headed : headed.length ? [grownFrom(from, 'lf-head-scale', ...headed)] : [];
+    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, ...(ghost ? [] : [land, shore, crown]), painted, ...top);
   });
   // A gate on each shore a link between islands crosses: a bar across the wire in its island's colour, as long as the
   // port it marks. A finding
@@ -130,9 +159,18 @@ export const css = `
 .lf-island-add:is(:hover, :focus-visible) { color: var(--accent, var(--ln-text)); }
 .lf-island-add text { fill: currentColor; }
 .lf-add-mark { stroke: currentColor; stroke-width: var(--ln-flow-stroke-hover); fill: none; }
-.lf-shore rect { fill: none; stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-island-stroke); }
+.lf-shore :is(rect, path), .lf-crown-shore { fill: none; stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-island-stroke); }
 .lf-island-name { pointer-events: auto; cursor: pointer; }
-.lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-lit-mix)); font-size: var(--ln-flow-island-text); font-family: var(--type-region-family, var(--ln-font)); font-weight: var(--type-region-weight, 400); font-style: var(--type-region-style, normal); text-transform: var(--type-region-case, none); letter-spacing: var(--type-region-track, 0); dominant-baseline: central; }
+/* Its name in the plain face, near the text's colour: the region's small-caps serif read as a whisper at this size (study e_unru8ftt). */
+.lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-island-name-mix)); font-size: var(--ln-flow-island-text); font-family: var(--ln-font); dominant-baseline: central; }
+/* Its header kept at its size on screen: 1 over the camera's scale (--ln-plane-scale, set on the frame), within the style's least and most. */
+.lf-region { --lf-head: clamp(var(--ln-flow-island-head-least), calc(1 / var(--ln-plane-scale)), var(--ln-flow-island-head-most)); }
+.lf-head-scale, .lf-crown-scale { transform-box: view-box; transform-origin: 0 0; }
+.lf-head-scale { transform: scale(var(--lf-head)); }
+/* The crown: the land and shore above a header's foot, as tall as the header is drawn; its line kept its width. */
+.lf-crown-scale { transform: scaleY(var(--lf-head)); }
+.lf-crown-land { fill: var(--lf-land); stroke: none; }
+.lf-crown-shore { vector-effect: non-scaling-stroke; }
 .lf-island-key text { fill: var(--ln-muted); font-size: var(--ln-flow-island-legend-text); font-family: var(--ln-font); dominant-baseline: central; }
 /* A gate: a bar on the shore in the island's colour. A finding read across: its outline in its island's colour. */
 .lf-gate-bar { fill: none; stroke: var(--lf-island, var(--ln-text)); stroke-width: var(--ln-flow-island-gate-stroke); stroke-linecap: round; }

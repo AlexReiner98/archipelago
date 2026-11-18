@@ -25,7 +25,7 @@ function edge([cx, cy], n, [px, py]) {
  * `ties` and each island's frame.
  */
 export function placedOut(args, m, islandOf, heads, wides = new Map()) {
-  const { sizes } = args, GAP = sizes.flow_node_gap, PAD = sizes.flow_island_pad, M = sizes.flow_margin;
+  const { sizes } = args, GAP = sizes.flow_node_gap, PAD = sizes.flow_island_pad, M = sizes.flow_margin, RISE = args.rise ?? 0;
   const corners = args.placed ?? {}, cellBy = new Map((args.items ?? []).map((i) => [i.id, cellOf(i.fields?.cell)]));
   const list = [...m.nodes.values()];
   const cw = Math.max(...list.map((n) => n.w)) + GAP, ch = Math.max(...list.map((n) => n.h)) + GAP;
@@ -33,12 +33,13 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   for (const n of list) (groups.get(islandOf(n.id)) ?? groups.set(islandOf(n.id), []).get(islandOf(n.id))).push(n);
   const x = new Map(), y = new Map(), islands = [];
   let bottom = M;
-  // Islands an agent has given a corner stand there; the rest follow in a row to the right of all of those.
+  // Islands an agent has given a corner stand there; the rest are laid out at the origin, then shelved after them (shelve).
   const own = [...groups].filter(([id]) => id !== null).sort(([a], [b]) => Number(!cellOf(corners[a])) - Number(!cellOf(corners[b])));
   let right = M - GAP;
+  const loose = [];
   for (const [id, items] of own) {
     const corner = cellOf(corners[id]), top = heads.get(id) ?? 0;
-    const l = corner ? M + corner[0] * cw : right + GAP, t = corner ? M + corner[1] * ch : M;
+    const l = corner ? M + corner[0] * cw : 0, t = corner ? M + RISE + corner[1] * ch : 0;
     // An island with a look of its own (./looks.js) stands where its look puts what it holds; what the look leaves
     // unplaced is placed by cell beside it.
     const given = args.looks?.get(id), look = given && lookOut(given.look, { ...given, nodes: items, sizes, measure: args.measure });
@@ -51,7 +52,8 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
       for (const n of items) x.set(n.id, lx + w / 2), y.set(n.id, ly + h / 2);
       const r = Math.max(l + (wides.get(id) ?? 0), lx + w + PAD), b = ly + h + PAD;
       islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }], canvas: { at: [lx, ly], size: [w, h] } });
-      (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
+      if (!corner) loose.push({ isle: islands.at(-1), items });
+      else (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
       continue;
     }
     // Where its focus stands, as the island's style says (look.focus, decision e_up4wjd94): at its cell, in the corner
@@ -60,10 +62,11 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     const lx = l + PAD, ly = t + PAD + top, rest = (look ? items.filter((n) => !look.places.has(n.id)) : items).filter((n) => n !== fn), after = look ? look.width + GAP : 0;
     const dx = fn && fat === 'corner' ? fn.w + GAP : 0, dy = fn && fat === 'top' ? fn.h + GAP : 0;
     if (look) for (const n of items) if (look.places.has(n.id)) x.set(n.id, lx + look.places.get(n.id)[0]), y.set(n.id, ly + look.places.get(n.id)[1]);
-    const unplaced = rest.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0;
-    const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + n.w / 2), y.set(n.id, ly + dy + r * ch + n.h / 2));
-    // Row by row across the block, so the order they came in reads left to right, then down.
-    unplaced.forEach((n, k) => at(n, [k % shift, Math.floor(k / shift)]));
+    const unplaced = rest.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0, block = blockOf(unplaced, m, shift, [cw, ch]);
+    // Each box in the middle of its cell, so a column of mixed kinds (a decision is wider than a task) keeps one line.
+    const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + (cw - GAP) / 2), y.set(n.id, ly + dy + r * ch + (ch - GAP) / 2));
+    // Row by row across the block, what is linked together kept together (blockOf).
+    for (const [n, cell] of block) at(n, cell);
     for (const n of rest) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
     // Over the rest it stands in the middle of their width; in the corner, first.
     const wide = Math.max(fn?.w ?? 0, ...rest.map((n) => x.get(n.id) + n.w / 2 - lx));
@@ -71,11 +74,86 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     const r = Math.max(l + (wides.get(id) ?? 0), look ? lx + look.width + PAD : l, ...items.map((n) => x.get(n.id) + n.w / 2 + PAD));
     const b = Math.max(look ? ly + look.height + PAD : t, ...items.map((n) => y.get(n.id) + n.h / 2 + PAD));
     islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }], ...(look && { look: { at: [lx, ly], paint: look.paint, items: look.items } }) });
-    bottom = Math.max(bottom, b);
-    right = Math.max(right, r);
+    if (!corner) loose.push({ isle: islands.at(-1), items });
+    else (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
   }
+  ({ right, bottom } = shelve(loose, { x, y, from: [islands.length > loose.length ? right + sizes.flow_island_sea : M, M + RISE], gap: sizes.flow_island_sea, rise: RISE, aspect: args.aspect, right, bottom }));
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
   return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
+}
+
+/**
+ * The cells of `nodes` in a block `columns` wide: each group of items linked together (in `m`'s chains and ties) in
+ * a block of its own rows, round its most linked item, so a wire stays short (`cell` the cells' width and height); each starts a row,
+ * so where one group ends and the next begins is a row's edge, not the middle of one (study e_unru8ftt: a gap that said
+ * nothing, wires across the whole island). Items linked to nothing here come last, together. Answers [node, [c, r]].
+ */
+export function blockOf(nodes, m, columns, cell = [1, 1]) {
+  const ids = new Set(nodes.map((n) => n.id)), near = new Map(nodes.map((n) => [n.id, []]));
+  for (const w of [...(m.chains ?? []), ...(m.ties ?? [])]) if (ids.has(w.a) && ids.has(w.b) && w.a !== w.b) near.get(w.a).push(w.b), near.get(w.b).push(w.a);
+  const order = new Map(nodes.map((n, k) => [n.id, k])), seen = new Set(), groups = [];
+  const most = (list) => [...list].sort((a, b) => near.get(b.id).length - near.get(a.id).length || order.get(a.id) - order.get(b.id))[0];
+  for (const n of nodes) {
+    if (seen.has(n.id)) continue;
+    const members = [], queue = [n.id];
+    seen.add(n.id);
+    while (queue.length) for (const id of near.get(queue.shift())) if (!seen.has(id)) seen.add(id), queue.push(id), members.push(id);
+    members.push(n.id);
+    // From its most linked item, outward: each one's neighbours in the order they came.
+    const from = most(members.map((id) => nodes[order.get(id)])), run = [from.id], put = new Set(run);
+    for (let k = 0; k < run.length; k++) for (const id of [...near.get(run[k])].sort((a, b) => order.get(a) - order.get(b))) if (!put.has(id)) put.add(id), run.push(id);
+    groups.push(run);
+  }
+  const lone = groups.filter((g) => g.length === 1).flat(), linked = groups.filter((g) => g.length > 1).sort((a, b) => b.length - a.length);
+  const cells = [];
+  let r = 0;
+  // A linked group stands round its most linked item, in the middle of its rows; each next one in the free cell nearest
+  // the ones it links to (verdict e_a4efymfc: a wire ran the length of a row into the item it bears on).
+  for (const run of linked) {
+    const rows = Math.ceil(run.length / columns), free = [];
+    for (let y = 0; y < rows; y++) for (let x = 0; x < columns; x++) free.push([x, y]);
+    const at = new Map(), [cw, ch] = cell;
+    const far = ([x, y], [px, py]) => ((x - px) * cw) ** 2 + ((y - py) * ch) ** 2;
+    for (const id of run) {
+      const by = near.get(id).filter((o) => at.has(o)).map((o) => at.get(o));
+      const aim = by.length ? [by.reduce((s, p) => s + p[0], 0) / by.length, by.reduce((s, p) => s + p[1], 0) / by.length] : [(columns - 1) / 2, (rows - 1) / 2];
+      // Nearest the aim; of cells as near, the upper, then the left, so what is left empty is the block's last row's ends.
+      const k = free.reduce((best, p, i) => ((d) => (d < best.d || (d === best.d && (p[1] < free[best.i][1] || (p[1] === free[best.i][1] && p[0] < free[best.i][0]))) ? { d, i } : best))(far(p, aim)), { d: Infinity, i: 0 }).i;
+      at.set(id, free.splice(k, 1)[0]);
+      cells.push([nodes[order.get(id)], [at.get(id)[0], r + at.get(id)[1]]]);
+    }
+    r += rows;
+  }
+  lone.forEach((id, k) => cells.push([nodes[order.get(id)], [k % columns, r + Math.floor(k / columns)]]));
+  return cells;
+}
+
+/**
+ * Islands with no corner, each laid out from the origin, moved into shelves after those with one (verdict e_amqnqtsn:
+ * one row of them ran off the frame): from `from`, toward the picture's shape (`aspect`, width over height), each
+ * shelf under the tallest island of the one above, `gap` between (and `rise` more above each shelf, for its headers). Moves each island's frame and what it holds in `x`,
+ * `y`; answers the picture's right and bottom edges with them.
+ */
+export function shelve(loose, { x, y, from: [x0, y0], gap, rise = 0, aspect, right, bottom }) {
+  if (!loose.length) return { right, bottom };
+  const size = ({ isle: { rect: [l, t, r, b] } }) => [r - l, b - t];
+  const area = loose.reduce((s, i) => ((w, h) => s + (w + gap) * (h + gap))(...size(i)), 0);
+  const wide = Math.max(...loose.map((i) => size(i)[0]), aspect > 0 ? Math.sqrt(area * aspect) : 0);
+  let cx = x0, cy = y0, shelf = 0;
+  for (const i of loose) {
+    const [w, h] = size(i);
+    if (cx > x0 && cx + w > x0 + wide) (cx = x0), (cy += shelf + gap + rise), (shelf = 0);
+    const [dx, dy] = [cx - i.isle.rect[0], cy - i.isle.rect[1]];
+    for (const n of i.items) if (x.has(n.id)) x.set(n.id, x.get(n.id) + dx), y.set(n.id, y.get(n.id) + dy);
+    const { isle } = i, [l, t, r, b] = isle.rect;
+    isle.rect = [l + dx, t + dy, r + dx, b + dy];
+    isle.land = isle.land.map((p) => ({ l: p.l + dx, t: p.t + dy, r: p.r + dx, b: p.b + dy }));
+    if (isle.canvas) isle.canvas = { ...isle.canvas, at: [isle.canvas.at[0] + dx, isle.canvas.at[1] + dy] };
+    if (isle.look) isle.look = { ...isle.look, at: [isle.look.at[0] + dx, isle.look.at[1] + dy] };
+    (right = Math.max(right, cx + w)), (bottom = Math.max(bottom, cy + h));
+    (cx += w + gap), (shelf = Math.max(shelf, h));
+  }
+  return { right, bottom };
 }
 
 /** How many columns `n` boxes of cells `cw` by `ch` take to stand in a block of `aspect` (width over height): one with no aspect. */

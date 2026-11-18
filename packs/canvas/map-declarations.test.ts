@@ -50,7 +50,7 @@ test('the header shows the island pack, then what it requires, in order', () => 
 
 test('the island frame is wide enough for its header', () => {
   const svg = draw(answer).scene.svg, found = packsIn(svg);
-  const shore = marks(svg, (m) => m[1]?.class === 'lf-shore')[0], rect = marks(shore, (k) => k[0] === 'rect')[0][1];
+  const land = marks(svg, (m) => m[1]?.class === 'lf-land')[0], rect = marks(land, (k) => k[0] === 'rect')[0][1];
   const last = marks(found.at(-1), (k) => k[0] === 'circle')[0][1];
   assert.ok(Number(last.cx) + Number(last.r) <= Number(rect.x) + Number(rect.width), 'the last mark stands inside the frame');
 });
