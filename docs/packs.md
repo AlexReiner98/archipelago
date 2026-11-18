@@ -387,6 +387,9 @@ The island rules, for an island pack:
   the line (`spokenWith`, `packs/loader/kernel/islands.ts`). With the parent
   off there, Design waits, its `lacks` naming each name no active pack gives
   (`PackState.lacks`, `packs/loader/kernel/packorder.ts`).
+  A rule the parent holds on its own islands (`must_link.on.pack`) holds on
+  the child's too: Build's `build.task_in_lane` puts a Design study's
+  screens in lanes (`inScope`, `packs/rules/kernel/rule-links.ts`).
 - A shared type no pack taken there declares (task and decision, while work
   is not taken) cannot be built on: a pack that does waits.
 

@@ -5,12 +5,13 @@
 
 import type { Q } from '../../database/kernel/db.ts';
 import { ISLAND } from '../../loader/kernel/island-items.ts';
+import { spokenWith } from '../../loader/kernel/islands.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import type { FormOp } from './rule-forms.ts';
 
 /** A link an item holds: out to an item of `to`, or in from an item of `from` ("*" for any), at least n of them (1 left out). */
 export interface LinkSpec { link: string; to?: string; from?: string; n?: number }
-/** The islands a rule holds on: those that speak a pack, or are a focus of a type (flavours included), or both. */
+/** The islands a rule holds on: those that speak a pack (or a pack that extends it, as Design extends Build), or are a focus of a type (flavours included), or both. */
 export interface Scope { pack?: string; focus?: string }
 
 type Reg = Pick<Registry, 'types'> & Partial<Pick<Registry, 'relations'>>;
@@ -54,7 +55,9 @@ export async function inScope(q: Q, reg: Registry, on: Scope, island: string | u
   if (!it) return false;
   const focus = it.props?.focus === true;
   const pack = focus ? reg.type(it.type)?.pack : reg.isA(it.type, ISLAND) ? String(it.props?.pack ?? '') : undefined;
-  return (on.pack === undefined || on.pack === pack) && (on.focus === undefined || (focus && reg.isA(it.type, on.focus)));
+  // A pack that extends another (requires its types by name) speaks it too: a Build rule holds on a Design island (task e_wnpnunpp).
+  const speaks = (p: string | undefined) => p !== undefined && (on.pack === p || spokenWith(p, reg.packs).has(on.pack!));
+  return (on.pack === undefined || speaks(pack)) && (on.focus === undefined || (focus && reg.isA(it.type, on.focus)));
 }
 
 /**

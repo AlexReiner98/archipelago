@@ -110,3 +110,19 @@ test('{missing} names what fails an unless with every and with none', async () =
   assert.match(await refusal(send(l, [{ op: 'update', id: f, status: 'merged' }] as Op[])), /Not merged: "Lane B"$/);
   assert.match(await refusal(send(l, [{ op: 'update', id: f, status: 'approved' }] as Op[])), /Still working: "Lane B"$/);
 });
+
+test('must_link on a pack’s islands holds on the islands of a pack that extends it, and not on one that does not', async () => {
+  const study = { id: 'extra.study', title: 'Study', description: 'A feature judged by eye.', extends: 'forms.feature', capabilities: { focus: true } };
+  const extra = { id: 'extra', version: '1.0.0', title: 'Extra', description: 'A pack over Forms.', requires: ['type:forms.feature', 'type:forms.lane', 'type:forms.in_lane'], types: [study] } as unknown as PackFile;
+  const rule: RuleDef = { id: 'in_a_lane', type: 'task', must_link: { link: 'forms.in_lane', to: 'forms.lane', on: { pack: 'forms' } }, say: '"{title}" is in a lane' };
+  const l = await freshWith(new Registry(packsWith(pack([rule]), extra)));
+  await l.db.query(`insert into setting (key, value) values ('agent_changes', '"apply"'::jsonb) on conflict (key) do update set value = excluded.value`);
+  await setIslands(l, human, true);
+  const { s, plain } = await make(l, [
+    { op: 'create', ref: 's', type: 'extra.study', title: 'A study', props: { focus: true, island: '{s}' } },
+    { op: 'create', ref: 'plain', type: 'island', title: 'Plain', props: { pack: 'core' } },
+  ] as Op[]);
+  assert.match(await refusal(send(l, [{ op: 'create', type: 'task', title: 'Loose screen', props: { island: s } }] as Op[])), /"Loose screen" is in a lane/, 'a study speaks Forms: its tasks are in lanes');
+  assert.equal((await send(l, [{ op: 'create', ref: 'ln', type: 'forms.lane', title: 'Lane', props: { island: s } }, { op: 'create', ref: 't', type: 'task', title: 'Placed', props: { island: s } }, { op: 'link', type: 'forms.in_lane', from: 't', to: 'ln' }] as Op[])).status, 'applied');
+  assert.equal((await send(l, [{ op: 'create', type: 'task', title: 'Elsewhere', props: { island: plain } }] as Op[])).status, 'applied', 'a pack that extends nothing of Forms is not held to it');
+});
