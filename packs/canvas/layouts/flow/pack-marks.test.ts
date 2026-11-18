@@ -181,3 +181,13 @@ test('the open row is counted in how wide the header stands', () => {
   assert.ok(packsWidth(answer.islands[0].pack, z, null, measure, new Set(['build'])) > packsWidth(answer.islands[0].pack, z, null, measure));
   assert.equal(packsWidth(answer.islands[0].pack, z, null, measure, new Set(['nothing'])), packsWidth(answer.islands[0].pack, z, null, measure));
 });
+
+test('a parts island is shelved right after the island it is of, before any other', () => {
+  const two = { ...answer, islands: [...answer.islands, { id: 'e_aaneighb', title: 'Neighbour' }], items: [{ ...item('e_aan1zzzz', 'Neighbour one'), island: 'e_aaneighb' }, ...answer.items] };
+  const svg = draw(opened(two, 'build'), writer).scene.svg;
+  const ghost = marks(keyed(svg, 'gh:')[0], (k) => k[1]?.class === 'lf-ghost')[0][1], own = landOf(svg, 'e_buildisl'), other = landOf(svg, 'e_aaneighb');
+  const at = (r: any) => [Number(r.x), Number(r.y)];
+  const [gx, gy] = at(ghost), [ox, oy] = at(own), [nx, ny] = at(other);
+  assert.ok(gy > oy || gx > ox, 'after its own island');
+  assert.ok(gy < ny || (gy === ny && gx < nx) || ny < oy || (ny === oy && nx < ox), 'and before the neighbour that comes after its own');
+});
