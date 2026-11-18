@@ -61,6 +61,8 @@ let served;
 const servedStyle = () => (served ??= (globalThis.pelagoEarly?.theme ?? fetch('/connect/theme').then((r) => (r.ok ? r.json() : null), () => null)).then((s) => ((served = s ?? null), again(), s)));
 
 function wear() {
+  // A land fading out is let go whole before anything else runs: it is worn again once it has.
+  if (going) return;
   const place = placeOf();
   if (place === 'gate' && served === undefined) return void servedStyle();
   const land = landFor(place === 'gate' ? (served instanceof Promise ? null : served) : style, place);
@@ -70,18 +72,19 @@ function wear() {
   // stands in for it (the owner, 17 Nov 2026: one showed through the land as it gathered): asked for less motion, or
   // where it cannot run, the page is left blank.
   const calm = Boolean(code && LESS_MOTION.matches);
-  const key = code ? `${calm ? 'calm ' : ''}${land.drawing.hash} ${JSON.stringify(land.setup ?? {})} ${JSON.stringify(land.numbers ?? {})}` : '';
+  // Its emblem is its page's palette: two pages of one setup but not one palette are two lands.
+  const key = code ? `${calm ? 'calm ' : ''}${land.drawing.hash} ${JSON.stringify(land.setup ?? {})} ${JSON.stringify(land.numbers ?? {})} ${land.emblem ?? ''}` : '';
   if (running?.key === key) {
     if (key && !running.still) document.body.dataset.land = place;
     return;
   }
-  // From one page's land to the next (sign in to sign up...): the one shown stays until the next has drawn and fades
-  // in over it, so the page is never blank between them. Anything else is taken away at once.
-  const crossing = Boolean(code && !calm && running && !running.still && running.place === place);
-  if (crossing) leaving.push(running);
-  else (running?.stop(), leaveAll());
+  // From one page's land to the next (sign in to sign up...): the one shown fades out and is stopped, its palette with
+  // it, and only then does the next start, from nothing, in its own palette and emblem. Anything else goes at once.
+  if (code && !calm && running && !running.still && running.place === place) return void fadeOut(running);
+  running?.stop();
   running = null;
-  if (!crossing) (delete document.body.dataset.land, delete document.body.dataset.landDrew);
+  delete document.body.dataset.land;
+  delete document.body.dataset.landDrew;
   wearEmblem(code ? land : null);
   if (!code) return;
   if (calm) return void (running = { key, stop: () => undefined, still: true });
@@ -93,11 +96,9 @@ function wear() {
     dressed: document.body,
     // Before the map, so the map, the sheet and the bars are drawn over it.
     under: document.getElementById('canvas'),
-    replace: false,
-    drew: () => ((document.body.dataset.landDrew = ''), running?.key === key && leaveFaded()),
+    drew: () => running?.key === key && (document.body.dataset.landDrew = ''),
     failed: () => {
       if (running?.key !== key) return;
-      leaveAll();
       // Where the land cannot run the page is blank; kept as this land, so it is not tried again until the theme or
       // the place changes.
       running = { key, stop: () => undefined, still: true };
@@ -105,22 +106,35 @@ function wear() {
       delete document.body.dataset.land;
     },
   });
-  running = { key, stop, place };
+  running = { key, stop, place, frame: [...document.querySelectorAll('body > iframe.page-backdrop')].at(-1) };
 }
 
-/** The lands a new one is fading in over: each taken away once it has (after `wait` ms), quietly, the new one's look kept. */
-let leaving = [];
-function leaveAll() {
-  const going = leaving;
-  leaving = [];
-  going.forEach((l) => l.stop({ quiet: true }));
-}
-/** Once the newest land has faded in (its frame's opacity transition, packs/surface/page/gate.css), the rest go. */
-function leaveFaded() {
-  const frame = [...document.querySelectorAll('body > iframe.page-backdrop')].at(-1);
-  const fades = frame && getComputedStyle(frame).transitionDuration.split(',').some((d) => parseFloat(d) > 0);
-  if (!fades) return leaveAll();
-  frame.addEventListener('transitionend', leaveAll, { once: true });
+/** The land fading out between two pages, until it is gone. */
+let going = null;
+/**
+ * Fade a land out (its frame's opacity transition, packs/surface/page/gate.css, as it faded in), then stop it and
+ * take its palette from the page; the next is worn after. One not yet drawn, or a frame that does not fade, goes at once.
+ */
+function fadeOut(land) {
+  going = land;
+  running = null;
+  const { frame } = land;
+  const secs = frame?.isConnected && document.body.dataset.landDrew !== undefined ? Math.max(0, ...getComputedStyle(frame).transitionDuration.split(',').map(parseFloat)) : 0;
+  let gone = false;
+  const done = () => {
+    if (gone) return;
+    gone = true;
+    land.stop();
+    going = null;
+    delete document.body.dataset.land;
+    delete document.body.dataset.landDrew;
+    wear();
+  };
+  if (!secs) return done();
+  frame.addEventListener('transitionend', (e) => e.propertyName === 'opacity' && done());
+  // Where the end of the fade is never heard (a hidden tab), it is let go when it would have ended.
+  setTimeout(done, secs * 1000 + 100);
+  frame.style.opacity = '0';
 }
 
 let soon = 0;
