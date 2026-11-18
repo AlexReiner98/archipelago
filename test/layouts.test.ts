@@ -98,7 +98,7 @@ test('in a browser, a drawing that asks for a surface paints pixels under its pi
       return { scene: { svg: ['svg', { width: 40, height: 40 }], size: { width: 40, height: 40 }, surface: { key: 's' } } };
     }`;
     const plain = `export async function picture(input, tools) { setTimeout(async () => { const s = await tools.surface(); tools.patch([{ key: 'svg', toggle: { ['none-' + (s === null)]: true } }]); }, 10); return { scene: { svg: ['svg', { key: 'svg' }] } }; }`;
-    const got: any = await page.evaluate(`(async () => {
+    const at: { x: number; y: number } = await page.evaluate(`(async () => {
       const { drawWith } = await import('/layout.js');
       const draw = async (name, code, done) => {
         const host = document.createElement('div');
@@ -112,8 +112,21 @@ test('in a browser, a drawing that asks for a surface paints pixels under its pi
       const c = a.querySelector('canvas.lf-surface'), seen = document.createElement('canvas');
       seen.width = seen.height = 4;
       seen.getContext('2d').drawImage(c, 0, 0, 4, 4);
+      c.scrollIntoView({ block: 'center' });
+      const still = c.style.transform, box = c.getBoundingClientRect();
+      window.painted = { a, c, b, seen, still, at: { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) } };
+      return window.painted.at;
+    })()`);
+    // A frame shown at rest is on screen at once, with no move to bring it (as a look takes the page).
+    const shot = (await page.screenshot()).toString('base64');
+    const onScreen = await page.evaluate(`new Promise((done) => {
+      const img = new Image();
+      img.onload = () => { const k = document.createElement('canvas'); k.width = img.width; k.height = img.height; const g = k.getContext('2d'); g.drawImage(img, 0, 0); done([...g.getImageData(${at.x}, ${at.y}, 1, 1).data]); };
+      img.src = 'data:image/png;base64,${shot}';
+    })`);
+    const got: any = await page.evaluate(`(async () => {
+      const { a, c, b, seen, still } = window.painted;
       // The page's camera moves the paint at once, from where it was painted, before the drawing paints again.
-      const still = c.style.transform;
       a.moves.zoomBy(2);
       for (let n = 0; n < 2; n++) await new Promise((r) => requestAnimationFrame(r));
       const under = getComputedStyle(c).zIndex + ' ' + getComputedStyle(c.parentElement).isolation;
@@ -126,6 +139,7 @@ test('in a browser, a drawing that asks for a surface paints pixels under its pi
     assert.match(got.moved, /scale\(2\)/, `zoomed in twice, the paint is drawn twice as large at once: ${got.moved}`);
     assert.match(got.under, /^-1 isolate/, `the surface lies under the marks: ${got.under}`);
     assert.deepEqual(got.pixel, [255, 0, 0, 255], 'what it painted is shown');
+    assert.deepEqual(onScreen, [255, 0, 0, 255], 'what it painted at rest is on screen, unmoved');
     assert.match(got.plain, /none-true/);
     assert.equal(got.surfaces, 0);
   } finally {

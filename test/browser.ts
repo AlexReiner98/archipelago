@@ -42,7 +42,7 @@ export interface Page {
   still: (watch?: string, ms?: number) => Promise<boolean>;
   /** A DevTools command, for what the rest does not cover (emulating less motion, say). */
   send: (method: string, params?: Record<string, unknown>, sessionId?: string) => Promise<any>;
-  /** The page as it looks, as a PNG. */
+  /** The page as a person sees it (the window, as the server's look takes it), as a PNG. */
   screenshot: () => Promise<Buffer>;
   /** What the page logged and threw. */
   logs: () => string[];
@@ -141,7 +141,9 @@ export async function open(url: string): Promise<Page> {
         }
         return true;
       })()`), ms, 0),
-    screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })).result.data, 'base64'),
+    // The window only: one taken beyond it redraws the page at another size for the shot, and leaves out a surface's
+    // frame shown at rest (packs/walls/page/surface.js), as no person or look sees it.
+    screenshot: async () => Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'),
     logs: () => events.filter((e) => e.method === 'Runtime.consoleAPICalled' || e.method === 'Runtime.exceptionThrown').map((e) => JSON.stringify(e.params).slice(0, 500)),
     // Chrome holds its profile until it has exited (on Windows, a while after the kill): wait for that, then remove it.
     close: async () => {
