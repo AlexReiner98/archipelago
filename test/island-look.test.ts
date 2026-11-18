@@ -54,3 +54,27 @@ test('a layout kept about an island is its look in the answer; a style is none, 
   await make(l, [{ op: 'archive', id: newer.dash }]);
   assert.equal((await islandLooks(l, [isle.here])).get(isle.here)?.id, kept.old, 'archived, the one before draws it');
 });
+
+test('where nothing draws an island, a style on its type names its look; a link of its own still wins, and a retired style names none', async () => {
+  const l = await freshWith(new Registry(packsWith()));
+  const isle = await make(l, [
+    { op: 'create', ref: 'feature', type: 'task', title: 'A focus of a type the style is on' },
+    { op: 'create', ref: 'linked', type: 'task', title: 'A focus drawn by its own link' },
+    { op: 'create', ref: 'other', type: 'person', title: 'A focus of another type' },
+  ]);
+  const kept = await make(l, [
+    { op: 'create', ref: 'lines', type: 'layout', title: 'Lines', props: { code: CODE } },
+    { op: 'create', ref: 'own', type: 'layout', title: 'Its own', props: { code: CODE } },
+    { op: 'link', type: 'draws', from: 'own', to: isle.linked },
+  ]);
+  Object.assign(kept, await make(l, [{ op: 'create', ref: 'style', type: 'style', title: 'Work is drawn as lines', props: { on: ['work'], look: kept.lines } }]));
+
+  const looks = await islandLooks(l, [isle.feature, isle.linked, isle.other]);
+  assert.equal(looks.get(isle.feature)?.id, kept.lines, 'a task is work: the style names its look');
+  assert.equal(looks.get(isle.feature)?.coded, true);
+  assert.equal(looks.get(isle.linked)?.id, kept.own, 'a draws link of its own wins over the style');
+  assert.equal(looks.has(isle.other), false, 'a person is not work: no look');
+
+  await make(l, [{ op: 'update', id: kept.style, status: 'retired' }]);
+  assert.equal((await islandLooks(l, [isle.feature])).has(isle.feature), false, 'a retired style names no look');
+});

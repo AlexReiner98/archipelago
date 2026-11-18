@@ -31,7 +31,7 @@ To read one: `git show archive/layouts-2026-11-09:packs/canvas/layouts/<folder>/
 
 ## An island's own look
 
-An island may be drawn by code of its own (decisions e_3c3wr7jv and e_r4emvndv, the owner, 17 Nov 2026): a layout kept on the map that `draws` the island (core's link of its own, decision e_gwfwbx3t; to its island item or its focus). A layout `about` an island still means what it means everywhere: the pictures of that item are drawn by it. The islands answer names it (`islands[].look`, `packs/loader/kernel/island-look.ts`); the page puts its files beside Map's own under names of their own and writes Map's `island-looks.js` to import them (`packs/walls/page/island-looks.js`), so it runs in the drawing's worker behind the same walls. Its `index.js` exports:
+An island may be drawn by code of its own (decisions e_3c3wr7jv and e_r4emvndv, the owner, 17 Nov 2026): a layout kept on the map that `draws` the island (core's link of its own, decision e_gwfwbx3t; to its island item or its focus). Where nothing draws an island, a style kept on the map on its item's type (`on`) may name one (`look`, a layout's id), so every build feature is drawn as lanes without a link of its own (task e_wnpnunpp). A layout `about` an island still means what it means everywhere: the pictures of that item are drawn by it. The islands answer names it (`islands[].look`, `packs/loader/kernel/island-look.ts`); the page puts its files beside Map's own under names of their own and writes Map's `island-looks.js` to import them (`packs/walls/page/island-looks.js`), so it runs in the drawing's worker behind the same walls. Its `index.js` exports:
 
 ```js
 export function island({ island, items, links, style }, { measure, m }) {
