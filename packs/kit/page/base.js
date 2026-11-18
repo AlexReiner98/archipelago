@@ -203,7 +203,9 @@ function before() {
   const all = Object.values(known.all()).sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
   const mins = (at) => Math.floor((Date.now() - at) / 60_000);
   const when = (at) => (!at ? 'earlier' : mins(at) < 60 ? `${Math.max(1, mins(at))} min ago` : mins(at) < 1440 ? `${Math.floor(mins(at) / 60)} h ago` : new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }));
-  return all.map((w) => ({ ...w, label: all.filter((o) => o.name === w.name).length > 1 ? `${w.name}, ${when(w.at)}` : w.name }));
+  // Of one name, those remembered before times were kept are one entry, "earlier": they cannot be told apart.
+  const kept = all.filter((w, i) => w.at || !all.slice(0, i).some((o) => o.name === w.name && !o.at));
+  return kept.map((w) => ({ ...w, label: kept.filter((o) => o.name === w.name).length > 1 ? `${w.name}, ${when(w.at)}` : w.name }));
 }
 
 /** A client's request to connect, kept across a sign-in, whose mail's link may open in another tab: for half an hour. */

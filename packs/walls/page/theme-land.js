@@ -27,7 +27,7 @@ export function pageOf(body = document.body, hash = location.hash) {
   const name = hash.replace(/^#\/?/, '').split(/[/?]/)[0];
   if (body.dataset.first === 'wait' || (name === 'v' && body.dataset.gate !== undefined)) return 'try';
   // Sign up from the sign-in page passes through Try it (#/try?then=sign-up) on its way: it wears Sign up's land already.
-  if (name === 'try' && /[?&]then=sign-up/.test(hash)) return 'sign-up';
+  if (name === 'try' && /[?&]then=sign-up\b/.test(hash)) return 'sign-up';
   return name || 'sign-in';
 }
 
