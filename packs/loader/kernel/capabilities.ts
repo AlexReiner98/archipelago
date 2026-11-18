@@ -97,7 +97,9 @@ export interface Subject {
 /**
  * What its page opens on, under its title: one band in a form the page draws, filled
  * from the fields named. A measure is its number large (value, unit, as of); an alert is said while a boolean field is
- * false (unless), with what would clear it (says); a timeline is the beats a json field keeps ({ at, said }). A
+ * false (unless), with what would clear it (says); a timeline is the beats a json field keeps ({ at, said }), each
+ * marked by the value of its own key `mark` when it has one: the glyph `marks` gives that value, drawn as a warning
+ * when `warn` names it (a session's story marks what befell it: a claim, a refusal). A
  * question that settles opens on its choices, or its answer once settled, with no lead declared.
  */
 export interface Lead {
@@ -108,6 +110,12 @@ export interface Lead {
   unless?: string;
   says?: string;
   beats?: string;
+  /** A timeline's: the key of a beat whose value marks it. */
+  mark?: string;
+  /** A timeline's: the glyph for each value of a beat's mark. */
+  marks?: Record<string, string>;
+  /** A timeline's: the values of a beat's mark drawn as a warning. */
+  warn?: string[];
 }
 
 export interface Capabilities {
@@ -210,6 +218,9 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     has('lead.unless', lead.unless, ['boolean']);
     has('lead.says', lead.says, ['string']);
     has('lead.beats', lead.beats, ['json']);
+    if (lead.mark !== undefined && (typeof lead.mark !== 'string' || lead.form !== 'timeline')) problems.push('lead.mark is the key of a beat that marks it, on a timeline');
+    if (lead.marks !== undefined && (!lead.mark || typeof lead.marks !== 'object' || Object.values(lead.marks).some((g) => typeof g !== 'string' || !g || g.length > 2))) problems.push('lead.marks gives a glyph (a character or two) for each value of lead.mark');
+    if (lead.warn !== undefined && (!lead.mark || !Array.isArray(lead.warn) || lead.warn.some((w) => typeof w !== 'string'))) problems.push('lead.warn lists values of lead.mark');
   }
   for (const flag of ['owned', 'actionable', 'plannable', 'kernel'] as const) if (caps[flag] !== undefined && caps[flag] !== true) problems.push(`${flag} is true, or left out`);
   if (caps.subject && !relations.has(caps.subject.link)) problems.push(`subject is linked by "${caps.subject.link}", which is no relation`);

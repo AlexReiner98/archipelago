@@ -10,7 +10,7 @@ import { transientOf } from './root-transient.ts';
 import { op, source, TITLE_MAX } from './tool-ops.ts';
 import type { Tool } from './tools.ts';
 import { undo } from '../../write/kernel/undo.ts';
-import { closeOffers, resolveRun } from './session-calls.ts';
+import { befell, closeOffers, resolveRun } from './session-calls.ts';
 import { covering } from '../../write/kernel/withdraw.ts'; import { proposals } from './map-reads.ts';
 import { holdsOff } from '../../rules/kernel/rules.ts';
 import { logged } from '../../../src/logged.ts';
@@ -158,6 +158,9 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         // A refused change is kept, so that what is wrong with one op is all that has to be sent again.
         const name = retry ?? `k_${Math.random().toString(36).slice(2, 10)}`;
         await store(l, { keep: { key: `refused:${name}`, value: { who, input } satisfies Refused, ms: REFUSED_MINUTES * 60_000 } });
+        // Told on the session's story too, with why: the first thing the refusal names (the sessions pack's beats).
+        const why = message.replace(/^Change rejected:?\s*/, '').split('\n').map((s) => s.replace(/^-\s*/, '').trim()).find(Boolean);
+        if (input.run) await befell(l, { run: input.run, did: 'refused', said: `Change refused (${input.reason ?? 'no reason'}): ${why ?? 'see the answer'}`, by: 'write' });
         throw new Error(
           `${message}\nNothing was changed. The change is kept for ${REFUSED_MINUTES} minutes as "${name}": to correct it, send change with only retry: "${name}" and fixes: [{ at: <the op’s number>, op: <the whole op as it should be> }]. Every other op is sent as it was.`,
         );

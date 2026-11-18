@@ -438,7 +438,7 @@
         "sys.run"
       ],
       "extends": "system",
-      "capabilities": { "lead": { "form": "timeline", "beats": "story" } },
+      "capabilities": { "lead": { "form": "timeline", "beats": "story", "mark": "did", "marks": { "took": "→", "claimed": "+", "released": "−", "refused": "✕", "stopped": "■" }, "warn": ["refused"] } },
       "title": "Run",
       "description": "One agent session or one execution of an automation.",
       "statuses": {

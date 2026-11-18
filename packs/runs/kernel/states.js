@@ -60,13 +60,16 @@ export function lineOf({ turns = [], wait, beat, title }) {
  * The state of a run: { state, for?, line, since }.
  * run: { open, status?, started?, ended? }; turns: its turns in order ("A turn"); wait?: its open wait, else read off
  * the latest turn; blocked?: true or { since } when it works on an item with an open depends_on; beat?: its latest
- * beat ({ said } or the words); title?: what it works on; last?: its latest event's time; now: the time now;
+ * beat ({ said, did? } or the words); title?: what it works on; last?: its latest event's time; now: the time now;
  * quiet_after: minutes with no event before an open run is quiet.
  */
 export function stateOf(input) {
   const f = facts(input);
   const rule = STATES.find((s) => s.holds(f));
-  const out = { state: rule.state, line: lineOf(input), since: rule.since(f) ?? null };
+  const line = lineOf(input);
+  const out = { state: rule.state, line, since: rule.since(f) ?? null };
+  // A line that is what befell the session (a claim, a refusal) says so, for a mark beside it.
+  if (input.beat?.did && line === input.beat.said) out.did = input.beat.did;
   if (rule.for) out.for = rule.for(f);
   return out;
 }
