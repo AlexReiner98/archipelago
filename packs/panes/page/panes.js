@@ -132,6 +132,9 @@ export function drawPane(at, el, said) {
       const naming = () => live && said('named', String((style.canvas && titles.get(style.canvas)) || (lens ? lensName() : 'Home') || 'Canvas').slice(0, 120));
       naming();
       canvas.show(lens, here, style);
+      // An item's own address draws a lens: the pane stands at that lens from now on, so shutting the item's page over
+      // it leaves the lens drawn and does not open the item again (task e_x94xu6ut).
+      if (/^e\//.test(at) && lens) ((now = `v?${addressOf(lens, canvas.asked)}`), said('settled', { at: now }));
       // The bar and find act on the pane in focus alone: a pane drawn beside it does not take them.
       if (selected()) activate(canvas);
     }, (err) => live && host.replaceChildren(h('div', { class: 'error' }, err.message)));
@@ -160,7 +163,8 @@ export function toAddress(at) {
   lone.stop?.();
   lone.at = at;
   // Where the canvas moves (another lens) it writes the page's address, which draws it again here.
-  lone.stop = drawPane(at, lone.body, () => {});
+  const pane = lone;
+  pane.stop = drawPane(at, pane.body, (name, v) => name === 'settled' && pane.at === at && (pane.at = v.at));
 }
 /** Start the page's pane in #canvas, once the map's schema is read (packs/shell/page/app.js): what it draws is read through it. */
 export function startCanvas() {
