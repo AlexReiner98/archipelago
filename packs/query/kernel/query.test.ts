@@ -28,7 +28,9 @@ function fake(answer: (q: Record<string, unknown>) => unknown = () => undefined)
   const types = new Map([['task', { id: 'task', lineage: ['task'], fields: {}, statuses: {} }]]);
   const relations = new Map([['part_of', { id: 'part_of', from: ['*'], to: ['*'] }]]);
   const registry = { types, relations, canonical: (x: string) => x, type: (id: string) => types.get(id), isA: () => false, family: (t: string) => [t], relationFamily: (...r: string[]) => r };
-  const ctx = { registry, provided: () => ['near'], reads: async (q: Record<string, unknown>) => (asked.push(q), answer(q)) } as unknown as KernelContext;
+  // What other packs answer by name: the sessions on an item (the runs pack's answer.sessions_on), one on e_a.
+  const call = async (name: string) => (name === 'answer.sessions_on' ? { on: { e_a: [{ run: 'e_r', state: 'working', hue: '#2f5fb3' }] } } : {});
+  const ctx = { registry, provided: () => ['near'], call, reads: async (q: Record<string, unknown>) => (asked.push(q), answer(q)) } as unknown as KernelContext;
   return { ctx, asked };
 }
 
@@ -44,8 +46,9 @@ test('a lens is checked by reading it, nothing asked of the map; the check says 
 test('the flat lens by name reads its seeds through the reads API as the asker, and counts no use of a view', async () => {
   const row = { id: 'e_a', type: 'task', title: 'A', body: '', visibility: 'shared', status: 'todo', is_open: true, owner: null, props: {}, created_at: new Date(0), updated_at: new Date(0) };
   const { ctx, asked } = fake((q) => (q.me ? null : q.flat ? { items: [row], links: [], whole: [], found: { e_a: ['type'] }, terms: { e_a: ['type task'] }, step: {}, on_islands: false, islands: [] } : undefined));
-  const answer = (await flat(ctx, { filter: { find: ['type task'] } })) as { lens: { not: string[] }; items: { id: string; found: string[] }[] };
+  const answer = (await flat(ctx, { filter: { find: ['type task'] } })) as { lens: { not: string[] }; items: { id: string; found: string[]; sessions?: { run: string }[] }[] };
   assert.deepEqual(answer.items.map((i) => [i.id, i.found]), [['e_a', ['type']]]);
+  assert.deepEqual(answer.items[0].sessions?.map((s) => s.run), ['e_r'], 'the sessions on an item ride on it, a mark every drawing is handed');
   assert.deepEqual(answer.lens.not, ['kind system'], 'the default Not');
   assert.ok(asked.every((q) => q.view === undefined), 'no view is asked, so no use is counted');
   const seeds = asked.find((q) => q.flat)!.flat as { find: { as: string }[]; said_not: boolean; limit: number };

@@ -1,0 +1,107 @@
+// Parallel sessions that cannot collide, on the write path: a change sent again with its key applies once (task
+// e_x265z5tk), an update made from a stale read is refused with what moved (e_5r9bxyh9), and the first answer after a
+// restart says what became of the change it cut off (e_86qhrtzy).
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import type { Actor, Archipelago } from '../packs/write/kernel/pelago.ts';
+import { callTool } from '../packs/surface/kernel/tools.ts';
+import { transientOf } from '../packs/surface/kernel/root-transient.ts';
+import { seedOf } from '../packs/surface/kernel/restart-said.ts';
+import { fresh } from './map.ts';
+
+const owner: Actor = { kind: 'human', name: 'owner', admin: true };
+const agent: Actor = { kind: 'agent', name: 'test' };
+type Answer = Record<string, any>;
+
+const count = async (l: Archipelago, title: string) => (await l.db.query<{ n: number }>(`select count(*)::int as n from entity where title = $1`, [title])).rows[0].n;
+
+test('a change sent again with its key is answered with the first, applied or held, and applies once', async () => {
+  const l = await fresh();
+  await callTool(l, owner, 'workspace_set', { agent_changes: 'apply' });
+  const send = () => callTool(l, agent, 'change', { reason: 'test', key: 'k-1', ops: [{ op: 'create', type: 'task', title: 'Once only' }] }) as Promise<Answer>;
+  const first = await send();
+  assert.equal(first.status, 'applied');
+  const again = await send();
+  assert.deepEqual([again.status, again.again, again.changeset], ['applied', true, first.changeset]);
+  assert.match(again.note, /nothing was applied again/);
+  assert.equal(await count(l, 'Once only'), 1);
+
+  // Two at once: the second waits for the first, then finds it.
+  const both = await Promise.all([0, 1].map(() => callTool(l, agent, 'change', { reason: 'test', key: 'k-2', ops: [{ op: 'create', type: 'task', title: 'Twice at once' }] }) as Promise<Answer>));
+  assert.equal(new Set(both.map((b) => b.changeset)).size, 1);
+  assert.equal(await count(l, 'Twice at once'), 1);
+
+  // Another key, or none, is another change.
+  await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'create', type: 'task', title: 'Once only' }] });
+  assert.equal(await count(l, 'Once only'), 2);
+
+  await callTool(l, owner, 'workspace_set', { agent_changes: 'hold' });
+  const held = (await callTool(l, agent, 'change', { reason: 'test', key: 'k-3', ops: [{ op: 'create', type: 'task', title: 'Held once' }] })) as Answer;
+  assert.equal(held.status, 'proposed');
+  const heldAgain = (await callTool(l, agent, 'change', { reason: 'test', key: 'k-3', ops: [{ op: 'create', type: 'task', title: 'Held once' }] })) as Answer;
+  assert.deepEqual([heldAgain.status, heldAgain.again, heldAgain.proposal, heldAgain.proposal_status], ['proposed', true, held.proposal, 'pending']);
+  const { rows } = await l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending'`);
+  assert.equal(rows[0].n, 1);
+});
+
+test('an update naming the position it read is refused with what moved, and goes through the retry with the new one', async () => {
+  const l = await fresh();
+  await callTool(l, owner, 'workspace_set', { agent_changes: 'apply' });
+  const made = (await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Shared field' }] })) as Answer;
+  const id = made.created.t as string;
+  const read = (await callTool(l, agent, 'get', { id })) as Answer;
+  assert.equal(typeof read.as_of, 'number');
+
+  // Nothing moved: it applies.
+  const fine = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id, title: 'Shared field, named', as_of: read.as_of }] })) as Answer;
+  assert.equal(fine.status, 'applied');
+
+  const reread = (await callTool(l, agent, 'get', { id })) as Answer;
+  await l.change(owner, { reason: 'test', ops: [{ op: 'update', id, status: 'doing' }] });
+  const refused = await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id, status: 'done', as_of: reread.as_of }] }).then(
+    () => assert.fail('a stale update applied'),
+    (err: Error) => err.message,
+  );
+  assert.match(refused, /moved since you read it/);
+  assert.match(refused, /status was "todo" when you read it \(as_of \d+\), is "doing" now, and this would make it "done"/);
+  assert.equal((await l.entity(id))!.status, 'doing', 'nothing was changed');
+
+  // A field it does not set may move: only what it sets is checked.
+  const other = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id, title: 'Renamed from the old read', as_of: reread.as_of }] })) as Answer;
+  assert.equal(other.status, 'applied');
+
+  const name = /kept for \d+ minutes as "([^"]+)"/.exec(refused)![1];
+  const now = (await callTool(l, agent, 'get', { id })) as Answer;
+  const retried = (await callTool(l, agent, 'change', { retry: name, fixes: [{ at: 1, op: { op: 'update', id, status: 'done', as_of: now.as_of } }] })) as Answer;
+  assert.equal(retried.status, 'applied');
+  assert.equal((await l.entity(id))!.status, 'done');
+});
+
+test('the first answer after a restart says when, and whether the change it cut off applied', async () => {
+  const l = await fresh();
+  await callTool(l, owner, 'workspace_set', { agent_changes: 'apply' });
+  const store = (ask: Parameters<typeof transientOf>[1]) => transientOf({ caller: 'surface', map: l }, ask);
+  const who = `${l.workspace}:`;
+  const earlier = '2000-01-01T00:00:00.000Z';
+  const made = (await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Something to read' }] })) as Answer;
+  const ask = () => callTool(l, agent, 'get', { id: made.created.t }) as Promise<Answer>;
+  assert.equal((await ask()).restarted, undefined, 'the first a sender hears from any server is no restart');
+
+  // The server restarted while a change was in flight, before it applied.
+  const cut = async (key: string) => {
+    await store({ keep: { key: `heard:${who}`, value: { started: earlier }, ms: 60_000 } });
+    await store({ keep: { key: `last:${who}`, value: { key, seed: seedOf(agent), at: earlier, reason: 'Make the cut task', given: true }, ms: 60_000 } });
+  };
+  await cut('k-cut');
+  assert.ok(Array.isArray(await callTool(l, agent, 'search', { q: 'nothing' })), 'a list cannot carry it');
+  const told = await ask();
+  assert.equal(told.restarted.last_change.status, 'not applied');
+  assert.match(told.restarted.note, /restarted at .*not applied: send it again with key "k-cut"/);
+  assert.equal((await ask()).restarted, undefined, 'said once');
+
+  // Sent again with its key, it applies; were it cut after applying, the next answer says so.
+  const sent = (await callTool(l, agent, 'change', { reason: 'Make the cut task', key: 'k-cut', ops: [{ op: 'create', type: 'task', title: 'The cut task' }] })) as Answer;
+  await cut('k-cut');
+  const after = await ask();
+  assert.deepEqual(after.restarted.last_change, { status: 'applied', changeset: sent.changeset, reason: 'Make the cut task' });
+});

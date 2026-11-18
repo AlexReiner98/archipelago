@@ -12,6 +12,7 @@ import { layoutOf } from '../../rules/kernel/layout-changes.ts';
 import { append, headOf, type Fact } from '../../log/kernel/log.ts'; import { projectDecision, projectFacts, stamp } from '../../log/kernel/replay.ts'; import { linkFacts } from '../../log/kernel/facts.ts';
 import { decideProposal } from './proposals.ts'; import { needHuman } from '../../identity/kernel/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
+import { AppliedAlready, firstAnswer, keyedIds, onceUnder } from './keyed.ts'; import { staleReads } from './stale.ts';
 import { planChange } from './change-plan.ts'; import { asSent, editsResolved } from './edit.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
 
 export * from './pelago-types.ts';
@@ -109,6 +110,22 @@ export class Archipelago {
   /** measured: a report's reading (a part up or down), applied at once as a measurement, not anyone's judgment. */
   async change(actor: Actor, input: ChangeInput, measured = false) {
     if (!input.reason?.trim()) throw new Error('Every change needs a reason.');
+    // A keyed change sent again is answered with the first (packs/write/kernel/keyed.ts): nothing is judged or applied twice.
+    const keyed = input.key ? keyedIds(`${actorId(actor)}:${actor.token ?? ''}`, input.key) : undefined;
+    if (keyed) {
+      const first = await firstAnswer(this.db, keyed);
+      if (first) return first as unknown as Awaited<ReturnType<Archipelago['changeOnce']>>;
+      try {
+        return await this.changeOnce(actor, input, measured, keyed);
+      } catch (err) {
+        if (!(err instanceof AppliedAlready)) throw err;
+        return (await firstAnswer(this.db, keyed)) as unknown as Awaited<ReturnType<Archipelago['changeOnce']>>;
+      }
+    }
+    return this.changeOnce(actor, input, measured);
+  }
+
+  private async changeOnce(actor: Actor, input: ChangeInput, measured: boolean, keyed?: { changeset: string; proposal: string }) {
     // An edit of a code field is the whole field it leaves from here on: judged, held and logged as any update (packs/write/kernel/edit.ts).
     const sent = input.ops;
     const { ops: whole, edited } = await editsResolved(this.registry, input.ops, async (id) => (await this.entity(id)) ?? null);
@@ -120,6 +137,9 @@ export class Archipelago {
     const followed = await follow({ map: this, reg: this.registry }, input.ops);
     if (followed.length) input = { ...input, ops: [...input.ops, ...followed.flatMap((f) => f.ops)] };
     const { warnings } = await this.plan(input.ops, { human: actor.kind === 'human', pack: input.pack });
+    // An update that names the position it read (as_of) is refused when what it sets has moved since (packs/write/kernel/stale.ts).
+    const stale = await staleReads(this, input.ops);
+    if (stale.length) throw new Error(`Change rejected:\n${stale.map((r) => `- ${r}`).join('\n')}`);
     const me = actorId(actor);
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);
@@ -145,14 +165,15 @@ export class Archipelago {
 
     const by = { id: me, ...(actor.token && { token: actor.token }) };
     if (verdict.outcome === 'hold') {
-      const id = newId('p');
+      const id = keyed?.proposal ?? newId('p');
       // What it would do on the map as it is now, with the ids it would make: approved with nothing moved, it appends these facts.
       const { facts = [], ids = {}, created: would = {} } = await this.apply(me, input, { authority, dry: true });
       const base = (await headOf(this.db)).pos, rule = verdict.by && { rule: verdict.by.rule, pack: verdict.by.pack, say: verdict.by.say, ...(verdict.by.version && { version: verdict.by.version }) };
       // The queue is a projection of the pending stream: the record makes its row (packs/log/kernel/replay.ts).
-      await this.db.transaction(async (tx) =>
-        projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), base, ops: asSent(input.ops, sent), warnings, ids, private_to: this.viewer || null }, facts, codeFields(this.registry))),
-      );
+      await this.db.transaction(async (tx) => {
+        if (keyed) await onceUnder(tx, keyed);
+        return projectDecision(tx, await append(tx, this.workspace, 'pending', { id, actor: by, authority, held_by: rule ?? null, reason: input.reason, source: input.source ?? null, action: input.action ?? null, undoes: input.undoes ?? null, ...(input.run && { run: input.run }), ...(input.part && { part: input.part }), base, ops: asSent(input.ops, sent), warnings, ids, private_to: this.viewer || null }, facts, codeFields(this.registry)));
+      });
       return {
         status: 'proposed' as const,
         proposal: id,
@@ -162,7 +183,7 @@ export class Archipelago {
       };
     }
     const spared = [...new Map(verdict.spared.flat().map((r) => [`${r.pack}.${r.rule}`, { rule: r.rule, pack: r.pack }])).values()];
-    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared }, ...(followed.length && { followed }) })), ...letThrough(verdict.spared), ...said };
+    const applied = { ...(await this.apply(me, input, { authority, token: actor.token, rule: { outcome: 'apply', spared }, ...(followed.length && { followed }), ...(keyed && { keyed }) })), ...letThrough(verdict.spared), ...said };
     return answered.length ? { ...applied, answered } : applied;
   }
 
