@@ -58,7 +58,7 @@ function measure(item, lead) {
   const said = typeof v === 'number' ? v.toLocaleString() : typeof v === 'string' ? v : JSON.stringify(v);
   const unit = lead.unit && typeof props[lead.unit] === 'string' ? props[lead.unit] : '';
   const asOf = lead.as_of && typeof props[lead.as_of] === 'string' ? props[lead.as_of].slice(0, 10) : '';
-  return band(['box', { flow: 'row', gap: 6, align: 'end' },
+  return band(['box', { flow: 'row', gap: 6 },
     ['text', { look: 'title', size: typeof v === 'number' ? 9 : 6, tip: tip(said) }, said],
     unit && ['text', { look: 'muted', size: 5, tip: tip(unit) }, unit],
     asOf && ['text', { look: 'muted', size: 2, tip: asOf }, `as of ${asOf}`]].filter(Boolean));
@@ -101,7 +101,8 @@ export function waitsOnMe(item, waits, me) {
 
 const waitsLine = (w) => ['box', { flow: 'row', gap: 2 },
   ['text', { tone: 'warn', bold: true }, '↩ Waits on you'],
-  ...(w.for ? [['text', { look: 'muted', tip: tip(w.for) }, w.for]] : [])];
+  // What for takes the room left, so the words before it are never cut.
+  ...(w.for ? [['box', { flow: 'row', grow: true }, ['text', { look: 'muted', tip: tip(w.for) }, w.for]]] : [])];
 
 /** The band an item's page opens on, as marks, or null when its type declares none, it holds nothing to show and nothing waits on the person looking. */
 export function leadMarks(item, type, c, { writes = false, asking, now, waits, me } = {}) {
