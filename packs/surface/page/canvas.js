@@ -66,7 +66,10 @@ export function activate(c) {
 function barNow() {
   if (current?.view) drawBand(current.lens, current.view, h('span', { class: 'q-part q-canvas' }, ...[hooks.islandsButton?.(), hooks.waitingButton?.(), ...(hooks.paneButtons?.() ?? [])].filter(Boolean)));
   hooks.addressMoved?.();
+  hooks.canvasMoved?.();
 }
+/** What the canvas in focus has drawn, for the island side bar to mark exactly that: whether it is Home, and its islands. */
+hooks.canvasNow = () => (current?.view ? { home: current.home, islands: islandsOf(current.lens) } : null);
 /** Draw the band again, as a part of it came (the side bar's button, once the side bar is drawn). */
 hooks.drawBand = () => barNow();
 /** What the canvas in focus drew last, as the slots drawn from its query are handed it, and whether reading it failed. */

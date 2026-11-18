@@ -6,29 +6,38 @@
 
 import { api, firstDrawn, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
-import { atHome, capital, drawnAt, islandsOnMap, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
+import { atHome, capital, drawnBy, islandOf, islandsOnMap, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
 import { numberOf } from './style-number.js';
 import { ago, titles } from './words.js';
 import { onOpen, openNow } from './sessions-open.js';
 import { sessionsPart } from './island-sessions.js';
 
-/** Every island on the map, each with its pack, read once a page. */
+/** Every island on the map, each with its pack: read once a page, and again (`fresh`) when the log says one was made or changed. */
 let reading;
-export const allIslands = () =>
-  (reading ??= api('search', { islands: true, limit: 2000 }).then(
-    (found) => found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, worked_at: e.worked_at ?? e.updated_at, pack: e.pack ?? { id: '', title: '' } })),
-    () => [],
-  ));
+export const allIslands = (fresh = false) => {
+  if (fresh) reading = undefined;
+  return (reading ??= api('search', { islands: true, limit: 2000 }).then((found) => found.map((e) => (titles.set(e.id, e.title), islandOf(e))), () => []));
+};
 
 let mine = [];
 const heard = new Set();
-/** The islands the canvas draws now: the address's, else the person's own. */
-export const drawnNow = () => drawnAt(location.hash, mine);
-/** Hear what the canvas draws change (a toggle, the address). */
+/** What the canvas in focus has drawn (./canvas.js, hooks.canvasNow): whether it is Home, and its lens's islands. */
+const canvasNow = () => hooks.canvasNow?.() ?? null;
+/** The islands the canvas draws now, whatever the address (Home, an item's, a show's): the bar marks exactly these. */
+export const drawnNow = () => drawnBy(location.hash, mine, canvasNow());
+/** Whether the canvas draws Home: a press elsewhere brings it Home to draw the list it makes. */
+const homeNow = () => canvasNow()?.home ?? atHome(location.hash);
+/** Hear what the canvas draws change (a toggle, the address, the canvas drawing another lens). */
 export const onDrawn = (f) => heard.add(f);
 const tell = () => heard.forEach((f) => f());
 onIslands((now) => ((mine = now), tell()));
 addEventListener('hashchange', tell);
+/** The canvas drew: told only where what it draws differs from what the bar last heard. */
+let drawnWas = '';
+hooks.canvasMoved = () => {
+  const now = `${homeNow()}:${drawnNow().join()}`;
+  if (now !== drawnWas) (drawnWas = now), tell();
+};
 
 /** Keep what a press makes of the list, and bring the canvas Home where it drew another list. */
 function apply({ list, home }, reason) {
@@ -36,11 +45,11 @@ function apply({ list, home }, reason) {
   if (home) location.hash = '#/';
 }
 /** Put island `i` on. */
-export const putOn = (i) => apply(turnedOn(location.hash, mine, i.id), `${i.title} put on the canvas`);
+export const putOn = (i) => apply(turnedOn(drawnNow(), homeNow(), i.id), `${i.title} put on the canvas`);
 /** Take island `i` off. */
-export const takeOff = (i) => apply({ list: drawnNow().filter((x) => x !== i.id), home: !atHome(location.hash) }, `${i.title} taken off the canvas`);
+export const takeOff = (i) => apply({ list: drawnNow().filter((x) => x !== i.id), home: !homeNow() }, `${i.title} taken off the canvas`);
 /** Island `i` alone on the canvas. */
-export const showOnly = (i) => apply(only(location.hash, i.id), `${i.title} alone on the canvas`);
+export const showOnly = (i) => apply(only(homeNow(), i.id), `${i.title} alone on the canvas`);
 
 /** A pack's title as the list shows it. */
 const packTitle = (pack) => capital(pack?.title || pack?.id);
@@ -331,6 +340,14 @@ export function drawPicker() {
   onDrawn(() => (anew ? ((anew = false), relay()) : draw()));
   // The chats read again: the list drawn again only once it is laid out, so On is laid out from what the canvas drew.
   onOpen(() => laidOn && draw());
+  // The page is a replica of the log: an island made since it was read (an agent's new focus), or one renamed, is listed
+  // as the tail says so, without a reload. What the tail touched is told by ./live.js (hooks.islandsTouched).
+  let rereading = null;
+  hooks.islandsTouched = (touched) => {
+    const known = new Set(islands.map((i) => i.id));
+    if (!(touched.made || touched.ids === null || touched.ids.some((id) => known.has(id)))) return;
+    rereading ??= allIslands(true).then((all) => ((rereading = null), (islands = all), draw()));
+  };
   // Read once the first view is drawn, as the bar read its saved views: the drawing goes first (test/first-drawing.test.ts).
   firstDrawn.then(() => Promise.all([islandsOn(), allIslands()])).then(([now, all]) => ((mine = now), (islands = all), draw()));
 }

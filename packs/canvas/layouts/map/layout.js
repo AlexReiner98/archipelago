@@ -56,7 +56,7 @@ export function laidOut(args, { islandOf = () => null, heads = new Map(), wides 
 export function layout(args) {
   if (args.extras?.plain) {
     const m = model(args);
-    return { all: [...m.nodes.values()], chains: m.chains, ties: m.ties, breaks: [], args };
+    return { all: [...m.nodes.values()], chains: m.chains, ties: m.ties, potential: m.potential, breaks: [], args };
   }
   const a = laidOut(args);
   const done = finish({ nodes: a.nodes, x: a.x, y: a.y, chains: a.chains, ties: a.ties, potential: a.m.potential, margin: args.sizes.flow_margin });

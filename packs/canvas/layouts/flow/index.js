@@ -29,7 +29,7 @@ import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { looks as kept } from './island-looks.js';
 import { placesAsColours } from './places.js';
-import { drawn } from './polyline.js';
+import { arrowHead, drawn, middleOf } from './polyline.js';
 import { carried } from './carried.js';
 import { shapedBy, shapeIn, SHAPES } from './steps.js';
 import { focusOf } from './focus.js';
@@ -168,13 +168,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   };
   /** Why an item waits: its pack is not active on its island (decision e_57bjxy2x), and the pack's why. */
   const waitWords = (i) => `Waiting on ${i.waiting.pack ?? 'its pack'}${i.waiting.why ? `: ${i.waiting.why}` : ''}`;
-  // A head points along the way its line comes in: from the last point before the tip that is not the tip.
-  const head = (points, tip = points.at(-1), rest = points.slice(0, -1).reverse()) => {
-    const from = rest.find((p) => p[0] !== tip[0] || p[1] !== tip[1]) ?? [tip[0], tip[1] - 1];
-    const dx = tip[0] - from[0], dy = tip[1] - from[1], l = Math.hypot(dx, dy), ux = dx / l, uy = dy / l;
-    const bx = tip[0] - ux * z('head_length'), by = tip[1] - uy * z('head_length'), [nx, ny] = dx ? [-uy, ux] : [-1, 0], half = z('head_half');
-    return `M${tip[0]} ${tip[1]}L${bx + nx * half} ${by + ny * half}L${bx - nx * half} ${by - ny * half}Z`;
-  };
+  const head = (points) => arrowHead(points, z('head_length'), z('head_half'));
   // A tie's head is on the end its link points to (`headAt`, the end or the start of its line), the way the line comes into it.
   const headless = new Set(Array.isArray(style.headless) ? style.headless : []);
   // Which ends of a type's wire carry a head (the style's `ends`): where it points, where it leaves, or both.
@@ -185,11 +179,12 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const atEnd = ends !== 'start' && !w.toPort, atStart = ends !== 'end' && !w.stop && !w.fromPort;
     return [atEnd && head(toEnd), atStart && head([...toEnd].reverse())].filter(Boolean).join('') || null;
   };
-  // A tie in a legend, as it is drawn: its line and its heads. A headless type keeps its own line (part_of solid).
+  // A tie in a legend, as it is drawn: its line and its heads (the order's too, dashed where a choice is still open).
   const tieKey = (type, cls) => {
     const [stroke, d] = { end: ['M1 7H17', 'M21 7L13 3V11Z'], start: ['M5 7H21', 'M1 7L9 3V11Z'], both: ['M5 7H17', 'M1 7L9 3V11ZM21 7L13 3V11Z'] }[endsOf(type)];
     return m('g', {}, m('path', { d: stroke, class: `lf-tie${type === 'part_of' ? ' near' : ''}${headless.has(type) ? '' : ' headed'}${cls}` }), m('path', { d, class: `lf-head${cls}` }));
   };
+  const orderKey = (dashed = false) => m('g', {}, m('path', { d: 'M1 7H17', class: `lf-wire${kind(ORDER_TYPE)}${dashed ? ' dashed' : ''}` }), m('path', { d: 'M21 7L13 3V11Z', class: `lf-head${kind(ORDER_TYPE)}` }));
   // A wire is broken where it passes under another; one that is drawn in as a story plays stays whole.
   const line = (w) => drawn(w.points, story ? [] : w.gaps, z('break_half'));
   // A held change's badge: where the person decides it, on the step's corner or a wire's middle. One per mark.
@@ -202,11 +197,6 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     return titled(m('g', { key, on: ['click', 'enter', 'leave'], class: 'lf-held', transform: `translate(${bx} ${by})` }, m('circle', { cx: 0, cy: 0, r: z('held_badge') }), m('text', { x: 0, y: 0 }, '?')), `Held for you${pending.reason ? `: ${pending.reason}` : ''}`);
   };
   const held = (pending) => Boolean(pending?.proposal);
-  /** Where a wire's badge goes: the middle of its middle stretch. */
-  const middleOf = (points) => {
-    const k = Math.max(0, Math.floor((points.length - 2) / 2)), [a, b] = [points[k], points[k + 1] ?? points[k]];
-    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-  };
 
   // What can be dimmed, by the item it is of; each step's key, for hovering; the badge of each step a held change is on.
   const dims = new Map(), keyed = new Map(), tipped = new Set(), stepBadges = new Map();
@@ -271,7 +261,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
    * shares, so no legend explains them): the phase dot, a session's state, held up, waits on you, a finding crossing and
    * what is held for you leave it, each told in a tip on the mark itself.
    */
-  const keyRows = ({ st, chains, ties, breaks, heldHere, local = false }) => {
+  const untilDecided = (st, model) => st.some((n) => !n.stub && model?.potential?.has(n.id)) && mark(m('g', { class: 'lf-step scenario' }, outline('box', G.x, G.y, G.w, G.h, CORNER)), 'Until decided');
+  const keyRows = ({ st, chains, ties, breaks, heldHere, model, local = false }) => {
     const drawnAs = new Map();
     for (const n of st) (drawnAs.get(n.shape) ?? drawnAs.set(n.shape, new Set()).get(n.shape)).add(n.stub ? 'Possible end' : kindWord(n.item));
     const uses = (test) => !local && st.some(test);
@@ -283,8 +274,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
       uses((n) => !n.stub && heldUp(n.item)) && mark(dot('trouble hollow', 'hollow', G.x, G.y, G.r), 'Held up'),
       uses((n) => !n.stub && yours(n.item)) && mark(m('g', { class: 'lf-step you' }, outline('box', G.x, G.y, G.w, G.h, CORNER)), 'Waits on you'),
       shownAs.places.filter((p) => st.some((n) => !n.stub && shownAs.of.get(n.id) === p.id)).map((p) => mark(m('g', { class: `lf-step placed ${placeClass(p.hex)}` }, outline('box', G.x, G.y, G.w, G.h, CORNER)), p.within ? `${p.title}, in ${p.within}` : p.title)),
-      chains.length > 0 && mark(m('path', { d: 'M1 7H21', class: `lf-wire${kind(ORDER_TYPE)}` }), 'Leads to'),
-      chains.some((c) => c.dashed) && mark(m('path', { d: 'M1 7H21', class: 'lf-wire dashed' }), 'If chosen'),
+      untilDecided(st, model ?? g),
+      chains.length > 0 && mark(orderKey(), 'Leads to'),
+      chains.some((c) => c.dashed) && mark(orderKey(true), 'If chosen'),
       breaks && mark(m('path', { d: 'M1 7H21M11 0V4M11 10V14', class: 'lf-wire' }), 'Passes under'),
       // A tie of each type in the colour it is drawn in: its own, or that of what waits on you; "you" said only where both are drawn.
       ((rows) => rows.map((row) => {
@@ -296,18 +288,22 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   };
   // On an archipelago each island carries its own legend, inside it (the owner, 5 Nov 2026): its types and the link
   // types of its own wires. A link that leaves it is a finding crossing, of the shared grammar, told at its gates.
-  // An island that says its pack (the answer's `islands`) names it in the pack's words and order, but only what is in
-  // use on it (the owner, 6 Nov 2026): the types of its items and the link types of its own links.
-  const packRows = (pack, group) => [
+  // An island that says its pack (the answer's `islands`) names it in the pack's words and order, what is in use on it
+  // (the owner, 6 Nov 2026), and the marks it draws besides: a step dashed until a choice is made, a possible end, the
+  // order dashed where it follows an open choice (the owner, 18 Nov 2026: the legend said none of those).
+  const packRows = (pack, group, st = group.model.all.filter((n) => !n.dummy)) => [
     ...pack.types.filter((t) => group.items.some((i) => i.type === t.id)).map((t) => ((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapeIn({ type: t.id, is: t.is, island: group.id }, shapes))),
-    ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => mark(r.id === ORDER_TYPE ? m('path', { d: 'M1 7H21', class: `lf-wire${kind(r.id)}` }) : tieKey(r.id, kind(r.id)), r.title)),
-  ];
+    st.some((n) => n.stub) && mark(m('g', { class: 'lf-step scenario' }, outline('end', G.x, G.y, G.w, G.h, CORNER, G.h / 3)), 'Possible end'),
+    untilDecided(st, group.model),
+    ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => mark(r.id === ORDER_TYPE ? orderKey() : tieKey(r.id, kind(r.id)), r.title)),
+    group.model.chains.some((c) => c.dashed) && mark(orderKey(true), 'If chosen'),
+  ].filter(Boolean);
   const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack, capOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.cap;
   // An island's findings are items, drawn as any item is where its query holds them; its shore lists none (the owner, 10 Nov 2026).
   const [KW, KH] = ['key_width', 'key_height'].map(z);
   // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id }] : []);
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null).map((p) => [p.id, [...(packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'region') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
