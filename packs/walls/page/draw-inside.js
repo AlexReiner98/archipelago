@@ -144,7 +144,7 @@ function inside(home, given) {
     };
     const helpers = helperPorts.length ? poolOf(helperPorts) : null;
     if (helpers) tools.helpers = { size: helpers.size, run: helpers.run };
-    let surface, gotSurface;
+    let surface, gotSurface, paintedAt = null;
     const sized = [];
     // A canvas of its own here, the surface's size; each frame painted on it goes to the page as an image (show).
     const paintable = (said) => {
@@ -158,7 +158,8 @@ function inside(home, given) {
         resized: (fn) => sized.push(fn),
         show: () => {
           const image = canvas.transferToImageBitmap();
-          if (!ended) port.postMessage({ type: 'surface-frame', image }, [image]);
+          // With the view the drawing was last told, which it painted at: the page moves the frame from there to where its camera is now.
+          if (!ended) port.postMessage({ type: 'surface-frame', image, at: paintedAt }, [image]);
         },
       };
     };
@@ -193,6 +194,7 @@ function inside(home, given) {
           else if (said.type === 'viewport') {
             const now = view;
             view = null;
+            paintedAt = now;
             if (drawn?.viewport) send({ type: 'patch', list: (await drawn.viewport(now)) ?? [] });
           } else if (said.type === 'frame') waiting.splice(0).forEach((resolve) => resolve(said.t));
           else if (said.type === 'surface') gotSurface?.(said.none ? null : paintable(said));

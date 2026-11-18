@@ -303,7 +303,7 @@ export function drawWith(host, answer, style, keep) {
       }
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
       else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });
-      else if (said.type === 'surface-frame') surface?.paint(said.image);
+      else if (said.type === 'surface-frame') surface?.paint(said.image, said.at);
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
       // A change it asks for is put to the person, and sent as theirs (packs/walls/page/layout-asks.js); what came of it goes back.
       // What it made is not yet in the answer the canvas keeps, which follows only what it holds: the lens is read again.
