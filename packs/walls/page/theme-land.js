@@ -106,35 +106,30 @@ function wear() {
       delete document.body.dataset.land;
     },
   });
-  running = { key, stop, place, frame: [...document.querySelectorAll('body > iframe.page-backdrop')].at(-1) };
+  running = { key, stop, place };
 }
 
-/** The land fading out between two pages, until it is gone. */
+/** The land dissipating between two pages, until it is gone. */
 let going = null;
 /**
- * Fade a land out (its frame's opacity transition, packs/surface/page/gate.css, as it faded in), then stop it and
- * take its palette from the page; the next is worn after. One not yet drawn, or a frame that does not fade, goes at once.
+ * Let a land go by its own motion: its code is told the page is leaving (page.leaving: backdrop.js) and given the
+ * theme's time for it (backdrop.wait.leave, in ms), then stopped, its palette with it; the next is worn after, from
+ * nothing. Not faded: what is seen is the pattern dissolving. One not yet drawn, or a theme that gives no time, goes at once.
  */
 function fadeOut(land) {
   going = land;
   running = null;
-  const { frame } = land;
-  const secs = frame?.isConnected && document.body.dataset.landDrew !== undefined ? Math.max(0, ...getComputedStyle(frame).transitionDuration.split(',').map(parseFloat)) : 0;
-  let gone = false;
+  const ms = document.body.dataset.landDrew !== undefined && served && !(served instanceof Promise) ? landFor(served, 'gate')?.wait?.leave ?? 0 : 0;
   const done = () => {
-    if (gone) return;
-    gone = true;
     land.stop();
     going = null;
     delete document.body.dataset.land;
     delete document.body.dataset.landDrew;
     wear();
   };
-  if (!secs) return done();
-  frame.addEventListener('transitionend', (e) => e.propertyName === 'opacity' && done());
-  // Where the end of the fade is never heard (a hidden tab), it is let go when it would have ended.
-  setTimeout(done, secs * 1000 + 100);
-  frame.style.opacity = '0';
+  if (!(ms > 0) || !land.stop.leave) return done();
+  land.stop.leave();
+  setTimeout(done, ms);
 }
 
 let soon = 0;
