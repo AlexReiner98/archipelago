@@ -16,15 +16,16 @@ test('as many islands from the first as read whole together open', () => {
   const got = leading(boxes, ROOM, 16, 0.7);
   assert.equal(got.n, 2, 'the third would take it under the least');
   assert.deepEqual(got.box, [0, 0, 900, 400]);
+  assert.equal(got.across, false);
 });
 
-test('a first island too big to read whole opens alone, from its top left', () => {
+test('a first island too big to read whole opens alone, whole across (verdict e_uxs5858p)', () => {
   const got = leading([[0, 0, 3000, 900], [3020, 0, 3400, 200]], ROOM, 16, 0.7);
-  assert.deepEqual(got, { n: 1, box: [0, 0, 3000, 900] });
+  assert.deepEqual(got, { n: 1, box: [0, 0, 3000, 900], across: true });
 });
 
 test('no islands open nothing', () => {
-  assert.deepEqual(leading([], ROOM, 16, 0.7), { n: 0, box: null });
+  assert.deepEqual(leading([], ROOM, 16, 0.7), { n: 0, box: null, across: false });
 });
 
 test('an island wholly out of the room is named on the edge toward it, in reading order', () => {

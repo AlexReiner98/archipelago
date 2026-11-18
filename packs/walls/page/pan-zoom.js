@@ -32,7 +32,8 @@ export function framed([l, t, r, b], [rl, rt, rw, rh], pad, least = 0, high = fa
 /**
  * Which of these boxes [l, t, r, b] (islands, in the order they are read) open in sight together at a size that reads:
  * the most from the first on whose union `framed` shows whole at `least` or more. Answers their count, and the union;
- * none (a first box too big to read whole) answers that first box alone, to be shown from its top left.
+ * none (a first box too big to read whole) answers that first box alone, `across`: shown whole across its width, at
+ * whatever size that takes, its height running on below (verdict e_uxs5858p: the island it opens on is whole).
  */
 export function leading(boxes, room, pad, least) {
   let union = null, n = 0;
@@ -42,7 +43,7 @@ export function leading(boxes, room, pad, least) {
     union = next;
     n += 1;
   }
-  return n ? { n, box: union } : { n: boxes.length ? 1 : 0, box: boxes[0] ?? null };
+  return n ? { n, box: union, across: false } : { n: boxes.length ? 1 : 0, box: boxes[0] ?? null, across: boxes.length > 0 };
 }
 
 /**
@@ -148,13 +149,16 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   };
   /**
    * Open readable on these boxes (islands, in reading order): as many from the first as read whole together, standing at
-   * the top of the room; zooming out still reaches all of it. Answers how many are in sight.
+   * the top of the room, or the first alone whole across where even it does not read whole; zooming out still reaches
+   * all of it. Answers how many are in sight.
    */
   const openOn = (boxes, right = 0, top = 0, bottom = 0) => {
-    const { n, box } = leading(boxes, roomOf(right, top, bottom), plane.fit_pad, plane.fit_least);
+    const { n, box, across } = leading(boxes, roomOf(right, top, bottom), plane.fit_pad, plane.fit_least);
     if (!box) return 0;
     fitted = Math.min(fitted, framed([0, 0, width, height], roomOf(right, top, bottom), plane.fit_pad).whole);
-    toBox(box, right, top, bottom, true, true);
+    // Whole across, its height left to run on: fitted as a box of its width and no height, from the room's top.
+    if (across) toBox([box[0], box[1], box[2], box[1]], right, top, bottom, false, true);
+    else toBox(box, right, top, bottom, true, true);
     return n;
   };
   /** Hear each view as it is drawn; answers how to stop. */
