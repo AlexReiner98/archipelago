@@ -27,13 +27,10 @@ test('no islands open nothing', () => {
   assert.deepEqual(leading([], ROOM, 16, 0.7), { n: 0, box: null });
 });
 
-test('an island wholly out of the room is named on the edge toward it, level with its top', () => {
+test('an island wholly out of the room is named on the edge toward it, in reading order', () => {
   const v = { x: 0, y: 0, s: 1 };
-  const out = outOfSight([['a', [10, 60, 400, 300]], ['b', [1200, 60, 1600, 300]], ['c', [100, 900, 300, 1000]]], ROOM, v);
-  assert.deepEqual(out.map(([id, side]: [string, number[]]) => [id, side]), [['b', [1, 0]], ['c', [0, 1]]], 'a is in sight; b to the right; c below');
-  assert.equal(out[0][2][0], 1000, 'on the right edge');
-  assert.equal(out[0][2][1], 60, 'level with its top');
-  assert.equal(out[1][2][1], 748, 'on the foot');
+  const out = outOfSight([['a', [10, 60, 400, 300]], ['b', [1200, 60, 1600, 300]], ['c', [100, 900, 300, 1000]], ['d', [1100, 2000, 1300, 2100]]], ROOM, v);
+  assert.deepEqual(out, [['b', [1, 0]], ['c', [0, 1]], ['d', [0, 1]]], 'a is in sight; b to the right; c and d below, in order');
 });
 
 test('an island cut by the edge is in sight, not named', () => {

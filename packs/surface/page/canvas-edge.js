@@ -1,8 +1,10 @@
 // The islands a canvas has on but not in sight, named at its frame's edge, each toward where it lies (the study "The
-// canvas, by eye", verdict e_amqnqtsn): the camera opens readable on the islands that fit (packs/walls/page/pan-zoom.js
-// openOn), and what it leaves out is never lost off an edge. A name stands on the edge the line from the room's middle
-// to the island's middle meets, level with the island's top or left, an arrow on its side toward the island; names on
-// one edge never cover each other. A press brings that island into sight, as the side bar's does. Drawn again as the view moves, once a frame.
+// canvas, by eye", verdicts e_amqnqtsn and round 2's): the camera opens readable on the islands that fit
+// (packs/walls/page/pan-zoom.js openOn), and what it leaves out is never lost off an edge. The names stand in a band of
+// the sea along the edge the line from the room's middle to each island's middle meets, in the order the islands are
+// read, plain words and an arrow toward them; the band has the sea's ground and its line, as the bars do, so no name is
+// ever drawn over an island's land. A press brings that island into sight, as the side bar's does. Drawn again as the
+// view moves, once a frame; the camera asks the bands' room first, so it opens beside them (`now`).
 
 /** An element of the page: its tag, its attributes, its children (a press for `onclick`). Imports nothing, so the pure part is tried without a page. */
 function h(tag, attrs, ...kids) {
@@ -14,11 +16,13 @@ function h(tag, attrs, ...kids) {
 
 /** The arrow toward an edge, by [across, down]. */
 const ARROWS = { '-1,0': '←', '1,0': '→', '0,-1': '↑', '0,1': '↓' };
+/** Each edge's band by [across, down], as its class says it (shell.css). */
+const BANDS = { '-1,0': 'left', '1,0': 'right', '0,-1': 'top', '0,1': 'foot' };
 
 /**
- * Where each island out of sight is named, in the room [left, top, width, height] of a frame seen from `v` { x, y, s }:
- * `boxes` its islands [id, [l, t, r, b]] in the picture's units. Answers [id, side [across, down], point [x, y]] for each
- * wholly out of the room, its point on that edge (level with the island's top or left), in the frame's pixels.
+ * Which islands are out of sight, in the room [left, top, width, height] of a frame seen from `v` { x, y, s }: `boxes`
+ * its islands [id, [l, t, r, b]] in the picture's units, in reading order. Answers [id, side [across, down]] for each
+ * wholly out of the room, in that order: the side is the edge the line from the room's middle to the island's meets.
  */
 export function outOfSight(boxes, [rl, rt, rw, rh], v) {
   const cx = rl + rw / 2, cy = rt + rh / 2;
@@ -29,17 +33,16 @@ export function outOfSight(boxes, [rl, rt, rw, rh], v) {
     if (sr > rl && sl < rl + rw && sb > rt && st < rt + rh) continue;
     const mx = (sl + sr) / 2 - cx, my = (st + sb) / 2 - cy;
     // Scaled to the room's half sizes, the larger way is the edge the line meets.
-    const ax = Math.abs(mx) / (rw / 2), ay = Math.abs(my) / (rh / 2), far = Math.max(ax, ay) || 1;
-    const side = ax >= ay ? [Math.sign(mx) || 1, 0] : [0, Math.sign(my)];
-    // On that edge, level with the island's top (a side edge) or its left (the top or foot), so a row reads in order.
-    out.push([id, side, side[0] ? [cx + mx / far, st] : [sl, cy + my / far]]);
+    const ax = Math.abs(mx) / (rw / 2), ay = Math.abs(my) / (rh / 2);
+    out.push([id, ax >= ay ? [Math.sign(mx) || 1, 0] : [0, Math.sign(my)]]);
   }
   return out;
 }
 
 /**
- * Keep the names of `canvas`'s islands out of sight over its stage: `islands()` answers [id, title, box] in reading
- * order, `room()` the room the camera fits in, `go(id)` brings one into sight. Answers how to stop.
+ * Keep the names of a canvas's islands out of sight over its stage: `islands()` answers [id, title, box] in reading
+ * order, `room()` the room the camera fits in, `go(id)` brings one into sight. Answers `stop`, and `now()`, which
+ * draws them at once and answers the room their bands take [right, foot] (what the camera keeps clear as it opens).
  */
 export function edgeNames(stage, moves, { islands, room, go }) {
   const layer = h('div', { class: 'lf-edge-names' });
@@ -48,34 +51,28 @@ export function edgeNames(stage, moves, { islands, room, go }) {
   const draw = () => {
     queued = 0;
     const list = islands(), titles = new Map(list.map(([id, title]) => [id, title]));
-    const [rl, rt, rw, rh] = room(), v = moves.state();
-    const out = outOfSight(list.map(([id, , box]) => [id, box]), [rl, rt, rw, rh], v);
-    layer.replaceChildren(
-      ...out.map(([id, [sx, sy]]) => {
-        const arrow = ARROWS[`${sx},${sy}`] ?? '→';
-        // The arrow is never cut: only the name is, where it does not fit.
-        const name = h('span', { class: 'lf-edge-word' }, titles.get(id)), mark = h('span', { class: 'lf-edge-arrow' }, arrow);
-        const words = sx < 0 || (sx === 0 && sy < 0) ? [mark, name] : [name, mark];
-        return h('button', { type: 'button', class: 'lf-edge-name', title: `${titles.get(id)}: bring it into sight`, 'data-item': id, onclick: () => go(id) }, ...words);
-      }),
-    );
-    // Each name inside the room, at its point, kept off the edge by its own margin; on one edge, in order along it, each
-    // past the one before, so none covers another.
-    const placed = [...layer.children].map((el, k) => {
-      const [, [sx, sy], [px, py]] = out[k];
-      const m = parseFloat(getComputedStyle(el).marginTop) || 0, w = el.offsetWidth, ht = el.offsetHeight;
-      const x = sx > 0 ? px - w - m : px + m, y = sy > 0 ? py - ht - m : py + m;
-      return { el, m, w, ht, along: sx !== 0, edge: `${sx},${sy}`, x: Math.min(Math.max(x, rl + m), rl + rw - w - m), y: Math.min(Math.max(y, rt + m), rt + rh - ht - m) };
-    });
-    for (const edge of new Set(placed.map((p) => p.edge))) {
-      const on = placed.filter((p) => p.edge === edge), key = on[0].along ? 'y' : 'x', size = on[0].along ? 'ht' : 'w';
-      on.sort((a, b) => a[key] - b[key]).forEach((p, k) => k && (p[key] = Math.max(p[key], on[k - 1][key] + on[k - 1][size])));
+    const [rl, rt, rw, rh] = room();
+    const out = outOfSight(list.map(([id, , box]) => [id, box]), [rl, rt, rw, rh], moves.state());
+    const bands = new Map();
+    for (const [id, side] of out) {
+      const key = `${side}`, arrow = h('span', { class: 'lf-edge-arrow' }, ARROWS[key]), word = h('span', { class: 'lf-edge-word' }, titles.get(id));
+      // The arrow is never cut, only the name; it stands on the side the island lies.
+      const name = h('button', { type: 'button', class: 'lf-edge-name', title: `${titles.get(id)}: bring it into sight`, 'data-item': id, onclick: () => go(id) }, ...(side[0] < 0 || side[1] < 0 ? [arrow, word] : [word, arrow]));
+      if (!bands.has(key)) bands.set(key, h('div', { class: `lf-edge-band lf-edge-${BANDS[key]}` }));
+      bands.get(key).append(name);
     }
-    // Its margin already stands it in from its corner: the place is said without it.
-    for (const p of placed) p.el.style.transform = `translate(${p.x - p.m}px, ${p.y - p.m}px)`;
+    // Each band along its edge of the room: its own size is its class's, its place the room's.
+    for (const [key, band] of bands) {
+      const [sx, sy] = key.split(',').map(Number);
+      Object.assign(band.style, sx ? { top: `${rt}px`, height: `${rh}px`, left: `${sx > 0 ? rl + rw : rl}px` } : { left: `${rl}px`, width: `${rw}px`, top: `${sy > 0 ? rt + rh : rt}px` });
+    }
+    layer.replaceChildren(...bands.values());
+    const size = (key, way) => bands.get(key)?.[way] ?? 0;
+    return [size('1,0', 'offsetWidth'), size('0,1', 'offsetHeight')];
   };
   const soon = () => (queued ||= requestAnimationFrame(draw));
   const unwatch = moves.watch(soon);
   soon();
-  return () => (cancelAnimationFrame(queued), unwatch(), layer.remove());
+  const now = () => (cancelAnimationFrame(queued), draw());
+  return { stop: () => (cancelAnimationFrame(queued), unwatch(), layer.remove()), now };
 }

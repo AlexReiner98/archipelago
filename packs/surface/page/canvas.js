@@ -321,9 +321,14 @@ export function canvasIn(host, pane) {
       // A size that reads wins over all of it in sight (verdict e_amqnqtsn): the canvas opens on as many of its islands
       // as read whole together, in the order they are read, standing under the bars; the rest are named at the frame's
       // edge (./canvas-edge.js). A lens that is no list of islands fits all of it, never smaller than reads (e_5cp4fw78).
-      const moves = c.moves(), isles = islandBoxes();
-      if (isles.length) moves?.openOn(isles.map(([, , box]) => box), 0, ...bars(host));
-      else moves?.fit(0, ...bars(host), true);
+      const moves = c.moves(), isles = islandBoxes(), [top, bottom] = bars(host), boxes = isles.map(([, , box]) => box);
+      if (!isles.length) moves?.fit(0, top, bottom, true);
+      else if (moves) {
+        // Opened once, the bands of names it leaves out take their room, and it opens again beside them.
+        moves.openOn(boxes, 0, top, bottom);
+        const [right, foot] = edges?.now() ?? [0, 0];
+        if (right || foot) (moves.openOn(boxes, right, top, bottom + foot), edges.now());
+      }
       if (at) at.fitted = c.moves()?.state();
     },
     /** The islands it draws as [id, title, box], in the order they are read: by their top, then their left. */
@@ -373,7 +378,7 @@ export function canvasIn(host, pane) {
     const stage = host.querySelector('.lf-stage');
     if (stage) sized.observe(stage);
     // The islands it leaves out of sight, named at the frame's edge, on each new stage.
-    edges?.();
+    edges?.stop();
     edges = stage && c.moves() ? edgeNames(stage, c.moves(), { islands: islandBoxes, room: () => c.moves().room(0, ...bars(host)), go: (id) => c.toItem(id) }) : null;
     if (at?.kept) c.moves()?.restore(at.kept);
     else c.fit();
