@@ -2,8 +2,8 @@
 // canvas, by eye", verdicts e_amqnqtsn and round 2's): the camera opens readable on the islands that fit
 // (packs/walls/page/pan-zoom.js openOn), and what it leaves out is never lost off an edge. The names stand in a band of
 // the sea along the edge the line from the room's middle to each island's middle meets, in the order the islands are
-// read, plain words and an arrow toward them; the band has the sea's ground and its line, as the bars do, so no name is
-// ever drawn over an island's land. A press brings that island into sight, as the side bar's does. Drawn again as the
+// read, plain words and an arrow toward them, on the sea's ground with its line, as the bars have: across the top or
+// foot a band, at a side one label as narrow as its words, hugging that edge. A press brings that island into sight, as the side bar's does. Drawn again as the
 // view moves, once a frame; the camera asks the bands' room first, so it opens beside them (`now`).
 
 /** An element of the page: its tag, its attributes, its children (a press for `onclick`). Imports nothing, so the pure part is tried without a page. */
@@ -69,11 +69,13 @@ export function edgeNames(stage, moves, { islands, room, go }) {
     // Each band along its edge of the room: its own size is its class's, its place the room's.
     for (const [key, band] of bands) {
       const [sx, sy] = key.split(',').map(Number);
-      Object.assign(band.style, sx ? { top: `${rt}px`, height: `${rh}px`, left: `${sx > 0 ? rl + rw : rl}px` } : { left: `${rl}px`, width: `${rw}px`, top: `${sy > 0 ? rt + rh : rt}px` });
+      // A side's names hug that edge, as tall and as wide as their words (verdict e_nbk5a5b2); the top and foot are bands across the room.
+      Object.assign(band.style, sx ? { top: `${rt}px`, left: `${sx > 0 ? rl + rw : rl}px` } : { left: `${rl}px`, width: `${rw}px`, top: `${sy > 0 ? rt + rh : rt}px` });
     }
     layer.replaceChildren(...bands.values());
     const size = (key, way) => bands.get(key)?.[way] ?? 0;
-    return [size('1,0', 'offsetWidth'), size('0,1', 'offsetHeight')];
+    // Only the foot's band is kept clear as the camera opens: a side's label lies over the edge it names.
+    return [0, size('0,1', 'offsetHeight')];
   };
   const soon = () => (queued ||= requestAnimationFrame(draw));
   const unwatch = moves.watch(soon);
