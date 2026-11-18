@@ -170,7 +170,7 @@ test('an agent may settle its own work unreviewed, but only proposes the answer 
   ]);
   // As in dev mode: nothing an agent does is reviewed.
   const free = new Archipelago(l.db, l.registry, { create: 'auto', update: 'auto', link: 'auto' });
-  const decided = l.registry.type('decision')!.statuses.closed[0];
+  const decided = l.registry.type('question')!.statuses.closed[0];
 
   assert.equal((await free.change(agent, { reason: 'did it', ops: [{ op: 'update', id: made.t, status: 'done' }] })).status, 'applied', 'its own task');
   assert.equal((await free.change(agent, { reason: 'a note', ops: [{ op: 'update', id: made.d, body: 'Supabase is set up.' }] })).status, 'applied', 'a note on a question');

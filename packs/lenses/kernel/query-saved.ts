@@ -126,11 +126,11 @@ const UNSAID: Record<string, string> = {
  */
 export function oldQuery(ctx: Typed, props: Props, about: string[]): { lens: { filter: Props; walk: { over: string[] | 'all'; steps: number } } | null; lost: string[] } {
   const lost: string[] = [];
-  const known = (t: string) => ctx.registry.types.has(t);
+  const known = (t: string) => ctx.registry.types.has(ctx.registry.canonical(t)); // a type taken over reads as the one that took it
   const linked = (r: string) => ctx.registry.relations.has(r);
   const start = typeof props.from === 'string' && ITEM.test(props.from) ? [props.from] : about;
   if (typeof props.from === 'string' && !ITEM.test(props.from)) lost.push('from "'.concat(props.from, '"'));
-  const kinds = list(props.kinds);
+  const kinds = list(props.kinds).map((k) => (k.startsWith('-') ? `-${ctx.registry.canonical(k.slice(1))}` : ctx.registry.canonical(k)));
   const wanted = kinds.filter((k) => !k.startsWith('-'));
   if (wanted.some((k) => !known(k))) lost.push(`kinds ${wanted.filter((k) => !known(k)).join(', ')}`);
   const types = wanted.filter(known);

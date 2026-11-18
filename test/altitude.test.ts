@@ -20,7 +20,7 @@ test('an aim, a project, its streams and their steps each sit at their own level
   assert.equal(at('aim'), 'workspace');
   assert.equal(at('levels.project'), 'project', 'a type sets its own');
   assert.equal(at('levels.part'), 'stream', 'a flavour inherits it');
-  for (const id of ['task', 'decision', 'question', 'finding', 'event']) assert.equal(at(id), 'step', id);
+  for (const id of ['task', 'question', 'event']) assert.equal(at(id), 'step', id);
   // People and places are not in the hierarchy.
   assert.equal(at('person'), undefined);
   assert.equal(at('place'), undefined);

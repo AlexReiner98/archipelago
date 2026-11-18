@@ -180,10 +180,10 @@ test('a flat answer names, after its pack, every other type and link type in use
   assert.ok(links.includes('depends_on'), `the link in use within it: ${links.join(', ')}`);
 });
 
-test("core's legend on an island is task and decision (event is calendar's), and the links an island's work is drawn with", () => {
+test("core's legend on an island is task (event is calendar's), and the links an island's work is drawn with", () => {
   const reg = new Registry(join(import.meta.dirname, '..', 'packs'));
   const types = [...reg.types.values()].filter((t) => t.pack === 'core' && typeOnLegend(t)).map((t) => t.id).sort();
   const links = [...reg.relations.values()].filter((r) => r.pack === 'core' && linkOnLegend(r)).map((r) => r.id).sort();
-  assert.deepEqual(types, ['decision', 'task']);
+  assert.deepEqual(types, ['task']);
   assert.deepEqual(links, ['about', 'bears_on', 'depends_on', 'involves', 'link', 'lives_in', 'needs', 'owned_by', 'part_of', 'produced', 'reads', 'serves', 'uses', 'waits_on']);
 });
