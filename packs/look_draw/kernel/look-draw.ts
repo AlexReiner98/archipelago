@@ -52,6 +52,8 @@ export interface Drawn {
   fell_back?: { asked: string; drawn: string }[];
   /** What the page's parts drew with, one for each island it drew parts on (packs/loader/kernel/pack-versions.ts, Drew). */
   drew?: unknown[];
+  /** The tries the page drew with, of those it was given (packs/surface/page/preview.js, lookTried). */
+  tried_with?: { item: string; field: string }[];
   /** A dry run's: what its drawings said went wrong, each once, the first first. */
   errors?: string[];
   /** A pressed look's: the keys found and pressed, in order, and those no mark had (or none could be reached). */
@@ -255,8 +257,9 @@ async function drawNow(address: string, pass: string, width: number, height: num
     const checks = checksOf(await tab.evaluate<Probe>(PROBE).catch(logged(`look ${address}: its checks could not be read`, null)));
     const drew = await tab.evaluate<unknown[] | null>('window.lookDrew ? window.lookDrew() : null').catch(logged(`look ${address}: what it drew with could not be read`, null));
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
+    const tried_with = tries?.length ? ((await tab.evaluate<{ item: string; field: string }[] | null>('window.lookTried ? window.lookTried() : null').catch(logged(`look ${address}: the tries it drew with could not be read`, null))) ?? []) : undefined;
     const errors = tries?.length ? errorsOf(state, why, (await tab.evaluate<string[]>(SHOWN_ERRORS).catch(logged(`look ${address}: its errors could not be read`, []))) ?? []) : undefined;
-    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, checks, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(errors && { errors }), ...presses };
+    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, checks, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(tried_with && { tried_with }), ...(errors && { errors }), ...presses };
   } catch (err) {
     throw Date.now() - began >= LATE_MS ? new Error(`The view had not drawn within ${LATE_MS / 1000} s, and its page stopped answering: it was closed.`) : err;
   } finally {
