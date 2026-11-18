@@ -146,3 +146,19 @@ test('a look that paints is given its island’s frame and a surface, its items 
   assert.ok(Math.min(off(into[0], into[1]), off(into.at(-2), into.at(-1))) < 0.01, `the wire in ends on the item’s edge, where the look draws it: ${into} at ${at}`);
   out.end?.();
 });
+
+test('a look that paints says the shape it draws, and its island’s frame takes that shape, within bounds', () => {
+  const frameOf = (look: any) => laidWith(entry(look)).islands.find((i: any) => i.id === 'e_islandaa').canvas.size;
+  const paints = (frame?: any) => ({ default() {}, ...(frame && { frame }), settings: { wide: 6 } });
+  const [bw, bh] = frameOf(paints());
+  let asked: any = null;
+  const [w, h] = frameOf(paints((said: any) => ((asked = said), { width: 1200, height: 200 })));
+  assert.deepEqual([Math.round(w), Math.round(h)], [1200, 200], 'a width and height it says are its frame');
+  assert.deepEqual(asked.answer.items.map((i: any) => i.id).sort(), ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_cccccccc'], 'asked with what its island holds');
+  assert.equal(asked.style.wide, 6, 'and its settings');
+  const [aw, ah] = frameOf(paints(() => ({ aspect: 1 })));
+  assert.ok(Math.abs(aw - ah) < 1e-6 && Math.abs(aw * ah - bw * bh) < 1e-6, 'an aspect alone keeps the block’s area');
+  const [fw, fh] = frameOf(paints(() => ({ width: 1e6, height: 1 })));
+  assert.ok(fw / fh <= house.sizes.flow_look_aspect_most + 1e-6 && fw * fh <= bw * bh * house.sizes.flow_look_area_most + 1e-3, `held within bounds: ${fw} × ${fh}`);
+  assert.deepEqual(frameOf(paints(() => { throw new Error('no'); })), [bw, bh], 'a frame that throws leaves the block');
+});
