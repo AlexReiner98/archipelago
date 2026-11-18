@@ -7,6 +7,7 @@ import { FRONTIER_REASONS, frontier as frontierOf, frontierText, said, workedOn 
 import { narrowed as narrowedOf, narrowedText } from './frontier-prompt.ts';
 import { livesIn as livesInOf, livesInFor, placeFor as placeOf } from './places.ts';
 import { byAttention, markOf, sessionStates } from './session-state.ts';
+import { sessionsOn } from './sessions-on.ts';
 import { sessionMeasures, type MeasuresInput } from './session-measures.ts';
 import { runSpans, type Run } from './sessiontime.ts';
 export { spent } from './spent.ts';
@@ -43,6 +44,11 @@ export async function marks(ctx: KernelContext, input: { runs: string[]; now?: s
   const found = await sessionStates(ctx, ids(input?.runs, 'runs'), input.now);
   const marked = Object.fromEntries([...found].map(([run, s]) => [run, markOf(s)]));
   return { marks: marked, order: Object.keys(marked).sort((a, b) => byAttention(marked[a], marked[b])) };
+}
+
+/** The open sessions on some items, by item id, each a mark every drawing is handed on the item (./sessions-on.ts). */
+export async function on(ctx: KernelContext, input: { items: string[]; now?: string }) {
+  return { on: await sessionsOn(ctx, ids(input?.items, 'items'), input.now) };
 }
 
 /** When some sessions were at work between two instants (milliseconds), cut by the work each was on: spans by run id. */

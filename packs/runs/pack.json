@@ -37,6 +37,11 @@
         "out": { "marks": "any", "order": ["id"] },
         "run": "answers.ts#marks"
       },
+      "answer.sessions_on": {
+        "in": { "items": ["id"], "now?": "string" },
+        "out": { "on": "any" },
+        "run": "answers.ts#on"
+      },
       "answer.run_spans": {
         "in": { "runs": [{ "id": "id", "is_open": "boolean", "props": "any", "created_at": "any", "updated_at?": "any" }], "from": "number", "to": "number", "now?": "number" },
         "out": { "spans": "any" },

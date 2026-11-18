@@ -37,10 +37,11 @@ export interface SessionMark {
   since: string | null;
 }
 
-/** A run's state with its latest turn and how many it has had. */
+/** A run's state with its latest turn, how many it has had, and when it was last heard from. */
 export interface SessionState extends SessionMark {
   turn?: Turn;
   turns: number;
+  heard?: string;
 }
 
 const turnsOf = turnsOfJs as (events: SessionEvent[]) => Turn[];
@@ -105,7 +106,7 @@ export async function sessionStates(ctx: KernelContext, runs: string[], now: str
       now,
       ...numbers,
     });
-    out.set(r.id, { ...mark, ...(turns.length && { turn: turns.at(-1) }), turns: turns.length });
+    out.set(r.id, { ...mark, ...(turns.length && { turn: turns.at(-1) }), turns: turns.length, ...(last && { heard: last }) });
   }
   return out;
 }

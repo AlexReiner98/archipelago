@@ -8,6 +8,7 @@
     "service:answer.worked_on",
     "service:answer.session_states",
     "service:answer.session_marks",
+    "service:answer.sessions_on",
     "service:answer.run_spans",
     "service:answer.spent",
     "service:answer.session_measures",
