@@ -17,7 +17,7 @@ const keyed = (m: Marks, key: string) => all(m).filter((x) => (x[1] as { key?: s
 
 const person = { capabilities: { lead: { form: 'actor', link: 'waits_on' } } };
 const aim = { capabilities: { lead: { form: 'aim', link: 'serves' } } };
-const words = { types: { work: { title: 'Work', capabilities: { plannable: true } }, task: { of: 'work', title: 'Task', fields: { tokens_estimated: { type: 'number' } } }, aim: { title: 'Aim', capabilities: aim.capabilities } } };
+const words = { types: { 'build.lane': { of: 'work', title: 'Lane', fields: { tokens_estimated: { type: 'number' } } }, work: { title: 'Work', capabilities: { plannable: true } }, task: { of: 'work', title: 'Task', fields: { tokens_estimated: { type: 'number' } } }, aim: { title: 'Aim', capabilities: aim.capabilities } } };
 const ties = (type: string, ...open: boolean[]) => open.map((o, i) => ({ type, root: type, id: `e_tie0000${i}`, title: `T${i}`, open: o }));
 
 test('a person: Light them at the end of the count, lighting what waits on them while pointed at', () => {
@@ -66,6 +66,13 @@ test('Add work names the work in place, then makes it serve the aim in one chang
   ]);
   assert.equal(pressEvent({ key: 'lead-add-title', name: 'submit', value: 'Undo it' }, item, aim, { words, adding: 'Undo it' }).ops[0].title, 'Undo it');
   assert.deepEqual(pressEvent({ key: 'lead-add-cancel', name: 'press' }, item, aim, { words, adding: 'x' }), { adding: undefined });
+});
+
+test("work added to an aim is of the aim's own pack, so its island speaks it", () => {
+  const made = pressEvent({ key: 'lead-add-go', name: 'press' }, { id: 'e_a', type: 'aim', props: {} }, aim, { words, adding: 'Undo it' });
+  assert.equal(made.ops[0].type, 'task', "core's aim gets core's task, never another pack's lane");
+  const lane = pressEvent({ key: 'lead-add-go', name: 'press' }, { id: 'e_a', type: 'build.goal', props: {} }, aim, { words, adding: 'Undo it' });
+  assert.equal(lane.ops[0].type, 'build.lane');
 });
 
 test("a press is only its own form's: another type's band answers nothing to it", () => {

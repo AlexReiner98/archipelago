@@ -265,10 +265,16 @@ export function leadFields(item, type, c) {
   return [lead.value, lead.unit, lead.as_of, lead.unless, lead.says, lead.beats].filter(Boolean);
 }
 
-/** The type work added to an aim is: the island's flavour of plannable work with an estimate, as a new item's own; else the plannable starter. */
-function workTypeOf(words) {
-  const ids = Object.keys(words?.types ?? {});
-  const plannable = (t) => Boolean(typeOf(words, t).capabilities.plannable) && !words.types[t].dormant;
+/** The pack a type is named in: what comes before its last dot, none for core's. */
+const packOf = (type) => (String(type ?? '').includes('.') ? String(type).slice(0, String(type).lastIndexOf('.')) : '');
+
+/**
+ * The type work added to an aim is, or null: a flavour of plannable work with an estimate from the aim's own pack, so
+ * the island it is on speaks it (core's task for core's aim); else that pack's plannable starter.
+ */
+function workTypeOf(words, aimType) {
+  const ids = Object.keys(words?.types ?? {}).filter((t) => packOf(t) === packOf(aimType) && !words.types[t].dormant);
+  const plannable = (t) => Boolean(typeOf(words, t).capabilities.plannable);
   return ids.find((t) => words.types[t].of && plannable(t) && typeOf(words, t).fields.tokens_estimated) ?? ids.find((t) => !words.types[t].of && plannable(t)) ?? null;
 }
 
@@ -282,7 +288,7 @@ function pressOf(item, lead, { writes, links, words }) {
     const ids = into(links, lead.link).filter((t) => t.open !== false && t.id).map((t) => t.id);
     return ids.length ? { key: 'lead-light', said: 'Light them', tip: 'Draw what waits on them on the canvas', lights: ids.slice(0, 500) } : null;
   }
-  if (lead?.form === 'aim' && writes && !into(links, lead.link).length && workTypeOf(words)) return { key: 'lead-add', said: 'Add work', tip: 'Name work that serves it' };
+  if (lead?.form === 'aim' && writes && !into(links, lead.link).length && workTypeOf(words, item.type)) return { key: 'lead-add', said: 'Add work', tip: 'Name work that serves it' };
   return null;
 }
 
@@ -316,7 +322,7 @@ export function pressEvent(event, item, type, { links, words, adding } = {}) {
   if (k === 'lead-add-title' && n === 'edit') return { adding: String(event.value ?? '') };
   if (!((k === 'lead-add-go' && n === 'press') || (k === 'lead-add-title' && n === 'submit'))) return null;
   const title = String((n === 'submit' ? event.value : adding) ?? '').trim();
-  const kind = workTypeOf(words);
+  const kind = workTypeOf(words, item.type);
   if (!title || !kind) return { adding };
   const island = typeof item.props?.island === 'string' ? item.props.island : null;
   return { ops: [{ op: 'create', ref: 'work', type: kind, title, ...(island && { props: { island } }) }, { op: 'link', type: lead.link, from: 'work', to: item.id }], reason: `Work added in the UI to serve "${item.title ?? item.id}"` };
