@@ -179,6 +179,8 @@ export async function tryPage(query = '') {
   making = true;
   const error = h('div', { class: 'error gate-error' });
   const title = signUp ? 'Sign up' : TITLE;
+  // A map made is entered by loading the page again: the land shown dissolves first, and none starts before the load.
+  const left = signUp ? undefined : hooks.landLeave?.();
   gate(title, gateRow(h('span', { class: 'muted grow' }, from ? 'Copying the map…' : signUp ? 'Getting ready…' : 'Making your map…')), error);
   try {
     const res = await postJson('/guest', from ? { from } : {});
@@ -194,9 +196,11 @@ export async function tryPage(query = '') {
     // A new map opens on the card (firstMoments), over the canvas the agent draws on; a copy, on the copy.
     keepLanding(workspace.id, `#/v?${from ? QUERY : FIRST_QUERY}`);
     if (!from) keepFirst({ ws: workspace.id, prompt: body.result.prompt, stage: 'wait', fresh: true });
+    await left;
     enter(page_token);
   } catch (err) {
     making = false;
+    hooks.landBack?.();
     error.textContent = err.message;
     gate(title, gateRow(h('span', { class: 'grow' }), h('button', { class: 'primary', onclick: () => tryPage(query) }, 'Try again')), error);
   }

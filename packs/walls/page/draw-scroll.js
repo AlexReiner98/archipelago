@@ -3,14 +3,14 @@
 // of draw.js (packs/surface/kernel/ui-files.ts), as draw-record.js is.
 'use strict';
 
-/** What the page around a backdrop says, made numbers and at most 256 boxes: its size, scroll, window, a box for each block of its words, its call to action's (focus) and the margin it asks drawn above and below the window, or that it is out of sight; and whether its reader asks for less motion. */
+/** What the page around a backdrop says, made numbers and at most 256 boxes: its size, scroll, window, a box for each block of its words, its call to action's (focus) and the margin it asks drawn above and below the window, or that it is out of sight; whether its reader asks for less motion; and whether it is leaving (leaving: true, only ever that). */
 function pageOf(said) {
   const n = (v) => (Number.isFinite(v) ? v : 0);
   if (!said || typeof said !== 'object') return null;
-  const reducedMotion = said.reducedMotion === true;
-  if (said.visible === false) return { visible: false, reducedMotion };
+  const reducedMotion = said.reducedMotion === true, leaving = said.leaving === true ? { leaving: true } : {};
+  if (said.visible === false) return { visible: false, reducedMotion, ...leaving };
   const box = (b) => ({ x: n(b?.x), y: n(b?.y), w: Math.max(0, n(b?.w)), h: Math.max(0, n(b?.h)) });
-  return { visible: true, reducedMotion, width: n(said.width), height: n(said.height), scroll: n(said.scroll), margin: Math.max(0, n(said.margin)), view: { width: n(said.view?.width), height: n(said.view?.height) }, clear: Array.isArray(said.clear) ? said.clear.slice(0, 256).map(box) : [], focus: said.focus && typeof said.focus === 'object' ? box(said.focus) : null };
+  return { visible: true, reducedMotion, width: n(said.width), height: n(said.height), scroll: n(said.scroll), margin: Math.max(0, n(said.margin)), view: { width: n(said.view?.width), height: n(said.view?.height) }, clear: Array.isArray(said.clear) ? said.clear.slice(0, 256).map(box) : [], focus: said.focus && typeof said.focus === 'object' ? box(said.focus) : null, ...leaving };
 }
 
 /** What a backdrop's code tells its page of its look (look() in its worker): only these names, each a hex colour, nothing else (the page checks it again: packs/walls/page/backdrop.js). */
