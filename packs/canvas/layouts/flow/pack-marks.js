@@ -155,6 +155,7 @@ export function packMarks({ island, pack, off = [], partsOff = [], open = null, 
     marks.push(titled(m('g', { key, on: events, ...(!opens && switches && { item: island, pack: p.id }), class: cls }, ...ring(cx, D / 2, glyphOf(p))), lines.join('\n')));
     // Each part's tip whether listed or not, so a hover after a click has it.
     for (const part of partsOf(p)) { const pk = `pt:${island}:${part.id}`; tip(pk, partTipOf(p, part, partTogglesHere(p, part, partsOff) && on(pk).includes('toggle'))); }
+    for (const [kind, parts] of kinds) tip(`pg:${island}:${p.id}:${kind}`, kindTipOf(kind, parts, isOpen && openKind === kind));
     if (!opens) { cx += D + GAP; continue; }
     if (isOpen) {
       let px = cx + D / 2 + GAP + d / 2;
@@ -164,7 +165,6 @@ export function packMarks({ island, pack, off = [], partsOff = [], open = null, 
       for (const [kind, parts] of kinds) {
         px += d / 2 + GAP + d / 2;
         const gk = `pg:${island}:${p.id}:${kind}`, listed = openKind === kind, kl = kindTipOf(kind, parts, listed), count = countText(parts);
-        tip(gk, kl);
         marks.push(titled(m('g', { key: gk, on: ['enter', 'leave', 'click'], class: `lf-part lf-kind k-${kind} st-${kindState(parts)}${listed ? ' open' : ''}` }, ...ring(px, d / 2, kindGlyph(style, kind)), m('text', { x: px + d / 2 + gap, y, class: 'lf-part-count' }, count)), kl.join('\n')));
         if (listed) marks.push(partList({ island, pack: p, parts, partsOff, at: [px - d / 2, y + D / 2], z, m, titled, on, measure, style }));
         px += gap + measure(count, z('island_part_text'));
