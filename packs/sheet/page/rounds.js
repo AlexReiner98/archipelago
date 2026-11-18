@@ -1,9 +1,11 @@
 // A screen's rounds (the rounds piece, packs/loader/kernel/slots.ts): the pictures kept of it round by round, read from
-// the field the piece names, `[{ wide: { id, url? }, narrow: { id, url? }, commit?, at?, checks?: [{ rule, said, ok? }] }]`
+// the field the piece names, `[{ wide: { id }, narrow: { id }, commit?, at?, checks?: [{ rule, said, ok? }] }]`
 // oldest first. Drawn newest first, a row per round: its commit and when as one line with its failed checks as marks,
 // then its wide and narrow pictures side by side. A click on a picture opens it whole. Every length is the style's
-// (the sheet's preset, `round_*`). It imports nothing: it is handed how to make an element, an age and a picture's
-// address, so it is tested as it is (test/sheet-rounds.test.ts).
+// (the sheet's preset, `round_*`). A picture is a kept look, read by its id with the page's own auth (query picture
+// { look }, decision on e_n7fcg7v8): a url beside it is not read, as no address loads without the token. It imports
+// nothing: it is handed how to make an element, an age and a picture's address, so it is tested as it is
+// (test/sheet-rounds.test.ts).
 
 /** The rounds a field holds, newest first; what is not a round is left out. */
 export const roundsOf = (value) =>
@@ -12,8 +14,8 @@ export const roundsOf = (value) =>
     .map((r, i) => ({ ...r, n: i + 1 }))
     .reverse();
 
-/** A picture of a round: a kept look's id, or an address the page loads. */
-const side = (s) => (s && typeof s === 'object' && (typeof s.id === 'string' || typeof s.url === 'string') ? s : null);
+/** A picture of a round: a kept look, by its id. */
+const side = (s) => (s && typeof s === 'object' && typeof s.id === 'string' && s.id ? s : null);
 
 /** The checks a round failed: every one not marked ok. */
 export const failed = (round) => (Array.isArray(round.checks) ? round.checks.filter((c) => c && typeof c === 'object' && c.ok !== true) : []);
@@ -34,7 +36,7 @@ const picture = (h, s, which, round, src) => {
     img.ownerDocument.body.append(box);
     box.showModal();
   };
-  const at = Promise.resolve(s.url ?? src(s)).then((url) => (url ? (img.src = url) : img.remove()), () => img.remove());
+  const at = Promise.resolve(src(s)).then((url) => (url ? (img.src = url) : img.remove()), () => img.remove());
   return { node: h('figure', { 'data-side': which, style: `margin: 0; min-width: 0; flex: 0 1 var(--round-${which})` }, img), at };
 };
 

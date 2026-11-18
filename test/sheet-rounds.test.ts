@@ -28,7 +28,7 @@ const rounds = [
 ];
 
 test('rounds are read newest first, numbered from the oldest; what is not a round is left out', () => {
-  const read = roundsOf([...rounds, null, { commit: 'no pictures' }]);
+  const read = roundsOf([...rounds, null, { commit: 'no pictures' }, { wide: { url: '/only-an-address.png' } }]);
   assert.deepEqual(read.map((r: { n: number }) => r.n), [2, 1]);
   assert.deepEqual(roundsOf(undefined), []);
   assert.deepEqual(failed(read[0]).map((c: { rule: string }) => c.rule), ['no pills']);
@@ -45,10 +45,10 @@ test('each round is a row: its line, then its wide and narrow pictures side by s
   const figures = all(newest).filter((e) => e.tag === 'figure');
   assert.deepEqual(figures.map((f) => f.attrs['data-side']), ['wide', 'narrow']);
   for (const f of figures) assert.match(String(f.attrs.style), /var\(--round-(wide|narrow)\)/, 'its share is a length on the style');
-  // A kept look is asked for by its id; a round that has an address loads it as it is.
-  assert.deepEqual(asked, ['k_two_w', 'k_two_n']);
+  // A kept look is asked for by its id, with the page's own auth; a url beside it is never loaded.
+  assert.deepEqual(asked, ['k_two_w', 'k_two_n', 'k_one_w', 'k_one_n']);
   assert.deepEqual(all(newest).filter((e) => e.tag === 'img').map((i) => i.src), ['data:k_two_w', 'data:k_two_n']);
-  assert.deepEqual(all(oldest).filter((e) => e.tag === 'img').map((i) => i.src), ['/a-wide.png', '/a-narrow.png']);
+  assert.deepEqual(all(oldest).filter((e) => e.tag === 'img').map((i) => i.src), ['data:k_one_w', 'data:k_one_n']);
   // Its line: the number, the commit cut to seven with the whole in the tooltip, when, and a mark per failed check.
   const line = text(newest.kids[0] as El);
   for (const s of ['#2', 'bbbbbbb', 'ago:2026-11-18T12:00:00Z', 'no pills']) assert.ok(line.includes(s), s);
