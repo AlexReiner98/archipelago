@@ -99,7 +99,7 @@ export interface RuleDef {
   type?: string;
   /** At most n open links of a type into an item of the type; must_link: an item of the type holds a link; unless: what a walk from the item reaches, which spares it the rule where it holds (./rule-forms.ts). */
   at_most?: AtMost; must_link?: MustLink; unless?: Unless;
-  /** What a refusal says, and why a held change waits. {title} is the item's; {missing}, what fails a must_link or an unless. */
+  /** What a refusal says, and why a held change waits. {title} is the item's. */
   say?: string;
   /** What letting it through means, said in the answer of a change it did not hold (holds off, a lift): who sees it, what runs where, whether it can be undone. {title} as in say. */
   stake?: string;
