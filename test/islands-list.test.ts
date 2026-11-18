@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { atHome, capital, drawnAt, drawnBy, islandsIn, islandsOnMap, pressed, rankIslands, recentFirst } from '../packs/surface/page/islands-list.js';
+import { AUTO, atHome, autoToggled, capital, changedWithin, clean, drawnAt, drawnBy, islandsIn, islandsOnMap, pressed, rankIslands, recentFirst } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
@@ -109,4 +109,15 @@ test('a map keeps islands when its types that live on one declare the field isla
   assert.equal(islandsOnMap({ types: [{ id: 'task', fields: { island: { type: 'string' }, cell: {} } }, { id: 'person', fields: {} }] }), true);
   assert.equal(islandsOnMap({ types: [{ id: 'task', fields: { cell: {} } }] }), false);
   assert.equal(islandsOnMap(undefined), false, 'no schema read yet: no islands assumed');
+});
+
+test('Auto is kept in the list like a read, and puts on the islands changed within its minutes, the latest first', () => {
+  assert.deepEqual(clean(['e_xgrowth1', AUTO, AUTO, 'nonsense']), ['e_xgrowth1', AUTO], 'kept once, beside islands');
+  assert.deepEqual(autoToggled(['e_xgrowth1']), ['e_xgrowth1', AUTO]);
+  assert.deepEqual(autoToggled(['e_xgrowth1', AUTO]), ['e_xgrowth1']);
+  const now = Date.parse('2026-11-18T12:00:00Z'), at = (min: number) => new Date(now - min * 60_000).toISOString();
+  const islands = [{ id: 'e_old00001', worked_at: at(30) }, { id: 'e_new00001', worked_at: at(1) }, { id: 'e_new00002', worked_at: at(4) }, { id: 'e_never001' }];
+  assert.deepEqual(changedWithin(islands, now, 10), ['e_new00001', 'e_new00002'], 'within ten minutes, the latest first');
+  assert.deepEqual(changedWithin(islands, now, 10, 1), ['e_new00001'], 'as many as it may hold');
+  assert.deepEqual(changedWithin(islands, now, 60), ['e_new00001', 'e_new00002', 'e_old00001']);
 });

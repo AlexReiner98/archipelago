@@ -6,7 +6,8 @@
 
 import { api, firstDrawn, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
-import { atHome, capital, drawnBy, islandOf, islandsOnMap, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
+import { AUTO, atHome, autoToggled, capital, changedWithin, drawnBy, islandOf, islandsOnMap, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
+import { autoIslands, onAuto, setAuto } from './islands-auto.js';
 import { numberOf } from './style-number.js';
 import { ago, titles } from './words.js';
 import { onOpen, openNow } from './sessions-open.js';
@@ -27,6 +28,10 @@ const canvasNow = () => hooks.canvasNow?.() ?? null;
 export const drawnNow = () => drawnBy(location.hash, mine, canvasNow());
 /** Whether the canvas draws Home: a press elsewhere brings it Home to draw the list it makes. */
 const homeNow = () => canvasNow()?.home ?? atHome(location.hash);
+/** Whether the person has Auto on. */
+const autoOn = () => mine.includes(AUTO);
+/** What the bar marks on: what the canvas draws, and at Home what Auto put there too; a press keeps only the first. */
+const markedNow = () => (homeNow() && autoOn() ? [...new Set([...drawnNow(), ...autoIslands()])] : drawnNow());
 /** Hear what the canvas draws change (a toggle, the address, the canvas drawing another lens). */
 export const onDrawn = (f) => heard.add(f);
 const tell = () => heard.forEach((f) => f());
@@ -50,6 +55,8 @@ export const putOn = (i) => apply(turnedOn(drawnNow(), homeNow(), i.id), `${i.ti
 export const takeOff = (i) => apply({ list: drawnNow().filter((x) => x !== i.id), home: !homeNow() }, `${i.title} taken off the canvas`);
 /** Island `i` alone on the canvas. */
 export const showOnly = (i) => apply(only(homeNow(), i.id), `${i.title} alone on the canvas`);
+/** Turn Auto on or off: the person's own list, Home drawing it. */
+const toggleAuto = () => apply({ list: autoToggled(mine), home: !homeNow() }, autoOn() ? 'Auto off' : 'Auto on: islands changed lately put on the canvas');
 
 /** A pack's title as the list shows it. */
 const packTitle = (pack) => capital(pack?.title || pack?.id);
@@ -112,7 +119,9 @@ export function drawPicker() {
     const name = ev.target.closest?.('.isl-name:not(.isl-chat .isl-name)');
     if (name) name.scrollWidth > name.clientWidth ? (name.title = name.textContent) : name.removeAttribute('title');
   });
-  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), edge);
+  // Auto, at the line's right: its dot lit while it is on, Home then drawing what changed lately too.
+  const auto = h('button', { type: 'button', class: 'isl-auto', 'aria-pressed': 'false', onclick: () => toggleAuto() }, 'Auto');
+  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key, auto), body), edge);
   document.body.append(side);
   hooks.islandsButton = () => fold;
   hooks.drawBand?.();
@@ -211,17 +220,20 @@ export function drawPicker() {
     if (hooks.toIsland) setTimeout(go, numberOf(state.style, 'picker_go_every'));
   };
   /** A found island taken: one that is on is gone to (with Shift, shown alone); one that is off is put on and gone to. */
-  const press = (i, alone = false) => (drawnNow().includes(i.id) && !alone ? goTo(i) : putOnAndGo(i, alone));
+  const press = (i, alone = false) => (markedNow().includes(i.id) && !alone ? goTo(i) : putOnAndGo(i, alone));
   /**
    * An island's row in part `at` of the list (on, recent, all): its name, a press on which puts it on, or, on, brings the
    * canvas to it; then what tells it apart there: under Recent when work last changed on it, under All its pack, under
    * On nothing, where the name needs the room beside ×.
    */
-  const row = (i, on, at) =>
-    h('div', { class: `isl-row${on ? ' on' : ''}${shown.has(i.id) ? ' shown' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
+  const row = (i, on, at) => {
+    // On only because Auto put it there: when work changed on it, in place of ×, which would not take it off.
+    const byAuto = on && at === 'on' && !drawnNow().includes(i.id);
+    return h('div', { class: `isl-row${on ? ' on' : ''}${shown.has(i.id) ? ' shown' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
       h('button', { type: 'button', class: 'isl-name', tabindex: '-1', ...(shown.has(i.id) && { title: shownSaid(i) }), onclick: () => (seeShown(i, on), done()) }, i.title),
-      at === 'recent' ? h('span', { class: 'isl-when' }, ago(i.worked_at)) : at === 'all' ? packOf(i) : '',
-      on ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
+      at === 'recent' || byAuto ? h('span', { class: 'isl-when', ...(byAuto && { title: `Put on by Auto: changed ${ago(i.worked_at)}` }) }, ago(i.worked_at)) : at === 'all' ? packOf(i) : '',
+      on && !byAuto ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
+  };
   /** What a lit row's tooltip says: who showed what there. */
   const shownSaid = (i) => {
     const { item, by } = shown.get(i.id);
@@ -247,8 +259,8 @@ export function drawPicker() {
       h('span', { class: 'isl-name' }, i.title),
       packOf(i));
   const draw = () => {
-    const drawn = drawnNow(), q = input.value.trim();
-    count.textContent = drawn.length ? String(drawn.length) : '';
+    const drawn = markedNow(), q = input.value.trim(), shownN = drawn.filter((x) => /^e_/.test(x)).length;
+    count.textContent = shownN ? String(shownN) : '';
     found = rankIslands(islands, q);
     // Searching: one list, best first, worked from the keyboard, within the bar (Alex: nothing drops outside it).
     if (q) {
@@ -267,7 +279,9 @@ export function drawPicker() {
     const part = (at, head, all, count = all.length) =>
       h('div', { class: `isl-sec isl-sec-${at}` }, h('div', { class: 'isl-head' }, `${head} · ${count}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id), at))));
     // The chats at work after On (./island-sessions.js): they were tabs.
-    body.replaceChildren(part('on', 'On', on, drawn.length), ...sessionsPart(openNow(), done), ...(recent.length ? [part('recent', 'Recent', recent)] : []), ...(others.length ? [part('all', 'All', others)] : []));
+    Object.assign(auto, { title: `${autoOn() ? 'Auto is on' : 'Auto'}: also draw every island changed in the last ${numberOf(state.style, 'picker_auto_minutes')} minutes` });
+    auto.setAttribute('aria-pressed', String(autoOn()));
+    body.replaceChildren(part('on', 'On', on, shownN), ...sessionsPart(openNow(), done), ...(recent.length ? [part('recent', 'Recent', recent)] : []), ...(others.length ? [part('all', 'All', others)] : []));
     light();
   };
   /** The row the keyboard is on in the list (an island's id), lit while the list has the focus. */
@@ -307,7 +321,7 @@ export function drawPicker() {
   const settled = () => {
     clearTimeout(settling);
     if (input.value.trim() || !laidOn) return;
-    const drawn = drawnNow();
+    const drawn = markedNow();
     if (drawn.length === laidOn.size && drawn.every((id) => laidOn.has(id))) return;
     const was = new Map(rowsNow().map((r) => [r.dataset.id, r.getBoundingClientRect().top]));
     relay();
@@ -344,11 +358,27 @@ export function drawPicker() {
   // The page is a replica of the log: an island made since it was read (an agent's new focus), or one renamed, is listed
   // as the tail says so, without a reload. What the tail touched is told by ./live.js (hooks.islandsTouched).
   let rereading = null;
+  // Auto: what it has on, worked out from when work last changed on each island; again each picker_auto_tick ms, so an
+  // island leaves as its change grows old, and read anew at most each picker_auto_every ms while the log moves.
+  const autoNow = () => setAuto(autoOn() ? changedWithin(islands, Date.now(), numberOf(state.style, 'picker_auto_minutes'), numberOf(state.style, 'picker_auto_most')) : []);
+  onIslands(autoNow);
+  onAuto(() => laidOn && settle());
+  setInterval(() => autoOn() && autoNow(), numberOf(state.style, 'picker_auto_tick'));
+  let posWas = state.pos, autoRead = null;
+  const readForAuto = () => {
+    if (state.pos === posWas || autoRead) return;
+    autoRead = setTimeout(() => {
+      autoRead = null;
+      posWas = state.pos;
+      rereading ??= allIslands(true).then((all) => ((rereading = null), (islands = all), autoNow(), draw()));
+    }, numberOf(state.style, 'picker_auto_every'));
+  };
   hooks.islandsTouched = (touched) => {
+    if (autoOn()) readForAuto();
     const known = new Set(islands.map((i) => i.id));
     if (!(touched.made || touched.ids === null || touched.ids.some((id) => known.has(id)))) return;
     rereading ??= allIslands(true).then((all) => ((rereading = null), (islands = all), draw()));
   };
   // Read once the first view is drawn, as the bar read its saved views: the drawing goes first (test/first-drawing.test.ts).
-  firstDrawn.then(() => Promise.all([islandsOn(), allIslands()])).then(([now, all]) => ((mine = now), (islands = all), draw()));
+  firstDrawn.then(() => Promise.all([islandsOn(), allIslands()])).then(([now, all]) => ((mine = now), (islands = all), autoNow(), draw()));
 }
