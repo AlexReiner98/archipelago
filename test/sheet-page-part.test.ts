@@ -113,12 +113,12 @@ test('a page opens on the band its type declares: choices, answer, measure, aler
   assert.ok(settled.includes('A: refresh the weights') && settled.includes('B: refresh only') && !settled.includes('"A: refresh + four"'), 'the answer, and only the choice not taken set aside, matched by its label');
   const measured = marks({ type: 'finding', props: { value: 147, unit: 's', as_of: '2026-11-17' } });
   assert.doesNotThrow(() => checkMarks(noSlots(measured), { kinds }));
-  assert.ok(JSON.stringify(measured).includes('"size":9') && !JSON.stringify(measured).includes('field-row:value'), 'the number large, and not again among the fields');
+  assert.ok(JSON.stringify(measured).includes('"key":"lead-figure"') && JSON.stringify(measured).includes('"147 s"') && !JSON.stringify(measured).includes('field-row:value'), 'the number large, and not again among the fields');
   assert.ok(lead({ type: 'work', props: { seen_working: false, to_see: 'Open the page' } }), 'built and not seen working');
   assert.ok(!lead({ type: 'work', props: { seen_working: true } }) && !lead({ type: 'work', props: {} }), 'seen, or nothing said: no band');
   const told = marks({ type: 'run', props: { story: Array.from({ length: 8 }, (_, i) => ({ n: i + 1, at: '2026-11-17T21:00:00Z', said: `Beat ${i + 1}` })) } });
   assert.doesNotThrow(() => checkMarks(noSlots(told), { kinds }));
-  assert.ok(JSON.stringify(told).includes('2 earlier') && JSON.stringify(told).includes('Beat 8') && !JSON.stringify(told).includes('Beat 2"'), 'the latest beats, the rest counted');
+  assert.ok(JSON.stringify(told).includes('Beat 6') && JSON.stringify(told).includes('Beat 8') && !JSON.stringify(told).includes('Beat 5"'), 'the latest three beats: a band is three lines at most');
   assert.ok(!lead({ type: 'task', props: {} }), 'a type that declares no lead opens as before');
   // What befell a run is marked by its glyph, a refusal as a warning; its own words are not marked.
   const befell = marks({ type: 'run', props: { story: [{ n: 1, said: 'Mine' }, { n: 2, said: 'Claimed Rig', did: 'claimed' }, { n: 3, said: 'Change refused', did: 'refused', by: 'write' }] } });

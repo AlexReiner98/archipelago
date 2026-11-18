@@ -11,7 +11,7 @@ import { flatView } from './query.js';
 import { tokenPiece } from './token-piece.js';
 import { tokenAskPiece } from './token-ask.js';
 import { drawPart } from './part-host.js';
-import { pageIsA, pageSchema } from './page-schema.js';
+import { pageIsA, pageSchema, pageType } from './page-schema.js';
 import { ago, label, link, statusMark, typeMark, unfolded } from './words.js';
 
 /** One section of an item's page: a heading, a count where it has one, and what it holds. */
@@ -286,7 +286,20 @@ export const sectionsOn = (data) => drawnOn(data, piecesOn(data).filter((p) => p
  * What the screens on this item stand in its band, under its title (`place: "lead"`, decision e_x89zp8uz): any piece,
  * the kernel's or one a pack's part draws (piece.<name>), drawn there in place of below the source.
  */
-export const leadsOn = (data) => drawnOn(data, piecesOn(data).filter((p) => p.place === 'lead' && p.piece !== 'button'));
+export const leadsOn = (data) => [leadPicture(data), ...drawnOn(data, piecesOn(data).filter((p) => p.place === 'lead' && p.piece !== 'button'))].filter(Boolean);
+/**
+ * A type whose band is a picture of what it draws (its lead's form, packs/loader/kernel/capabilities.ts): the picture
+ * kept for it, small, once it is read; nothing while none is kept. The rest of its band is the page part's (lead.js).
+ */
+function leadPicture(data) {
+  if (pageType(data.entity.type)?.capabilities?.lead?.form !== 'picture') return null;
+  const node = h('div', { class: 'lead-picture' });
+  api('picture', { result: data.entity.id }).then(
+    (p) => (p?.data ? node.replaceChildren(h('img', { src: `data:${p.content_type};base64,${p.data}`, alt: '', title: data.entity.title })) : node.remove()),
+    () => node.remove(),
+  );
+  return node;
+}
 /** Pieces drawn for an item's page, each a node, filled once it is read. */
 const drawnOn = (data, pieces) =>
   pieces

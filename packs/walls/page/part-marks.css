@@ -203,3 +203,12 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 .pm-input[data-code] { display: block; width: 100%; min-width: 0; }
 .pm-input[data-code][data-loading] { min-height: var(--code-fold); }
 .pm-input[data-code][data-failed] { color: var(--bad); }
+
+/* The band an item's page opens on (packs/sheet/parts/page/lead.js): its number large and its progress a thin bar,
+   each a length the style names (lead_figure, lead_bar, lead_bar_most), else a step of its scale. */
+.pm-box[data-key="lead-figure"] > .pm-text { font-size: var(--lead-figure, var(--text-9)); line-height: 1; }
+.pm-box[data-key="lead-bar"] { align-self: center; max-width: var(--lead-bar-most, var(--progress-col)); }
+.pm-box[data-key="lead-bar"] > .pm-box { flex: 1 1 0; height: var(--lead-bar, var(--border-4)); background: currentColor; border-radius: var(--radius-1); }
+/* A band that is a picture of what it draws (packs/sheet/page/screens.js, leadPicture): small, as high as the style's lead_picture. */
+.lead-picture { border-bottom: var(--border-1) solid var(--line); padding-bottom: var(--space-5); }
+.lead-picture img { display: block; width: 100%; height: var(--lead-picture, var(--thumb-still)); object-fit: cover; border-radius: var(--radius-1); }

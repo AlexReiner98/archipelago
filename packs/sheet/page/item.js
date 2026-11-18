@@ -15,7 +15,7 @@ import { readDocument, readingOf } from './item-reading.js';
 import { publicMark, publicOf, shareMenu } from './item-share.js';
 import { heldBand, heldOn } from './item-held.js';
 import { actionForm, actionsFor, buttonsOn, countOn, drawnBy, leadsOn, readWhole, sectionsOn, toolOf } from './screens.js';
-import { isA, menu, relations, titles } from './words.js';
+import { isA, isClosed, menu, relations, titles } from './words.js';
 import { pageType, readPageModel } from './page-schema.js';
 
 /** The root relation a relation extends: what the page reads, whichever pack's flavour of it was used. */
@@ -56,12 +56,14 @@ const FOLDS = ['head', 'fields', 'source'];
 function told(data, owner, count, named, folds, me) {
   const e = data.entity;
   const tie = (r) => ({ type: r.type, root: rootOf(r.type) });
+  // What is linked into it, with its name and whether it is still open: the band counts it (lead.js).
+  const into = (r) => ({ ...tie(r), title: r.title, open: !isClosed(r.entity_type, r.status) });
   return {
     name: 'page',
     item: Object.fromEntries(['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'].filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),
     views: {
       // Who it waits on and for what, and who is looking: the band says when it is them (decision e_xj9cs33u).
-      item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(tie), titles: named, waits: data.outgoing.filter((r) => rootOf(r.type) === 'waits_on').map((r) => ({ id: r.id, title: r.title, ...(typeof r.props?.for === 'string' && { for: r.props.for.slice(0, 200) }) })), ...(me && { me }), ...(voiceOf(data.note_by) && { voice: voiceOf(data.note_by) }),...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
+      item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(into), titles: named, waits: data.outgoing.filter((r) => rootOf(r.type) === 'waits_on').map((r) => ({ id: r.id, title: r.title, ...(typeof r.props?.for === 'string' && { for: r.props.for.slice(0, 200) }) })), ...(me && { me }), ...(voiceOf(data.note_by) && { voice: voiceOf(data.note_by) }),...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
     },
     ...(count && { count }),
     // The parts its own style folds a click away (page.head, fields, source: folded), a style on its type or about it.

@@ -2,15 +2,16 @@
   "id": "core",
   "version": "0.1.0",
   "title": "Core",
-  "description": "The starter types (the seven of the work, and system), task and decision (the shared set every pack may build on), the root links every link type extends, and the system tier.",
+  "description": "The starter types (the seven of the work, and system), task (the shared set every pack may build on), the root links every link type extends, and the system tier.",
   "uses": ["slot:piece.document"],
-  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "decision", "finding"],
+  "shared": ["actor", "aim", "work", "question", "record", "occurrence", "place", "system", "task", "finding"],
   "types": [
     {
       "id": "actor",
       "title": "Actor",
       "description": "Holds authority, owns work and is waited on: a person, a company, an agent. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["active"], "closed": ["inactive"] },
+      "capabilities": { "lead": { "form": "actor", "link": "waits_on" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "confidence": { "type": "number", "column": true, "description": "0 to 1: how sure the author is that this is true. Kept in the item's row." },
@@ -19,7 +20,7 @@
     },
     {
       "id": "aim",
-      "capabilities": { "owned": true },
+      "capabilities": { "owned": true, "lead": { "form": "aim", "link": "serves" } },
       "altitude": "workspace",
       "title": "Aim",
       "description": "Why work exists: what work is for, such as a goal or a principle (a pack names its own). A starter type of the work: a pack's type may extend it, or extend nothing.",
@@ -33,7 +34,7 @@
     },
     {
       "id": "work",
-      "capabilities": { "owned": true, "actionable": true, "plannable": true, "lead": { "form": "alert", "unless": "seen_working", "says": "to_see" } },
+      "capabilities": { "owned": true, "actionable": true, "plannable": true, "lead": { "form": "done", "link": "part_of", "unless": "seen_working", "says": "to_see" } },
       "altitude": "step",
       "title": "Work",
       "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. A starter type of the work: a pack's type may extend it, or extend nothing.",
@@ -49,21 +50,27 @@
     },
     {
       "id": "question",
-      "capabilities": { "owned": true, "actionable": true, "focus": true },
+      "moved_from": ["decision", "work.decision"],
+      "capabilities": { "owned": true, "actionable": true, "focus": true, "bound": { "field": "due", "limit": "today" }, "lead": { "form": "choices" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
       "altitude": "step",
-      "title": "Question",
-      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. A starter type of the work: a pack's type may extend it, or extend nothing.",
-      "statuses": { "open": ["open"], "closed": ["settled", "dropped"], "phases": { "open": "not_started", "settled": "finished" } },
+      "title": "Decision",
+      "description": "Open until settled, by someone's word or by evidence: a decision, a hypothesis, an idea. The title is the question; once settled, outcome holds the answer. Questions and decisions are one type since 18 Nov 2026 (decision e_5yrdf8aq): a decision's items are this one's. A starter type of the work: a pack's type may extend it, or extend nothing.",
+      "statuses": { "open": ["open"], "closed": ["decided", "settled", "reversed", "dropped"], "phases": { "open": "not_started", "decided": "finished", "settled": "finished" } },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "owner": { "type": "string", "column": true, "description": "Id of the person or agent responsible. Kept in the item's row." },
         "confidence": { "type": "number", "column": true, "description": "0 to 1: how sure the author is that this is true. Kept in the item's row." },
-        "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
+        "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." },
+        "due": { "type": "date" },
+        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
+        "outcome": { "type": "string", "description": "The answer: what was chosen, in a line. Set when it is settled, not left in the note.", "shown": true },
+        "rationale": { "type": "string", "description": "Why." },
+        "decided_on": { "type": "date" }
       }
     },
     {
       "id": "record",
-      "capabilities": { "owned": true },
+      "capabilities": { "owned": true, "lead": "none" },
       "altitude": "step",
       "title": "Record",
       "description": "Explains, and is replaced by a newer one: a note, a result, a procedure, a document. A starter type of the work: a pack's type may extend it, or extend nothing.",
@@ -78,7 +85,7 @@
     },
     {
       "id": "occurrence",
-      "capabilities": { "owned": true },
+      "capabilities": { "owned": true, "lead": { "form": "occurrence" } },
       "altitude": "step",
       "title": "Occurrence",
       "description": "Happens at a time, and can be a gate: an event, a meeting, a release. A starter type of the work: a pack's type may extend it, or extend nothing.",
@@ -93,7 +100,7 @@
     {
       "id": "place",
       "moved_from": ["resource"],
-      "capabilities": { "capacity": { "field": "exclusive" } },
+      "capabilities": { "capacity": { "field": "exclusive" }, "lead": { "form": "place", "link": "holds", "waits": "needs" } },
       "title": "Place",
       "description": "Exists somewhere, physical or not; work lives in it or uses it: a repository, a file, a machine, a licence. One that says exclusive is a resource: work that needs it claims it, one holder at a time when exclusive is true. A starter type of the work: a pack's type may extend it, or extend nothing.",
       "statuses": { "open": ["available", "unavailable"], "closed": ["retired"], "phases": { "unavailable": "trouble" } },
@@ -109,7 +116,7 @@
       "title": "System",
       "description": "The app's own configuration, kept as items: views, styles, screens, runs, sources, notifications, automations. Views of the work leave it out unless asked: its types carry the kernel flag. Only the kernel's packs declare types of it.",
       "statuses": { "open": ["current"], "closed": ["retired"] },
-      "capabilities": { "kernel": true },
+      "capabilities": { "kernel": true, "lead": "none" },
       "fields": {
         "status": { "type": "enum", "column": true, "description": "Where it stands: one of its statuses, an open one while it is unfinished. Kept in the item's row." },
         "source": { "type": "string", "column": true, "system": true, "description": "Where its facts came from: the source of the change that made it, or of its op. Kept in the item's row." }
@@ -145,22 +152,6 @@
         "recurrence": { "type": "string", "description": "How often it repeats, in plain words or an RRULE." },
         "tokens_estimated": { "type": "number", "description": "How many tokens an agent expects this to take, one number: input and output together, not counting cached re-reads. Whoever plans it or picks it up says; it can be corrected." },
         "tokens_used": { "type": "number", "description": "Tokens spent on it so far, measured from the sessions that worked on it.", "system": true }
-      }
-    },
-    {
-      "id": "decision",
-      "moved_from": ["work.decision"],
-      "capabilities": { "bound": { "field": "due", "limit": "today" }, "settles": { "by": "word", "whose": "owner", "choices": "options", "chosen": "outcome", "why": "rationale", "on": "decided_on" } },
-      "extends": "question",
-      "title": "Decision",
-      "description": "Something decided, or still open, with its reasoning. The title is the question.",
-      "statuses": { "open": ["open"], "closed": ["decided", "reversed"] },
-      "fields": {
-        "due": { "type": "date" },
-        "options": { "type": "json", "description": "The choices being weighed, as a list of short strings, e.g. [\"Hosted API\", \"Local model\"].", "shown": true },
-        "outcome": { "type": "string", "description": "What was chosen.", "shown": true },
-        "rationale": { "type": "string", "description": "Why." },
-        "decided_on": { "type": "date" }
       }
     },
     {
@@ -266,6 +257,7 @@
       "title": "Layout",
       "description": "How a view is drawn, as code: a drawing kept on the map. It draws only where a view names it (its style field's style) or, about an item, on the pictures of that item; never as the workspace's. With code (code), it is a drawing of its own; with a pack drawing's id (preset) and modules, the owner's version of that drawing, its modules over the pack's; retired, the pack's drawing is not used. Its settings are the style fields it draws with unless the style or the view says otherwise. Written by an agent, its code waits for the human.",
       "statuses": { "open": ["working", "kept"], "closed": ["retired"], "phases": { "working": "under_way", "kept": "standing", "retired": "ended" } },
+      "capabilities": { "lead": { "form": "picture" } },
       "fields": {
         "code": { "type": "string", "large": true, "code": true, "files": true, "description": "The layout itself: one JavaScript module, or files by path ({ \"index.js\": ..., \"physics.js\": ... }) entered at index.js, one importing another as './name.js' (an edit of one file logs that file alone). The entry is the module: export default function draw({ canvas, answer, style, theme, size, tree, three, on, open, tip, cursor, field, change }). It runs in the browser of whoever looks, in a worker inside a sandboxed frame: it has a canvas to draw on and no page, no network and no storage. Written by an agent, it waits for the human to approve it before it runs. canvas is an OffscreenCanvas (2D or WebGL); answer is what the query view answered; style is what it is drawn with: its settings, under the style and the view's own; theme is the page's colours by what each is for, as colors says (sea is the ground, so take accent for what must stand out on it; land, inner, line, text, muted, blocked, you, session, done, warn) and dark; size is { width, height, dpr }, kept current; tree() gives the answer as a tree ({ root, byId, me }, each thing with kids, up, depth and its counts all, work, blk, you, at); three() resolves to three.js; on(name, fn) hears pointerdown, pointermove, pointerup, pointerleave, wheel (each { x, y, button, buttons, deltaY, shift, ctrl, id, kind }: id tells two fingers apart, kind is mouse, touch or pen) and resize; open(id) opens an item's page; tip(text, x, y) shows words by the pointer (null hides them); cursor(name) sets the pointer; field(key, { x, y, width, height, value, placeholder, title }) puts a text field the page draws over the canvas (null takes it away), and on('field') hears { key, value, done }, never a key; change(ops, reason) asks the page to send ops as the person looking and resolves to { status, created, proposal, held } or { error }: it applies where it writes only the types in writes, and waits for that person otherwise; on('answer') hears the query answer again as the map changes (code that does not listen is started again); its types are DrawInput in packs/walls/page/draw.d.ts. With code, shape is not used; a nearer style that names a shape and has no code (a view's own, one about the item, one named outright) clears it, so it draws only where nothing nearer says how." },
         "writes": { "type": "json", "description": "The types this layout's code may change by itself, as a list, e.g. [\"local.ridges_setup\"]: what its layout asks for (a preset saved, one deleted) the page sends as the person looking, and it applies where it writes only these types; anything else waits for that person (core's drawing_* rules). Written by an agent, it waits for the human, as code does." },

@@ -817,7 +817,11 @@ The vault is `packs/seal/kernel/vault.ts`, sealing `packs/seal/kernel/seal.ts`, 
   from object to array, a default made explicit. A change of meaning (a type
   renamed by its pack, a field moved to another type) is never an upcaster: it
   is a system change set of facts, like today's `retype`, so the map's history
-  says when the meaning changed.
+  says when the meaning changed. Core's `decision` folded into the starter
+  `question` this way (18 Nov 2026, e_5yrdf8aq): `question` names it in
+  `moved_from`, each decision's entries stay as they were, a `type.moved`
+  change set says it is a question from then on, and an old name in a change
+  or a query reads as the new one (`canonical`).
 - Each upcaster ships with a test: a stored entry at version `n` in, the
   expected entry out (in `test/`, run with no database).
 - A server that reads an entry of a version newer than it knows refuses to
