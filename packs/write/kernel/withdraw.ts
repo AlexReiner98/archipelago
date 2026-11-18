@@ -6,6 +6,12 @@
 import type { Actor, Archipelago, Op, Proposal } from './pelago.ts';
 import { proposalsOf, rejection } from './proposals.ts';
 
+/**
+ * Who an actor is under its sub-actor: "agent:agent/script" is "agent:agent". A label ("Who you are, for the log") is
+ * free text the caller writes; the token is the identity (packs/surface/kernel/server.ts adds the label after a "/").
+ */
+const tokenOf = (actor: string) => actor.split('/')[0];
+
 const SET = ['title', 'status', 'owner', 'visibility', 'confidence'] as const;
 
 /** What an op settles, as keys: an item's field, a link, an archive. Undefined for one that makes something new. */
@@ -28,7 +34,7 @@ const keysOf = (p: Pick<Proposal, 'ops'>) => {
 };
 
 /**
- * Of pending held changes, which older ones each newer one covers: proposed by the same actor, earlier, and asking
+ * Of pending held changes, which older ones each newer one covers: proposed by the same token, earlier, and asking
  * for nothing the newer one does not set again. One that makes something new is never covered: what it makes is its own.
  */
 export function covering(pending: Pick<Proposal, 'id' | 'ts' | 'actor' | 'ops'>[]): Map<string, string[]> {
@@ -39,7 +45,7 @@ export function covering(pending: Pick<Proposal, 'id' | 'ts' | 'actor' | 'ops'>[
     if (!mine) continue;
     const older = pending.filter((p) => {
       const theirs = keys.get(p.id);
-      return p.id !== newer.id && p.actor === newer.actor && new Date(p.ts) < new Date(newer.ts) && theirs?.size && [...theirs].every((k) => mine.has(k));
+      return p.id !== newer.id && tokenOf(p.actor) === tokenOf(newer.actor) && new Date(p.ts) < new Date(newer.ts) && theirs?.size && [...theirs].every((k) => mine.has(k));
     });
     if (older.length) covers.set(newer.id, older.map((p) => p.id));
   }
@@ -54,13 +60,13 @@ export function withCovers<P extends Pick<Proposal, 'id' | 'ts' | 'actor' | 'ops
   return pending.map((p) => ({ ...p, ...(covers.has(p.id) && { covers: covers.get(p.id) }), ...(by.has(p.id) && { covered_by: by.get(p.id) }) }));
 }
 
-/** Take back a held change `actor` proposed. Never another's, and never one already decided. */
+/** Take back a held change `actor` proposed, under any label its token wrote it with. Never another's, and never one already decided. */
 export async function withdraw(l: Archipelago, actor: Actor, input: { proposal: string; reason?: string }) {
   const me = `${actor.kind}:${actor.name}`;
   const { rows } = await l.db.query<Proposal>(`select * from proposal where id = $1`, [input.proposal]);
   const p = rows[0];
   if (!p) throw new Error(`No proposal "${input.proposal}"`);
-  if (p.actor !== me) throw new Error(`Proposal ${p.id} was made by ${p.actor}, not you: only its proposer may withdraw it, and deciding it is a person's.`);
+  if (tokenOf(p.actor) !== tokenOf(me)) throw new Error(`Proposal ${p.id} was made by ${p.actor}, not you: only its proposer may withdraw it, and deciding it is a person's.`);
   if (p.status !== 'pending') throw new Error(`Proposal ${p.id} is already ${p.status}`);
   const by = [...covering(await proposalsOf(l))].find(([, older]) => older.includes(p.id))?.[0];
   const note = input.reason ?? (by ? `Covered by ${by}` : 'Withdrawn by its proposer');

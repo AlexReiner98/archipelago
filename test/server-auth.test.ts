@@ -77,6 +77,19 @@ test('a token fixes identity and authority, whichever surface is used', async ()
   const listed = await mcp.text();
   assert.ok(listed.includes('"name":"change"') && !listed.includes('"name":"decide"'));
 
+  // One token is one actor, on MCP and as plain JSON alike: what it holds through one it takes back through the other (bump e_8ehgpaku).
+  const viaMcp = async (name: string, args: Record<string, unknown>) => {
+    const res = await fetch(`${base}/mcp`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', authorization: `Bearer ${agent}` }, body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } }) });
+    const text = await res.text(), message = JSON.parse(/^data: (.*)$/m.exec(text)?.[1] ?? text);
+    return JSON.parse(message.result.content[0].text);
+  };
+  const onMcp = await viaMcp('change', { reason: 'held through MCP', ops: [{ op: 'create', type: 'record', title: 'Through MCP' }] });
+  const onJson = (await call('/agent/change', agent, { reason: 'held as plain JSON', ops: [{ op: 'create', type: 'record', title: 'As JSON' }] })).result;
+  const held = ((await call('/api/proposals', owner, {})).result as any[]).filter((p) => [onMcp.proposal, onJson.proposal].includes(p.id));
+  assert.deepEqual(held.map((p) => p.actor), ['agent:claude-code', 'agent:claude-code'], 'logged as the same actor');
+  assert.equal((await call('/agent/revise', agent, { action: 'withdraw', params: { proposal: onMcp.proposal } })).result.status, 'withdrawn');
+  assert.equal((await viaMcp('revise', { action: 'withdraw', params: { proposal: onJson.proposal } })).status, 'withdrawn');
+
   // Revoked and expired tokens stop working at once.
   const list = (await call('/api/token_list', owner)).result as any[];
   assert.ok(list.every((t) => !('hash' in t) && !('token' in t)), 'secrets are never listed');

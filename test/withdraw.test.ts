@@ -52,3 +52,19 @@ test('an agent withdraws its own held change, never another’s, and a newer one
   const own = await callTool(l, agent, 'revise', { action: 'withdraw', params: { proposal: newer.proposal, reason: 'Not needed after all' } });
   assert.deepEqual(own, { proposal: newer.proposal, status: 'withdrawn', note: 'Not needed after all' });
 });
+
+test('one token is one proposer, whatever label it gave the log (bump e_8ehgpaku)', async () => {
+  const l = await fresh();
+  const { s } = await make(l, [{ op: 'create', ref: 's', type: 'task', title: 'Ridges' }]);
+  // What an agent's plain JSON calls were logged as, before they acted as their token: its name and "/script".
+  const script = { ...agent, name: `${agent.name}/script` };
+  const change = (who: typeof agent, reason: string, ops: Op[]) => callTool(l, who, 'change', { reason, ops, hold: true }) as Promise<any>;
+  const older = await change(script, 'taller islands', [{ op: 'update', id: s, title: 'Taller' }]);
+  const newer = await change(agent, 'taller islands again', [{ op: 'update', id: s, title: 'Taller still' }]);
+  assert.deepEqual(newer.covers, [older.proposal], 'the same token covers its own older change, made under a label');
+  await assert.rejects(callTool(l, { kind: 'agent', name: 'testing' }, 'revise', { action: 'withdraw', params: { proposal: older.proposal } }), /only its proposer/, 'a name that only starts the same is another');
+  const gone = (await callTool(l, agent, 'revise', { action: 'withdraw', params: { proposal: older.proposal } })) as any;
+  assert.equal(gone.status, 'withdrawn', 'unlabelled, it takes back what it made labelled');
+  const back = (await callTool(l, { ...agent, name: `${agent.name}/session-two` }, 'revise', { action: 'withdraw', params: { proposal: newer.proposal } })) as any;
+  assert.equal(back.status, 'withdrawn', 'and labelled, what it made unlabelled');
+});
