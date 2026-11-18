@@ -290,7 +290,12 @@ const themeSignedOut = () => (globalThis.pelagoEarly?.theme ?? fetch('/connect/t
  * A page for whoever is not in a workspace yet, or is asked something before they are (sign in, agree, sign up,
  * Allow a client): one column in the middle, with no canvas, tabs or find behind it (packs/surface/page/gate.css, [data-gate]).
  */
+let gated = 0;
 export function gate(title, ...kids) {
+  // Where the theme's land changes with the page (packs/walls/page/theme-land.js), the last page stays until it has
+  // gone, so its words and emblem change together; only the latest page asked for is drawn then.
+  const mine = ++gated, turn = hooks.landTurn?.();
+  if (turn) return void turn.then(() => mine === gated && gate(title, ...kids));
   themeSignedOut();
   document.body.dataset.gate = 'on';
   document.body.dataset.sheet = 'open';

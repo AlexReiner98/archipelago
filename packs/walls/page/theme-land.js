@@ -60,27 +60,37 @@ function wearEmblem(land) {
 let served;
 const servedStyle = () => (served ??= (globalThis.pelagoEarly?.theme ?? fetch('/connect/theme').then((r) => (r.ok ? r.json() : null), () => null)).then((s) => ((served = s ?? null), again(), s)));
 
-function wear() {
-  // A land fading out is let go whole before anything else runs: it is worn again once it has.
-  if (going) return;
+/** The land the page would wear where it is now, and its key; undefined while the gate's style is still being asked. */
+function target() {
   const place = placeOf();
   if (place === 'gate' && served === undefined) return void servedStyle();
   const land = landFor(place === 'gate' ? (served instanceof Promise ? null : served) : style, place);
   if (land?.drawing.modules) kept.set(land.drawing.hash, land.drawing.modules);
   const code = land && kept.get(land.drawing.hash);
-  // The same land in the same place runs on; a move between places it shows in keeps it running too. No still picture
-  // stands in for it (the owner, 17 Nov 2026: one showed through the land as it gathered): asked for less motion, or
-  // where it cannot run, the page is left blank.
+  // No still picture stands in for it (the owner, 17 Nov 2026: one showed through the land as it gathered): asked for
+  // less motion, or where it cannot run, the page is left blank.
   const calm = Boolean(code && LESS_MOTION.matches);
   // Its emblem is its page's palette: two pages of one setup but not one palette are two lands.
   const key = code ? `${calm ? 'calm ' : ''}${land.drawing.hash} ${JSON.stringify(land.setup ?? {})} ${JSON.stringify(land.numbers ?? {})} ${land.emblem ?? ''}` : '';
+  // From one page's land to the next (sign in to sign up...): the one shown is let go first.
+  const turns = Boolean(code && !calm && running && !running.still && running.place === place && running.key !== key);
+  return { place, land, code, calm, key, turns };
+}
+
+function wear() {
+  // A land dissipating is let go whole before anything else runs: it is worn again once it has.
+  if (going) return;
+  const t = target();
+  if (!t) return;
+  const { place, land, code, calm, key } = t;
+  // The same land in the same place runs on; a move between places it shows in keeps it running too.
   if (running?.key === key) {
     if (key && !running.still) document.body.dataset.land = place;
     return;
   }
-  // From one page's land to the next (sign in to sign up...): the one shown fades out and is stopped, its palette with
-  // it, and only then does the next start, from nothing, in its own palette and emblem. Anything else goes at once.
-  if (code && !calm && running && !running.still && running.place === place) return void fadeOut(running);
+  // The one shown dissipates and is stopped, its palette with it, and only then does the next start, from nothing, in
+  // its own palette and emblem. Anything else goes at once.
+  if (t.turns) return void letGo(running);
   running?.stop();
   running = null;
   delete document.body.dataset.land;
@@ -109,15 +119,16 @@ function wear() {
   running = { key, stop, place };
 }
 
-/** The land dissipating between two pages, until it is gone. */
+/** The land dissipating between two pages, until it is gone: `done` resolves once the next has been put on. */
 let going = null;
 /**
  * Let a land go by its own motion: its code is told the page is leaving (page.leaving: backdrop.js) and given the
  * theme's time for it (backdrop.wait.leave, in ms), then stopped, its palette with it; the next is worn after, from
  * nothing. Not faded: what is seen is the pattern dissolving. One not yet drawn, or a theme that gives no time, goes at once.
  */
-function fadeOut(land) {
-  going = land;
+function letGo(land) {
+  let finish;
+  going = { land, done: new Promise((r) => (finish = r)) };
   running = null;
   const ms = document.body.dataset.landDrew !== undefined && served && !(served instanceof Promise) ? landFor(served, 'gate')?.wait?.leave ?? 0 : 0;
   const done = () => {
@@ -126,10 +137,26 @@ function fadeOut(land) {
     delete document.body.dataset.land;
     delete document.body.dataset.landDrew;
     wear();
+    finish();
   };
-  if (!(ms > 0) || !land.stop.leave) return done();
+  if (!(ms > 0) || !land.stop.leave) return void done();
   land.stop.leave();
   setTimeout(done, ms);
+}
+
+/**
+ * Before a gate page is drawn (packs/kit/page/base.js gate): where its land is not the one shown, the one shown is let
+ * go first, and the page waits on it, so its words and emblem change together, on a bare sea, and its land grows after.
+ * Null where there is nothing to wait for.
+ */
+export function landTurn() {
+  if (going) return going.done;
+  const t = target();
+  if (!t?.turns) return null;
+  // The next page's emblem is fetched while the last land goes, so it is there the moment the page changes.
+  if (typeof t.land.emblem === 'string' && EMBLEM.test(t.land.emblem)) new Image().src = t.land.emblem;
+  letGo(running);
+  return going?.done ?? null;
 }
 
 let soon = 0;
@@ -160,6 +187,7 @@ export function landShown(since) {
 /** Start wearing the theme's land: each style the page is painted in, and each move between places, is heard. */
 export function startLand() {
   hooks.landShown = landShown;
+  hooks.landTurn = landTurn;
   // Asked already where the page opens before a workspace (packs/surface/page/early.js): taken now, so the land starts at once.
   if (globalThis.pelagoEarly?.theme) servedStyle();
   onTheme((next) => ((style = next), again()));
