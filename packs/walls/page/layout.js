@@ -246,7 +246,7 @@ export function drawWith(host, answer, style, keep) {
   let moved = null;
   const tell = (key, name, ev, from) => {
     const held = name === 'click' && HELD.exec(key);
-    if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1] } }));
+    if (held) host.dispatchEvent(new CustomEvent('drawing-held', { bubbles: true, detail: { proposal: held[1], key } }));
     const at = (name === 'move' || name === 'click') && pictureAt(ev);
     if (name === 'move') return void (moved ? (moved.key = key, moved.at = at) : ((moved = { key, at }), requestAnimationFrame(() => ((moved.at && send({ key: moved.key, name, at: moved.at })), (moved = null)))));
     send({ key, name, ...(at && { at }), ...(from !== undefined && { from: String(from) }) });
@@ -303,7 +303,7 @@ export function drawWith(host, answer, style, keep) {
       }
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
       else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });
-      else if (said.type === 'surface-frame') surface?.paint(said.image);
+      else if (said.type === 'surface-frame') surface?.paint(said.image, said.at);
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
       // A change it asks for is put to the person, and sent as theirs (packs/walls/page/layout-asks.js); what came of it goes back.
       // What it made is not yet in the answer the canvas keeps, which follows only what it holds: the lens is read again.

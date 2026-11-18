@@ -75,8 +75,9 @@ function choices(c, item, { writes, asking }, room) {
   const more = hidden.length > 0 && (writes
     ? ['menu', { key: 'choices-more', label: `+${hidden.length}`, look: 'quiet' }, ...hidden.map(name)]
     : ['text', { look: 'muted', tip: tip(hidden.map((i) => c.list[i]).join(' · ')) }, `+${hidden.length}`]);
-  const lines = shown.map((i, n) => line(rec[i] && ['text', { tone: 'ok', tip: 'Recommended' }, '★'],
-    ['box', { flow: 'row', grow: true }, name(i)], n === shown.length - 1 && more));
+  // The mark after the name, so every name starts at the band's edge whether or not it is the recommended one.
+  const lines = shown.map((i, n) => line(['box', { flow: 'row', grow: true }, name(i), ...(rec[i] ? [['text', { tone: 'ok', tip: 'Recommended' }, '★']] : [])],
+    n === shown.length - 1 && more));
   const ask = asking !== undefined && ['box', { flow: 'column', gap: 1, look: 'sunk', pad: 2 },
     ['text', {}, `Settle it: ${c.list[asking]}`],
     ...(c.why ? [['input', { key: 'choice-why', kind: 'text', hint: 'Why? (optional)', grow: true, focus: true }]] : []),
@@ -108,10 +109,10 @@ const bar = (done, all) => {
   const n = Math.min(all, SEGMENTS), lit = Math.round((done * n) / all);
   return ['box', { key: 'lead-bar', flow: 'row', gap: 1, grow: true }, ...Array.from({ length: n }, (_, i) => ['box', { tone: i < lit ? 'ok' : 'closed' }])];
 };
-/** "3 of 5 done" and its bar, or null with nothing to count. */
+/** "3 of 5 done" and its bar, or null with nothing to count or nothing left: all done is what its status says. */
 const progress = (ties) => {
   const done = ties.filter((t) => t.open === false).length;
-  return ties.length ? line(['text', { look: 'muted' }, `${done} of ${ties.length} done`], bar(done, ties.length)) : null;
+  return ties.length && done < ties.length ? line(['text', { look: 'muted' }, `${done} of ${ties.length} done`], bar(done, ties.length)) : null;
 };
 
 /** A measure: its number large with what it counts, and when it was true. */
@@ -262,7 +263,9 @@ export function leadFields(item, type, c) {
   if (!lead || lead.form === 'choices') return [];
   // An alert's field is said only while it is not true; once true it stays among the fields.
   if ((lead.form === 'alert' || lead.form === 'done') && item?.props?.[lead.unless] === true) return [];
-  return [lead.value, lead.unit, lead.as_of, lead.unless, lead.says, lead.beats].filter(Boolean);
+  // A field whose words the band cuts and its tip cannot hold whole stays among the fields, where it reads in full.
+  const whole = (f) => !(typeof item?.props?.[f] === 'string' && item.props[f].length > tip(item.props[f]).length);
+  return [lead.value, lead.unit, lead.as_of, lead.unless, lead.says, lead.beats].filter(Boolean).filter(whole);
 }
 
 /** The pack a type is named in: what comes before its last dot, none for core's. */

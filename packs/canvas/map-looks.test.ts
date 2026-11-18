@@ -118,14 +118,47 @@ test('a view that says its islands are plain draws none by its own look or layer
   assert.doesNotMatch(JSON.stringify(find(JSON.parse(plain), (k: any) => k[1]?.href === '#/e/e_bbbbbbbb')), /"path"/, 'nor the island’s outlines');
 });
 
-test('a look that paints is given its island’s frame and a surface, its items left to it', () => {
-  const field = { default: () => {} };
-  const answer = { items, links: [], islands: [{ id: 'e_islandaa', title: 'Here', look: { id: 'e_look0000', kind: 'layout', coded: true } }, { id: 'e_islandbb', title: 'There' }] };
-  const tools = { measure, looks: new Map([['e_islandaa', field]]), gestures: () => ({ on: () => [] }), frame: () => new Promise(() => {}) };
+test('a look that paints is given its island’s frame and a surface, its items marked where it hands their places', async () => {
+  (globalThis as any).OffscreenCanvas ??= class { width: number; height: number; constructor(w: number, h: number) { this.width = w; this.height = h; } getContext() { return {}; } };
+  const links = [{ from: 'e_dddddddd', to: 'e_aaaaaaaa', type: 'depends_on' }, { from: 'e_aaaaaaaa', to: 'e_bbbbbbbb', type: 'bears_on' }];
+  let handed: any = null;
+  // A look that settles at once and hands two of its items' places.
+  const field = { default: ({ hand }: any) => (handed = hand)({ places: { e_aaaaaaaa: [20, 30, 6], e_bbbbbbbb: [80, 30, 6] } }) };
+  const answer = { items, links, islands: [{ id: 'e_islandaa', title: 'Here', look: { id: 'e_look0000', kind: 'layout', coded: true } }, { id: 'e_islandbb', title: 'There' }] };
+  const patches: any[] = [];
+  const surface = { canvas: { width: 1, height: 1, getContext: () => ({ clearRect() {}, drawImage() {} }) }, size: { width: 1200, height: 800, dpr: 1 }, colours: {}, show() {} };
+  const tools = { measure, looks: new Map([['e_islandaa', field]]), gestures: () => ({ on: () => [] }), frame: () => new Promise(() => {}), surface: async () => surface, patch: (list: any[]) => patches.push(...list) };
   const out = draw({ answer, style: { ...house, placed }, reduced: true, width: 1200, height: 800 }, tools);
   assert.deepEqual(out.scene.surface, { key: 'islands-painted' }, 'the scene asks for a surface');
   const svg = JSON.stringify(out.scene.svg);
-  assert.ok(!svg.includes('#/e/e_aaaaaaaa'), 'its items are not drawn as steps');
-  assert.ok(svg.includes('#/e/e_dddddddd'), 'the other island’s are');
+  assert.match(svg, /"key":"s:e_aaaaaaaa"[^}]*"class":"lf-step[^"]*painted unplaced/, 'its items are marked, hidden until placed');
+  assert.ok(svg.includes('#/e/e_dddddddd'), 'the other island’s are drawn as steps');
+  out.viewport({ x: 0, y: 0, width: 1200, height: 800 });
+  for (let k = 0; k < 5 && !handed; k++) await new Promise((r) => setTimeout(r));
+  const at = patches.find((p) => p.key === 'at:e_aaaaaaaa')?.set.transform.match(/[\d.]+/g).map(Number);
+  assert.ok(at, 'the item stands where the look handed it');
+  assert.ok(patches.some((p) => p.key === 's:e_aaaaaaaa' && p.toggle.unplaced === false), 'and is shown');
+  assert.doesNotMatch(svg, /"key":"n:/, 'the link between its own items is its look’s, not the map’s');
+  const wires = patches.filter((p) => /^[wn]:/.test(p.key));
+  assert.equal(wires.length, 1, 'the wire in from the other island');
+  const into = wires.find((p) => p.key.startsWith('w:')).set.d.match(/-?[\d.]+/g).map(Number);
+  const off = (x: number, y: number) => Math.abs(Math.hypot(x - at[0], y - at[1]) - 6);
+  assert.ok(Math.min(off(into[0], into[1]), off(into.at(-2), into.at(-1))) < 0.01, `the wire in ends on the item’s edge, where the look draws it: ${into} at ${at}`);
   out.end?.();
+});
+
+test('a look that paints says the shape it draws, and its island’s frame takes that shape, within bounds', () => {
+  const frameOf = (look: any) => laidWith(entry(look)).islands.find((i: any) => i.id === 'e_islandaa').canvas.size;
+  const paints = (frame?: any) => ({ default() {}, ...(frame && { frame }), settings: { wide: 6 } });
+  const [bw, bh] = frameOf(paints());
+  let asked: any = null;
+  const [w, h] = frameOf(paints((said: any) => ((asked = said), { width: 1200, height: 200 })));
+  assert.deepEqual([Math.round(w), Math.round(h)], [1200, 200], 'a width and height it says are its frame');
+  assert.deepEqual(asked.answer.items.map((i: any) => i.id).sort(), ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_cccccccc'], 'asked with what its island holds');
+  assert.equal(asked.style.wide, 6, 'and its settings');
+  const [aw, ah] = frameOf(paints(() => ({ aspect: 1 })));
+  assert.ok(Math.abs(aw - ah) < 1e-6 && Math.abs(aw * ah - bw * bh) < 1e-6, 'an aspect alone keeps the block’s area');
+  const [fw, fh] = frameOf(paints(() => ({ width: 1e6, height: 1 })));
+  assert.ok(fw / fh <= house.sizes.flow_look_aspect_most + 1e-6 && fw * fh <= bw * bh * house.sizes.flow_look_area_most + 1e-3, `held within bounds: ${fw} × ${fh}`);
+  assert.deepEqual(frameOf(paints(() => { throw new Error('no'); })), [bw, bh], 'a frame that throws leaves the block');
 });

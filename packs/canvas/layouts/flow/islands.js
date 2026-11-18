@@ -17,6 +17,18 @@ export function saidOf(to) {
   return `${to?.title ?? ''}${value !== undefined && value !== null && typeof value !== 'object' ? `: ${value}` : ''}`;
 }
 
+/** A rect { x, y, width, height, rx } as a path, its corners round. */
+export const roundRect = ({ x, y, width: w, height: h, rx = 0 }) => {
+  const q = Math.max(0, Math.min(rx, w / 2, h / 2)), arc = (tx, ty) => (q ? `A${q} ${q} 0 0 1 ${tx} ${ty}` : `L${tx} ${ty}`);
+  return `M${x + q} ${y}H${x + w - q}${arc(x + w, y + q)}V${y + h - q}${arc(x + w - q, y + h)}H${x + q}${arc(x, y + h - q)}V${y + q}${arc(x + q, y)}Z`;
+};
+
+/** The part of a frame at [ax, ay], [aw, ah] inside the rect `r`, as a path to cut from it (evenodd), or nothing. */
+export const cutOf = (r, [ax, ay], [aw, ah]) => {
+  const l = Math.max(r.x, ax), t = Math.max(r.y, ay), rr = Math.min(r.x + r.width, ax + aw), b = Math.min(r.y + r.height, ay + ah);
+  return rr > l && b > t ? `M${l} ${t}V${b}H${rr}V${t}Z` : '';
+};
+
 /**
  * The islands' marks: `layer` (drawn first, under the wires), `gates` (drawn over them), the colour `rules` they read,
  * and `found`: the class each finding read across takes, by its id, for its outline in its island's colour.
@@ -42,9 +54,15 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
   const layer = g.islands.map((isle) => {
     const rects = isle.land.map(rectOf);
     // The land a tint of the island's colour, its shore a line of it round the frame.
-    // A painted island's land hears the pointer for its look (./painted.js), and holds a spot its look's tip stands beside.
+    // A painted island's land hears the pointer for its look (./painted.js).
+    // Its paint lies under the picture (packs/walls/page/surface.js), so its land is tinted with the look's frame cut out.
     const land = isle.canvas
-      ? m('g', { key: `paint:${isle.id}`, on: ['move', 'leave', 'click'], class: 'lf-land lf-painted' }, ...rects.map((r) => m('rect', r)), m('rect', { key: `spot:${isle.id}`, class: 'lf-spot', x: isle.canvas.at[0], y: isle.canvas.at[1], width: 1, height: 1 }))
+      ? m(
+          'g',
+          {},
+          m('g', { class: 'lf-land lf-land-cut' }, ...rects.map((r) => m('path', { d: roundRect(r) + cutOf(r, isle.canvas.at, isle.canvas.size) }))),
+          m('g', { key: `paint:${isle.id}`, on: ['move', 'leave', 'click'], class: 'lf-painted' }, ...rects.map((r) => m('rect', r))),
+        )
       : m('g', { class: 'lf-land' }, ...rects.map((r) => m('rect', r)));
     const shore = m('g', { class: 'lf-shore' }, ...rects.map((r) => m('rect', r)));
     // A pack's parts as an island of the query (./parts-islands.js) is its parts' drawing alone: no land, shore, name or key of its own.
@@ -100,11 +118,13 @@ export const css = `
 /* An island: its shore its frame's outline in its colour, its land a tint of it over the sea, under every wire. */
 .lf-island { --lf-land: color-mix(in srgb, var(--lf-island, var(--ln-line)) var(--ln-flow-island-tint), var(--ln-sea)); }
 .lf-region { pointer-events: none; }
-/* A painted island's land takes the pointer for its look, which says when it points at something; its tip's spot is never seen. */
+/* A painted island's land takes the pointer for its look, which says when it points at something. */
 .lf-region .lf-painted { pointer-events: all; }
 .lf-painted.pointing { cursor: pointer; }
-.lf-spot { fill: none; stroke: none; pointer-events: none; }
 .lf-land rect { fill: var(--lf-land); stroke: none; }
+/* A painted island's land, the look's frame cut out of it, where its paint shows under the picture; what takes its pointer is not filled. */
+.lf-land-cut path { fill: var(--lf-land); fill-rule: evenodd; stroke: none; }
+.lf-painted rect { fill: none; stroke: none; }
 /* The add row: a button the page answers (ui/marks-add.js), lit as the pointer comes to it. */
 .lf-island-add { pointer-events: auto; cursor: pointer; color: var(--ln-muted); outline: none; }
 .lf-island-add:is(:hover, :focus-visible) { color: var(--accent, var(--ln-text)); }

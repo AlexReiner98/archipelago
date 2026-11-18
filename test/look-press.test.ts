@@ -29,7 +29,7 @@ const LANES = {
 const out = process.env.LOOK_PRESS_OUT;
 const save = (name: string, data: string) => out && (mkdirSync(out, { recursive: true }), writeFileSync(join(out, `${name}.png`), Buffer.from(data, 'base64')));
 
-test('in a browser, a look presses a pack’s mark open, then lists one kind of its parts, each its own picture', { skip: !chrome() && 'no Chrome here (set CHROME)' }, async () => {
+test('in a browser, a look presses a pack’s mark open (its parts an island of the query), then shut again, each its own picture', { skip: !chrome() && 'no Chrome here (set CHROME)' }, async () => {
   const { workspaces, call } = await serve('off');
   const l = (await workspaces.get('default')).pelago;
   await setIslands(l, human, true);
@@ -45,33 +45,33 @@ test('in a browser, a look presses a pack’s mark open, then lists one kind of 
   });
   const lens = { filter: { find: [`island ${here}`] } };
   const look = (params: Record<string, unknown>) => call('/agent/query', undefined, { actor: 'robot', name: 'look', params: { lens, width: 900, height: 500, ...params } }).then((r) => r.result ?? r);
-  const [pk, pg] = [`pk:${here}:lanes`, `pg:${here}:lanes:type`];
+  const pk = `pk:${here}:lanes`, away = 'pk:e_nothere0:lanes';
 
   const closed = await look({});
   assert.equal(closed.state, 'drawn', JSON.stringify({ ...closed, image: undefined }));
   assert.equal(closed.pressed, undefined, 'a look that presses nothing says nothing of it');
   save('closed', closed.image.data);
 
-  // A kind's mark is drawn only in an open row: pressed alone, it is missing, and the picture is the view as it opens.
-  const early = await look({ press: [pg] });
-  assert.deepEqual([early.pressed, early.missing], [[], [pg]]);
+  // A mark the view does not draw is missing, and the picture is the view as it opens.
+  const early = await look({ press: [away] });
+  assert.deepEqual([early.pressed, early.missing], [[], [away]]);
 
   const opened = await look({ press: [pk] });
   assert.equal(opened.state, 'drawn', JSON.stringify({ ...opened, image: undefined }));
   assert.deepEqual([opened.pressed, opened.missing], [[pk], []]);
   assert.notEqual(opened.look, closed.look, 'a pressed look is a picture of its own, not the view as it opens again');
-  assert.notEqual(opened.image.data, closed.image.data, 'the pack’s row is drawn open');
+  assert.notEqual(opened.image.data, closed.image.data, 'the pack’s parts are drawn, an island of the query');
   save('opened', opened.image.data);
 
-  // Then one kind: found only because the row opened, and its parts listed below it.
-  const listed = await look({ press: [pk, pg, 'pk:e_nothere0:lanes'] });
-  assert.deepEqual([listed.pressed, listed.missing], [[pk, pg], ['pk:e_nothere0:lanes']]);
-  assert.notEqual(listed.image.data, opened.image.data, 'the kind’s parts are listed');
-  save('listed', listed.image.data);
+  // Pressed again, the find takes its term away: the parts are gone, a picture of its own.
+  const listed = await look({ press: [pk, pk, away] });
+  assert.deepEqual([listed.pressed, listed.missing], [[pk, pk], [away]]);
+  assert.notEqual(listed.image.data, opened.image.data, 'the parts island is gone again');
+  save('shut', listed.image.data);
 
   // The same presses, the map unchanged: that picture again.
-  const again = await look({ press: [pk, pg, 'pk:e_nothere0:lanes'] });
+  const again = await look({ press: [pk, pk, away] });
   assert.equal(again.again, true);
   assert.equal(again.look, listed.look);
-  assert.deepEqual(again.pressed, [pk, pg]);
+  assert.deepEqual(again.pressed, [pk, pk]);
 });
