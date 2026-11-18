@@ -408,6 +408,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       height: z.number().int().min(240).max(1600).optional().describe('Its height (750).'),
       scheme: z.enum(['dark', 'light']).optional().describe('The theme it is drawn in, as a reader whose system is dark or light sees it (dark).'),
       fresh: z.boolean().optional().describe('Draw it again, never the picture already taken.'),
+      keep: z.boolean().optional().describe('Keep it past the 30 minutes, for anyone who reads the map: answers kept { id }, which query picture with look reads again.'),
       published: z.boolean().optional().describe('With entity a document: draw the page publishing it now would give, as its preview does, not the app.'),
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
 

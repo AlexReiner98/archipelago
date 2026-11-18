@@ -9,6 +9,8 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 import type { KernelContext } from '#pelago/kernel';
+import type { Check } from './checks.ts';
+import { KEPT, keepLook, keptLook } from './kept.ts';
 import { drawLook, type Marks, type Try } from './look-draw.ts';
 import { keep, kept, keptWith } from './store.ts';
 
@@ -76,11 +78,14 @@ interface Kept {
   /** A dry run: the fields drawn in place of what the map holds (`item field`), and what the drawing's code threw. */
   tried?: string[];
   errors?: string[];
+  /** What the drawn page breaks of the rules a machine reads (./checks.ts); a look kept before there were checks has none. */
+  checks?: Check[];
 }
 
 /** What a look answers: what was drawn and how it stood, with the picture as an image (packs/surface/kernel/mcp.ts sends it as one), or the drawing's marks where they were asked for and it has them. */
-const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
+const answer = (look: string, k: Kept, data: Buffer, again = false, kept?: { id: string }) => ({
   look,
+  ...(kept && { kept }),
   view: k.hash,
   workspace: k.workspace,
   drawn_at: k.at,
@@ -92,6 +97,7 @@ const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
   ...(k.drew && { drew: k.drew }),
   ...(k.as_at && { as_at: k.as_at }),
   ...(k.tried && { tried: k.tried, errors: k.errors ?? [] }),
+  checks: k.checks ?? [],
   width: k.width,
   height: k.height,
   bytes: data.length,
@@ -103,7 +109,7 @@ const answer = (look: string, k: Kept, data: Buffer, again = false) => ({
  * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>; or preview/<id>, a document as it
  * would publish) for the asking agent and keep the picture. `fresh` draws it again whatever has changed or not.
  */
-export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean; at?: number; tries?: Try[] } = {}) {
+export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean; at?: number; tries?: Try[]; keep?: boolean } = {}) {
   const width = Math.min(1920, Math.max(320, Math.round(size.width ?? 1200)));
   const height = Math.min(1600, Math.max(240, Math.round(size.height ?? 750)));
   const scheme = size.scheme ?? 'dark';
@@ -118,21 +124,28 @@ export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash
   if (!size.fresh && !tries) {
     const was = await kept<{ look: string }>(ctx, same);
     const had = was && (await keptWith<Kept>(ctx, `look:${whose(w)}:${was.look}`));
-    if (was && had?.data) return answer(was.look, had.value, had.data, true);
+    if (was && had?.data) return answer(was.look, had.value, had.data, true, size.keep ? await keepLook(ctx, { ...had.value, look: was.look }, had.data) : undefined);
   }
   await countLook(ctx, w.viewer || actor);
   const { pass } = await ofRoots(ctx, { pass: { actor } });
   const address = hash.startsWith('preview/') ? `${origin}/${hash}?look` : `${origin}/?look${asAt ? `&at=${asAt}` : ''}#/${hash}`;
   const got = await drawLook(address, pass, width, height, scheme, marks, tries);
   const look = `l_${randomBytes(6).toString('hex')}`;
-  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }), ...(got.drew && { drew: got.drew }), ...(asAt && { as_at: asAt }), ...(tries && { tried: tries.map((t) => `${t.item} ${t.field}`), errors: got.errors ?? [] }) };
+  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }), ...(got.drew && { drew: got.drew }), ...(asAt && { as_at: asAt }), ...(tries && { tried: tries.map((t) => `${t.item} ${t.field}`), errors: got.errors ?? [] }), checks: got.checks };
   await keep(ctx, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
   if (!tries) await keep(ctx, same, { look }, LOOK_MS);
-  return answer(look, k, got.data);
+  // Kept (keep: true): past LOOK_MS, for the whole workspace, under an id of its own (./kept.ts). A dry run is kept too: a round may picture code not yet saved.
+  return answer(look, k, got.data, false, size.keep ? await keepLook(ctx, { ...k, look }, got.data) : undefined);
 }
 
-/** A look taken on this screen in the last LOOK_MS, again. */
+/** A look taken on this screen in the last LOOK_MS, or one kept (k_...), again. */
 export async function lookAt(ctx: KernelContext, w: Whose, look: string) {
+  // A kept look is the workspace's, whoever took it, for as long as it is kept.
+  if (KEPT.test(look)) {
+    const got = await keptLook<Kept & { look: string }>(ctx, look);
+    if (!got?.data) throw new Error(`No look "${look}" is kept here: it was never kept, or more were kept since.`);
+    return answer(got.value.look, got.value, got.data, true, { id: look });
+  }
   if (!LOOK.test(look)) throw new Error(`"${look}" is not a look: query look or show with look: true names one.`);
   const got = await keptWith<Kept>(ctx, `look:${whose(w)}:${look}`);
   if (!got?.data) throw new Error(`No look "${look}" was taken on this screen in the last ${LOOK_MS / 60_000} minutes.`);
