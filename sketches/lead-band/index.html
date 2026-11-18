@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lead band</title>
+<!-- A sketch, not the app: each sheet opens on what its item is for, drawn from what its type declares (capabilities),
+     with the head as one line of marks and the rest folded. Data is the Focus map's, 17 Nov 2026. -->
+<style>
+  :root {
+    --bg: #141614; --sheet: #181a18; --line: #2a2d2a; --text: #e6e6e1; --muted: #8b8f88; --faint: #5d615b;
+    --accent: #7fb685; --warn: #d9a441; --soft: rgba(127, 182, 133, .10); --warn-soft: rgba(217, 164, 65, .10);
+    --head: Georgia, Gelasio, "Noto Serif", serif; --body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--body); }
+  main { display: flex; flex-wrap: wrap; gap: 24px; padding: 24px 16px 48px; justify-content: center; }
+  .cap { width: 440px; max-width: 100%; }
+  .cap > small { display: block; color: var(--faint); font-size: 12px; margin: 0 0 6px 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sheet { background: var(--sheet); border-left: 1px solid var(--line); padding: 18px 20px 14px; min-height: 420px; }
+
+  /* Title and its one line of marks: what the head said in seven rows. */
+  .top { display: flex; align-items: baseline; gap: 12px; }
+  .top { align-items: flex-start; }
+  .top a { padding-top: 3px; }
+  .top h1 { flex: 1; min-width: 0; margin: 0; font: 600 18px/1.3 var(--head); overflow-wrap: anywhere; }
+  .top a { color: var(--muted); font-size: 13px; text-decoration: none; white-space: nowrap; }
+  .marks { display: flex; gap: 10px; align-items: center; color: var(--muted); font-size: 12.5px; margin: 6px 0 14px; white-space: nowrap; overflow: hidden; }
+  .marks .st { color: var(--text); }
+  .marks .st::after { content: " ▾"; color: var(--faint); font-size: 10px; }
+  .glyph { display: inline-block; width: 11px; height: 11px; border: 1.4px solid var(--muted); vertical-align: -1px; }
+  .glyph.dia { transform: rotate(45deg) scale(.8); }
+  .glyph.tick { border-radius: 0 3px 3px 0; border-left-style: dashed; }
+  .glyph.hex { border-radius: 3px; }
+  .glyph.ring { border-radius: 50%; }
+  .glyph.sq { }
+
+  /* The lead band: the point of the item, first. */
+  .lead { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 14px 0; margin-bottom: 6px; }
+  .waits { display: flex; gap: 8px; align-items: baseline; color: var(--warn); font-size: 13px; margin-bottom: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .waits b { font-weight: 600; }
+  .opt { display: grid; grid-template-columns: 18px 1fr auto; gap: 2px 8px; align-items: baseline; padding: 7px 8px; margin: 0 -8px; border-radius: 4px; }
+  .opt:hover { background: var(--soft); }
+  .opt .dot { width: 9px; height: 9px; border: 1.4px solid var(--muted); border-radius: 50%; align-self: center; }
+  .opt .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opt .s { grid-column: 2 / 4; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opt .go { color: var(--faint); font-size: 12px; visibility: hidden; }
+  .opt:hover .go { visibility: visible; color: var(--accent); }
+  .opt.rec .dot { border-color: var(--accent); }
+  .opt.rec .tag { color: var(--accent); font-size: 11.5px; margin-left: 6px; font-weight: 400; }
+  .opt.chosen .dot { background: var(--accent); border-color: var(--accent); }
+  .opt.gone { opacity: .45; }
+  .opt.gone .t { font-weight: 400; text-decoration: line-through; text-decoration-color: var(--faint); }
+
+  .answer { font: 600 17px/1.35 var(--head); margin: 0 0 6px; display: flex; gap: 10px; }
+  .answer::before { content: "✓"; color: var(--accent); font-family: var(--body); }
+  .why { color: var(--muted); font-size: 13px; margin: 0 0 10px 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .by { color: var(--faint); font-size: 12px; margin-left: 24px; }
+
+  .big { display: flex; align-items: baseline; gap: 10px; }
+  .big .n { font: 600 44px/1 var(--head); letter-spacing: -.5px; }
+  .big .u { color: var(--muted); font-size: 18px; }
+  .big .vs { color: var(--muted); font-size: 13px; margin-left: auto; text-align: right; }
+  .bar { position: relative; height: 6px; background: var(--line); border-radius: 3px; margin: 12px 0 6px; }
+  .bar i { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 3px; }
+  .bar b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--muted); }
+  .scale { display: flex; justify-content: space-between; color: var(--faint); font-size: 11.5px; }
+
+  .beats { list-style: none; margin: 0; padding: 0; counter-reset: b; }
+  .beats li { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; padding: 5px 0; counter-increment: b; }
+  .beats li::before { content: counter(b); color: var(--faint); font-size: 12px; text-align: right; }
+  .beats span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .beats time { color: var(--faint); font-size: 12px; }
+  .stands { display: flex; gap: 14px; color: var(--muted); font-size: 12.5px; margin-top: 10px; white-space: nowrap; }
+  .stands b { color: var(--text); font-weight: 500; }
+
+  .unseen { display: flex; gap: 10px; align-items: baseline; padding: 10px 12px; background: var(--warn-soft); border-left: 2px solid var(--warn); }
+  .unseen .eye { color: var(--warn); }
+  .unseen p { margin: 0; min-width: 0; }
+  .unseen strong { display: block; font-weight: 600; }
+  .unseen span { color: var(--muted); font-size: 12.5px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .unseen .ok { margin-left: auto; color: var(--accent); font-size: 12.5px; white-space: nowrap; }
+
+  .preview { height: 150px; border: 1px solid var(--line); border-radius: 4px; background: radial-gradient(circle at 30% 40%, rgba(127,182,133,.18), transparent 40%), radial-gradient(circle at 70% 60%, rgba(217,164,65,.12), transparent 35%), #101210; position: relative; overflow: hidden; }
+  .preview svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .use { display: flex; gap: 14px; align-items: center; margin-top: 10px; font-size: 13px; }
+  .use a { color: var(--accent); text-decoration: none; }
+  .use span { color: var(--muted); }
+
+  .wait-row { display: grid; grid-template-columns: 12px 1fr; gap: 2px 10px; padding: 6px 0; }
+  .wait-row .glyph { align-self: center; }
+  .wait-row .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wait-row .f { grid-column: 2; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .count { color: var(--warn); font-size: 13px; margin-bottom: 6px; }
+
+  /* What follows the band: one folded row each. */
+  .fold { display: flex; gap: 8px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; }
+  .fold::before { content: "▸"; color: var(--faint); font-size: 10px; }
+  .fold b { color: var(--text); font-weight: 500; letter-spacing: .04em; font-size: 11px; text-transform: uppercase; }
+  .fold span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .note-open { color: var(--text); font-size: 13.5px; padding: 8px 0 10px; border-bottom: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<main>
+
+  <!-- 1. A question still open: what to choose, and that it is you who is waited on. -->
+  <section class="cap">
+    <small>Open decision · capability settles + a waits_on to you</small>
+    <div class="sheet">
+      <div class="top"><h1>How does a pack lay out its island?</h1><a href="#">Link</a><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph dia"></span><span>Decision</span><span class="st">open</span><span>3 h</span></div>
+      <div class="lead">
+        <div class="waits">↩ <b>Waits on you</b>· once the options are drawn on real islands</div>
+        <div class="opt rec"><span class="dot"></span><span class="t">Named arrangements<span class="tag">recommended</span></span><span class="go">Choose</span><span class="s">The canvas pack keeps a short list; a pack's look names one</span></div>
+        <div class="opt"><span class="dot"></span><span class="t">An island module</span><span class="go">Choose</span><span class="s">A map pack ships code that arranges one island, in the sandbox</span></div>
+        <div class="opt"><span class="dot"></span><span class="t">Cells only</span><span class="go">Choose</span><span class="s">Agents keep placing items by cell; a pack gives where unplaced start</span></div>
+      </div>
+      <div class="note-open">Recommended: named arrangements, data in the pack, code in the canvas pack.</div>
+      <div class="fold"><b>Note</b><span>Why · Alex, 17 Nov · Tried (17 Nov)</span></div>
+      <div class="fold"><b>Bears on it</b><span>6 findings</span></div>
+      <div class="fold"><b>Fields</b><span>Island · Cell 1·0</span></div>
+      <div class="fold"><b>History</b><span>4 · last: layout options drawn on a real island</span></div>
+    </div>
+  </section>
+
+  <!-- 2. A question settled: the answer is the page. -->
+  <section class="cap">
+    <small>Decided · settles: chosen + why + on</small>
+    <div class="sheet">
+      <div class="top"><h1>How do we make CI fast again?</h1><a href="#">Link</a><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph dia"></span><span>Decision</span><span class="st">decided</span><span>17 Nov</span></div>
+      <div class="lead">
+        <p class="answer">Refresh the weights, approvals table in four, keep 10 shards</p>
+        <p class="why">More shards exceed the free plan's 20 concurrent jobs; the approvals files set the floor</p>
+        <div class="by">Alex · 17 Nov · 15 min after it was asked</div>
+        <div style="height:10px"></div>
+        <div class="opt gone"><span class="dot"></span><span class="t">B: refresh weights only</span><span></span></div>
+        <div class="opt gone"><span class="dot"></span><span class="t">C: 12 shards</span><span></span></div>
+      </div>
+      <div class="fold"><b>Note</b><span>CI's wall time is a median 2.8 min uncontended… · Options</span></div>
+      <div class="fold"><b>Bears on it</b><span>7 findings · 1 view</span></div>
+      <div class="fold"><b>Source</b><span>Tests workflow runs</span></div>
+      <div class="fold"><b>History</b><span>3 · last: Alex chose option A</span></div>
+    </div>
+  </section>
+
+  <!-- 3. A finding with a value: the number is the point. -->
+  <section class="cap">
+    <small>Finding · value + unit, against what it is compared with</small>
+    <div class="sheet">
+      <div class="top"><h1>PR #435's CI run took 147 s, against a median of 166 s</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph tick"></span><span>Finding</span><span class="st">current</span><span>as of 17 Nov</span></div>
+      <div class="lead">
+        <div class="big"><span class="n">147</span><span class="u">s</span><span class="vs">median 166 s<br>−19 s · −11%</span></div>
+        <div class="bar"><i style="width:73.5%"></i><b style="left:83%"></b></div>
+        <div class="scale"><span>0</span><span>median</span><span>200 s</span></div>
+      </div>
+      <div class="note-open">A single run, with no queue; pglite shard 1 still took 130 s.</div>
+      <div class="fold"><b>Bears on</b><span>How do we make CI fast again?</span></div>
+      <div class="fold"><b>Fields</b><span>Island · Value type number</span></div>
+      <div class="fold"><b>History</b><span>1</span></div>
+    </div>
+  </section>
+
+  <!-- 4. A task built and not yet seen working: what would show it, and the one press that says it was. -->
+  <section class="cap">
+    <small>Task · seen_working false + to_see</small>
+    <div class="sheet">
+      <div class="top"><h1>Rebalance CI: fresh weights, approvals in four</h1><a href="#">Link</a><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph sq"></span><span>Task</span><span class="st">done</span><span>29k of 300k tokens</span></div>
+      <div class="lead">
+        <div class="unseen"><span class="eye">◌</span><p><strong>Nobody has seen it working</strong><span>Check main's next Tests runs: slowest step near 100–110 s, wall near 2.3 min</span></p><a class="ok" href="#">Seen it</a></div>
+      </div>
+      <div class="fold"><b>Note</b><span>PR #435 · then refresh the weights again</span></div>
+      <div class="fold"><b>Worked on by</b><span>Eigg · Rebalance CI shards for faster tests</span></div>
+      <div class="fold"><b>History</b><span>2</span></div>
+    </div>
+  </section>
+
+  <!-- 5. A session: its story, and where its work stands now. -->
+  <section class="cap">
+    <small>Run · story beats + stands (branch, unpushed)</small>
+    <div class="sheet">
+      <div class="top"><h1>Rebalance CI shards for faster tests</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph hex"></span><span>Eigg</span><span class="st">finished</span><span>26 min</span><span>193k tokens</span></div>
+      <div class="lead">
+        <ol class="beats">
+          <li><span>CI is slow mostly from queueing: every run takes all 20 jobs</span><time>21:17</time></li>
+          <li><span>Option A is PR #435: fresh weights, approvals in four</span><time>21:24</time></li>
+          <li><span>Main's first run with #435 passed: slowest job 142 s</span><time>21:33</time></li>
+        </ol>
+        <div class="stands"><span>competent-sanderson</span><span><b>0</b> unpushed</span><span><b>0</b> dirty</span><span>ended</span></div>
+      </div>
+      <div class="fold"><b>Worked on</b><span>11 items · drawn</span></div>
+      <div class="fold"><b>Fields</b><span>Surface · Session · Packs 9 · Cwd</span></div>
+      <div class="fold"><b>History</b><span>7</span></div>
+    </div>
+  </section>
+
+  <!-- 6. A layout: what it draws, and where to use it. -->
+  <section class="cap">
+    <small>Layout · code that draws: its picture first</small>
+    <div class="sheet">
+      <div class="top"><h1>Field</h1><a href="#">Link</a><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph ring"></span><span>Layout</span><span class="st">working</span><span>1,264 lines</span></div>
+      <div class="lead">
+        <div class="preview"><svg viewBox="0 0 400 150" aria-hidden="true"><g fill="#7fb685" opacity=".75"><circle cx="90" cy="60" r="2"/><circle cx="104" cy="52" r="2"/><circle cx="98" cy="72" r="2"/><circle cx="118" cy="66" r="2"/><circle cx="84" cy="80" r="2"/><circle cx="110" cy="82" r="2"/><circle cx="126" cy="50" r="2"/></g><g fill="#d9a441" opacity=".7"><circle cx="270" cy="90" r="2"/><circle cx="286" cy="80" r="2"/><circle cx="262" cy="104" r="2"/><circle cx="300" cy="98" r="2"/><circle cx="280" cy="110" r="2"/></g><g fill="#e6e6e1" opacity=".5"><circle cx="190" cy="40" r="2"/><circle cx="206" cy="48" r="2"/><circle cx="196" cy="60" r="2"/></g><g stroke="#8b8f88" stroke-width=".6" opacity=".4" fill="none"><path d="M104 52 L190 40 M118 66 L196 60 L270 90 M206 48 L286 80"/></g></svg></div>
+        <div class="use"><a href="#">Use here</a><span>Islands · 70 dials</span><span>on 2 islands</span></div>
+      </div>
+      <div class="note-open">The map as particles, moved by behaviours that each add a push.</div>
+      <div class="fold"><b>Note</b><span>Behaviours · Untangle · On this map</span></div>
+      <div class="fold"><b>Dials</b><span>Dt, Hud, Bend k +67</span></div>
+      <div class="fold"><b>Code</b><span>1,264 lines</span></div>
+    </div>
+  </section>
+
+  <!-- 7. A person: what waits on them. -->
+  <section class="cap">
+    <small>Person · incoming waits_on, each with its for</small>
+    <div class="sheet">
+      <div class="top"><h1>alex@aperture.tools</h1><a href="#">⋯</a></div>
+      <div class="marks"><span class="glyph hex"></span><span>Person</span><span class="st">active</span><span>8 islands</span></div>
+      <div class="lead">
+        <div class="count">2 wait on you</div>
+        <div class="wait-row"><span class="glyph dia"></span><span class="t">How does a pack lay out its island?</span><span class="f">choosing, once the options are drawn on real islands</span></div>
+        <div class="wait-row"><span class="glyph sq"></span><span class="t">Move archipelago.tools to Focus</span><span class="f">merging PR #433 · PELAGO_SITES in the hosted .env</span></div>
+      </div>
+      <div class="fold"><b>Islands</b><span>Parallel sessions · Strip Archipelago · archipelago.tools +5</span></div>
+      <div class="fold"><b>History</b><span>17</span></div>
+    </div>
+  </section>
+
+</main>
+</body>
+</html>
