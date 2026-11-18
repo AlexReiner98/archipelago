@@ -62,12 +62,15 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     const lx = l + PAD, ly = t + PAD + top, rest = (look ? items.filter((n) => !look.places.has(n.id)) : items).filter((n) => n !== fn), after = look ? look.width + GAP : 0;
     const dx = fn && fat === 'corner' ? fn.w + GAP : 0, dy = fn && fat === 'top' ? fn.h + GAP : 0;
     if (look) for (const n of items) if (look.places.has(n.id)) x.set(n.id, lx + look.places.get(n.id)[0]), y.set(n.id, ly + look.places.get(n.id)[1]);
-    const unplaced = rest.filter((n) => !cellBy.get(n.id)), shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0, block = blockOf(unplaced, m, shift, [cw, ch]);
+    // Beside a block of what no agent placed, a placed item linked to nothing here joins the block's loners, in its
+    // cell's reading order (study e_unru8ftt, round 2: three placed decisions stood a block's width off, at the far right).
+    const joins = loners(rest, m, cellBy), cellOfHere = (n) => (joins.has(n.id) ? null : cellBy.get(n.id));
+    const unplaced = [...rest.filter((n) => !cellBy.get(n.id)), ...[...joins].map((id) => m.nodes.get(id))], shift = unplaced.length ? columns(unplaced.length, args.aspect, cw, ch) : 0, block = blockOf(unplaced, m, shift, [cw, ch]);
     // Each box in the middle of its cell, so a column of mixed kinds (a decision is wider than a task) keeps one line.
     const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + (cw - GAP) / 2), y.set(n.id, ly + dy + r * ch + (ch - GAP) / 2));
     // Row by row across the block, what is linked together kept together (blockOf).
     for (const [n, cell] of block) at(n, cell);
-    for (const n of rest) if (cellBy.get(n.id)) at(n, [cellBy.get(n.id)[0] + shift, cellBy.get(n.id)[1]]);
+    for (const n of rest) if (cellOfHere(n)) at(n, [cellOfHere(n)[0] + shift, cellOfHere(n)[1]]);
     // Over the rest it stands in the middle of their width; in the corner, first.
     const wide = Math.max(fn?.w ?? 0, ...rest.map((n) => x.get(n.id) + n.w / 2 - lx));
     if (fn) x.set(fn.id, fat === 'top' ? lx + wide / 2 : lx + fn.w / 2), y.set(fn.id, ly + fn.h / 2);
@@ -80,6 +83,19 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   ({ right, bottom } = shelve(loose, { x, y, from: [islands.length > loose.length ? right + sizes.flow_island_sea : M, M + RISE], gap: sizes.flow_island_sea, rise: RISE, aspect: args.aspect, right, bottom }));
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
   return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
+}
+
+/**
+ * Of `nodes`, those an agent placed (`cellBy`) that are linked to none of the others in `m`'s chains and ties, when some
+ * of them were placed by no one: a cell means where an item stands among those it is placed with, so beside a block of
+ * the unplaced a loner's cell says only its order. Answers their ids, in their cells' reading order (row, then column).
+ */
+export function loners(nodes, m, cellBy) {
+  if (!nodes.some((n) => !cellBy.get(n.id))) return new Set();
+  const ids = new Set(nodes.map((n) => n.id)), tied = new Set();
+  for (const w of [...(m.chains ?? []), ...(m.ties ?? [])]) if (ids.has(w.a) && ids.has(w.b) && w.a !== w.b) tied.add(w.a), tied.add(w.b);
+  const lone = nodes.filter((n) => cellBy.get(n.id) && !tied.has(n.id));
+  return new Set(lone.sort((a, b) => cellBy.get(a.id)[1] - cellBy.get(b.id)[1] || cellBy.get(a.id)[0] - cellBy.get(b.id)[0]).map((n) => n.id));
 }
 
 /**

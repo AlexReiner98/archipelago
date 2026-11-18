@@ -63,3 +63,18 @@ test('a big island with nothing placed wraps to a block the pane’s shape, not 
   const wide = span(many.map((i) => g.x.get(i.id))), tall = span(many.map((i) => g.y.get(i.id)));
   assert.ok(wide / tall > 0.8, `shaped to the pane, not a column: ${Math.round(wide)} by ${Math.round(tall)}`);
 });
+
+test('a placed item linked to nothing joins the block of the unplaced, at its edge, not a block’s width off (e_x7c54w7k)', () => {
+  const free = Array.from({ length: 7 }, (_, k) => item(`e_free${String(k).padStart(4, '0')}`, 'e_islanddd'));
+  const lone = [item('e_lonea000', 'e_islanddd', [2, 2]), item('e_loneb000', 'e_islanddd', [2, 1])];
+  const tied = [item('e_tieda000', 'e_islanddd', [0, 0]), item('e_tiedb000', 'e_islanddd', [1, 0])];
+  const all = [...free, ...lone, ...tied], wires = [{ id: 'r_2', type: 'depends_on', from: 'e_tiedb000', to: 'e_tieda000' }];
+  const run = (part: any) => layout({ ...part, undrawn: [], headless: house.headless, measure, sizes: house.sizes, aspect: 1.6, shapes: { type: {} }, placed: { e_islanddd: [0, 0] } });
+  const g = compose(islandModels({ items: all, links: wires, run }), { legends: new Map(), names: new Map(), sizes: house.sizes });
+  const right = Math.max(...free.map((i) => g.x.get(i.id))), last = Math.max(...free.map((i) => g.y.get(i.id)));
+  for (const i of lone) assert.ok(g.x.get(i.id) <= right && g.y.get(i.id) >= last, `${i.id} stands in the block's last rows, within its width`);
+  // In its cell's reading order: the one a row up comes first.
+  const at = (id: string) => [g.y.get(id), g.x.get(id)];
+  assert.ok(at('e_loneb000')[0] < at('e_lonea000')[0] || (at('e_loneb000')[0] === at('e_lonea000')[0] && at('e_loneb000')[1] < at('e_lonea000')[1]), 'the loner placed higher reads first');
+  for (const i of tied) assert.ok(g.x.get(i.id) > right, `${i.id}, linked, keeps its cell beside the block`);
+});
