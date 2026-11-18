@@ -18,8 +18,7 @@ const ties = (type: string, ...open: boolean[]) => open.map((o, i) => ({ type, r
 
 test('a type that says none, or holds nothing to add, opens with no band', () => {
   assert.equal(leadMarks({ id: 'e_1', props: {} }, { capabilities: { lead: 'none' } }, null), null);
-  assert.equal(leadMarks({ id: 'e_1', props: {} }, work, null, { links: [] }), null, 'no parts and nothing unseen');
-  assert.equal(leadMarks({ id: 'e_1', props: { seen_working: true } }, work, null, { links: [] }), null);
+  assert.equal(leadMarks({ id: 'e_1', props: { seen_working: true } }, work, null, { links: [] }), null, 'no parts and seen working');
   assert.equal(leadMarks({ id: 'e_1', props: {} }, { capabilities: { lead: { form: 'actor', link: 'waits_on' } } }, null, { links: ties('waits_on', false) }), null, 'nothing open waits on them');
 });
 
@@ -84,4 +83,58 @@ test('a measure: its number and unit large, when it was true muted', () => {
   valid(m);
   assert.match(said(m), /"147 s"/);
   assert.match(said(m), /as of 2026-11-17/);
+});
+
+test('the alert fires when its field is unset, not only false, and says it until it is true', () => {
+  const m = leadMarks({ id: 'e_1', props: {} }, work, null, { writes: true, links: [] });
+  valid(m);
+  assert.equal(lines(m).length, 1);
+  assert.match(said(m), /Not yet seen working/);
+  assert.deepEqual(leadFields({ props: {} }, work, null), ['seen_working', 'to_see'], 'unset: the band says it, the fields do not');
+});
+
+test('a line: one field as one line, named and cut; a link into it by its far ends; absent when empty', () => {
+  const instr = { capabilities: { lead: { form: 'line', value: 'for' } } };
+  const m = leadMarks({ id: 'e_1', props: { for: ['session_start', 'file:src/**'] } }, instr, null);
+  valid(m);
+  assert.equal(lines(m).length, 1);
+  assert.match(said(m), /"For"/);
+  assert.match(said(m), /session_start, file:src\/\*\*/);
+  assert.match(said(m), /"grow":true/, 'the words take the room left, cut with an ellipsis');
+  assert.deepEqual(leadFields({ props: { for: ['x'] } }, instr, null), ['for']);
+  for (const v of [undefined, '', '  ', [], null]) assert.equal(leadMarks({ id: 'e_1', props: { for: v } }, instr, null), null, JSON.stringify(v));
+  assert.deepEqual(leadFields({ props: {} }, instr, null), [], 'empty: it stays among the fields');
+  const from = { capabilities: { lead: { form: 'line', value: 'from_workspace' } } };
+  assert.match(said(leadMarks({ id: 'e_1', props: { from_workspace: 'focus' } }, from, null)), /From workspace.*focus/);
+  const about = { capabilities: { lead: { form: 'line', link: 'about' } } };
+  const a = leadMarks({ id: 'e_1', props: {} }, about, null, { links: [...ties('about', true, false), ...ties('serves', true)] });
+  valid(a);
+  assert.match(said(a), /"About".*T0, T1/);
+  assert.equal(leadMarks({ id: 'e_1', props: {} }, about, null, { links: ties('serves', true) }), null);
+});
+
+test("an open decision: one line per option, its says in the tooltip, the recommended one marked, three in sight", () => {
+  const decision = { capabilities: { lead: { form: 'choices' } } };
+  const options = [
+    { title: 'Count the island', says: 'A bar of its island. Recommended.' },
+    { title: 'No bar', says: 'Only part_of counts.' },
+  ];
+  const c = (list: { title: string; says?: string; recommended?: boolean }[]) => ({ field: 'options', list: list.map((x) => x.title), says: list.map((x) => x.says) });
+  const two = leadMarks({ id: 'e_1', is_open: true, props: { options } }, decision, c(options), { writes: true });
+  valid(two);
+  assert.equal(lines(two).length, 2, 'one line each, not two');
+  assert.match(said(lines(two)[0] as Marks), /★/);
+  assert.doesNotMatch(said(lines(two)[1] as Marks), /★/);
+  assert.match(said(two), /"tip":"No bar: Only part_of counts."/);
+  assert.doesNotMatch(said(two), /"look":"muted"[^\]]*Only part_of/, 'what it says is in the tooltip, not a line of its own');
+  const five = ['A', 'B', 'C', 'D', 'E'].map((t) => ({ title: t, ...(t === 'E' && { recommended: true }) }));
+  const m = leadMarks({ id: 'e_1', is_open: true, props: { options: five } }, decision, c(five), { writes: true });
+  valid(m);
+  assert.equal(lines(m).length, 3);
+  assert.match(said(lines(m)[2] as Marks), /★.*"E".*"key":"choices-more","label":"\+2"/, 'the recommended one in sight, the rest behind a count');
+  assert.match(said(m), /"key":"choice:2"/, 'a hidden one is still pressed from the count');
+  const mine = leadMarks({ id: 'e_1', is_open: true, props: { options: five } }, decision, c(five), { waits: [{ id: 'e_me' }], me: 'e_me' });
+  valid(mine);
+  assert.equal(lines(mine).length, 3, 'the line that it waits on you takes one of the three');
+  assert.match(said(lines(mine)[2] as Marks), /"\+3"/);
 });

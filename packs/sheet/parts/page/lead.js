@@ -10,6 +10,8 @@ import { ago, label } from './words.js';
 
 /** Words cut to what a tip holds. */
 const tip = (s) => String(s ?? '').slice(0, 200);
+/** One line of the band: its words cut where they do not fit, a press at its end. */
+const line = (...marks) => ['box', { flow: 'row', gap: 2 }, ...marks.filter(Boolean)];
 /** The band: one, set apart from what follows by a line. */
 const band = (...marks) => ['box', { key: 'lead', look: 'band', flow: 'column', gap: 2, pad: 2 }, ...marks.filter(Boolean)];
 
@@ -36,25 +38,50 @@ export function leadOf(item, type, c) {
   const lead = type?.capabilities?.lead;
   if (!lead?.form) return null;
   if (lead.form === 'measure') return props[lead.value] === undefined || props[lead.value] === null || props[lead.value] === '' ? null : lead;
-  if (lead.form === 'alert') return props[lead.unless] === false ? lead : null;
+  if (lead.form === 'alert') return props[lead.unless] !== true ? lead : null;
+  if (lead.form === 'line') return lead.value ? (said(props[lead.value]) ? lead : null) : lead.link ? lead : null;
   if (lead.form === 'timeline') return Array.isArray(props[lead.beats]) && props[lead.beats].length ? lead : null;
   if (LINKED.includes(lead.form) || lead.form === 'occurrence') return lead;
   return null;
 }
 
+/** A field's value as words on one line: a list joined, a number as the reader writes it; '' when there is nothing. */
+const said = (v) => (v === undefined || v === null || typeof v === 'boolean' ? '' : typeof v === 'string' ? v.trim()
+  : typeof v === 'number' ? v.toLocaleString() : Array.isArray(v) ? v.map(said).filter(Boolean).join(', ') : JSON.stringify(v));
+
 /** The forms that count what is linked into it, by the link types the lead names. */
 const LINKED = ['aim', 'done', 'place', 'actor'];
 
-/** The choices of a question still open: each its name and what it means; a press asks to settle it by that one. */
-function choices(c, { writes, asking }) {
-  return band(
-    ['list', { look: 'rows' }, ...c.list.map((x, i) => ['box', { flow: 'column', gap: 0 },
-      ['box', { flow: 'row' }, writes ? ['button', { key: `choice:${i}`, look: 'quiet', tip: tip(`Settle it: ${x}`) }, x] : ['text', { bold: true, tip: tip(x) }, x]],
-      ...(c.says[i] ? [['text', { look: 'muted', tip: tip(c.says[i]) }, c.says[i]]] : [])])],
-    asking !== undefined && ['box', { flow: 'column', gap: 1, look: 'sunk', pad: 2 },
-      ['text', {}, `Settle it: ${c.list[asking]}`],
-      ...(c.why ? [['input', { key: 'choice-why', kind: 'text', hint: 'Why? (optional)', grow: true, focus: true }]] : []),
-      ['box', { flow: 'row', gap: 2 }, ['button', { key: 'choice-settle', look: 'main' }, 'Settle it'], ['button', { key: 'choice-cancel', look: 'quiet' }, 'Cancel']]]);
+/** Whether a choice is the one recommended: `recommended: true` on it, or its words say so. */
+const recommended = (x, says) => (x && typeof x === 'object' && x.recommended === true) || /\brecommended\b/i.test(says ?? '');
+
+/**
+ * The choices of a question still open, one line each: its name, what it means in the tooltip, the recommended one
+ * marked. As many as the band has room for are in sight, the recommended one always among them, the rest behind a
+ * count at the end of the last line. A press on one asks to settle it by that one.
+ */
+function choices(c, item, { writes, asking }, room) {
+  const kept = item?.props?.[c.field];
+  const rec = c.list.map((_, i) => recommended(Array.isArray(kept) ? kept[i] : undefined, c.says[i]));
+  let shown = c.list.map((_, i) => i);
+  if (shown.length > room) {
+    const r = rec.indexOf(true);
+    shown = shown.slice(0, room);
+    if (r >= room) shown[room - 1] = r;
+  }
+  const hidden = c.list.map((_, i) => i).filter((i) => !shown.includes(i));
+  const what = (i) => tip(c.says[i] ? `${c.list[i]}: ${c.says[i]}` : c.list[i]);
+  const name = (i) => (writes ? ['button', { key: `choice:${i}`, look: 'quiet', tip: what(i) }, c.list[i]] : ['text', { bold: true, tip: what(i) }, c.list[i]]);
+  const more = hidden.length > 0 && (writes
+    ? ['menu', { key: 'choices-more', label: `+${hidden.length}`, look: 'quiet' }, ...hidden.map(name)]
+    : ['text', { look: 'muted', tip: tip(hidden.map((i) => c.list[i]).join(' · ')) }, `+${hidden.length}`]);
+  const lines = shown.map((i, n) => line(rec[i] && ['text', { tone: 'ok', tip: 'Recommended' }, '★'],
+    ['box', { flow: 'row', grow: true }, name(i)], n === shown.length - 1 && more));
+  const ask = asking !== undefined && ['box', { flow: 'column', gap: 1, look: 'sunk', pad: 2 },
+    ['text', {}, `Settle it: ${c.list[asking]}`],
+    ...(c.why ? [['input', { key: 'choice-why', kind: 'text', hint: 'Why? (optional)', grow: true, focus: true }]] : []),
+    ['box', { flow: 'row', gap: 2 }, ['button', { key: 'choice-settle', look: 'main' }, 'Settle it'], ['button', { key: 'choice-cancel', look: 'quiet' }, 'Cancel']]];
+  return { lines, ask };
 }
 
 /**
@@ -70,10 +97,8 @@ function answer(a, c) {
     aside && ['text', { tone: 'closed', tip: tip(aside) }, aside]);
 }
 
-/** One line of the band: its words cut where they do not fit, a press at its end. */
-const line = (...marks) => ['box', { flow: 'row', gap: 2 }, ...marks.filter(Boolean)];
 /** Words that take the room left on their line, so what stands before and after them keeps its own. */
-const rest = (said, look = {}) => ['box', { flow: 'row', grow: true }, ['text', { ...look, tip: tip(said) }, said]];
+const rest = (words, look = {}) => ['box', { flow: 'row', grow: true }, ['text', { ...look, tip: tip(words) }, words]];
 /** The number a band is about, large: drawn at the style's lead_figure (part-marks.css). */
 const figure = (said, tone) => ['box', { key: 'lead-figure', flow: 'row' }, ['text', { look: 'title', ...(tone && { tone }), tip: tip(said) }, said]];
 /** The most segments a bar is cut into: more parts than this share them. */
@@ -99,10 +124,13 @@ function measure(item, lead) {
   return [line(figure(unit ? `${said} ${unit}` : said), asOf && ['text', { look: 'muted' }, `as of ${asOf}`])];
 }
 
-/** An alert, while the field it reads is false: one line, what is not yet so, what would make it so, and the press that says it is. */
+/**
+ * An alert, while the field it reads is not true (false, or never said): one line, what is not yet so, what would make
+ * it so, and the press that says it is.
+ */
 function alert(item, lead, { writes }) {
   const props = item.props ?? {};
-  if (!lead.unless || props[lead.unless] !== false) return [];
+  if (!lead.unless || props[lead.unless] === true) return [];
   const says = lead.says && typeof props[lead.says] === 'string' ? props[lead.says] : '';
   const what = label(lead.unless).toLowerCase();
   return [line(['text', { tone: 'warn' }, `◌ Not yet ${what}`], says ? rest(says, { look: 'muted' }) : ['box', { grow: true }],
@@ -151,6 +179,12 @@ function actor(item, lead, links, me) {
   return n ? [line(figure(String(n), you ? 'warn' : undefined), ['text', { look: 'muted' }, `${n === 1 ? 'waits' : 'wait'} on ${you ? 'you' : 'them'}`])] : [];
 }
 
+/** A line: one field, or the far ends of a link into it, named and cut where it does not fit; nothing when empty. */
+function oneLine(item, lead, links) {
+  const words = lead.value ? said((item.props ?? {})[lead.value]) : into(links, lead.link).map((t) => t.title).filter(Boolean).join(', ');
+  return words ? [line(['text', { look: 'muted' }, label(lead.value ?? lead.link)], rest(words))] : [];
+}
+
 /** When it happens, read from its type's when: the day large, its hour and how far off muted. */
 function occurrence(item, type, now = Date.now()) {
   const when = type?.capabilities?.when;
@@ -189,11 +223,15 @@ const LINES = 3;
 export function leadMarks(item, type, c, { writes = false, asking, now, waits, me, links } = {}) {
   const lead = leadOf(item, type, c);
   const mine = waitsOnMe(item, waits, me);
-  if (lead?.form === 'choices' || lead?.form === 'answer') {
-    const body = lead.form === 'choices' ? choices(c, { writes: writes && item.is_open !== false, asking }) : answer(answerOf(item, type), c);
+  const room = LINES - (mine ? 1 : 0);
+  if (lead?.form === 'choices') {
+    const { lines, ask } = choices(c, item, { writes: writes && item.is_open !== false, asking }, room);
+    return band(mine && waitsLine(mine), ...lines, ask);
+  }
+  if (lead?.form === 'answer') {
+    const body = answer(answerOf(item, type), c);
     return mine ? [body[0], body[1], waitsLine(mine), ...body.slice(2)] : body;
   }
-  const room = LINES - (mine ? 1 : 0);
   const lines = !lead ? []
     : lead.form === 'measure' ? measure(item, lead)
     : lead.form === 'alert' ? alert(item, lead, { writes })
@@ -203,6 +241,7 @@ export function leadMarks(item, type, c, { writes = false, asking, now, waits, m
     : lead.form === 'place' ? place(lead, links)
     : lead.form === 'actor' ? actor(item, lead, links, me)
     : lead.form === 'occurrence' ? occurrence(item, type, now)
+    : lead.form === 'line' ? oneLine(item, lead, links)
     : [];
   // The line that it waits on you stands first; the band is never more than its lines.
   const all = [mine && waitsLine(mine), ...lines].filter(Boolean).slice(0, LINES);
@@ -221,7 +260,7 @@ export function leadFields(item, type, c) {
   const lead = leadOf(item, type, c);
   if (lead?.form === 'answer') { const a = answerOf(item, type); return [a.chosen, a.reason && a.why].filter(Boolean); }
   if (!lead || lead.form === 'choices') return [];
-  // An alert's field is said only while it is false; once true it stays among the fields.
-  if ((lead.form === 'alert' || lead.form === 'done') && item?.props?.[lead.unless] !== false) return [];
+  // An alert's field is said only while it is not true; once true it stays among the fields.
+  if ((lead.form === 'alert' || lead.form === 'done') && item?.props?.[lead.unless] === true) return [];
   return [lead.value, lead.unit, lead.as_of, lead.unless, lead.says, lead.beats].filter(Boolean);
 }

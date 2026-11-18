@@ -72,6 +72,17 @@ test('a lead may be "none", and the forms that count linked items name a link th
   assert.equal(checkCapabilities({ lead: 'some' } as never, fields, links).length, 1);
 });
 
+test('a line names one field of any kind with words, or a link there is: one of them', () => {
+  const links = new Set(['about']);
+  const fields = { for: { type: 'json' }, from: { type: 'string' }, at: { type: 'url' }, seen: { type: 'boolean' } } as never;
+  for (const lead of [{ form: 'line', value: 'for' }, { form: 'line', value: 'from' }, { form: 'line', value: 'at' }, { form: 'line', link: 'about' }] as const)
+    assert.deepEqual(checkCapabilities({ lead }, fields, links), [], JSON.stringify(lead));
+  assert.deepEqual(checkCapabilities({ lead: { form: 'line' } }, fields, links), ['a line lead names its value or its link, one of them']);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'line', value: 'from', link: 'about' } }, fields, links), ['a line lead names its value or its link, one of them']);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'line', value: 'seen' } }, fields, links), ['lead.value reads "seen", a boolean, not a number or json or string or url or date or datetime']);
+  assert.deepEqual(checkCapabilities({ lead: { form: 'line', link: 'befriends' } }, fields, links), ['lead.link follows "befriends", which is no relation']);
+});
+
 test('every core deadline is a bound, and a flavour inherits its parent capabilities', async () => {
   const l = await map(SHOP);
   assert.deepEqual(l.registry.type('task')!.capabilities.bound, { field: 'due', limit: 'today' });

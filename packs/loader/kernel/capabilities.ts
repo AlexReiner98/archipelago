@@ -99,16 +99,20 @@ export interface Subject {
  * saying only what its title and status marks cannot (decision e_65cnpc2b). Every starter declares one, or "none" when
  * the title is the point, and a flavour inherits it or says its own (decision e_khf3pf8g; test/structure-lead.test.ts).
  * - measure: its number large (value, unit, as of).
- * - alert: said while a boolean field is false (unless), with what would clear it (says).
+ * - alert: said while a boolean field is not true, false or never said (unless), with what would clear it (says).
  * - timeline: the beats a json field keeps ({ at, said }), each marked by the value of its own key `mark` when it has
  *   one: the glyph `marks` gives that value, drawn as a warning when `warn` names it.
- * - choices: a question that settles opens on its choices, or its answer once settled (capability settles).
+ * - choices: a question that settles opens on its choices, one line each, the recommended one marked (`recommended:
+ *   true` on it, or its says saying so), at most three in sight and the rest behind a count; or on its answer once
+ *   settled (capability settles).
  * - aim: what serves it (`link`, into it), how much of that is done, or that nothing does yet.
  * - done: work's own: how many of its parts (`link`, into it) are done, and the alert of unless and says.
  * - occurrence: when it next happens, large, read from its when.
  * - place: who holds it (`link`, into it) and how many need it (`waits`, into it).
  * - actor: how many wait on them (`link`, into them).
  * - picture: what it draws, small.
+ * - line: one field (`value`), or the far ends of a link into it (`link`), as one line named by it and cut where it
+ *   does not fit; no band while it is empty.
  */
 export interface Lead {
   form: LeadForm;
@@ -124,14 +128,14 @@ export interface Lead {
   marks?: Record<string, string>;
   /** A timeline's: the values of a beat's mark drawn as a warning. */
   warn?: string[];
-  /** An aim's, work's done, a place's or an actor's: the link type whose items, linked into it, the band counts. */
+  /** An aim's, work's done, a place's or an actor's: the link type whose items, linked into it, the band counts. A line's: whose far ends it names. */
   link?: string;
   /** A place's: the link type of what needs it, linked into it. */
   waits?: string;
 }
 
 /** The forms a band is drawn in, and what each must name. */
-export const LEAD_FORMS = { measure: ['value'], alert: ['unless'], timeline: ['beats'], choices: [], aim: ['link'], done: ['link'], occurrence: [], place: ['link'], actor: ['link'], picture: [] } as const;
+export const LEAD_FORMS = { measure: ['value'], alert: ['unless'], timeline: ['beats'], choices: [], aim: ['link'], done: ['link'], occurrence: [], place: ['link'], actor: ['link'], picture: [], line: [] } as const;
 export type LeadForm = keyof typeof LEAD_FORMS;
 
 export interface Capabilities {
@@ -230,7 +234,8 @@ export function checkCapabilities(caps: Capabilities, fields: Record<string, Fie
     if (!needs) problems.push(`lead is "none" or a form: ${Object.keys(LEAD_FORMS).join(', ')}`);
     else {
       for (const key of needs) if (!lead[key as keyof Lead]) problems.push(`a ${lead.form} lead names its ${key}`);
-      has('lead.value', lead.value, ['number', 'json', 'string']);
+      if (lead.form === 'line' && Boolean(lead.value) === Boolean(lead.link)) problems.push('a line lead names its value or its link, one of them');
+      has('lead.value', lead.value, lead.form === 'line' ? ['number', 'json', 'string', 'url', ...DATES] : ['number', 'json', 'string']);
       has('lead.unit', lead.unit, ['string']);
       has('lead.as_of', lead.as_of, DATES);
       has('lead.unless', lead.unless, ['boolean']);

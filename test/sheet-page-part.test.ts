@@ -115,7 +115,8 @@ test('a page opens on the band its type declares: choices, answer, measure, aler
   assert.doesNotThrow(() => checkMarks(noSlots(measured), { kinds }));
   assert.ok(JSON.stringify(measured).includes('"key":"lead-figure"') && JSON.stringify(measured).includes('"147 s"') && !JSON.stringify(measured).includes('field-row:value'), 'the number large, and not again among the fields');
   assert.ok(lead({ type: 'work', props: { seen_working: false, to_see: 'Open the page' } }), 'built and not seen working');
-  assert.ok(!lead({ type: 'work', props: { seen_working: true } }) && !lead({ type: 'work', props: {} }), 'seen, or nothing said: no band');
+  assert.ok(lead({ type: 'work', props: {} }), 'never said: not seen, so the alert');
+  assert.ok(!lead({ type: 'work', props: { seen_working: true } }), 'seen: no band');
   const told = marks({ type: 'run', props: { story: Array.from({ length: 8 }, (_, i) => ({ n: i + 1, at: '2026-11-17T21:00:00Z', said: `Beat ${i + 1}` })) } });
   assert.doesNotThrow(() => checkMarks(noSlots(told), { kinds }));
   assert.ok(JSON.stringify(told).includes('Beat 6') && JSON.stringify(told).includes('Beat 8') && !JSON.stringify(told).includes('Beat 5"'), 'the latest three beats: a band is three lines at most');
