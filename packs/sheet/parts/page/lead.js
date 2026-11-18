@@ -5,6 +5,7 @@
 // marks do not already say, opens with no band (decision e_65cnpc2b): a band is three lines at most, its status only
 // in the marks, and only the press the person likely makes now in sight, at the end of the line it acts on.
 
+import { isChosen } from './sections.js';
 import { ago, label } from './words.js';
 
 /** Words cut to what a tip holds. */
@@ -56,11 +57,17 @@ function choices(c, { writes, asking }) {
       ['box', { flow: 'row', gap: 2 }, ['button', { key: 'choice-settle', look: 'main' }, 'Settle it'], ['button', { key: 'choice-cancel', look: 'quiet' }, 'Cancel']]]);
 }
 
-/** A settled question, as the marks cannot say it: the answer, and why in a line. Who settled it and when are its marks. */
-function answer(a) {
+/**
+ * A settled question, as the marks cannot say it: the answer, why in a line, and the choices not taken set aside in
+ * one quiet line (the fields leave the choices out). Who settled it and when are its marks.
+ */
+function answer(a, c) {
+  const others = c ? c.list.filter((x) => !isChosen(a.picked, x)) : [];
+  const aside = others.length > 0 && others.length < c.list.length ? others.join(' · ') : '';
   return band(
     ['box', { flow: 'row', gap: 2 }, ['text', { tone: 'ok' }, '✓'], ['box', { flow: 'row', grow: true }, ['text', { bold: true, tip: tip(a.picked) }, a.picked]]],
-    a.reason && ['text', { look: 'muted', tip: tip(a.reason) }, a.reason]);
+    a.reason && ['text', { look: 'muted', tip: tip(a.reason) }, a.reason],
+    aside && ['text', { tone: 'closed', tip: tip(aside) }, aside]);
 }
 
 /** One line of the band: its words cut where they do not fit, a press at its end. */
@@ -183,7 +190,7 @@ export function leadMarks(item, type, c, { writes = false, asking, now, waits, m
   const lead = leadOf(item, type, c);
   const mine = waitsOnMe(item, waits, me);
   if (lead?.form === 'choices' || lead?.form === 'answer') {
-    const body = lead.form === 'choices' ? choices(c, { writes: writes && item.is_open !== false, asking }) : answer(answerOf(item, type));
+    const body = lead.form === 'choices' ? choices(c, { writes: writes && item.is_open !== false, asking }) : answer(answerOf(item, type), c);
     return mine ? [body[0], body[1], waitsLine(mine), ...body.slice(2)] : body;
   }
   const room = LINES - (mine ? 1 : 0);

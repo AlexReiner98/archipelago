@@ -87,10 +87,10 @@ test('a settled question opens on its answer, with or without choices; an open o
   assert.ok(!band.includes('2026-11-18'), 'when it was settled is a mark, not the band');
   assert.deepEqual(leadFields(settled, type, null), ['outcome', 'rationale'], 'what the band says, the fields do not say again');
 
-  // With choices: the answer, and the choices not taken are not listed again.
-  const picked = { ...settled, props: { ...settled.props, options: ['Yes: each option carries a consequence', 'No'] } };
+  // With choices: the answer, and the choices not taken in one line set aside (the fields leave the choices out).
+  const picked = { ...settled, props: { ...settled.props, options: ['Yes: each option carries a consequence', 'No', 'Later'] } };
   const withChoices = flat(leadMarks(picked, type, choicesOf(picked, type)));
-  assert.ok(withChoices.includes('Yes: each option carries a consequence') && !withChoices.includes('"No"'));
+  assert.ok(withChoices.includes('Yes: each option carries a consequence') && withChoices.includes('No · Later'));
 
   // Open, with choices: each a press to settle it by.
   const open = { id: 'e_2', is_open: true, status: 'open', props: { options: ['Named arrangements', 'An island module'] } };
