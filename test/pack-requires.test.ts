@@ -58,14 +58,14 @@ test('swapping the provider of a type leaves its consumer active', () => {
   assert.ok(reachOf(reg, 'minutes').has('cal_b') && !reachOf(reg, 'minutes').has('cal_a'));
 
   reg.turnOff(['cal_a', 'cal_b']);
-  assert.deepEqual(reg.states.get('minutes'), { state: 'waiting', why: 'needs type:gathering, which cal_a is off, cal_b is off' });
+  assert.deepEqual(reg.states.get('minutes'), { state: 'waiting', why: 'needs type:gathering, which cal_a is off, cal_b is off', lacks: ['type:gathering'] });
 });
 
 test('a name nobody provides leaves the pack waiting, saying so', () => {
   const core = new Registry(PACKS).found.find((p) => p.id === 'core')!;
   const found = new Map([core, MINUTES].map((p) => [p.id, p]));
   const { states } = orderPacks(found, new Map(), 'local');
-  assert.deepEqual(states.get('minutes'), { state: 'waiting', why: 'needs type:gathering: no pack here provides it' });
+  assert.deepEqual(states.get('minutes'), { state: 'waiting', why: 'needs type:gathering: no pack here provides it', lacks: ['type:gathering'] });
 });
 
 test('a name is has:, type:, event: or a pack id', () => {
@@ -90,7 +90,7 @@ test('taking out a provider sends its consumer to waiting, with why; adding it b
 
   const out = await setPack(l, human, { pack: 'cal_a', on: false });
   assert.deepEqual(out.waiting, [{ id: 'minutes', why: 'needs type:gathering, which cal_a is off' }]);
-  assert.deepEqual(reg.states.get('minutes'), { state: 'waiting', why: 'needs type:gathering, which cal_a is off' });
+  assert.deepEqual(reg.states.get('minutes'), { state: 'waiting', why: 'needs type:gathering, which cal_a is off', lacks: ['type:gathering'] });
   assert.ok(!reg.packs.some((p) => p.id === 'minutes'), 'what it registered is withdrawn');
   assert.ok(out.dormant.includes('minute'), 'its types go dormant');
   assert.equal((await l.entity(minute))!.title, 'Standup', 'its items are kept');

@@ -76,8 +76,8 @@ test('packs wait for what they require, and the server starts whatever their sta
   assert.deepEqual(Object.fromEntries(states), {
     core: { state: 'active' },
     clock: { state: 'off', why: 'turned off here' },
-    billing: { state: 'waiting', why: 'needs clock, which is off' },
-    crm: { state: 'waiting', why: 'needs nowhere, which is not on this server' },
+    billing: { state: 'waiting', why: 'needs clock, which is off', lacks: ['clock'] },
+    crm: { state: 'waiting', why: 'needs nowhere, which is not on this server', lacks: ['nowhere'] },
   });
   const reg = new Registry(packsDir());
   reg.turnOff(['tally', 'core']);
