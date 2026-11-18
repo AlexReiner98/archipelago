@@ -127,8 +127,9 @@ dialog.ask .toolbar { justify-content: flex-end; margin-top: var(--space-3); }
 .switch button:first-child { border-radius: var(--radius-2) 0 0 var(--radius-2); margin-left: 0; }
 .switch button:last-child { border-radius: 0 var(--radius-2) var(--radius-2) 0; }
 .switch button.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); position: relative; font-weight: 600; }
-/* A lens, drawn in a style. Its sizes are the style's, set by dress (ui/query-base.js) from the house style; its colours follow the page's until they are presets too. */
-.lens-view {
+/* A lens, drawn in a style. Its sizes are the style's, set by dress (ui/query-base.js) from the house style; its colours follow the page's until they are presets too.
+   The island side bar marks a session as a lens does, so it has the same colours. */
+.lens-view, #islands {
   --ln-sea: var(--bg); --ln-land: var(--panel); --ln-inner: var(--bg); --ln-line: var(--edge); --ln-text: var(--text); --ln-muted: var(--muted);
   --ln-blocked: var(--g-blocked); --ln-you: var(--g-question); --ln-session: var(--accent); --ln-done: var(--ok); --ln-warn: var(--warn); --ln-accent: var(--accent);
 }

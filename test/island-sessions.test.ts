@@ -26,7 +26,7 @@ test('in a browser, the side bar lists the chats at work and the band counts tho
     if (!(await holds(ok, 20_000, 250))) assert.fail(`${what}: ${page.logs().join('\n')}`);
   };
   /** The chats' rows: their state, mark and name, and whether each stands on one line. */
-  const chats = `[...document.querySelectorAll('#islands .isl-chat')].map((r) => ({ state: r.dataset.state, mark: r.querySelector('.isl-chat-mark.on-you') && getComputedStyle(r.querySelector('.isl-chat-mark')).maskImage.includes('inbox.svg') ? 'inbox' : r.querySelector('.isl-chat-mark').textContent, name: r.querySelector('.isl-name').textContent, line: r.scrollHeight <= r.clientHeight + 1 && r.querySelector('.isl-name').scrollWidth >= r.querySelector('.isl-name').clientWidth }))`;
+  const chats = `[...document.querySelectorAll('#islands .isl-chat')].map((r) => ({ state: r.dataset.state, mark: ((k) => k.dataset.shape === 'inbox' && getComputedStyle(k, '::before').maskImage.includes('inbox.svg') ? 'inbox' : (k.dataset.shape ?? ''))(r.querySelector('.isl-chat-mark')), name: r.querySelector('.isl-name').textContent, line: r.scrollHeight <= r.clientHeight + 1 && r.querySelector('.isl-name').scrollWidth >= r.querySelector('.isl-name').clientWidth }))`;
   try {
     for (const width of [1280, 560]) {
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -34,9 +34,9 @@ test('in a browser, the side bar lists the chats at work and the band counts tho
       await page.evaluate(`document.body.dataset.islands === 'open' || document.querySelector('#query .isl-toggle').click()`);
       await until(`the chats at ${width} px`, () => page.evaluate<boolean>(`${chats}.length === 2`));
       const rows = await page.evaluate<{ state: string; mark: string; name: string; line: boolean }[]>(chats);
-      // The one waiting on the owner first, by its mark; every row on one line.
+      // The one waiting on the owner first, each marked as the canvas marks its state (session_marks): every row on one line.
       // (A run's title is cut at 60 characters when it is made: its start is compared.)
-      assert.deepEqual(rows.map((r) => [r.state, r.mark, r.name.slice(0, 30)]), [['your_move', 'inbox', titles[0]], ['idle', '', titles[1].slice(0, 30)]], `at ${width} px`);
+      assert.deepEqual(rows.map((r) => [r.state, r.mark, r.name.slice(0, 30)]), [['your_move', 'inbox', titles[0]], ['idle', 'ring', titles[1].slice(0, 30)]], `at ${width} px`);
       assert.ok(rows.every((r) => r.line), `one line a row at ${width} px`);
       assert.match(await page.evaluate<string>(`[...document.querySelectorAll('#islands .isl-head')].map((h) => h.textContent).join(' | ')`), /^On · \d+ \| Sessions · 2/, 'Sessions after On');
       // The band counts the one waiting on the owner, beside the islands button: the inbox, its count a badge.

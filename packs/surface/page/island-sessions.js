@@ -2,21 +2,26 @@
 // row a chat, its state a mark before its name, those waiting on the owner first, as the sessions view orders them.
 // A press opens the chat's page. They were tabs, which went on 18 Nov 2026.
 
-import { h } from './base.js';
+import { h, state as page } from './base.js';
 import { YOURS } from './sessions-open.js';
 
-/** The mark for a session's state: what waits on the owner the inbox (by its class), one at work a dot, one blocked a square, one resting none. */
-const MARKS = { working: '•', blocked: '■' };
-const markOf = (state) => (YOURS[state] ? '' : (MARKS[state] ?? ''));
+/**
+ * A session's state as the canvas marks it: the shape and colour the style names for it (session_marks, the sessions
+ * pack's), drawn by ./island-picker.css, so the bar and the canvas never mark one state two ways. None where it names none.
+ */
+const markOf = (state) => {
+  const s = page.style?.session_marks?.[state];
+  return s && typeof s === 'object' ? { shape: /^[a-z]+$/.test(s.shape) ? s.shape : 'disc', hue: /^[a-z]+$/.test(s.hue ?? '') ? s.hue : 'text' } : null;
+};
 
 /** A chat's row: its mark, its name cut short, its line or state in the tooltip. */
 function row(s, done) {
   const state = s.session?.state ?? 'idle';
   const said = s.session?.line || YOURS[state]?.said || state;
   const name = s.title ?? s.label ?? s.name ?? s.id;
+  const mark = markOf(state);
   return h('div', { class: 'isl-row isl-chat', role: 'listitem', 'data-id': s.id, 'data-state': state },
-    // What waits on the owner is the inbox, the page's one mark for it (inbox.svg); the rest a glyph.
-    h('span', { class: `isl-chat-mark${YOURS[state] ? ' on-you' : ''}`, 'aria-hidden': 'true' }, markOf(state)),
+    h('span', { class: 'isl-chat-mark', 'aria-hidden': 'true', ...(mark && { 'data-shape': mark.shape, style: `--isl-mark: var(--ln-${mark.hue})` }) }),
     h('button', { type: 'button', class: 'isl-name', tabindex: '-1', title: `${name}: ${said}`, onclick: () => ((location.hash = `#/e/${s.id}`), done()) }, name));
 }
 
