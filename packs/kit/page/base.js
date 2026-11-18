@@ -295,7 +295,7 @@ export function gate(title, ...kids) {
   // Where the theme's land changes with the page (packs/walls/page/theme-land.js), the last page stays until it has
   // gone, so its words and emblem change together; only the latest page asked for is drawn then.
   const mine = ++gated, turn = hooks.landTurn?.();
-  if (turn) return void turn.then(() => mine === gated && gate(title, ...kids));
+  if (turn) return turn.then(() => mine === gated && gate(title, ...kids));
   themeSignedOut();
   document.body.dataset.gate = 'on';
   document.body.dataset.sheet = 'open';
@@ -392,7 +392,8 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
     const tip = 'Make a workspace of your own; a client waiting to connect is asked again once you are in';
     // Sent here by a client, in a browser that has never signed in: most likely they have no account, so it leads.
     const start = h(newcomer ? 'button' : 'a', { class: newcomer ? 'primary' : '', href: newcomer ? undefined : to.href, title: tip, onclick: newcomer ? () => location.assign(to.href) : undefined }, url ? 'Start a workspace' : 'Try it with your agent');
-    begin.replaceWith(h('div', { class: 'gate-row gate-foot' }, h('span', { class: 'muted' }, 'New here?'), ...(url ? [] : [h('a', { href: '#/try?then=sign-up', title: 'Make an account now, and add your agent after' }, 'Sign up'), h('span', { class: 'muted' }, 'or')]), start));
+    // Filled in place, not swapped: the page may not be drawn yet (gate waits for its land to turn).
+    (begin.className = 'gate-row gate-foot'), (begin.hidden = false), begin.replaceChildren(h('span', { class: 'muted' }, 'New here?'), ...(url ? [] : [h('a', { href: '#/try?then=sign-up', title: 'Make an account now, and add your agent after' }, 'Sign up'), h('span', { class: 'muted' }, 'or')]), start);
   }, () => undefined);
 
   // From inside a workspace the menu lists them already; signed out, they are the quickest way back in.
@@ -401,7 +402,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   const ways = hooks.otherWays?.(fail, { email, withCodes }) ?? {};
   const first = () => {
     if (error.textContent !== (message ?? '')) fail('');
-    gate(
+    Promise.resolve(gate(
       title,
       newcomer && begin,
       newcomer && gateRow(h('span', { class: 'muted grow' }, 'Have one? Sign in')),
@@ -412,8 +413,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
       others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.label}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.label)))),
       !newcomer && begin,
       back && gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), ungate(), route()) }, state.workspace?.name ? `Back to ${state.workspace.name}` : 'Back')),
-    );
-    email.focus();
+    )).then(() => email.focus());
   };
   first();
 }
