@@ -21,7 +21,7 @@ export function leadOf(item, type, c) {
   const lead = type?.capabilities?.lead;
   if (!lead?.form) return null;
   if (lead.form === 'measure') return props[lead.value] === undefined || props[lead.value] === null || props[lead.value] === '' ? null : lead;
-  if (lead.form === 'alert') return props[lead.unless] === false ? lead : null;
+  if (lead.form === 'alert' || lead.form === 'done') return lead.unless && props[lead.unless] === false ? { ...lead, form: 'alert' } : null;
   if (lead.form === 'timeline') return Array.isArray(props[lead.beats]) && props[lead.beats].length ? lead : null;
   return null;
 }
@@ -134,7 +134,7 @@ export function leadMarks(item, type, c, { writes = false, asking, now, waits, m
 /** What a press on the band comes to: the alert's field made true, as one change on the person's word; else null. */
 export function leadEvent(event, item, type) {
   const lead = type?.capabilities?.lead;
-  if (event?.key !== 'lead-yes' || event.name !== 'press' || lead?.form !== 'alert') return null;
+  if (event?.key !== 'lead-yes' || event.name !== 'press' || !['alert', 'done'].includes(lead?.form)) return null;
   return { ops: [{ op: 'update', id: item.id, props: { [lead.unless]: true } }], reason: `${label(lead.unless)}, said in the UI` };
 }
 
