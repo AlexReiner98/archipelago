@@ -185,13 +185,15 @@ export async function tryPage(query = '') {
     const body = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(body.error ?? 'That did not work.');
     const { workspace, page_token } = body.result;
-    // A new map opens on the card (firstMoments), over the canvas the agent draws on; a copy, on the copy.
-    keepLanding(workspace.id, signUp ? '#/sign-up?new=1' : `#/v?${from ? QUERY : FIRST_QUERY}`);
-    if (!from && !signUp) keepFirst({ ws: workspace.id, prompt: body.result.prompt, stage: 'wait', fresh: true });
     // The page token is this browser's sign-in, remembered as any workspace is: signing in to keep the map
     // (packs/identity/page/authorize.js, /oauth/authorize opened by the agent's installer) finds the guest by it.
     store.token = page_token;
     known.remember(workspace);
+    // On to Sign up with no reload: nothing of the map is drawn on it, and its land runs on from this page, unbroken.
+    if (signUp) return void ((making = false), location.replace('#/sign-up?new=1'));
+    // A new map opens on the card (firstMoments), over the canvas the agent draws on; a copy, on the copy.
+    keepLanding(workspace.id, `#/v?${from ? QUERY : FIRST_QUERY}`);
+    if (!from) keepFirst({ ws: workspace.id, prompt: body.result.prompt, stage: 'wait', fresh: true });
     enter(page_token);
   } catch (err) {
     making = false;
