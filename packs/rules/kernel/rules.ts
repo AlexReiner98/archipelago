@@ -9,15 +9,12 @@
 import type { Q } from '../../database/kernel/db.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import type { Keep } from '../../log/kernel/retention.ts';
-import { outsideLayout, outsideReach } from './reach-check.ts';
-export { outsideLayout, outsideReach } from './reach-check.ts';
+import { outsideLayout, outsideReach } from './reach-check.ts'; export { outsideLayout, outsideReach } from './reach-check.ts';
 // What checks a pack's rules as it loads is the loader's; the words it checks by are read here too.
-import { COMPARE, fillForms, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
-import { checkForms, checkUnless, holdsUnless, missingLinks, overMost, type AtMost, type FormOp, type MustLink, type Unless } from './rule-forms.ts';
-import { apartRefused, type Apart } from './apart.ts';
-export { checkRules } from '../../loader/kernel/rule-check.ts';
-import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
-import { opFacts } from '../../loader/kernel/part-trial.ts';
+import { COMPARE, fillExamples, fillForms, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
+import { checkForms, checkUnless, holdsUnless, madeIn, missingLinks, overMost, type AtMost, type FormOp, type MustLink, type Unless } from './rule-forms.ts';
+import { apartRefused, type Apart } from './apart.ts'; import { exampleProblems, type Example } from './examples.ts'; export { checkRules } from '../../loader/kernel/rule-check.ts';
+import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts'; import { opFacts } from '../../loader/kernel/part-trial.ts';
 
 type OneOrMany = string | string[];
 
@@ -94,6 +91,8 @@ export interface RuleDef {
   then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] } | { carry: Carry };
   /** For spare: the rules it lets the op through, by id, each of its own pack. Left out, every rule (bookkeeping). */
   spares?: string[];
+  /** Small changes on made-up items (refs only) and what each must come to, judged as its pack's manifest is written (./examples.ts). */
+  examples?: Example[];
   /** Fields whose values together may belong to one item of the type only. */
   unique?: string[];
   /** For unique, at_most and must_link: the type it holds within (of), flavours included. */
@@ -194,7 +193,7 @@ export interface Who {
 /** The settings an owner lifts a rule by: each one an agent's token may read (packs/database/kernel/schema.ts, AGENT_CODE_READ). On is true, or "apply". */
 export const LIFTS = ['agent_changes', 'agent_code', 'agent_publish', 'agent_backups'];
 // The loader's slot loader.lifts: a pack's rule is checked against these as it loads (packs/loader/kernel/rule-check.ts).
-fillLifts(LIFTS); fillForms({ checkForms, checkUnless }); // and loader.rule_forms: the forms that read links, checked as a pack loads
+fillLifts(LIFTS); fillForms({ checkForms, checkUnless }); fillExamples((reg, pack) => exampleProblems(reg, pack, decide)); // and loader.rule_forms: the forms that read links, checked as a pack loads
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
 /** The lift by which agents' changes apply as they are made; a new workspace begins with it (beginApplying). */
 export const AGENT_CHANGES = 'agent_changes';
@@ -446,6 +445,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   const ops = given as (Written & { id?: string; keep?: string; drop?: string })[];
   const on = (op: (typeof ops)[number]) => (op.op === 'merge' ? [op.keep!, op.drop!] : op.id ? [op.id] : []);
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
+  for (const [ref, made] of madeIn(reg, ops as FormOp[])) if (!found.has(ref)) found.set(ref, made); // an op on an item the change makes, as a rule's example writes one
   // What is read of each op beside it: a part's trial version, a version spread to another island (packs/loader/kernel/part-trial.ts).
   const facts = await opFacts(q, reg, ops, found);
   // A rule that holds or refuses unless what a walk from the item reaches holds is spared where it does (./rule-forms.ts).
