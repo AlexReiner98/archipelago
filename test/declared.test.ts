@@ -109,6 +109,10 @@ test('screens are declared in pack files, checked when the pack loads, and liste
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', tip: 'T', draw: { shape: 'list' } }] }]), /a button piece names its label/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', draw: { shape: 'list' } }] }]), /a button piece names its tip/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T' }] }]), /a button does one thing/);
+  // A piece may stand in an item's band, under its title (place: lead), on a screen on items; nowhere else.
+  assert.doesNotThrow(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'figure', place: 'lead' }] }]));
+  assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'figure', place: 'top' }] }]), /place is "lead"/);
+  assert.throws(bad([{ id: 'demo.s', title: 'S', nav: true, pieces: [{ piece: 'figure', place: 'lead' }] }]), /place is "lead"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T', draw: { lens: 'x' } }] }]), /a button's draw says "style" or "shape"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', on: ['task'], pieces: [{ piece: 'button', label: 'L', tip: 'T', action: 'demo.none' }] }]), /declares no action "demo.none"/);
   assert.throws(bad([{ id: 'demo.s', title: 'S', nav: true, pieces: [{ piece: 'page', page: 'nowhere' }] }]), /draws no page "nowhere"/);

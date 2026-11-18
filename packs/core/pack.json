@@ -33,7 +33,7 @@
     },
     {
       "id": "work",
-      "capabilities": { "owned": true, "actionable": true, "plannable": true },
+      "capabilities": { "owned": true, "actionable": true, "plannable": true, "lead": { "form": "alert", "unless": "seen_working", "says": "to_see" } },
       "altitude": "step",
       "title": "Work",
       "description": "Open until finished; it blocks and is blocked: a task, a project, an issue. A starter type of the work: a pack's type may extend it, or extend nothing.",
@@ -166,7 +166,7 @@
     {
       "id": "finding",
       "extends": "record",
-      "capabilities": { "promised": { "fields": ["value", "as_of"], "published": "published" } },
+      "capabilities": { "promised": { "fields": ["value", "as_of"], "published": "published" }, "lead": { "form": "measure", "value": "value", "unit": "unit", "as_of": "as_of" } },
       "title": "Finding",
       "description": "What an island has found, read in one line: the claim, its value, how sure, as of when. Marked published, it is what the island stands by, and only then may another island read it; the rest are its working findings. The title is the claim as a short sentence (\"Peak load is 42 kW\", not \"Peak load\"); the value is the fact, with its unit; confidence says how sure; as_of when it was true. The note says how it was found, three lines at most. An option is an alternative, a bug is a bug, working research stays research: none is a finding. Its readers read it (reads); a new value keeps the old one in the log.",
       "statuses": { "open": ["current"], "closed": ["superseded", "withdrawn"] },
@@ -438,6 +438,7 @@
         "sys.run"
       ],
       "extends": "system",
+      "capabilities": { "lead": { "form": "timeline", "beats": "story" } },
       "title": "Run",
       "description": "One agent session or one execution of an automation.",
       "statuses": {
