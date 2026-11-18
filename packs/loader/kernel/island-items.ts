@@ -3,8 +3,11 @@
 // may speak one pack, below a project or across projects (e_a2bpang8). Every other item lives on exactly one island,
 // kept on it as its field `island` (a fact in the log like any field: no entry changes form), but for the kernel's own
 // types and actors, which live on none and are linked from anywhere. Checked on write: a new item names its island, its
-// type is the island's pack's or of the shared set, and no link joins items on two islands but one of a link type
-// marked `crosses` (core's reading of a finding: findings are how islands meet). An island's pack is fixed once it is made. Off is the default: with the setting off, nothing here is asked.
+// type is the island's pack's or of the shared set. A link that says how two items relate (depends_on, bears_on, a
+// reading...) joins items on two islands as it does on one (Alex, 18 Nov 2026: links between islands are never refused
+// outright); only part_of does not cross, since it would put an item on two islands: the part is moved instead. A link
+// type marked `crosses` (core's reading) may end across islands only on what that island marks published. An island's
+// pack is fixed once it is made. Off is the default: with the setting off, nothing here is asked.
 
 import { sharedOf } from './islands.ts';
 import { KERNEL_PACKS } from './packorder.ts';
@@ -114,8 +117,11 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
   const retired = new Set(['link', 'about', 'part_of'].flatMap((f) => reg.relationFamily(f)));
   /** Whether an island is a focus's: the item it names is a focus (decision e_mqex8wrf). */
   const focusIsland = async (key: string) => { const ref = made.get(key); return (ref ? ref.props[FOCUS] : (await map.entity(key))?.props[FOCUS]) === true; };
-  const crossing = (where: string, a: Where, b: Where) =>
-    a.island && b.island && a.island !== b.island ? `${where}: "${a.title}" lives on the island ${a.island} and "${b.title}" on ${b.island}: no link joins two islands; publish a finding instead` : undefined;
+  /** The link types that hold one item inside another: part_of and its flavours, which never cross. */
+  const holds = new Set(reg.relationFamily('part_of'));
+  /** A link of `type` between two islands is refused only when it would hold an item inside one on another island. */
+  const crossing = (where: string, a: Where, b: Where, type: string) =>
+    a.island && b.island && a.island !== b.island && holds.has(type) ? `${where}: "${a.title}" lives on the island ${a.island} and "${b.title}" on ${b.island}: a part lives on its whole's island; move "${a.title}" there (props.island) or tie them by a link that says how, such as depends_on` : undefined;
   /** The field an item read across islands must mark true (its type's promised.published), and the item as this change leaves it. */
   const markOf = async (key: string) => {
     const ref = made.get(key);
@@ -174,15 +180,15 @@ export async function islandRefusals(map: Archipelago, reg: Registry, ops: Op[])
       const placed = bare(where, op.props.island) ?? (await placing(where, type, islandKey(op.props.island)));
       if (placed) { problem(placed); continue; }
       const here = moved.get(op.id)!;
-      // What it is linked to stays where this change leaves it: a move that would leave a link joining two islands is refused.
-      const { rows } = await map.db.query<{ other: string }>(`select case when from_id = $1 then to_id else from_id end as other from relation where (from_id = $1 or to_id = $1) and valid_to is null and id <> all($2::text[]) and type <> all($3::text[])`, [op.id, cut, crosses]);
-      for (const { other } of rows) { const there = await whereIs(other); if (there) problem(crossing(where, here, there)); }
+      // Its links go with it; only a part_of that would join two islands is refused (move its whole, or its parts, with it).
+      const { rows } = await map.db.query<{ other: string; type: string }>(`select case when from_id = $1 then to_id else from_id end as other, type from relation where (from_id = $1 or to_id = $1) and valid_to is null and id <> all($2::text[]) and type = any($3::text[])`, [op.id, cut, [...holds]]);
+      for (const { other, type } of rows) { const there = await whereIs(other); if (there) problem(crossing(where, here, there, type)); }
     } else if (op.op === 'link' && crosses.includes(op.type)) {
       problem(await unpublished(where, op.from, op.to));
     } else if ((op.op === 'link' && !crosses.includes(op.type)) || op.op === 'merge') {
       const [a, b] = op.op === 'link' ? [op.from, op.to] : [op.keep, op.drop];
       const [x, y] = [await whereIs(a), await whereIs(b)];
-      if (x && y) problem(crossing(where, x, y));
+      if (x && y) problem(crossing(where, x, y, op.op === 'link' ? op.type : 'part_of'));
       // On a focus's island everything is taken as related (decision e_e7bmgd92): a link only says how, never that.
       if (op.op === 'link' && x?.island && x.island === y?.island && retired.has(op.type) && (await focusIsland(x.island))) problem(`${where}: "${x.title}" and "${y.title}" are on one focus's island, which already says they belong together: link them by depends_on or a link type that says how, not ${op.type}`);
     }

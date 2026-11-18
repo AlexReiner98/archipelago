@@ -62,27 +62,34 @@ test('an item names its island, and its type is the island’s pack’s or of th
   await refused(l, [{ op: 'update', id: t, props: { island: null } }], /lives on an island here/);
 });
 
-test('no link joins items on two islands, by link, move or merge', async () => {
+test('a link that says how joins items on two islands; only part_of does not cross, by link, move or merge', async () => {
+  // Alex, 18 Nov 2026: links between islands are never refused outright (task e_g8uymn8b).
   const l = await islandMap();
   const { a, b, a2 } = await make(l, [
     { op: 'create', ref: 'a', type: 'island', title: 'Billing', props: { pack: 'plain' } },
     { op: 'create', ref: 'a2', type: 'island', title: 'Billing again', props: { pack: 'plain' } },
     { op: 'create', ref: 'b', type: 'island', title: 'Hiring', props: { pack: 'other' } },
   ]);
-  const { x, y, z } = await make(l, [
+  const { x, y, z, w } = await make(l, [
     { op: 'create', ref: 'x', type: 'task', title: 'Here', props: { island: a } },
     { op: 'create', ref: 'y', type: 'task', title: 'There', props: { island: b } },
     { op: 'create', ref: 'z', type: 'task', title: 'Beside', props: { island: a } },
+    { op: 'create', ref: 'w', type: 'task', title: 'Within', props: { island: a } },
     { op: 'link', type: 'depends_on', from: 'x', to: 'z' },
+    { op: 'link', type: 'part_of', from: 'w', to: 'x' },
   ]);
-  await refused(l, [{ op: 'link', type: 'depends_on', from: x, to: y }], /lives on the island .* no link joins two islands; publish a finding instead/);
-  await refused(l, [{ op: 'create', ref: 'n', type: 'task', title: 'New', props: { island: b } }, { op: 'link', type: 'depends_on', from: 'n', to: x }], /no link joins two islands/);
-  await refused(l, [{ op: 'merge', keep: x, drop: y }], /no link joins two islands/);
-  await refused(l, [{ op: 'update', id: z, props: { island: a2 } }], /no link joins two islands/);
+  // A depends_on across islands is kept as it is, made with a new item too.
+  await make(l, [{ op: 'link', type: 'depends_on', from: x, to: y }]);
+  await make(l, [{ op: 'create', ref: 'n', type: 'task', title: 'New', props: { island: b } }, { op: 'link', type: 'depends_on', from: 'n', to: x }]);
+  // An item moves to another island with its depends_on: the link stays.
+  await make(l, [{ op: 'update', id: z, props: { island: a2 } }]);
+  assert.equal((await l.entity(z))!.props.island, a2, 'it moves, its links with it');
+  // part_of does not cross: a part lives on its whole's island, and the refusal says to move it.
+  await refused(l, [{ op: 'link', type: 'part_of', from: y, to: x }], /a part lives on its whole's island; move "There" there/);
+  await refused(l, [{ op: 'update', id: w, props: { island: b } }], /a part lives on its whole's island/);
+  await refused(l, [{ op: 'merge', keep: x, drop: y }], /a part lives on its whole's island/);
   await make(l, [{ op: 'link', type: 'plain_reads', from: x, to: y }]); // a link type marked crosses joins two islands
   await make(l, [{ op: 'link', type: 'about', from: x, to: a }]); // the island itself is on none: a view's or a note’s about it may be
-  await make(l, [{ op: 'unlink', relation: (await l.db.query<{ id: string }>(`select id from relation where from_id = $1 and to_id = $2`, [x, z])).rows[0].id }, { op: 'update', id: z, props: { island: a2 } }]);
-  assert.equal((await l.entity(z))!.props.island, a2, 'with nothing tying it, an item moves');
 });
 
 test('an island made in the same change is named {ref}, and linked items move together (issue e_cctzam6z)', async () => {
@@ -106,7 +113,9 @@ test('an island made in the same change is named {ref}, and linked items move to
     { op: 'link', type: 'depends_on', from: 'y', to: 'z' },
     { op: 'link', type: 'depends_on', from: 'z', to: 'w' },
   ]);
-  await refused(l, [{ op: 'update', id: x, props: { island: b } }, { op: 'update', id: y, props: { island: b } }, { op: 'update', id: z, props: { island: b } }], /"Three" lives on the island .* and "Stays"/);
+  // Three move and one stays: the depends_on from Three to Stays now joins two islands, and is kept (task e_g8uymn8b).
+  await make(l, [{ op: 'update', id: x, props: { island: b } }, { op: 'update', id: y, props: { island: b } }, { op: 'update', id: z, props: { island: b } }]);
+  assert.deepEqual([(await l.entity(z))!.props.island, (await l.entity(w))!.props.island], [b, a], 'moved apart, the tie kept');
   await make(l, [{ op: 'update', id: w, props: { island: b } }, { op: 'update', id: x, props: { island: b } }, { op: 'update', id: y, props: { island: b } }, { op: 'update', id: z, props: { island: b } }]);
   for (const id of [x, y, z, w]) assert.equal((await l.entity(id))!.props.island, b, 'moved together, ties and all');
   const { n } = await make(l, [{ op: 'create', ref: 'n', type: 'island', title: 'New', props: { pack: 'plain' } }, { op: 'update', id: x, props: { island: '{n}' } }, { op: 'update', id: y, props: { island: '{n}' } }, { op: 'unlink', relation: (await l.db.query<{ id: string }>(`select id from relation where from_id = $1 and to_id = $2`, [y, z])).rows[0].id }]);
