@@ -5,7 +5,7 @@
 // back here with a ticket (#/sign-up?ticket=, #/sign-in?ticket=) the server trades once
 // (packs/identity/kernel/verified.ts). The host's: it enters a token, which no pack's code may do.
 
-import { authHeaders, enter, gate, gateRow, h, keepLanding, postJson, whoami, workspaceOf } from './base.js';
+import { authHeaders, enter, gate, gateRow, h, keepLanding, known, postJson, store, whoami, workspaceOf } from './base.js';
 import { autofillHere, passkeyTicket, passkeysHere } from './passkey.js';
 
 const TITLE = 'Sign up to save your map';
@@ -135,7 +135,10 @@ export async function signUpPage(query = '', { machine } = {}) {
   const providers = social.filter((p) => PROVIDERS[p]);
   // Come straight from Sign up on the sign-in page (#/sign-up?new=1): there is no map to save or go back to yet.
   const fresh = params.get('new') === '1';
-  gate(fresh ? 'Sign up' : TITLE, row, ...providers.map((p) => button(`Sign up with ${PROVIDERS[p]}`, withProvider(p), p)), !providers.length && byEmail, error, !fresh && gateRow(h('a', { href: '#/', class: 'small', title: 'It is kept for a week unsaved' }, 'Back to your map')));
+  // Back to sign in: from a fresh start, the empty map made for it is let go, so it is not listed as signed in before.
+  const signIn = h('a', { href: '#/sign-in', title: 'Sign in to a workspace you have', onclick: () => fresh && (known.forget(me.workspace.id), (store.token = '')) }, 'Sign in');
+  const have = h('div', { class: 'gate-row gate-foot' }, h('span', { class: 'muted' }, 'Have an account?'), signIn);
+  gate(fresh ? 'Sign up' : TITLE, row, ...providers.map((p) => button(`Sign up with ${PROVIDERS[p]}`, withProvider(p), p)), !providers.length && byEmail, error, have, !fresh && gateRow(h('a', { href: '#/', class: 'small', title: 'It is kept for a week unsaved' }, 'Back to your map')));
 }
 
 /** A ticket traded: a token entered, or the agreement, the workspace or the start it waits on. `purpose`: keep or sign-in. */

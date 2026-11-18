@@ -189,32 +189,22 @@ export const whoami = () =>
     },
   ));
 
-// The workspaces this browser has signed in to, so moving between them does
-// not mean finding and pasting a token each time. Kept beside the token.
+// The workspaces this browser has signed in to, each with when it was last open (`at`), so moving between them does not
+// mean finding and pasting a token each time. Kept beside the token; without storage, only the one signed in to now.
+const KNOWN = 'pelago-workspaces';
 export const known = {
-  all() {
-    try {
-      return JSON.parse(localStorage.getItem('pelago-workspaces') ?? '{}');
-    } catch {
-      return {};
-    }
-  },
-  save(map) {
-    try {
-      localStorage.setItem('pelago-workspaces', JSON.stringify(map));
-    } catch {
-      // Without storage there is only the workspace signed in to now.
-    }
-  },
-  remember(ws) {
-    this.save({ ...this.all(), [ws.id]: { name: ws.name, token: store.token } });
-  },
-  forget(id) {
-    const map = this.all();
-    delete map[id];
-    this.save(map);
-  },
+  all() { try { return JSON.parse(localStorage.getItem(KNOWN) ?? '{}'); } catch { return {}; } },
+  save(map) { try { localStorage.setItem(KNOWN, JSON.stringify(map)); } catch {} },
+  remember(ws) { this.save({ ...this.all(), [ws.id]: { name: ws.name, token: store.token, at: Date.now() } }); },
+  forget(id) { const { [id]: _, ...rest } = this.all(); this.save(rest); },
 };
+/** Signed in before, the last open first: two of one name (a Guest map and a Guest map) told apart by when each was. */
+function before() {
+  const all = Object.values(known.all()).sort((a, b) => (b.at ?? 0) - (a.at ?? 0));
+  const mins = (at) => Math.floor((Date.now() - at) / 60_000);
+  const when = (at) => (!at ? 'earlier' : mins(at) < 60 ? `${Math.max(1, mins(at))} min ago` : mins(at) < 1440 ? `${Math.floor(mins(at) / 60)} h ago` : new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }));
+  return all.map((w) => ({ ...w, label: all.filter((o) => o.name === w.name).length > 1 ? `${w.name}, ${when(w.at)}` : w.name }));
+}
 
 /** A client's request to connect, kept across a sign-in, whose mail's link may open in another tab: for half an hour. */
 const WAITING = 'pelago-authorize';
@@ -401,7 +391,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
   }, () => undefined);
 
   // From inside a workspace the menu lists them already; signed out, they are the quickest way back in.
-  const others = back ? [] : Object.values(known.all());
+  const others = back ? [] : before();
   const newcomer = Boolean(ref) && !back && others.length === 0;
   const ways = hooks.otherWays?.(fail, { email, withCodes }) ?? {};
   const first = () => {
@@ -414,7 +404,7 @@ export function signIn(message, title = 'Sign in', { back = false, email: given 
       gateRow(email), gateRow(password, showOf(password)), gateRow(send),
       error,
       ways.below,
-      others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.name}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.name)))),
+      others.length > 0 && gateRow(h('span', { class: 'muted' }, 'Signed in before'), h('span', { class: 'grow gist gate-others' }, others.map((w) => h('a', { href: '#', title: `Open ${w.label}`, onclick: (e) => (e.preventDefault(), enter(w.token)) }, w.label)))),
       !newcomer && begin,
       back && gateRow(h('a', { href: '#', class: 'small', onclick: (e) => (e.preventDefault(), ungate(), route()) }, state.workspace?.name ? `Back to ${state.workspace.name}` : 'Back')),
     );
