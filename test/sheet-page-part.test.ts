@@ -103,7 +103,7 @@ test('a page opens on the band its type declares: choices, answer, measure, aler
   const lw = { ...words, types: { ...words.types,
     finding: { title: 'Finding', open: ['current'], closed: ['superseded'], fields: { value: { type: 'json' }, unit: { type: 'string' }, as_of: { type: 'date' } }, capabilities: { lead: { form: 'measure', value: 'value', unit: 'unit', as_of: 'as_of' } } },
     work: { title: 'Work', open: ['todo'], closed: ['done'], fields: { seen_working: { type: 'boolean' }, to_see: { type: 'string' } }, capabilities: { lead: { form: 'alert', unless: 'seen_working', says: 'to_see' } } },
-    run: { title: 'Run', open: ['running'], closed: ['finished'], fields: { story: { type: 'json' } }, capabilities: { lead: { form: 'timeline', beats: 'story' } } } } };
+    run: { title: 'Run', open: ['running'], closed: ['finished'], fields: { story: { type: 'json' } }, capabilities: { lead: { form: 'timeline', beats: 'story', mark: 'did', marks: { claimed: '+', refused: '✕' }, warn: ['refused'] } } } } };
   const marks = (item: object) => pageMarks({ item: { ...task, ...item }, words: lw, views: {} }, { draft: { fields: {} }, open: new Set() });
   const lead = (item: object) => JSON.stringify(marks(item)).includes('"key":"lead"');
   const open = marks({ type: 'decision', is_open: true, props: { options: [{ title: 'Named', says: 'A short list' }, { title: 'Module', says: 'Code' }] } });
@@ -120,6 +120,11 @@ test('a page opens on the band its type declares: choices, answer, measure, aler
   assert.doesNotThrow(() => checkMarks(noSlots(told), { kinds }));
   assert.ok(JSON.stringify(told).includes('2 earlier') && JSON.stringify(told).includes('Beat 8') && !JSON.stringify(told).includes('Beat 2"'), 'the latest beats, the rest counted');
   assert.ok(!lead({ type: 'task', props: {} }), 'a type that declares no lead opens as before');
+  // What befell a run is marked by its glyph, a refusal as a warning; its own words are not marked.
+  const befell = marks({ type: 'run', props: { story: [{ n: 1, said: 'Mine' }, { n: 2, said: 'Claimed Rig', did: 'claimed' }, { n: 3, said: 'Change refused', did: 'refused', by: 'write' }] } });
+  assert.doesNotThrow(() => checkMarks(noSlots(befell), { kinds }));
+  const drawn = JSON.stringify(befell);
+  assert.ok(drawn.includes('"+"') && drawn.includes('{"tone":"bad","tip":"Change refused"}') && drawn.includes('refused, told by write') && drawn.includes('{"tip":"Mine"}'), drawn);
 });
 
 test('the head is one line of marks: type, status to pick, age, who may see it; how sure only when not sure', () => {

@@ -34,6 +34,8 @@ export interface SessionMark {
   state: string;
   for?: string;
   line: string;
+  /** Set when the line is what befell the session (a beat the orchestration told, ../../sessions/kernel/beats.ts): what it was, so a refusal is drawn apart. */
+  did?: string;
   since: string | null;
 }
 
@@ -51,7 +53,7 @@ const stateOf = stateOfJs as (input: Record<string, unknown>) => SessionMark;
 export const ATTENTION = ['waiting', 'your_move', 'blocked', 'quiet', 'working', 'idle', 'done'];
 
 /** Of a state: the mark the sessions view and the flat answer carry, without its turns. */
-export const markOf = ({ state, for: f, line, since }: SessionState): SessionMark => ({ state, ...(f && { for: f }), line, since });
+export const markOf = ({ state, for: f, line, did, since }: SessionState): SessionMark => ({ state, ...(f && { for: f }), line, ...(did && { did }), since });
 
 /** Orders runs by their states' attention, each state's oldest `since` first. */
 export function byAttention(a: SessionMark, b: SessionMark): number {
@@ -78,8 +80,8 @@ async function eventsOf(ctx: KernelContext, runs: RunRow[]): Promise<Map<string,
   return new Map(runs.map((r) => [r.id, read[r.id] ?? []]));
 }
 
-/** Its latest beat that stands (none taken back), from its story: its own words, never what a rule asked of it (`asked`). */
-const beatOf = (story: unknown) => (Array.isArray(story) ? (story as { said?: string; replaced_by?: number; asked?: string }[]).findLast((b) => b && b.replaced_by === undefined && !b.asked && typeof b.said === 'string') : undefined);
+/** Its latest beat that stands (none taken back), from its story: its own words or what befell it (`did`), never what a rule asked of it (`asked`). */
+const beatOf = (story: unknown) => (Array.isArray(story) ? (story as { said?: string; replaced_by?: number; asked?: string; did?: string }[]).findLast((b) => b && b.replaced_by === undefined && !b.asked && typeof b.said === 'string') : undefined);
 
 /** The states of many runs, by run id: a run not found is left out. */
 export async function sessionStates(ctx: KernelContext, runs: string[], now: string = ctx.now().toISOString()): Promise<Map<string, SessionState>> {
