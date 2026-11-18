@@ -16,15 +16,17 @@ test('as many islands from the first as read whole together open', () => {
   const got = leading(boxes, ROOM, 16, 0.7);
   assert.equal(got.n, 2, 'the third would take it under the least');
   assert.deepEqual(got.box, [0, 0, 900, 400]);
+  assert.equal(got.across, false);
 });
 
-test('a first island too big to read whole opens alone, at the floor from its top left (the floor wins)', () => {
-  const got = leading([[0, 0, 3000, 900], [3020, 0, 3400, 200]], ROOM, 16, 0.7);
-  assert.deepEqual(got, { n: 1, box: [0, 0, 3000, 900] });
+test('a first island too big to read whole opens whole across down to its own floor (option C)', () => {
+  // 984 px of room across 2200 units is 0.447: under 0.45 it opens at the floor, from its top left; over 0.44, whole across.
+  assert.deepEqual(leading([[0, 0, 2200, 900], [2220, 0, 2400, 200]], ROOM, 16, 0.7, 0.45), { n: 1, box: [0, 0, 2200, 900], across: false });
+  assert.deepEqual(leading([[0, 0, 2200, 900], [2220, 0, 2400, 200]], ROOM, 16, 0.7, 0.44), { n: 1, box: [0, 0, 2200, 900], across: true });
 });
 
 test('no islands open nothing', () => {
-  assert.deepEqual(leading([], ROOM, 16, 0.7), { n: 0, box: null });
+  assert.deepEqual(leading([], ROOM, 16, 0.7), { n: 0, box: null, across: false });
 });
 
 test('an island wholly out of the room is named on the edge toward it, in reading order', () => {

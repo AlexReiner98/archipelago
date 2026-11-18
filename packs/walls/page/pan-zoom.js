@@ -13,7 +13,7 @@ import { pinchOf } from './pinch.js';
 export const tierOf = (px, { text_least, more_from }) => (px < text_least ? 'none' : px < more_from ? 'names' : 'all');
 
 /** The numbers a plane moves by, the style's (the house style names every one). */
-const planeOf = (style) => Object.fromEntries(['zoom_least', 'zoom_most', 'open_least', 'fit_least', 'text_least', 'more_from', 'margin', 'wheel', 'drag_from', 'fit_pad'].map((n) => [n, numberOf(style, `plane_${n}`)]));
+const planeOf = (style) => Object.fromEntries(['zoom_least', 'zoom_most', 'open_least', 'fit_least', 'open_across', 'text_least', 'more_from', 'margin', 'wheel', 'drag_from', 'fit_pad'].map((n) => [n, numberOf(style, `plane_${n}`)]));
 
 /**
  * Where to stand to see the box [l, t, r, b] of a picture in a room `room` [left, top, width, height] of the frame,
@@ -32,10 +32,11 @@ export function framed([l, t, r, b], [rl, rt, rw, rh], pad, least = 0, high = fa
 /**
  * Which of these boxes [l, t, r, b] (islands, in the order they are read) open in sight together at a size that reads:
  * the most from the first on whose union `framed` shows whole at `least` or more. Answers their count, and the union;
- * none (a first box too big to read whole) answers that first box alone, shown at `least` from its top left and the
- * rest of it reached by panning (the floor wins: round 3's answer on verdict e_uxs5858p).
+ * none (a first box too big to read whole) answers that first box alone: `across`, whole across its width with its
+ * height running on, where that is at `across` a unit or more (a second floor, the opening island's own); else shown at
+ * `least` from its top left, the rest reached by panning (round 3's verdict, option C).
  */
-export function leading(boxes, room, pad, least) {
+export function leading(boxes, room, pad, least, across = least) {
   let union = null, n = 0;
   for (const [l, t, r, b] of boxes) {
     const next = union ? [Math.min(union[0], l), Math.min(union[1], t), Math.max(union[2], r), Math.max(union[3], b)] : [l, t, r, b];
@@ -43,7 +44,10 @@ export function leading(boxes, room, pad, least) {
     union = next;
     n += 1;
   }
-  return n ? { n, box: union } : { n: boxes.length ? 1 : 0, box: boxes[0] ?? null };
+  if (n) return { n, box: union, across: false };
+  if (!boxes.length) return { n: 0, box: null, across: false };
+  const [l, t, r] = boxes[0];
+  return { n: 1, box: boxes[0], across: framed([l, t, r, t], room, pad).whole >= across };
 }
 
 /**
@@ -149,14 +153,16 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   };
   /**
    * Open readable on these boxes (islands, in reading order): as many from the first as read whole together, standing at
-   * the top of the room, or the first alone from its top left at the least that reads; zooming out still reaches all of
-   * it. Answers how many are in sight.
+   * the top of the room, or the first alone, whole across down to its own floor (`plane_open_across`), else from its top
+   * left at the least that reads; zooming out still reaches all of it. Answers how many are in sight.
    */
   const openOn = (boxes, right = 0, top = 0, bottom = 0) => {
-    const { n, box } = leading(boxes, roomOf(right, top, bottom), plane.fit_pad, plane.fit_least);
+    const { n, box, across } = leading(boxes, roomOf(right, top, bottom), plane.fit_pad, plane.fit_least, plane.open_across);
     if (!box) return 0;
     fitted = Math.min(fitted, framed([0, 0, width, height], roomOf(right, top, bottom), plane.fit_pad).whole);
-    toBox(box, right, top, bottom, true, true);
+    // Whole across, its height left to run on: fitted as a box of its width and no height, from the room's top.
+    if (across) toBox([box[0], box[1], box[2], box[1]], right, top, bottom, false, true);
+    else toBox(box, right, top, bottom, true, true);
     return n;
   };
   /** Hear each view as it is drawn; answers how to stop. */
