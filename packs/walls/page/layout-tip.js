@@ -8,6 +8,16 @@
 import { h } from './base.js';
 import { quietTip } from './tip.js';
 
+/** Where a pointer event is in the picture's units: in its mark's outermost svg, rounded to a tenth; null off a picture. */
+export function pictureAt(ev) {
+  let svg = ev?.currentTarget?.ownerSVGElement ?? null;
+  while (svg?.ownerSVGElement) svg = svg.ownerSVGElement;
+  const m = svg?.getScreenCTM?.();
+  if (!m || !Number.isFinite(ev.clientX)) return null;
+  const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse());
+  return [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10];
+}
+
 /** Points along the lines lit in host, on the screen: what the tip keeps off. */
 function litPoints(host) {
   const points = [];

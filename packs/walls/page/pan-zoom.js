@@ -62,9 +62,16 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     const els = [...svg.children].flatMap((el) => (el.tagName === 'g' && !el.attributes.length ? [...el.children] : [el])).filter((el) => el.tagName !== 'defs' && el.tagName !== 'title');
     for (const el of els) el.removeAttribute('display');
     marks = els.map((el) => ({ el, at: box(el), off: false }));
+    readText();
+  };
+  const readText = () => {
     const text = svg.querySelector('text');
     textPx = text ? parseFloat(getComputedStyle(text).fontSize) || 0 : 0;
   };
+  // A picture just mounted is drawn whole on its first frame, and what is out of sight is put out once that frame is
+  // painted: reading where each of its marks lies would hold the page for as long as laying all of them out takes.
+  let reading = 0;
+  const readSoon = () => (reading ||= requestAnimationFrame(() => setTimeout(() => ((reading = 0), (first = false), frame.isConnected && cull(inView())))));
   // A drawing that moves, adds or takes away a mark has it read again before the plane next moves.
   const reshaped = new MutationObserver(() => (marks = null));
   reshaped.observe(svg, { subtree: true, childList: true, attributes: true, attributeFilter: ['d', 'transform', 'x', 'y', 'cx', 'cy', 'width', 'height', 'points'] });
@@ -74,7 +81,13 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     const [W, H] = size();
     return { x: view.x, y: view.y, width: W / view.s, height: H / view.s, scale: view.s };
   };
+  let first = true;
   const cull = (v) => {
+    if (!marks && first) {
+      if (!textPx) readText();
+      if (textPx) frame.dataset.text = tierOf(textPx * v.scale, plane);
+      return void readSoon();
+    }
     if (!marks) read();
     const mx = v.width * plane.margin, my = v.height * plane.margin;
     const l = v.x - mx, t = v.y - my, r = v.x + v.width + mx, b = v.y + v.height + my;

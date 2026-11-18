@@ -57,6 +57,7 @@ export function laidOut(args, { islandOf = () => null, heads = new Map(), wides 
 
 /** The model the flow's scene draws: the whole picture with no islands, or the kit's plain graph when only that is asked. */
 export function layout(args) {
+  if (args.extras?.args) return { args };
   if (args.extras?.plain) {
     const m = model(args);
     return { all: [...m.nodes.values()], chains: m.chains, ties: m.ties, potential: m.potential, breaks: [], args };

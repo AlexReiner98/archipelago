@@ -7,18 +7,8 @@
 
 import { api, drawFrame, h, state, whoami } from './base.js';
 import { drawingActs, drawingAsked } from './layout-asks.js';
-import { tipOf } from './layout-tip.js';
+import { pictureAt, tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
-
-/** Where a pointer event is in the picture's units: in its mark's outermost svg, rounded to a tenth; null off a picture. */
-function pictureAt(ev) {
-  let svg = ev?.currentTarget?.ownerSVGElement ?? null;
-  while (svg?.ownerSVGElement) svg = svg.ownerSVGElement;
-  const m = svg?.getScreenCTM?.();
-  if (!m || !Number.isFinite(ev.clientX)) return null;
-  const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse());
-  return [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10];
-}
 import { build, cssFor, patch, step } from './marks.js';
 import { readerAsks, stillReading } from './reader-frame.js';
 import { followSheet, sheetAside } from './sheet-follow.js';
@@ -90,8 +80,8 @@ export function warmLayouts() {
   const frame = given && given.getAttribute('sandbox') === want.sandbox && new URL(given.src).origin === new URL(want.src, location.href).origin ? given : h('iframe', { class: 'drawing-sandbox', sandbox: want.sandbox, src: want.src, title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
   if (given && given !== frame) given.remove();
   const loads = new Map();
-  sandbox = { frame, loads, ready: null, started: null };
-  sandbox.ready = new Promise((resolve) => (sandbox.started = resolve));
+  const box = (sandbox = { frame, loads, ready: null, started: null, isReady: false });
+  box.ready = new Promise((resolve) => (box.started = () => ((box.isReady = true), resolve())));
   if (!hearing) ((hearing = true), addEventListener('message', hear));
   // Beside the body, not in it, so a page that draws its body anew does not take it away.
   if (frame !== given) document.documentElement.append(frame);
@@ -217,11 +207,16 @@ export function drawWith(host, answer, style, keep) {
     begun = true;
     performance.mark('drawing-begun', { detail: drawing.id });
     // Told what to draw before anything else, so what happens on the page waits behind it: the channel keeps it until the worker has the other end.
-    port.postMessage({ type: 'start', input });
+    // As its text: it crosses to the worker at once, where the answer as objects is copied piece by piece on the way in.
+    port.postMessage({ type: 'start', text: JSON.stringify(input) });
     if (view) port.postMessage({ type: 'viewport', view });
+    // A drawing the frame has loaded already is handed the picture's channel now, not once the page has done all it
+    // does for this edit: it lays out while the page goes on.
+    const box = sandbox?.frame.isConnected && sandbox.isReady && sandbox.loads.has(drawing.hash) ? sandbox : null;
+    if (box) box.frame.contentWindow.postMessage({ type: 'picture', hash: drawing.hash }, '*', [channel.port2]);
     code.then((modules) => {
       if (layouts.get(drawing.hash) !== modules || [...layouts.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
-      return loaded(drawing.hash, modules, ended ? undefined : channel.port2);
+      return loaded(drawing.hash, modules, ended || box ? undefined : channel.port2);
     }).then(
       () => {
         if (ended) return;
@@ -281,6 +276,7 @@ export function drawWith(host, answer, style, keep) {
     try {
       // A scene already mounted from what was kept is the same scene: the worker's is for what comes after (hovering, lighting).
       if (said.type === 'scene' && given) return;
+      if (said.type === 'scene' && typeof said.text === 'string') said.scene = JSON.parse(said.text);
       if (said.type === 'scene') {
         const got = performance.now();
         mounted = true;
