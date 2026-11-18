@@ -54,6 +54,8 @@ export interface UpdateOp {
   visibility?: 'private' | 'shared' | 'public';
   confidence?: number;
   props?: Props;
+  /** The position of the fact stream it was read at: refused if what it sets has been set since (packs/write/kernel/stale.ts). */
+  as_of?: number;
 }
 export interface LinkOp {
   op: 'link';

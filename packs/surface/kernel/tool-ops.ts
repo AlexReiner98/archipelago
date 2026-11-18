@@ -70,6 +70,7 @@ export const op = z.discriminatedUnion('op', [
     visibility: visibility.optional(),
     confidence: confidence.optional(),
     props: props.optional().describe('Merged into existing props. Set a field to null to clear it.'),
+    as_of: z.number().int().nonnegative().optional().describe('The position the map stood at when you read the item (get answers it as as_of): refused, saying what moved, if what this sets has been set since by anyone.'),
   }),
   z.object({
     op: z.literal('link'),

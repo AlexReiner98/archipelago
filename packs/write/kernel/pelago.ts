@@ -12,7 +12,7 @@ import { layoutOf } from '../../rules/kernel/layout-changes.ts';
 import { append, headOf, type Fact } from '../../log/kernel/log.ts'; import { projectDecision, projectFacts, stamp } from '../../log/kernel/replay.ts'; import { linkFacts } from '../../log/kernel/facts.ts';
 import { decideProposal } from './proposals.ts'; import { needHuman } from '../../identity/kernel/actor-checks.ts';
 import { ACTIVE_HOLDS, actorId, type Actor, type Authority, type ChangeInput, type Entity, type Op, type Proposal } from './pelago-types.ts';
-import { AppliedAlready, firstAnswer, keyedIds, onceUnder } from './keyed.ts';
+import { AppliedAlready, firstAnswer, keyedIds, onceUnder } from './keyed.ts'; import { staleReads } from './stale.ts';
 import { planChange } from './change-plan.ts'; import { asSent, editsResolved } from './edit.ts'; import { linkOwners } from './owner-link.ts'; import { applyChange, letThrough } from './change-apply.ts'; import { opRuns } from '../../loader/kernel/island-rules.ts';
 
 export * from './pelago-types.ts';
@@ -137,6 +137,9 @@ export class Archipelago {
     const followed = await follow({ map: this, reg: this.registry }, input.ops);
     if (followed.length) input = { ...input, ops: [...input.ops, ...followed.flatMap((f) => f.ops)] };
     const { warnings } = await this.plan(input.ops, { human: actor.kind === 'human', pack: input.pack });
+    // An update that names the position it read (as_of) is refused when what it sets has moved since (packs/write/kernel/stale.ts).
+    const stale = await staleReads(this, input.ops);
+    if (stale.length) throw new Error(`Change rejected:\n${stale.map((r) => `- ${r}`).join('\n')}`);
     const me = actorId(actor);
     const claimed = input.authority;
     const authority = authorityOf(actor.kind === 'human', me, claimed);

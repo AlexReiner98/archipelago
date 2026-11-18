@@ -1,5 +1,5 @@
 // Parallel sessions that cannot collide, on the write path: a change sent again with its key applies once (task
-// e_x265z5tk).
+// e_x265z5tk), an update made from a stale read is refused with what moved (e_5r9bxyh9).
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Actor, Archipelago } from '../packs/write/kernel/pelago.ts';
@@ -39,4 +39,37 @@ test('a change sent again with its key is answered with the first, applied or he
   assert.deepEqual([heldAgain.status, heldAgain.again, heldAgain.proposal, heldAgain.proposal_status], ['proposed', true, held.proposal, 'pending']);
   const { rows } = await l.db.query<{ n: number }>(`select count(*)::int as n from proposal where status = 'pending'`);
   assert.equal(rows[0].n, 1);
+});
+
+test('an update naming the position it read is refused with what moved, and goes through the retry with the new one', async () => {
+  const l = await fresh();
+  await callTool(l, owner, 'workspace_set', { agent_changes: 'apply' });
+  const made = (await l.change(owner, { reason: 'test', ops: [{ op: 'create', ref: 't', type: 'task', title: 'Shared field' }] })) as Answer;
+  const id = made.created.t as string;
+  const read = (await callTool(l, agent, 'get', { id })) as Answer;
+  assert.equal(typeof read.as_of, 'number');
+
+  // Nothing moved: it applies.
+  const fine = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id, title: 'Shared field, named', as_of: read.as_of }] })) as Answer;
+  assert.equal(fine.status, 'applied');
+
+  const reread = (await callTool(l, agent, 'get', { id })) as Answer;
+  await l.change(owner, { reason: 'test', ops: [{ op: 'update', id, status: 'doing' }] });
+  const refused = await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id, status: 'done', as_of: reread.as_of }] }).then(
+    () => assert.fail('a stale update applied'),
+    (err: Error) => err.message,
+  );
+  assert.match(refused, /moved since you read it/);
+  assert.match(refused, /status was "todo" when you read it \(as_of \d+\), is "doing" now, and this would make it "done"/);
+  assert.equal((await l.entity(id))!.status, 'doing', 'nothing was changed');
+
+  // A field it does not set may move: only what it sets is checked.
+  const other = (await callTool(l, agent, 'change', { reason: 'test', ops: [{ op: 'update', id, title: 'Renamed from the old read', as_of: reread.as_of }] })) as Answer;
+  assert.equal(other.status, 'applied');
+
+  const name = /kept for \d+ minutes as "([^"]+)"/.exec(refused)![1];
+  const now = (await callTool(l, agent, 'get', { id })) as Answer;
+  const retried = (await callTool(l, agent, 'change', { retry: name, fixes: [{ at: 1, op: { op: 'update', id, status: 'done', as_of: now.as_of } }] })) as Answer;
+  assert.equal(retried.status, 'applied');
+  assert.equal((await l.entity(id))!.status, 'done');
 });
