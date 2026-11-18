@@ -355,15 +355,17 @@ export function canvasIn(host, pane) {
   // never once the reader has moved it. At the next frame, once the plane has kept its middle (packs/walls/page/pan-zoom.js).
   const sized = new ResizeObserver(() => requestAnimationFrame(() => c.fit()));
   // A drawing mounted anew (a new view, the map changed under it): back where the reader left it, else fitted.
-  new MutationObserver((list) => {
-    if (!list.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches('.lf-stage') || n.querySelector?.('.lf-stage'))))) return;
+  // One kept in place with a new picture on it (packs/walls/page/marks-kept.js) is put back the same way.
+  const remounted = () => {
     sized.disconnect();
     const stage = host.querySelector('.lf-stage');
     if (stage) sized.observe(stage);
     if (at?.kept) c.moves()?.restore(at.kept);
     else c.fit();
     if (at?.shows) bringIn();
-  }).observe(host, { childList: true, subtree: true });
+  };
+  new MutationObserver((list) => list.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches('.lf-stage') || n.querySelector?.('.lf-stage')))) && remounted()).observe(host, { childList: true, subtree: true });
+  host.addEventListener('stage-kept', remounted);
   // What a find said to bring into sight (packs/walls/page/marks-find.js `shows`), once a picture holds it: panned to,
   // at the scale the reader had, as little as puts it in sight.
   const bringIn = () => {

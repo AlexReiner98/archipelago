@@ -227,7 +227,8 @@ const whole = new Set();
  */
 export function flatView({ lens, style = {}, of, key, only, nest = false, extra, played, quiet = false, before }) {
   const chosen = {};
-  const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
+  // The view's own element; one that keeps the picture before it on screen takes that picture's element instead (firstFrom).
+  let body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
   const host = h('div', { class: 'lens-wrap' }, body);
   const place = { opened: new Map(), ask: {} };
   const keep = (change) => Object.assign(chosen, change);
@@ -359,10 +360,10 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     const ctx = { viewer: answer.viewer, typeKnown: (t) => types.has(t), systemType: (t) => Boolean(types.get(t)?.system) };
     const first = narrowedFrom(was.lens, lens, answer, was.raw.lens, ctx) ?? opened(was.lens, lens, answer, was.raw.lens);
     // An edit it cannot draw early shows the picture before it until the answer is drawn, never an empty canvas
-    // (e_m5x8pmwu). What it was drawn in goes in whole, on the page, so its drawing goes on (what a look paints is its
-    // worker's, gone when it ends), keeps its stylesheet (data-drawing) and pans as it did; it ends once the new picture
-    // replaces it. It stands where it stood: the frame's own room (padding, clip) is this one's.
-    const keepOld = () => (Object.assign(was.body.style, { padding: '0', clipPath: 'none' }), body.replaceChildren(was.body));
+    // (e_m5x8pmwu). The element it was drawn in becomes this view's, on the page, so it keeps its stylesheet
+    // (data-drawing) and pans as it did, and the new picture is patched into it where it stands: what it says alike is
+    // neither made nor laid out again (packs/walls/page/marks-kept.js).
+    const keepOld = () => ((body = was.body), host.replaceChildren(body));
     if (!first) return void keepOld();
     const held = new Set(answer.items.map((i) => i.id));
     // What is held for the owner stays drawn where it would land; the server's answer says it again.
@@ -381,7 +382,10 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     // The picture on screen narrowed at once (packs/walls/page/narrow-picture.js), and the drawing asked to lay out the
     // new answer once the frame that shows it is painted, unless the server's answer is drawn first.
     // Nothing taken out (a pack's parts opened): the picture before stays whole until the new one is drawn.
-    if (!narrowPicture(body, was.body, new Set(old.items.map((i) => i.id).filter((id) => !ids.has(id))))) return void (keepOld(), early());
+    // Laid out once its pane is on the page and has a size, as the answer would be: never at no size, so it is the picture
+    // the same answer always draws, and the server's answer, alike, is not drawn again.
+    const sized = () => host.earlyDraw === early && (body.isConnected && body.clientWidth > 0 ? early() : requestAnimationFrame(sized));
+    if (!narrowPicture(body, was.body, new Set(old.items.map((i) => i.id).filter((id) => !ids.has(id))))) return void (keepOld(), (host.earlyDraw = early), queueMicrotask(sized));
     host.earlyDraw = early;
     requestAnimationFrame(() => setTimeout(() => host.earlyDraw === early && early()));
   }

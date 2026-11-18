@@ -8,6 +8,7 @@ import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { unmoved } from '../../marks-moved.ts';
 import { pathToFileURL } from 'node:url';
 
 const root = join(import.meta.dirname, '..', '..');
@@ -39,7 +40,8 @@ const answer = {
   links: [],
 };
 const writer = ({ island = (_: string) => null, pack = (_: string) => false } = {}) => ({ on: (key: string) => (island(key) ? ['add'] : pack(key) ? ['toggle'] : []), hear: () => false });
-const draw = (a: any, gestures?: any) => picture({ answer: a, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, ...(gestures && { gestures }) });
+// Read where the marks stand on the picture: each island is drawn about its own corner, in a group moved there.
+const draw = (a: any, gestures?: any) => ((p) => ({ ...p, scene: { ...p.scene, svg: unmoved(p.scene.svg) } }))(picture({ answer: a, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, ...(gestures && { gestures }) }));
 
 const marks = (mark: any, hold: (m: any) => boolean): any[] => {
   if (!Array.isArray(mark)) return [];
@@ -196,7 +198,7 @@ test('in a view whose islands stand at corners, a parts island stands beside its
   // Islands at corners (or with looks of their own) are laid out by ../map/placed.js, which once put a parts island after
   // every other, out of sight (e_m5x8pmwu).
   const two = { ...answer, islands: [...answer.islands, { id: 'e_aaneighb', title: 'Neighbour' }], items: [{ ...item('e_aan1zzzz', 'Neighbour one'), island: 'e_aaneighb' }, ...answer.items] };
-  const placed = (corners: any) => picture({ answer: opened(two, 'build'), style: { ...house, placed: corners }, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, gestures: writer }).scene.svg;
+  const placed = (corners: any) => unmoved(picture({ answer: opened(two, 'build'), style: { ...house, placed: corners }, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, gestures: writer }).scene.svg);
   const box = (r: any) => [Number(r.x), Number(r.y), Number(r.x) + Number(r.width), Number(r.y) + Number(r.height)];
   const meets = (a: number[], b: number[]) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
   for (const corners of [{ e_buildisl: [0, 0], e_aaneighb: [3, 0] }, { e_buildisl: [0, 0], e_aaneighb: [1, 1] }, { e_buildisl: [0, 0] }]) {
