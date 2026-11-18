@@ -15,6 +15,7 @@ import { AUTO, clean, islandsOnMap } from './islands-list.js';
 import { autoIslands, onAuto } from './islands-auto.js';
 import { unfollow } from './replica.js';
 import { drawBand } from './bar-band.js';
+import { edgeNames } from './canvas-edge.js';
 import './sessions-open.js';
 
 /** What lives on these islands (a list as a person keeps it: islands by id, live reads by name, which are not islands). */
@@ -317,12 +318,16 @@ export function canvasIn(host, pane) {
     fit() {
       if (at?.kept) return;
       if (at) at.kept = null;
-      // Every island on in sight, at any width: the canvas opens on all of it, however small (the study "The canvas, by
-      // eye", screen e_sm4bdcs5), standing under the bars as a page does; the wheel zooms in from there. An item brought
-      // to (toItem) still opens at a size that reads.
-      c.moves()?.fit(0, ...bars(host), false, true);
+      // A size that reads wins over all of it in sight (verdict e_amqnqtsn): the canvas opens on as many of its islands
+      // as read whole together, in the order they are read, standing under the bars; the rest are named at the frame's
+      // edge (./canvas-edge.js). A lens that is no list of islands fits all of it, never smaller than reads (e_5cp4fw78).
+      const moves = c.moves(), isles = islandBoxes();
+      if (isles.length) moves?.openOn(isles.map(([, , box]) => box), 0, ...bars(host));
+      else moves?.fit(0, ...bars(host), true);
       if (at) at.fitted = c.moves()?.state();
     },
+    /** The islands it draws as [id, title, box], in the order they are read: by their top, then their left. */
+    islands: () => islandBoxes(),
     /** This item's mark (an island's land, an item's box) in sight at a size that reads, kept there as a reader's move is. */
     toItem(id) {
       const moves = c.moves(), name = host.querySelector(`.lf-stage svg [data-item="${id}"]`);
@@ -340,6 +345,20 @@ export function canvasIn(host, pane) {
     },
   };
   all.add(c);
+  /** Each island the lens lists with its title and where its land lies, by its name's mark, read top down then across. */
+  const islandBoxes = () => {
+    const moves = c.moves(), items = at?.view?.answer?.items ?? [];
+    // Its title from the answer, else as its name's mark says it (an island the answer holds no item of).
+    if (!moves || !at) return [];
+    return islandsOf(at.lens)
+      .map((id) => {
+        const name = host.querySelector(`.lf-stage svg [data-item="${id}"]`), box = name && moves.boxOf(name);
+        return box && [id, items.find((i) => i.id === id)?.title ?? name.querySelector('text')?.textContent ?? id, box];
+      })
+      .filter(Boolean)
+      .sort(([, , a], [, , b]) => a[1] - b[1] || a[0] - b[0]);
+  };
+  let edges = null;
   // Where the reader left it, each time they move it: a drawing drawn again (the map changed) is put back there. A click
   // that moved nothing leaves it where it was fitted, so it is fitted again.
   const keepIt = () => at && c.moves() && (at.kept = moved() ?? at.kept);
@@ -353,6 +372,9 @@ export function canvasIn(host, pane) {
     sized.disconnect();
     const stage = host.querySelector('.lf-stage');
     if (stage) sized.observe(stage);
+    // The islands it leaves out of sight, named at the frame's edge, on each new stage.
+    edges?.();
+    edges = stage && c.moves() ? edgeNames(stage, c.moves(), { islands: islandBoxes, room: () => c.moves().room(0, ...bars(host)), go: (id) => c.toItem(id) }) : null;
     if (at?.kept) c.moves()?.restore(at.kept);
     else c.fit();
   }).observe(host, { childList: true, subtree: true });

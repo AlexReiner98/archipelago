@@ -30,6 +30,22 @@ export function framed([l, t, r, b], [rl, rt, rw, rh], pad, least = 0, high = fa
 }
 
 /**
+ * Which of these boxes [l, t, r, b] (islands, in the order they are read) open in sight together at a size that reads:
+ * the most from the first on whose union `framed` shows whole at `least` or more. Answers their count, and the union;
+ * none (a first box too big to read whole) answers that first box alone, to be shown from its top left.
+ */
+export function leading(boxes, room, pad, least) {
+  let union = null, n = 0;
+  for (const [l, t, r, b] of boxes) {
+    const next = union ? [Math.min(union[0], l), Math.min(union[1], t), Math.max(union[2], r), Math.max(union[3], b)] : [l, t, r, b];
+    if (framed(next, room, pad).whole < least) break;
+    union = next;
+    n += 1;
+  }
+  return n ? { n, box: union } : { n: boxes.length ? 1 : 0, box: boxes[0] ?? null };
+}
+
+/**
  * Make `svg` (`width` by `height` in its own units) move inside `frame`. `start` is a point to open on when all of
  * it cannot be read at once; `aside` is room kept on the left for what floats over the frame (a legend); `style` gives
  * the plane's numbers; `told(view)` hears what is in view, in the picture's units, as it changes; `beside()` says the
@@ -43,6 +59,8 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
   const view = { s: 1, x: 0, y: 0 };
   let fitted = 1;
   let drag = null;
+  /** Who hears each view drawn, beside the drawing (`told`): what stands over the frame and follows it (./canvas-edge.js). */
+  const watching = new Set();
   const size = () => [Math.max(1, frame.clientWidth), Math.max(1, frame.clientHeight)];
 
   // ---- What is drawn: each mark of the picture with where it lies, read once and again when the drawing moves one.
@@ -96,6 +114,7 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     queued = 0;
     const v = inView();
     svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.width} ${v.height}`);
+    for (const f of watching) f(v);
     // The scale, for what keeps its size on screen at any zoom (an island's header text, lane 2, overlap e_mb3n6uwb).
     frame.style.setProperty('--ln-plane-scale', String(v.scale));
     cull(v);
@@ -127,6 +146,19 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     now();
     return whole;
   };
+  /**
+   * Open readable on these boxes (islands, in reading order): as many from the first as read whole together, standing at
+   * the top of the room; zooming out still reaches all of it. Answers how many are in sight.
+   */
+  const openOn = (boxes, right = 0, top = 0, bottom = 0) => {
+    const { n, box } = leading(boxes, roomOf(right, top, bottom), plane.fit_pad, plane.fit_least);
+    if (!box) return 0;
+    fitted = Math.min(fitted, framed([0, 0, width, height], roomOf(right, top, bottom), plane.fit_pad).whole);
+    toBox(box, right, top, bottom, true, true);
+    return n;
+  };
+  /** Hear each view as it is drawn; answers how to stop. */
+  const watch = (f) => (watching.add(f), () => watching.delete(f));
   const open = () => {
     fit();
     if (fitted >= plane.open_least) return;
@@ -243,5 +275,5 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     if (!marks) read();
     return marks.find((m) => m.el.contains(el))?.at ?? null;
   };
-  return { zoomBy, fit, toBox, boxOf, open, show, state, restore, inView, stop };
+  return { zoomBy, fit, toBox, openOn, watch, boxOf, open, show, state, restore, inView, stop, room: roomOf };
 }
