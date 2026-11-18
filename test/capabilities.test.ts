@@ -75,10 +75,10 @@ test('a lead may be "none", and the forms that count linked items name a link th
 test('every core deadline is a bound, and a flavour inherits its parent capabilities', async () => {
   const l = await map(SHOP);
   assert.deepEqual(l.registry.type('task')!.capabilities.bound, { field: 'due', limit: 'today' });
-  assert.deepEqual(l.registry.type('decision')!.capabilities.bound, { field: 'due', limit: 'today' });
+  assert.deepEqual(l.registry.type('question')!.capabilities.bound, { field: 'due', limit: 'today' });
   assert.deepEqual(l.registry.type('shop.order')!.capabilities.bound, { field: 'due', limit: 'today' });
   assert.equal(l.registry.type('event')!.capabilities.when?.start, 'at');
-  assert.deepEqual(l.registry.having('settles').filter((t) => ['core', 'shop'].includes(l.registry.type(t)!.pack)).sort(), ['decision', 'shop.verdict']);
+  assert.deepEqual(l.registry.having('settles').filter((t) => ['core', 'shop'].includes(l.registry.type(t)!.pack)).sort(), ['question', 'shop.verdict']);
 });
 
 test('at risk is what crosses its bound, whatever the field is called', async () => {
