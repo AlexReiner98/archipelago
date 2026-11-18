@@ -211,6 +211,12 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 .pm-box[data-key="lead-bar"] > .pm-box { flex: 1 1 0; height: var(--lead-bar, var(--border-4)); background: currentColor; border-radius: var(--radius-1); }
 /* A press that takes the room left on a line of the band (a decision's option) is cut where it does not fit, as words are. */
 .pm-box[data-key="lead"] .pm-grow > .pm-button { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* Every line of the band keeps one rhythm, a press on it as high as its words; only the large figure stands taller.
+   A decision's option reads as a press: in the text's colour, the accent under the pointer. */
+.pm-box[data-key="lead"] > .pm-box { min-height: var(--lead-line, var(--space-11)); align-items: center; }
+.pm-box[data-key="lead"] .pm-button { padding-block: 0; }
+.pm-box[data-key="lead"] .pm-grow > .pm-button-quiet { color: var(--text); }
+.pm-box[data-key="lead"] .pm-grow > .pm-button-quiet:hover { color: var(--accent); }
 /* A band that is a picture of what it draws (packs/sheet/page/screens.js, leadPicture): small, as high as the style's lead_picture. */
 .lead-picture { border-bottom: var(--border-1) solid var(--line); padding-bottom: var(--space-5); }
 .lead-picture img { display: block; width: 100%; height: var(--lead-picture, var(--thumb-still)); object-fit: cover; border-radius: var(--radius-1); }
@@ -221,7 +227,8 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 
 /* lead-piece (Lane 7): a piece a pack places in the band (screens.js, bandLines), a line each, its label and its value
    cut with an ellipsis, the whole value in its tip; and a picture band that has no picture takes no room. */
-.lead-piece { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding-bottom: var(--space-5); border-bottom: var(--border-1) solid var(--line); }
+.lead-piece { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding: var(--space-5) 0; border-top: var(--border-1) solid var(--line); }
+.lead-piece-line { min-height: var(--lead-line, var(--space-11)); }
 .lead-piece-line { display: flex; align-items: baseline; gap: var(--space-4); min-width: 0; white-space: nowrap; }
 .lead-piece-label { flex: none; color: var(--muted); }
 .lead-piece-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

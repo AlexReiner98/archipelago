@@ -131,7 +131,7 @@ test("an open decision: one line per option, its says in the tooltip, the recomm
   const m = leadMarks({ id: 'e_1', is_open: true, props: { options: five } }, decision, c(five), { writes: true });
   valid(m);
   assert.equal(lines(m).length, 3);
-  assert.match(said(lines(m)[2] as Marks), /★.*"E".*"key":"choices-more","label":"\+2"/, 'the recommended one in sight, the rest behind a count');
+  assert.match(said(lines(m)[2] as Marks), /"E".*★.*"key":"choices-more","label":"\+2"/, 'the recommended one in sight, the rest behind a count');
   assert.match(said(m), /"key":"choice:2"/, 'a hidden one is still pressed from the count');
   const mine = leadMarks({ id: 'e_1', is_open: true, props: { options: five } }, decision, c(five), { waits: [{ id: 'e_me' }], me: 'e_me' });
   valid(mine);
