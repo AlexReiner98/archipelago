@@ -10,7 +10,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { KernelContext } from '#pelago/kernel';
 import type { Check } from './checks.ts';
-import { KEPT, keepLook, keptLook, keptUrl } from './kept.ts';
+import { KEPT, keepLook, keptLook } from './kept.ts';
 import { drawLook, type Marks, type Try } from './look-draw.ts';
 import { keep, kept, keptWith } from './store.ts';
 
@@ -83,7 +83,7 @@ interface Kept {
 }
 
 /** What a look answers: what was drawn and how it stood, with the picture as an image (packs/surface/kernel/mcp.ts sends it as one), or the drawing's marks where they were asked for and it has them. */
-const answer = (look: string, k: Kept, data: Buffer, again = false, kept?: { id: string; url: string }) => ({
+const answer = (look: string, k: Kept, data: Buffer, again = false, kept?: { id: string }) => ({
   look,
   ...(kept && { kept }),
   view: k.hash,
@@ -144,7 +144,7 @@ export async function lookAt(ctx: KernelContext, w: Whose, look: string) {
   if (KEPT.test(look)) {
     const got = await keptLook<Kept & { look: string }>(ctx, look);
     if (!got?.data) throw new Error(`No look "${look}" is kept here: it was never kept, or more were kept since.`);
-    return answer(got.value.look, got.value, got.data, true, { id: look, url: keptUrl(ctx.workspace, look) });
+    return answer(got.value.look, got.value, got.data, true, { id: look });
   }
   if (!LOOK.test(look)) throw new Error(`"${look}" is not a look: query look or show with look: true names one.`);
   const got = await keptWith<Kept>(ctx, `look:${whose(w)}:${look}`);

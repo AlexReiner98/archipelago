@@ -1,11 +1,11 @@
 // A look kept past LOOK_MS (packs/look_draw/kernel/kept.ts): on a fake context whose transient store keeps by a fake
-// clock, a look taken on a screen lapses at LOOK_MS while the same look kept is read again by anyone on the map, its
-// picture at the address it was given; past KEPT_MOST the oldest is taken away.
+// clock, a look taken on a screen lapses at LOOK_MS while the same look kept is read again by anyone on the map;
+// past KEPT_MOST the oldest is taken away.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { KernelContext } from '#pelago/kernel';
-import { KEPT_MOST, KEPT_MS, keepLook, keptPicture, keptUrl } from '../packs/look_draw/kernel/kept.ts';
+import { KEPT_MOST, KEPT_MS, keepLook, keptLook } from '../packs/look_draw/kernel/kept.ts';
 import { LOOK_MS, lookAt } from '../packs/look_draw/kernel/looks.ts';
 
 function fake(workspace: string) {
@@ -42,8 +42,7 @@ test('a kept look is read again past LOOK_MS, by anyone on the map; the screenâ€
   store.set('look:w1:e_sam00001:l_0123456789ab', { value: drawn, data: png, until: clock.now + LOOK_MS });
   const kept = await keepLook(ctx, { ...drawn, look: 'l_0123456789ab' }, png);
   assert.match(kept.id, /^k_[0-9a-f]{24}$/);
-  assert.equal(kept.url, `/look/w1/${kept.id}`);
-  assert.equal(kept.url, keptUrl('w1', kept.id));
+  assert.deepEqual(Object.keys(kept), ['id'], 'an id alone: no address reads it without a token');
 
   clock.now += LOOK_MS + 1;
   await assert.rejects(lookAt(ctx, sam, 'l_0123456789ab'), /No look/, 'the screenâ€™s look has lapsed');
@@ -54,9 +53,8 @@ test('a kept look is read again past LOOK_MS, by anyone on the map; the screenâ€
     assert.equal(again.image.data, png.toString('base64'));
     assert.deepEqual(again.checks, drawn.checks, 'its checks are kept with it');
   }
-  assert.deepEqual(await keptPicture(ctx, kept.id), { data: png, content_type: 'image/png' });
-  assert.equal(await keptPicture(ctx, 'k_nope'), undefined, 'an id that is none is nothing');
-  assert.equal(await keptPicture(ctx, `k_${'0'.repeat(24)}`), undefined, 'nor one never kept');
+  assert.equal(await keptLook(ctx, 'k_nope'), undefined, 'an id that is none is nothing');
+  await assert.rejects(lookAt(ctx, sam, `k_${'0'.repeat(24)}`), /is kept here/, 'nor one never kept');
 
   clock.now += KEPT_MS;
   await assert.rejects(lookAt(ctx, sam, kept.id), /is kept here/, 'past KEPT_MS it is gone too');
@@ -67,9 +65,9 @@ test('a workspace keeps its last KEPT_MOST looks: a keep past them takes the old
   const png = Buffer.from('p');
   const ids: string[] = [];
   for (let n = 0; n <= KEPT_MOST; n++) ids.push((await keepLook(ctx, { ...drawn, look: 'l_0123456789ab' }, png)).id);
-  assert.equal(await keptPicture(ctx, ids[0]), undefined, 'the first is gone');
-  assert.ok(await keptPicture(ctx, ids[1]), 'the second stays');
-  assert.ok(await keptPicture(ctx, ids.at(-1)!));
+  assert.equal(await keptLook(ctx, ids[0]), undefined, 'the first is gone');
+  assert.ok(await keptLook(ctx, ids[1]), 'the second stays');
+  assert.ok(await keptLook(ctx, ids.at(-1)!));
   assert.equal([...store.keys()].filter((k) => k.startsWith('keptlook:k_')).length, KEPT_MOST);
   assert.equal((store.get('keptlook:index')!.value as string[]).length, KEPT_MOST);
 });

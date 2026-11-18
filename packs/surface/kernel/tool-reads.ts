@@ -400,7 +400,7 @@ export const READ_TOOLS: Record<string, Tool> = {
   },
   look: {
     description:
-      'See what a view looks like: the server draws it in its own browser, from the same page, layouts and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the query found nothing, error, late), settled (false for a layout still moving), why, the workspace it was drawn from, drawn_at, drew (what its parts drew with: the host’s commit, the packs, each part’s hash, the log position), and fell_back: each face the page asked for that the server drew in another; checks: what the drawn page breaks of the rules a machine reads (past_frame, small_text, wrapped_row), each with the mark and a line, empty when nothing does. ' +
+      'See what a view looks like: the server draws it in its own browser, from the same page, layouts and sandbox the owner’s screen uses, as you see the map (private items as query shows them to you), and answers with the picture as an image, once the view says it has drawn: state (drawn, empty: the query found nothing, error, late), settled (false for a layout still moving), why, the workspace it was drawn from, drawn_at, drew (what its parts drew with: the host’s commit, the packs, each part’s hash, the log position), and fell_back: each face the page asked for that the server drew in another. ' +
       'It never moves the owner’s page (show with look: true does both), and the person reading a chat does not see it: draw shows them. The same view at the same size, the map and the server unchanged, answers with the picture already taken (again: true, and when it was drawn) unless fresh. With published and a document, the page a reader would get if it were published now. At most 60 an hour per workspace.',
     input: {
       ...VIEW_INPUT,
@@ -408,7 +408,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       height: z.number().int().min(240).max(1600).optional().describe('Its height (750).'),
       scheme: z.enum(['dark', 'light']).optional().describe('The theme it is drawn in, as a reader whose system is dark or light sees it (dark).'),
       fresh: z.boolean().optional().describe('Draw it again, never the picture already taken.'),
-      keep: z.boolean().optional().describe('Keep it past the 30 minutes, for anyone who reads the map: answers kept { id, url }, url the address the app’s page loads it at; query picture with look the id reads it again.'),
+      keep: z.boolean().optional().describe('Keep it past the 30 minutes, for anyone who reads the map: answers kept { id }, which query picture with look reads again.'),
       published: z.boolean().optional().describe('With entity a document: draw the page publishing it now would give, as its preview does, not the app.'),
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
 

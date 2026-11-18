@@ -20,7 +20,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { hostAt, hostOf } from '../../loader/kernel/kernel-context.ts';
 import { backupFile } from './backup-route.ts';
 import { guestCountsRoute, guestLink, guestMake, guestRead } from './guest-route.ts';
-import { keptLook } from './kept-look-route.ts';
 import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { actorId } from '../../write/kernel/pelago-types.ts';
 import type { Workspaces } from '../../identity/kernel/workspaces.ts';
@@ -113,7 +112,7 @@ export async function answerFilled(l: Archipelago, key: string, read: unknown, _
 }
 
 /** The surface's own routes answered before the server's, in order. */
-export const filledRoutes = (): RouteFilling[] => [backupFile, guestMake, guestLink, guestRead, guestCountsRoute, keptLook];
+export const filledRoutes = (): RouteFilling[] => [backupFile, guestMake, guestLink, guestRead, guestCountsRoute];
 
 /** Serve a request by the first route filling that matches it: true when one did. */
 export async function serveFilled(req: IncomingMessage, res: ServerResponse, path: string, host: RouteHost): Promise<boolean> {
