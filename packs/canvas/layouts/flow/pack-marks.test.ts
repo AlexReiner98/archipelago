@@ -1,8 +1,7 @@
-// A pack's parts in an island's header (feature e_4r82mvf3, lane e_d2s3ekhz): a click on a pack whose parts the answer
-// names opens them as a row of smaller marks after it, grouped by kind, the first the switch for the whole pack; a
-// click on a part is a toggle the page answers (packs/walls/page/marks-toggle.js) in the island's parts_off. Off a part
-// is dashed, waiting faded and dashed; its tip says what it gives and lacks. Drawn from a fixture answer, as the kernel
-// half (Lane 3) is to give it.
+// A pack's parts on an island (feature e_4r82mvf3, study e_a4zcgpda, verdict e_xqmtjtpw): a click on a pack whose parts
+// the answer names asks the page to add `parts <pack> <island>` to the canvas query; the answer then holds its parts as
+// an island of their own, placed by the layout like any island, what acts wired to what it names; a click on a part
+// there toggles it in the island's parts_off. The island's key toggles its types and links, and counts the rest.
 
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
@@ -21,11 +20,11 @@ const measure = (t: string, px: number) => t.length * px * 0.55;
 
 const item = (id: string, title: string) => ({ id, type: 'task', is: ['work'], title, open: true, status: 'todo', phase: 'not_started', island: 'e_buildisl' });
 const parts = [
-  { id: 'build.wave', kind: 'view', state: 'active' },
+  { id: 'build.wave', kind: 'view', state: 'active', needs: ['build.feature'] },
   { id: 'build.lane', kind: 'type', state: 'off' },
-  { id: 'build.gate', kind: 'rule', state: 'waiting', lacks: ['type:build.lane'] },
+  { id: 'build.gate', kind: 'rule', state: 'waiting', lacks: ['type:build.lane'], needs: ['build.lane'] },
   { id: 'build.feature', kind: 'type', state: 'active' },
-  { id: 'build.hands_to', kind: 'link', state: 'active' },
+  { id: 'build.hands_to', kind: 'link', state: 'active', needs: ['build.feature'] },
 ];
 const answer = {
   islands: [{
@@ -51,98 +50,110 @@ const keyed = (svg: any, prefix: string) => marks(svg, (m) => typeof m[1]?.key =
 const texts = (mark: any): string[] => (typeof mark === 'string' ? [mark] : Array.isArray(mark) ? mark.slice(typeof mark[0] === 'string' ? 2 : 0).flatMap(texts) : []);
 const cx = (mark: any) => Number(marks(mark, (k) => k[0] === 'circle')[0][1].cx);
 const r = (mark: any) => Number(marks(mark, (k) => k[0] === 'circle')[0][1].r);
-/** Click a pack's mark: the header the patch draws in its place. */
-const click = (p: any, key: string) => {
-  const patches = p.on({ name: 'click', key });
-  const head = patches.find((x: any) => x.key === 'ph:e_buildisl');
-  assert.ok(head, 'the header is drawn again');
-  return head.mark;
+/** The answer with a pack's parts open as an island of the query (the term `parts <pack> e_buildisl`, ./parts-islands.js). */
+const opened = (a: any, ...packs: string[]) => {
+  const isle = a.islands[0], of = (id: string) => (id === isle.pack.id ? isle.pack : isle.pack.requires.find((r: any) => r.id === id));
+  return { ...a, islands: [...a.islands, ...packs.map((id) => ({ id: `parts:e_buildisl:${id}`, title: `${of(id).title}: its parts`, parts_of: { island: 'e_buildisl', pack: id }, pack: of(id) }))] };
 };
+/** A parts island's rows, by the part each names. */
+const ghostRows = (svg: any) => new Map(keyed(keyed(svg, 'gh:')[0] ?? [], 'pt:').map((m) => [m[1].key.split(':')[2], m]));
+const xOf = (m: any) => Number(marks(m, (k) => k[0] === 'circle')[0][1].cx);
+/** The land of an island, by its region's key: its first rect. */
+const landOf = (svg: any, id: string) => marks(keyed(svg, `i:${id}`)[0], (k) => k[0] === 'rect')[0]?.[1];
 
-test('closed, a pack with parts is a button that opens them, and none of its parts is drawn', () => {
+test("a pack with parts asks the page to add its term to the canvas query, and none of its parts is drawn until the answer holds them", () => {
   const svg = draw(answer, writer).scene.svg, [build] = keyed(svg, 'pk:');
-  assert.ok(build[1].on.includes('click') && !build[1].on.includes('toggle'), 'a click opens it: it is not the switch');
+  assert.ok(build[1].on.includes('find') && !build[1].on.includes('toggle'), 'a click is a find: it is not the switch');
+  assert.equal(build[1].find, 'parts build e_buildisl', 'the term the page adds or takes away');
   assert.equal(build[1].pack, undefined);
   assert.match(texts(build).join('\n'), /Click to open its parts/);
-  assert.match(texts(build).join('\n'), /Turn it off here from its first part/, 'its tip says where the whole pack is turned off');
-  assert.equal(keyed(svg, 'pt:').length + keyed(svg, 'pw:').length, 0);
-  assert.equal(keyed(svg, 'ph:').length, 1, 'the header is one group a click can replace');
+  assert.equal(keyed(svg, 'gh:').length + keyed(svg, 'pw:').length, 0);
 });
 
-test('a click opens its parts after it, the switch first, grouped by kind; again, closes them', () => {
-  const p = draw(answer, writer), before = keyed(p.scene.svg, 'pk:').map(cx);
-  const head = click(p, 'pk:e_buildisl:build');
-  const [sw] = keyed(head, 'pw:'), row = keyed(head, 'pt:'), packs = keyed(head, 'pk:');
-  assert.equal(sw[1].key, 'pw:e_buildisl:build');
-  assert.deepEqual(row.map((m) => m[1].key.split(':')[2]), ['build.lane', 'build.feature', 'build.hands_to', 'build.gate', 'build.wave'], 'types, links, rules, views: each kind in the answer\'s order');
-  assert.deepEqual(partsOf(answer.islands[0].pack).map((x: any) => x.kind), ['type', 'type', 'link', 'rule', 'view']);
-  const xs = [cx(packs[0]), cx(sw), ...row.map(cx)];
-  assert.ok(xs.every((x, k) => !k || x > xs[k - 1]), 'in a row, after the pack');
-  assert.ok(cx(packs[1]) > xs.at(-1)!, 'the packs after it stand past its row');
-  assert.ok(cx(packs[1]) > before[1]);
-  const step = (a: any, b: any) => cx(b) - cx(a);
-  assert.ok(step(row[1], row[2]) > step(row[0], row[1]), 'a wider gap between kinds');
-  assert.ok(r(row[0]) < r(packs[0]), 'a part is smaller than a pack');
-  assert.equal(r(row[0]), house.sizes.flow_island_part_mark / 2, 'its size is the style\'s');
-  assert.match(packs[0][1].class, /\bopen\b/);
-  assert.match(texts(packs[0]).join('\n'), /Click to close its parts/);
-  const shut = click(p, 'pk:e_buildisl:build');
-  assert.equal(keyed(shut, 'pt:').length, 0, 'a second click closes them');
-  assert.deepEqual(keyed(shut, 'pk:').map(cx), before);
+test("the answer's parts island is placed by the layout as an island of its own: what is written left, what acts right", () => {
+  const svg = draw(opened(answer, 'build'), writer).scene.svg;
+  assert.equal(keyed(svg, 'gh:').length, 1, 'one parts island');
+  assert.equal(keyed(svg, 'pw:')[0][1].key, 'pw:e_buildisl:build', 'the whole pack\'s switch beside its mark, open');
+  assert.match(keyed(svg, 'pk:e_buildisl:build')[0][1].class, /\bopen\b/);
+  assert.match(texts(keyed(svg, 'pk:e_buildisl:build')[0]).join('\n'), /Click to close its parts/);
+  const rows = ghostRows(svg);
+  assert.deepEqual([...rows.keys()].sort(), ['build.feature', 'build.gate', 'build.hands_to', 'build.lane', 'build.wave'], 'every part, named');
+  assert.ok(xOf(rows.get('build.gate')) > xOf(rows.get('build.lane')), 'types and links left, rules and views right');
+  // Laid out as an island: its parts do not lie on the island it is of.
+  const land = landOf(svg, 'e_buildisl'), x0 = Number(land.x), x1 = x0 + Number(land.width), y0 = Number(land.y), y1 = y0 + Number(land.height);
+  for (const m of rows.values()) {
+    const [x, y] = [xOf(m), Number(marks(m, (k) => k[0] === 'circle')[0][1].cy)];
+    assert.ok(!(x >= x0 && x <= x1 && y >= y0 && y <= y1), `${m[1].key} stands off the island's land`);
+  }
+  assert.equal(keyed(svg, 'i:parts:e_buildisl:build').length, 1, 'it is an island of the drawing');
+  assert.equal(marks(keyed(svg, 'i:parts:e_buildisl:build')[0], (k) => k[1]?.class === 'lf-island-name').length, 0, 'with no name or key of its own: its parts\' title says it');
 });
 
-test('opening one pack closes another, and each pack opens its own', () => {
-  const p = draw(answer, writer);
-  click(p, 'pk:e_buildisl:build');
-  const runs = click(p, 'pk:e_buildisl:runs');
-  assert.deepEqual(keyed(runs, 'pt:').map((m) => m[1].key), ['pt:e_buildisl:runs.run']);
+test('a wire runs from each part that acts to each type it names, each in its own channel', () => {
+  const svg = draw(opened(answer, 'build'), writer).scene.svg;
+  const wires = marks(keyed(svg, 'gh:')[0], (k) => k[0] === 'path' && String(k[1].class).startsWith('lf-ghost-wire'));
+  assert.equal(wires.length, 2, 'build.gate to build.lane, build.wave to build.feature');
+  const channels = wires.map((w: any) => /H(-?[\d.]+)V/.exec(String(w[1].d))![1]);
+  assert.notEqual(channels[0], channels[1], 'no two parts\' wires share a stretch');
+  const wire = wires.find((w: any) => /\bst-waiting\b/.test(w[1].class));
+  assert.ok(wire, "a waiting rule's wire is drawn waiting");
+  const rows = ghostRows(svg), gate = rows.get('build.gate');
+  assert.equal(Number(/^M(-?[\d.]+) (-?[\d.]+)/.exec(String(wire[1].d))![2]), Number(marks(gate, (k) => k[0] === 'circle')[0][1].cy), 'from the row that acts');
 });
 
-test('the switch turns the whole pack, and each part toggles in parts_off, where the session may write', () => {
-  const head = click(draw(answer, writer), 'pk:e_buildisl:build');
-  const [sw] = keyed(head, 'pw:'), by = new Map(keyed(head, 'pt:').map((m) => [m[1].key.split(':')[2], m]));
+test('two packs open are two parts islands', () => {
+  const svg = draw(opened(answer, 'build', 'runs'), writer).scene.svg;
+  assert.equal(keyed(svg, 'gh:').length, 2);
+  assert.ok(keyed(svg, 'i:parts:e_buildisl:runs').length === 1 && keyed(svg, 'pt:e_buildisl:runs.run').length === 1);
+});
+
+test('the switch turns the whole pack, and each part on its island toggles in parts_off, where the session may write', () => {
+  const svg = draw(opened(answer, 'build'), writer).scene.svg;
+  const [sw] = keyed(svg, 'pw:'), by = ghostRows(svg);
   assert.ok(sw[1].on.includes('toggle') && sw[1].item === 'e_buildisl' && sw[1].pack === 'build', 'the switch names its island and pack');
-  assert.match(texts(sw).join('\n'), /Click to turn the whole pack off here/);
   const feature = by.get('build.feature');
-  assert.ok(feature[1].on.includes('toggle') && feature[1].item === 'e_buildisl' && feature[1].pack === 'build.feature', 'an active part toggles, naming the part');
-  assert.match(texts(feature).join('\n'), /Click to turn it off here/);
-  const lane = by.get('build.lane');
-  assert.ok(lane[1].on.includes('toggle'), 'off by this island: a button to turn it on');
-  assert.match(texts(lane).join('\n'), /Click to turn it on here/);
+  assert.ok(feature[1].on.includes('toggle') && feature[1].item === 'e_buildisl' && feature[1].pack === 'build.feature', 'an active part toggles, naming the part, in the island it is of');
+  assert.ok(by.get('build.lane')[1].on.includes('toggle'), 'off by this island: a button to turn it on');
   const gate = by.get('build.gate');
   assert.ok(!gate[1].on.includes('toggle') && gate[1].pack === undefined, 'a waiting part is no button: it waits on what it lacks');
   const elsewhere = { ...answer, islands: [{ ...answer.islands[0], parts_off: [] }] };
-  const off = keyed(click(draw(elsewhere, writer), 'pk:e_buildisl:build'), 'pt:e_buildisl:build.lane')[0];
-  assert.ok(!off[1].on.includes('toggle'), 'off, but not by this island: no button');
+  assert.ok(!ghostRows(draw(opened(elsewhere, 'build'), writer).scene.svg).get('build.lane')[1].on.includes('toggle'), 'off, but not by this island: no button');
 });
 
-test('a reader opens a pack\'s parts but switches nothing', () => {
-  const head = click(draw(answer), 'pk:e_buildisl:build');
-  for (const m of [...keyed(head, 'pw:'), ...keyed(head, 'pt:')]) assert.ok(!m[1].on.includes('toggle') && m[1].pack === undefined, `${m[1].key} is no button`);
-  assert.doesNotMatch(texts(keyed(head, 'pt:')).join('\n'), /Click/);
+test("a reader sees a pack's parts but switches nothing", () => {
+  const svg = draw(opened(answer, 'build')).scene.svg, rows = [...ghostRows(svg).values()];
+  assert.equal(rows.length, 5);
+  for (const m of [...keyed(svg, 'pw:'), ...rows]) assert.ok(!m[1].on.includes('toggle') && m[1].pack === undefined, `${m[1].key} is no button`);
 });
 
-test('off a part is dashed, waiting faded and dashed, in its state\'s colour', () => {
-  const p = draw(answer), head = click(p, 'pk:e_buildisl:build'), by = new Map(keyed(head, 'pt:').map((m) => [m[1].key.split(':')[2], m]));
+test("off a part is dashed, waiting faded and dashed, in its state's colour, each with its kind's glyph", () => {
+  const p = draw(opened(answer, 'build')), by = ghostRows(p.scene.svg);
   assert.match(by.get('build.lane')[1].class, /\bst-off\b/);
   assert.match(by.get('build.gate')[1].class, /\bst-waiting\b/);
-  assert.match(by.get('build.feature')[1].class, /\bk-type\b/);
+  const glyph = (m: any) => texts(marks(m, (k) => k[0] === 'text')[0]).join('');
+  for (const [id, m] of by) assert.equal(glyph(m), house.pack_marks.kinds[parts.find((x) => x.id === id)!.kind]);
   const css = p.scene.css;
-  assert.ok(css.includes('.lf-pack.st-off circle, .lf-part.st-off circle { stroke-dasharray: var(--ln-flow-dash-held); }'), 'off: dashed');
   assert.ok(css.includes('.lf-part.st-waiting { opacity: var(--ln-flow-waiting); }'), 'waiting: faded, as a waiting step');
-  assert.ok(css.includes('.lf-part.st-waiting circle { stroke-dasharray: var(--ln-flow-dash-held); }'), 'waiting: dashed');
   for (const state of ['active', 'waiting', 'off']) assert.ok(css.includes(`.lf-part.st-${state} { --lf-pack: var(--ln-${house.pack_marks[state].hue}); }`), `the ${state} colour comes from the style`);
 });
 
-test('each part shows its kind\'s glyph from the style', () => {
-  const head = click(draw(answer), 'pk:e_buildisl:build');
-  const glyph = (m: any) => texts(marks(m, (k) => k[0] === 'text')[0]).join('');
-  assert.equal(glyph(keyed(head, 'pw:')[0]), house.pack_marks.kinds.pack);
-  for (const m of keyed(head, 'pt:')) assert.equal(glyph(m), house.pack_marks.kinds[parts.find((x) => x.id === m[1].key.split(':')[2])!.kind]);
+test("the island's key toggles a type it shows, and counts each pack's other parts", () => {
+  const typed = {
+    ...answer,
+    islands: [{ ...answer.islands[0], pack: { ...answer.islands[0].pack, types: [{ id: 'build.feature', title: 'Feature', is: ['work'] }, { id: 'build.lane', title: 'Lane', is: ['work'] }] } }],
+    items: [{ ...item('e_buildisl', 'Build the thing'), type: 'build.feature' }, { ...item('e_lanezzzz', 'A lane'), type: 'build.lane' }],
+  };
+  const svg = draw(typed, writer).scene.svg;
+  const keyRow = (id: string) => keyed(svg, `pt:e_buildisl:${id}:key`)[0];
+  assert.ok(keyRow('build.feature')[1].on.includes('toggle') && keyRow('build.feature')[1].pack === 'build.feature', 'a type in the key is a toggle naming its part');
+  assert.match(keyRow('build.lane')[1].class, /\bst-off\b/, 'a type off here is drawn off in the key');
+  const count = `${house.pack_marks.kinds.rule} 0/1 · ${house.pack_marks.kinds.view} 1`;
+  assert.ok(texts(svg).includes(count), "a row for the pack's other parts, by kind, its mark the pack's glyph");
+  assert.equal(keyed(draw(typed).scene.svg, 'pt:e_buildisl:build.feature:key')[0][1].pack, undefined, 'a reader toggles nothing');
 });
 
 test('a hover says what a pack gives and takes (with who gives it), and what a waiting one lacks', () => {
-  const p = draw(answer);
+  const p = draw(opened(answer, 'build'));
   const tipOf = (key: string) => texts(p.on({ name: 'enter', key }).find((x: any) => x.tip)?.tip.mark).join('\n');
   const build = tipOf('pk:e_buildisl:build');
   assert.match(build, /Gives type:build\.feature, type:build\.lane, link:build\.hands_to/);
@@ -167,6 +178,16 @@ test('a pack the answer names no parts of is its own switch, as before; the kern
 
 test('the open row is counted in how wide the header stands', () => {
   const z = (n: string) => house.sizes[`flow_${n}`];
-  assert.ok(packsWidth(answer.islands[0].pack, z, null, measure, 'build') > packsWidth(answer.islands[0].pack, z, null, measure));
-  assert.equal(packsWidth(answer.islands[0].pack, z, null, measure, 'nothing'), packsWidth(answer.islands[0].pack, z, null, measure));
+  assert.ok(packsWidth(answer.islands[0].pack, z, null, measure, new Set(['build'])) > packsWidth(answer.islands[0].pack, z, null, measure));
+  assert.equal(packsWidth(answer.islands[0].pack, z, null, measure, new Set(['nothing'])), packsWidth(answer.islands[0].pack, z, null, measure));
+});
+
+test('a parts island is shelved right after the island it is of, before any other', () => {
+  const two = { ...answer, islands: [...answer.islands, { id: 'e_aaneighb', title: 'Neighbour' }], items: [{ ...item('e_aan1zzzz', 'Neighbour one'), island: 'e_aaneighb' }, ...answer.items] };
+  const svg = draw(opened(two, 'build'), writer).scene.svg;
+  const ghost = marks(keyed(svg, 'gh:')[0], (k) => k[1]?.class === 'lf-ghost')[0][1], own = landOf(svg, 'e_buildisl'), other = landOf(svg, 'e_aaneighb');
+  const at = (r: any) => [Number(r.x), Number(r.y)];
+  const [gx, gy] = at(ghost), [ox, oy] = at(own), [nx, ny] = at(other);
+  assert.ok(gy > oy || gx > ox, 'after its own island');
+  assert.ok(gy < ny || (gy === ny && gx < nx) || ny < oy || (ny === oy && nx < ox), 'and before the neighbour that comes after its own');
 });
