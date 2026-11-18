@@ -56,6 +56,8 @@ export const UI_FILES: Record<string, string> = {
   // The mark of what waits on the owner (their move, a question to them): an inbox, painted by the stylesheets as a mask
   // wherever that state is drawn (the band's count, the side bar's chats, a tab), so it is one drawing everywhere.
   '/inbox.svg': 'inbox.svg',
+  // Google's mark in its own colours, before Sign in with Google (packs/identity/page/sign-up.js).
+  '/google.svg': 'google.svg',
   // How a part's marks look: classes and steps the style gives values to (packs/walls/page/part-render.js).
   '/part-marks.css': 'part-marks.css',
   
