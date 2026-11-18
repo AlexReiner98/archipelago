@@ -44,6 +44,7 @@ export const SLOW: Record<string, string> = {
   'test/first-drawing.test.ts': 'browser',
   'test/kept-views.test.ts': 'browser',
   'test/looks.test.ts': 'browser',
+  'test/look-press.test.ts': 'browser',
   'test/mcp-view-host.test.ts': 'browser',
   'test/kept-pictures.test.ts': 'browser',
   'test/narrow-picture.test.ts': 'browser',

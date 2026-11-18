@@ -36,6 +36,8 @@ const seen = (el, fn) => {
 export const toldOfEnter = new WeakSet();
 /** The one address a drawing may link to: an item's page. */
 const ITEM = /^#\/e\/e_[a-z0-9]{8}$/;
+/** Each keyed element made, by its key: what a look presses finds a mark by (./look-press.js), never read by a drawing. */
+export const keyOf = new WeakMap();
 /** The most marks one drawing may make: past it, the drawing is stopped. */
 export const mostMarks = 60000;
 
@@ -66,19 +68,19 @@ export function build(mark, keys, tell, svg = false, count = { n: 0 }) {
   const [tag, attrs = {}, ...kids] = mark;
   if (tag === 'reader' && !svg) {
     const el = readerFrame(attrs ?? {}, fail);
-    if (attrs?.key !== undefined) keys.set(String(attrs.key), el);
+    if (attrs?.key !== undefined) (keys.set(String(attrs.key), el), keyOf.set(el, String(attrs.key)));
     return el;
   }
   if (tag === 'view' && !svg) {
     const el = viewFrame(attrs ?? {}, fail);
-    if (attrs?.key !== undefined) keys.set(String(attrs.key), el);
+    if (attrs?.key !== undefined) (keys.set(String(attrs.key), el), keyOf.set(el, String(attrs.key)));
     return el;
   }
   const inSvg = svg || tag === 'svg';
   if (!(inSvg ? SVG_TAGS : HTML_TAGS).has(tag)) fail(`the tag "${tag}"`);
   const el = inSvg ? document.createElementNS(SVG, tag) : document.createElement(tag);
   for (const [name, value] of Object.entries(attrs ?? {})) {
-    if (name === 'key') keys.set(String(value), el);
+    if (name === 'key') (keys.set(String(value), el), keyOf.set(el, String(value)));
     else if (name === 'on') for (const e of Array.isArray(value) ? value : []) !EVENTS[e] ? fail(`the event "${e}"`) : OWN[e] ? OWN[e](el, String(attrs.key), tell) : (e === 'enter' && toldOfEnter.add(el), el.addEventListener(EVENTS[e], (ev) => tell(String(attrs.key), e, ev)));
     else attribute(el, name, value);
   }

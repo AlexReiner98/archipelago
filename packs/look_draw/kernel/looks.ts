@@ -78,6 +78,9 @@ interface Kept {
   /** A dry run: the fields drawn in place of what the map holds (`item field`), and what the drawing's code threw. */
   tried?: string[];
   errors?: string[];
+  /** A pressed look's: the marks pressed before it was taken, by key, and those not found. */
+  pressed?: string[];
+  missing?: string[];
   /** What the drawn page breaks of the rules a machine reads (./checks.ts); a look kept before there were checks has none. */
   checks?: Check[];
 }
@@ -97,6 +100,7 @@ const answer = (look: string, k: Kept, data: Buffer, again = false, kept?: { id:
   ...(k.drew && { drew: k.drew }),
   ...(k.as_at && { as_at: k.as_at }),
   ...(k.tried && { tried: k.tried, errors: k.errors ?? [] }),
+  ...(k.pressed && { pressed: k.pressed, missing: k.missing ?? [] }),
   checks: k.checks ?? [],
   width: k.width,
   height: k.height,
@@ -109,7 +113,7 @@ const answer = (look: string, k: Kept, data: Buffer, again = false, kept?: { id:
  * Draw the page at `hash` (as the UI addresses it: v?canvas=<id>, v?<lens>, e/<id>; or preview/<id>, a document as it
  * would publish) for the asking agent and keep the picture. `fresh` draws it again whatever has changed or not.
  */
-export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean; at?: number; tries?: Try[]; keep?: boolean } = {}) {
+export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash: string, size: { width?: number; height?: number; scheme?: 'dark' | 'light'; fresh?: boolean; marks?: boolean; at?: number; tries?: Try[]; keep?: boolean; press?: string[] } = {}) {
   const width = Math.min(1920, Math.max(320, Math.round(size.width ?? 1200)));
   const height = Math.min(1600, Math.max(240, Math.round(size.height ?? 750)));
   const scheme = size.scheme ?? 'dark';
@@ -117,8 +121,10 @@ export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash
   const marks = Boolean(size.marks) && hash.startsWith('v');
   // As it was: the page asks its parts at that log position (packs/surface/page/part-host.js), so they run the code of then.
   const asAt = Number.isInteger(size.at) && size.at! > 0 ? size.at : undefined;
+  // Pressed first: its own picture, as many marks as asked, in order (packs/look_draw/kernel/look-draw.ts, pressAll).
+  const press = size.press?.length ? size.press.map(String) : undefined;
   const pos = await ctx.reads({ log_head: true });
-  const same = `lookof:${whose(w)}:${sha256Hex(JSON.stringify([hash, width, height, scheme, pos, marks, asAt ?? null, (await ofRoots(ctx, { ui: true })).ui, BEGAN])).slice(0, 32)}`;
+  const same = `lookof:${whose(w)}:${sha256Hex(JSON.stringify([hash, width, height, scheme, pos, marks, asAt ?? null, (await ofRoots(ctx, { ui: true })).ui, BEGAN, ...(press ? [press] : [])])).slice(0, 32)}`;
   // A dry run (tries: code not yet saved) is drawn each time and never kept as what the view looks like.
   const tries = size.tries?.length ? size.tries : undefined;
   if (!size.fresh && !tries) {
@@ -129,9 +135,9 @@ export async function takeLook(ctx: KernelContext, w: Whose, actor: string, hash
   await countLook(ctx, w.viewer || actor);
   const { pass } = await ofRoots(ctx, { pass: { actor } });
   const address = hash.startsWith('preview/') ? `${origin}/${hash}?look` : `${origin}/?look${asAt ? `&at=${asAt}` : ''}#/${hash}`;
-  const got = await drawLook(address, pass, width, height, scheme, marks, tries);
+  const got = await drawLook(address, pass, width, height, scheme, marks, tries, press);
   const look = `l_${randomBytes(6).toString('hex')}`;
-  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }), ...(got.drew && { drew: got.drew }), ...(asAt && { as_at: asAt }), ...(tries && { tried: tries.map((t) => `${t.item} ${t.field}`), errors: got.errors ?? [] }), checks: got.checks };
+  const k: Kept = { scheme, content_type: got.content_type, width: got.width, height: got.height, state: got.state, settled: got.settled, ...(got.why && { why: got.why }), hash, ms: got.ms, at: new Date().toISOString(), workspace: w.workspace, ...(got.marks && { marks: got.marks }), ...(got.fell_back && { fell_back: got.fell_back }), ...(got.drew && { drew: got.drew }), ...(asAt && { as_at: asAt }), ...(tries && { tried: tries.map((t) => `${t.item} ${t.field}`), errors: got.errors ?? [] }), ...(press && { pressed: got.pressed ?? [], missing: got.missing ?? [] }), checks: got.checks };
   await keep(ctx, `look:${whose(w)}:${look}`, k, LOOK_MS, got.data);
   if (!tries) await keep(ctx, same, { look }, LOOK_MS);
   // Kept (keep: true): past LOOK_MS, for the whole workspace, under an id of its own (./kept.ts). A dry run is kept too: a round may picture code not yet saved.

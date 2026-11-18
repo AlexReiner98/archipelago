@@ -26,5 +26,8 @@ export function sayLook(state, why) {
 if (lookMode) {
   // The drawing as marks, for a look that asks for them (packs/look_draw/kernel/look-draw.ts): loaded only here.
   window.lookMarks = async () => (await import('./look-marks.js')).marksOf(document.querySelector('#canvas [data-drawing]'));
+  // Where a mark stands, by its key, and how many times the page has changed: for a look that presses marks first (./look-press.js).
+  window.lookPlace = async (key) => (await import('./look-press.js')).placeOf(key);
+  window.lookChanges = async () => (await import('./look-press.js')).changes();
   root.dataset.look = 'drawing';
 }

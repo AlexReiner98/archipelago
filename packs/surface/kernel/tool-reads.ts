@@ -410,6 +410,7 @@ export const READ_TOOLS: Record<string, Tool> = {
       fresh: z.boolean().optional().describe('Draw it again, never the picture already taken.'),
       keep: z.boolean().optional().describe('Keep it past the 30 minutes, for anyone who reads the map: answers kept { id }, which query picture with look reads again.'),
       published: z.boolean().optional().describe('With entity a document: draw the page publishing it now would give, as its preview does, not the app.'),
+      press: z.array(z.string().min(1).max(200)).min(1).max(12).optional().describe('Marks to press first, by their keys, in order: each clicked as a person would, once the view has drawn, and let settle, before the picture is taken (a header opened, then one of its rows). The answer says pressed and missing (no such mark drawn). A pressed look is a picture of its own.'),
       marks: z.boolean().optional().describe('Answer with the drawing as marks (markup and its stylesheet, large) in place of the image, where it has them: what a view drawn in a chat asks for. To see a view yourself, leave this out.'),
 
       at: z.number().int().min(1).optional().describe('Redraw as it was: a log position (an earlier look’s drew.at), so the page’s parts run the code their packs had then. The host is the server’s code now; drew says if its commit differs.'),
