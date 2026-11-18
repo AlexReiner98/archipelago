@@ -7,6 +7,7 @@
 // drawn past LATE_MS: a page that never yields is answered for, not waited on. Chrome is started on the first and
 // stopped when none has come for IDLE_MS.
 
+import { checksOf, PROBE, type Check, type Probe } from './checks.ts';
 import { openBrowser, type Browser, type Tab } from './chrome.ts';
 
 /** A catch that says what failed and answers `fallback` (as src/logged.ts does): a drawing's extras never fail it. */
@@ -49,6 +50,8 @@ export interface Drawn {
   drew?: unknown[];
   /** A dry run's: what its drawings said went wrong, each once, the first first. */
   errors?: string[];
+  /** What the drawn page breaks of the rules a machine reads (./checks.ts): empty when nothing does. */
+  checks: Check[];
 }
 
 /** Code not yet saved, drawn in place of a field the map holds (packs/surface/kernel/tool-preview.ts, Preview): the page's tries, set before its code runs. */
@@ -200,10 +203,12 @@ async function drawNow(address: string, pass: string, width: number, height: num
     const jpeg = last.length > PNG_MOST;
     const made = marks && state === 'drawn' ? await tab.evaluate<Marks | null>('window.lookMarks()').catch(logged(`look ${address}: its marks could not be read`, null)) : null;
     const fell_back = await facesOf(tab).catch(logged(`look ${address}: its faces could not be read`));
+    // Read off the page as it was taken: a probe that fails is said, and the look answers with no checks.
+    const checks = checksOf(await tab.evaluate<Probe>(PROBE).catch(logged(`look ${address}: its checks could not be read`, null)));
     const drew = await tab.evaluate<unknown[] | null>('window.lookDrew ? window.lookDrew() : null').catch(logged(`look ${address}: what it drew with could not be read`, null));
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
     const errors = tries?.length ? errorsOf(state, why, (await tab.evaluate<string[]>(SHOWN_ERRORS).catch(logged(`look ${address}: its errors could not be read`, []))) ?? []) : undefined;
-    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(errors && { errors }) };
+    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, checks, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(errors && { errors }) };
   } catch (err) {
     throw Date.now() - began >= LATE_MS ? new Error(`The view had not drawn within ${LATE_MS / 1000} s, and its page stopped answering: it was closed.`) : err;
   } finally {

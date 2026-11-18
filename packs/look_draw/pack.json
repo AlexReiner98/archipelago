@@ -48,7 +48,8 @@
       }
     },
     "hooks": {
-      "surface.looks": "served.ts#served"
+      "surface.looks": "served.ts#served",
+      "surface.kept_look": "kept.ts#keptPicture"
     }
   },
   "parts": [
