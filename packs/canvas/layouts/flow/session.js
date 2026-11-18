@@ -1,6 +1,7 @@
 // A run's session on its step (docs/sessions.md, "Wired: what the server gives"): where the answer gives a run its
 // `session` ({ state, for?, line, since }), its state is a mark in place of the dot, in the shape and hue the style
-// names for it (session_marks), and its line is the step's one line, cut to fit, whole in its tip. The states the style
+// names for it (session_marks), and its name is the step's one line, cut to fit (the study e_unru8ftt, screen e_fd547h78:
+// a step that said its last beat read a refused test as the session's state); its line is in its tip. The states the style
 // lights (lit) are drawn as what waits on you (./state.js) and laid out first, in the states' order of attention, each
 // oldest first. Layer: marks. Pure: an answer's items and the style in, items, marks and rules out.
 
@@ -39,8 +40,8 @@ export function sessionMarks(style) {
 export const litStates = (marks) => new Set([...marks].filter(([, s]) => s.lit).map(([state]) => state));
 
 /**
- * The items as the flow lays them out: a run with a session and a mark has its line as its title, cut to one line by
- * `cut` (the whole line kept as `said`, the run's own title as `named`), and every such run comes before the rest, the lit
+ * The items as the flow lays them out: a run with a session and a mark has its name as its title, cut to one line by
+ * `cut` (its line kept as `said`, for its tip, the run's whole title as `named`), and every such run comes before the rest, the lit
  * first, in the states' order, each oldest `since` first (`place`, which the steps are sorted by).
  */
 export function sessionItems(items, marks, cut) {
@@ -56,7 +57,7 @@ export function sessionItems(items, marks, cut) {
     if (!place.has(i.id)) return i;
     const said = String(sessionOf(i).line || i.title);
     const asks = askedOf(sessionOf(i));
-    return { ...i, title: cut(said), said, named: i.title, place: place.get(i.id), ...(asks && { asks }) };
+    return { ...i, title: cut(String(i.title)), said, named: i.title, place: place.get(i.id), ...(asks && { asks }) };
   });
 }
 
