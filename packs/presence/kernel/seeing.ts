@@ -126,6 +126,6 @@ export interface Sight {
  * whether a page of theirs is open (`open`, from the pages counted in the last few seconds) to light it.
  */
 export async function inSight(_ctx: KernelContext, _w: Whose, _run: string | undefined, open: number): Promise<Sight> {
-  if (!open) return { looking: false, where: 'No page of theirs is open in sight: it lands when they open one within ten minutes; later, show it again.' };
+  if (!open) return { looking: false, where: 'No page of theirs is open in sight: the islands it names are on their canvas when they look (put_on); the item is lit if they open a page within ten minutes.' };
   return { looking: false, where: 'Their view stays where it is: an item on an island is lit in their side bar, its island put on their canvas; anything else is not drawn. Tell them where to look.' };
 }
