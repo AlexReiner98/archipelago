@@ -52,7 +52,7 @@ test('each form is checked as its pack loads', () => {
   assert.match(bad({ id: 'x', must_link: { link: 'part_of', to: 'nothing' }, type: 'forms.lane' }), /no type "nothing"/);
   assert.match(bad({ id: 'x', when: { op: 'update' }, then: 'refuse', unless: { walk: 'part_of<>', holds: { status: 'done' } } }), /unless.walk/);
   assert.match(bad({ id: 'x', when: { op: 'update' }, then: 'refuse', unless: { walk: 'part_of<', steps: 9, holds: { status: 'done' } } }), /steps is 1 to 5/);
-  assert.match(bad({ id: 'x', when: { op: 'update' }, then: 'refuse', unless: { walk: 'part_of<', holds: {} } }), /a status or fields/);
+  assert.match(bad({ id: 'x', when: { op: 'update' }, then: 'refuse', unless: { walk: 'part_of<', holds: {} } }), /a status, fields or a link/);
   assert.match(bad({ id: 'x', when: { op: 'update' }, then: 'spare', spares: ['x'], unless: { walk: 'part_of<', holds: { status: 'done' } } }), /holds or refuses/);
 });
 
