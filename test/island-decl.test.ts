@@ -47,16 +47,16 @@ test('an island speaking Design, which extends Build, with one Build part off: b
   const d = got.pack, b = d.requires.find((r: { id: string }) => r.id === 'build');
   assert.equal(d.id, 'design');
   assert.equal(d.state, 'active');
-  assert.deepEqual(d.parts, [{ id: 'design.study', kind: 'type', state: 'active' }]);
+  assert.deepEqual(d.parts, [{ id: 'design.study', kind: 'type', state: 'active', needs: ['build.feature'] }]);
   assert.deepEqual(d.provides, ['type:design.study']);
   assert.deepEqual(d.consumes, [{ name: 'core', by: 'core' }, { name: 'type:build.feature', by: 'build' }]);
   assert.equal(d.lacks, undefined);
 
   assert.equal(b.state, 'active', 'a part off leaves its pack on');
-  assert.deepEqual(part(b, 'build.feature'), { id: 'build.feature', kind: 'type', state: 'active' });
-  assert.deepEqual(part(b, 'build.overlap'), { id: 'build.overlap', kind: 'type', state: 'off' });
-  assert.deepEqual(part(b, 'build.touches'), { id: 'build.touches', kind: 'link', state: 'waiting', lacks: ['type:build.overlap'] });
-  assert.deepEqual(part(b, 'build.watched'), { id: 'build.watched', kind: 'rule', state: 'waiting', lacks: ['type:build.overlap'] });
+  assert.deepEqual(part(b, 'build.feature'), { id: 'build.feature', kind: 'type', state: 'active', needs: ['work'] });
+  assert.deepEqual(part(b, 'build.overlap'), { id: 'build.overlap', kind: 'type', state: 'off', needs: ['work'] });
+  assert.deepEqual(part(b, 'build.touches'), { id: 'build.touches', kind: 'link', state: 'waiting', lacks: ['type:build.overlap'], needs: ['build.overlap', 'build.feature', 'about'] });
+  assert.deepEqual(part(b, 'build.watched'), { id: 'build.watched', kind: 'rule', state: 'waiting', lacks: ['type:build.overlap'], needs: ['build.overlap'] });
   assert.deepEqual(b.parts.map((p: { id: string }) => p.id), ['build.feature', 'build.overlap', 'build.touches', 'build.watched'], 'in the manifest’s order, those off kept in place');
   assert.deepEqual(b.provides, ['type:build.feature'], 'what is off or waits gives nothing there');
   assert.deepEqual(b.consumes, [{ name: 'core', by: 'core' }]);
@@ -71,7 +71,7 @@ test('Build off on the island: Design waits, lacking what Build gave', async () 
   assert.equal(d.state, 'waiting');
   assert.deepEqual(d.lacks, ['type:build.feature']);
   assert.deepEqual(d.consumes, [{ name: 'core', by: 'core' }, { name: 'type:build.feature' }], 'no pack on there gives it');
-  assert.deepEqual(d.parts, [{ id: 'design.study', kind: 'type', state: 'waiting' }], 'a part of a waiting pack waits with it');
+  assert.deepEqual(d.parts, [{ id: 'design.study', kind: 'type', state: 'waiting', needs: ['build.feature'] }], 'a part of a waiting pack waits with it');
   assert.equal(b.state, 'off');
   assert.ok(b.parts.every((p: { state: string }) => p.state === 'off'), 'and of a pack off, is off');
   assert.equal(b.lacks, undefined, 'a pack off lacks nothing: it is off');

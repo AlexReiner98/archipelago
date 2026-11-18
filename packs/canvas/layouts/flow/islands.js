@@ -23,7 +23,7 @@ export function saidOf(to) {
  * `legends` holds each island's rows ({ glyph, label }, and `add` on the row that adds to it); `isHex` says what is a colour;
  * `header(id, [x, y], name)` what an island's header shows after its name ({ marks, tips }: its packs, ./pack-marks.js).
  */
-export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex, header = () => null }) {
+export function islandMarks({ g, legends, islands = [], style, z, m, titled, isHex, header = () => null, part = () => null }) {
   if (!g.islands?.length) return { layer: [], gates: [], rules: [], tips: new Map(), found: new Map() };
   const given = Array.isArray(style.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style.hues) ? style.hues : [];
   const hues = given.filter(isHex);
@@ -50,7 +50,7 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     const title = named.get(isle.id);
     const name = title && titled(m('a', { href: `#/e/${isle.id}`, class: 'lf-island-name' }, m('text', { x: isle.name[0] + z('island_name_x'), y: isle.name[1] }, title)), title);
     // After its name, what the header shows of it: its pack and what that pack requires (./pack-marks.js).
-    const head = title ? header(isle.id, [isle.name[0] + z('island_name_x'), isle.name[1]], title) : null;
+    const head = title ? header(isle.id, [isle.name[0] + z('island_name_x'), isle.name[1]], title, null, { right: Math.max(...isle.land.map((r) => r.r)), top: Math.min(...isle.land.map((r) => r.t)) }) : null;
     for (const [key, tip] of head?.tips ?? []) tips.set(key, tip);
     // Its legend: each row's mark, then its words.
     const legend = (legends.get(isle.id) ?? []).map((row, n) => {
@@ -58,6 +58,9 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
       const key = m('g', { class: 'lf-island-key' }, m(tag, { ...attrs, x: ex, y: ey + (ROW - KEY_H) / 2 }, ...inner), m('text', { x: ex + KEY_W + MARK_GAP, y: ey + ROW / 2 }, row.label));
       // The add row is a button the page answers (ui/marks-add.js): it stands for the island by its id.
       if (row.add) return titled(m('g', { key: `add:${row.add}`, item: row.add, on: ['add'], class: 'lf-island-key lf-island-add' }, ...key.slice(2)), row.tip);
+      // A row that is a part of a pack here (a type, a link type) is in its state, and a toggle where the session may turn it (./pack-marks.js, partInKey).
+      const p = row.part && part(isle.id, row.part);
+      if (p) return titled(m('g', { key: `pt:${isle.id}:${row.part}:key`, on: ['enter', 'leave', ...(p.toggles ? ['toggle'] : [])], ...(p.toggles && { item: isle.id, pack: row.part }), class: `lf-island-key lf-key-part st-${p.state}${p.toggles ? ' toggles' : ''}` }, ...key.slice(2)), p.lines.join('\n'));
       return key;
     });
     // What its own look paints (../map/looks.js), over its land and under what it holds.
