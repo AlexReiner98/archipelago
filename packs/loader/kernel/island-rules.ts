@@ -4,15 +4,15 @@
 // items'. An op on no island, or on one that runs the map's pack, is judged by the map's rules. What the rules then
 // make of it is decide's alone (packs/rules/kernel/rules.ts): this only says which version each op runs under.
 
-import { islandVersion } from './island-pin.ts';
+import { islandRun } from './island-pin.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import type { Op } from '../../write/kernel/pelago-types.ts';
 import type { IslandRun } from '../../rules/kernel/rules.ts';
 
-/** For each op, the versions its islands run, undefined for an island on the map's (an empty list: the map's rules alone). */
+/** For each op, what its islands run (a version, packs or parts off), undefined for an island on the map's (an empty list: the map's rules alone). */
 export async function opRuns(map: Archipelago, ops: Op[]): Promise<(IslandRun | undefined)[][]> {
   const reg = map.registry;
-  if (!reg.versions.size) return ops.map(() => []);
+  if (!reg.versions.size && !reg.onIslands) return ops.map(() => []);
   const unlinks = ops.flatMap((op) => (op.op === 'unlink' ? [op.relation] : []));
   const ends = new Map(unlinks.length ? (await map.db.query<{ id: string; from_id: string; to_id: string }>(`select id, from_id, to_id from relation where id = any($1::text[])`, [unlinks])).rows.map((r) => [r.id, [r.from_id, r.to_id]]) : []);
   // What this change makes lives where its create puts it (placeOnIslands has placed it by now).
@@ -25,7 +25,7 @@ export async function opRuns(map: Archipelago, ops: Op[]): Promise<(IslandRun | 
   };
   const runs = new Map<string, IslandRun | undefined>();
   const runOf = async (island: string) => {
-    if (!runs.has(island)) runs.set(island, await islandVersion(map, island, reg));
+    if (!runs.has(island)) runs.set(island, await islandRun(map, island, reg));
     return runs.get(island);
   };
   return Promise.all(ops.map(async (op) => {
@@ -39,7 +39,7 @@ export async function opRuns(map: Archipelago, ops: Op[]): Promise<(IslandRun | 
     const found = new Map<string, IslandRun | undefined>();
     for (const island of new Set(on)) {
       const run = typeof island === 'string' && island ? await runOf(island) : undefined;
-      found.set(run?.version.item ?? '', run);
+      found.set(run?.off ? `off:${island}` : run?.version?.item ?? '', run);
     }
     return found.size === 1 && found.has('') ? [] : [...found.values()];
   }));

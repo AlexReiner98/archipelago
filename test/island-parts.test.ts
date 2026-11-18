@@ -72,7 +72,7 @@ test('a type off on one island makes no new item there, its items stay, and a ru
 
   await make(l, [{ op: 'update', id: over, title: 'An overlap here, edited' }]);
   assert.equal((await l.entity(over))!.title, 'An overlap here, edited', 'an item of a type off is still edited');
-  await refused(l, [{ op: 'create', type: 'lanes.overlap', title: 'New here', props: { island: here } }], /lanes\.overlap waits on this island/);
+  await refused(l, [{ op: 'create', type: 'lanes.overlap', title: 'New here', props: { island: here } }], /lanes\.overlap waits on this island: it is turned off on this island, so no new item of it is made here/);
   await make(l, [{ op: 'create', type: 'lanes.overlap', title: 'New there', props: { island: there } }]);
   await make(l, [{ op: 'create', type: 'lanes.lane', title: 'A lane is still made here', props: { island: here } }]);
 
@@ -81,9 +81,7 @@ test('a type off on one island makes no new item there, its items stay, and a ru
   await make(l, [{ op: 'create', type: 'lanes.overlap', title: 'New here again', props: { island: here } }]);
 });
 
-// Waits on packs/loader/kernel/island-rules.ts, which is no lane's: it judges an op by its island's registry only for a
-// pinned version (opRuns returns early with no versions). Raised as an overlap for the integration; packs_off has the same gap.
-test('a rule off on one island judges nothing there, and still does on another', { todo: 'island-rules.ts reads only pinned versions: overlap raised for the integration' }, async () => {
+test('a rule off on one island judges nothing there, and still does on another', async () => {
   const { l, here, lane, lane2 } = await map();
   assert.equal((await send(l, [{ op: 'update', id: lane, title: 'Renamed' }])).status, 'proposed', 'on, it holds');
   await make(l, [{ op: 'update', id: here, props: { parts_off: ['lanes.careful'] } }]);
@@ -92,6 +90,13 @@ test('a rule off on one island judges nothing there, and still does on another',
   const there = await send(l, [{ op: 'update', id: lane2, title: 'Renamed there' }]);
   assert.equal(there.status, 'proposed');
   assert.equal(there.held_by?.rule, 'lanes.careful', 'the other island is still under it');
+});
+
+test('a pack off on one island: its rules judge nothing there either, core’s dormant rule does', async () => {
+  const { l, here, lane, lane2 } = await map();
+  await make(l, [{ op: 'update', id: here, props: { packs_off: ['lanes'] } }]);
+  assert.equal((await send(l, [{ op: 'update', id: lane, title: 'Renamed here' }])).held_by?.rule, 'dormant', 'its rules are gone there: core’s dormant rule looks at a write to a type whose pack is off');
+  assert.equal((await send(l, [{ op: 'update', id: lane2, title: 'Renamed there' }])).held_by?.rule, 'lanes.careful', 'the other island is still under them');
 });
 
 test('parts_off names parts a pack here declares, never the kernel’s own, and only on an island', async () => {
