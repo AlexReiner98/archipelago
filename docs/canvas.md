@@ -166,7 +166,16 @@ value from a menu, a day, yes or no, an item) is a change at once, and words
 page's one Save (decided 26 Oct 2026, e_mvzugyga). System fields are only
 read. What a field means beyond its kind comes from capabilities: a question
 whose type declares `settles.choices` (and `chosen`, `why`, `on`) is settled
-by picking one, as one change (e_xyxct9nq). A note is written in one dialect (`packs/kit/page/text.js`: titles,
+by picking one, as one change (e_xyxct9nq). The page opens on one band under its
+title, before its head (decision e_ktr4vbcd, `packs/sheet/parts/page/lead.js`): a question that settles
+on its choices, or its answer once settled; any other type on what its capability `lead` declares, as
+data a pack ships: a `measure` (its `value` large, with `unit` and `as_of`), an `alert` while the boolean
+`unless` is false (with `says`, and a press that makes it true), or a `timeline` of the beats a json
+`beats` field keeps. Fields the band shows are not shown again below it. The head is one line of marks under the title (type, status as a
+pick, age, who may see it, the owner, how sure only when not sure: e_x3h4vbe7). An item that waits on the
+person looking says so in the band, with what for (a state, not a listed link: e_xj9cs33u). A screen's
+piece with `place: "lead"` stands in the band too, the kernel's own or one a pack's part draws as
+`piece.<name>` (e_x89zp8uz). A note is written in one dialect (`packs/kit/page/text.js`: titles,
 lists, checklists, callouts, tables, code, emphasis, links, items by id),
 read the same by the sheet and the published reader; ticking a checklist is a
 change to that line. How it looks is the style's `notes` (callout colours, the
@@ -193,8 +202,8 @@ measure it reads at), shipped by the house style and a pack's presets.
 | `pinch.js` | two fingers on it |
 | `canvas-wires.js` | a held change's badge clicked, opening where it is decided |
 | `live.js`, `replica.js`, `membership.js` | tailing the log; the one store, keyed by item, shared by views; when a view asks again; held changes drawn into it |
-| the panes part (`packs/panes/parts/`), `panes.js` | more than one canvas at once: panes alike side by side in a tab, dragged; the address and back and forward the pane in focus's; `panes.js` draws each pane's canvas |
-| `tabs.js`, `tab-bar.js`, `pane-route.js`, `pane-land.js` | tabs at the top, one per session at work, popped out and back; where an agent's step lands |
+| `panes.js`, `pane-address.js` | the one canvas at the page's address, with back and forward in the band |
+| `pane-route.js` | what a session is called where a show lights its item |
 | `item.js`, `item-sections.js`, `field-edit.js`, `link-pick.js`, `settle.js` | the item's page, the host's by who owns what (the owner, 13 Nov 2026): its frame, fields, links, choices and settling for any type; a piece only one type or screen has is a part of the pack that owns it (a screen's note: `canvas.note`) |
 | `fields.js` | a field's value by its kind, else by its shape; the choices a question settles by |
 | `text.js`, `body.js` | the one dialect a note is written in, and the note drawn from it, folded |
@@ -239,113 +248,28 @@ measure it reads at), shipped by the house style and a pack's presets.
 1. A held change comes back as a proposal, drawn as a ghost; a click on it
    asks Apply or Decline, and `decide` settles it.
 
-## Tabs and panes: more than one canvas at once
-Every pane in a tab is alike (the owner, 28 Oct 2026): none is the main one.
-Each is a canvas of its own (`canvas.js`): a query and a style, held in its
-own store and kept current from the log, with its wires and its
-fitting. Panes stand side by side, as a code editor's groups do:
-◫ in the bar opens the pane in focus's canvas in a pane beside it, a pane's
-name dragged onto a side of another docks it there (onto its middle swaps
-them), the line between two shares the room, and × closes it; the last one stays. One pane alone has no strip: the bar floats
-over its top, as the page's canvas always did.
+## One canvas
+The page has one canvas (`panes.js`, `canvas.js`): a query and a style, held
+in its own store and kept current from the log, with its wires and its
+fitting. Tabs and panes side by side went on 18 Nov 2026 (decision
+e_mnuthcap): what a person sees is the islands they have on, and two models
+of the view, tabs and the island side bar, each claimed it.
 
-The pane last touched is in focus: the view's band sits in its strip and
-find acts on its query (decision e_h2pqjy2q). The address is its address
-(`pane-address.js`): `#/v?…` says its query, and an item's page open over it
-is `#/e/<id>?…` with that query beside it. Moving focus rewrites the address
-without a step of the browser's; a query given to a pane in focus is one. Each
-pane keeps its own back and forward, kept with its tab, so a reload draws
-every pane as it was, history included: a step for each query it is given,
-none for typing or for a page opened over it (e_ssnyd3ex). ‹ › in the bar,
-dimmed with nowhere to go, and the browser's own back and forward, all act on
-the pane in focus. A click on a node in any pane puts that pane in focus,
-adds the node to its filter and opens its page in the sheet over it. Find shuts when
-another pane or tab comes into focus, and what was typed goes. On a page taller than wide a row is
-drawn as a column. The top bar runs across the page over the sheet, one pane
-or several: the sheet opens under it. The sheet takes its room from the panes
-(`panes.js`), one alone too, so every canvas resizes to stand beside it,
-whatever draws it, and no view does this itself.
+The address is the canvas's (`pane-address.js`): `#/v?…` says its query, and
+an item's page open over it is `#/e/<id>?…` with that query beside it. ‹ › in
+the band, and the browser's own back and forward, step through what it drew.
+A click on a node adds it to the filter and opens its page in the sheet over
+the canvas. The top bar runs across the page over the sheet: the sheet opens
+under it, and takes its room from the canvas, so whatever draws it stands
+beside it and no view does this itself.
 
-A tab (`tab-bar.js`, `tabs.js`; decision e_mzer5m4t) is a set of panes,
-which stay together in it. The tabs stand in the
-top bar, one tab included, each named as its pane in focus is: a session's by the
-session in its hue, else a view or an item by its name, a query by
-what its filter finds, Home by Home. There is no most: many shrink to their
-mark and first letters (e_q3amet26). What is the tab's own is on the strip,
-never in the query bar, which shows the query (e_j7ggggjr): + at its end
-opens a blank tab, one pane with no query, as Split in the bar opens a blank
-pane (the owner, 3 Nov 2026, e_33eqyryy), and an agent's show takes a blank
-pane before it splits one; a press brings a tab into sight, a
-middle press closes it, and every tab has ⋯, its menu, and ×, in sight or not. A tab,
-not a pane, pops out into a window of its own (Pop out in ⋯, or the tab
-dragged out of the page) and ⇲ there docks it back whole (e_ezb7s3a7).
-Brought into sight again, a tab's bar acts on the pane last touched in it
-(e_x9b9yv5g), and the bar's canvas name takes the hue of the session it
-follows. The tabs are the reader's, kept in this browser for each workspace
-like the canvas settings: never on the map, meaning nothing.
-
-A pane moves into a tab of its own by hand, with ⧉ in its strip or dragged
-onto the tabs, in sight beside the one it left; a pane held for a session
-takes the session with it, and the new tab follows it (e_c5stzz6z). An agent
-cannot ask for a tab: a tab is the reader's. The way back is the reader's too:
-Merge into in ⋯, or a tab dragged onto another, puts its panes beside that
-tab's, and a pane dragged onto a tab joins it, the pane in focus there staying
-so. A session keeps what is its own through all of it: a pane moved to a tab
-takes the session along, panes from a tab that followed a session are held
-for it again, and its next show finds them in any tab but one that follows
-nobody.
-
-Each tab follows everyone (the default), one session, or nobody (its name
-in italics): the reader picks it in ⋯, which lists the sessions open now, and
-what the tab follows even once that session has ended.
-
-A tab may instead watch what it draws (a plan, decision e_98z44prb: "Both,
-via the plan", the owner, 10 Nov 2026): Sessions in what it draws in ⋯, or
-an agent's show sent with `watch` once the owner has approved the plan it
-shows. Every session whose task is in it, or that it draws, lands there and
-opens no tab of its own: it is drawn on its step by the plan's view (one
-that walks `works_on<` and leaves out no run), its node's line its latest
-beat, read again as it tells one, and its shows share one pane beside the
-plan (`shown`), which never takes the plan's own pane. Which items a session
-is in comes with its every step (`within`: its tasks and all that hold them). Where an agent's step lands is `pane-route.js`, worked
-out from that alone (decisions e_622ev534, e_nwmx4tbd, e_y7uz9pk9):
-- only a show lands: a change or a beat of a session's story moves nothing
-  and is said nowhere on the canvas (the owner, 29 and 30 Oct 2026,
-  e_e7yfp2yg). Whom a tab follows is the one control: there is no line at the
-  foot and no Follow agents;
-- a session's show goes to the tab that follows it;
-- else to a tab that follows everyone and no other session at work (a step
-  within ten minutes) holds: the one where it holds a pane, the one it
-  landed in, the one drawing it, else the one in sight;
-- when those are all held by other sessions, it gets a tab of its own,
-  following it, out of sight;
-- within the tab, a show's `pane` may be a name of the session's own ("map",
-  "tests"): a pane by that name is split beside the others the first time and
-  drawn in again each time it is named. Else it goes to the session's own
-  pane: one held for it (a pane keeps whose it is, and says so in its strip,
-  for as long as it stands, so a long session finds it again), else one that
-  draws what it shows, else one nobody holds, else one split for it. Never
-  the pane the reader is in or touched last (the owner, 28 and 29 Oct 2026);
-  in a tab that follows the session alone every pane is its own. A page that
-  is not a canvas opens over a pane only there, else in a tab of its own;
-- a show brings its tab into sight (the owner, 4 Nov 2026: "the tab you
-  open should automatically take focus", e_uh7qu8ts). Only a show sent with
-  `focus: false` is drawn in a tab out of sight, where its mark rings
-  (e_xjrpyysn); a change, a tell or a session's tab opening brings none;
-- a pane the reader is busy in (`pane-busy.js`: a press, scroll or key there
-  in the last twenty seconds, text selected there, or words typed in the
-  sheet and not saved; moving the pointer or turning a dial is not busy) is
-  never taken, and no pane is split into a tab the reader is at work in: a
-  show goes to a tab of its own in the background instead.
-A side (`left`, `right`, `above`, `below`) puts the session's pane there in
-its tab; `alone` closes the others only in a tab that follows the session;
-`main`, from before every pane was alike, is the session's own pane. A page
-that is not a canvas (a screen) opens in the sheet only in a tab that follows
-the session, and is otherwise offered. A session
-is its run: a step carries the run it names (show, tell, session_update), or
-the one its agent last named (`packs/presence/kernel/presence.ts`). A popped-out window follows
-no agent: the main page does, and draws a show for its tab in the window's
-pane in focus when that tab follows the session.
+Where an agent's step lands (`live.js`): only a show lands, and it never
+moves the reader's view. A show of an item on an island puts that island on
+their canvas and lights the item in the side bar, where a press goes to it;
+any other show leaves the page as it is. A change or a beat of a session's
+story moves nothing and is said nowhere on the canvas (the owner, 29 and 30
+Oct 2026, e_e7yfp2yg). The chats at work are the side bar's Sessions part,
+and the count of those waiting on you stands beside the islands button.
 
 ## What is not yet so
 - Not leaves out only closed, system or a type; an item named to leave out

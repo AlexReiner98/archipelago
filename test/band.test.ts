@@ -24,7 +24,7 @@ test('in a browser, the band under the tabs holds the islands button, back and f
   const band = `(() => { const q = document.getElementById('query'), v = q?.querySelector('.q-view'), nav = document.getElementById('nav').getBoundingClientRect(), r = q?.getBoundingClientRect();
     if (!v?.querySelector('button')) return { shown: false };
     return { shown: !q.hidden && r.height > 0, under: r.top >= nav.bottom - 1, line: v.scrollWidth <= v.clientWidth + 1 && v.getBoundingClientRect().height <= v.querySelector('button').getBoundingClientRect().height * 2,
-      buttons: [...q.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') ?? b.firstChild.textContent) }; })()`;
+      buttons: [...q.querySelectorAll('button:not([hidden])')].map((b) => b.getAttribute('aria-label') ?? b.firstChild.textContent) }; })()`;
   /** Whether the islands button is the topmost thing where it stands, so a press reaches it. */
   const reachable = `(() => { const b = document.querySelector('#query .isl-toggle').getBoundingClientRect(); return document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2)?.closest('.isl-toggle') != null; })()`;
   /** The side bar, open, stands under the band, which keeps the whole width: it is never pushed over by it. */

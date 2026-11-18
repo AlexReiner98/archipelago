@@ -327,7 +327,7 @@ function partInside() {
           else if (mounted.has(id)) send({ type: 'seen', id, seen: said.seq });
         }
         else if (said.type === 'event' && mounted.get(id)?.on) marks(id, await mounted.get(id).on(said.event));
-        // A slot that asks a decision (tabs.land, tabs.life): the part answers a value, the root that asked applies it.
+        // A slot that asks a decision (ghosts): the part answers a value, the root that asked applies it.
         else if (said.type === 'decide') send({ type: 'decided', id, asked: said.asked, value: mounted.get(id)?.decide ? ((await mounted.get(id).decide(said.input)) ?? null) : null });
         else if (said.type === 'unmount') (mounted.get(id)?.end?.(), mounted.delete(id), seen.delete(id));
       } catch (err) {

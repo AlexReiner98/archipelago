@@ -6,27 +6,38 @@
 
 import { api, firstDrawn, h, hooks, state } from './base.js';
 import { islandsOn, keepList, onIslands } from './islands-on.js';
-import { atHome, capital, drawnAt, islandsOnMap, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
+import { atHome, capital, drawnBy, islandOf, islandsOnMap, only, rankIslands, recentFirst, turnedOn } from './islands-list.js';
 import { numberOf } from './style-number.js';
 import { ago, titles } from './words.js';
+import { onOpen, openNow } from './sessions-open.js';
+import { sessionsPart } from './island-sessions.js';
 
-/** Every island on the map, each with its pack, read once a page. */
+/** Every island on the map, each with its pack: read once a page, and again (`fresh`) when the log says one was made or changed. */
 let reading;
-export const allIslands = () =>
-  (reading ??= api('search', { islands: true, limit: 2000 }).then(
-    (found) => found.map((e) => (titles.set(e.id, e.title), { id: e.id, title: e.title, worked_at: e.worked_at ?? e.updated_at, pack: e.pack ?? { id: '', title: '' } })),
-    () => [],
-  ));
+export const allIslands = (fresh = false) => {
+  if (fresh) reading = undefined;
+  return (reading ??= api('search', { islands: true, limit: 2000 }).then((found) => found.map((e) => (titles.set(e.id, e.title), islandOf(e))), () => []));
+};
 
 let mine = [];
 const heard = new Set();
-/** The islands the canvas draws now: the address's, else the person's own. */
-export const drawnNow = () => drawnAt(location.hash, mine);
-/** Hear what the canvas draws change (a toggle, the address). */
+/** What the canvas in focus has drawn (./canvas.js, hooks.canvasNow): whether it is Home, and its lens's islands. */
+const canvasNow = () => hooks.canvasNow?.() ?? null;
+/** The islands the canvas draws now, whatever the address (Home, an item's, a show's): the bar marks exactly these. */
+export const drawnNow = () => drawnBy(location.hash, mine, canvasNow());
+/** Whether the canvas draws Home: a press elsewhere brings it Home to draw the list it makes. */
+const homeNow = () => canvasNow()?.home ?? atHome(location.hash);
+/** Hear what the canvas draws change (a toggle, the address, the canvas drawing another lens). */
 export const onDrawn = (f) => heard.add(f);
 const tell = () => heard.forEach((f) => f());
 onIslands((now) => ((mine = now), tell()));
 addEventListener('hashchange', tell);
+/** The canvas drew: told only where what it draws differs from what the bar last heard. */
+let drawnWas = '';
+hooks.canvasMoved = () => {
+  const now = `${homeNow()}:${drawnNow().join()}`;
+  if (now !== drawnWas) (drawnWas = now), tell();
+};
 
 /** Keep what a press makes of the list, and bring the canvas Home where it drew another list. */
 function apply({ list, home }, reason) {
@@ -34,11 +45,11 @@ function apply({ list, home }, reason) {
   if (home) location.hash = '#/';
 }
 /** Put island `i` on. */
-export const putOn = (i) => apply(turnedOn(location.hash, mine, i.id), `${i.title} put on the canvas`);
+export const putOn = (i) => apply(turnedOn(drawnNow(), homeNow(), i.id), `${i.title} put on the canvas`);
 /** Take island `i` off. */
-export const takeOff = (i) => apply({ list: drawnNow().filter((x) => x !== i.id), home: !atHome(location.hash) }, `${i.title} taken off the canvas`);
+export const takeOff = (i) => apply({ list: drawnNow().filter((x) => x !== i.id), home: !homeNow() }, `${i.title} taken off the canvas`);
 /** Island `i` alone on the canvas. */
-export const showOnly = (i) => apply(only(location.hash, i.id), `${i.title} alone on the canvas`);
+export const showOnly = (i) => apply(only(homeNow(), i.id), `${i.title} alone on the canvas`);
 
 /** A pack's title as the list shows it. */
 const packTitle = (pack) => capital(pack?.title || pack?.id);
@@ -87,7 +98,7 @@ export function drawPicker() {
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // Its shortcut, at the line's right while nothing is typed.
   const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
-  // The bar's button, first in the band under the tabs (./canvas.js): a press shows the islands or puts them away; how
+  // The bar's button, first in the band (./canvas.js): a press shows the islands or puts them away; how
   // many are on is its count.
   const count = h('span', { class: 'isl-toggle-count' });
   const fold = h('button', { type: 'button', class: 'isl-toggle', 'aria-label': 'Islands' }, sideMark(), count);
@@ -97,7 +108,8 @@ export function drawPicker() {
   const body = h('div', { class: 'isl-body', tabindex: '0', 'aria-label': 'Islands' });
   // No tooltip on a row: a name cut short has the whole of it as its tooltip, the name alone.
   body.addEventListener('pointerover', (ev) => {
-    const name = ev.target.closest?.('.isl-name');
+    // A chat's row has its tooltip of its own (./island-sessions.js): who it is, what it is on, its line.
+    const name = ev.target.closest?.('.isl-name:not(.isl-chat .isl-name)');
     if (name) name.scrollWidth > name.clientWidth ? (name.title = name.textContent) : name.removeAttribute('title');
   });
   const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key), body), edge);
@@ -181,6 +193,11 @@ export function drawPicker() {
   let laidOn = null;
   /** The island the canvas was last brought to from the bar: marked under On while it stays on. */
   let here = null;
+  /**
+   * Islands a show added, each with the item it showed and who showed it (decision e_mnuthcap): a show never moves the
+   * view; its island's row is lit until it is pressed, which brings the canvas to the island and lights the item.
+   */
+  const shown = new Map();
   /** Bring the canvas to island `i`, where the canvas can (hooks.toIsland, the canvas's), and mark it. */
   const goTo = (i) => hooks.toIsland?.(i.id) && ((here = i.id), draw(), true);
   /**
@@ -201,10 +218,29 @@ export function drawPicker() {
    * On nothing, where the name needs the room beside ×.
    */
   const row = (i, on, at) =>
-    h('div', { class: `isl-row${on ? ' on' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
-      h('button', { type: 'button', class: 'isl-name', tabindex: '-1', onclick: () => (on ? goTo(i) : putOnAndGo(i), done()) }, i.title),
+    h('div', { class: `isl-row${on ? ' on' : ''}${shown.has(i.id) ? ' shown' : ''}`, role: 'listitem', 'data-id': i.id, ...(on && i.id === here && { 'aria-current': 'location' }) },
+      h('button', { type: 'button', class: 'isl-name', tabindex: '-1', ...(shown.has(i.id) && { title: shownSaid(i) }), onclick: () => (seeShown(i, on), done()) }, i.title),
       at === 'recent' ? h('span', { class: 'isl-when' }, ago(i.worked_at)) : at === 'all' ? packOf(i) : '',
       on ? h('button', { type: 'button', class: 'isl-off', tabindex: '-1', title: `Take ${i.title} off the canvas`, 'aria-label': `Take ${i.title} off`, onclick: () => takeOff(i) }, '×') : '');
+  /** What a lit row's tooltip says: who showed what there. */
+  const shownSaid = (i) => {
+    const { item, by } = shown.get(i.id);
+    return `${by ? `${by} showed` : 'Shown'}: ${hooks.nameSaid?.(item, draw) ?? item}`;
+  };
+  /** A press on an island's row: to it (put on first if it is off), and the item a show lit there lit on the canvas. */
+  const seeShown = (i, on) => {
+    const lit = shown.get(i.id);
+    shown.delete(i.id);
+    if (on) goTo(i);
+    else putOnAndGo(i);
+    if (lit) hooks.lights?.([lit.item]);
+    draw();
+  };
+  /**
+   * A show's island (packs/panes/parts/life.js, by name so nothing imports this file for it): its row lit for the
+   * person to press when they want to go there, `item` what it showed and `by` who showed it, a session's name.
+   */
+  hooks.lightIsland = (island, item, by) => (shown.set(island, { item, by }), draw());
   /** A row of what the search found: its dot if it is on, its name, its pack; lit as Enter would take it. */
   const hit = (i, n, drawn) =>
     h('div', { class: `isl-row isl-hit${drawn.includes(i.id) ? ' on' : ''}`, role: 'option', id: `isl-${i.id}`, 'aria-selected': String(n === lit), onpointerdown: (ev) => ev.preventDefault(), onclick: (ev) => (press(i, ev.shiftKey), done()) },
@@ -230,7 +266,8 @@ export function drawPicker() {
     // Each part a band of its own, under a head with its count: On first, on the canvas's own ground, then Recent and All.
     const part = (at, head, all, count = all.length) =>
       h('div', { class: `isl-sec isl-sec-${at}` }, h('div', { class: 'isl-head' }, `${head} · ${count}`), h('div', { role: 'list' }, ...all.map((i) => row(i, drawn.includes(i.id), at))));
-    body.replaceChildren(part('on', 'On', on, drawn.length), ...(recent.length ? [part('recent', 'Recent', recent)] : []), ...(others.length ? [part('all', 'All', others)] : []));
+    // The chats at work after On (./island-sessions.js): they were tabs.
+    body.replaceChildren(part('on', 'On', on, drawn.length), ...sessionsPart(openNow(), done), ...(recent.length ? [part('recent', 'Recent', recent)] : []), ...(others.length ? [part('all', 'All', others)] : []));
     light();
   };
   /** The row the keyboard is on in the list (an island's id), lit while the list has the focus. */
@@ -302,6 +339,16 @@ export function drawPicker() {
     input.select();
   });
   onDrawn(() => (anew ? ((anew = false), relay()) : draw()));
+  // The chats read again: the list drawn again only once it is laid out, so On is laid out from what the canvas drew.
+  onOpen(() => laidOn && draw());
+  // The page is a replica of the log: an island made since it was read (an agent's new focus), or one renamed, is listed
+  // as the tail says so, without a reload. What the tail touched is told by ./live.js (hooks.islandsTouched).
+  let rereading = null;
+  hooks.islandsTouched = (touched) => {
+    const known = new Set(islands.map((i) => i.id));
+    if (!(touched.made || touched.ids === null || touched.ids.some((id) => known.has(id)))) return;
+    rereading ??= allIslands(true).then((all) => ((rereading = null), (islands = all), draw()));
+  };
   // Read once the first view is drawn, as the bar read its saved views: the drawing goes first (test/first-drawing.test.ts).
   firstDrawn.then(() => Promise.all([islandsOn(), allIslands()])).then(([now, all]) => ((mine = now), (islands = all), draw()));
 }

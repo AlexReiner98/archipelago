@@ -27,11 +27,8 @@ import { cut, findFor, keepFor, keptFor, keptKey, pickFor, settingsOf, styleValu
 import { readFor } from './part-read.js';
 import { inOrder, pressesHeld } from './part-order.js';
 import { hearAway, tellAway } from './part-away.js';
-import { focusWindow, goHash, hearPage, openWindow, pageOf } from './part-page.js';
-import { AWAY_SLOTS, DECISION_SLOTS, PAGE_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
+import { AWAY_SLOTS, DECISION_SLOTS, QUERY_SLOTS, SHOWN_WHILE } from './part-slots.js';
 import { paintSwatch, tryTheme } from './swatch.js';
-import { replayIn } from './replay.js';
-import { project } from './project.js';
 
 /** Each part's modules by the hash of them, once fetched: asked again, the page says it has them. */
 const modules = new Map();
@@ -88,7 +85,7 @@ async function inputOf(part, item, given) {
   const now = canvasNow();
   // The theme this screen alone is painted in, if one is being tried (a button's `try`), so a part can say Keep or Stop;
   // and the page's origin, for a part that shows an address of this server (connect's MCP address): words only.
-  const page = { up: hooks.viewUp?.() ?? null, trying: state.trying ?? null, origin: location.origin, ...(told.has(part.slot) && { told: told.get(part.slot) }), ...(PAGE_SLOTS.includes(part.slot) && { page: pageOf() }) };
+  const page = { up: hooks.viewUp?.() ?? null, trying: state.trying ?? null, origin: location.origin, ...(told.has(part.slot) && { told: told.get(part.slot) }) };
   const here = item ? cut(item, part.reads) ?? { id: item.id, type: item.type } : null;
   const views = part.views?.length ? { views: await viewsOf(part, item, given.piece ?? {}) } : {};
   given = { ...given, ...page, ...(part.go && { address: await addressSaid(given.words, now) }), ...(await queryGiven(part.slot, given.words, now)) };
@@ -140,7 +137,7 @@ async function workerOf(version, parts, pack) {
   };
   // A part that declares `go` names another address after a gesture; the app checks it and moves (hooks.go, ui/canvas.js).
   // A part that declares `state` publishes page state; the runtime writes it on the root (publishState).
-  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part, go: (address, part) => (PAGE_SLOTS.includes(part?.slot) && address?.hash ? goHash(address) : hooks.go?.(address)), state: publishState });
+  one.bridge = partBridge(answering, { partOf: (id) => one.mounted.get(id)?.part, go: (address) => hooks.go?.(address), state: publishState });
   one.port.onmessage = (ev) => {
     const said = ev.data ?? {};
     if (one.bridge.heard(said)) return;
@@ -157,7 +154,6 @@ async function workerOf(version, parts, pack) {
     } else if (said.type === 'seen') m.heard?.(said.seen);
     else if (said.type === 'decided') m.decided?.(said.asked, said.value);
     else if (said.type === 'read') void readFor(m, said, (message) => one.port.postMessage(message));
-    else if ((said.type === 'window' || said.type === 'focus') && PAGE_SLOTS.includes(m.part.slot)) (said.type === 'window' ? openWindow : focusWindow)(said);
     else if (said.type === 'keep') keepFor(m.part, m.item, String(said.name ?? '').slice(0, 80), said.value);
     else if (said.type === 'error') m.failed(said.message);
   };
@@ -285,8 +281,6 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
     // A style preset's colours, and a theme tried on this screen alone: the page's, as a part paints no colour.
     swatch: (preset, el) => paintSwatch(preset, el),
     tryTheme: (preset) => tryTheme(preset),
-    // What the person missed, played on the canvas the part stands over (its store, hooks.storeUnder: ./canvas.js).
-    replay: (r) => replayIn(hooks.storeUnder?.(node) ?? null, r, project),
     // The ghosts a part holds, as data for the canvas under it to read back into its answer (hooks.ghosts: the replica's).
     ghosts: (list) => hooks.ghosts?.(node, list),
     // A `slot` mark: a slot this part opens, filled by its parts in the mark's node, unseen by the holder; a few deep at most.
@@ -301,17 +295,13 @@ async function mountOn(version, node, part, parts, item, words, piece, { openVie
   await hand();
   shownWhile();
   if (AWAY_SLOTS.includes(part.slot)) hearAway(mountedNow);
-  if (PAGE_SLOTS.includes(part.slot)) hearPage((event) => tellSlot(part.slot, event), () => refreshOn(PAGE_SLOTS));
 }
 
-// Words one window kept are handed to the same part in every other window of this browser (the tabs across windows).
+// Words one window kept are handed to the same part in every other window of this browser (a part open in two windows).
 addEventListener('storage', (ev) => {
   if (!ev.key?.startsWith('pelago-part:')) return;
   for (const { m } of mountedNow()) if (ev.key.startsWith(keptKey(m.part, m.item))) void m.refresh();
 });
-
-/** Whether a part is mounted on a slot now: what is worked out only for one (the beat's rows for `traces`) waits on it. */
-hooks.slotFilled = (slot) => [...mountedNow()].some(({ m }) => m.part.slot === slot && m.node.isConnected);
 
 /** Hand every part on these slots its input again. */
 const refreshOn = (slots) => { for (const { m } of mountedNow()) if (slots.includes(m.part.slot)) void m.refresh(); };
@@ -330,7 +320,7 @@ function islandOf(item) {
 
 /**
  * Which pinned version of a part is mounted and fetched, given what the part stands on: the island of the item, where
- * it stands on one. A part that stands on nothing (the tabs, the panes, Home, the menu, a bar over a canvas that spans
+ * it stands on one. A part that stands on nothing (Home, the menu, a bar over a canvas that spans
  * islands) is the chrome, and is to be pinned per person (decision e_x6bqupud, task e_fpm9n7er); until that lands the
  * chrome runs the map's version, which is what `undefined` asks for here. Every place that resolves a version goes
  * through this one function, so that change is one function's.
@@ -371,7 +361,7 @@ const decideWithin = 2000;
 const decideMost = 200000;
 
 /**
- * Ask the part that fills a decision slot (`tabs.land`, `tabs.life`) to decide: it is handed `input` as data and
+ * Ask the part that fills a decision slot (`ghosts`) to decide: it is handed `input` as data and
  * answers a value, which comes back as data for the root that asked to check and apply. Undefined when no part fills
  * the slot, or the part fails or takes too long: the root then decides as it did before. A part never applies anything.
  */

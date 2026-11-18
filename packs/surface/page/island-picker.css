@@ -1,18 +1,26 @@
 /* The island picker (packs/surface/page/island-picker.js): a list at the canvas's left edge, folded to it or open, the canvas beside it. */
 #islands { position: fixed; z-index: 3; top: var(--band); bottom: 0; left: 0; display: flex; box-sizing: border-box; width: min(var(--isl-width, var(--side-least)), 60%); border-right: var(--border-1) solid var(--line); background: var(--panel); font-size: var(--text-4); }
 #islands[hidden] { display: none; }
-/* The canvas, and the panes in it (fixed to the window, packs/walls/page/part-marks.css), start at the bar's edge; put away, the bar is gone and the canvas has the width. */
-body[data-islands="open"] :is(#canvas, #canvas .pm-panes) { left: min(var(--isl-width, var(--side-least)), 60%); }
-body[data-islands="folded"] :is(#canvas, #canvas .pm-panes), body[data-islands-over="on"] :is(#canvas, #canvas .pm-panes) { left: 0; }
+/* The canvas, and its pane (fixed to the window, packs/surface/page/shell.css), start at the bar's edge; put away, the bar is gone and the canvas has the width. */
+body[data-islands="open"] :is(#canvas, #canvas > .pane) { left: var(--active-left); }
+body[data-islands="folded"] :is(#canvas, #canvas > .pane), body[data-islands-over="on"] :is(#canvas, #canvas > .pane) { left: 0; }
+/* The canvas's frame, which find and the bar are laid out by: below the band, beside the bar while it is open. */
+body[data-panes="1"] { --active-top: var(--band); }
+/* With the bar under the band, the two stand one above the other over the canvas: what it keeps clear is both. */
+body[data-panes="1"]:has(#query:not([hidden])) #canvas { --safe-top: calc(var(--band) + var(--strip) + var(--space-4)); }
+/* An open sheet takes its room from the canvas, so whatever draws it stands beside it. */
+body[data-panes="1"][data-sheet="open"] { --active-right: min(var(--sheet), 50%); }
+body[data-panes="1"] #canvas > .pane { right: var(--active-right, 0); }
+body[data-islands="open"]:not([data-islands-over="on"]) { --active-left: min(var(--isl-width, var(--side-least)), 60%); }
 body[data-islands="folded"] #islands { display: none; }
-/* The band under the tabs keeps the whole width: the bar opens under it, beside the canvas or over it, never pushing it. */
+/* The band keeps the whole width: the bar opens under it, beside the canvas or over it, never pushing it. */
 body[data-islands] #query { left: 0; }
 body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip)); }
 #islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* The bar's right edge: a strip to drag, drawn only as the line it already has, lit while pointed at. */
 #islands .isl-edge { position: absolute; top: 0; bottom: 0; right: 0; width: var(--space-4); cursor: col-resize; }
 #islands .isl-edge:hover { background: var(--line); }
-/* Its button, first in the band under the tabs: its mark and how many are on, lit while the bar is open. */
+/* Its button, first in the band: its mark and how many are on, lit while the bar is open. */
 #query .isl-toggle { flex: none; display: flex; align-items: center; gap: var(--space-4); align-self: stretch; border: 0; border-bottom: var(--border-3) solid transparent; border-radius: 0; background: none; padding: 0 var(--space-7); font: inherit; color: var(--muted); cursor: pointer; }
 #query .isl-toggle:is(:hover, :focus-visible) { color: var(--text); outline: none; }
 #query .isl-toggle[aria-expanded="true"] { color: var(--text); border-bottom-color: var(--accent); }
@@ -43,6 +51,12 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 #islands .isl-sec-on .isl-row:not(.on) .isl-name { color: var(--muted); }
 #islands .isl-row:hover { background: var(--accent-soft); }
 #islands .isl-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; border: 0; background: none; padding: 0; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+/* What a chat works on, after its name: quieter, and the first cut when the row narrows (e_vr7tpgxp). */
+/* A chat's row is drawn from pieces (./session-pieces.js): a word a piece adds is quieter than the name, the first cut
+   when the row narrows, in the piece's hue where it has one; the name is the one that grows. */
+#islands .isl-chat .isl-piece:not(.isl-chat-mark) { flex: 0 2 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--session-hue, var(--muted)); }
+#islands .isl-chat .isl-piece.isl-name { flex: 1 1 auto; }
+#islands .isl-chat-on { margin-left: var(--space-4); }
 #islands .isl-off { flex: none; border: 0; background: none; padding: 0 var(--space-3); font: inherit; color: var(--muted); cursor: pointer; }
 #islands .isl-off:hover { color: var(--accent); }
 
@@ -57,3 +71,29 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 /* Recent: where work is now, named in full colour, when at its right. */
 #islands .isl-sec-recent .isl-row .isl-name { color: var(--text); }
 #islands .isl-row:not(.on, .isl-hit) .isl-name:hover { color: var(--text); }
+
+/* The chats at work (./island-sessions.js): a row each, its state a mark in the room the island rows keep for their dot. */
+#islands .isl-chat::before { display: none; }
+/* Its mark is the canvas's for that state (session_marks): a shape in the state's colour, as ./session-piece-state.js
+   names them; the inbox in its state's colour. */
+#islands .isl-chat-mark { flex: none; display: inline-grid; place-items: center; width: var(--text-6); }
+#islands .isl-chat-mark[class*="shape-"]::before { content: ''; box-sizing: border-box; width: var(--space-5); height: var(--space-5); background: var(--session-hue); }
+#islands .isl-chat-mark:is(.shape-disc, .shape-ring, .shape-half)::before { border-radius: 50%; }
+#islands .isl-chat-mark:is(.shape-ring, .shape-half)::before { border: thin solid var(--session-hue); background: none; }
+#islands .isl-chat-mark.shape-half::before { background: linear-gradient(90deg, var(--session-hue) 50%, transparent 50%); }
+#islands .isl-chat-mark.shape-diamond::before { transform: rotate(45deg) scale(0.8); }
+#islands .isl-chat-mark.shape-triangle::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+#islands .isl-chat-mark.on-you { color: var(--session-hue, var(--warn)); }
+#islands .isl-chat .isl-name { color: var(--text); }
+/* An island a show added: its row on the soft ground and its name bold until it is pressed (decision e_mnuthcap). */
+#islands .isl-row.shown { background: var(--accent-soft); }
+#islands .isl-row.shown .isl-name { color: var(--text); font-weight: 600; }
+/* The count of chats waiting on the owner, in the band beside the islands button: an inbox, its count raised at its
+   top right in the warning's colour, a word and no capsule. */
+#query .q-waiting { position: relative; flex: none; display: inline-grid; place-items: center; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: 0; background: none; font: inherit; color: var(--text); cursor: pointer; }
+#query .q-waiting[hidden] { display: none; }
+#query .q-waiting:hover { background: var(--accent-soft); }
+#query .q-waiting-badge { position: absolute; top: 0; right: 0; color: var(--warn); font-size: var(--text-1); font-weight: 700; line-height: 1; }
+
+/* What waits on the owner, wherever it is drawn: the inbox (inbox.svg), painted in the colour of what holds it. */
+.on-you { display: inline-block; width: var(--text-6); height: var(--text-6); vertical-align: middle; background: currentColor; -webkit-mask: url(/inbox.svg) center / contain no-repeat; mask: url(/inbox.svg) center / contain no-repeat; }

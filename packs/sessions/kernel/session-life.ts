@@ -17,6 +17,8 @@ import { actorId, type Actor, type Item, type Op } from './types.ts';
 
 /** A step the owner's page is shown at once (presence's took): who, what, of which run, and whether its tab rests or ends. */
 export type Shown = { actor: string; did: string; run: string; rests?: true; ends?: true };
+/** What befell a session as a call ran, told on its story once the call is done (./beats.ts): what, of whom, and why. */
+export type Befell = { run: string; did: Did; said: string; about?: string[]; by: string };
 
 const now = (ctx: Pick<KernelContext, 'now'>) => ctx.now().toISOString();
 const itemOf = async (ctx: KernelContext, id: string) => ((await ctx.reads({ ids: [id] })) as Item[])[0];
@@ -48,7 +50,7 @@ export async function sessionBegan(ctx: KernelContext, sessionId: string | undef
 /** What a session says of itself as it registers. */
 export type SessionSaid = { title?: string; surface?: string; cwd?: string; remote?: string; session_id?: string; task?: string; branch?: string; source?: string; parent?: string };
 
-export async function sessionStart(ctx: KernelContext, actor: Actor, input: SessionSaid, shown: Shown[] = []) {
+export async function sessionStart(ctx: KernelContext, actor: Actor, input: SessionSaid, shown: Shown[] = [], befell: Befell[] = []) {
   const workspace = async () => ({ id: ctx.workspace, name: (await ctx.reads({ workspace_name: true })) as string });
   // The session that started this one, refused before anything is made when there is none.
   const parent = input.parent ? await parentRun(ctx, input.parent) : undefined;
@@ -95,11 +97,14 @@ export async function sessionStart(ctx: KernelContext, actor: Actor, input: Sess
         if ((ctx.registry.capacity(res as never) ?? Infinity) === Infinity && res.status === 'available') continue;
         await claimAs(ctx, actor, { resource: res.id, holder: run, for: task.id, reason: `Needed for "${task.title}"` });
         claimed.push(res.title);
+        befell.push({ run, did: 'claimed', said: `Claimed ${res.title} for ${task.title}`, about: [res.id, task.id], by: 'sessions' });
       } catch (err) {
         blocked.push({ resource: res.id, title: res.title, why: (err as Error).message });
+        befell.push({ run, did: 'refused', said: `Could not claim ${res.title}: ${(err as Error).message}`, about: [res.id, task.id], by: 'sessions' });
       }
     }
   }
+  if (task) befell.unshift({ run, did: 'took', said: `Took up ${task.title}`, about: [task.id], by: 'sessions' });
   if (blocked.length) await bookkeep(ctx, actorId(actor), { ops: [{ op: 'update', id: run, status: 'waiting' }], reason: `Waiting on ${blocked.map((b) => b.title).join(', ')}` });
 
   return {
@@ -234,7 +239,7 @@ export async function recordUsage(ctx: KernelContext, sessionId: string | undefi
   return { run: run.id, added, to: work.map((w) => w.id) };
 }
 
-export async function sessionUpdate(ctx: KernelContext, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string; branch?: string; title?: string; parent?: string }, shown: Shown[] = []) {
+export async function sessionUpdate(ctx: KernelContext, actor: Actor, input: { run: string; status?: 'running' | 'waiting'; note?: string; task?: string; branch?: string; title?: string; parent?: string }, shown: Shown[] = [], befell: Befell[] = []) {
   const run = await resolveRun(ctx, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
@@ -258,11 +263,14 @@ export async function sessionUpdate(ctx: KernelContext, actor: Actor, input: { r
     },
   ];
   if (input.task) ops.push({ op: 'link', type: 'works_on', from: run.id, to: input.task });
+  // A task it did not work on yet is taken up: that is told on its story.
+  const already = input.task ? ((await ctx.reads({ links: { from: [run.id], to: [input.task], types: ['works_on'] } })) as unknown[]).length > 0 : true;
   await bookkeep(ctx, actorId(actor), { ops, reason: input.note ?? `Session ${input.status ?? 'update'}` });
   await touch(ctx, run.id);
   // Work that is picked up with no estimate is the moment to give it one.
   const task = input.task ? await itemOf(ctx, input.task) : undefined;
   const unestimated = task && ctx.registry.type(task.type)?.fields.tokens_estimated && task.props.tokens_estimated == null;
+  if (task && !already) befell.push({ run: run.id, did: 'took', said: `Took up ${task.title}`, about: [task.id], by: 'sessions' });
   return {
     run: run.id,
     status: input.status ?? run.status,
@@ -286,7 +294,15 @@ export interface Beat {
   finding?: boolean;
   /** Set on a beat a rule on the reply's end asked with (packs/sessions/kernel/replies.ts): the rule, as pack.id. */
   asked?: string;
+  /** Set on a beat the orchestration told of the session, not the session itself (./beats.ts): what befell it. */
+  did?: Did;
+  /** Who told it, with did: the pack (or pack.rule) that did it. */
+  by?: string;
 }
+
+/** What the orchestration does to a session, told as a beat: a task taken up, a resource claimed or given back, a change or claim refused, a launch stopped. */
+export const DIDS = ['took', 'claimed', 'released', 'refused', 'stopped'] as const;
+export type Did = (typeof DIDS)[number];
 const BEATS_KEPT = 80;
 const SAID_MAX = 280;
 /** A finding is a few plain sentences: the point, what it rests on, what is left. */
@@ -305,11 +321,12 @@ const SAYS_MAX = 40;
 export async function tell(
   ctx: KernelContext,
   _actor: Actor,
-  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number; finding?: boolean; asked?: string },
+  input: { run: string; said: string; about?: string[]; links?: { from: string; to: string; says: string }[]; replaces?: number; finding?: boolean; asked?: string; did?: Did; by?: string },
 ) {
   const run = await resolveRun(ctx, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
-  if (!run.is_open) throw new Error(`Session "${run.title}" has already ended`);
+  // What befell a session is told even as it ends: giving back what it held is the last of its story.
+  if (!run.is_open && !input.did) throw new Error(`Session "${run.title}" has already ended`);
   const said = input.said.trim();
   if (!said) throw new Error('A beat says something: give said a sentence.');
   const most = input.finding ? FINDING_MAX : SAID_MAX;
@@ -335,11 +352,14 @@ export async function tell(
     if (old.replaced_by) throw new Error(`Beat ${old.n} was already taken back by beat ${old.replaced_by}.`);
   }
   if (input.finding && !about.length) throw new Error('A finding names the items it is about (about, or the ends of links): they are its picture.');
-  const beat: Beat = { n: story.length + 1, at: now(ctx), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }), ...(input.asked && { asked: input.asked }) };
+  const beat: Beat = { n: story.length + 1, at: now(ctx), said, about, links, ...(input.replaces !== undefined && { replaces: input.replaces }), ...(input.finding && { finding: true }), ...(input.asked && { asked: input.asked }), ...(input.did && { did: input.did, by: input.by }) };
   const next = [...story.map((b) => (b.n === input.replaces ? { ...b, replaced_by: beat.n } : b)), beat];
-  await operational(ctx, run.id, { props: { story: next, last_seen: now(ctx) } });
-  await touch(ctx, run.id);
-  await heard(ctx, run, `Session "${run.title}" told of its work`);
+  // What befell it is not the session heard from: its story grows, its last word stays its own.
+  await operational(ctx, run.id, { props: { story: next, ...(!input.did && { last_seen: now(ctx) }) } });
+  if (!input.did) {
+    await touch(ctx, run.id);
+    await heard(ctx, run, `Session "${run.title}" told of its work`);
+  }
   return { run: run.id, beat: beat.n, standing: next.filter((b) => !b.replaced_by).length };
 }
 
@@ -351,7 +371,7 @@ export async function story(ctx: KernelContext, input: Record<string, unknown>) 
   const beats = Array.isArray(run.props.story) ? (run.props.story as Beat[]) : [];
   // What the page opens on: the latest finding that stands, else the latest beat the session said itself, not a rule.
   const standing = beats.filter((b) => !b.replaced_by);
-  const found = standing.findLast((b) => b.finding) ?? standing.findLast((b) => !b.asked) ?? standing.at(-1);
+  const found = standing.findLast((b) => b.finding) ?? standing.findLast((b) => !b.asked && !b.did) ?? standing.at(-1);
   return { run: { id: run.id, title: run.title, status: run.status, open: run.is_open }, finding: found?.n ?? null, beats };
 }
 
@@ -374,7 +394,7 @@ export type EndInput = {
   reason?: string;
 };
 
-export async function sessionEnd(ctx: KernelContext, actor: Actor, input: EndInput, shown: Shown[] = []) {
+export async function sessionEnd(ctx: KernelContext, actor: Actor, input: EndInput, shown: Shown[] = [], befell: Befell[] = []) {
   const run = await resolveRun(ctx, input.run);
   if (!run) throw new Error(`No session "${input.run}"`);
   if (!run.is_open) return { run: run.id, status: run.status, already_ended: true };
@@ -418,7 +438,10 @@ export async function sessionEnd(ctx: KernelContext, actor: Actor, input: EndInp
   }
   // Whatever it held goes back first, so a finished session is never seen still keeping the lane.
   const held = (await ctx.reads({ links: { from: [run.id], types: ['holds'] } })) as { to_id: string }[];
-  for (const h of held) await releaseAs(ctx, actor, { resource: h.to_id, holder: run.id, reason: `Session ${outcome}` });
+  for (const h of held) {
+    await releaseAs(ctx, actor, { resource: h.to_id, holder: run.id, reason: `Session ${outcome}` });
+    befell.push({ run: run.id, did: 'released', said: `Gave back ${(await itemOf(ctx, h.to_id))?.title ?? 'what it held'}: session ${outcome}`, about: [h.to_id], by: 'sessions' });
+  }
   await touch(ctx, run.id, 'close');
   await keepTouched(ctx, run.id);
   const working = (await ctx.reads({ links: { from: [run.id], types: ['works_on'] } })) as { id: string }[];

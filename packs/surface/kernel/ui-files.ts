@@ -53,6 +53,9 @@ export const UI_FILES: Record<string, string> = {
   '/menus.css': 'menus.css',
   // The island picker: the side list (packs/surface/page/island-picker.js).
   '/island-picker.css': 'island-picker.css',
+  // The mark of what waits on the owner (their move, a question to them): an inbox, painted by the stylesheets as a mask
+  // wherever that state is drawn (the band's count, the side bar's chats, a tab), so it is one drawing everywhere.
+  '/inbox.svg': 'inbox.svg',
   // How a part's marks look: classes and steps the style gives values to (packs/walls/page/part-render.js).
   '/part-marks.css': 'part-marks.css',
   

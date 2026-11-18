@@ -41,65 +41,17 @@ body[data-panes="1"] #canvas .lf-legend { bottom: auto; pointer-events: auto; }
 /* One layout for one pane or several: the bar in a band across the top, over the sheet, and every pane under it with
    its strip, so nothing moves or changes width when a tab is split. */
 body { --band: calc(var(--box-9) + 2 * var(--space-4)); --strip: calc(var(--box-9) + 2 * var(--space-3)); }
-/* The lines of the frame are one system: a line under the tabs across the page, the tab in sight standing on it in the
-   panel's colour; a line under each band; one line between two panes, which is what is dragged and lights when it is
-   (ui/panes.js). Nothing draws a border of its own around a view. */
+/* The lines of the frame are one system: a line under the top bar across the page, and a line under each band.
+   Nothing draws a border of its own around a view. */
 body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) - var(--border-1)); left: 0; right: 0; height: var(--border-1); background: var(--line); pointer-events: none; }
 #nav > .grow { flex: 1; pointer-events: none; }
-/* Tabs (ui/tab-bar.js): one for each canvas kept, a session's named in its hue; many shrink to their mark and first letters.
-   They stand on one line across the bar, square below and rounded above; the one in sight is raised in the panel's
-   colour over that line, its top in the accent or its session's hue. No tab changes its size or controls when another
-   comes into sight. */
-#tabs { align-self: stretch; display: flex; align-items: flex-end; gap: var(--space-1); min-width: 0; margin-bottom: calc(-1 * var(--space-4)); padding: 0 var(--space-3); overflow-x: auto; scrollbar-width: none; }
-/* A tab the panes pack's part draws (a box marked selected or not): no wider than the style's tab_most (else side_least), its name cut
-   short as the bar narrows, its × in sight on the tab in sight and under the pointer only, its room kept so no tab changes size. Tabs
-   side by side out of sight are parted by a short line, as an editor's are; the chats' tabs by a longer one from yours. */
-#tabs > .tabs-part, #tabs > .tabs-part > .part-body { min-width: 0; flex: 1 1 auto; }
-#tabs .pm-box[aria-selected] { position: relative; flex: 0 1 auto; min-width: var(--box-10); max-width: var(--tab-most, var(--side-least)); }
-#tabs .pm-box[aria-selected] > .pm-button-tab { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-/* A tab is one square shape: under the pointer the whole of it is tinted, never a rounded outline round its name, its
-   × or +; its words a step smaller than the canvas's, so the strip reads quieter than what it holds. */
-#tabs .pm-box[aria-selected] { font-size: var(--text-4); }
-#tabs .pm-box[aria-selected="false"]:hover { background: var(--accent-soft); }
-#tabs .pm-box[aria-selected] > .pm-button, #tabs [data-key="new"] { border: 0; border-radius: 0; background: none; font-size: inherit; }
-#tabs .pm-box[aria-selected]:hover > .pm-button-tab, #tabs .pm-box[aria-selected] > .pm-button-quiet:hover, #tabs [data-key="new"]:hover { color: var(--text); }
-#tabs .pm-box[aria-selected] > .pm-button-quiet { width: var(--box-7); padding: 0; }
-#tabs .pm-box[aria-selected="false"]:not(:hover, :focus-within) > .pm-button-quiet { visibility: hidden; }
-#tabs .pm-box[aria-selected="false"] + .pm-box[aria-selected="false"]::before { content: ''; position: absolute; left: 0; top: var(--space-5); bottom: var(--space-5); width: var(--border-1); background: var(--line); }
-#tabs .pm-box[aria-selected="false"]:hover::before, #tabs .pm-box[aria-selected="false"]:hover + .pm-box::before { display: none; }
-#tabs .pm-box[data-dock] > .pm-box:not([aria-selected]) { align-self: center; height: var(--box-5); margin: 0 var(--space-5); border-left: var(--border-1) solid var(--line); }
-#tabs > .tab { pointer-events: auto; flex: 0 1 auto; max-width: 40%; min-width: calc(var(--box-8) + 2 * var(--box-7) + var(--space-6)); box-sizing: border-box; display: inline-flex; align-items: center; gap: 0; height: var(--box-8); padding: 0 var(--space-1) 0 var(--space-6); background: none; border: var(--border-1) solid transparent; border-bottom: 0; border-radius: var(--radius-3) var(--radius-3) 0 0; color: var(--muted); font-size: var(--text-5); white-space: nowrap; overflow: hidden; cursor: pointer; user-select: none; touch-action: none; }
-#tabs > .tab:hover { color: var(--text); background: var(--accent-soft); }
-#tabs > .tab[aria-selected="true"] { color: var(--text); background: var(--panel); border-color: var(--line); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
-#tabs > .tab.tab-out { border-color: var(--line); border-style: dashed; }
-#tabs > .tab[data-unseen] { color: var(--text); box-shadow: inset 0 var(--border-3) 0 var(--session-hue, var(--accent)); }
-#tabs > .tab.tab-drop { background: var(--accent-soft); }
-#tabs > .tab.tab-shown { animation: tab-shown 1.2s ease 2; }
-@keyframes tab-shown { 50% { background: var(--accent-soft); } }
-#tabs .tab-name { min-width: 0; margin-right: var(--space-5); overflow: hidden; text-overflow: ellipsis; }
-#tabs .tab-name.who-session::before { margin-right: var(--space-3); }
-#tabs > .tab[data-ended] .tab-name { text-decoration: line-through; }
-#tabs > .tab[data-quiet] .tab-name { opacity: var(--ln-dim); }
-#tabs > .tab.tab-chats { margin-left: var(--space-6); }
-/* A session's state, a mark before its name; one waiting on the owner stands out (ui/tab-count.js). */
-#tabs .tab-state { flex: none; margin-right: var(--space-3); }
-#tabs > .tab:is([data-state="waiting"], [data-state="your_move"]) { color: var(--text); }
-#tabs > .tab:is([data-state="waiting"], [data-state="your_move"]) .tab-state, #nav > .tab-count { color: var(--warn); }
-/* The sessions waiting on the owner, counted beside the strip so every tab sees them; a press goes to the oldest. */
-#nav > .tab-count { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); height: var(--box-7); padding: 0 var(--space-4); border: 0; border-radius: var(--radius-2); background: none; font: inherit; font-size: var(--text-5); cursor: pointer; }
-#nav > .tab-count[hidden] { display: none; }
-#nav > .tab-count .tab-state { margin: 0; }
-#nav > .tab-count:hover { background: var(--accent-soft); }
-/* Every control on the strip, in the bar and on a pane is a button a finger finds: a square of one size, its mark large enough to read. */
-#tabs .tab-act, #tabs > .tab-new, #query .q-save, .pane-bar .pane-act { flex: none; display: inline-grid; place-items: center; box-sizing: border-box; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); font-size: var(--text-8); line-height: 1; cursor: pointer; }
-#tabs .tab-act:hover, #tabs > .tab-new:hover, #query .q-save:hover:not(:disabled), .pane-bar .pane-act:hover { color: var(--text); background: var(--accent-soft); }
+/* Every control in the bar and on a pane is a button a finger finds: a square of one size, its mark large enough to read. */
+#query .q-save, .pane-bar .pane-act { flex: none; display: inline-grid; place-items: center; box-sizing: border-box; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: var(--radius-2); background: none; color: var(--muted); font-size: var(--text-8); line-height: 1; cursor: pointer; }
+#query .q-save:hover:not(:disabled), .pane-bar .pane-act:hover { color: var(--text); background: var(--accent-soft); }
 #query .q-save:disabled { opacity: 0.35; cursor: default; }
 #query .q-mark { width: var(--text-5); height: var(--text-5); fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linejoin: round; }
 /* An action that is not read from its mark alone says its word beside it. */
 #query .q-save.q-word { width: auto; gap: var(--space-3); grid-auto-flow: column; padding: 0 var(--space-5); font-size: var(--text-4); color: var(--text); }
-/* New tab: on the line of the tabs' own buttons, as a browser's + is (its glyph sits a hairline lower than × and ⋯, so it is lifted by one), in the text's colour so it reads at a glance. */
-#tabs > .tab-new { pointer-events: auto; align-self: flex-end; margin: 0 0 calc((var(--box-8) - var(--box-7)) / 2 + var(--border-1)) var(--space-3); color: var(--text); }
-/* The tab in sight's menu: whom it follows, pop out. A popover, so the strip does not clip it. */
 /* Drawn as every open list is (ui/style.css, decision e_eqsuv24q). */
 .tab-menu, .term-pick { position: fixed; inset: auto; margin: var(--space-3) 0 0; }
 .tab-menu:not(:popover-open), .term-pick:not(:popover-open) { display: none; }
@@ -128,8 +80,7 @@ body::before { content: ''; position: fixed; z-index: 5; top: calc(var(--band) -
 #nav .brand { flex: none; width: var(--box-9); height: var(--box-9); background: var(--emblem) center / contain no-repeat; border-radius: var(--radius-2); font-size: 0; color: transparent; text-decoration: none; }
 #nav .brand > .error { font-size: var(--text-2); }
 #nav .brand .workspace-name { display: none; }
-/* Under the tabs, two bands, each the width of the pane: the view, in the panel's colour and joined to the tab in sight
-   (or the strip of the pane in focus), with the canvas up and what is done with it; then the query, in the page's
+/* Under the top bar, two bands, each the width of the canvas: the view, in the panel's colour, with the canvas up and what is done with it; then the query, in the page's
    colour, in one line, with its editor under it when open. No box holds another (rule e_vgs9vt5j): the filter, the walk
    and the limit are rows of the editor set apart by a line, and each term is its words and its ×, with no shape of its own. */
 #query { position: fixed; z-index: 2; top: var(--active-top, 0%); left: var(--active-left, 0%); right: var(--active-right, 0%); display: flex; flex-direction: column; white-space: nowrap; pointer-events: none; }
@@ -424,7 +375,6 @@ body[data-panes] #canvas .pane-canvas .view-frame .lens-view:is(*, :has(.lf-stag
 /* A finger needs more to land on than a pointer does. */
 @media (pointer: coarse) {
   #query .q-save { min-width: var(--box-8); height: var(--box-9); }
-  #tabs .tab-act, #tabs > .tab-new { width: var(--box-8); height: var(--box-8); }
 }
 #canvas .pane-canvas > .empty, #canvas .pane-canvas > .error, #canvas .pane-canvas .lens-view > .empty { position: absolute; top: 40%; left: 0; right: 0; text-align: center; }
 /* The line between two panes: drawn by the sash itself, over the bands it crosses, wider and in the accent while it is
@@ -469,9 +419,9 @@ body:not([data-panes="1"]) #query .q-view { margin: 0 calc(var(--space-5) + (var
 .thumb-stage { position: fixed; top: 0; left: 100%; width: var(--thumb-frame); height: var(--thumb-frame-high); overflow: hidden; visibility: hidden; pointer-events: none; contain: strict; }
 .thumb-stage .lens-wrap, .thumb-stage .lens-view { width: 100%; height: 100%; }
 
-/* A frozen link's page (packs/kit/page/base.js `link`, decision e_qpaqnmrc): the view it shows alone, without the tabs, menu, other
+/* A frozen link's page (packs/kit/page/base.js `link`, decision e_qpaqnmrc): the view it shows alone, without the menu, other
    views or panes of whoever opens it; its query in sight and not to be changed, since the answer is frozen. */
-:root[data-reader] #tabs, :root[data-reader] #more, :root[data-reader] #listening, :root[data-reader] #query .q-travel, :root[data-reader] #query .q-split, :root[data-reader] #query .q-band-menu, :root[data-reader] #query .q-view-pick > :last-child { display: none; }
+:root[data-reader] #more, :root[data-reader] #listening, :root[data-reader] #query .q-travel, :root[data-reader] #query .q-split, :root[data-reader] #query .q-band-menu, :root[data-reader] #query .q-view-pick > :last-child { display: none; }
 :root[data-reader] #query .q-view-pick, :root[data-reader] #find { pointer-events: none; }
 /* A link's reader is shown, in the bar, a way to start a map of their own (ui/app.js, startOwn). */
 #nav .sign-in { margin-left: auto; color: var(--text); font-size: var(--text-4); }

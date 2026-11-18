@@ -54,6 +54,8 @@ export interface UpdateOp {
   visibility?: 'private' | 'shared' | 'public';
   confidence?: number;
   props?: Props;
+  /** The position of the fact stream it was read at: refused if what it sets has been set since (packs/write/kernel/stale.ts). */
+  as_of?: number;
 }
 export interface LinkOp {
   op: 'link';
@@ -127,6 +129,8 @@ export interface ChangeInput {
   part?: PartRef;
   /** The change set this one reverses: undo's own. */
   undoes?: string; /** The session it was made in (a run's id), kept in the log's entry: where it came from, never on whose authority. */ run?: string;
+  /** The sender's key for it: the same key sent again is answered with the first change, not applied twice (packs/write/kernel/keyed.ts). */
+  key?: string;
 }
 
 export interface Entity {

@@ -66,16 +66,12 @@ test('parts is a key of the manifest, and a map pack’s alone', () => {
 // never changes under a pack that fills it.
 test('the host offers these slots, each handing the part what it is named with', () => {
   assert.deepEqual(FRAME_SLOTS, {
-    panes: [],
-    tabs: ['tabs', 'current', 'page'],
-    'tab.mark': ['tab', 'current'],
     bar: ['current', 'home'],
     'bar.views': ['current', 'home'],
     'bar.find': ['query', 'home', 'answer', 'names'],
     'bar.find.rows': ['query', 'home', 'answer', 'names'],
     'bar.layouts': ['current', 'layout'],
     canvas: ['query', 'layout'],
-    traces: ['query'],
     sheet: ['reading'],
     'item.menu': [],
     find: ['query', 'shapes'],
@@ -83,8 +79,6 @@ test('the host offers these slots, each handing the part what it is named with',
     nav: [],
     look: ['drawn', 'why'],
     'workspace.card': ['workspace', 'section'],
-    'tabs.land': ['step', 'tabs', 'drawable'],
-    'tabs.life': ['open', 'tabs'],
     ghosts: ['held', 'drawn', 'loose'],
   });
   assert.deepEqual(PAGES, ['doc', 'public']);
@@ -110,7 +104,7 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   assert.throws(refused({ reads: { nothing: ['title'] } }), /reads unknown type "nothing"/);
   assert.throws(refused({ reads: '*' }), /reads items whole \("\*"\), which only a root pack's part may/);
   assert.doesNotThrow(refused({ reads: '*' }, { kernel: { trust: 'root', internal: true } }), "a root pack's part reads items whole");
-  // A frame slot no pack opens (tab.mark is the panes root's part's now: one name, one owner).
+  // A frame slot no map pack opens: one name, one owner.
   assert.throws(refused({ opens: ['item.menu'] }), /opens "item.menu", which the host draws/, "a map pack's part may not open the host's slot");
   assert.doesNotThrow(refused({ opens: ['item.menu'] }, { kernel: { trust: 'root', internal: true } }), "a root pack is the host: its part opens a frame slot");
   assert.throws(refused({ reads: { 'bin.box': ['size'] } }, {}, bin), /reads "size" of "bin.box", bin's: ask for it, as type:bin.box or field:size@bin.box/);
@@ -130,7 +124,7 @@ test('a part loads when its shapes hold, and is refused with why when one does n
   // A part that only publishes state draws nothing, so it may name no mark; one that names none and publishes none is refused.
   assert.throws(refused({ marks: [] }), /names the marks it answers with/);
   assert.doesNotThrow(refused({ marks: [], state: ['look'] }), 'a part that only publishes state names no mark');
-  assert.doesNotThrow(refused({ slot: 'tabs.land', marks: [] }), 'a part that only answers a decision names no mark');
+  assert.doesNotThrow(refused({ slot: 'ghosts', marks: [] }), 'a part that only answers a decision names no mark');
   assert.doesNotThrow(refused({ views: [{ name: 'search', live: true }] }), 'search, live, is the kernel’s: no pack answers it');
   assert.throws(refused({ views: [{ name: 'search' }] }), /does not answer/, 'search handed at mount is a view like any other');
   assert.throws(refused({ views: [{ name: 'search', live: 'yes' }] }), /live is true or false/);

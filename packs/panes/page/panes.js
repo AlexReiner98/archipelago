@@ -1,11 +1,11 @@
-// A pane's canvas: the panes pack's part decides which panes stand where and what each draws (packs/panes/parts/index.js),
-// the runtime lays them out (the `pane` mark, packs/walls/page/part-pane.js), and this draws the canvas in each, at
-// the address the part names: a lens, a saved canvas, an item (`e/<id>`), or nothing (`v?shown=none`). It tells the
-// part what is done there (another lens, an item opened) and what it draws (its name, its items). The pane pressed
-// is the one the query bar and find act on (decision e_h2pqjy2q). A look's page, and a frozen link's, draw their one
-// view in a pane of their own, with no tabs.
+// The canvas: one pane, at the page's address (decision e_mnuthcap, Alex, 17 Nov 2026: the tabs went; what a person
+// sees is the islands they have on, and a show adds its island rather than taking the view). It draws a lens, a saved
+// canvas, an item (`e/<id>`), or nothing (`v?shown=none`), and keeps the page's address as it moves. The band holds
+// back and forward. A look's page, and a frozen link's, draw their one view the same way, with no band.
 
 import { api, h, hooks } from './base.js';
+import { still } from './look.js';
+import { atOf } from './pane-address.js';
 import { activate, canvasIn, focusOn, homeReady, islandsLens } from './canvas.js';
 import { islandsIn } from './islands-on.js';
 import { islandsName, islandsOfLens } from './islands-lens.js';
@@ -151,28 +151,45 @@ export function drawPane(at, el, said) {
 }
 hooks.paneFrame = drawPane;
 
-// ---- A page with no tabs (a look's, a frozen link's): its one view in a pane of its own, at the page's address.
+// ---- The page's one pane, at the page's address.
 
 let lone = null;
-/** The page's address given to the lone pane of a page with no tabs (packs/shell/page/app.js): drawn again only for another. */
+/** The page's address given to the pane (packs/shell/page/app.js): drawn again only for another. */
 export function toAddress(at) {
   if (!lone || at === undefined || at === lone.at) return;
   lone.stop?.();
   lone.at = at;
+  // Where the canvas moves (another lens) it writes the page's address, which draws it again here.
   lone.stop = drawPane(at, lone.body, () => {});
 }
-/** Start the lone pane of a page with no tabs, in #canvas. */
-export function lonePane(at) {
+/** Start the page's pane in #canvas, once the map's schema is read (packs/shell/page/app.js): what it draws is read through it. */
+export function startCanvas() {
+  if (lone) return;
   const canvas = document.getElementById('canvas');
   const body = h('section', { class: 'pane' });
   canvas?.replaceChildren(body);
   lone = { at: null, body, stop: null };
-  toAddress(at);
+  if (!still) {
+    // One pane: the page's own rules lay it out alone (packs/surface/page/shell.css, island-picker.css: body[data-panes]).
+    document.body.dataset.panes = '1';
+    // The sheet or the side bar opened or shut moves the canvas's frame: what fits itself to it (find, the drawing) is told.
+    // Only a frame that moved: the same state said again (the sheet as it was) is no new room, and a pan goes on.
+    let frame = '';
+    let soon;
+    const moved = () => {
+      const r = body.getBoundingClientRect();
+      const now = [r.left, r.right, r.top, r.bottom].join(' ');
+      if (now !== frame) ((frame = now), dispatchEvent(new Event('resize')));
+    };
+    new MutationObserver(() => (clearTimeout(soon), (soon = setTimeout(moved, 30)))).observe(document.body, { attributes: true, attributeFilter: ['data-sheet', 'data-islands', 'data-islands-over'] });
+    const button = (label, title, mark, onclick) => h('button', { type: 'button', class: 'q-save q-travel', title, 'aria-label': label, onclick }, mark);
+    hooks.paneButtons = () => [button('Back', 'Back to what the canvas drew before', '‹', () => history.back()), button('Forward', 'Forward again', '›', () => history.forward())];
+  }
+  toAddress(atOf(location.hash) ?? 'v');
 }
-/** Where closing the page over the canvas goes: the address the pane in focus stands at, as the panes part publishes it (`data-pane_at`), else the lens the page's address carries. */
+/** Where closing the page over the canvas goes: the address the canvas stands at, else the lens the page's address carries. */
 export function hrefNow(from = '') {
-  const at = document.documentElement.dataset.pane_at;
-  if (at) return at;
+  if (lone?.at) return lone.at === 'v' ? '#/' : `#/${lone.at}`;
   const query = (from || location.hash).split('?')[1];
   return query ? `#/v?${query}` : '#/';
 }

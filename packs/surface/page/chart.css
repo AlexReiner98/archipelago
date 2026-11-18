@@ -42,7 +42,7 @@ body:has(main > nav.site-head) {
   background: var(--c-ground);
   color: var(--c-ink);
 }
-body[data-gate] {
+body[data-gate], body[data-first="wait"] {
   --c-ground: var(--chart-ground, var(--bg));
   --c-ink: var(--chart-ink, var(--text));
   --c-muted: var(--chart-muted, var(--muted));
@@ -52,10 +52,10 @@ body[data-gate] {
   color: var(--c-ink);
 }
 body[data-gate] #sheet { background: var(--c-ground); }
-body[data-gate] .gate .muted { color: var(--c-muted); }
+body[data-gate] .gate .muted, body[data-first] .first-card :is(.muted, .first-promise, .first-steps li::marker) { color: var(--c-muted); }
 
 /* The roles, each as the house gives it. */
-:where(main:has(> nav.site-head)), body[data-gate] .gate,
+:where(main:has(> nav.site-head)), body[data-gate] .gate, body[data-first] .first-card,
 :where(main:has(> nav.site-head)) :is(nav, footer, h3, h4) {
   font-family: var(--type-voice-family);
   font-weight: var(--type-voice-weight);
@@ -68,20 +68,20 @@ main > nav.site-head .site-name {
   text-transform: var(--type-wordmark-case);
   letter-spacing: var(--type-wordmark-track);
 }
-:where(main:has(> nav.site-head)) :is(h1, h2), body[data-gate] .gate h1 {
+:where(main:has(> nav.site-head)) :is(h1, h2), body[data-gate] .gate h1, body[data-first] .first-card h1 {
   font-family: var(--type-heading-family);
   font-weight: var(--type-heading-weight);
   font-variation-settings: var(--type-heading-axes);
   color: var(--c-ink);
 }
 :where(main:has(> nav.site-head)) :is(.site-pages a, th, li > strong:first-child, p.action > a),
-body[data-gate] .gate :is(button, .primary, input) {
+body[data-gate] .gate :is(button, .primary, input), body[data-first] .first-card .primary {
   font-family: var(--type-label-family);
   font-weight: var(--type-label-weight);
   font-variation-settings: var(--type-label-axes);
 }
 /* What an agent wrote is set in its monospace end: code, and a guest map being made. */
-:where(main:has(> nav.site-head)) :is(code, pre), body[data-gate] .gate-row > .muted.grow:only-child {
+:where(main:has(> nav.site-head)) :is(code, pre), body[data-gate] .gate-row > .muted.grow:only-child, body[data-first] .first-prompt {
   font-family: var(--type-agent-family);
   font-weight: var(--type-agent-weight);
   font-variation-settings: var(--type-agent-axes);
@@ -113,41 +113,57 @@ body[data-gate] .gate :is(button, .primary, input) {
   mask: linear-gradient(to right, black 15%, transparent 90%);
 }
 
-/* The one way forward on a page: a link alone on its line on a site (p.action), and the gate's primary button. Ink, a
-   heavier foot, no colour; it fills with ink when pointed at. */
+/* The one way forward before an account, one button wherever it stands: a link alone on its line on a site (p.action),
+   the gate's primary, and a new map's Copy the prompt. A chart label on the land: the ink of the palette the land is in
+   (the backdrop says it, --backdrop-*, packs/walls/page/backdrop.js), light type and rule, a dark collar parting the land
+   under it; the light fills it when pointed at. */
 :where(main:has(> nav.site-head)) p.action > a,
-body[data-gate] .gate .primary {
+body:is([data-gate], [data-first]) :is(.gate, .first-card) .primary {
+  --way-ink: var(--backdrop-ink, var(--c-ink));
+  --way-light: var(--backdrop-light, var(--c-ground));
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-5);
-  padding: var(--space-7) var(--space-11);
-  background: var(--c-ground);
-  color: var(--c-ink);
-  border: var(--action-rule) solid var(--c-ink);
-  border-bottom-width: var(--action-foot);
+  padding: var(--rhythm-4) var(--rhythm-8);
+  background: var(--way-ink);
+  color: var(--way-light);
+  border: var(--border-2) solid var(--way-light);
   border-radius: 0;
+  letter-spacing: var(--track-2);
   text-decoration: none;
   text-align: center;
   max-width: 100%;
+  box-shadow: 0 0 0 var(--space-4) color-mix(in srgb, var(--way-ink) 72%, transparent), 0 var(--space-6) var(--box-8) color-mix(in srgb, var(--way-ink) 55%, transparent);
+  transition: background 0.5s, color 0.5s, border-color 0.5s, box-shadow 0.5s;
+}
+/* With no land it is dark with light type in either scheme, as the front page's is, so a land arriving does not flip it. */
+@media (prefers-color-scheme: dark) {
+  :where(main:has(> nav.site-head)) p.action > a,
+  body:is([data-gate], [data-first]) :is(.gate, .first-card) .primary {
+    --way-ink: var(--backdrop-ink, var(--c-ground));
+    --way-light: var(--backdrop-light, var(--c-ink));
+  }
 }
 :where(main:has(> nav.site-head)) p.action > a:hover,
-body[data-gate] .gate .primary:hover:not(:disabled) {
-  background: var(--c-ink);
-  color: var(--c-ground);
+body:is([data-gate], [data-first]) :is(.gate, .first-card) .primary:hover:not(:disabled) {
+  background: var(--way-light);
+  color: var(--way-ink);
 }
-body[data-gate] .gate .primary:focus-visible { outline: var(--border-3) solid var(--c-ink); outline-offset: var(--border-3); }
+body:is([data-gate], [data-first]) :is(.gate, .first-card) .primary:focus-visible { outline: var(--border-3) solid var(--way-light); outline-offset: var(--space-4); }
 
 /* The gate: a clearing with room, the form at reading size; fields square, their edge strong enough to see. */
-body[data-gate] .gate { gap: var(--space-10); }
+/* On a short window the room gives way first: the gap closes towards space_5 as the window falls below about 870 px. */
+body[data-gate] .gate { gap: clamp(var(--space-5), calc(5dvh - var(--space-11)), var(--space-10)); }
 body[data-gate] .gate-row { gap: var(--space-7); }
 body[data-gate] .gate input, body[data-gate] .gate button:not(.primary) { padding: var(--space-7) var(--space-8); }
 /* What can be pointed at says so: a field or a plain button takes the ink edge, as the primary fills with ink. */
 body[data-gate] .gate input:hover:not(:focus) { border-color: var(--c-ink); }
 body[data-gate] .gate button:not(.primary):hover:not(:disabled) { border-color: var(--c-ink); box-shadow: inset 0 0 0 var(--border-1) var(--c-ink); }
 body[data-gate] .gate .gate-foot { gap: var(--space-5); padding-top: var(--space-4); }
-body[data-gate] .gate h1, :where(main:has(> nav.site-head)) section > h2 { font-size: var(--chart-title); line-height: 1.25; }
-body[data-gate] .gate, :where(main:has(> nav.site-head)) { font-size: var(--chart-text); }
+body[data-gate] .gate h1, body[data-first] .first-card h1, :where(main:has(> nav.site-head)) section > h2 { font-size: var(--chart-title); line-height: 1.25; }
+body[data-gate] .gate, body[data-first] .first-card, :where(main:has(> nav.site-head)) { font-size: var(--chart-text); }
 body[data-gate] .gate input { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }
 body[data-gate] .gate input:focus { border-color: var(--c-ink); outline: var(--border-2) solid var(--c-ink); outline-offset: var(--border-1); }
 body[data-gate] .gate button:not(.primary) { border-radius: 0; background: var(--c-ground); border-color: var(--c-edge); color: var(--c-ink); }

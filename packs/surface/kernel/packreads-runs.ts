@@ -21,6 +21,8 @@ export type RunsRead = {
   run_rows?: string[];
   /** Of some runs: what each works on now, newest first, with since when that waits on open work. */
   run_works?: { ids: string[]; works_on: string[]; depends_on: string[] };
+  /** Of some items: the open runs linked works_on to each now (a few per item, the latest taken up first), with what each spent. */
+  runs_on?: { ids: string[]; works_on: string[]; runs: string[] };
   /** Of some runs: every works_on link they had, open or closed, with the item's title and type. */
   run_links?: { ids: string[]; works_on: string[] };
   /** Of some runs: every works_on link they had, open or closed, in the order taken up. */
@@ -52,6 +54,9 @@ export type RunsRead = {
   /** Of some items, those of some types, not archived, the newest first. */
   settling?: { ids: string[]; types: string[] };
 };
+
+/** The most open runs read for each item asked of runs_on: a few chats at once on one task is already a crowd. */
+const RUNS_ON_MOST = 4;
 
 type Row = { stream: Light['stream']; pos: number; at: Date; head: Omit<Light, 'stream' | 'pos' | 'at' | 'facts'>; facts: OpFact[] };
 type Event = { at: string; kind: string; [field: string]: unknown };
@@ -119,6 +124,16 @@ export async function runsRead(l: Archipelago, q: RunsRead): Promise<unknown> {
        from relation r join entity e on e.id = r.to_id
        where r.from_id = any($1::text[]) and r.valid_to is null and r.type = any($2::text[]) order by r.valid_from desc`,
       [list(q.run_works.ids, 'run_works.ids'), list(q.run_works.works_on, 'run_works.works_on'), list(q.run_works.depends_on, 'run_works.depends_on')],
+    );
+    return rows;
+  }
+  if (q.runs_on !== undefined) {
+    const { rows } = await l.db.query(
+      `select r.to_id as item, e.id as run, e.title, e.props->>'name' as name, e.props->'tokens_used' as tokens, e.props->'cost_usd' as cost_usd
+       from relation r join entity e on e.id = r.from_id
+       where r.to_id = any($1::text[]) and r.valid_to is null and r.type = any($2::text[]) and e.type = any($3::text[]) and e.is_open and e.archived_at is null
+       order by r.valid_from desc, e.id limit $4`,
+      [list(q.runs_on.ids, 'runs_on.ids'), list(q.runs_on.works_on, 'runs_on.works_on'), list(q.runs_on.runs, 'runs_on.runs'), RUNS_ON_MOST * q.runs_on.ids.length],
     );
     return rows;
   }

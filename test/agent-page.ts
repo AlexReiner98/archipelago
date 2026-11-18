@@ -1,5 +1,5 @@
-// What the tests of the tabs at the top of the owner's page share (test/tabs*.test.ts, test/show-*.test.ts): each test
-// in a file of its own, so that the steps a server keeps, and a Chrome, are a test's alone, and CI deals them apart.
+// What the browser tests of agents on the owner's page share (test/panes.test.ts, test/show-*.test.ts): each test in a
+// file of its own, so that the steps a server keeps, and a Chrome, are a test's alone, and CI deals them apart.
 
 import { pageModule, type Page } from './browser.ts';
 
@@ -18,22 +18,12 @@ export const heard = (page: Page) =>
     return true;
   })()`);
 
-/**
- * The tabs and panes as the panes part draws them (packs/panes/parts/index.js), each mark found by its key: a tab is
- * `tab:<id>` (its name `front:<id>`, its × `close:<id>`), its canvas `pane:<id>`. In the page, as JavaScript.
- */
-export const TAB = '#tabs [data-key^="tab:"]';
-export const PANE = '#canvas .pm-pane';
-/** The tab at `n` (from 1), as an expression of the page. */
-export const tabAt = (n: number) => `[...document.querySelectorAll('${TAB}')][${n - 1}]`;
-/** A selector for the name of the tab at `n` (from 1), to press: by the key of the tab there now. */
-export const tabName = async (page: Page, n: number) => `[data-key="front:${(await page.evaluate<string>(`${tabAt(n)}.dataset.key`)).slice(4)}"]`;
-/** What a pane's strip says: its name. */
-export const paneName = (pane: string) => `${pane}.querySelector('.pm-pane-strip .pm-text')`;
+/** The page's one canvas (packs/panes/page/panes.js). In the page, as a selector. */
+export const PANE = '#canvas > .pane';
 
-/** The page is up, its tabs drawn, and has heard the server: it follows agents' steps from here on. */
+/** The page is up, its canvas drawn, and has heard the server: it follows agents' steps from here on. */
 export async function ready(page: Page) {
-  if (!(await page.until(`Boolean(document.querySelector('${TAB}'))`))) throw new Error(`the page did not start: ${page.logs().join('\n')}`);
+  if (!(await page.until(`Boolean(document.querySelector('${PANE} .pane-canvas'))`))) throw new Error(`the page did not start: ${page.logs().join('\n')}`);
   await heard(page);
 }
 

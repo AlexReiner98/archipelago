@@ -167,7 +167,6 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `bar.find.rows` | The query's rows above find, shown while find publishes `find_open`. | `query`, `home`, `answer`, `names` |
 | `bar.layouts` | The layout a view is drawn in. | `current`, `layout` |
 | `canvas` | The canvas itself. | `query`, `layout` |
-| `traces` | The overlay of traces over it. | `query` |
 | `sheet` | The sheet over the canvas, an item's one page. | `reading` |
 | `item.menu` | What is done rarely to that item. | — |
 | `find` | Find at the canvas's foot. | `query`, `shapes` |
@@ -179,8 +178,8 @@ stands on (its `piece`; `test/ui-parts.test.ts` freezes the table):
 | `tabs.life` | A decision: which kept tabs' sessions have ended or rested. | `open`, `tabs` |
 | `ghosts` | A decision: what the changes held would look like, read back into the canvas's answer. | `held`, `drawn`, `loose` |
 
-**What the query slots are handed.** `bar.find`, `bar.find.rows`, `find`,
-`canvas` and `traces` are handed the lens the canvas in focus draws as
+**What the query slots are handed.** `bar.find`, `bar.find.rows`, `find`
+and `canvas` are handed the lens the canvas in focus draws as
 `query` (Home's where no query is up, and `home` true), and `names`, the
 titles of the items it names. The bar's two are handed `answer` too, in
 brief: each item's `id`, `type`, `status`, the `terms` that found it or the
@@ -200,17 +199,6 @@ part there names the page to show with
 `tools.go({ item, replace: true })`, which replaces the address and never
 leaves words not yet saved. With no part told, the page follows the reading
 itself.
-
-**What the traces are told.** A part on `traces` is handed `me` in its piece (the
-person's actor, as the log names one) and told each beat of the log as
-`{ name: 'beat', from, to, rows: [{ id, was, now, by?, at?, pos }] }`: the
-rows the beat touched as they were and are (null where not held, or gone),
-projected by the runtime, which keeps the store and the projector
-(`packs/surface/page/beat-rows.js`); the part compares them. On the first
-canvas of a page it is told `{ name: 'missed', from, to, entries: [{ pos, at,
-by?, moved?, facts, rows: [{ id, was, now }] }] }`, entry by entry from where
-the person last looked, then one beat for the whole span. Neither is worked
-out unless a part is mounted on `traces`.
 
 **A part may hold other parts** (`['slot', { name }]`, decision
 e_hp9xmrbq): only a slot in its own `opens`, and it may hand them a `piece` of words, numbers, yes and no (a
@@ -267,7 +255,7 @@ A part is handed the item it stands on cut to the fields it `reads`, its
 query's items, its named reads, and, where it declares `go`, the page's
 address. It answers with marks alone (`packs/walls/page/part-check.js`): `box`,
 `text`, `list`, `input`, `button`, `paint`, `path`, `note`, `menu`, `thumb`,
-`picture`, `web`, `pane`, `panes`, `swatch`, `trace`, `replay`, `ghost` and `slot`, each named in its `marks`.
+`picture`, `web`, `pane`, `panes`, `swatch`, `ghost` and `slot`, each named in its `marks`.
 
 **What any mark may carry**, beside `key`, `item`, `view` and `tip`:
 `lights`, up to 500 items it lights on the canvas in sight while the person
@@ -289,8 +277,6 @@ part is told nothing.
 | `slot` | A slot the part opens (`name`, one of its `opens`), drawn in its place by the parts that fill it, four deep at most (`slot(name, el)` in part-host). | nothing. |
 | `ghost` | Nothing where it stands: a change held for the owner, as data (`of` item, link or mark; `id` such as `p_x:ref`, `proposal`, `op`, and the item's or link's fields), handed to whoever hosts the part (`ghosts(list)`, `hooks.ghosts`) for the canvas to read back into its answer and draw where it would land. | nothing. |
 | `paint` `controls` | −, Fit and + in the surface's corner, zoomed by the style's `zoom_step`. A `path` may be filled as a diagram's shapes are (`look: area`, `box`, `strong`), and a path or placed text may carry a `tip` and an `href` (opened apart). | nothing. |
-| `replay` | Nothing where it stands: the canvas under the part shows what the person missed (`store.missed`, set as the canvas mounts) up to step `at` of `steps` (`[{ pos, ids }]`, each the facts of entry `pos` about those ids), the store `playing` while it is said; a step back or other steps rewinds first. With no replay mark, what was not played is projected at once and the store is the map as it is now (`packs/surface/page/replay.js`). The part drives the timer. | nothing. |
-| `trace` | Nothing where it stands: its `item`'s marks on the canvas painted with its line (`tip`, the page's tip over them) in a session's `hue`, until each was in sight for the style's `trace_seen_after` while the page painted; then it fades over `trace_fade` (`part-trace.js`). A trace no longer sent is taken off. | `seen`, with `item`. |
 | `menu` | What is done rarely, in steps (`part-menu.js`): a head (`text`), a field, buttons, and a `menu` in it as the next step (›, opened it is all its step shows, ‹ back). A `search` field narrows its step's choices in the page and Enter takes the first left; Backspace in it, empty, goes back. `open: true` opens it; it stays as the person leaves it while its key stays. | `press` from a choice, `edit` from a field; a `text` field still `submit`s, an `item` field `pick`s. |
 | `web` | A page on the web framed in place (`url`, http or https), sandboxed (`allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox`), no referrer, with ↗ to open it apart; this server's own pages are refused, drawn as what they are. A new `reload` loads it again. | nothing. |
 | `pane` | A canvas at an address (`at`) the page draws in its body (`hooks.paneFrame(at, el, said)`, whoever keeps the panes), the part's marks in its strip; `at` of `w?url=` frames that page as `web` does. `share` is its room; `ring` rings it once. | `focus` when pressed or focused in; whatever the frame says (`open`, `opened`, `named`). |

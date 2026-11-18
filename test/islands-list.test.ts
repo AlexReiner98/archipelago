@@ -5,27 +5,34 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { atHome, capital, drawnAt, islandsIn, islandsOnMap, pressed, rankIslands, recentFirst } from '../packs/surface/page/islands-list.js';
+import { atHome, capital, drawnAt, drawnBy, islandsIn, islandsOnMap, pressed, rankIslands, recentFirst } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
 test('Home draws the person’s own list, and a press there changes it in place', () => {
   for (const hash of ['', '#', '#/', '#/v']) assert.ok(atHome(hash), hash);
   assert.deepEqual(drawnAt('#/', mine), mine);
-  assert.deepEqual(pressed('#/', mine, 'e_lightcor'), { list: ['e_xgrowth1', 'e_lightcor'], home: false });
-  assert.deepEqual(pressed('#/', mine, 'e_xgrowth1'), { list: [], home: false });
+  assert.deepEqual(drawnBy('#/', mine, { home: true, islands: [] }), mine, 'Home is the person’s list, reads among it');
+  assert.deepEqual(pressed(mine, true, 'e_lightcor'), { list: ['e_xgrowth1', 'e_lightcor'], home: false });
+  assert.deepEqual(pressed(mine, true, 'e_xgrowth1'), { list: [], home: false });
 });
 
 test('a canvas at an address that names islands draws those, and a press there goes Home with them', () => {
   const hash = '#/v?islands=e_shown001';
   assert.ok(!atHome(hash));
   assert.deepEqual(drawnAt(hash, mine), ['e_shown001']);
-  assert.deepEqual(pressed(hash, mine, 'e_lightcor'), { list: ['e_shown001', 'e_lightcor'], home: true }, 'what was drawn, the island added: drawn at once');
-  assert.deepEqual(pressed('#/e/e_item0001?islands=e_shown001', mine, 'e_shown001'), { list: [], home: true });
+  assert.deepEqual(drawnBy(hash, mine, null), ['e_shown001'], 'before the canvas has drawn, the address');
+  const drawn = drawnBy(hash, mine, { home: false, islands: ['e_shown001'] });
+  assert.deepEqual(pressed(drawn, false, 'e_lightcor'), { list: ['e_shown001', 'e_lightcor'], home: true }, 'what was drawn, the island added: drawn at once');
+  assert.deepEqual(pressed(drawn, false, 'e_shown001'), { list: [], home: true });
 });
 
-test("an item's page draws its own island: a press goes Home with the person's list changed", () => {
-  assert.deepEqual(pressed('#/e/e_item0001', mine, 'e_lightcor'), { list: ['e_xgrowth1', 'e_lightcor'], home: true });
+test("an item's address draws its own island: the bar marks that, and a press acts on it (e_7jx9ccjb)", () => {
+  // The address names no islands; the canvas read the item's island and draws it alone.
+  const drawn = drawnBy('#/e/e_item0001', mine, { home: false, islands: ['e_itsisle1'] });
+  assert.deepEqual(drawn, ['e_itsisle1'], 'not the person’s list');
+  assert.deepEqual(pressed(drawn, false, 'e_lightcor'), { list: ['e_itsisle1', 'e_lightcor'], home: true });
+  assert.deepEqual(drawnBy('#/e/e_item0002', mine, { home: false, islands: [] }), [], 'an item on no island: none on');
 });
 
 test('the list read after a press is the new one, so Home drawn again draws what was put on', async () => {

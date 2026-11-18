@@ -22,9 +22,9 @@ import { fits, fitOnce } from './part-fits.js';
 import { menuSteps } from './part-menu.js';
 import { buildPane, frameWeb, layPanes, paneBody, paneGone, sashes } from './part-pane.js';
 import { draggable } from './part-drag.js';
-import { traceGone, traceMark } from './part-trace.js';
 import { setsField } from './part-echo.js';
 import { codeAt, codeField, codeSet, codeText } from './part-code.js';
+import { boxOfLines, fit, oneLine } from './part-lines.js';
 
 /** What each element was drawn from, and the surface that runs a paint mark. */
 const drawnFrom = new WeakMap();
@@ -43,7 +43,6 @@ const sent = new WeakMap();
  * said)` draws a canvas at a pane's address in `el` (said(name, value) tells the part what is done in it), answering
  * with a way to stop it; `hue(words)` is a session's hue named by words; `swatch(preset, el)` paints a style preset's
  * colours into `el`, and `tryTheme(preset)` paints this screen alone in one ('' the workspace's own again);
- * `replay({ at, steps } | null)` shows the canvas under the part the missed steps up to `at`, or the map as it is now;
  * `ghosts(list)` is handed the ghosts each answer holds (each mark's attributes), for the canvas to draw where they land;
  * `slot(name, el, piece)` draws the parts that fill a slot this part opens into `el`, handed `piece` when the mark gives one. `find(q, types, link)` answers the items an item
  * input offers as the person types, and `pick(kind)` the item a pick button waits for on the canvas: each
@@ -51,8 +50,8 @@ const sent = new WeakMap();
  * `draw(node, seen)` for each answer the part gives, `seen` the number of the last message the part had heard when it
  * gave it (what `tell` answers each event with), and `stop()`.
  */
-export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, replay = () => {}, ghosts = () => {}, slot = async () => 0, preview } = {}) {
-  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, replay, ghosts, slot, preview };
+export function mountPart(root, { tell = () => {}, style, canvas = () => {}, thumb = () => null, picture = () => {}, find = async () => [], pick = async () => null, lights = () => {}, frame = () => null, hue = () => undefined, swatch = () => {}, tryTheme = () => {}, ghosts = () => {}, slot = async () => 0, preview } = {}) {
+  const ctx = { tell, style, canvas, thumb, picture, find, pick, lights, frame, hue, swatch, tryTheme, ghosts, slot, preview };
   let ended = false;
   return {
     draw(node, seen) {
@@ -112,10 +111,8 @@ function build(node, ctx) {
   else if (node.mark === 'web') el = make('div', 'pm-web');
   else if (node.mark === 'pane') el = buildPane(ctx.tell);
   else if (node.mark === 'panes') el = make('div', 'pm-panes');
-  else if (node.mark === 'trace') (el = make('span', 'pm-trace')), (el.hidden = true);
   else if (node.mark === 'slot') el = make('div', 'pm-slot');
   else if (node.mark === 'ghost') (el = make('span', 'pm-ghost')), (el.hidden = true);
-  else if (node.mark === 'replay') (el = make('span', 'pm-replay')), (el.hidden = true), (el.pmReplay = ctx.replay);
   else if (node.mark === 'swatch') {
     // A swatch is pressed as a button is: the part hears it by its key.
     el = make('button', 'pm-swatch');
@@ -188,7 +185,7 @@ function field(node, ctx) {
     return el;
   }
   const many = (node.at.lines ?? 1) > 1;
-  const el = kind === 'pick' ? make('select', 'pm-input') : make(many ? 'textarea' : 'input', 'pm-input');
+  const el = kind === 'pick' ? make('select', 'pm-input') : make(boxOfLines(node.at) ? 'textarea' : 'input', 'pm-input');
   if (el.tagName === 'INPUT') el.type = FIELD_TYPES[kind];
   const value = () => (kind === 'check' ? String(el.checked) : el.value);
   const said = (name, more = {}) => {
@@ -210,7 +207,7 @@ function field(node, ctx) {
   // (with Shift held, `shift`).
   if (PICKS.includes(kind)) el.addEventListener('change', () => said('pick'));
   else {
-    el.addEventListener('input', () => (said('edit'), fit(el)));
+    el.addEventListener('input', () => (oneLine(el, drawnFrom.get(el).at), said('edit'), fit(el, drawnFrom.get(el).at)));
     el.addEventListener('keydown', (e) => !many && e.key === 'Enter' && !e.isComposing && !drawnFrom.get(el).at.keys?.includes('Enter') && (e.preventDefault(), said('submit', e.shiftKey ? { shift: true } : {})));
   }
   return el;
@@ -250,23 +247,13 @@ function finder(node, ctx) {
   return el;
 }
 
-/** A box of lines that fits its words is as tall as they are; the scroll it sits in is kept still while it is measured. */
-function fit(el) {
-  if (el.tagName !== 'TEXTAREA' || !drawnFrom.get(el)?.at.fits) return;
-  const scroller = el.closest('#sheet') ?? document.scrollingElement;
-  const top = scroller?.scrollTop;
-  el.style.height = 'auto';
-  el.style.height = `${el.scrollHeight}px`;
-  if (scroller) scroller.scrollTop = top;
-}
-
 /** Set what a mark says on the element drawn from it; `fresh` when it was just made. Answers with the element that stands for it now. */
 function update(el, node, ctx, fresh = false) {
   const was = drawnFrom.get(el);
   drawnFrom.set(el, node);
   const { at } = node;
   if (node.mark === 'paint') return (surfaces.get(el).update(node), tipped(el, at.tip), el);
-  const remade = node.mark === 'input' ? (at.lines ?? 1) > 1 !== (el.tagName === 'TEXTAREA') || (at.kind ?? 'text') !== (was.at.kind ?? 'text') : node.mark === 'text' && Boolean(at.href) !== Boolean(was?.at.href);
+  const remade = node.mark === 'input' ? boxOfLines(at) !== (el.tagName === 'TEXTAREA') || (at.kind ?? 'text') !== (was.at.kind ?? 'text') : node.mark === 'text' && Boolean(at.href) !== Boolean(was?.at.href);
   if (remade) {
     // A field that changes between one line and many, or its kind, is made again; so is text that becomes a way out or stops being one.
     const made = build(node, ctx);
@@ -279,12 +266,9 @@ function update(el, node, ctx, fresh = false) {
   // Text in a session's hue is that session, marked as every session is (its dot, ui/style.css .who-session).
   if (node.mark === 'text') hued(el, at.hue !== undefined ? ctx.hue(at.hue) : undefined, at.hue !== undefined);
   if (node.mark === 'web') frameWeb(el, at.url, at.reload ?? '');
-  if (node.mark === 'trace') return (traceMark(el, node, ctx), el);
   // A slot the part opens: the parts that fill it are drawn in it by whoever hosts this one, again only for another slot.
   if (node.mark === 'slot' && (fresh || was.at.name !== at.name || JSON.stringify(was.at.piece ?? null) !== JSON.stringify(at.piece ?? null))) (el.replaceChildren(), (el.dataset.slot = at.name), ctx.slot(at.name, el, at.piece));
   if (node.mark === 'slot') return el;
-  // A replay: the canvas under the part shows the missed steps up to `at`; the host holds the store, the part the timer.
-  if (node.mark === 'replay') return (ctx.replay({ at: at.at, steps: at.steps }), el);
   // A swatch is painted by the host from the preset it names, again only for another preset.
   if (node.mark === 'swatch' && (fresh || was.at.preset !== at.preset)) ctx.swatch(at.preset, el.firstElementChild);
   if (node.mark === 'swatch') (el.lastElementChild.textContent = at.label ?? '', at.on ? (el.dataset.on = at.on) : delete el.dataset.on);
@@ -327,7 +311,7 @@ function update(el, node, ctx, fresh = false) {
     if (setsField(at.value ?? '', codeText(el), sent.get(el), ctx.seen)) codeSet(el, at.value ?? '');
   } else if (node.mark === 'input') {
     el.placeholder = at.hint ?? '';
-    if (el.tagName === 'TEXTAREA') el.rows = at.lines;
+    if (el.tagName === 'TEXTAREA') el.rows = at.lines ?? 1;
     // A pick offers its values, made again only when they change.
     if (el.tagName === 'SELECT' && (fresh || JSON.stringify([was.at.values, was.at.names]) !== JSON.stringify([at.values, at.names]))) {
       el.replaceChildren(...at.values.map((v, i) => Object.assign(document.createElement('option'), { value: v, textContent: at.names?.[i] ?? v })));
@@ -340,7 +324,7 @@ function update(el, node, ctx, fresh = false) {
       if (at.kind === 'check') el.checked = value === 'true';
       else el.value = value;
     }
-    if (fresh) requestAnimationFrame(() => fit(el));
+    if (fresh) requestAnimationFrame(() => fit(el, drawnFrom.get(el)?.at));
     if (at.focus && el.tagName !== 'SPAN') focusSoon(el);
   }
   if (node.mark === 'text' && at.href && el.getAttribute('href') !== at.href) el.setAttribute('href', at.href);
@@ -452,9 +436,6 @@ function drawnOnPlane(node) {
 function gone(el) {
   for (const s of [el, ...el.querySelectorAll('.pm-paint')]) surfaces.get(s)?.stop();
   for (const p of [el, ...el.querySelectorAll('.pm-pane')]) if (p.classList?.contains('pm-pane')) paneGone(p);
-  for (const t of [el, ...el.querySelectorAll('.pm-trace')]) traceGone(t);
-  // A replay no longer said: the canvas is the map as it is now.
-  for (const r of [el, ...el.querySelectorAll('.pm-replay')]) r.pmReplay?.(null);
 }
 
 /** What a box, a button or a pane may be when it stands for something moved or picked between: listened for once, when made. */

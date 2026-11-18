@@ -4,12 +4,14 @@
 // asks; the story view is the query pack's (`story`, answered by the runs pack's answer.story).
 
 import type { KernelContext } from '#pelago/kernel';
+import { befellAll } from './beats.ts';
 import * as chat from './chat-run.ts';
 import * as life from './session-life.ts';
 import { sessionLabelled, sessionPromptNamed } from './session-name.ts';
 import type { Actor, Item } from './types.ts';
 
-export { IDLE_MS, stretch, type Beat, type Shown } from './session-life.ts';
+export { DIDS, IDLE_MS, stretch, type Beat, type Befell, type Did, type Shown } from './session-life.ts';
+export { befell } from './beats.ts';
 export type { Actor, Item } from './types.ts';
 
 /** Each step shown on the owner's page at once; a page that missed one finds it when it next reads the sessions. */
@@ -19,17 +21,19 @@ export async function show(ctx: KernelContext, shown: life.Shown[]): Promise<voi
   for (const step of shown) await ctx.call('act.report.took', { whose, step: { kind: 'other', ...step } }).catch((err) => ctx.said(`session ${step.run}: the owner's page could not be told: ${(err as Error).message}`));
 }
 
-/** Run one of the pack's calls with a list for what it shows, then show it. */
-async function showing<T>(ctx: KernelContext, f: (shown: life.Shown[]) => Promise<T>): Promise<T> {
+/** Run one of the pack's calls with a list for what it shows and one for what befell its session, then show and tell them. */
+async function showing<T>(ctx: KernelContext, f: (shown: life.Shown[], befell: life.Befell[]) => Promise<T>): Promise<T> {
   const shown: life.Shown[] = [];
-  const out = await f(shown);
+  const told: life.Befell[] = [];
+  const out = await f(shown, told);
+  await befellAll(ctx, told);
   await show(ctx, shown);
   return out;
 }
 
-export const sessionStart = (ctx: KernelContext, actor: Actor, input: life.SessionSaid) => showing(ctx, (shown) => life.sessionStart(ctx, actor, input, shown));
-export const sessionUpdate = (ctx: KernelContext, actor: Actor, input: Parameters<typeof life.sessionUpdate>[2]) => showing(ctx, (shown) => life.sessionUpdate(ctx, actor, input, shown));
-export const sessionEnd = (ctx: KernelContext, actor: Actor, input: life.EndInput) => showing(ctx, (shown) => life.sessionEnd(ctx, actor, input, shown));
+export const sessionStart = (ctx: KernelContext, actor: Actor, input: life.SessionSaid) => showing(ctx, (shown, befell) => life.sessionStart(ctx, actor, input, shown, befell));
+export const sessionUpdate = (ctx: KernelContext, actor: Actor, input: Parameters<typeof life.sessionUpdate>[2]) => showing(ctx, (shown, befell) => life.sessionUpdate(ctx, actor, input, shown, befell));
+export const sessionEnd = (ctx: KernelContext, actor: Actor, input: life.EndInput) => showing(ctx, (shown, befell) => life.sessionEnd(ctx, actor, input, shown, befell));
 
 /** What a session's client calls it now, kept, and shown on every page open at once (./session-name.ts). */
 export const labelled = (ctx: KernelContext, run: Item, label: unknown, actor = 'agent:claude-code') =>

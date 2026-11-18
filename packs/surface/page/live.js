@@ -1,11 +1,10 @@
-import { api, h, hooks, main, route, state, whoami } from './base.js';
-import { project } from './project.js';
-import { beatRows, missedRows } from './beat-rows.js';
+import { api, h, hooks, main, route, state } from './base.js';
 import { follow as keepCurrent, Store, View } from './replica.js';
 import { still } from './look.js';
-import { hear, sessionOf } from './pane-route.js';
+import { hear, hearOpen, nameOf, sessionOf } from './pane-route.js';
+import { onOpen } from './sessions-open.js';
 import { numberOf } from './query-base.js';
-import { front, landsIn, poppedTab } from './tabs.js';
+import { islandsOn, keepList } from './islands-on.js';
 import { relations, starterOf, types } from './words.js';
 
 // ---- live updates --------------------------------------------------------
@@ -19,86 +18,6 @@ import { relations, starterOf, types } from './words.js';
 export let uiFiles;
 export let outdated = false;
 
-// ---- what changed, handed to the trace overlay as data (the slot `traces`, the catch_up pack's parts) -------------
-//
-// The runtime holds the store and the projector; the parts decide what a change was and what to trace or play. So each
-// beat is told as the rows it touched, as they stood before it and after (./beat-rows.js), worked out only while a part
-// is mounted on `traces` (hooks.slotFilled).
-
-/** Where the log stood when the person last looked, kept in this browser for each workspace: read once, as the page opens. */
-const lookedKey = whoami().then((j) => `pelago-looked-${j?.workspace?.id ?? 'default'}`, () => 'pelago-looked-default');
-const lookedAt = lookedKey.then((k) => {
-  try {
-    const v = Number(localStorage.getItem(k));
-    return Number.isFinite(v) && v > 0 ? v : undefined;
-  } catch {
-    return undefined;
-  }
-});
-/** The person has looked at the map as it stands at `pos`: kept for the next page, only while it is in sight. */
-function looked(pos) {
-  if (document.hidden || pos === undefined) return;
-  lookedAt.then(() => lookedKey).then((k) => {
-    try {
-      localStorage.setItem(k, String(pos));
-    } catch {
-      // Without storage a page opened later has nothing to catch up from.
-    }
-  });
-}
-
-/** What a view held before `entries`, from what it holds now and every fact said of their rows up to then (`was`). */
-function rowsBefore(view, kinds, was, entries) {
-  const at = { items: new Map(), links: new Map() };
-  for (const e of was) project(at, kinds, e.at, e.facts);
-  const out = { items: new Map(view.items), links: new Map(view.links) };
-  const made = new Set(entries.flatMap((e) => e.facts.filter((f) => f[0] === '+' && (f[2] === 'type' || f[2] === 'link')).map((f) => f[1])));
-  for (const e of entries) for (const f of e.facts) {
-    const key = f[1].startsWith('r_') ? 'links' : 'items';
-    const row = at[key].get(f[1]);
-    const held = view[key];
-    if (row && held.has(f[1])) out[key].set(f[1], held.get(f[1])?.session ? { ...row, session: held.get(f[1]).session } : row);
-    else if (made.has(f[1])) out[key].delete(f[1]);
-  }
-  return out;
-}
-
-let missedTold = false;
-/**
- * Tell the trace overlay what changed on a canvas's store since the person last looked, once a page: the whole span
- * as a beat (traced until seen), and each entry with its rows (`missed`, played by catch_up.replay). The view's store
- * keeps where it was (`store.missed`), so a replay mark can take it back there.
- */
-export async function tellMissed(view) {
-  if (missedTold || !view?.store || !hooks.slotFilled?.('traces')) return;
-  missedTold = true;
-  const from = await lookedAt;
-  const to = view.pos;
-  if (from === undefined || !(from < to)) return;
-  const most = numberOf(state.style, 'catch_up_entries_most');
-  const ids = [...view.ids, ...view.links.keys()];
-  const entries = [];
-  let gone = [];
-  for (let after = from; after < to; ) {
-    const beat = await api('tail', { after, ids });
-    entries.push(...(beat.entries ?? []).filter((e) => e.pos <= to));
-    gone = [...gone, ...(beat.gone ?? [])];
-    if (entries.length > most) return;
-    if (!beat.more || beat.pos <= after) break;
-    after = beat.pos;
-  }
-  if (!entries.length) return;
-  const touched = [...new Set(entries.flatMap((e) => e.facts.map((f) => f[1])))];
-  const { was } = await api('tail', { was: from, ids: touched });
-  const { kinds } = view;
-  const then = rowsBefore(view, kinds, was.entries ?? [], entries);
-  view.store.missed = { view, then, entries, from, to };
-  const islands = Object.fromEntries([...then.items].map(([id, r]) => [id, r.props?.island ?? '']));
-  hooks.tellSlot?.('traces', { name: 'missed', from, to, entries: missedRows(then, kinds, entries), islands });
-  hooks.tellSlot?.('traces', { name: 'beat', ...beatRows(then, kinds, entries, { after: from, gone }) });
-}
-// The canvas asks for it by name (packs/surface/page/canvas.js), never by importing this file.
-hooks.tellMissed = tellMissed;
 // Refresh throws away words not yet saved, so it asks first: the sheet's draft says so by name (packs/sheet/page/draft.js).
 const refresh = async () => {
   if (!(await (hooks.mayLeave?.() ?? true))) return;
@@ -111,25 +30,17 @@ main.addEventListener('input', (e) => {
   if (e.target.matches?.('textarea, [contenteditable], input:not([type=range], [type=checkbox], [type=radio], [type=color])')) state.dirty = true;
 });
 
-// Agents on the page: what a session shows lands in a pane of its own, or a tab of its own, and the pane's strip or the
-// tab's mark says so; where is ui/pane-route.js. Nothing else an agent does is said here: a change reaches the page from
-// the log, a story is on its session's page (the owner, 30 Oct 2026).
+// Agents on the page: what a session shows of an item on an island puts that island on the canvas and lights the item in
+// the side bar, never moving the view (decision e_mnuthcap). Nothing else an agent does is said here: a change reaches
+// the page from the log, a story is on its session's page (the owner, 30 Oct 2026).
 /** This page, among the owner's open pages: the server counts those a show can land in, so an agent's show says whether it did. */
 const pageId = Math.random().toString(36).slice(2, 14);
-// A page the server draws for an agent's look is no page of the owner's: it is not counted. Any other takes a show: a
-// chat with no tab here is opened one. Where it stands goes with it: the address of the pane in focus, and the chat whose
-// tab is in sight, so an agent knows what the owner is looking at and whether it is its own tab (packs/presence/kernel/seeing.ts). A
-// popped-out tab is the main page's too.
-const thisPage = () => {
-  if (still) return undefined;
-  const t = front();
-  const chat = t?.chat ?? (/^e_[a-z0-9]{8}$/.test(t?.follows ?? '') ? t.follows : undefined);
-  const lands = landsIn(t);
-  return { page: pageId, on: true, where: location.hash.slice(2, 2002), ...(chat && { tab: { chat, own: Boolean(t.chat) } }), ...(lands.length && { lands }) };
-};
+// A page the server draws for an agent's look is no page of the owner's: it is not counted. Any other takes a show.
+// Where it stands goes with it, the page's address, so an agent knows what the owner is looking at (packs/presence/kernel/seeing.ts).
+// The chats open now are heard too, so a show lit in the side bar is named by its chat's title.
+onOpen(hearOpen);
+const thisPage = () => (still ? undefined : { page: pageId, on: true, where: location.hash.slice(2, 2002) });
 let seenStep;
-/** Each session's last show not yet landed: it waits while a question is open over the page, or the reader is busy in its tab. */
-const waiting = new Map();
 /**
  * How long a step waits for a page to open, as the style says (show_waits_ms): one sent while none was (e_d8djfzmk)
  * lands when the next opens, within this. A style not yet read lets none wait.
@@ -151,9 +62,28 @@ const seenBefore = () => {
   }
 };
 
+/** Islands shows asked on, put on the canvas by a page in sight only, so two of the owner's pages never write their list at once. */
+const putting = new Map();
+async function putOnShown() {
+  if (document.visibilityState !== 'visible' || !putting.size) return;
+  const asked = [...putting.entries()];
+  putting.clear();
+  const on = await islandsOn();
+  const adding = asked.filter(([id]) => !on.includes(id));
+  if (adding.length) await keepList([...on, ...adding.map(([id]) => id)], `${adding.map(([, why]) => why).join('; ')}: put on the canvas by a show`).catch((err) => console.warn(err.message));
+}
+addEventListener('visibilitychange', () => void putOnShown());
+/** A show of an item on an island: the island on the canvas, the item lit in the side bar (the picker's lightIsland). */
+function light(s) {
+  const item = /^e\/(e_[a-z0-9]{8})(?:\?|$)/.exec(s.hash)?.[1] ?? s.island;
+  putting.set(s.island, s.did || (s.title ?? s.actor ?? 'A session'));
+  void putOnShown();
+  hooks.lightIsland?.(s.island, item, nameOf(sessionOf(s)));
+}
+
 export function follow(steps = []) {
-  // A look's page, and a popped-out tab, leave what agents show to the main page.
-  if (still || poppedTab) return;
+  // A look's page leaves what agents show to the owner's own pages.
+  if (still) return;
   // The first answer follows what came while no page here was open, back to the last step this browser followed and
   // no further than the style lets a step wait; what is older only says where things stand.
   const since = seenStep ?? Math.max(seenBefore(), Date.now() - waitsFor());
@@ -163,29 +93,16 @@ export function follow(steps = []) {
     localStorage.setItem(seenKey, String(Math.max(seenStep, seenBefore())));
   } catch {}
   for (const s of steps) hear(s);
-  // What a session does may move its state, which the tab bar counts (ui/tab-bar.js).
+  // What a session does may move its state, which the side bar and the band's count read (./sessions-open.js).
   if (fresh.some((s) => s.run)) hooks.sessionsMoved?.();
-  // A chat that ended closes its tab here (ui/tab-life.js).
-  // The part on `tabs` is told the same, as data (hooks.tellSlot, packs/surface/page/part-host.js), where one is mounted.
-  for (const s of fresh) if (s.ends && s.run) (hooks.sessionEnded?.(s.run, s.did), hooks.tellSlot?.('tabs', { name: 'ended', run: s.run, why: s.did ?? null }));
-  // One gone quiet or waiting lets its tab go too, until it next shows something.
-  for (const s of fresh) if (s.rests && s.run) (hooks.sessionRested?.(s.run), hooks.tellSlot?.('tabs', { name: 'rested', run: s.run }));
   // A beat told, or a session gone quiet, waiting or ended, moves its node on every canvas that draws it.
   const moved = [...new Set(fresh.filter((s) => s.run && (s.kind === 'story' || s.rests || s.ends)).map((s) => s.run))];
   if (moved.length) hooks.sessionsTold?.(moved);
-  // A chat renamed is named anew on its tab.
-  if (fresh.some((s) => s.did === 'titled')) hooks.drawStrip?.();
-  // A later show takes the place of what waits, and its tab of its own, if it was owed one, stays owed; so does its tab brought into sight.
-  for (const s of fresh) if (s.kind === 'show' && s.hash) {
-    const was = waiting.get(sessionOf(s));
-    waiting.set(sessionOf(s), { ...s, opens: s.opens || was?.opens, focus: s.focus || was?.focus });
-  }
-  if (document.querySelector('dialog[open]')) return;
-  // A part on `tabs` is told each show, and keeps what waits itself (it decides where a show lands, task e_dswpuaft).
-  for (const [session, s] of waiting) if (hooks.tellSlot?.('tabs', { name: 'land', step: s })) waiting.delete(session);
-  if (!hooks.land) return;
-  // One the reader is busy where it would land stays, and is tried again at the next look.
-  for (const [session, s] of waiting) if (hooks.land(s) !== 'later') waiting.delete(session);
+  // A chat renamed is named anew in the side bar.
+  if (fresh.some((s) => s.did === 'titled')) hooks.sessionsMoved?.();
+  // A show never moves the view (decision e_mnuthcap): one of an item on an island puts its island on the canvas and
+  // lights the item in the side bar. One of no island (a lens, a web page) leaves the page as it is.
+  for (const s of fresh) if (s.kind === 'show' && s.hash && s.island) light(s);
 }
 
 /** The items the sheet shows: what it is the page of, what it names or links to, and what its views hold. */
@@ -270,8 +187,7 @@ export async function checkTail() {
   let more = false;
   try {
     // From the furthest back of the page and its store, on everything it holds and the islands its views touch.
-    // A store being played from where its reader last looked is left alone until it ends (the replay mark: ./replay.js).
-    const following = store.views.size > 0 && !store.playing;
+    const following = store.views.size > 0;
     const at = [state.pos, ...(following ? [store.pos] : [])].filter((pos) => pos !== undefined);
     const from = at.length ? Math.min(...at) : undefined;
     const ids = [...new Set([...shownIds(), ...(following ? store.ids() : [])])];
@@ -280,11 +196,7 @@ export async function checkTail() {
     // Only an answer that read the facts moves the store: one that says only where the log stands would skip them.
     if (beat.entries && following) {
       try {
-        // What the facts changed of what the store held, worked out before they are folded in, once: told to the trace
-        // overlay as rows, which catch_up.changes traces until seen.
-        const told = hooks.slotFilled?.('traces') ? beatRows(store, kinds, store.fresh(beat.entries), { after: store.pos, gone: beat.gone }) : undefined;
         store.apply(beat);
-        if (told?.rows.length) hooks.tellSlot('traces', { name: 'beat', ...told });
       } catch (err) {
         console.error(err);
       }
@@ -293,7 +205,6 @@ export async function checkTail() {
     touched = state.pos === undefined ? undefined : touchedBy(beat, state.pos);
     now = `${beat.pos}.${beat.seq}.${beat.queue}`;
     state.pos = beat.pos;
-    looked(beat.pos);
     state.seq = beat.seq;
     more = Boolean(beat.more);
     // The page's own files changed on the server: load them, unless that would
@@ -315,6 +226,9 @@ export async function checkTail() {
     // What changes touched, for whoever follows items as they are tied (ui/canvas.js).
     if (touched) hooks.touched?.(touched);
     if (touched?.made) hooks.made?.(touched);
+    // An island made or changed is listed anew in the side bar (./island-picker.js).
+    // The first answer touches nothing it can name, but may say items were made since the page read: read anew too.
+    hooks.islandsTouched?.(touched ?? { ids: [], made: beat.made ?? 0 });
   } catch {
     return;
   }

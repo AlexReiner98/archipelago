@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { callTool } from '../packs/surface/kernel/tools.ts';
 import { chrome, open } from './browser.ts';
-import { heard } from './tab-page.ts';
+import { heard } from './agent-page.ts';
 import { fresh, human, make } from './map.ts';
 import { serve } from './serve.ts';
 import * as S from './sheet-page.ts';

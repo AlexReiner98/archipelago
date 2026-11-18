@@ -37,9 +37,9 @@ export interface Step {
   hash?: string;
   /** For a show: the pane of the owner's page it goes to (ui/panes.js): a side of the main canvas, the main one, the main one alone, or a pane of the session's own by the name it gives. */
   pane?: string;
-  /** For a show (true unless the agent sent focus: false): their page brings its tab into sight (ui/pane-route.js). */
-  focus?: boolean;
-  /** For a show: the session has just begun, and the owner's page opens it a tab of its own (ui/pane-route.js). */
+  /** For a show of an item on an island: that island, which their page puts on the canvas, lighting the item in its side bar (decision e_mnuthcap). */
+  island?: string;
+  /** For a show: the session has just begun (the tabs that opened for it went, decision e_mnuthcap). */
   opens?: boolean;
   /** For a show the server takes for a session: its pane draws the item's canvas, and no page opens over it. */
   canvas?: boolean;
@@ -57,7 +57,7 @@ export interface Step {
   title?: string;
   /** What its surface calls it (its title in Claude Code), when that is known. */
   label?: string;
-  /** What the session works on and everything that holds it, all the way up: a tab watching any of them takes its shows (ui/pane-route.js). */
+  /** What the session works on and everything that holds it, all the way up: kept with the step. */
   within?: string[];
   /** For a show: the owner approved what it shows, and the tab it lands in watches it from now on (ui/pane-land.js). */
   watch?: boolean;

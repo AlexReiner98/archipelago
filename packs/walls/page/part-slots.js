@@ -6,17 +6,15 @@
 import { filterSaid, namer } from './lens-terms.js';
 
 /** The frame slots handed the canvas's query. */
-export const QUERY_SLOTS = ['bar.find', 'bar.find.rows', 'canvas', 'traces', 'find'];
+export const QUERY_SLOTS = ['bar.find', 'bar.find.rows', 'canvas', 'find'];
 /** The slots handed the canvas's answer in brief too. */
 export const ANSWER_SLOTS = ['bar.find', 'bar.find.rows'];
 /** The slots whose part answers a decision, not marks. */
-export const DECISION_SLOTS = ['tabs.land', 'tabs.life', 'ghosts'];
+export const DECISION_SLOTS = ['ghosts'];
 /** The slots whose part is told `away` when a press lands outside all of them, or another pane takes the focus. */
 export const AWAY_SLOTS = ['find', 'bar.find', 'bar.find.rows'];
 /** The slots handed the layouts the packs ship (`shapes`: { shape, title }), for a part that offers a layout. */
 export const SHAPE_SLOTS = ['find'];
-/** The slots handed the page's address (`page`) and told its history's steps, whose part may write the address (`go({ hash, push })`). */
-export const PAGE_SLOTS = ['tabs'];
 /** Slots drawn only while a page state another part publishes is set. */
 export const SHOWN_WHILE = { 'bar.find.rows': 'find_open' };
 

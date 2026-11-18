@@ -23,3 +23,9 @@ export const recordUsage = (l: Archipelago, ...rest: Rest<typeof S.recordUsage>)
 export const resolveRun = async (l: Archipelago, key: string, openOnly = false) => (await ownCall<Out<typeof S.resolveRun>>(l, 'resolveRun', key, openOnly)) as Entity | undefined;
 export const closeOffers = (l: Archipelago, ...rest: Rest<typeof S.closeOffers>) => ownCall<Out<typeof S.closeOffers>>(l, 'closeOffers', ...rest);
 export const sessionsAwake = (l: Archipelago) => ownCall<number>(l, 'sessionsAwake');
+/**
+ * Tell what the orchestration did to a session on its story (the sessions pack's beats.ts): a resource claimed or
+ * given back, a change or a claim refused, a task taken up, a launch stopped. The one entry point: never fails the
+ * call it tells of, and a run that is no open session's is let go.
+ */
+export const befell = (l: Archipelago, beat: S.Befell) => ownCall<Out<typeof S.befell>>(l, 'befell', beat).catch(() => undefined);

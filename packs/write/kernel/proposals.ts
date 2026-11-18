@@ -30,7 +30,7 @@ export async function proposalsOf(l: Pick<Archipelago, 'db'>, input: { status?: 
  * what was there, what is there now, and what it would make it. A note added to or a passage replaced is planned on
  * the note as it is now, and a link only if missing is checked again by the write path, so neither is here.
  */
-export async function overtakenFields(l: Archipelago, base: number, ops: Op[]): Promise<string[]> {
+export async function overtakenFields(l: Archipelago, base: number, ops: Op[], then = 'when this was held'): Promise<string[]> {
   const problems: string[] = [];
   for (const op of ops) {
     if (op.op !== 'update') continue;
@@ -39,9 +39,9 @@ export async function overtakenFields(l: Archipelago, base: number, ops: Op[]): 
     for (const [field, proposed] of set) {
       const now = await factAt(l.db, op.id, field);
       if (!now || now.pos <= base || said(field, now.op === '+' ? now.value : null) === said(field, proposed)) continue;
-      const then = await factAt(l.db, op.id, field, base);
+      const was = await factAt(l.db, op.id, field, base);
       const title = (await l.entity(op.id))?.title ?? op.id;
-      problems.push(`"${title}": ${field} was ${show(field, then?.op === '+' ? then.value : null)} when this was held, is ${show(field, now.op === '+' ? now.value : null)} now, and this would make it ${show(field, proposed)}`);
+      problems.push(`"${title}": ${field} was ${show(field, was?.op === '+' ? was.value : null)} ${then}, is ${show(field, now.op === '+' ? now.value : null)} now, and this would make it ${show(field, proposed)}`);
     }
   }
   return problems;

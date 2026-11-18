@@ -24,21 +24,26 @@ export const atHome = (hash) => /^#?\/?(v)?$/.test(String(hash ?? ''));
 export const drawnAt = (hash, mine) => islandsIn(String(hash ?? '').split('?')[1]) ?? mine;
 
 /**
- * A press on island `id` in the picker, the canvas at `hash`: the list it draws with `id` put on or taken off, kept as
- * the person's own, and whether the canvas then goes Home to draw it (it stood at another list: an agent's show, an item).
+ * What the canvas draws now: where it has drawn (`canvas`, its `home` and the `islands` of its lens), that, Home the
+ * person's own list (reads among it); before it has, what the address says (an item's address names its island only
+ * once the canvas has read it). The side bar marks this and a press acts on it, so the two never disagree.
  */
-export const pressed = (hash, mine, id) => {
-  const drawn = drawnAt(hash, mine);
-  return { list: drawn.includes(id) ? drawn.filter((x) => x !== id) : [...drawn, id], home: !atHome(hash) };
-};
+export const drawnBy = (hash, mine, canvas) => (canvas ? (canvas.home ? mine : canvas.islands) : drawnAt(hash, mine));
+
+/**
+ * A press on island `id` in the picker, the canvas drawing `drawn` (Home or not): the list it draws with `id` put on or
+ * taken off, kept as the person's own, and whether the canvas then goes Home to draw it (it stood at another list: an
+ * agent's show, an item).
+ */
+export const pressed = (drawn, home, id) => ({ list: drawn.includes(id) ? drawn.filter((x) => x !== id) : [...drawn, id], home: !home });
 
 /** Island `id` on, whatever it was: what the canvas draws with it added, and whether the canvas then goes Home. */
-export const turnedOn = (hash, mine, id) => {
-  const drawn = drawnAt(hash, mine);
-  return { list: drawn.includes(id) ? drawn : [...drawn, id], home: !atHome(hash) };
-};
+export const turnedOn = (drawn, home, id) => ({ list: drawn.includes(id) ? drawn : [...drawn, id], home: !home });
 /** Island `id` alone on the canvas. */
-export const only = (hash, id) => ({ list: [id], home: !atHome(hash) });
+export const only = (home, id) => ({ list: [id], home: !home });
+
+/** The islands as the side list keeps them, each read as search answers it. */
+export const islandOf = (e) => ({ id: e.id, title: e.title, worked_at: e.worked_at ?? e.updated_at, pack: e.pack ?? { id: '', title: '' } });
 
 /** The words of a text, as search reads them: lower case, split on what is not a letter or a digit. */
 const words = (s) => String(s ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
