@@ -19,9 +19,10 @@
 // what it touched: the server cannot tell apart sessions that share a token.
 // And what Claude Code calls the session (its title: the one the owner gave it, else the one Claude Code made), which
 // the map calls the session by and its tab on the owner's page shows, at the start (on a resume) and at every event.
-// And what the reply did since the owner's last message (the turn): how many times it read the map (and of those,
-// surveyed it: read about several items), showed the owner something, changed the map, told a beat of its story, called
-// any other tool (worked), edited a file, committed and pushed, so that a rule on a reply's end can ask the agent to go on.
+// And what the reply did since the owner's last message (the turn): how often it read the map (surveyed: about several
+// items), showed the owner something, changed the map, told a beat, called any other tool (worked), edited a file,
+// committed, pushed, looked at an image (a tool's answer holding one) and showed one (sent, shown, drawn; unshown: those
+// looked at less those shown), so that a rule on a reply's end can ask the agent to go on.
 // And the commits the session made, by their full ids (what git answered each commit with, looked up in the
 // checkout, and what the checkout's HEAD log records while each commit command ran, for one that answered nothing),
 // with those the reply made or, when it pushed, all of them: the map asks about those it does not account for.
@@ -55,12 +56,10 @@ import { dirname, resolve } from 'node:path';
 
 // Which hand-out of Archipelago's files this project has: the setup writes it in, and the server says when it is behind.
 const SETUP = '';
-
 const name = process.argv[2], base = (process.env.PELAGO_URL || 'http://127.0.0.1:3100').replace(/\/$/, '');
 const login = await import('./pelago-login.mjs').catch(() => null);
 const kept = await login?.accessToken(base).catch(() => undefined), env = process.env.PELAGO_AGENT_TOKEN;
 let token = process.argv.includes('--plugin') ? kept || env : env || kept;
-
 let input = '';
 for await (const chunk of process.stdin) input += chunk;
 
@@ -77,8 +76,8 @@ const COMMIT = GIT('commit');
 const PUSH = GIT('push'), PR = /(^|[\s;&|(])gh\s+pr\s+(create|merge)(?![\w-])/;
 // The reads that are not about several items: one item, what the tools take, where a session starts, how a page looks.
 const NOT_SURVEYS = new Set(['get', 'document', 'actions', 'schema', 'watch', 'picture', 'packs', 'style', 'story', 'published', 'publish_plan', 'backup_download', 'share_figure', 'brief', 'handoff', 'frontier']);
-// The tools that write a file.
-const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']);
+const EDITS = new Set(['Edit', 'Write', 'MultiEdit', 'NotebookEdit']); // The tools that write a file.
+const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i, SENDS = /^SendUserFile$|^mcp__(plugin_[\w-]+?_)?pelago__draw$/; // What puts an image before the owner.
 // What git answers a commit with: [branch 1a2b3c4] Subject, or [main (root-commit) 1a2b3c4], or [detached HEAD 1a2b3c4].
 const MADE = /^\[[^\]\n]*? ([0-9a-f]{7,40})\] /gm;
 const textOf = (content) => (typeof content === 'string' ? content : Array.isArray(content) ? content.map((p) => p.text ?? '').join('\n') : '');
@@ -125,12 +124,12 @@ function readTranscript(text) {
         // A line that is not whole yet: the next count has it.
       }
     }
-    if (!line.includes('"usage"') && !line.includes('"tool_use"') && !calls && !answered && !asked && !line.includes('"Bash"') && !/"(Edit|Write|MultiEdit|NotebookEdit)"/.test(line)) continue;
+    if (!line.includes('"usage"') && !line.includes('"tool_use"') && !calls && !answered && !asked && !line.includes('"Bash"') && !line.includes('"image"') && !/"(Edit|Write|MultiEdit|NotebookEdit)"/.test(line)) continue;
     try {
       const entry = JSON.parse(line);
       if (prompted(entry)) {
         turn = entry.uuid;
-        reply = { read: 0, surveyed: 0, showed: 0, changed: 0, told: 0, worked: 0, edited: 0, committed: 0, pushed: 0 };
+        reply = { read: 0, surveyed: 0, showed: 0, changed: 0, told: 0, worked: 0, edited: 0, committed: 0, pushed: 0, looked: 0, shown: 0 };
         turnMade = [];
         turns++;
       }
@@ -149,6 +148,8 @@ function readTranscript(text) {
         }
         if (part.type === 'tool_use' && !ANY_MAP_TOOL.test(part.name ?? '')) reply.worked = (reply.worked ?? 0) + 1;
         if (part.type === 'tool_use' && EDITS.has(part.name)) reply.edited = (reply.edited ?? 0) + 1;
+        if (part.type === 'tool_result' && Array.isArray(part.content)) reply.looked = (reply.looked ?? 0) + part.content.filter((p) => p?.type === 'image').length;
+        if (part.type === 'tool_use' && SENDS.test(part.name ?? '')) reply.shown = (reply.shown ?? 0) + (part.name !== 'SendUserFile' ? 1 : [part.input?.files ?? []].flat().filter((f) => IMAGE.test(String(f))).length);
         if (part.type === 'tool_use' && part.name === 'Bash' && typeof part.input?.command === 'string') {
           if (COMMIT.test(part.input.command)) (reply.committed = (reply.committed ?? 0) + 1), committing.add(part.id), running.set(part.id, { from: Date.parse(entry.timestamp), turn: turns });
           if (PUSH.test(part.input.command)) reply.pushed = (reply.pushed ?? 0) + 1;
@@ -166,7 +167,7 @@ function readTranscript(text) {
   for (const n of answers.values()) tokens += n;
   const ran = [...running.values()].map((r) => ({ ...r, mine: Boolean(turn) && r.turn === turns }));
   const called = title ?? made_title;
-  return { tokens, touched: [...touched], made, ran, ...(called && { title: called }), ...(turn && { turn, reply, turnMade }) };
+  return { tokens, touched: [...touched], made, ran, ...(called && { title: called }), ...(turn && { turn, reply: { ...reply, unshown: Math.max(0, reply.looked - reply.shown - reply.showed) }, turnMade }) };
 }
 
 /** Commits by their full ids, looked up in the checkout: what it does not hold (gone, or another folder's) is left out. */

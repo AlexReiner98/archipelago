@@ -24,9 +24,10 @@ export const REPLY_ENDED = 'reply_ended';
  * What a reply did, as the hook counts it since the owner's last message. surveyed counts the reads that answer about
  * several items (search, a lens, a view), not one item's get nor a read of what the tools take or where to start;
  * told, the beats it told (report, action tell); worked, its calls to tools other than the map's (a file read or
- * written, a command run); edited counts the files it wrote.
+ * written, a command run); edited counts the files it wrote; looked, the images it looked at (a tool's answer holding
+ * one); unshown, those of them it did not put before the owner (image files sent, a show, a draw).
  */
-export const REPLY_FACTS = ['read', 'surveyed', 'showed', 'changed', 'told', 'worked', 'edited', 'committed', 'pushed'] as const;
+export const REPLY_FACTS = ['read', 'surveyed', 'showed', 'changed', 'told', 'worked', 'edited', 'committed', 'pushed', 'looked', 'unshown'] as const;
 export type ReplyFacts = Partial<Record<(typeof REPLY_FACTS)[number], number>>;
 
 /** A reply rule's setting: what the owner turns it off by. */
