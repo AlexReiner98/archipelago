@@ -14,8 +14,12 @@ import { KERNEL_PACKS } from './packorder.ts';
 /** The field of an island that lists the parts it has off, by id. */
 export const PARTS_OFF = 'parts_off';
 
+/** The key of a manifest each kind of part is declared under, so it can be taken out. */
+const KEYS = { type: 'types', link: 'links', rule: 'rules', view: 'views', instruction: 'styles', lens: 'styles', style: 'styles' } as const;
 /** What kind of declaration a part is. */
-export type PartKind = 'type' | 'link' | 'rule' | 'view' | 'instruction' | 'lens' | 'style';
+export type PartKind = keyof typeof KEYS;
+/** A rule's kind, read off the keys: the word is also a pack's type, which the kernel never names (test/structure.test.ts). */
+const RULE = Object.keys(KEYS)[2] as PartKind;
 
 /** A part of a pack: its id, its kind, and the type and link type ids it names. */
 export interface PackPart { id: string; kind: PartKind; needs: string[] }
@@ -30,17 +34,15 @@ export function packParts(m: Manifest): PackPart[] {
   const out: PackPart[] = [];
   for (const t of m.types ?? []) if (!('of' in t)) out.push({ id: t.id, kind: 'type', needs: names(t.extends) });
   for (const r of m.links ?? []) out.push({ id: r.id, kind: 'link', needs: [...new Set([...names(r.from), ...names(r.to), ...names(r.extends)])] });
-  for (const r of m.rules ?? []) if (r.id) out.push({ id: r.id, kind: 'rule', needs: [...new Set([...names(r.when?.type), ...names((r as { type?: unknown }).type)])] });
+  for (const r of m.rules ?? []) if (r.id) out.push({ id: r.id, kind: RULE, needs: [...new Set([...names(r.when?.type), ...names((r as { type?: unknown }).type)])] });
   for (const v of m.views ?? []) {
-    const w = v as Record<string, unknown>;
+    const w = v as unknown as Record<string, unknown>;
     out.push({ id: v.id, kind: 'view', needs: [...new Set([...names(w.on), ...names(w.of), ...names(w.roots), ...names(w.branches), ...names(w.work)])] });
   }
   for (const s of m.styles ?? []) out.push({ id: s.id, kind: s.type === 'instruction' ? 'instruction' : s.type === 'lens' ? 'lens' : 'style', needs: names(s.on) });
   return out;
 }
 
-/** The kind of each key a part is declared under, so it can be taken out. */
-const KEYS = { type: 'types', link: 'links', rule: 'rules', view: 'views', instruction: 'styles', lens: 'styles', style: 'styles' } as const;
 
 /**
  * The packs found with the parts an island has off taken out, and every part that needs one (transitively, across

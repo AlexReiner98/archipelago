@@ -34,6 +34,9 @@ export const CORNER_FIELD: FieldDef = { type: 'json', cell: true, shown: true, d
 /** The field of an island (or a focus) that names the packs turned off there alone (task e_hr4qvr9u, packs/loader/kernel/island-off.ts). */
 export const PACKS_OFF = 'packs_off';
 export const PACKS_OFF_FIELD: FieldDef = { type: 'json', shown: true, description: 'The packs turned off on this island alone, by id (["build"]): the rest of the map keeps them. What relies on them waits here, and their items stay, editable, with no new one made here. Never the kernel’s own pack.' };
+/** The field of an island (or a focus) that names the parts of packs turned off there alone (feature e_4r82mvf3, packs/loader/kernel/island-parts.ts), and both off fields as a focus is given them. */
+export const PARTS_OFF_FIELD: FieldDef = { type: 'json', shown: true, description: 'The parts of packs turned off on this island alone, by id (["build.overlap"]): a type, link type, rule, view, instruction, lens or style. What needs one waits here, saying what it lacks; items of a type off stay, editable, with no new one made here. Never a part of the kernel’s own pack.' };
+export const OFF_FIELDS: Record<string, FieldDef> = { [PACKS_OFF]: PACKS_OFF_FIELD, parts_off: PARTS_OFF_FIELD };
 /** Whether an item of a type may be a focus: one that lives on an island and whose pack marks it so (capability focus). */
 export const mayBeFocus = (t: { system: boolean; lineage: string[]; capabilities?: { focus?: boolean } }) => livesOnIsland(t) && t.capabilities?.focus === true;
 

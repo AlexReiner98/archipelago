@@ -7,12 +7,12 @@ import { capacityOf, checkCapabilities, type Capabilities } from './capabilities
 import { checkDeclared, KERNEL_VERBS, presetsOf, screensOf, stylesOf, toolName, type ActionDef, type TreeDef, type VerbDef, type ViewDef } from './declared.ts';
 import { altitudeOf, type Altitude } from './altitude.ts';
 import { checkValue } from './fields.ts'; import { checkFieldDecls, headOf, ownHead, type ColumnField } from './head.ts';
-import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { CELL, CELL_FIELD, CORNER, CORNER_FIELD, FOCUS, FOCUS_FIELD, ISLAND, ISLAND_FIELD, livesOnIsland, mayBeFocus, PACKS_OFF, promisedHead, PACKS_OFF_FIELD } from './island-items.ts';
+import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import { CELL, CELL_FIELD, CORNER, CORNER_FIELD, FOCUS, FOCUS_FIELD, ISLAND, ISLAND_FIELD, livesOnIsland, mayBeFocus, OFF_FIELDS, promisedHead } from './island-items.ts';
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts'; import { checkRules } from './rule-check.ts';
 import { isApp, isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
 import { OWN_PACKS, readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts'; import { checkParts } from './ui-parts.ts';
-import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from '../../../src/phases.ts'; import { keepVersionTypes } from './version-types.ts';
+import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from '../../../src/phases.ts'; import { keepVersionTypes } from './version-types.ts'; import { withoutParts, type PartState } from './island-parts.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
 
@@ -135,7 +135,7 @@ export class Registry {
   added = new Map<string, Map<string, string>>();
   /** A name a type or link type had before (its moved_from), by the one it is now: what an old name still reads as. */ renamed = new Map<string, string>();
   /** Packs the owner turned off in this workspace. */
-  private turnedOff: string[] = []; /** Of those, the ones an island turned off, in an island's registry (packs/loader/kernel/island-off.ts). */ offHere: string[] = []; /** Whether this workspace holds its packs to the island rules (packs/loader/kernel/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (packs/loader/kernel/island-items.ts). */ get onIslands() { return this.islands; }
+  private turnedOff: string[] = []; /** Of those, the ones an island turned off, in an island's registry (packs/loader/kernel/island-off.ts). */ offHere: string[] = []; /** The parts an island turned off, in an island's registry, and the state of each part not on there: off, or waiting on one off (packs/loader/kernel/island-parts.ts). */ partsOff: string[] = []; partStates = new Map<string, PartState>(); /** Whether this workspace holds its packs to the island rules (packs/loader/kernel/islands.ts). */ private islands = false; /** Whether this workspace has islands on: its items live on islands (packs/loader/kernel/island-items.ts). */ get onIslands() { return this.islands; }
   /** The packs kept as items (packs/loader/kernel/pack-items.ts) by id, the pack items that are none with why, and those the owner added here. */ made = new Map<string, ItemPack>(); madeWrong = new Map<string, string>(); private madeOn = new Set<string>(); /** The versions of packs kept as items, by item (packs/loader/kernel/island-pin.ts), and the one this registry runs in its pack's place. */ versions = new Map<string, PackVersion>(); private swap?: PackVersion;
   /** Definitions kept from the type table whose packs are gone, put back after every reload. */
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
@@ -151,11 +151,11 @@ export class Registry {
   reload(): void { const held = new Map<string, string>(); while (this.loadOnce(held)); } /** One load: true when it held back a pack whose declarations did not hold (it waits with why), to be loaded again without it. */
   private loadOnce(held: Map<string, string>): boolean {
     // A workspace's own types are in its database, never in a folder another server started from here would read.
-    const { found, hashes, where } = this.given ? { found: new Map(this.given.found), hashes: new Map(this.given.hashes), where: new Map(this.given.where) } : readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
+    let { found, hashes, where } = this.given ? { found: new Map(this.given.found), hashes: new Map(this.given.hashes), where: new Map(this.given.where) } : readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
     this.where = where;
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
     const made = madePacks(this.items, found, LOCAL_PACK); this.made = new Map(made.packs.map((p) => [p.manifest.id, p])); this.madeWrong = made.wrong;
-    for (const p of [...made.packs, ...(this.swap ? [{ manifest: this.swap.manifest, hash: this.swap.hash }] : [])]) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash); this.versions = new Map(made.versions.map((v) => [v.item, v])); if (this.swap?.code) where.set(this.swap.of, versionWhere(this.swap.of, join(where.get(this.swap.of) ?? this.dir, this.swap.of), this.swap.code)); // a version's own code runs from its own folder
+    for (const p of [...made.packs, ...(this.swap ? [{ manifest: this.swap.manifest, hash: this.swap.hash }] : [])]) found.set(p.manifest.id, p.manifest), hashes.set(p.manifest.id, p.hash); this.versions = new Map(made.versions.map((v) => [v.item, v])); if (this.swap?.code) where.set(this.swap.of, versionWhere(this.swap.of, join(where.get(this.swap.of) ?? this.dir, this.swap.of), this.swap.code)); ({ found, states: this.partStates } = withoutParts(found, this.partsOff)); // a version's own code runs from its own folder; an island's parts off, and what needs them, are taken out before the order
 
     // Load in dependency order what is on and has what it requires; the rest waits or is off.
     const off = new Map([...found.keys()].filter((id) => this.only && !this.only.includes(id) && id !== LOCAL_PACK && !this.made.has(id) && !(isApp(found.get(id)!) && [this.dir, OWN_PACKS].includes(this.where.get(id) ?? ''))).map((id) => [id, 'not enabled on this server'])); // an app pack of the server's own folder is the app's own screen, on in every map (decision e_y9dcs4nv): a server's list does not leave it out
@@ -215,7 +215,7 @@ export class Registry {
         system: kernel,
         statuses: { ...statuses, phases: phasesOf(statuses, [def.statuses?.phases, parent?.statuses.phases]) },
         // A type that extends nothing keeps in its row the columns it declares, or the common ones (packs/loader/kernel/head.ts, ownHead).
-        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD, [CELL]: CELL_FIELD, ...(mayBeFocus({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])], capabilities: { ...parent?.capabilities, ...def.capabilities } }) && { [FOCUS]: FOCUS_FIELD, [CORNER]: CORNER_FIELD, [PACKS_OFF]: PACKS_OFF_FIELD }) }) }, statuses),
+        ...headOf({ ...ownHead(Boolean(parent?.columns.status ?? def.fields?.status?.column), Boolean(def.capabilities?.owned ?? parent?.capabilities.owned)), ...parent?.fields, ...parent?.columns, ...def.fields, ...extra.get(id), ...(this.islands && (livesOnIsland({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])] }) || (def.capabilities?.subject ?? parent?.capabilities.subject)) && { [ISLAND]: ISLAND_FIELD, [CELL]: CELL_FIELD, ...(mayBeFocus({ system: kernel, lineage: [id, ...(parent?.lineage ?? [])], capabilities: { ...parent?.capabilities, ...def.capabilities } }) && { [FOCUS]: FOCUS_FIELD, [CORNER]: CORNER_FIELD, ...OFF_FIELDS }) }) }, statuses),
         deliverable: def.deliverable ?? parent?.deliverable ?? false,
         public: def.public ?? parent?.public ?? false, ...((def.private ?? parent?.private) && { private: true }),
         ...((def.altitude ?? parent?.altitude) && { altitude: altitudeOf(id, def.altitude ?? parent?.altitude) }),
@@ -457,8 +457,8 @@ export class Registry {
   takeItems(items: TypeItem[]): void { const was = this.items; this.items = items; try { this.reload(); } catch (err) { this.items = was; this.reload(); throw err; } }
   /** The folder a pack's files are in: where it was found, or the first folder for one not found. */
   folderOf(pack: string): string { return join(this.where.get(pack) ?? this.dir, pack); }
-  /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against; `off`, packs turned off there too (an island's, packs/loader/kernel/island-off.ts). */
-  trial(items: TypeItem[], on: string[] = [], swap?: PackVersion, off: string[] = []): Registry { const r = new Registry(this.given ?? this.dirs, this.only, this.local); r.swap = swap; r.turnedOff = [...new Set([...this.turnedOff.filter((p) => !on.includes(p)), ...off.filter((p) => !KERNEL_PACKS.includes(p))])]; r.madeOn = new Set([...this.madeOn, ...on].filter((p) => !off.includes(p))); r.offHere = off.filter((p) => !this.turnedOff.includes(p)); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
+  /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against; `off`, packs turned off there too (an island's, packs/loader/kernel/island-off.ts); `partsOff`, parts (island-parts.ts). */
+  trial(items: TypeItem[], on: string[] = [], swap?: PackVersion, off: string[] = [], partsOff: string[] = []): Registry { const r = new Registry(this.given ?? this.dirs, this.only, this.local); r.swap = swap; r.partsOff = [...new Set([...this.partsOff, ...partsOff])]; r.turnedOff = [...new Set([...this.turnedOff.filter((p) => !on.includes(p)), ...off.filter((p) => !KERNEL_PACKS.includes(p))])]; r.madeOn = new Set([...this.madeOn, ...on].filter((p) => !off.includes(p))); r.offHere = off.filter((p) => !this.turnedOff.includes(p)); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));
