@@ -96,6 +96,8 @@ export function panZoom(frame, svg, { width, height, start = [width / 2, 0], asi
     queued = 0;
     const v = inView();
     svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.width} ${v.height}`);
+    // The scale, for what keeps its size on screen at any zoom (an island's header text, lane 2, overlap e_mb3n6uwb).
+    frame.style.setProperty('--ln-plane-scale', String(v.scale));
     cull(v);
     const said = `${v.x} ${v.y} ${v.width} ${v.height}`;
     if (told && said !== last) ((last = said), told(v));
