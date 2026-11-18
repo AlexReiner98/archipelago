@@ -54,7 +54,7 @@ export function placer({ g, painted, gap, draw, heads, order, over }) {
     const again = [...handed.places.keys()].some((id) => placed.has(id)), changed = new Set(handed.places.keys());
     for (const [id, at] of handed.places) placed.set(id, at);
     const moving = again ? over : 0;
-    return [...itemPatches(handed.places, items, gap, moving), ...wirePatches({ wires, boxes, placed, painted, changed, draw, heads, over: moving })];
+    return [...itemPatches(handed.places, items, gap, moving, handed.tags), ...wirePatches({ wires, boxes, placed, painted, changed, draw, heads, over: moving })];
   };
 }
 
