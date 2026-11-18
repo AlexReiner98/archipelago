@@ -131,7 +131,7 @@ async function rows(host, id, p) {
 }
 
 /** A kept look's picture, as an address an image loads (query picture { look }). */
-const lookSrc = (s) => s.id && api('picture', { look: s.id }).then((p) => (p ? `data:${p.content_type};base64,${p.data}` : null));
+const lookSrc = (s) => s.id && api('picture', { look: s.id }).then((p) => ((i) => (i?.data ? `data:${i.content_type};base64,${i.data}` : null))(p?.image ?? p));
 
 /**
  * A piece a pack places in the band (place: "lead") reads as band lines, not as a card under a header: each a label
