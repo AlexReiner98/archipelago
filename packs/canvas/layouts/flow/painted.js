@@ -181,8 +181,10 @@ export function paintIslands({ islands, tools, placed }) {
     fit();
     runs.forEach((r, k) => {
       const isle = islands[k];
-      // One ground: the look's frame painted in its island's land, under its paint, and that land its theme's sea.
-      r.land = isle.hue ? landOf(isle.hue, isle.tint, surface.colours?.lens?.sea) : null;
+      // One ground: the look's frame painted in its island's land, under its paint, and that land its theme's sea. An
+      // island with no colour of its own is tinted with the line's, as its frame's land is (./islands.js, .lf-island).
+      const lens = surface.colours?.lens ?? {};
+      r.land = landOf(isle.hue || lens.line || lens.muted, isle.tint, lens.sea);
       const theme = themeOf(surface.colours, r.land);
       try {
         frames.as(r, () => isle.look.default({
@@ -206,11 +208,13 @@ export function paintIslands({ islands, tools, placed }) {
       place();
       ctx.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
       for (const r of runs) {
-        if (r.ended || r.canvas.width <= 1) continue;
+        // Its ground is laid whatever its look does (one that ended, or has not yet sized its canvas): the frame is cut
+        // out of the island's land, so without it the sea would show there, a shade off the land round the header.
         const d = size.dpr, x0 = Math.max(0, Math.floor(r.cam.tx * d)), y0 = Math.max(0, Math.floor(r.cam.ty * d));
-        const x1 = Math.min(r.canvas.width, surface.canvas.width, Math.ceil((r.cam.tx + r.w * r.cam.k) * d)), y1 = Math.min(r.canvas.height, surface.canvas.height, Math.ceil((r.cam.ty + r.h * r.cam.k) * d));
+        const x1 = Math.min(surface.canvas.width, Math.ceil((r.cam.tx + r.w * r.cam.k) * d)), y1 = Math.min(surface.canvas.height, Math.ceil((r.cam.ty + r.h * r.cam.k) * d));
         if (x1 > x0 && y1 > y0 && r.land) (ctx.fillStyle = r.land), ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-        if (x1 > x0 && y1 > y0) ctx.drawImage(r.canvas, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
+        const [cx, cy] = [Math.min(x1, r.canvas.width), Math.min(y1, r.canvas.height)];
+        if (!r.ended && r.canvas.width > 1 && cx > x0 && cy > y0) ctx.drawImage(r.canvas, x0, y0, cx - x0, cy - y0, x0, y0, cx - x0, cy - y0);
       }
       surface.show();
     }
