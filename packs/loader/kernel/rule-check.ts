@@ -24,6 +24,9 @@ export const liftsNamed = (): readonly string[] => lifts ?? [];
 type FormCheck = (rule: RuleDef, at: string, reg: Pick<Registry, 'types'> & Partial<Pick<Registry, 'relations'>>) => string[];
 let forms: { checkForms: FormCheck; checkUnless: FormCheck } | undefined;
 export const fillForms = (filled: NonNullable<typeof forms>): void => void (forms = filled);
+/** The slot loader.rule_apart: the rules' check of apart (packs/rules/kernel/apart.ts), filled as it loads. */
+let apart: FormCheck | undefined;
+export const fillApart = (filled: FormCheck): void => void (apart = filled);
 /** A rule's comparison: a field, an operator, and a number or a field. */
 export const COMPARE = /^\s*([a-z_][a-z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?|[a-z_][a-z0-9_]*)\s*$/;
 
@@ -78,6 +81,7 @@ export function checkRules(rules: RuleDef[], reg: Pick<Registry, 'types'> & Part
       else for (const f of rule.unique) if (!fieldsAsLaidOver(reg.types.get(rule.type)!)[f]) problems.push(`${at}: ${rule.type} has no field "${f}"`);
       continue;
     }
+    if (rule.apart !== undefined) { problems.push(...(apart?.(rule, at, reg) ?? [`${at}: apart is the rules' form, not loaded`])); continue; }
     if (rule.at_most !== undefined || rule.must_link !== undefined) { problems.push(...(forms?.checkForms(rule, at, reg) ?? [`${at}: at_most and must_link are the rules' forms, not loaded`])); continue; }
     if (rule.unless !== undefined) problems.push(...(forms?.checkUnless(rule, at, reg) ?? [`${at}: unless is the rules' form, not loaded`]));
     const then = rule.then;
