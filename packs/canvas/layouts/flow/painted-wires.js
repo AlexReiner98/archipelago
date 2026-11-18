@@ -1,30 +1,59 @@
-// The wires that come into a painted island (./painted.js): a link from an item outside to one its look paints is
-// routed as any wire is, to where the map would have placed that item, and its stretch inside the island's frame is
-// under the paint. This says where each comes in at the frame and whether its head is at that end, so the surface can
-// carry it on to where the look draws the item. Layer: metrics. Pure: the model in, places out.
+// What a painted island's look hands the map once it has settled (decision e_jfctpqza, the owner, 18 Nov 2026): each
+// item's place, with the radius it draws it at. A look draws everything on its island, its own lines included (decision
+// e_a6kbgg8c, revised by the owner, 18 Nov 2026), so the links among its items are not the map's; the map ends each
+// wire from another island on its item there. This checks what a look hands and says what those wires become: each
+// re-routed to the item's edge, from the other end's box. Layer: metrics. Pure: what was handed in, patches out.
 
-/** Where the segment from a, outside the frame { at, size }, to b, inside it, crosses its edge. */
-export function edgeOf([ax, ay], [bx, by], { at: [x0, y0], size: [w, h] }) {
-  const ts = [[x0, ax, bx], [x0 + w, ax, bx], [y0, ay, by], [y0 + h, ay, by]].map(([e, a, b]) => (b !== a ? (e - a) / (b - a) : -1));
-  const on = ts.filter((t) => t >= 0 && t <= 1).map((t) => [ax + (bx - ax) * t, ay + (by - ay) * t]).filter(([x, y]) => x >= x0 - 0.5 && x <= x0 + w + 0.5 && y >= y0 - 0.5 && y <= y0 + h + 0.5);
-  return on.sort((p, q) => Math.hypot(p[0] - ax, p[1] - ay) - Math.hypot(q[0] - ax, q[1] - ay))[0] ?? [bx, by];
-}
+/** A finite number. */
+const num = (v) => typeof v === 'number' && Number.isFinite(v);
 
 /**
- * The wires coming into the painted island `c` ({ id, canvas: { at, size } }): each { item, at, head }, the item it
- * ends on inside, where it meets the frame, and whether a head is drawn at that end. `g` the composed model (its chains
- * and ties, each with a, b and points), `items` the answer's, `painted` the ids of every item a look paints, `endsOf`
- * which end of a link type takes the head, `order` the type the chains are of.
+ * What a look handed, checked: `said` { places: { id: [x, y, r?] } }, in the island's units from its frame's top left,
+ * for the items of `own` alone. Moved to the picture by the frame's corner `at`. Answers { places: Map(id → [x, y, r]) },
+ * or null where it gives no place.
  */
-export function comingIn(c, { g, items, painted, endsOf, order }) {
-  const inside = ([x, y]) => x > c.canvas.at[0] && x < c.canvas.at[0] + c.canvas.size[0] && y > c.canvas.at[1] && y < c.canvas.at[1] + c.canvas.size[1];
-  const mine = (id) => painted.has(id) && items.find((i) => i.id === id)?.island === c.id;
-  return [...g.chains.map((w) => [w, order]), ...g.ties.map((w) => [w, w.type])].flatMap(([w, type]) => {
-    if (mine(w.a) === mine(w.b) || !w.points?.length) return [];
-    const last = mine(w.b), pts = last ? w.points : [...w.points].reverse(), k = pts.findIndex(inside);
-    const at = k > 0 ? edgeOf(pts[k - 1], pts[k], c.canvas) : pts[pts.length - 1];
-    const ends = endsOf(type), atEnd = ends !== 'start' && !w.toPort, atStart = ends !== 'end' && !w.stop && !w.fromPort;
-    const headLast = w.headAt === 'start' ? atStart : atEnd, headFirst = w.headAt === 'start' ? atEnd : atStart;
-    return [{ item: last ? w.b : w.a, at, head: last ? headLast : headFirst }];
+export function handedOf(said, own, [ax, ay]) {
+  if (!said || typeof said !== 'object' || !said.places || typeof said.places !== 'object') return null;
+  const places = new Map();
+  for (const [id, at] of Object.entries(said.places)) {
+    if (own.has(id) && Array.isArray(at) && num(at[0]) && num(at[1])) places.set(id, [ax + at[0], ay + at[1], num(at[2]) && at[2] > 0 ? at[2] : 0]);
+  }
+  return { places };
+}
+
+/** The model `g` without the links between two items of one painted island: those are its look's to draw. */
+export function shoreOnly(g, islandOf, painted) {
+  if (!painted.size) return g;
+  const own = (w) => painted.has(w.a) && painted.has(w.b) && islandOf(w.a) === islandOf(w.b);
+  return { ...g, chains: g.chains.filter((w) => !own(w)), ties: g.ties.filter((w) => !own(w)) };
+}
+
+/** Where the line from `c` toward `p` leaves an end: a circle of radius `r`, or a box { w, h } about it. */
+function exit([cx, cy], end, [px, py]) {
+  const dx = px - cx, dy = py - cy, l = Math.hypot(dx, dy);
+  if (!l) return [cx, cy];
+  if (end.r !== undefined) return [cx + (dx / l) * end.r, cy + (dy / l) * end.r];
+  const t = Math.min(dx ? end.w / 2 / Math.abs(dx) : Infinity, dy ? end.h / 2 / Math.abs(dy) : Infinity);
+  return [cx + dx * t, cy + dy * t];
+}
+
+/** The straight line of a wire between ends `a` and `b` ({ at: [x, y], r } a placed item, { at, w, h } a box), edge to edge. */
+export const lineOf = (a, b) => [exit(a.at, a, b.at), exit(b.at, b, a.at)];
+
+/**
+ * The patches that put every wire touching what was just placed where it now ends. `wires` [{ key, head, w, type }]: each
+ * drawn wire's keys, its model (a, b, its points), its link type; `boxes` Map(id → { w, h, at }) where every other item
+ * stands; `placed` Map(id → [x, y, r]) every item a look has placed so far; `painted` the ids a look draws (one not yet
+ * placed keeps its wires hidden); `changed` the ids just placed; `draw(w)` and `heads(w, type)` the map's own path and
+ * heads for a wire; `over` how long the move takes (0 at first).
+ */
+export function wirePatches({ wires, boxes, placed, painted, changed, draw, heads, over = 0 }) {
+  const end = (id) => (placed.has(id) ? { at: placed.get(id).slice(0, 2), r: placed.get(id)[2] } : painted.has(id) ? null : boxes.get(id) ?? null);
+  return wires.flatMap(({ key, head, w, type }) => {
+    if (!changed.has(w.a) && !changed.has(w.b)) return [];
+    const a = end(w.a), b = end(w.b);
+    if (!a || !b) return [];
+    const moved = { ...w, points: lineOf(a, b), gaps: [] }, tip = head && heads(moved, type), move = over ? { over } : {};
+    return [{ key, set: { d: draw(moved) }, toggle: { unplaced: false }, ...move }, ...(head ? [{ key: head, set: { d: tip || '' }, toggle: { unplaced: !tip }, ...move }] : [])];
   });
 }
