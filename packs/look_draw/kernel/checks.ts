@@ -10,6 +10,8 @@
 // small_text: text drawn under LEAST px, scale included (a zoomed drawing's text as it reaches the eye).
 // wrapped_row: an element meant as one line (a row by its class, `data-one-line`, or one that cuts with an
 // ellipsis) whose text runs on more than one line.
+// on_island: a mark of one island (in its `.lf-region`) drawn over another island's land, as a pack's parts set
+// beside an island can: past_frame sees only a mark's own island, so this reads every island's land.
 
 /** A box on the page, in CSS px of the viewport. */
 export interface Box {
@@ -31,6 +33,8 @@ export interface Seen {
   frame_is?: 'viewport' | 'land';
   /** Its text's size as drawn, in px, where it has text of its own. */
   px?: number;
+  /** The island it is drawn on, by its name, where it is in one's region. */
+  island?: string;
   /** Meant as one line, and how many lines its text took. */
   one_line?: boolean;
   lines?: number;
@@ -41,10 +45,17 @@ export interface Probe {
   width: number;
   height: number;
   seen: Seen[];
+  /** Each island's land, by its name: its rects as drawn. */
+  lands?: Land[];
+}
+
+export interface Land {
+  island: string;
+  rects: Box[];
 }
 
 export interface Check {
-  rule: 'past_frame' | 'small_text' | 'wrapped_row';
+  rule: 'past_frame' | 'small_text' | 'wrapped_row' | 'on_island';
   mark?: string;
   said: string;
 }
@@ -87,6 +98,18 @@ export function wrappedRow(seen: Seen[]): Check[] {
   return seen.filter((s) => s.one_line && (s.lines ?? 1) > 1).map((s) => ({ rule: 'wrapped_row' as const, mark: s.mark, said: `${name(s)} wraps onto ${s.lines} lines` }));
 }
 
+/** How far two boxes overlap each way, in px: both above a pixel's rounding is an overlap. */
+const overlaps = (a: Box, b: Box) => Math.min(a.r, b.r) - Math.max(a.l, b.l) > SLACK && Math.min(a.b, b.b) - Math.max(a.t, b.t) > SLACK;
+
+/** A mark of one island that lies over another island's land: each told once, by the first island it covers. */
+export function onIsland(seen: Seen[], lands: Land[] = []): Check[] {
+  return seen.flatMap((s) => {
+    if (!s.island) return [];
+    const other = lands.find((l) => l.island !== s.island && l.rects.some((r) => overlaps(s.box, r)));
+    return other ? [{ rule: 'on_island' as const, mark: s.mark, said: `${name(s)} of ${s.island} lies over ${other.island}’s land` }] : [];
+  });
+}
+
 /** At most MOST of one rule, the last saying how many more there were. */
 export function capped(checks: Check[], most = MOST): Check[] {
   if (checks.length <= most) return checks;
@@ -97,7 +120,7 @@ export function capped(checks: Check[], most = MOST): Check[] {
 /** Every check a probe fails, each rule's capped: empty when nothing fails. */
 export function checksOf(probe: Probe | null | undefined): Check[] {
   const seen = probe?.seen ?? [];
-  return [...capped(pastFrame(seen)), ...capped(smallText(seen)), ...capped(wrappedRow(seen))];
+  return [...capped(pastFrame(seen)), ...capped(smallText(seen)), ...capped(wrappedRow(seen)), ...capped(onIsland(seen, probe?.lands))];
 }
 
 /**
@@ -119,15 +142,15 @@ export const PROBE = `(() => {
   // A box that clips or scrolls what is in it: what runs past it is cut, and the box itself is what is checked.
   const clips = (st) => /hidden|auto|scroll|clip/.test(st.overflowX) || /hidden|auto|scroll|clip/.test(st.overflowY);
   const clipped = (el) => { for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) if (clips(getComputedStyle(p))) return true; return false; };
-  const lands = new Map();
+  // Each island's land, its rects as drawn, and its name: the name its header says, else its place among them.
+  const regions = [...document.querySelectorAll('.lf-region')];
+  const landRects = (region) => [...region.querySelectorAll(':scope > .lf-land rect:not(.lf-spot), :scope > .lf-land:not(:has(rect))')].map((r) => r.getBoundingClientRect()).filter((r) => r.width > 1 && r.height > 1);
+  const lands = new Map(regions.map((region, n) => [region, { island: (region.querySelector('.lf-island-name text, text.lf-island-name')?.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 40) || 'island ' + (n + 1), rects: landRects(region).map(box) }]));
   const landOf = (el) => {
-    const region = el.closest('.lf-region');
-    if (!region) return null;
-    if (!lands.has(region)) {
-      const rects = [...region.querySelectorAll(':scope > .lf-land rect, :scope > .lf-land')].map((r) => r.getBoundingClientRect()).filter((r) => r.width && r.height);
-      lands.set(region, rects.length ? { l: Math.min(...rects.map((r) => r.left)), t: Math.min(...rects.map((r) => r.top)), r: Math.max(...rects.map((r) => r.right)), b: Math.max(...rects.map((r) => r.bottom)) } : null);
-    }
-    return lands.get(region);
+    const land = lands.get(el.closest('.lf-region'));
+    if (!land?.rects.length) return null;
+    const rs = land.rects;
+    return { l: Math.min(...rs.map((r) => r.l)), t: Math.min(...rs.map((r) => r.t)), r: Math.max(...rs.map((r) => r.r)), b: Math.max(...rs.map((r) => r.b)) };
   };
   // Meant as one line: a row by its class, one that says so, or one that cuts its text with an ellipsis.
   const oneLine = (el, st) => !(el instanceof SVGElement) && (el.hasAttribute('data-one-line') || /(^|[\\s-])row($|\\s)/.test(typeof el.className === 'string' ? el.className : '') || st.textOverflow === 'ellipsis');
@@ -161,11 +184,11 @@ export const PROBE = `(() => {
     const s = { mark: label(el), box: box(r) };
     const text = words(el); if (text) s.text = text;
     const land = landOf(el);
-    if (land) { s.frame = land; s.frame_is = 'land'; }
+    if (land) { s.frame = land; s.frame_is = 'land'; s.island = lands.get(el.closest('.lf-region')).island; }
     else if (!(canvas && canvas.contains(el)) && !clipped(el) && st.position !== 'fixed') { s.frame = { l: 0, t: -1e9, r: vw, b: 1e9 }; s.frame_is = 'viewport'; }
     if (texts.length) s.px = parseFloat(st.fontSize) * scaleOf(el);
     if (one) { s.one_line = true; s.lines = lineCount(el); }
     seen.push(s);
   }
-  return { width: vw, height: vh, seen };
+  return { width: vw, height: vh, seen, lands: [...lands.values()].filter((l) => l.rects.length) };
 })()`;
