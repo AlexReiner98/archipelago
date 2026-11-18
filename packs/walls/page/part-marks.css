@@ -212,3 +212,10 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 /* A band that is a picture of what it draws (packs/sheet/page/screens.js, leadPicture): small, as high as the style's lead_picture. */
 .lead-picture { border-bottom: var(--border-1) solid var(--line); padding-bottom: var(--space-5); }
 .lead-picture img { display: block; width: 100%; height: var(--lead-picture, var(--thumb-still)); object-fit: cover; border-radius: var(--radius-1); }
+/* lead-piece (Lane 7): a piece a pack places in the band (screens.js, bandLines), a line each, its label and its value
+   cut with an ellipsis, the whole value in its tip; and a picture band that has no picture takes no room. */
+.lead-piece { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; padding-bottom: var(--space-5); border-bottom: var(--border-1) solid var(--line); }
+.lead-piece-line { display: flex; align-items: baseline; gap: var(--space-4); min-width: 0; white-space: nowrap; }
+.lead-piece-label { flex: none; color: var(--muted); }
+.lead-piece-value { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lead-picture:empty { display: none; }
