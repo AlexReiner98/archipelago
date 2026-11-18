@@ -67,3 +67,11 @@ test('on a painted island each ring has its tag, moved out with the radius the l
   const none = paintedBody({ item, x: 0, y: 0, gap: 4, style: house, m });
   assert.ok(!marks(none).some((x) => x[0] === 'text'), 'a style that names no tag size draws none');
 });
+
+test('a look that writes the rings\' tags itself has the map\'s hidden', async () => {
+  const { itemPatches } = await import(pathToFileURL(join(laid, 'painted.js')).href);
+  const item = task(1, [on(0)]), places = new Map([[item.id, [10, 20, 9]]]), items = new Map([[item.id, item]]);
+  const tagOfPatch = (own?: boolean) => itemPatches(places, items, 4, 0, own).find((p: any) => p.key === `tag:${item.id}:0`);
+  assert.deepEqual(tagOfPatch(true).toggle, { written: true }, 'hidden where the look says it writes them');
+  assert.deepEqual(tagOfPatch().toggle, { written: false }, 'drawn by the map otherwise');
+});

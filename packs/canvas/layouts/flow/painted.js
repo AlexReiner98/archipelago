@@ -34,14 +34,17 @@ export function paintedBody({ item, x, y, gap, style, m }) {
     m('circle', { key: `hit:${id}`, class: 'lf-hit', r: gap }));
 }
 
-/** The patches that stand a placed item where its look drew it, its rings, their tags and pointer area round its radius. */
-export const itemPatches = (placed, items, gap, over = 0) => [...placed].flatMap(([id, [x, y, r]]) => [
+/**
+ * The patches that stand a placed item where its look drew it, its rings, their tags and pointer area round its radius.
+ * A look that writes the rings' tags itself (it hands `tags: true`, overlap e_jhqsvwwh) has the map's tags hidden.
+ */
+export const itemPatches = (placed, items, gap, over = 0, ownTags = false) => [...placed].flatMap(([id, [x, y, r]]) => [
   { key: `s:${id}`, toggle: { unplaced: false } },
   { key: `at:${id}`, set: { transform: `translate(${x} ${y})` }, ...(over && { over }) },
   { key: `hit:${id}`, set: { r: Math.max(r, gap) } },
   ...sessionsOn(items.get(id)).flatMap((_, k, on) => [
     { key: `ring:${id}:${k}`, set: { r: r + gap * (k + 1) } },
-    { key: `tag:${id}:${k}`, set: { transform: `translate(0 ${-(r + gap * on.length)})` } },
+    { key: `tag:${id}:${k}`, set: { transform: `translate(0 ${-(r + gap * on.length)})` }, toggle: { written: ownTags === true } },
   ]),
 ]);
 
@@ -66,6 +69,7 @@ export function placer({ g, painted, gap, draw, heads, order, over }) {
 export const css = `
 .lf-step.unplaced, .lf-wire.unplaced, .lf-tie.unplaced, .lf-head.unplaced { visibility: hidden; pointer-events: none; }
 .lf-step .lf-sr circle.lf-shape { fill: none; }
+.lf-step .lf-sr g.written { display: none; }
 `;
 
 /** How light a colour the page gives is: the sum of its channels, as rgb() writes them. */
