@@ -27,7 +27,7 @@ export function pageOf(body = document.body, hash = location.hash) {
   const name = hash.replace(/^#\/?/, '').split(/[/?]/)[0];
   if (body.dataset.first === 'wait' || (name === 'v' && body.dataset.gate !== undefined)) return 'try';
   // Sign up from the sign-in page passes through Try it (#/try?then=sign-up) on its way: it wears Sign up's land already.
-  if (name === 'try' && /[?&]then=sign-up/.test(hash)) return 'sign-up';
+  if (name === 'try' && /[?&]then=sign-up\b/.test(hash)) return 'sign-up';
   return name || 'sign-in';
 }
 
@@ -82,33 +82,40 @@ function wear() {
   if (going) return;
   const t = target();
   if (!t) return;
-  const { place, land, code, calm, key } = t;
   // The same land in the same place runs on; a move between places it shows in keeps it running too.
-  if (running?.key === key) {
-    if (key && !running.still) document.body.dataset.land = place;
+  if (running?.key === t.key) {
+    if (t.key && !running.still) document.body.dataset.land = t.place;
     return;
   }
-  // The one shown dissipates and is stopped, its palette with it, and only then does the next start, from nothing, in
+  // The one shown dissipates and is stopped, its palette with it, and only then is the next shown, from nothing, in
   // its own palette and emblem. Anything else goes at once.
-  if (t.turns) return void letGo(running);
+  if (t.turns) return void letGo(running, t);
   running?.stop();
   running = null;
   delete document.body.dataset.land;
   delete document.body.dataset.landDrew;
-  wearEmblem(code ? land : null);
-  if (!code) return;
-  if (calm) return void (running = { key, stop: () => undefined, still: true });
-  document.body.dataset.land = place;
-  const stop = runBackdrop({
+  wearEmblem(t.code ? t.land : null);
+  if (!t.code) return;
+  if (t.calm) return void (running = { key: t.key, stop: () => undefined, still: true });
+  document.body.dataset.land = t.place;
+  running = start(t);
+}
+
+/** A land run: shown, or `held` out of sight while the last one goes, so it has started by the time it is shown. */
+function start({ land, code, key, place }, held = false) {
+  const run = { key, place, drew: false };
+  run.stop = runBackdrop({
     code,
     answer: { items: [], links: [] },
     style: { ...(land.setup && { setup: land.setup }), ...(land.numbers && { numbers: land.numbers }) },
     dressed: document.body,
     // Before the map, so the map, the sheet and the bars are drawn over it.
     under: document.getElementById('canvas'),
-    drew: () => running?.key === key && (document.body.dataset.landDrew = ''),
+    replace: !held,
+    held,
+    drew: () => ((run.drew = true), running === run && (document.body.dataset.landDrew = ''), run.onDrew?.()),
     failed: () => {
-      if (running?.key !== key) return;
+      if (running !== run) return void ((run.failed = true), run.onDrew?.());
       // Where the land cannot run the page is blank; kept as this land, so it is not tried again until the theme or
       // the place changes.
       running = { key, stop: () => undefined, still: true };
@@ -116,37 +123,59 @@ function wear() {
       delete document.body.dataset.land;
     },
   });
-  running = { key, stop, place };
+  return run;
 }
 
 /** The land dissipating between two pages, until it is gone: `done` resolves once the next has been put on. */
 let going = null;
 /**
  * Let a land go by its own motion: its code is told the page is leaving (page.leaving: backdrop.js) and given the
- * theme's time for it (backdrop.wait.leave, in ms), then stopped, its palette with it; the next is worn after, from
- * nothing. Not faded: what is seen is the pattern dissolving. One not yet drawn, or a theme that gives no time, goes at once.
+ * theme's time for it (backdrop.wait.leave, in ms), then stopped, its palette with it. The next page's land (`next`)
+ * starts out of sight meanwhile, so it is under way the moment it is shown, with its emblem. Not faded: what is seen
+ * is the pattern dissolving. One not yet drawn, or a theme that gives no time, goes at once.
  */
-function letGo(land) {
+function letGo(land, next) {
   let finish;
   going = { land, done: new Promise((r) => (finish = r)) };
   running = null;
-  const ms = document.body.dataset.landDrew !== undefined && served && !(served instanceof Promise) ? landFor(served, 'gate')?.wait?.leave ?? 0 : 0;
+  const wait = document.body.dataset.landDrew !== undefined && served && !(served instanceof Promise) ? landFor(served, 'gate')?.wait : undefined;
+  const ms = wait?.leave ?? 0;
+  const early = ms > 0 && land.stop.leave && next?.code && !next.calm ? start(next, true) : null;
   const done = () => {
     land.stop();
     going = null;
-    delete document.body.dataset.land;
-    delete document.body.dataset.landDrew;
-    wear();
+    // The page moved on again meanwhile, or the next one could not run: worn afresh for where the page is now.
+    if (!early || early.failed || target()?.key !== early.key) {
+      early?.stop();
+      delete document.body.dataset.land;
+      delete document.body.dataset.landDrew;
+      wear();
+      return void finish();
+    }
+    running = early;
+    wearEmblem(next.land);
+    document.body.dataset.land = next.place;
+    if (early.drew) document.body.dataset.landDrew = '';
+    else delete document.body.dataset.landDrew;
+    early.stop.show();
     finish();
+  };
+  // The page changes when the last land has gone and the next has its first picture, so words, emblem and land come
+  // together; the next is waited for at most the theme's wait.ready (ms) more.
+  const ready = () => {
+    if (!early || early.drew || early.failed || !(wait?.ready > 0)) return done();
+    const once = () => ((early.onDrew = undefined), clearTimeout(cap), done());
+    const cap = setTimeout(once, wait.ready);
+    early.onDrew = once;
   };
   if (!(ms > 0) || !land.stop.leave) return void done();
   land.stop.leave();
-  setTimeout(done, ms);
+  setTimeout(ready, ms);
 }
 
 /**
  * Before a gate page is drawn (packs/kit/page/base.js gate): where its land is not the one shown, the one shown is let
- * go first, and the page waits on it, so its words and emblem change together, on a bare sea, and its land grows after.
+ * go first, and the page waits on it, so its words and emblem change together, as its own land comes in.
  * Null where there is nothing to wait for.
  */
 export function landTurn() {
@@ -155,7 +184,7 @@ export function landTurn() {
   if (!t?.turns) return null;
   // The next page's emblem is fetched while the last land goes, so it is there the moment the page changes.
   if (typeof t.land.emblem === 'string' && EMBLEM.test(t.land.emblem)) new Image().src = t.land.emblem;
-  letGo(running);
+  letGo(running, t);
   return going?.done ?? null;
 }
 

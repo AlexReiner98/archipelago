@@ -68,15 +68,16 @@ export function wear(look, root = document.documentElement) {
  * `replace` is false (a theme's land fading in over the last, which its caller stops). `under`: the element it is put
  * before, so what follows it on the page is drawn over it (the app's map); else it is put last. The answer, stop, takes
  * it away; stop({ quiet: true }) leaves the page's look as it is (worn by the land that follows it). stop.leave() tells
- * its code the page is leaving (page.leaving), before the stop.
+ * its code the page is leaving (page.leaving), before the stop. `held`: started out of sight, so it is ready when it is
+ * shown (stop.show()); until then the look its code tells is kept, not worn, so the page does not change early.
  */
-export function runBackdrop({ code, answer, style, dressed, under, replace = true, drew = () => {}, failed = () => {} }) {
+export function runBackdrop({ code, answer, style, dressed, under, replace = true, held = false, drew = () => {}, failed = () => {} }) {
   if (replace) document.querySelector('body > iframe.page-backdrop')?.remove();
   const frame = h('iframe', { class: 'page-backdrop', sandbox: frameSandbox(), src: '/draw.html', title: 'The page’s backdrop', 'aria-hidden': 'true', tabindex: '-1' });
   const colours = Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(dressed).getPropertyValue(`--ln-${name}`).trim()]));
   const theme = { ...colours, dark: matchMedia('(prefers-color-scheme: dark)').matches };
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
-  let pending = 0, done = false, scrolls = false, refit = false, words = null, worn = '{}', leaving = false;
+  let pending = 0, done = false, scrolls = false, refit = false, words = null, worn = '{}', leaving = false, kept_ = null;
   const kept = () => (words ??= wordsSaid());
   // A frame that scrolls with the page is as tall as the page without it, and says where its top stands on the page.
   const fit = () => {
@@ -118,7 +119,7 @@ export function runBackdrop({ code, answer, style, dressed, under, replace = tru
     // Its code tells the page its look (look() in its worker): checked again here, and worn only when it changes.
     else if (said.type === 'look') {
       const look = lookOf(said.look), key = JSON.stringify(look);
-      if (key !== worn) ((worn = key), wear(look));
+      if (key !== worn) ((worn = key), held ? (kept_ = look) : wear(look));
     }
     // A backdrop that stops is taken away, and what the page showed before it stays.
     else if (said.type === 'error') (stop(), failed(String(said.message ?? '').slice(0, 300)));
@@ -136,5 +137,10 @@ export function runBackdrop({ code, answer, style, dressed, under, replace = tru
   if (under?.parentNode === document.body) document.body.insertBefore(frame, under);
   else document.body.append(frame);
   stop.leave = () => ((leaving = true), tell());
+  // Out of sight by an opacity just above none: a frame hidden or at none is not rendered (Chrome), so its code would
+  // not run until shown.
+  // Shown at once, with no fade: it is already under way.
+  if (held) (frame.style.opacity = '0.001'), (frame.style.transition = 'none');
+  stop.show = () => ((held = false), frame.style.removeProperty('opacity'), kept_ && wear(kept_));
   return stop;
 }
