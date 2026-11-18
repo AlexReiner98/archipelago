@@ -78,3 +78,17 @@ test('a placed item stands at its own cell, not a block’s width off, and the u
   const at = new Set([...free, ...lone].map((i) => `${g.x.get(i.id)},${g.y.get(i.id)}`));
   assert.equal(at.size, free.length + lone.length, 'no two items share a cell');
 });
+
+test('a shelf is as wide as the room: an island starting within it stands beside the one before, one past it goes under', async () => {
+  const { shelve } = await import('./layouts/map/placed.js');
+  const isle = (id: string, w: number, h: number) => ({ isle: { id, rect: [0, 0, w, h], land: [{ l: 0, t: 0, r: w, b: h }] }, items: [] });
+  const at = (across: number) => {
+    const loose = [isle('site', 758, 640), isle('core', 2024, 1144), isle('build', 1860, 750)];
+    shelve(loose, { x: new Map(), y: new Map(), from: [24, 24], gap: 72, aspect: 1.4, across, right: 0, bottom: 0 });
+    return loose.map((i) => i.isle.rect.slice(0, 2));
+  };
+  // 1020 across: Core starts at 854, inside the room, so beside Site; Build would start at 2950, so under them.
+  assert.deepEqual(at(1020), [[24, 24], [854, 24], [24, 1240]]);
+  // 560 across: Core would start past the room, so under Site.
+  assert.deepEqual(at(560), [[24, 24], [24, 736], [24, 1952]]);
+});

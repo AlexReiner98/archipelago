@@ -80,7 +80,7 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     if (!corner) loose.push({ isle: islands.at(-1), items });
     else (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
   }
-  ({ right, bottom } = shelve(loose, { x, y, from: [islands.length > loose.length ? right + sizes.flow_island_sea : M, M + RISE], gap: sizes.flow_island_sea, rise: RISE, aspect: args.aspect, right, bottom }));
+  ({ right, bottom } = shelve(loose, { x, y, from: [islands.length > loose.length ? right + sizes.flow_island_sea : M, M + RISE], gap: sizes.flow_island_sea, rise: RISE, aspect: args.aspect, across: args.across, right, bottom }));
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
   return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
 }
@@ -138,9 +138,12 @@ export function blockOf(nodes, m, columns, cell = [1, 1], taken = new Set()) {
  * Islands with no corner, each laid out from the origin, moved into shelves after those with one (verdict e_amqnqtsn:
  * one row of them ran off the frame): from `from`, toward the picture's shape (`aspect`, width over height), each
  * shelf under the tallest island of the one above, `gap` between (and `rise` more above each shelf, for its headers). Moves each island's frame and what it holds in `x`,
- * `y`; answers the picture's right and bottom edges with them.
+ * `y`; answers the picture's right and bottom edges with them. Where the pane's width is known (`across`, in the
+ * picture's units as the canvas opens no larger than life) a shelf is as wide as the room: an island that starts within
+ * it stays on it, though it runs past, in sight beside the one before it as the canvas opens; one that would start past
+ * it begins the next (round 2 of "The canvas, by eye", the lead: Core beside Site at 1280, under it at 560).
  */
-export function shelve(loose, { x, y, from: [x0, y0], gap, rise = 0, aspect, right, bottom }) {
+export function shelve(loose, { x, y, from: [x0, y0], gap, rise = 0, aspect, across = 0, right, bottom }) {
   if (!loose.length) return { right, bottom };
   const size = ({ isle: { rect: [l, t, r, b] } }) => [r - l, b - t];
   const area = loose.reduce((s, i) => ((w, h) => s + (w + gap) * (h + gap))(...size(i)), 0);
@@ -148,7 +151,7 @@ export function shelve(loose, { x, y, from: [x0, y0], gap, rise = 0, aspect, rig
   let cx = x0, cy = y0, shelf = 0;
   for (const i of loose) {
     const [w, h] = size(i);
-    if (cx > x0 && cx + w > x0 + wide) (cx = x0), (cy += shelf + gap + rise), (shelf = 0);
+    if (cx > x0 && (across > 0 ? cx >= x0 + across : cx + w > x0 + wide)) (cx = x0), (cy += shelf + gap + rise), (shelf = 0);
     const [dx, dy] = [cx - i.isle.rect[0], cy - i.isle.rect[1]];
     for (const n of i.items) if (x.has(n.id)) x.set(n.id, x.get(n.id) + dx), y.set(n.id, y.get(n.id) + dy);
     const { isle } = i, [l, t, r, b] = isle.rect;

@@ -350,7 +350,7 @@ export function canvasIn(host, pane) {
     },
   };
   all.add(c);
-  /** Each island the lens lists with its title and where its land lies, by its name's mark, read top down then across. */
+  /** Each island the lens lists with its title and where its land lies, by its name's mark, read top down, those level across. */
   const islandBoxes = () => {
     const moves = c.moves(), items = at?.view?.answer?.items ?? [];
     // Its title from the answer, else as its name's mark says it (an island the answer holds no item of).
@@ -361,7 +361,8 @@ export function canvasIn(host, pane) {
         return box && [id, items.find((i) => i.id === id)?.title ?? name.querySelector('text')?.textContent ?? id, box];
       })
       .filter(Boolean)
-      .sort(([, , a], [, , b]) => a[1] - b[1] || a[0] - b[0]);
+      // Two that stand level (their spans down overlap: one shelf) are read from the left, else from the top.
+      .sort(([, , a], [, , b]) => (a[1] < b[3] && b[1] < a[3] ? a[0] - b[0] : a[1] - b[1]) || a[1] - b[1]);
   };
   let edges = null;
   // Where the reader left it, each time they move it: a drawing drawn again (the map changed) is put back there. A click
