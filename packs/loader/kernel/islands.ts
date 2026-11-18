@@ -2,8 +2,9 @@
 // knows two kinds of pack, read off the file with no key of its own. An island pack speaks on an island: it declares a
 // type that lives on one (packs/loader/kernel/island-items.ts, livesOnIsland), a link type, or fields on another pack's type. It is
 // held to the island rules: its file holds vocabulary (types, links, the rules on its own items), views the kernel
-// draws and instructions, and it builds on the shared set alone, requiring the kernel's pack and no other. The shared
-// set is the list `shared` in the kernel's pack file: type ids, grown only by the owner's decision. A map pack owns no
+// draws and instructions, and it builds on the shared set and on the types it requires by name (`type:<id>`, decision
+// e_rdfvhra7: it extends another pack that way, never by naming the pack). The shared set is the list `shared` in the
+// kernel's pack file: type ids, grown only by the owner's decision. A map pack owns no
 // type that lives on an island and brings looks, layouts, views, actions, handlers, uses and reach to the whole map,
 // each part judged by the gate it already has (a layout by the sandbox, code by code-runs, reach by core's pack reach
 // rule, adding a pack by the owner); it may require other packs. A pack that is both is refused: split it into an
@@ -105,15 +106,19 @@ export function islandProblems(m: Manifest, shared: Shared): string[] {
   if (added.length) problems.push(`it adds fields to ${added.join(', ')}: a pack adds no fields to another pack's types`);
   const own = new Set(p.types.map((t) => t.id));
   const links = new Set(p.relations.map((r) => r.id));
+  // A type or link type another pack declares is the pack's to name when it requires it by name (`type:build.feature`,
+  // decision e_rdfvhra7): as a type's parent, a link's end or parent, a rule's type. With its provider off it waits.
+  const required = new Set((m.requires ?? []).map(needOf).filter((n) => n.by === 'type').map((n) => n.name));
   const fine = (name: string) => name === '*' || own.has(name) || shared.types.has(name) || capabilityOf(name) !== undefined;
+  const fineHere = (name: string) => fine(name) || required.has(name);
   const named = new Set<string>();
-  for (const t of p.types) if (t.extends && !fine(t.extends)) named.add(t.extends);
-  for (const r of p.relations) for (const end of [...r.from, ...r.to]) if (!fine(end)) named.add(end);
-  for (const r of m.rules ?? []) for (const t of [r.when?.type, r.type].flat()) if (typeof t === 'string' && !fine(t)) named.add(t);
-  for (const r of m.requires ?? []) { const n = needOf(r); if (n.by === 'type' && !fine(n.name) && !links.has(n.name) && !shared.links.has(n.name)) named.add(n.name); if (n.of && !fine(n.of)) named.add(n.of); }
-  if (named.size) problems.push(`it names ${[...named].join(', ')}, not its own nor in the shared set (${[...shared.types].join(', ')})`);
-  const built = p.relations.filter((r) => r.extends && !links.has(r.extends) && !shared.links.has(r.extends)).map((r) => `${r.id} extends ${r.extends}`);
-  if (built.length) problems.push(`its links extend another pack's (${built.join('; ')}): only the kernel's or its own`);
+  for (const t of p.types) if (t.extends && !fineHere(t.extends)) named.add(t.extends);
+  for (const r of p.relations) for (const end of [...r.from, ...r.to]) if (!fineHere(end)) named.add(end);
+  for (const r of m.rules ?? []) for (const t of [r.when?.type, r.type].flat()) if (typeof t === 'string' && !fineHere(t)) named.add(t);
+  for (const r of m.requires ?? []) { const n = needOf(r); if (n.of && !fine(n.of)) named.add(n.of); }
+  if (named.size) problems.push(`it names ${[...named].join(', ')}, not its own, in the shared set (${[...shared.types].join(', ')}) nor required by name`);
+  const built = p.relations.filter((r) => r.extends && !links.has(r.extends) && !shared.links.has(r.extends) && !required.has(r.extends)).map((r) => `${r.id} extends ${r.extends}`);
+  if (built.length) problems.push(`its links extend another pack's (${built.join('; ')}): only the kernel's, its own or one it requires by name`);
   return problems;
 }
 
