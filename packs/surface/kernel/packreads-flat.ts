@@ -368,8 +368,8 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
   const islandOf = (e: { props: Record<string, unknown> }) => (l.registry.onIslands && typeof e.props?.[ISLAND] === 'string' ? (e.props[ISLAND] as string) : undefined);
   const islandIds = [...new Set(items.flatMap((e) => islandOf(e) ?? []))];
   // A focus is its own island (decision e_mqex8wrf): it speaks its type's pack, and says it is one so a drawing names the island by it.
-  // The packs it turned off ride with it, so a drawing offers to turn them on again where its item is not in the answer (an island item).
-  const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; type: string; pack: string | null; focus: string | null; packs_off: unknown }>(`select id, title, type, props->>'pack' as pack, props->>'focus' as focus, props->'packs_off' as packs_off from entity where id = any($1::text[])`, [islandIds])).rows.map(({ type, focus, packs_off, ...r }) => ({ ...(focus === 'true' ? { ...r, pack: l.registry.type(type)?.pack ?? null, focus: true } : r), ...(Array.isArray(packs_off) && packs_off.length && { packs_off: packs_off.filter((p): p is string => typeof p === 'string') }) })) : [];
+  // The packs and parts it turned off ride with it (packs_off, parts_off: feature e_4r82mvf3), so a drawing offers to turn them on again where its item is not in the answer (an island item).
+  const isles = islandIds.length ? (await l.db.query<{ id: string; title: string; type: string; pack: string | null; focus: string | null; packs_off: unknown; parts_off: unknown }>(`select id, title, type, props->>'pack' as pack, props->>'focus' as focus, props->'packs_off' as packs_off, props->'parts_off' as parts_off from entity where id = any($1::text[])`, [islandIds])).rows.map(({ type, focus, packs_off, parts_off, ...r }) => ({ ...(focus === 'true' ? { ...r, pack: l.registry.type(type)?.pack ?? null, focus: true } : r), ...offList('packs_off', packs_off), ...offList('parts_off', parts_off) })) : [];
   // What each island declares (its pack, what that requires, each one's state there) and which items wait because their
   // pack is not active on their island (task e_ter3cwup, decision e_57bjxy2x): derived here, nothing written to an item.
   const sources = isles.length ? await styleSources(l) : undefined;
@@ -388,6 +388,9 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
     ...(cut && { cut: true }), ...(matched !== undefined && { matched }),
   };
 }
+
+/** An island's list of what it turned off, as the answer gives it: the ids, none where it names none. */
+const offList = (key: 'packs_off' | 'parts_off', said: unknown) => (Array.isArray(said) && said.length ? { [key]: said.filter((p): p is string => typeof p === 'string') } : {});
 
 /** The answer to one of these reads, or undefined when the read is none of them. */
 export async function flatRead(l: Archipelago, q: FlatRead): Promise<unknown> {
