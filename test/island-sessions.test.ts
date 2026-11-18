@@ -34,7 +34,7 @@ test('in a browser, the side bar lists the chats at work and the band counts tho
       await page.send('Emulation.setDeviceMetricsOverride', { width, height: 800, deviceScaleFactor: 1, mobile: false });
       await until('the side bar and its button', () => page.evaluate<boolean>(`Boolean(document.getElementById('islands') && document.querySelector('#query .isl-toggle'))`));
       await page.evaluate(`document.body.dataset.islands === 'open' || document.querySelector('#query .isl-toggle').click()`);
-      await until(`the chats at ${width} px`, () => page.evaluate<boolean>(`${chats}.length === 2`));
+      await until(`the chats at ${width} px`, () => page.evaluate<boolean>(`document.querySelectorAll('#islands .isl-chat .isl-name').length === 2`)); // filled once its pieces have loaded
       const rows = await page.evaluate<{ state: string; mark: string; name: string; line: boolean }[]>(chats);
       // The one waiting on the owner first, by its mark; every row on one line.
       // (A run's title is cut at 60 characters when it is made: its start is compared.)
