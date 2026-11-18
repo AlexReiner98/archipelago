@@ -1,6 +1,6 @@
 /* A page for whoever is not in a workspace yet (gate, packs/kit/page/base.js): sign in, sign up, agree, Allow a client. One column
    in the middle of the page, and nothing of the app behind it: no canvas, bar, tabs, find or close. */
-body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
+body[data-gate] #canvas, body[data-gate] #nav, body[data-gate] #query, body[data-gate] #find, body[data-gate] #islands, body[data-gate] #sheet-close, body[data-gate]::before { display: none; }
 body[data-gate] #sheet { top: 0; width: 100%; border-left: 0; box-shadow: none; transform: none; visibility: visible; transition: none; display: flex; flex-direction: column; }
 body[data-gate] #main { flex: 1 0 auto; display: flex; flex-direction: column; }
 /* In the middle of the page both ways, a little above centre, as most sign-in pages sit; the mark and title centred over it. */
@@ -39,7 +39,7 @@ body[data-land-emblem] .gate-mark { box-sizing: border-box; padding-left: var(--
 /* The first moments on a new guest map (packs/identity/page/guest.js, firstMoments): until the agent has drawn the work,
    one card in the middle, and nothing of the app; then the map, with Sign up, the
    menu and find around it and none of the view's tools or legend, until the map is saved. */
-body[data-first] #query, body[data-first] #tabs, body[data-first] #canvas .lf-legend, body[data-first] #canvas .lf-island-key, body[data-first] #canvas .lf-island-name { display: none; }
+body[data-first] #query, body[data-first] #islands, body[data-first] #tabs, body[data-first] #canvas .lf-legend, body[data-first] #canvas .lf-island-key, body[data-first] #canvas .lf-island-name { display: none; }
 body[data-first="wait"] #find, body[data-first="wait"] #more, body[data-first="wait"] #nav > :not(.brand):not(.grow) { display: none; }
 body[data-first="wait"] #canvas, body[data-first="wait"] #sheet { visibility: hidden; }
 .first { transition: opacity 0.6s ease; }
