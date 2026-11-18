@@ -33,12 +33,13 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   for (const n of list) (groups.get(islandOf(n.id)) ?? groups.set(islandOf(n.id), []).get(islandOf(n.id))).push(n);
   const x = new Map(), y = new Map(), islands = [];
   let bottom = M;
-  // Islands an agent has given a corner stand there; the rest follow in a row to the right of all of those.
+  // Islands an agent has given a corner stand there; the rest are laid out at the origin, then shelved after them (shelve).
   const own = [...groups].filter(([id]) => id !== null).sort(([a], [b]) => Number(!cellOf(corners[a])) - Number(!cellOf(corners[b])));
   let right = M - GAP;
+  const loose = [];
   for (const [id, items] of own) {
     const corner = cellOf(corners[id]), top = heads.get(id) ?? 0;
-    const l = corner ? M + corner[0] * cw : right + GAP, t = corner ? M + corner[1] * ch : M;
+    const l = corner ? M + corner[0] * cw : 0, t = corner ? M + corner[1] * ch : 0;
     // An island with a look of its own (./looks.js) stands where its look puts what it holds; what the look leaves
     // unplaced is placed by cell beside it.
     const given = args.looks?.get(id), look = given && lookOut(given.look, { ...given, nodes: items, sizes, measure: args.measure });
@@ -51,7 +52,8 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
       for (const n of items) x.set(n.id, lx + w / 2), y.set(n.id, ly + h / 2);
       const r = Math.max(l + (wides.get(id) ?? 0), lx + w + PAD), b = ly + h + PAD;
       islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }], canvas: { at: [lx, ly], size: [w, h] } });
-      (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
+      if (!corner) loose.push({ isle: islands.at(-1), items });
+      else (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
       continue;
     }
     // Where its focus stands, as the island's style says (look.focus, decision e_up4wjd94): at its cell, in the corner
@@ -72,9 +74,10 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     const r = Math.max(l + (wides.get(id) ?? 0), look ? lx + look.width + PAD : l, ...items.map((n) => x.get(n.id) + n.w / 2 + PAD));
     const b = Math.max(look ? ly + look.height + PAD : t, ...items.map((n) => y.get(n.id) + n.h / 2 + PAD));
     islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }], ...(look && { look: { at: [lx, ly], paint: look.paint, items: look.items } }) });
-    bottom = Math.max(bottom, b);
-    right = Math.max(right, r);
+    if (!corner) loose.push({ isle: islands.at(-1), items });
+    else (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
   }
+  ({ right, bottom } = shelve(loose, { x, y, from: [islands.length > loose.length ? right + sizes.flow_island_sea : M, M], gap: sizes.flow_island_sea, aspect: args.aspect, right, bottom }));
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
   return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
 }
@@ -112,6 +115,34 @@ export function blockOf(nodes, m, columns) {
     }
   }
   return cells;
+}
+
+/**
+ * Islands with no corner, each laid out from the origin, moved into shelves after those with one (verdict e_amqnqtsn:
+ * one row of them ran off the frame): from `from`, toward the picture's shape (`aspect`, width over height), each
+ * shelf under the tallest island of the one above, `gap` between. Moves each island's frame and what it holds in `x`,
+ * `y`; answers the picture's right and bottom edges with them.
+ */
+export function shelve(loose, { x, y, from: [x0, y0], gap, aspect, right, bottom }) {
+  if (!loose.length) return { right, bottom };
+  const size = ({ isle: { rect: [l, t, r, b] } }) => [r - l, b - t];
+  const area = loose.reduce((s, i) => ((w, h) => s + (w + gap) * (h + gap))(...size(i)), 0);
+  const wide = Math.max(...loose.map((i) => size(i)[0]), aspect > 0 ? Math.sqrt(area * aspect) : 0);
+  let cx = x0, cy = y0, shelf = 0;
+  for (const i of loose) {
+    const [w, h] = size(i);
+    if (cx > x0 && cx + w > x0 + wide) (cx = x0), (cy += shelf + gap), (shelf = 0);
+    const [dx, dy] = [cx - i.isle.rect[0], cy - i.isle.rect[1]];
+    for (const n of i.items) if (x.has(n.id)) x.set(n.id, x.get(n.id) + dx), y.set(n.id, y.get(n.id) + dy);
+    const { isle } = i, [l, t, r, b] = isle.rect;
+    isle.rect = [l + dx, t + dy, r + dx, b + dy];
+    isle.land = isle.land.map((p) => ({ l: p.l + dx, t: p.t + dy, r: p.r + dx, b: p.b + dy }));
+    if (isle.canvas) isle.canvas = { ...isle.canvas, at: [isle.canvas.at[0] + dx, isle.canvas.at[1] + dy] };
+    if (isle.look) isle.look = { ...isle.look, at: [isle.look.at[0] + dx, isle.look.at[1] + dy] };
+    (right = Math.max(right, cx + w)), (bottom = Math.max(bottom, cy + h));
+    (cx += w + gap), (shelf = Math.max(shelf, h));
+  }
+  return { right, bottom };
 }
 
 /** How many columns `n` boxes of cells `cw` by `ch` take to stand in a block of `aspect` (width over height): one with no aspect. */
