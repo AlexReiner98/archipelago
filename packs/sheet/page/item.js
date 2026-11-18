@@ -56,8 +56,9 @@ const FOLDS = ['head', 'fields', 'source'];
 function told(data, owner, count, named, folds, me) {
   const e = data.entity;
   const tie = (r) => ({ type: r.type, root: rootOf(r.type) });
-  // What is linked into it, with its name and whether it is still open: the band counts it (lead.js).
-  const into = (r) => ({ ...tie(r), title: r.title, open: !isClosed(r.entity_type, r.status) });
+  // What is linked into it, with its name, whether it is still open and its id: the band counts it, and its press lights
+  // it on the canvas (lead.js).
+  const into = (r) => ({ ...tie(r), id: r.id, title: r.title, open: !isClosed(r.entity_type, r.status) });
   return {
     name: 'page',
     item: Object.fromEntries(['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'].filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),

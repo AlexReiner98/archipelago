@@ -6,7 +6,7 @@
 // in the marks, and only the press the person likely makes now in sight, at the end of the line it acts on.
 
 import { isChosen } from './sections.js';
-import { ago, label } from './words.js';
+import { ago, label, typeOf } from './words.js';
 
 /** Words cut to what a tip holds. */
 const tip = (s) => String(s ?? '').slice(0, 200);
@@ -220,7 +220,7 @@ const LINES = 3;
  * The band an item's page opens on, as marks, or null when its type says none, it holds nothing the title and marks
  * do not already say, and nothing waits on the person looking. `links` are the ties into it ({ type, root, title, open }).
  */
-export function leadMarks(item, type, c, { writes = false, asking, now, waits, me, links } = {}) {
+export function leadMarks(item, type, c, { writes = false, asking, adding, now, waits, me, links, words } = {}) {
   const lead = leadOf(item, type, c);
   const mine = waitsOnMe(item, waits, me);
   const room = LINES - (mine ? 1 : 0);
@@ -244,7 +244,7 @@ export function leadMarks(item, type, c, { writes = false, asking, now, waits, m
     : lead.form === 'line' ? oneLine(item, lead, links)
     : [];
   // The line that it waits on you stands first; the band is never more than its lines.
-  const all = [mine && waitsLine(mine), ...lines].filter(Boolean).slice(0, LINES);
+  const all = [mine && waitsLine(mine), ...pressed(lines, lead, item, { writes, links, words, adding })].filter(Boolean).slice(0, LINES);
   return all.length ? band(...all) : null;
 }
 
@@ -263,4 +263,67 @@ export function leadFields(item, type, c) {
   // An alert's field is said only while it is not true; once true it stays among the fields.
   if ((lead.form === 'alert' || lead.form === 'done') && item?.props?.[lead.unless] === true) return [];
   return [lead.value, lead.unit, lead.as_of, lead.unless, lead.says, lead.beats].filter(Boolean);
+}
+
+/** The pack a type is named in: what comes before its last dot, none for core's. */
+const packOf = (type) => (String(type ?? '').includes('.') ? String(type).slice(0, String(type).lastIndexOf('.')) : '');
+
+/**
+ * The type work added to an aim is, or null: a flavour of plannable work with an estimate from the aim's own pack, so
+ * the island it is on speaks it (core's task for core's aim); else that pack's plannable starter.
+ */
+function workTypeOf(words, aimType) {
+  const ids = Object.keys(words?.types ?? {}).filter((t) => packOf(t) === packOf(aimType) && !words.types[t].dormant);
+  const plannable = (t) => Boolean(typeOf(words, t).capabilities.plannable);
+  return ids.find((t) => words.types[t].of && plannable(t) && typeOf(words, t).fields.tokens_estimated) ?? ids.find((t) => !words.types[t].of && plannable(t)) ?? null;
+}
+
+/**
+ * The band's one likely press, or null (task e_mgu5nw8b): on a person, Light them, what waits on them drawn on the
+ * canvas and lit while pointed at; on an aim nothing serves, Add work, for one who may write. A settled choice and Seen
+ * working are pressed where their forms draw them.
+ */
+function pressOf(item, lead, { writes, links, words }) {
+  if (lead?.form === 'actor') {
+    const ids = into(links, lead.link).filter((t) => t.open !== false && t.id).map((t) => t.id);
+    return ids.length ? { key: 'lead-light', said: 'Light them', tip: 'Draw what waits on them on the canvas', lights: ids.slice(0, 500) } : null;
+  }
+  if (lead?.form === 'aim' && writes && !into(links, lead.link).length && workTypeOf(words, item.type)) return { key: 'lead-add', said: 'Add work', tip: 'Name work that serves it' };
+  return null;
+}
+
+/** The press, at the end of the line it acts on: the band's first line, set apart at its end by the style (lead-press). */
+const pressMark = (p) => ['box', { key: 'lead-press', flow: 'row' }, ['button', { key: p.key, look: 'quiet', tip: p.tip, ...(p.lights && { lights: p.lights }) }, p.said]];
+
+/** Work being named for an aim, in place: its words, Add and Cancel, on one line under the line it acts on. */
+const addingLine = (adding) => ['box', { flow: 'row', gap: 2, look: 'sunk', pad: 2 },
+  ['input', { key: 'lead-add-title', kind: 'text', value: adding, hint: 'What work serves it?', grow: true, focus: true }],
+  ['button', { key: 'lead-add-go', look: 'main' }, 'Add'], ['button', { key: 'lead-add-cancel', look: 'quiet' }, 'Cancel']];
+
+/** A form's lines with its press at the end of the first, or, while work is being named, the words to name it under it. */
+function pressed(lines, lead, item, opts) {
+  const p = lines.length ? pressOf(item, lead, opts) : null;
+  if (!p) return lines;
+  if (p.key === 'lead-add' && typeof opts.adding === 'string') return [lines[0], addingLine(opts.adding), ...lines.slice(1)];
+  return [[...lines[0], pressMark(p)], ...lines.slice(1)];
+}
+
+/**
+ * What a press on the band comes to, or null: { go } a query that draws what waits on a person (moving the canvas
+ * changes nothing on the map); { adding } the words of work being named for an aim (undefined once let go); or the work
+ * made and serving the aim, as one change on the person's word.
+ */
+export function pressEvent(event, item, type, { links, words, adding } = {}) {
+  const lead = type?.capabilities?.lead, k = event?.key, n = event?.name;
+  if (lead?.form === 'actor' && k === 'lead-light' && n === 'press') return { go: { query: { filter: { find: [`id ${item.id}`, `${lead.link} ${item.id}`], not: ['done', 'kind system'] } } } };
+  if (lead?.form !== 'aim' || !['lead-add', 'lead-add-title', 'lead-add-go', 'lead-add-cancel'].includes(k)) return null;
+  if (k === 'lead-add' && n === 'press') return { adding: '' };
+  if (k === 'lead-add-cancel' && n === 'press') return { adding: undefined };
+  if (k === 'lead-add-title' && n === 'edit') return { adding: String(event.value ?? '') };
+  if (!((k === 'lead-add-go' && n === 'press') || (k === 'lead-add-title' && n === 'submit'))) return null;
+  const title = String((n === 'submit' ? event.value : adding) ?? '').trim();
+  const kind = workTypeOf(words, item.type);
+  if (!title || !kind) return { adding };
+  const island = typeof item.props?.island === 'string' ? item.props.island : null;
+  return { ops: [{ op: 'create', ref: 'work', type: kind, title, ...(island && { props: { island } }) }, { op: 'link', type: lead.link, from: 'work', to: item.id }], reason: `Work added in the UI to serve "${item.title ?? item.id}"` };
 }
