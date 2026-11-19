@@ -313,7 +313,8 @@ test('a legend entry turned, the tree is drawn again in place from the changed v
   const rules = [{ id: 'core.guard', title: 'A guard', pack: 'core', effect: 'refuse', where: 'tool:change', fired: [] }];
   const patches: any[] = [];
   const act = async (name: string, params: any) => (name === 'rules' ? { answer: rules } : name === 'legend' ? { answer: { changed: true } } : { answer: params.ids.map((one: string) => ({ id: one, said: 0 })) });
-  const drawn = await picture({ answer: a, style: { ...style, sends: { ...style.sends, rules: 'rules', legend: 'legend' } }, reduced: true }, { frame: () => new Promise(() => {}), patch: (p: any[]) => patches.push(...p), open() {}, act });
+  // Where the page draws no new picture of the view (none asked for within reflex_said_wait ms).
+  const drawn = await picture({ answer: a, style: { ...style, numbers: { ...style.numbers, reflex_said_wait: 0 }, sends: { ...style.sends, rules: 'rules', legend: 'legend' } }, reduced: true }, { frame: () => new Promise(() => {}), patch: (p: any[]) => patches.push(...p), open() {}, act });
   assert.ok(JSON.stringify(drawn.scene.svg).includes('n:core.guard'));
   drawn.on({ name: 'click', key: 'lg:kind:rule' });
   await new Promise((r) => setTimeout(r, 10));
@@ -372,7 +373,7 @@ const keyed = (mark: any, out = new Map<string, any>()): Map<string, any> => {
   kids.forEach((kid) => keyed(kid, out));
   return out;
 };
-const quick = { ...style, numbers: { ...style.numbers, reflex_reflow: 20, reflex_film_lead: 0.01 } };
+const quick = { ...style, numbers: { ...style.numbers, reflex_reflow: 20, reflex_film_lead: 0.01, reflex_said_wait: 0 } };
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 test('a legend entry turned, the one tree moves live: what stays moves to its new place, what leaves fades, and it keeps playing', async () => {

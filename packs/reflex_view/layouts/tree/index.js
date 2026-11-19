@@ -71,17 +71,25 @@ function legendClick(event, hidden, style, tools, answer, again) {
   return [{ key, toggle: { 'rt-off': !on } }];
 }
 
+/** How many pictures this worker has been asked for: a legend entry turned, the page draws the view again. */
+let started = 0;
+
 /**
- * The tree, drawn again in place when a legend entry turns: the pack has changed the view, and the picture now drawn
- * is the same view's, so it is built again from it (grown, as one already seen) and its marks take the old ones' place.
+ * The tree, drawn again when a legend entry turns: the pack has changed the view, and the page draws it again, a new
+ * picture that moves from this one (./reflow.js). Where the page has not asked for one within reflex_said_wait ms (a
+ * view it does not draw again on its style alone), it is built again here and its marks take the old ones' place.
  */
 export async function picture(input, tools) {
+  started++;
   // The page's last view, and the box the picture was mounted in: drawn again in place, the tree's frame is fitted
   // into that box (./reflow.js), so its names are laid for the two together.
   let now = null, view = null;
   const box = {};
   const viewNow = () => view;
   const again = async (hidden) => {
+    const asked = started;
+    await new Promise((r) => setTimeout(r, input.style?.numbers?.reflex_said_wait ?? 0));
+    if (started !== asked) return;
     const next = await drawn1({ ...input, style: { ...input.style, hidden } }, tools, again, viewNow, box);
     now?.end?.();
     now = next;
