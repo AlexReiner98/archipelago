@@ -18,7 +18,8 @@ body[data-islands="folded"] #islands { display: none; }
 body[data-islands] #query { left: 0; }
 /* Under the bar where it is a strip of its own (a pane alone); on a still page (a look) the bar is in the band, and the side bar starts at the band's line. */
 body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip)); }
-#islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* One scroll for the whole bar (Alex, 19 Nov 2026): the panel scrolls, both rows and their lists in it, at their own height. */
+#islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 /* The bar's right edge: a strip to drag, drawn only as the line it already has, lit while pointed at. */
 #islands .isl-edge { position: absolute; top: 0; bottom: 0; right: 0; width: var(--space-4); cursor: col-resize; }
 #islands .isl-edge:hover { background: var(--line); }
@@ -26,7 +27,6 @@ body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) 
 #query .isl-toggle { flex: none; display: flex; align-items: center; gap: var(--space-4); align-self: stretch; border: 0; border-bottom: var(--border-3) solid transparent; border-radius: 0; background: none; padding: 0 var(--space-7); font: inherit; color: var(--muted); cursor: pointer; }
 #query .isl-toggle:is(:hover, :focus-visible) { color: var(--text); outline: none; }
 #query .isl-toggle[aria-expanded="true"] { color: var(--text); border-bottom-color: var(--accent); }
-#query .isl-toggle-count { color: var(--muted); font-size: var(--text-2); }
 /* Its mark: a window and its left panel, outlined; the panel filled while the bar is open. */
 #query .isl-mark { width: var(--text-6); height: var(--text-6); fill: none; stroke: currentColor; stroke-width: 1.2; stroke-linejoin: round; }
 #query .isl-toggle[aria-expanded="true"] .isl-mark-side { fill: currentColor; }
@@ -35,7 +35,7 @@ body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) 
 #islands .isl-key { flex: none; padding: 0 var(--space-3); color: var(--muted); font-size: var(--text-2); }
 #islands .isl-search:not(:placeholder-shown) + .isl-key { display: none; }
 #islands .isl-search { flex: 1; min-width: 0; box-sizing: border-box; height: var(--box-8); border: 0; background: none; padding: 0 var(--space-3); font: inherit; font-size: var(--text-5); color: var(--text); outline: none; }
-#islands .isl-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding: 0 0 var(--space-9); }
+#islands .isl-body { padding: 0 0 var(--space-9); }
 /* The list's parts, each a band: a line and space above it, its head small and spaced, its rows under it. */
 #islands .isl-sec { padding-bottom: var(--space-5); }
 #islands .isl-sec + .isl-sec { border-top: var(--border-1) solid var(--line); }
@@ -104,3 +104,22 @@ body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) 
 
 /* What waits on the owner, wherever it is drawn: the inbox (inbox.svg), painted in the colour of what holds it. */
 .on-you { display: inline-block; width: var(--text-6); height: var(--text-6); vertical-align: middle; background: currentColor; -webkit-mask: url(/inbox.svg) center / contain no-repeat; mask: url(/inbox.svg) center / contain no-repeat; }
+
+/* The bar's two rows (e_spqgn9td): each a head that folds what is under it, small and spaced as a part's head is, square
+   and set apart by a line alone; the one drawn on the canvas now in full colour. */
+#islands .isl-fold { flex: none; display: flex; align-items: center; gap: var(--space-4); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-8); padding: 0 var(--space-6); border: 0; border-radius: 0; border-bottom: var(--border-1) solid var(--line); background: none; box-shadow: none; font: inherit; font-size: var(--text-1); text-transform: uppercase; letter-spacing: var(--track-3); color: var(--muted); text-align: left; white-space: nowrap; cursor: pointer; }
+#islands .isl-fold:is(:hover, :focus-visible) { color: var(--text); outline: none; }
+#islands .isl-fold[data-up] { color: var(--text); }
+#islands .isl-fold-mark { flex: none; width: var(--space-5); text-align: center; }
+#islands .isl-fold-mark::before { content: '▸'; }
+#islands .isl-fold[aria-expanded="true"] .isl-fold-mark::before { content: '▾'; }
+#islands .isl-fold-word { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#islands .isl-fold-count { flex: none; color: var(--muted); }
+#islands .isl-fold[aria-expanded="false"] + .isl-fold-body { display: none; }
+#islands .isl-fold[aria-expanded="true"] + .isl-fold-body { border-bottom: var(--border-1) solid var(--line); }
+#islands .isl-fold-body { flex: none; }
+/* A view's row: on, its name in full colour; Pin or Unpin at its right while it is pointed at, × on the one up. */
+#islands .isl-view.on .isl-name { color: var(--text); }
+#islands .isl-pin { flex: none; visibility: hidden; border: 0; background: none; padding: 0 var(--space-3); font: inherit; font-size: var(--text-2); color: var(--muted); cursor: pointer; }
+#islands .isl-view:is(:hover, :focus-within) .isl-pin { visibility: visible; }
+#islands .isl-pin:hover { color: var(--accent); }

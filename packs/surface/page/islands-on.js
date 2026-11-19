@@ -5,15 +5,18 @@
 // list is drawn and the person's own is left as it was.
 
 import { api, whoami } from './base.js';
-import { clean, islandsIn, READS } from './islands-list.js';
+import { clean, islandsIn, listWith, READS, viewsIn } from './islands-list.js';
 
 export { islandsIn, READS };
 
 const LOCAL = 'pelago-islands';
 let person;
 let list;
+/** The views kept on the same list (e_74ghhvdp): by a lens's id or a pack's view's. */
+let views = [];
 const heard = new Set();
-const told = () => heard.forEach((f) => f(list));
+const heardViews = new Set();
+const told = () => (heard.forEach((f) => f(list)), heardViews.forEach((f) => f(views)));
 
 /** The person the page acts as, if the server says (none with sign-in off). */
 const me = () => (person ??= whoami().then((w) => w?.actor?.person ?? null, () => null));
@@ -38,6 +41,7 @@ export function islandsOn() {
     // A person who has never chosen sees the map's islands, the latest first (as many as search gives by default), so
     // the work agents left is drawn on their first look; their first toggle makes the list their own.
     list = kept == null ? await unchosen() : clean(kept);
+    views = viewsIn(kept);
   })();
   // The list as it is now, not as first read: a toggle since then keeps a new one (Home drawn again read the old).
   return reading.then(() => list);
@@ -45,18 +49,25 @@ export function islandsOn() {
 
 /** Hear the list each time it changes; answers how to stop. */
 export const onIslands = (f) => (heard.add(f), () => heard.delete(f));
+/** The views on the person's list, as it is now. */
+export const viewsKept = () => islandsOn().then(() => views);
+/** Hear the views on the list change. */
+export const onViews = (f) => (heardViews.add(f), () => heardViews.delete(f));
 
 /** Keep a new list: on the person item where there is one, else in this browser. Told at once; put back if refused. */
-async function keep(next, reason) {
-  const was = list;
+async function keep(next, reason, nextViews = views) {
+  const was = list, viewsWere = views;
   list = next;
+  views = nextViews;
   told();
+  const whole = listWith(next, nextViews);
   const id = await me();
   try {
-    if (id) await api('change', { ops: [{ op: 'update', id, props: { islands: next } }], reason });
-    else localStorage.setItem(LOCAL, JSON.stringify(next));
+    if (id) await api('change', { ops: [{ op: 'update', id, props: { islands: whole } }], reason });
+    else localStorage.setItem(LOCAL, JSON.stringify(whole));
   } catch (err) {
     list = was;
+    views = viewsWere;
     told();
     throw err;
   }
@@ -66,6 +77,12 @@ async function keep(next, reason) {
 export async function keepList(next, reason) {
   await islandsOn();
   await keep(clean(next), reason);
+}
+
+/** Keep `next` as the views on the person's list, the islands as they are. */
+export async function keepViews(next, reason) {
+  await islandsOn();
+  await keep(list, reason, viewsIn(listWith([], next)));
 }
 
 /** Where each island stands on every canvas (its focus's field `corner`), by id: null where no agent has set one. */

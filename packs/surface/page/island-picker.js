@@ -12,6 +12,7 @@ import { numberOf } from './style-number.js';
 import { ago, titles } from './words.js';
 import { onOpen, openNow } from './sessions-open.js';
 import { sessionsPart } from './island-sessions.js';
+import { viewsList, viewUp } from './views-side.js';
 
 /** Every island on the map, each with its pack: read once a page, and again (`fresh`) when the log says one was made or changed. */
 let reading;
@@ -95,6 +96,23 @@ function sideMark() {
   return svg;
 }
 
+/** A row of the bar that folds what is under it, kept so in this browser; `pressed` may act first and answer true. */
+function foldHead(name, word, pressed = () => false) {
+  const head = h('button', { type: 'button', class: 'isl-fold', 'data-fold': name, 'aria-expanded': String(kept(`fold:${name}`, true)) }, h('span', { class: 'isl-fold-mark', 'aria-hidden': 'true' }), h('span', { class: 'isl-fold-word' }, word), h('span', { class: 'isl-fold-count' }));
+  head.onclick = () => {
+    if (pressed()) return unfold(name);
+    const on = head.getAttribute('aria-expanded') !== 'true';
+    head.setAttribute('aria-expanded', String(on));
+    keep(`fold:${name}`, on);
+  };
+  return head;
+}
+/** Open row `name` of the bar. */
+function unfold(name) {
+  document.querySelector(`#islands .isl-fold[data-fold="${name}"]`)?.setAttribute('aria-expanded', 'true');
+  keep(`fold:${name}`, true);
+}
+
 /** Draw the side list, once a page; the foot strip of the find bar is put away. */
 export function drawPicker() {
   if (document.getElementById('islands')) return;
@@ -105,10 +123,9 @@ export function drawPicker() {
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // Its shortcut, at the line's right while nothing is typed.
   const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
-  // The bar's button, first in the band (./canvas.js): a press shows the islands or puts them away; how
-  // many are on is its count.
-  const count = h('span', { class: 'isl-toggle-count' });
-  const fold = h('button', { type: 'button', class: 'isl-toggle', 'aria-label': 'Islands' }, sideMark(), count);
+  // The bar's button, first in the band (./canvas.js): a press shows the islands or puts them away. How many are on is
+  // the Islands row's count, not the button's (Alex, 19 Nov 2026).
+  const fold = h('button', { type: 'button', class: 'isl-toggle', 'aria-label': 'Islands' }, sideMark());
   // The bar's right edge: dragged, it sets the bar's width.
   const edge = h('div', { class: 'isl-edge', 'aria-hidden': 'true', title: 'Drag to widen; double-click for the usual width' });
   // The list is one stop for Tab, worked with arrows (see `keys` below); its rows' presses are for the pointer.
@@ -121,7 +138,14 @@ export function drawPicker() {
   });
   // Auto, at the line's right: its dot lit while it is on, Home then drawing what changed lately too.
   const auto = h('button', { type: 'button', class: 'isl-auto', 'aria-pressed': 'false', onclick: () => toggleAuto() }, 'Auto');
-  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' }, h('div', { class: 'isl-panel' }, h('div', { class: 'isl-top' }, input, key, auto), body), edge);
+  // Two rows that fold (Alex, 19 Nov 2026, e_spqgn9td): Islands, the bar as it was, and Custom views (./views-side.js),
+  // whose press puts a drawing up in place of the islands. A press on Islands while a drawing is up brings them back.
+  const views = h('div', { class: 'isl-views', 'aria-label': 'Custom views' });
+  const islandsHead = foldHead('islands', 'Islands', () => viewUp() && ((location.hash = '#/'), true));
+  const viewsHead = foldHead('views', 'Custom views');
+  const side = h('aside', { id: 'islands', 'aria-label': 'Islands' },
+    h('div', { class: 'isl-panel' }, islandsHead, h('div', { class: 'isl-fold-body', 'data-fold': 'islands' }, h('div', { class: 'isl-top' }, input, key, auto), body), viewsHead, h('div', { class: 'isl-fold-body', 'data-fold': 'views' }, views)), edge);
+  viewsList(views, { done: () => done(), counted: (n, up) => ((viewsHead.querySelector('.isl-fold-count').textContent = n ? String(n) : ''), islandsHead.toggleAttribute('data-up', !up), viewsHead.toggleAttribute('data-up', up)) });
   document.body.append(side);
   hooks.islandsButton = () => fold;
   hooks.drawBand?.();
@@ -260,7 +284,7 @@ export function drawPicker() {
       packOf(i));
   const draw = () => {
     const drawn = markedNow(), q = input.value.trim(), shownN = drawn.filter((x) => /^e_/.test(x)).length;
-    count.textContent = shownN ? String(shownN) : '';
+    islandsHead.querySelector('.isl-fold-count').textContent = shownN ? String(shownN) : '';
     found = rankIslands(islands, q);
     // Searching: one list, best first, worked from the keyboard, within the bar (Alex: nothing drops outside it).
     if (q) {
@@ -349,6 +373,7 @@ export function drawPicker() {
     if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.key.toLowerCase() !== 'k') return;
     ev.preventDefault();
     if (document.body.dataset.islands !== 'open') open(true);
+    unfold('islands');
     input.focus();
     input.select();
   });
