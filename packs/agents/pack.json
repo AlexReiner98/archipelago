@@ -36,7 +36,8 @@
           "about?": "string",
           "island?": "string",
           "where?": "string",
-          "fill?": "any"
+          "fill?": "any",
+          "run?": "string"
         },
         "out": {
           "said": [
