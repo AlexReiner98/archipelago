@@ -395,7 +395,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, lands.sea, lands.land, isles.layer, tieLayer, wireLayer, trunkLayer, wn?.layer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
+  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, lands.sea, lands.land, isles.layer, tieLayer, wireLayer, trunkLayer, wn?.hits(line), stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark), wn?.layer);
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = [
     ...(parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 })),
@@ -408,9 +408,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   for (const id of dimmed(style)) addClass(dims.get(id), 'dim');
   /** Light the wires and ties of a step, or of none: while one is lit, the rest fade. One on a trunk is lit along it, to its head. */
   const wireKeys = wired.map((w, j) => [...(j < C ? [`w:${j}`, `h:${j}`] : tieKeys(j - C)), ...(carry[j].length ? [keysOf(j).on] : [])]);
-  const light = (id) => {
-    const on = new Set(id ? wired.flatMap((w, j) => (w.a === id || w.b === id ? [...wireKeys[j], ...carry[j].filter((c) => c.end).map((c) => keysOf(c.k).head)] : [])) : []);
-    return [{ key: 'flow', toggle: { lighting: Boolean(id) } }, ...wireKeys.flat().map((key) => ({ key, toggle: { lit: on.has(key) } })), ...(wn?.force(new Set(wired.flatMap((w, j) => (id && (w.a === id || w.b === id) ? [j] : [])))) ?? [])];
+  const light = (id, only = null) => {
+    const on = new Set(only !== null ? [...wireKeys[only], ...carry[only].filter((c) => c.end).map((c) => keysOf(c.k).head)] : id ? wired.flatMap((w, j) => (w.a === id || w.b === id ? [...wireKeys[j], ...carry[j].filter((c) => c.end).map((c) => keysOf(c.k).head)] : [])) : []);
+    return [{ key: 'flow', toggle: { lighting: Boolean(id) || only !== null } }, ...wireKeys.flat().map((key) => ({ key, toggle: { lit: on.has(key) } })), ...(wn?.force(new Set(only !== null ? [only] : wired.flatMap((w, j) => (id && (w.a === id || w.b === id) ? [j] : [])))) ?? [])];
   };
   /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
@@ -456,6 +456,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
         const on = String(key).startsWith('p:') ? `s:${String(key).slice(2)}` : null;
         return on && tipped.has(on) ? [{ tip: { key: on, mark: tipFor(on) } }] : [{ tip: null }];
       }
+      // A wire hovered lights as a board does and shows its name, whatever the give-way rule said (its name is drawn last, above the boards).
+      if (String(key).startsWith('wh:')) return name === 'enter' ? light(null, Number(String(key).split(':')[1])) : name === 'leave' ? light(null) : [];
       if (inPainted.has(keyed.get(key))) painting?.item(keyed.get(key), name === 'enter');
       if (name === 'leave') return [...light(null), { tip: null }];
       if (!keyed.has(key)) return [];

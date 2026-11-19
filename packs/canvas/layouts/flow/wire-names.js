@@ -76,7 +76,8 @@ export const wireRules = (style) => [
 .lf-wire.held, .lf-tie.held { stroke: var(--ln-you); } .lf-head.held { fill: var(--ln-you); } .lf-tie.you { stroke: var(--ln-you); } .lf-head.you { fill: var(--ln-you); }`,
   style.wire_names === true && `.lf-wn { pointer-events: none; transition: opacity 0.25s; } .lf-wn rect { fill: var(--ln-sea); stroke: none; }
 .lf-wn text { fill: var(--ln-text); font-size: var(--ln-flow-wire-name-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: central; }
-.lf-wn.lf-wn-quiet { opacity: 0; } .lf-wn.lf-wn-quiet.lf-wn-force { opacity: 1; }`,
+.lf-wn.lf-wn-quiet { opacity: 0; } .lf-wn.lf-wn-quiet.lf-wn-force { opacity: 1; }
+.lf-hit { fill: none; stroke: transparent; stroke-width: var(--ln-flow-wire-hit); pointer-events: stroke; }`,
 ].filter(Boolean).join('\n');
 
 /**
@@ -100,6 +101,8 @@ export function wireNames({ style, wired, C, boxes, z, measure, m, order }) {
   return {
     layer,
     text: (j) => items[j].text,
+    /** A hit area for each wire, hovered to light it and show its name: invisible, `flow_wire_hit` wide, drawn under the boards. */
+    hits: (line) => wired.map((w, j) => m('path', { key: `wh:${j}`, d: line(w), class: 'lf-hit', on: ['enter', 'leave'] })),
     viewport(view) {
       const f = 1 / Math.max(z('wire_name_zoom_least'), Number(view?.scale) || 1);
       if (Math.abs(Math.log(f / scaleAt)) < Math.log(z('wire_name_rescale'))) return [];

@@ -69,3 +69,32 @@ test('the waymark preset draws ink wires with names, and its css says so', () =>
   for (const k of ['flow_wire_ink', 'flow_wire_name_text', 'flow_wire_name_pad', 'flow_wire_name_knock', 'flow_wire_name_leading', 'flow_wire_name_zoom_least', 'flow_wire_name_rescale']) assert.ok(k in house.sizes, k);
   assert.ok(house.sizes.flow_wire_name_text >= 11);
 });
+
+test('pass 15: a wire hovered lights, shows its name whatever the rule said, and its name is drawn last', async () => {
+  const { copyFileSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { pathToFileURL } = await import('node:url');
+  const root = join(import.meta.dirname, '..', '..'), laid = mkdtempSync(join(tmpdir(), 'pelago-hover-'));
+  for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(root, file as string), join(laid, name));
+  const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
+  const house = pack.styles.find((s: any) => s.id === 'core.house').props;
+  const style = { ...house, ...waymark, shape: 'flow', sizes: { ...house.sizes, ...waymark.sizes } };
+  const ids = ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_cccccccc', 'e_dddddddd'];
+  const items = ids.map((id, k) => ({ id, type: 'task', is: ['work'], title: `Item ${k} with a longer name`, open: true, status: 'doing', phase: 'under_way' }));
+  const links = [['b', 'a'], ['c', 'a'], ['d', 'b'], ['d', 'c']].map(([f, to], k) => ({ id: `r_${k}`, type: 'depends_on', from: `e_${f.repeat(8)}`, to: `e_${to.repeat(8)}` }));
+  const out = picture({ answer: { items, links }, style, width: 700, height: 500 }, { measure: (s: string, px: number) => s.length * px * 0.55 });
+  const walk = (x: any): string[] => (Array.isArray(x) ? (typeof x[0] === 'string' ? [x[1]?.key ?? '', ...x.slice(2).flatMap(walk)] : x.flatMap(walk)) : []);
+  const keys = walk(out.scene.svg);
+  const hits = keys.filter((k: string) => k.startsWith('wh:')), names = keys.filter((k: string) => k.startsWith('wn:'));
+  assert.equal(hits.length, links.length, 'each wire has a hit area');
+  assert.ok(names.length > 0);
+  const lastStep = Math.max(...keys.map((k: string, i: number) => (k.startsWith('s:') ? i : -1)));
+  assert.ok(keys.indexOf(names[0]) > lastStep, 'names are drawn above the boards');
+  assert.ok(keys.indexOf(hits[0]) < keys.findIndex((k: string) => k.startsWith('s:')), 'hit areas lie under the boards');
+  const patches = out.on({ name: 'enter', key: hits[0] });
+  assert.ok(patches.some((p: any) => p.key === 'w:0' && p.toggle?.lit === true), 'the wire lights');
+  assert.ok(patches.some((p: any) => p.key === 'wn:0' && p.toggle?.['lf-wn-force'] === true), 'its name shows');
+  assert.ok(patches.some((p: any) => p.key === 'wn:1' && p.toggle?.['lf-wn-force'] === false), 'the others stay as the rule said');
+  assert.ok(out.on({ name: 'leave', key: hits[0] }).every((p: any) => !p.toggle?.['lf-wn-force'] && !p.toggle?.lit), 'on leave it goes back');
+  assert.match(out.scene.css, /\.lf-hit/);
+});
