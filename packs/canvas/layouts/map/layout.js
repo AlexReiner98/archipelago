@@ -21,7 +21,9 @@ function plainly(args, m, islandOf, heads, wides = new Map(), follows = new Map(
   const made = [...groups].map(([island, list]) => {
     const cw = Math.max(...list.map((n) => n.w)) + GAP, ch = Math.max(...list.map((n) => n.h)) + GAP, columns = Math.max(1, Math.round(Math.sqrt(list.length * ch / cw * 2)));
     const rows = Math.ceil(list.length / columns), pad = island === null ? 0 : PAD, top = pad + (island === null ? 0 : heads.get(island) ?? 0);
-    return { island, list, cw, ch, columns, top, pad, w: Math.max(wides.get(island) ?? 0, Math.min(columns, list.length) * cw - GAP + 2 * pad), h: top + rows * ch - GAP + pad };
+    // Each row is as tall as the tallest box in it, and no taller: a box with room of its own (a plate hung under it) makes only its row taller.
+    const rh = Array.from({ length: rows }, (_, r) => Math.max(...list.slice(r * columns, (r + 1) * columns).map((n) => n.h))), at = rh.map((_, r) => rh.slice(0, r).reduce((sum, v) => sum + v + GAP, 0));
+    return { island, list, cw, ch, columns, top, pad, rh, at, w: Math.max(wides.get(island) ?? 0, Math.min(columns, list.length) * cw - GAP + 2 * pad), h: top + rh.reduce((sum, v) => sum + v, 0) + (rows - 1) * GAP + pad };
   });
   // An island that follows another (a pack's parts, the island they are of) is shelved right after it.
   const blocks = made.filter((b) => !follows.has(b.island)).flatMap((b) => [b, ...made.filter((f) => follows.get(f.island) === b.island)]);
@@ -34,7 +36,7 @@ function plainly(args, m, islandOf, heads, wides = new Map(), follows = new Map(
     if (cx > M && cx + b.w > M + wide) (cx = M), (cy += shelf + SEA + RISE), (shelf = 0);
     b.list.forEach((n, k) => {
       x.set(n.id, cx + b.pad + (k % b.columns) * b.cw + n.w / 2);
-      y.set(n.id, cy + b.top + Math.floor(k / b.columns) * b.ch + n.h / 2);
+      y.set(n.id, cy + b.top + b.at[Math.floor(k / b.columns)] + b.rh[Math.floor(k / b.columns)] / 2);
     });
     if (b.island !== null) islands.push({ id: b.island, rect: [cx, cy, cx + b.w, cy + b.h], land: [{ l: cx, t: cy, r: cx + b.w, b: cy + b.h }] });
     cx += b.w + SEA;

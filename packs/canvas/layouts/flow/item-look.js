@@ -11,6 +11,7 @@ import { seedOf } from './ridge-item.js';
 import { bandPath } from './type-outline.js';
 import { rangeMarks } from './aim-range.js';
 import { crossPath, holdersOf, whoText } from './waymark.js';
+import { stateMark } from './session.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
 const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -106,6 +107,7 @@ export function itemRules(style) {
       rules.push(`.lf-step.boarded.bs-${k} .lf-who { fill: color-mix(in srgb, ${ld(f, 'fill')} 82%, black); } .lf-step.boarded.bs-${k} .lf-who-mark, .lf-step.boarded.bs-${k}:is(.lf-step) .lf-who-text { fill: ${ld(f, 'text')}; }`);
       rules.push(`.lf-step.boarded.bs-${k}:is(.lf-step) text { fill: ${ld(f, 'text')}; } .lf-sw.bs-${k} .lf-shape { fill: ${ld(f, 'fill')}; stroke: color-mix(in srgb, ${ld(f, 'fill')} 65%, var(--ln-text)); stroke-width: var(--ln-rule); }`);
     }
+    rules.push('.lf-step .lf-who-dormant { opacity: 0.6; }');
     rules.push('.lf-step .lf-who-hanger { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-rule); pointer-events: none; } .lf-step .lf-who { stroke: none; pointer-events: none; } .lf-step .lf-who-text { font-size: var(--ln-flow-who-text); font-family: var(--ln-font); dominant-baseline: middle; pointer-events: none; } .lf-step.boarded .lf-who-text.lf-who-you { fill: var(--ln-you); font-weight: 700; } .lf-step .lf-who-mark { stroke: none; pointer-events: none; }');
     if (g.board.fills.trouble) rules.push(`.lf-step .lf-cross { fill: none; stroke: ${ld(g.board.fills.trouble, 'text')}; stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; pointer-events: none; }`);
     // An ended board has no fill, a faded outline and a muted name; the key's types are outlines only.
@@ -143,7 +145,7 @@ const tickPath = (cx, cy, r) => `M${cx - r * 0.5} ${cy + r * 0.05}L${cx - r * 0.
  * the foot, the notch, a check, the glyph). `at` is its middle and `n` its step (w, h, shape, bevel); `z` the style's
  * sizes by name, `outline` the drawing of its outline, `m` the mark maker. A style that asks for none gives none.
  */
-export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner, dotAt, viewer }) {
+export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner, dotAt, viewer, smarks = new Map() }) {
   const l = X - n.w / 2, r = X + n.w / 2, t = Y - n.h / 2, b = Y + n.h / 2, ended = phase === 'finished' || phase === 'ended';
   const bevel = n.bevel ?? 0, round = n.shape === 'pill' ? n.h / 2 : bevel, out = { under: [], over: [] };
   if (g.fill === 'stratum' && !ended) out.under.push(addClass(outline(n.shape, X, Y + z('slab'), n.w, n.h, corner, n.bevel), 'lf-slab'));
@@ -184,10 +186,11 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
     if (holders.length) {
       const left = /^(hexagon|roundstart)$/.test(n.shape) ? n.bevel : 0, hs = z('who'), pad = z('who_pad'), mk = z('who_mark'), top = Y + n.h / 2 + z('who_gap'), x0 = l + left + z('who_inset');
       const said = `${word === 'waiting' ? 'waits on ' : ''}${whoText(holders, z('who_most'))}`, wide = Math.min(2 * pad + mk + pad + said.length * z('who_char'), n.w - left - 2 * z('who_inset'));
-      out.over.push(m('g', {}, m('title', {}, `${word === 'waiting' ? 'Waits on ' : ''}${holders.map((h) => h.full).join(', ')}`),
+      out.over.push(m('g', { class: holders[0].dormant ? 'lf-who-dormant' : '' }, m('title', {}, `${word === 'waiting' ? 'Waits on ' : ''}${holders.map((h) => h.full).join(', ')}`),
         m('path', { class: 'lf-who-hanger', d: `M${x0 + pad} ${top - z('who_gap')}V${top}M${x0 + wide - pad} ${top - z('who_gap')}V${top}` }),
         m('rect', { class: 'lf-who', x: x0, y: top, width: wide, height: hs, rx: 2 }),
-        holders[0].kind === 'session' ? m('rect', { class: 'lf-who-mark', x: x0 + pad, y: top + hs / 2 - mk / 2, width: mk, height: mk }) : m('circle', { class: 'lf-who-mark', cx: x0 + pad + mk / 2, cy: top + hs / 2, r: mk / 2 }),
+        // A session's mark is its state's, as the sessions pack's session_marks draw it (a ring idle, a half disc working...); a person's a dot.
+        holders[0].kind === 'session' ? (smarks.get(holders[0].state) ? stateMark(m, holders[0].state, smarks.get(holders[0].state), x0 + pad + mk / 2, top + hs / 2, mk / 2) : m('rect', { class: 'lf-who-mark', x: x0 + pad, y: top + hs / 2 - mk / 2, width: mk, height: mk })) : m('circle', { class: 'lf-who-mark', cx: x0 + pad + mk / 2, cy: top + hs / 2, r: mk / 2 }),
         m('text', { class: `lf-who-text${holders[0].you ? ' lf-who-you' : ''}`, x: x0 + 2 * pad + mk, y: top + hs / 2 }, said)));
     }
     if (word === 'trouble') out.over.push(m('path', { class: 'lf-cross', d: crossPath(l + (/^(hexagon|forward|roundstart)$/.test(n.shape) ? n.bevel : 0) + z('sign_margin'), Y - size / 2, size) }));

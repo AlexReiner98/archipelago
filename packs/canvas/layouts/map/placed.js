@@ -68,10 +68,13 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     const unplaced = rest.filter((n) => !cellBy.get(n.id)), taken = new Set(rest.filter((n) => cellBy.get(n.id)).map((n) => String(cellBy.get(n.id))));
     const block = unplaced.length ? blockOf(unplaced, m, columns(rest.length, args.aspect, cw, ch), [cw, ch], taken) : [];
     // Each box in the middle of its cell, so a column of mixed kinds (a decision is wider than a task) keeps one line.
-    const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + (cw - GAP) / 2), y.set(n.id, ly + dy + r * ch + (ch - GAP) / 2));
+    // Each row is as tall as the tallest box in it and no taller (a box with room of its own, a plate hung under it, makes only its row taller); a row nothing stands in keeps the height of the tallest.
+    const cells = [...block, ...rest.filter((n) => cellBy.get(n.id)).map((n) => [n, cellBy.get(n.id)])], rowH = new Map();
+    for (const [n, [, r]] of cells) rowH.set(r, Math.max(rowH.get(r) ?? 0, n.h));
+    const high = (r) => rowH.get(r) ?? ch - GAP, rowTop = (r) => Array.from({ length: r }, (_, q) => high(q) + GAP).reduce((sum, v) => sum + v, 0);
+    const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + (cw - GAP) / 2), y.set(n.id, ly + dy + rowTop(r) + high(r) / 2));
     // Row by row across the block, what is linked together kept together (blockOf).
-    for (const [n, cell] of block) at(n, cell);
-    for (const n of rest) if (cellBy.get(n.id)) at(n, cellBy.get(n.id));
+    for (const [n, cell] of cells) at(n, cell);
     // Over the rest it stands in the middle of their width; in the corner, first.
     const wide = Math.max(fn?.w ?? 0, ...rest.map((n) => x.get(n.id) + n.w / 2 - lx));
     if (fn) x.set(fn.id, fat === 'top' ? lx + wide / 2 : lx + fn.w / 2), y.set(fn.id, ly + fn.h / 2);

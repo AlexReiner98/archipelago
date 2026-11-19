@@ -52,7 +52,7 @@ export function holdersOf(item, word, viewer) {
   if (word !== 'under_way') return [];
   const owner = item.owner && !named.some((h) => h.id === item.owner) ? [person({ id: item.owner, name: 'owner' })] : [];
   return [
-    ...(Array.isArray(item.sessions) ? item.sessions : []).map((s) => ({ kind: 'session', name: String(s.title ?? 'a session'), full: `${s.title ?? 'A session'} (session)` })),
+    ...(Array.isArray(item.sessions) ? item.sessions : []).map((s) => ({ kind: 'session', name: String(s.title ?? 'a session'), full: `${s.title ?? 'A session'} (session)`, state: s.state, dormant: Boolean(s.dormant) })),
     ...named.filter((h) => h.how !== 'waits').map(person), ...owner,
   ];
 }

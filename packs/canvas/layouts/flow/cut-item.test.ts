@@ -276,3 +276,82 @@ test('pass 12: a board with a plate has room for it, and no plate overlaps anoth
   assert.ok(plate.bottom <= at('e_aaaaaaaa').y + at('e_aaaaaaaa').h / 2);
   for (const a of scene.places) for (const b of scene.places) if (a.id < b.id) assert.ok(Math.abs(a.x - b.x) * 2 >= a.w + b.w - 1e-6 || Math.abs(a.y - b.y) * 2 >= a.h + b.h - 1e-6, `${a.id} ${b.id} overlap`);
 });
+
+test('pass 13: the plate carries the session, with its state\'s mark, and the old tag stays only where there is no plate', async () => {
+  const { copyFileSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { pathToFileURL } = await import('node:url');
+  const root = join(import.meta.dirname, '..', '..'), laid = mkdtempSync(join(tmpdir(), 'pelago-tags-'));
+  for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(root, file as string), join(laid, name));
+  const [{ sessionRings }, { holdersOf }] = await Promise.all(['session-ring.js', 'waymark.js'].map((n) => import(pathToFileURL(join(laid, n)).href)));
+  const m = (tag: string, attrs: any = {}, ...kids: any[]) => [tag, attrs, ...kids], style = { sizes: { flow_session_tag_text: 11, flow_session_tag_lift: 4 }, numbers: { session_tag_letters: 30, session_tag_leading: 1.2 } };
+  const item = { id: 'e_x', title: 'An item', sessions: [{ run: 'e_r', title: 'Round 5, lane 1', state: 'working', hue: '#ff0000', dormant: true }] };
+  const rings = (noTag: boolean) => JSON.stringify(sessionRings({ item, shape: 'flag', x: 0, y: 0, w: 100, h: 30, corner: 6, bevel: 9, z: () => 4, outline: () => m('path'), m, style, noTag }));
+  assert.match(rings(false), /lf-sr-tag/);
+  assert.doesNotMatch(rings(true), /lf-sr-tag/);
+  assert.match(rings(true), /lf-sr-ff0000/, 'the ring stays');
+  assert.deepEqual(holdersOf(item, 'under_way', undefined).map((h: any) => [h.state, h.dormant]), [['working', true]]);
+});
+
+test('pass 13: rows of plated boards, close together, never overlap', async () => {
+  const { copyFileSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { pathToFileURL } = await import('node:url');
+  const root = join(import.meta.dirname, '..', '..'), laid = mkdtempSync(join(tmpdir(), 'pelago-dense-'));
+  for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(root, file as string), join(laid, name));
+  const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
+  const w = preset('canvas.waymark').props, style = { ...house, ...w, shape: 'flow', sizes: { ...house.sizes, ...w.sizes } };
+  const sessions = [{ run: 'e_r1', title: 'Round 5, lane 1', state: 'working', hue: '#ff0000', dormant: false, fresh: 1 }];
+  const t = (id: string, plated: boolean) => ({ id, type: 'task', is: ['work'], title: `Item ${id.slice(-1)} with a longer name`, open: true, status: 'doing', phase: 'under_way', ...(plated && { sessions }) });
+  const ids = ['e_aaaaaaaa', 'e_bbbbbbbb', 'e_cccccccc', 'e_dddddddd', 'e_eeeeeeee', 'e_ffffffff', 'e_gggggggg'];
+  const items = ids.map((id, k) => t(id, k % 2 === 0)), links = [['b', 'a'], ['c', 'a'], ['d', 'b'], ['e', 'b'], ['e', 'c'], ['f', 'd'], ['g', 'e']].map(([f, to], k) => ({ id: `r_${k}`, type: 'depends_on', from: `e_${f.repeat(8)}`, to: `e_${to.repeat(8)}` }));
+  const measure = (s: string, px: number) => s.length * px * 0.55;
+  for (const [width, height] of [[600, 400], [1020, 700], [1400, 500]]) {
+    const { scene } = picture({ answer: { items, links }, style, width, height }, { measure });
+    for (const a of scene.places) for (const b of scene.places) if (a.id < b.id) assert.ok(Math.abs(a.x - b.x) * 2 >= a.w + b.w - 1e-6 || Math.abs(a.y - b.y) * 2 >= a.h + b.h - 1e-6, `${width}x${height}: ${a.id} ${b.id} overlap`);
+    const plated = new Set(ids.filter((_, k) => k % 2 === 0)), board = house.sizes.flow_board_height, room = house.sizes.flow_who + house.sizes.flow_who_gap;
+    for (const p of scene.places) if (plated.has(p.id)) assert.ok(p.h >= board + 2 * room - 1e-6, `${p.id} has its room`);
+  }
+});
+
+test('pass 13: rows of a grid are only as far apart as they need: a plate makes only its own row taller', async () => {
+  const { copyFileSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { pathToFileURL } = await import('node:url');
+  const root = join(import.meta.dirname, '..', '..'), laid = mkdtempSync(join(tmpdir(), 'pelago-grid-'));
+  for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(root, file as string), join(laid, name));
+  const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
+  const w = preset('canvas.waymark').props, style = { ...house, ...w, shape: 'flow', sizes: { ...house.sizes, ...w.sizes } };
+  const sessions = [{ run: 'e_r1', title: 'Round 5, lane 1', state: 'working', hue: '#ff0000', dormant: false, fresh: 1 }];
+  const ids = Array.from({ length: 12 }, (_, k) => `e_${String.fromCharCode(97 + k).repeat(8)}`);
+  const items = ids.map((id, k) => ({ id, type: 'task', is: ['work'], title: 'A name', open: true, status: 'doing', phase: 'under_way', ...(k === 0 && { sessions }) }));
+  const { scene } = picture({ answer: { items, links: [] }, style, width: 800, height: 600 }, { measure: (s: string, px: number) => s.length * px * 0.55 });
+  const rows = [...new Set(scene.places.map((p: any) => Math.round(p.y)))].sort((a: any, b: any) => a - b) as number[];
+  const board = house.sizes.flow_board_height, gap = house.sizes.flow_node_gap, room = house.sizes.flow_who + house.sizes.flow_who_gap;
+  assert.ok(rows.length >= 3, 'a grid of several rows');
+  // The rows without a plate are one board and a gap apart; only the first row is taller.
+  const pitches = rows.slice(1).map((y, k) => y - rows[k]);
+  assert.ok(pitches.slice(1).every((p) => Math.abs(p - (board + gap)) < 1), `plain rows ${pitches.join(', ')}`);
+  assert.ok(Math.abs(pitches[0] - (board + gap + room)) < 1, `the plated row ${pitches[0]}`);
+});
+
+test('pass 13: on a focus island too, only a row with a plate is taller', async () => {
+  const { copyFileSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { pathToFileURL } = await import('node:url');
+  const root = join(import.meta.dirname, '..', '..'), laid = mkdtempSync(join(tmpdir(), 'pelago-focus-'));
+  for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(root, file as string), join(laid, name));
+  const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
+  const w = preset('canvas.waymark').props, style = { ...house, ...w, shape: 'flow', sizes: { ...house.sizes, ...w.sizes } };
+  const sessions = [{ run: 'e_r1', title: 'Round 5, lane 1', state: 'working', hue: '#ff0000', dormant: false, fresh: 1 }];
+  const ids = Array.from({ length: 12 }, (_, k) => `e_${String.fromCharCode(97 + k).repeat(8)}`);
+  const items = ids.map((id, k) => ({ id, type: 'task', is: ['work'], title: 'A name', open: true, status: 'doing', phase: 'under_way', island: 'e_isleisle', ...(k === 0 && { sessions }) }));
+  const answer = { items, links: [], islands: [{ id: 'e_isleisle', title: 'Isle', focus: true, style: { focus: { at: 'cell' } } }] };
+  const { scene } = picture({ answer, style, width: 800, height: 600 }, { measure: (s: string, px: number) => s.length * px * 0.55 });
+  const rows = [...new Set(scene.places.map((p: any) => Math.round(p.y)))].sort((a: any, b: any) => a - b) as number[];
+  const board = house.sizes.flow_board_height, gap = house.sizes.flow_node_gap, room = house.sizes.flow_who + house.sizes.flow_who_gap;
+  const pitches = rows.slice(1).map((y, k) => y - rows[k]);
+  assert.ok(pitches.length >= 2);
+  assert.ok(pitches.slice(1).every((p) => Math.abs(p - (board + gap)) < 1), `plain rows ${pitches.join(', ')}`);
+  assert.ok(Math.abs(pitches[0] - (board + gap + room)) < 1, `the plated row ${pitches[0]}`);
+});
