@@ -79,7 +79,15 @@ export function itemRules(style) {
     rules.push('.lf-dot-check { fill: none; stroke: var(--ln-land); stroke-width: var(--ln-flow-stroke); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
     rules.push('.lf-tick { fill: none; stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
   }
-  if (g.ridge) rules.push('.lf-step .lf-ridge { stroke: none; pointer-events: none; } .lf-step .lf-ridge-ink { fill: none; stroke: var(--ln-text); stroke-width: var(--ln-flow-ridge-ink); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-rc-island { fill: var(--lf-island, var(--ln-text)); }');
+  if (g.ridge) {
+    rules.push('.lf-step .lf-ridge { stroke: none; pointer-events: none; } .lf-step .lf-ridge-ink { fill: none; stroke: var(--lf-ink, var(--ln-text)); stroke-width: var(--ln-flow-ridge-ink); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-rc-island { fill: var(--lf-island, var(--ln-text)); }');
+    // The step's outline is the mountain's ink and its ground line, and its name: what hover, here, focus and you light.
+    rules.push('.lf-step.ridged text { text-anchor: middle; } .lf-step.ridged .lf-shape { fill: none; }');
+    shape(`.ridged${PLAIN}`, 'stroke: var(--ln-line); stroke-width: var(--ln-flow-stroke);');
+    rules.push('.lf-step.ridged:is(:hover, :focus) .lf-ridge-ink { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); } .lf-step.ridged:is(:hover, :focus) text { font-weight: 700; }');
+    rules.push('.lf-step.ridged.you .lf-ridge-ink { stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke-lit); } .lf-step.ridged.you text { fill: var(--ln-you); }');
+    rules.push('.lf-step.ridged.here .lf-ridge-ink { stroke: var(--accent, var(--ln-text)); stroke-width: var(--ln-flow-stroke-lit); } .lf-step.ridged.here text { fill: var(--accent, var(--ln-text)); }');
+  }
   if (Object.keys(g.marks).length) rules.push('.lf-step .lf-glyph { fill: var(--ln-muted); font-size: var(--ln-flow-glyph-text); font-family: var(--ln-font); text-anchor: end; dominant-baseline: middle; pointer-events: none; }');
   if (g.text.face === 'display') rules.push('.lf-step text { font-family: var(--type-heading-family, var(--face-chart, var(--ln-font))); font-weight: var(--type-heading-weight, 400); }');
   if (g.text.weight === 'phase') {
@@ -122,10 +130,9 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
   }
   if (g.ink === 'skyline') out.over.push(m('path', { class: 'lf-skyline', d: skyline(n, X, Y, round) }));
   if (g.ridge && n.shape === 'ridge') {
-    // The name is under the ridge, on the land, as a map labels a peak: the mountain stands on a base above its lines.
-    const name = (n.lines?.length ?? 1) * n.line + z('ridge_name_lift') + z('ridge_gap'), base = b - name, side = z('ridge_side');
+    // No box: the mountain stands on its ground line, which is the middle of the step (wires land on its ends), the name under it.
     const form = ((own) => g.ridge.forms[own] ?? Object.values(g.ridge.forms)[0] ?? {})(lineageOf(item).map((t) => g.ridge.types[t]).find(Boolean));
-    const made = ridgeMarks({ id: item.id, x0: l + side, x1: r - side, base, hgt: base - t - z('ridge_top'), form, phase, mode: g.ridge.mode, ways: g.ridge.ways, island: g.ridge.island, m, cols: z('ridge_cols'), bands: z('ridge_bands') });
+    const made = ridgeMarks({ id: item.id, x0: l + z('ridge_side'), x1: r - z('ridge_side'), base: Y, hgt: z('ridge_rise'), form, phase, mode: g.ridge.mode, ways: g.ridge.ways, island: g.ridge.island, m, cols: z('ridge_cols') });
     out.over.push(...made.marks);
     out.rules = made.rules;
   }

@@ -12,7 +12,7 @@ const pack = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'pack
 const house = pack.styles.find((s: any) => s.id === 'core.house').props;
 const m = (tag: string, attrs: any = {}, ...kids: any[]) => [tag, attrs, ...kids];
 const ways = colourWays(house.ridge_palettes.faroe);
-const draw = (id: string, phase: string, mode = 'bands', form = house.ridge_forms.rajaAmpat) => ridgeMarks({ id, x0: 0, x1: 100, base: 50, hgt: 40, form, phase, mode, ways, island: false, m, cols: 22, bands: 3 });
+const draw = (id: string, phase: string, mode = 'bands', form = house.ridge_forms.rajaAmpat) => ridgeMarks({ id, x0: 0, x1: 100, base: 50, hgt: 40, form, phase, mode, ways, island: false, m, cols: 22 });
 
 test('a profile is the same each time, and differs by item and by form', () => {
   const a = profile(house.ridge_forms.faroe, seedOf('e_aaaaaaaa'), 22);
@@ -24,7 +24,8 @@ test('a profile is the same each time, and differs by item and by form', () => {
 
 test('a karst tower has a flat top and a reef is low with a hollow middle', () => {
   const tower = profile(house.ridge_forms.rajaAmpat, 1, 22), reef = profile(house.ridge_forms.maldives, 1, 22);
-  assert.ok(tower.filter((h: number) => h >= Math.max(...tower) - 1e-9).length > 3);
+  assert.ok(tower.filter((h: number) => h >= Math.max(...tower) - 1e-9).length > 2);
+  assert.equal(tower[0], 0);
   assert.ok(reef[11] < Math.max(...reef));
 });
 
@@ -52,5 +53,5 @@ test('the house style holds the data a ridge reads, and the presets use it', () 
   for (const t of ['task', 'work', 'question', 'aim', 'record', 'occurrence', 'place', 'actor', 'system']) assert.ok(house.ridge_forms[house.type_forms[t]], t);
   for (const k of ['faroe', 'galapagos', 'svalbard']) assert.ok(house.ridge_palettes[k].colours.length >= 9, k);
   for (const id of ['canvas.ridge_items_bands', 'canvas.ridge_items_emerge', 'canvas.ridge_items_hue']) assert.ok(pack.styles.find((s: any) => s.id === id)?.props.ridge_state, id);
-  for (const k of ['flow_ridge_height', 'flow_ridge_name_lift', 'flow_ridge_gap', 'flow_ridge_side', 'flow_ridge_top', 'flow_ridge_cols', 'flow_ridge_bands', 'flow_ridge_ink']) assert.ok(k in house.sizes, k);
+  for (const k of ['flow_ridge_height', 'flow_ridge_rise', 'flow_ridge_name_gap', 'flow_ridge_side', 'flow_ridge_cols', 'flow_ridge_ink']) assert.ok(k in house.sizes, k);
 });

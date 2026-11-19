@@ -25,20 +25,23 @@ function noise(seed) {
 const clamp = (v, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
 
 /**
- * The heights (0 to about 1) of a landform across `cols` columns. `form`: rise, rugged, step, soft, top, cliff, atoll
- * as Ridges' FORMS, and `summits` (how many peaks), `levels` (steps in the height at step 1).
+ * The heights (0 to about 1) of a landform across `cols` columns. `form`: Ridges' FORMS dials (rise, rugged, step, soft,
+ * top, atoll) and this one's: `span` (the share of the width the land takes, the rest ground), `power` (how sheer its
+ * sides: low a sharp summit, high a flat-topped tower), `skew` (a cliff on one side), `summits`, `levels` (steps at step 1).
  */
 export function profile(form, seed, cols) {
-  const f = { rise: 1, rugged: 0, step: 1, soft: 0, top: 0, cliff: 0, summits: 1, levels: 2 ** 3, ...form }, n = noise(seed), phase = (seed % 97) / 97 * Math.PI;
+  const f = { rise: 1, rugged: 0, step: 1, soft: 0, top: 0, summits: 1, span: 1, power: 2, skew: 0, levels: 2 ** 3, ...form }, n = noise(seed), phase = (seed % 97) / 97 * Math.PI;
   const levels = Math.max(2, Math.round(f.levels / f.step)), blend = clamp(0.4 + f.soft * 1.5);
   return Array.from({ length: cols }, (_, i) => {
-    const t = cols > 1 ? i / (cols - 1) : 0.5;
-    let e = Math.sin(Math.PI * t) ** (1 - f.cliff * 0.75);
-    if (f.summits > 1) e *= 0.62 + 0.38 * Math.abs(Math.sin(f.summits * Math.PI * t + phase));
-    let h = e * (1 + f.rugged * (n(t * 6 + 1) - 0.5) * 1.6);
+    const t = cols > 1 ? i / (cols - 1) : 0.5, u = (t - (1 - f.span) / 2) / f.span;
+    if (u < 0 || u > 1) return 0;
+    const w = u ** (1 + f.skew);
+    let e = 1 - Math.abs(2 * w - 1) ** f.power;
+    if (f.summits > 1) e *= 0.62 + 0.38 * Math.abs(Math.sin(f.summits * Math.PI * w + phase));
+    let h = e * (1 + f.rugged * (n(w * 6 + 1) - 0.5) * 1.6);
     if (f.top > 0) { const c = 1 - f.top * 0.45; h = Math.min(h, c) / c; }
-    if (f.atoll) h *= 1 - 0.7 * Math.exp(-(((t - 0.5) / 0.18) ** 2));
-    h = clamp(h * f.rise, 0, 1.3);
+    if (f.atoll) h *= 1 - 0.85 * Math.exp(-(((w - 0.5) / 0.14) ** 2));
+    h = clamp(h * f.rise, 0, 1.4);
     const q = Math.round(h * levels) / levels;
     return q + (h - q) * blend;
   });
@@ -82,32 +85,38 @@ export function bandsOf(ways, phase) {
 }
 
 /**
- * The marks of one item: its mountain over the box `x0..x1`, standing on `base`, up to `hgt` tall. `mode` is `bands` or
- * `emerge`; `ways` the palette's (colourWays), or null for the island's own hue as the accent. A colour is a class with a rule of
- * its own (`rules`), as the flow does its link colours: a drawing sets no style on a mark.
+ * The marks of one item: its mountain over `x0..x1`, standing on the ground line `base`, up to `hgt` tall. Two or three
+ * profiles overlap back to front (the main peak, foothills in front of it), each a flat palette colour with the inked
+ * outline, as Ridges layers its rows. `mode` is `bands` (the colours by state, a snow cap finished) or `emerge` (an
+ * accent ridge behind a neutral one, risen by progress); `ways` the palette's (colourWays), `island` the island's own hue as the
+ * accent. A colour is a class with a rule of its own (`rules`): a drawing sets no style on a mark.
  */
-export function ridgeMarks({ id, x0, x1, base, hgt, form, phase, mode, ways, island, m, cols, bands }) {
-  const seed = seedOf(id), heights = profile(form, seed, cols), rules = new Set();
+export function ridgeMarks({ id, x0, x1, base, hgt, form, phase, mode, ways, island, m, cols }) {
+  const seed = seedOf(id), main = profile(form, seed, cols), rules = new Set(), marks = [];
   const cls = (hex, prefix = 'lf-rc') => {
     if (!hex) return `${prefix}-island`;
     const c = `${prefix}-${hex.slice(1).toLowerCase()}`;
     rules.add(`.${c} { fill: ${hex}; }`);
     return c;
   };
-  const pale = ways?.pale ?? [], marks = [];
+  // One layer: its colour class and its heights, filled and then inked.
+  const layer = (heights, scale, colour, extra = '') => marks.push(m('path', { class: `lf-ridge ${colour} ${extra}`.trim(), d: steps(heights, x0, x1, base, hgt * scale) }), m('path', { class: 'lf-ridge-ink', d: skyline(heights, x0, x1, base, hgt * scale) }));
+  const foot = (k, rise, summits) => profile({ ...form, rise, span: 1, power: 2, summits, rugged: 0.4, top: 0, atoll: false, skew: 0 }, seed + k, cols);
+  const grey = ways?.neutral ?? [], ended = phase === 'finished' || phase === 'ended';
   if (mode === 'emerge') {
-    // Progress: hidden not started, about half risen under way, clear above when finished; a neutral ridge in front.
+    // Progress: hidden not started, about half risen under way, clear above the front ridge when finished.
     const rise = { not_started: 0, under_way: 0.55, finished: 1.15, ended: 1.15, trouble: 0.8 }[phase] ?? 0;
-    const grey = ways?.neutral ?? [];
-    if (rise > 0) marks.push(m('path', { class: `lf-ridge lf-ridge-back ${ways && !island ? cls(ways.accent) : 'lf-rc-island'}`, d: steps(heights, x0, x1, base, hgt * rise) }));
-    marks.push(m('path', { class: `lf-ridge lf-ridge-front ${cls(grey[grey.length - 1])}`, d: steps(heights.map((h) => h * 0.8), x0, x1, base, hgt * 0.72) }));
-    marks.push(m('path', { class: 'lf-ridge-ink', d: skyline(heights.map((h) => h * 0.8), x0, x1, base, hgt * 0.72) }));
+    if (rise > 0) layer(main, rise, ways && !island ? cls(ways.accent) : 'lf-rc-island', 'lf-ridge-back');
+    layer(main.map((h) => h * 0.8), 0.72, cls(grey[grey.length - 1]), 'lf-ridge-front');
+    layer(foot(1, 0.35, 1 + 1), 0.4, cls(grey[Math.max(0, grey.length - 2)]), 'lf-ridge-foot');
     return { marks, rules: [...rules] };
   }
-  const colours = ways ? bandsOf(ways, phase) : pale;
-  colours.forEach((hex, k) => marks.push(m('path', { class: `lf-ridge ${cls(hex)}`, d: steps(heights, x0, x1, base, hgt * (1 - (k / bands) * 0.55)) })));
+  const colours = ways ? bandsOf(ways, phase) : [];
+  const [back = '', mid = '', front = ''] = colours.map((hex) => cls(hex));
+  layer(main, 1, back);
   // A snow cap on what is finished: the top of the summit in the palette's paper.
-  if (ways && (phase === 'finished' || phase === 'ended')) marks.push(m('path', { class: `lf-ridge lf-ridge-cap ${cls(ways.paper, 'lf-rp')}`, d: ((c) => steps(heights.map((h) => Math.max(0, h - c)), x0, x1, base - c * hgt, hgt))(0.78 * Math.max(...heights)) }));
-  marks.push(m('path', { class: 'lf-ridge-ink', d: skyline(heights, x0, x1, base, hgt) }));
+  if (ways && ended) marks.splice(marks.length - 1, 0, m('path', { class: `lf-ridge lf-ridge-cap ${cls(ways.paper, 'lf-rp')}`, d: ((c) => steps(main.map((h) => Math.max(0, h - c)), x0, x1, base - c * hgt, hgt))(0.78 * Math.max(...main)) }));
+  layer(foot(1, 0.5, 1 + 2), 0.62, mid);
+  layer(foot(1 + 1, 0.26, 1 + 1), 0.4, front);
   return { marks, rules: [...rules] };
 }
