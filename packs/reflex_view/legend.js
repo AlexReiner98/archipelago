@@ -29,3 +29,19 @@ export function legendOps({ view, entry, on, style, filter, walk, limit }, kept)
   const query = { ...(filter && typeof filter === 'object' && { filter }), ...(walk && typeof walk === 'object' && { walk }), ...(Number.isInteger(limit) && { limit }) };
   return { ops: [{ op: 'create', type: 'lens', title: typeof drawn.title === 'string' ? drawn.title : 'Reflex tree', props: { preset: view, ...query, style: { ...drawn, hidden: toggled(drawn.hidden, entry, on) } } }] };
 }
+
+/** The longest a node's name may be: a name is a few words. */
+const TITLE_MOST = 60;
+
+/**
+ * A node added on a branch of the tree: a trial reflex said where the branch is (for), named as the person typed it,
+ * its words what they said or, with none, its name. Whether its place is one that is said is the reflex pack's rule.
+ */
+export function addNodeOps({ for: where, title, body }) {
+  const name = String(title ?? '').trim();
+  if (!name) throw new Error('A node is named: what to say there, in a few words');
+  if (name.length > TITLE_MOST) throw new Error(`A node's name is ${TITLE_MOST} characters at most (this is ${name.length}): say the rest in its words`);
+  if (typeof where !== 'string' || !where.trim()) throw new Error('for is the place the node is said at, as the branch names it');
+  const words = String(body ?? '').trim() || name;
+  return { ops: [{ op: 'create', type: 'reflex', status: 'trial', title: name, body: words, props: { for: [where.trim()] } }] };
+}
