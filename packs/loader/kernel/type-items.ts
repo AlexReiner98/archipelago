@@ -8,7 +8,7 @@ import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 import { followMade } from './packstate.ts';
 import { syncTypes } from './typetable.ts';
 import { judgeExamples } from './rule-check.ts';
-import { systemKinds } from './pack-source.ts';
+import { isSystem, systemKinds, systemWhere, wholeKinds } from './pack-source.ts';
 import { rebuildRegistry, systemItems } from './registry-log.ts';
 
 /** What the registry reads from the map (packs/loader/kernel/pack-source.ts): types, link types, and packs made there (packs/loader/kernel/pack-items.ts). */
@@ -49,14 +49,15 @@ export const typeItems = (l: Archipelago): Promise<TypeItem[]> => systemItems(l)
 export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
   const reg = l.registry;
   const ids = ops.flatMap((op) => ('id' in op && typeof op.id === 'string' && op.op !== 'forget' ? [op.id] : []));
-  const { rows: touched } = ids.length ? await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and type = any($2::text[])`, [ids, kinds()]) : { rows: [] };
+  const { rows: touched } = ids.length ? await l.db.query<{ id: string }>(`select id from entity e where e.id = any($1::text[]) and e.type = any($2::text[]) and ${systemWhere('e', '$3', '$2', '$4', '$5')}`, [ids, kinds(), wholeKinds(), reg.relationFamily('part_of'), PACK_ITEM]) : { rows: [] };
   const ours = new Set(touched.map((r) => r.id));
-  if (!ours.size && !ops.some((op) => op.op === 'create' && kinds().includes(op.type))) return reg;
+  const made = (op: Op): op is Op & { op: 'create'; type: string } => op.op === 'create' && isSystem(op.type, op.props); // a system item this change makes
+  if (!ours.size && !ops.some(made)) return reg;
   const items = new Map((await typeItems(l)).map((i) => [i.id, i]));
   const restored = ops.flatMap((op) => (op.op === 'restore' && ours.has(op.id) ? [op.id] : []));
   const { rows: back } = restored.length ? await l.db.query<TypeItem>(`select id, type, title, body, is_open, ${l.props} from entity where id = any($1::text[])`, [restored]) : { rows: [] };
   for (const [i, op] of ops.entries()) {
-    if (op.op === 'create' && kinds().includes(op.type)) {
+    if (made(op)) {
       const key = op.ref ?? `#${i + 1}`;
       items.set(key, { id: key, type: op.type, title: op.title, body: op.body ?? '', is_open: reg.isOpen(op.type, op.status ?? 'current'), props: op.props ?? {} });
     } else if (op.op === 'update' && items.has(op.id)) {
@@ -73,7 +74,7 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
     throw new Error(`Change rejected:\n- the types it makes or changes: ${(err as Error).message}`);
   }
   // The registry leaves a workspace's own type that does not resolve to the type table (its pack turned off); one this change makes must resolve.
-  const written = ops.flatMap((op, i) => (op.op === 'create' && kinds().includes(op.type) ? [items.get(op.ref ?? `#${i + 1}`)!] : op.op === 'update' && items.has(op.id) ? [items.get(op.id)!] : []));
+  const written = ops.flatMap((op, i) => (made(op) ? [items.get(op.ref ?? `#${i + 1}`)!] : op.op === 'update' && items.has(op.id) ? [items.get(op.id)!] : []));
   const named = written.filter((i) => i.type !== PACK_ITEM);
   const packs = written.filter((i) => i.type === PACK_ITEM);
   const wrong = packs.flatMap((i) => (trial.madeWrong.has(i.id) ? [`the pack ${String(i.props.name ?? i.title)}: ${trial.madeWrong.get(i.id)}`] : []));
@@ -121,4 +122,4 @@ export async function typesTaken(l: Archipelago, besides: TypeItem[] = []): Prom
 
 /** A backup's type items: its own types (a name, no preset) are what its items may need. */
 export const typeItemsIn = (rows: Record<string, unknown>[]): TypeItem[] =>
-  rows.filter((r) => kinds().includes(r.type as string) && !r.archived_at).map((r) => ({ id: r.id as string, type: r.type as string, title: r.title as string, body: (r.body as string) ?? '', is_open: r.is_open !== false, props: (r.props as Record<string, unknown>) ?? {} }));
+  rows.filter((r) => isSystem(r.type as string, r.props as Record<string, unknown> | undefined) && !r.archived_at).map((r) => ({ id: r.id as string, type: r.type as string, title: r.title as string, body: (r.body as string) ?? '', is_open: r.is_open !== false, props: (r.props as Record<string, unknown>) ?? {} }));

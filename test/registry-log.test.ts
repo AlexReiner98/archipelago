@@ -14,6 +14,7 @@ import { setFloor, setPackModel, systemKinds } from '../packs/loader/kernel/pack
 import { manifestRead } from '../packs/loader/kernel/pack-folders.ts';
 import { madePacks } from '../packs/loader/kernel/pack-items.ts';
 import { createHash } from 'node:crypto';
+import { PACK_MODEL } from '../packs/loader/kernel/pack-model.ts';
 
 /** Count the registry's builds from items. */
 const counted = (l: Archipelago) => {
@@ -120,4 +121,25 @@ test('a part is read with the pack it is part_of; the text of a manifest from th
   const shipped = { id: 'e_s', type: 'pack', title: 'Core', body: '', is_open: true, props: { name: 'core', manifest: { id: 'core', version: '1', actions: [] }, shipped: { pack: 'core', version: '1', hash, value: {} } } };
   const out = madePacks([shipped], new Map(), 'local');
   assert.deepEqual([out.packs.length, out.wrong.size], [0, 0], 'neither made nor refused: the model assembles it');
+});
+
+test("under the pack model a map's own lens or instruction is no system item; a pack's shipped part is", async (t) => {
+  t.after(() => setPackModel(undefined));
+  setPackModel(PACK_MODEL);
+  const l = await fresh();
+  await followRegistry(l);
+  const n = counted(l), used = { trials: 0 }, trial = l.registry.trial.bind(l.registry);
+  l.registry.trial = (...a) => (used.trials++, trial(...a));
+  const made = await make(l, [
+    { op: 'create', ref: 'lens', type: 'lens', title: 'Open work', status: 'kept', props: {} },
+    { op: 'create', ref: 'say', type: 'instruction', title: 'Say it plainly', status: 'current', props: { for: ['working_rules'] } },
+  ]);
+  await make(l, [{ op: 'update', id: made.lens, body: 'what is open' }, { op: 'update', id: made.say, body: 'plainly' }]);
+  assert.equal(await followRegistry(l), false, "a map's own: nothing built");
+  assert.deepEqual([n.builds, used.trials], [0, 0], 'no trial registry and no rebuild for them');
+  assert.ok(!(await systemItems(l)).some((i) => i.id === made.lens || i.id === made.say));
+
+  const part = await make(l, [{ op: 'create', ref: 'p', type: 'instruction', title: 'Shipped', status: 'current', props: { declares: 'kit.say', spec: {}, shipped: { pack: 'kit', version: '1', hash: '0', value: { id: 'kit.say' } } } }]);
+  assert.ok(used.trials > 0, "a pack's part is checked as the registry will read it");
+  assert.ok((await systemItems(l)).some((i) => i.id === part.p), "a pack's shipped part is a system item");
 });

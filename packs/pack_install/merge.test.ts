@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mergeOne, plan } from './merge.js';
-import { flat, hashOf, onMap, shipped, unflat } from './shape.js';
+import { flat, hashOf, onMap, openStatus, shipped, unflat } from './shape.js';
+import { readFileSync } from 'node:fs';
 import handler from './handler.js';
 
 type Item = { id: string; type: string; title: string; body?: string; status?: string; props: Record<string, any> };
@@ -176,7 +177,7 @@ test('upgrade: a dropped part is retired, unless the owner changed it; shipped a
   assert.ok(!done.ops.some((o: Op) => ['archive', 'forget'].includes(o.op)), 'nothing is deleted');
   m.apply(done.ops);
   assert.equal(m.items.get(course.id)!.status, 'retired');
-  assert.equal(m.items.get(all.id)!.status, 'current');
+  assert.equal(m.items.get(all.id)!.status, 'kept');
   const back = plan(next('0.3.0'), m.of('recipes'));
   m.apply(back.ops);
   assert.equal(m.items.get(course.id)!.status, 'current', 'the item the pack retired is brought back, not made twice');
@@ -241,4 +242,12 @@ test('the handler reads the pack item and its parts, and answers the plan', asyn
   assert.equal(out.answer.to, '0.2.0');
   assert.deepEqual(asked, [{ items: { type: 'pack', where: { name: 'recipes' } } }, { parts_of: [m.of('recipes')[0].id] }]);
   await assert.rejects(handler['pack_install.install']({}, ctx), /manifest is the pack file/);
+});
+
+test("a part is made with an open status its core type lists", () => {
+  const core = JSON.parse(readFileSync(new URL('../core/pack.json', import.meta.url), 'utf8')) as { types: { id: string; statuses?: { open?: string[] } }[] };
+  for (const type of ['type', 'link_type', 'rule', 'view', 'screen', 'instruction', 'reflex', 'style', 'lens', 'layout', 'part', 'automation']) {
+    const open = core.types.find((t) => t.id === type)?.statuses?.open ?? [];
+    assert.ok(open.includes(openStatus(type)), `${type}: ${openStatus(type)} is not one of ${open.join(', ')}`);
+  }
 });

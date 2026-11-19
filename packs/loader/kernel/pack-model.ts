@@ -173,4 +173,4 @@ export function manifestsOf(items: readonly ModelItem[]): Map<string, { manifest
 }
 
 /** The pack model as the registry's seam takes it (pack-source.ts setPackModel): the item types, and the manifests they make. */
-export const PACK_MODEL = { kinds: MODEL_KINDS, manifests: manifestsOf };
+export const PACK_MODEL = { kinds: MODEL_KINDS, whole: [PACK, 'type', 'link_type'], manifests: manifestsOf };

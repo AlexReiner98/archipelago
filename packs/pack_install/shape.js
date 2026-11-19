@@ -118,8 +118,9 @@ export function onMap(item) {
 /** What an item's shipped becomes for this version. */
 export const stampOf = (ship, part) => ({ pack: ship.id, version: ship.version, hash: hashOf(part.value), value: part.value });
 
-/** The status a part is made with, and takes again when a later version ships it once more. */
-export const openStatus = (type) => (type === 'layout' || type === 'part' ? 'kept' : 'current');
+/** The status a part is made with, and takes again when a later version ships it once more: the open status its core type stands at. */
+const OPEN = { layout: 'kept', part: 'kept', lens: 'kept', automation: 'enabled' };
+export const openStatus = (type) => OPEN[type] ?? 'current';
 
 /** The fields an item is merged by, one value each: title, note, each top-level key of spec, and each of a type's spec.fields. */
 export function flat(item) {

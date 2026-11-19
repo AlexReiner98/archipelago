@@ -8,7 +8,7 @@
 // version of a pack becomes an item of its own is still open (e_ydbb24qj), so nothing here decides it.
 
 import type { Archipelago } from '../../write/kernel/pelago.ts';
-import { systemKinds, type SystemItem } from './pack-source.ts';
+import { systemKinds, systemWhere, wholeKinds, type SystemItem } from './pack-source.ts';
 import { PACK_ITEM } from './pack-items.ts';
 
 /** Where a map's registry was last built from the log: the fact position, the system items' ids, and those items as read. */
@@ -26,7 +26,7 @@ export async function factsHead(l: Archipelago): Promise<number> {
 
 /** The system items on the map now, archived ones left out, in the order they were made; each part with the name of the pack it is part_of, as `pack`. */
 export async function systemItems(l: Archipelago): Promise<SystemItem[]> {
-  const { rows } = await l.db.query<SystemItem>(`select id, type, title, body, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by created_at, id`, [systemKinds()]);
+  const { rows } = await l.db.query<SystemItem>(`select id, type, title, body, is_open, ${l.props} from entity e where type = any($1::text[]) and archived_at is null and ${systemWhere('e', '$2', '$1', '$3', '$4')} order by created_at, id`, [systemKinds(), wholeKinds(), l.registry.relationFamily('part_of'), PACK_ITEM]);
   const parts = rows.filter((r) => r.type !== PACK_ITEM).map((r) => r.id);
   if (!parts.length) return rows;
   const { rows: of } = await l.db.query<{ id: string; pack: string }>(`select r.from_id as id, p.props->>'name' as pack from relation r join entity p on p.id = r.to_id where r.from_id = any($1::text[]) and r.type = any($2::text[]) and p.type = $3 and p.archived_at is null and p.props->>'name' is not null`, [parts, l.registry.relationFamily('part_of'), PACK_ITEM]);
@@ -39,9 +39,10 @@ export async function touchesSystem(l: Archipelago, after: number, upto: number,
   const { rows } = await l.db.query<{ id: string }>(`select distinct id from log_fact where stream = 'facts' and pos > $1 and pos <= $2`, [after, upto]);
   if (rows.some((r) => ids.has(r.id))) return true;
   const items = rows.filter((r) => r.id.startsWith('e_')).map((r) => r.id), links = rows.filter((r) => r.id.startsWith('r_')).map((r) => r.id);
-  const kinds = systemKinds();
-  if (items.length && (await l.db.query(`select 1 from entity where id = any($1::text[]) and type = any($2::text[]) limit 1`, [items, kinds])).rows.length) return true;
-  return links.length > 0 && (await l.db.query(`select 1 from relation r join entity e on e.id = r.from_id or e.id = r.to_id where r.id = any($1::text[]) and e.type = any($2::text[]) limit 1`, [links, kinds])).rows.length > 0;
+  const kinds = [systemKinds(), wholeKinds(), l.registry.relationFamily('part_of'), PACK_ITEM];
+  if (items.length && (await l.db.query(`select 1 from entity e where e.id = any($1::text[]) and e.type = any($2::text[]) and ${systemWhere('e', '$3', '$2', '$4', '$5')} limit 1`, [items, ...kinds])).rows.length) return true;
+  // a link to a system item, or a part_of to a pack's item (it makes a part)
+  return links.length > 0 && (await l.db.query(`select 1 from relation r join entity e on e.id = r.from_id or e.id = r.to_id where r.id = any($1::text[]) and e.type = any($2::text[]) and (${systemWhere('e', '$3', '$2', '$4', '$5')} or (r.type = any($4::text[]) and e.type = $5)) limit 1`, [links, ...kinds])).rows.length > 0;
 }
 
 /** Record the registry as built at `pos` from these items, and take them in when they differ from what it was built from. Says whether it was built again. */

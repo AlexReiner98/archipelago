@@ -22,6 +22,12 @@ export type SystemItem = TypeItem & { pack?: string };
 /** What the pack model says of the system items: their types, and the manifests they make (by pack id, with each one's hash). */
 export interface PackModel {
   kinds: readonly string[];
+  /**
+   * The kinds every item of which the registry is built from (types, link types, packs kept on the map); of the other
+   * kinds, only a pack's parts: an item carrying what it shipped as, or part_of a pack's item. A map's own lens or
+   * instruction makes no manifest, so a change to it rebuilds nothing. Left out, every kind is whole.
+   */
+  whole?: readonly string[];
   /** Each with the text it was hashed from (the hash is its hex SHA-256), which the log keeps as a pack file's. */
   manifests(items: SystemItem[]): Map<string, { manifest: Manifest; hash: string; text?: string }>;
 }
@@ -34,6 +40,16 @@ let model: PackModel = STUB;
 export const setPackModel = (m: PackModel | undefined) => (model = m ?? STUB);
 /** The item types the registry is built from: a change to one of these rebuilds it (packs/loader/kernel/registry-log.ts). */
 export const systemKinds = (): readonly string[] => model.kinds;
+/** The kinds every item of which is a system item (PackModel.whole). */
+export const wholeKinds = (): readonly string[] => model.whole ?? model.kinds;
+/** Whether an item about to be written, of this type and with these props, is a system item (part_of a pack is read from the map: systemWhere). */
+export const isSystem = (type: string, props?: Record<string, unknown>): boolean => wholeKinds().includes(type) || (model.kinds.includes(type) && props?.shipped != null);
+/**
+ * The same as SQL, for the entity row aliased `e`: $whole the whole kinds, $kinds every kind, $partOf the part_of link
+ * family and $pack the pack item's type, each a text[] parameter (or text, for $pack) of the caller's.
+ */
+export const systemWhere = (e: string, whole: string, kinds: string, partOf: string, pack: string): string =>
+  `(${e}.type = any(${whole}::text[]) or (${e}.type = any(${kinds}::text[]) and (${e}.props ? 'shipped' or exists (select 1 from relation sr join entity sp on sp.id = sr.to_id where sr.from_id = ${e}.id and sr.type = any(${partOf}::text[]) and sp.type = ${pack} and sp.archived_at is null))))`;
 
 /** The seed of a registry: the pack files in its folders, read now. The workspace's own types are never a folder's. */
 export const readSeed = (dirs: string[], local: string): Seed => readPackFolders<Manifest>(dirs, local);

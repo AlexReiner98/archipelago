@@ -59,7 +59,7 @@ only the link. A part that is not open is out of its pack's manifest.
 | `shipped` | `{ pack, version, hash, value, dropped? }`: the declaration exactly as the file held it and its hash; `dropped` the version that stopped shipping it (install retires it then, and a later version that ships it again brings it back; one the owner retired stays retired). |
 | `pack_merge` | `both` on a change install offers where the owner and the file changed the same field (below). |
 | `runs` | layout, part: `[{ path, hash }]`, the modules it runs. |
-| status | `current` (`kept` for a layout or part); `retired` when a later version of its pack drops it. |
+| status | `current` (`kept` for a layout, part or lens, `enabled` for an automation); `retired` when a later version of its pack drops it. |
 
 The typed fields a part type had before (a style's colours, a screen's
 `pieces`, a layout's `code`) stay what they were: an owner's version
