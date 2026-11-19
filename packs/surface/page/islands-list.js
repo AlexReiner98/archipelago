@@ -13,6 +13,17 @@ const entry = (v) => typeof v === 'string' && (/^e_[a-z0-9]{8}$/.test(v) || READ
 /** A list as kept: its entries once each, nothing else. */
 export const clean = (v) => (Array.isArray(v) ? [...new Set(v.filter(entry))] : []);
 
+/**
+ * A view kept on the same list, beside the islands (Alex, 19 Nov 2026, e_74ghhvdp): `view:` and a lens's id, or the id
+ * its pack gives a view it ships, which needs no copy on the map to be kept.
+ */
+const VIEW = 'view:';
+const viewEntry = (v) => typeof v === 'string' && /^view:(e_[a-z0-9]{8}|[a-z0-9_]+\.[a-z0-9_.-]+)$/.test(v);
+/** The views a kept list holds, by id, once each, in its order. */
+export const viewsIn = (v) => (Array.isArray(v) ? [...new Set(v.filter(viewEntry).map((x) => x.slice(VIEW.length)))] : []);
+/** The list as kept: the islands and reads, then the views. */
+export const listWith = (islands, views) => [...clean(islands), ...[...new Set(views)].map((id) => `${VIEW}${id}`).filter(viewEntry)];
+
 /** The islands and reads an address's query names (`islands=a,b`), or null when it names none. */
 export const islandsIn = (query) => {
   const named = new URLSearchParams(query ?? '').get('islands');
