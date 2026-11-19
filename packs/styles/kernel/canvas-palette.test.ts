@@ -40,15 +40,40 @@ test('terrain tones stand off the ground, and boards stand off it more', () => {
   }
 });
 
-test('each theme preset changes boards, terrain and wires together, in both schemes', () => {
+const hueOf = (hex: string) => {
+  const [r, g, b] = [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16) / 255), max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (!d) return { hue: 0, chroma: 0 };
+  const h = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { hue: h * 60, chroma: d / max };
+};
+
+test('colour means status, in every palette: blue in progress, red blocked, amber waiting, quiet green done, neutral to do', () => {
+  for (const id of THEMES) for (const scheme of SCHEMES) {
+    const t = finished(id)[scheme], at = (n: string) => hueOf(t[n]);
+    const label = `${id ?? 'default'} ${scheme}`;
+    assert.ok(at('board_active').hue >= 200 && at('board_active').hue <= 235 && at('board_active').chroma >= 0.4, `${label} in progress is a clear blue`);
+    assert.ok((at('board_blocked').hue <= 8 || at('board_blocked').hue >= 352) && at('board_blocked').chroma >= 0.7, `${label} blocked is a saturated red`);
+    assert.ok(at('board_waiting').hue >= 35 && at('board_waiting').hue <= 50 && at('board_waiting').chroma >= 0.8, `${label} waiting is a clear amber`);
+    assert.ok(at('board_done').hue >= 80 && at('board_done').hue <= 160 && at('board_done').chroma < at('board_waiting').chroma, `${label} done is a quieter green`);
+    assert.ok(at('board_todo').chroma <= 0.15, `${label} to do is neutral`);
+    assert.ok(at('you').hue >= 255 && at('you').hue <= 290, `${label} you is violet`);
+  }
+});
+
+test('the land is one quiet neutral step off the sea, in every palette', () => {
+  for (const id of THEMES) for (const scheme of SCHEMES) {
+    const t = finished(id)[scheme], ratio = contrast(t.land_neutral, t.bg);
+    assert.ok(ratio >= 1.15 && ratio <= 1.3, `${id ?? 'default'} ${scheme}: ${ratio.toFixed(2)}`);
+    assert.ok(hueOf(t.land_neutral).chroma <= 0.1, 'no hue to speak of');
+  }
+  assert.deepEqual(waymark.island_hues, ['land_neutral']);
+});
+
+test('the palettes differ in temperament, never in which hue means what', () => {
   const base = finished();
   for (const id of THEMES.slice(1) as string[]) {
     const theme = finished(id);
-    for (const scheme of SCHEMES) {
-      assert.notEqual(theme[scheme].land_1, base[scheme].land_1, `${id} terrain`);
-      assert.notEqual(theme[scheme].board_active, base[scheme].board_active, `${id} boards follow the active role`);
-    }
+    assert.ok(SCHEMES.some((scheme) => ['board_active', 'board_done', 'you', 'wire_ink'].some((n) => theme[scheme][n] !== base[scheme][n])), `${id} differs from the default`);
     assert.equal(style(id).over, 'palette', 'a palette lies over any chosen look, and is chosen alone among palettes');
   }
-  assert.notEqual(finished('canvas.theme_field').light.wire_ink, base.light.wire_ink, 'wires follow the theme');
 });

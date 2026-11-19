@@ -30,8 +30,8 @@ test('the house declares the twelve roles it always gave, and the new ones', () 
 test('the waymark preset draws boards and islands from the theme, never from a hex', () => {
   assert.deepEqual(Object.keys(waymark.board_fills), ['not_started', 'under_way', 'waiting', 'finished', 'trouble']);
   for (const f of Object.values(waymark.board_fills) as any[]) assert.ok(isColour(f.fill) && !f.fill.startsWith('#') && isColour(f.text) && !f.text.startsWith('#'));
-  assert.deepEqual(waymark.island_hues, Array.from({ length: 8 }, (_, k) => `land_${k + 1}`), 'islands cycle the terrain set');
-  assert.ok(parseFloat(waymark.sizes.flow_island_tint) >= 30, 'a fill that can be seen, not 14%');
+  assert.deepEqual(waymark.island_hues, ['land_neutral'], 'every island is one neutral land by default; a terrain may still be named');
+  assert.equal(parseFloat(waymark.sizes.flow_island_tint), 100, 'the neutral land is the step itself, not a tint of a hue');
   assert.equal(waymark.link_colours, undefined, 'wires are ink');
 });
 
