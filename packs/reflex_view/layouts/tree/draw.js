@@ -15,7 +15,7 @@ export const HIDDEN = 1.5;
 const glow = (key, kind) => m('g', { key, class: `rt-glow rt-${kind}`, opacity: 0 }, m('circle', { class: 'rt-g1', r: 1 }), m('circle', { class: 'rt-g2', r: 0.6 }), m('circle', { class: 'rt-g3', r: 0.3 }));
 
 /** The scene's svg, and how many sparks and lights its pools hold. */
-export function marksOf(tree, placed, z, n, shown, named, story, gapped = new Set()) {
+export function marksOf(tree, placed, z, n, shown, named, story, gapped = new Set(), adds = () => null) {
   // A node's tier (core, pack, owner, learned) weighs its branch; its standing (trial, current, retired) marks its dot.
   // A bough takes the tier nearest the trunk of what grows from it.
   const RANK = ['core', 'pack', 'owner', 'learned'];
@@ -34,9 +34,9 @@ export function marksOf(tree, placed, z, n, shown, named, story, gapped = new Se
     const said = pack ? ` \u00b7 ${rule ? `rule, ${rule.effect ?? 'guards'}` : 'instruction'} \u00b7 ${pack}` : '';
     return m(
       'g',
-      { key: `n:${node.id}`, class: `rt-node rt-${standing(node)}${shown(node) ? ' on' : ''}${node.item || node.preset ? '' : ' rt-bough'}${gapped.has(node.id) ? ' rt-gap' : ''}${pack ? ` ${packClass(pack)}` : ''}${rule ? ' rt-rule' : ''}`, ...(node.item && { item: node.item.id, on: ['click', 'enter', 'leave'], role: 'link' }) },
+      { key: `n:${node.id}`, class: `rt-node rt-${standing(node)}${shown(node) ? ' on' : ''}${node.item || node.preset ? '' : ' rt-bough'}${gapped.has(node.id) ? ' rt-gap' : ''}${pack ? ` ${packClass(pack)}` : ''}${rule ? ' rt-rule' : ''}${adds(node) ? ' rt-adds' : ''}`, ...(node.item && { item: node.item.id, on: ['click', 'enter', 'leave'], role: 'link' }), ...(!node.item && adds(node) && { on: ['click'], role: 'button' }) },
       // Its whole name is its tooltip, whether its name shows or gives way.
-      m('title', {}, `${node.title}${said}`),
+      m('title', {}, `${node.title}${said}${adds(node) ? ' · click to add a trial node here' : ''}`),
       m('circle', { class: 'rt-hit', cx: at(p.x), cy: at(p.y), r: z('reflex_hit') }),
       rule ? m('rect', { class: 'rt-dot', x: at(p.x - side / 2), y: at(p.y - side / 2), width: side, height: side }) : m('circle', { class: 'rt-dot', cx: at(p.x), cy: at(p.y), r }),
       label && m('text', { key: `nm:${node.id}`, class: `rt-name${named.has(node.id) ? '' : ' rt-quiet'}`, x: at(spot.x), y: at(spot.y), transform: nameTransform(label, 1, at), 'text-anchor': spot.anchor, 'dominant-baseline': 'middle' }, label.text),

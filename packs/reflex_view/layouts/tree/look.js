@@ -51,6 +51,9 @@ ${level.join('\n')}
 .rt-gap .rt-dot { stroke: ${write}; stroke-width: ${z('reflex_gap_ring')}; stroke-opacity: ${n('reflex_gap_ink')}; }
 ${byPack.join('\n')}
 .rt-rule .rt-dot { fill-opacity: 1; }
+.rt-adds { cursor: copy; }
+.rt-adds:is(:hover, :focus-visible) .rt-dot { fill-opacity: 1; stroke: var(--accent); stroke-width: ${z('reflex_trial_ring')}; }
+.rt-adds:is(:hover, :focus-visible) .rt-name { text-decoration: underline; }
 .rt-light.rt-fired circle { fill: ${fire}; }
 .rt-trail.rt-fired { stroke: ${fire}; }
 .rt-head.rt-fired { fill: ${fire}; }

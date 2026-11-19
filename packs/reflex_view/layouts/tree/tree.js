@@ -99,3 +99,18 @@ export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0
   const born = order.slice(1).sort((a, b) => a.born - b.born || a.depth - b.depth);
   return { root, nodes, order, born, written: born.filter((n) => n.item && isNode(n.item)) };
 }
+
+/** The places a node may be said at by their kind alone, with nothing after it. */
+const PLAIN = ['session_start', 'working_rules', 'server_restarted', 'setup_behind'];
+/**
+ * The place a new node on a bough is said at, or null where none can be (the reflex pack refuses any place that is
+ * never said): a tool's or guide's bough by its name, a rule's by its rule, a deeper rule branch at its tool, a file
+ * folder as every file under it, and the plain places by their kind.
+ */
+export const placeOfBough = (id) => {
+  const key = String(id).replace(/^~for:/, '');
+  const [kind, ...rest] = key.split(':');
+  if (!rest.length) return PLAIN.includes(kind) ? kind : null;
+  if (kind === 'file') return `file:${rest.join(':').replace(/\/?$/, '/')}**`;
+  return ['tool', 'guide', 'rule'].includes(kind) ? `${kind}:${rest[0]}` : null;
+};

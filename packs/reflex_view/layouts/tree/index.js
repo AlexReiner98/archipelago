@@ -8,7 +8,7 @@
 // under reduced motion it stands grown and still. Every length, time and colour is the style's (reflex_* in its
 // sizes, numbers and colors): the view's preset names them all.
 
-import { treeOf } from './tree.js';
+import { placeOfBough, treeOf } from './tree.js';
 import { radial } from './radial.js';
 import { rulesOf, storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
@@ -106,7 +106,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const packs = [...new Set(everyNode.map((x) => x.pack))].sort((a, b) => (a === 'core' ? -1 : b === 'core' ? 1 : 0));
   const hues = packHues(style, packs);
   const happened = { miss: story.misses.length, held: story.said.filter((x) => x.verdict !== 'failed' && x.verdict !== 'came_back').length, failed: story.said.filter((x) => x.verdict === 'failed' || x.verdict === 'came_back').length, fired: story.rules.reduce((sum, r) => sum + r.fired.length, 0) };
-  const toggles = typeof style.sends?.legend === 'string' && typeof tools.act === 'function' && !reduced;
+  const toggles = typeof style.sends?.legend === 'string' && typeof tools.act === 'function';
   const legend = legendOf({ nodes: everyNode, events: happened, hidden, hues, toggles, schematic: story.schematic });
   if (!tree) return { scene: { svg: m('svg', { class: 'rt', width: z('reflex_margin'), height: z('reflex_margin') }), css: cssOf(style, z, n, hues) + legendCss, aside: legend, size: { width: z('reflex_margin'), height: z('reflex_margin') } }, on: (event) => legendClick(event, hidden, style, tools) };
   // How often each held, for which names show first and the tips.
@@ -130,7 +130,10 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   let scaleAt = 1, named = namesShown(tree, placed, held, z, n, scaleAt);
   // Grown, the gaps stand already: each place a miss sparked on and grew nothing from.
   const gapped = new Set(grown ? film.events.filter((e) => e.kind === 'miss' && !e.grew).map((e) => e.node.id) : []);
-  const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown, story, gapped);
+  // A bough whose place can be said takes a new trial node there, where the view sends `add` (the pack's action).
+  const adding = typeof style.sends?.add === 'string' && typeof tools.act === 'function';
+  const addsAt = (node) => (adding && !node.item && !node.preset && node.parent ? placeOfBough(node.id) : null);
+  const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown, story, gapped, addsAt);
   const css = cssOf(style, z, n, hues) + legendCss;
   if (missing.length) return { scene: { message: `This view's style names no ${[...new Set(missing)].slice(0, 2).join(', ')}: draw it with the Reflex tree view, whose preset names them.` } };
   const speed = { now: 1 };
@@ -160,6 +163,11 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
       const key = typeof event.key === 'string' ? event.key : '';
       if (key.startsWith('n:')) {
         const node = byKey(key);
+        const place = node && addsAt(node);
+        if (place && event.name === 'click') {
+          tools.act(style.sends.add, { for: place }, { asks: [{ field: 'title', title: `A trial node at ${place}`, input: { placeholder: 'What to say there, in a few words' }, action: 'Add' }] }).catch(() => {});
+          return [];
+        }
         if (!node?.item) return [];
         if (event.name === 'click') return (tools.open(node.item.id), []);
         if (event.name === 'enter') return [{ tip: { key, mark: tipOf(node, held.get(node.id) ?? 0, n('reflex_tip_most')) } }];

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { treeOf } from './tree.js';
+import { placeOfBough, treeOf } from './tree.js';
 import { radial } from './radial.js';
 import { rulesOf, storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
@@ -195,14 +195,14 @@ test('rules stand on the tree where they guard, beside what is said there: a squ
   ];
   const act = async (name: string, params: any) => (name === 'rules' ? { answer: rules } : { answer: params.ids.map((one: string) => ({ id: one, said: 0 })) });
   const drawn = await picture({ answer: a, style: { ...style, sends: { ...style.sends, rules: 'rules' } }, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
-  const svg = JSON.stringify(drawn.scene.svg), css = drawn.scene.css, key = JSON.stringify(drawn.scene.key);
+  const svg = JSON.stringify(drawn.scene.svg), css = drawn.scene.css, key = JSON.stringify(drawn.scene.aside);
   assert.ok(svg.includes('n:~for:tool:change:task:status') && svg.includes('n:~for:tool:change:task'), 'a rule hangs under the op, the type, the field');
   assert.equal((svg.match(/"n:~for:tool:change"/g) || []).length, 1, 'the instruction said at tool:change and the rules share one bough');
   assert.ok(svg.includes('"rect",{"class":"rt-dot"'), 'a rule is a square');
   assert.ok(svg.includes('rt-p-core') && svg.includes('rt-p-build'), 'each node carries its pack');
   assert.ok(svg.includes('Only the owner closes · rule, hold · core'), 'its effect and pack in its tooltip');
   assert.ok(css.includes('.rt-p-build .rt-dot { fill: #'), 'a pack beyond core takes the next of the style’s hues');
-  assert.ok(key.includes('From build') && key.includes('Core, the trunk') && key.includes('Fired'));
+  assert.ok(key.includes('lg:pack:build') && key.includes('lg:pack:core') && key.includes('Rule fired'));
   assert.ok(svg.includes('ci green · rule, refuse · build'), 'a rule whose title is a message with blanks goes by its own name');
   const tree = treeOf(a, (item: any) => item.fields?.for, n, rules.map((r) => ({ id: r.id, title: r.title, for: [r.where], kind: 'rule' })))!;
   const film = filmOf(tree, { ...storyOf(a, null, null, n), rules: rulesOf(rules) }, n);
@@ -218,4 +218,48 @@ test('played from the start, the trunk comes in too: a rule there from the first
   await new Promise((r) => setTimeout(r, 40));
   played.end();
   assert.ok(on.has('n:core.guard'));
+});
+
+test('the legend is the filter: entries off leave the tree, every entry keeps its count, and a click asks the view’s pack', async () => {
+  const a = { ...answer(3, []), lens: { find: ['legend'] } };
+  const rules = [
+    { id: 'core.guard', title: 'A guard', pack: 'core', effect: 'refuse', where: 'tool:change', fired: ['2026-11-18T00:00:00Z'] },
+    { id: 'build.lane', title: 'A lane', pack: 'build', effect: 'hold', where: 'tool:change:task', fired: [] },
+  ];
+  const asked: any[] = [];
+  const act = async (name: string, params: any) => (asked.push([name, params]), name === 'rules' ? { answer: rules } : name === 'legend' ? { answer: {} } : { answer: params.ids.map((one: string) => ({ id: one, said: 0 })) });
+  const tools = { frame: () => new Promise(() => {}), patch() {}, open() {}, act };
+  const sends = { ...style.sends, rules: 'rules', legend: 'legend' };
+  const all = await picture({ answer: a, style: { ...style, sends }, reduced: true }, tools);
+  const off = await picture({ answer: { ...a, lens: { find: ['legend-off'] } }, style: { ...style, sends, hidden: ['kind:rule', 'event:fired'] }, reduced: true }, tools);
+  const svgAll = JSON.stringify(all.scene.svg), svgOff = JSON.stringify(off.scene.svg), legendOff = JSON.stringify(off.scene.aside);
+  assert.ok(svgAll.includes('n:core.guard') && svgAll.includes('n:build.lane'));
+  assert.ok(!svgOff.includes('n:core.guard') && !svgOff.includes('n:build.lane'), 'rules turned off leave the tree');
+  assert.ok(!svgOff.includes('n:~for:tool:change:task'), 'a bough with nothing left under it goes too');
+  assert.ok(legendOff.includes('"rt-lg-row rt-off toggles"'), 'an entry off is marked off');
+  assert.ok(/"Rules"\],\["span",\{"class":"rt-lg-n"\},"2"\]/.test(legendOff), 'an entry off still says how many');
+  const reflexOnly = (await picture({ answer: { ...a, lens: { find: ['legend-click'] } }, style: { ...style, sends, hidden: ['kind:rule'] }, reduced: false }, { ...tools, surface: async () => null }));
+  const patched = reflexOnly.on({ name: 'click', key: 'lg:kind:rule' });
+  reflexOnly.end();
+  assert.deepEqual(asked.filter((x) => x[0] === 'legend').at(-1), ['legend', { entry: 'kind:rule', on: true }], 'a click asks the pack to turn it back on');
+  assert.deepEqual(patched, [{ key: 'lg:kind:rule', toggle: { 'rt-off': false } }]);
+  const none = await picture({ answer: { ...a, lens: { find: ['legend-none'] } }, style: { ...style, sends, hidden: ['kind:rule', 'kind:instruction'] }, reduced: true }, tools);
+  assert.ok(none.scene.aside, 'everything filtered out, the legend stays to bring it back');
+});
+
+test('a branch whose place can be said takes a new trial node there, through the view’s pack, its words asked first', async () => {
+  assert.deepEqual(['~for:tool:change', '~for:tool:change:task:status', '~for:file:packs/canvas/', '~for:session_start', '~for:tool', '~for:guide:style_code', '~for:push'].map(placeOfBough),
+    ['tool:change', 'tool:change', 'file:packs/canvas/**', 'session_start', null, 'guide:style_code', null]);
+  const a = { ...answer(2, []), lens: { find: ['add'] } };
+  a.items[0].fields = { for: ['tool:change'] };
+  const asked: any[] = [];
+  const act = async (name: string, params: any, more?: any) => (asked.push([name, params, more]), { answer: params.ids ? params.ids.map((one: string) => ({ id: one, said: 0 })) : {} });
+  const drawn = await picture({ answer: a, style: { ...style, sends: { ...style.sends, add: 'add' } }, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
+  assert.ok(JSON.stringify(drawn.scene.svg).includes('rt-adds'), 'a branch that takes a node is marked so');
+  drawn.on({ name: 'click', key: 'n:~for:tool:change' });
+  const add = asked.find((x) => x[0] === 'add');
+  assert.deepEqual(add[1], { for: 'tool:change' });
+  assert.equal(add[2].asks[0].field, 'title', 'the page asks for its words first');
+  const none = await picture({ answer: { ...a, lens: { find: ['no-add'] } }, style, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
+  assert.ok(!JSON.stringify(none.scene.svg).includes('rt-adds'), 'where the view sends no add, a branch takes nothing');
 });
