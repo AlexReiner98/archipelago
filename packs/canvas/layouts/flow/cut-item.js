@@ -49,12 +49,13 @@ const draw = (c) => `C${at(c[1])} ${at(c[2])} ${at(c[3])}`;
 /**
  * The cuts of a box as regions: each { d, cubics } with the cubic curves its edge is made of ([p0, p1, p2, p3] each), for
  * `box` { l, t, r, b } with corner `rx`, at `tension` (the share of a leg a curve's handle takes; 0.55 is a circle's).
- * `scale` multiplies every depth (the style's dial, and the phase's where it grows) and `seed` the item's id's number.
+ * `scale` multiplies every depth (the style's dial, and the phase's where it grows), `most` is the deepest a cut may be, as a share
+ * of the height (`cut_most`), and `seed` the item's id's number.
  */
-export function cuts(box, list, { rx, tension, scale = 1, seed = 0 }) {
+export function cuts(box, list, { rx, tension, scale = 1, seed = 0, most = 0.92 }) {
   const w = box.r - box.l, h = box.b - box.t, out = [], summits = [];
   for (const p of list) {
-    const d = Math.min(0.92, p.d * scale);
+    const d = Math.min(most, p.d * scale);
     if (!isCorner(p)) { summits.push({ p, d }); continue; }
     // Along the edge by `a`, down the other by `c`; a quarter of an ellipse, tangent to both. The box's own corner is followed round.
     const sx = p.at[1] === 'l' ? 1 : -1, sy = p.at[0] === 't' ? 1 : -1, cx = sx > 0 ? box.l : box.r, cy = sy > 0 ? box.t : box.b;
@@ -93,6 +94,8 @@ export function runsOf(palette) {
 
 /** The run each phase takes from a palette's runs: to do its pale, under way its land, done its deep, ended its greys, trouble an accent. */
 export const RUN = { not_started: 'pale', under_way: 'land', finished: 'deep', ended: 'grey', trouble: 'accent' };
+/** What each status is called in the key. */
+export const STATUS_WORDS = { not_started: 'To do', under_way: 'In progress', waiting: 'Waiting', finished: 'Done', trouble: 'Blocked' };
 /** What each run is called in the key. */
 export const ROLES = { pale: 'To do', land: 'Under way', deep: 'Done', grey: 'Ended', accent: 'Trouble' };
 

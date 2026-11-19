@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 // @ts-ignore a page module, untyped
-import { bandOf, bandsFor, boxHeight, cuts, GROWN, inset, listOf, ROLES, runsOf } from './cut-item.js';
+import { bandOf, bandsFor, boxHeight, cuts, GROWN, inset, listOf, ROLES, runsOf, STATUS_WORDS } from './cut-item.js';
 // @ts-ignore a page module, untyped
-import { grammar, itemMarks, swatchRows } from './item-look.js';
+import { grammar, itemMarks, itemRules, swatchRows } from './item-look.js';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'pack.json'), 'utf8'));
 const house = pack.styles.find((s: any) => s.id === 'core.house').props;
@@ -23,7 +23,7 @@ test('every named cut is a list of the two primitives, and the types name them',
   for (const t of ['task', 'work', 'place', 'record', 'question', 'decision', 'aim', 'occurrence', 'actor', 'system']) assert.ok(house.cut_forms[preset('canvas.cut_faroe').props.type_cuts[t]], t);
   assert.equal(cutOf('twin').length, 1);
   assert.equal(cutOf('twin')[0].cubics.length, 4);
-  assert.equal(cutOf('ring').length, 4);
+  assert.equal(cutOf('ring').length, 2);
 });
 
 test('a list in a type, or a name, gives the same cut; a flavour takes its starter\'s', () => {
@@ -119,4 +119,30 @@ test('the item is banded in its phase run, the box outlined once more over it, t
   }
   assert.equal(preset('canvas.cut_grow').props.cut_grow, true);
   assert.ok('flow_cut_pad' in house.sizes);
+});
+
+test('pass 4: one colour per item by status, a small cut, and every box the same height', () => {
+  const style = { ...house, ...preset('canvas.status_field').props };
+  const g = grammar(style), step = { id: 's', w: 100, h: 41, shape: 'carved', lines: ['x'], line: 16 }, m = (tag: string, attrs: any = {}, ...kids: any[]) => [tag, attrs, ...kids];
+  const over = (phase: string, status = 'todo', type = 'task') => itemMarks({ g, n: step, at: [50, 20], phase, item: { id: 'e_x', type, status }, z: () => 3, outline: () => m('rect', { class: 'lf-shape' }), m, corner: 6, dotAt: [0, 0] }).over;
+  assert.equal(over('under_way').length, 2);
+  assert.match(over('under_way')[0][1].class, /lf-cut-s-under_way/);
+  assert.match(over('under_way', 'waiting')[0][1].class, /lf-cut-s-waiting/);
+  assert.match(over('finished', 'waiting')[0][1].class, /lf-cut-s-finished/);
+  assert.match(over('trouble')[0][1].class, /lf-cut-s-trouble/);
+  assert.equal(over('ended').length, 1);
+  const css = itemRules(style);
+  for (const k of ['not_started', 'under_way', 'waiting', 'finished', 'trouble']) assert.match(css, new RegExp('lf-cut-s-' + k + '[^}]*light-dark[(]#[0-9a-f]{6}, #[0-9a-f]{6}[)]'));
+  // The same height for every type; no cut over a quarter of it.
+  const heights = new Set(Object.keys(house.cut_forms).map(() => boxHeight([{ d: style.cut_most }], 16, 10, style.cut_clear)));
+  assert.equal(heights.size, 1);
+  const h = [...heights][0] as number, tall = { l: 0, t: 0, r: 160, b: h };
+  for (const name of Object.keys(house.cut_forms)) for (const region of cuts(tall, house.cut_forms[name], { rx: 6, tension: 0.75, scale: style.cut_depth, most: style.cut_most, seed: 3 })) for (const seg of region.cubics) for (const [, y] of seg) assert.ok(y <= 0.25 * h + 6, `${name} ${y} of ${h}`);
+  const key = swatchRows(g.cut, { m, w: 22, h: 14, roles: ROLES, words: STATUS_WORDS });
+  assert.deepEqual(key.rows.map((r: any) => r.label), ['To do', 'In progress', 'Waiting', 'Done', 'Blocked']);
+  for (const id of ['canvas.status_field', 'canvas.status_ochre', 'canvas.status_clear']) {
+    const p = preset(id).props;
+    assert.equal(p.cut_bands, 1);
+    for (const k of ['not_started', 'under_way', 'waiting', 'finished', 'trouble']) assert.ok(p.status_colours[k].light && p.status_colours[k].dark, `${id} ${k}`);
+  }
 });

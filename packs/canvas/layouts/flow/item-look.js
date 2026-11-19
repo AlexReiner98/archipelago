@@ -18,7 +18,7 @@ const PLAIN = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.wai
 const ridgeOf = (style) => (['bands', 'emerge'].includes(style.ridge_state) ? { mode: style.ridge_state, ways: colourWays(record(style.ridge_palettes)[style.ridge_palette] ?? Object.values(record(style.ridge_palettes))[0]), island: !record(style.ridge_palettes)[style.ridge_palette], types: record(style.type_forms), forms: record(style.ridge_forms) } : null);
 
 /** The cut a style asks for: the accent of each phase, the cut of each type, and the dials (depth, softness, room above the name, whether it grows with progress). */
-const cutOf = (style) => ((runs) => (runs && Object.keys(record(style.cut_forms)).length ? { runs, types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, tension: Number(style.cut_tension), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink', bands: Math.max(1, Math.round(Number(style.cut_bands) || 1)), inset: Number(style.cut_inset) || 0 } : null))(runsOf(record(style.ridge_palettes)[style.cut_palette]));
+const cutOf = (style) => ((runs, status) => ((runs || Object.keys(status).length) && Object.keys(record(style.cut_forms)).length ? { runs, status, types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, most: Number(style.cut_most) || 0.92, tension: Number(style.cut_tension), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink', bands: Math.max(1, Math.round(Number(style.cut_bands) || 1)), inset: Number(style.cut_inset) || 0 } : null))(runsOf(record(style.ridge_palettes)[style.cut_palette]), record(style.status_colours));
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -84,6 +84,11 @@ export function itemRules(style) {
     rules.push('.lf-dot-check { fill: none; stroke: var(--ln-land); stroke-width: var(--ln-flow-stroke); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
     rules.push('.lf-tick { fill: none; stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
   }
+  if (g.cut && Object.keys(g.cut.status).length) {
+    for (const [k, v] of Object.entries(g.cut.status)) if (v?.light && v?.dark) rules.push(`.lf-step .lf-cut-s-${k}, .lf-sw.lf-cut-s-${k} { fill: light-dark(${v.light}, ${v.dark}); }`);
+    // An ended item has no fill and a muted name; a done one keeps its name's ink.
+    rules.push('.lf-step.ph-ended .lf-shape { fill: none; } .lf-step.ph-ended text { fill: var(--ln-muted); } .lf-step.closed:not(.ph-ended):not(.dim) text { fill: var(--ln-text); }');
+  }
   if (g.cut) rules.push(`.lf-step .lf-cut { stroke: ${g.cut.edge ? 'var(--lf-ink, var(--ln-text))' : 'none'}; stroke-width: var(--ln-rule); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-cut-none { fill: var(--ln-muted); } .lf-step .lf-cut-trouble { fill: var(--ln-blocked); } .lf-step.you .lf-cut { fill: var(--ln-you); } .lf-step .lf-shape.lf-edge { fill: none !important; }`);
   if (g.ridge) {
     rules.push('.lf-step .lf-ridge { stroke: none; pointer-events: none; } .lf-step .lf-ridge-ink { fill: none; stroke: var(--lf-ink, var(--ln-text)); stroke-width: var(--ln-flow-ridge-ink); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-rc-island { fill: var(--lf-island, var(--ln-text)); }');
@@ -143,14 +148,24 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
     out.rules = made.rules;
   }
   if (g.cut && n.shape === 'carved') {
-    // What the cuts take off is banded in the palette: the run of the phase, the colour in it the type's, then the box's outline is drawn once more over it.
     const lineage = lineageOf(item), list = listOf(g.cut, item, lineage), scale = g.cut.scale * (g.cut.grow ? GROWN[phase] ?? 1 : 1), rules = [];
-    bandsFor(g.cut.runs, phase, slotOf(g.cut, lineage), g.cut.bands).forEach((hex, k) => {
-      const cls = `lf-cut-${hex.slice(1).toLowerCase()}`;
-      rules.push(`.${cls} { fill: ${hex}; }`);
-      for (const c of cutsOf({ l, t, r, b }, inset(list, k, g.cut.inset), { rx: Math.min(corner, n.h / 5), tension: g.cut.tension, scale, seed: seedOf(item.id) })) out.over.push(m('path', { d: c.d, class: `lf-cut ${cls}` }));
-    });
+    const draw = (cls, k) => {
+      for (const c of cutsOf({ l, t, r, b }, inset(list, k, g.cut.inset), { rx: Math.min(corner, n.h / 5), tension: g.cut.tension, scale, seed: seedOf(item.id), most: g.cut.most })) out.over.push(m('path', { d: c.d, class: `lf-cut ${cls}` }));
+    };
+    if (Object.keys(g.cut.status).length) {
+      // One colour for the item, its status's: waiting is the status a task has; an ended item has no fill, its outline and a muted name.
+      const word = statusOf(item, phase);
+      if (word !== 'ended') draw(`lf-cut-s-${word}`, 0);
+    } else {
+      // What the cuts take off is banded in the palette: the run of the phase, the colour in it the type's.
+      bandsFor(g.cut.runs, phase, slotOf(g.cut, lineage), g.cut.bands).forEach((hex, k) => {
+        const cls = `lf-cut-${hex.slice(1).toLowerCase()}`;
+        rules.push(`.${cls} { fill: ${hex}; }`);
+        draw(cls, k);
+      });
+    }
     out.rules = rules;
+    // The box's outline is drawn once more over the fill.
     out.over.push(((edge) => (edge[1].class += ' lf-edge', edge))(outline(n.shape, X, Y, n.w, n.h, corner, n.bevel)));
   }
   const glyph = glyphOf(g, item);
@@ -174,8 +189,20 @@ function skyline(n, X, Y, round) {
   return `M${l} ${t}H${r}`;
 }
 
+/** The status an item shows: its phase, but waiting where its status says so and nothing has finished it. */
+export const statusOf = (item, phase) => (item.status === 'waiting' && !/^(finished|ended|trouble)$/.test(phase) ? 'waiting' : phase === 'standing' ? 'under_way' : /^(not_started|under_way|finished|ended|trouble)$/.test(phase) ? phase : 'not_started');
+
 /** The key's rows for a cut's palette: each run as a row of swatches, labelled with the role it plays (the phase). Colour rules for them too. */
-export function swatchRows(cut, { m, w, h, roles }) {
+export function swatchRows(cut, { m, w, h, roles, words = {} }) {
+  if (Object.keys(cut.status).length) {
+    // Just the statuses, one swatch each, with their words.
+    const rows = Object.keys(words).filter((k) => cut.status[k]).map((k) => ({ glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('rect', { class: `lf-sw lf-cut-s-${k}`, x: 0, y: 0, width: w, height: h })), label: words[k], tip: `${words[k]}: the colour of an item with that status` }));
+    return { rows, rules: [] };
+  }
+  return swatchRunRows(cut, { m, w, h, roles });
+}
+
+function swatchRunRows(cut, { m, w, h, roles }) {
   const rules = new Set(), rows = Object.entries(roles).filter(([run]) => cut.runs[run]?.length).map(([run, label]) => {
     const colours = cut.runs[run], cell = w / colours.length;
     colours.forEach((hex) => rules.add(`.lf-sw-${hex.slice(1).toLowerCase()} { fill: ${hex}; stroke: none; }`));
