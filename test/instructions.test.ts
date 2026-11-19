@@ -150,4 +150,7 @@ test('what the hooks and the MCP server say is worded on the map: the owner rewo
   const rules = await workspaceRules(l);
   assert.match(rules, /- \*\*Search first\.\*\* Look before you make\./);
   assert.doesNotMatch(rules, /Query with name search first/);
+  // And as the root service a written .claude/pelago.md is made from (root.rules_file).
+  const { rulesFileOf } = await import('../packs/surface/kernel/workspace-rules.ts');
+  assert.equal((await rulesFileOf({ map: l } as never, {})).text, rules);
 });

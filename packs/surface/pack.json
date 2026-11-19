@@ -38,6 +38,15 @@
         },
         "run": "workspace-tools.ts#countersOf"
       },
+      "root.rules_file": {
+        "in": {
+          "run?": "string"
+        },
+        "out": {
+          "text": "string"
+        },
+        "run": "workspace-rules.ts#rulesFileOf"
+      },
       "root.uses": {
         "in": {
           "workspace?": "string",
