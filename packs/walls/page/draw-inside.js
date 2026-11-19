@@ -174,6 +174,9 @@ function inside(home, given) {
         asked.get(n)?.(came);
         return void asked.delete(n);
       }
+      // What to draw may come as its text (packs/walls/page/layout.js): a text crosses at once, where an answer as
+      // objects is copied piece by piece on the way in.
+      if (said.type === 'start' && typeof said.text === 'string') said.input = JSON.parse(said.text);
       if (said.type === 'start') may = Array.isArray(said.input?.may) ? said.input.may : [];
       if (said.type === 'viewport') {
         const told = view;
@@ -188,7 +191,8 @@ function inside(home, given) {
             // How many pictures this worker has drawn, for whoever looks into it: a service worker is kept between pages.
             self.pictures = (self.pictures ?? 0) + 1;
             // How long the drawing took, for the page to tell whoever measures it.
-            send({ type: 'scene', scene: drawn?.scene ?? {}, took: performance.now() - t0 });
+            // As its text, as what to draw came: it crosses at once, where marks as objects are copied piece by piece.
+            send({ type: 'scene', text: JSON.stringify(drawn?.scene ?? {}), took: performance.now() - t0 });
           } else if (said.type === 'event' && drawn?.on) send({ type: 'patch', list: (await drawn.on(said.event)) ?? [], answers: said.event });
           else if (said.type === 'restyle' && drawn?.restyle) send({ type: 'patch', list: (await drawn.restyle(said.style)) ?? [] });
           else if (said.type === 'viewport') {

@@ -205,9 +205,41 @@ export function narrowed(was, next, answer, said, ctx = {}) {
   };
 }
 
-/** What a drawing is drawn from, said the same way whatever order its fields or links came in: two alike draw alike. */
+/** A term that opens a pack's parts on an island (packs/surface/kernel/packreads-flat.ts, partsIslands). */
+const PARTS = /^parts ([a-z][a-z0-9_.-]*) (e_[a-z0-9]{8})$/;
+/** What of a pack its parts island carries, as the server gives it. */
+const PARTS_PACK = ['id', 'title', 'state', 'parts', 'provides', 'consumes'];
+
+/**
+ * The answer of `next` where it only adds to Find terms that open a pack's parts on islands the answer holds: the same
+ * items and links, and each such island's parts as an island of its own after it, the pack as that island runs it,
+ * as the server makes it. Null when anything else changed, or the page does not hold the pack.
+ */
+export function opened(was, next, answer, said) {
+  if (!was?.filter || !next?.filter || was.view || next.view || was.time || next.time || !said?.find) return null;
+  const { find: f0 = [], ...rest0 } = was.filter, { find: f1 = [], ...rest1 } = next.filter;
+  const words = (t) => t.trim().replace(/\s+/g, ' ');
+  if (!same(rest0, rest1) || !same({ ...was, filter: null }, { ...next, filter: null }) || f1.length <= f0.length || !f0.every((t, n) => t === f1[n])) return null;
+  const added = f1.slice(f0.length).map(words), isles = answer.islands ?? [];
+  const parts = [];
+  for (const term of added) {
+    const [, pack, island] = PARTS.exec(term.toLowerCase()) ?? [], isle = isles.find((i) => i.id === island), id = `parts:${island}:${pack}`;
+    const own = isle?.pack && (isle.pack.id === pack ? isle.pack : (isle.pack.requires ?? []).find((r) => r.id === pack));
+    if (!own || isles.some((i) => i.id === id)) return null;
+    if (!parts.some((p) => p.id === id)) parts.push({ id, title: `${own.title}: its parts`, parts_of: { island, pack }, pack: Object.fromEntries(PARTS_PACK.filter((k) => own[k] !== undefined).map((k) => [k, own[k]])) });
+  }
+  return { ...answer, lens: { ...said, find: [...said.find, ...added] }, islands: isles.flatMap((i) => [i, ...parts.filter((p) => p.parts_of.island === i.id)]) };
+}
+
+/**
+ * What a drawing is drawn from, said the same way whatever order its fields or links came in: two alike draw alike. A
+ * session's age on an item (minutes since it was last heard) is said as of each read, so two reads of the same map a
+ * minute apart differ in it alone: it is left out, and a ring's fade catches up when the picture is next drawn.
+ */
 export function drawnKey(answer) {
-  const { lens, matched: _m, pos: _p, whole: _w, ...rest } = answer ?? {};
+  const { lens, matched: _m, pos: _p, whole: _w, ...raw } = answer ?? {};
+  const ageless = (s) => (s && typeof s === 'object' ? (({ age: _a, ...r }) => r)(s) : s);
+  const rest = { ...raw, ...(Array.isArray(raw.items) && { items: raw.items.map((i) => (Array.isArray(i?.sessions) ? { ...i, sessions: i.sessions.map(ageless) } : i)) }) };
   const sorted = (v) => (Array.isArray(v) ? v.map(sorted) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted(v[k])])) : v);
   return JSON.stringify(sorted({ ...rest, links: [...(rest.links ?? [])].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)), from: lens?.from, time: lens?.time }));
 }

@@ -8,6 +8,7 @@ import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { unmoved } from '../../marks-moved.ts';
 import { pathToFileURL } from 'node:url';
 
 const root = join(import.meta.dirname, '..', '..');
@@ -39,7 +40,8 @@ const answer = {
   links: [],
 };
 const writer = ({ island = (_: string) => null, pack = (_: string) => false } = {}) => ({ on: (key: string) => (island(key) ? ['add'] : pack(key) ? ['toggle'] : []), hear: () => false });
-const draw = (a: any, gestures?: any) => picture({ answer: a, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, ...(gestures && { gestures }) });
+// Read where the marks stand on the picture: each island is drawn about its own corner, in a group moved there.
+const draw = (a: any, gestures?: any) => ((p) => ({ ...p, scene: { ...p.scene, svg: unmoved(p.scene.svg) } }))(picture({ answer: a, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, ...(gestures && { gestures }) }));
 
 const marks = (mark: any, hold: (m: any) => boolean): any[] => {
   if (!Array.isArray(mark)) return [];
@@ -190,4 +192,25 @@ test('a parts island is shelved right after the island it is of, before any othe
   const [gx, gy] = at(ghost), [ox, oy] = at(own), [nx, ny] = at(other);
   assert.ok(gy > oy || gx > ox, 'after its own island');
   assert.ok(gy < ny || (gy === ny && gx < nx) || ny < oy || (ny === oy && nx < ox), 'and before the neighbour that comes after its own');
+});
+
+test('in a view whose islands stand at corners, a parts island stands beside its own and moves what it would lie on', () => {
+  // Islands at corners (or with looks of their own) are laid out by ../map/placed.js, which once put a parts island after
+  // every other, out of sight (e_m5x8pmwu).
+  const two = { ...answer, islands: [...answer.islands, { id: 'e_aaneighb', title: 'Neighbour' }], items: [{ ...item('e_aan1zzzz', 'Neighbour one'), island: 'e_aaneighb' }, ...answer.items] };
+  const placed = (corners: any) => unmoved(picture({ answer: opened(two, 'build'), style: { ...house, placed: corners }, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, gestures: writer }).scene.svg);
+  const box = (r: any) => [Number(r.x), Number(r.y), Number(r.x) + Number(r.width), Number(r.y) + Number(r.height)];
+  const meets = (a: number[], b: number[]) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+  for (const corners of [{ e_buildisl: [0, 0], e_aaneighb: [3, 0] }, { e_buildisl: [0, 0], e_aaneighb: [1, 1] }, { e_buildisl: [0, 0] }]) {
+    const svg = placed(corners), ghost = box(marks(keyed(svg, 'gh:')[0], (k) => k[1]?.class === 'lf-ghost')[0][1]), own = box(landOf(svg, 'e_buildisl')), other = box(landOf(svg, 'e_aaneighb'));
+    assert.ok(ghost[0] > own[2] && ghost[1] === own[1], `beside its own island, at its top (${JSON.stringify(corners)})`);
+    assert.ok(!meets(ghost, other), `on no other island (${JSON.stringify(corners)}: ${JSON.stringify({ ghost, own, other })})`);
+  }
+});
+
+test("a pack's mark that opens its parts names their island as what to bring into sight", () => {
+  const closed = keyed(draw(answer, writer).scene.svg, 'pk:e_buildisl:build')[0][1], open = keyed(draw(opened(answer, 'build'), writer).scene.svg, 'pk:e_buildisl:build')[0][1];
+  assert.equal(closed.shows, 'gh:e_buildisl:build');
+  assert.equal(open.shows, undefined, 'closing brings nothing into sight');
+  assert.equal(keyed(draw(opened(answer, 'build'), writer).scene.svg, 'gh:e_buildisl:build').length, 1, 'the key it names');
 });

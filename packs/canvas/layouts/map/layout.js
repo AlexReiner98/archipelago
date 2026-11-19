@@ -51,12 +51,13 @@ function plainly(args, m, islandOf, heads, wides = new Map(), follows = new Map(
 export function laidOut(args, { islandOf = () => null, heads = new Map(), wides = new Map(), follows = new Map() } = {}) {
   const m = model(args);
   // A view that lists its islands draws them where agents placed them (./placed.js).
-  if ((args.placed || args.looks?.size || args.focusAt?.size) && m.nodes.size) return placedOut(args, m, islandOf, heads, wides);
+  if ((args.placed || args.looks?.size || args.focusAt?.size) && m.nodes.size) return placedOut(args, m, islandOf, heads, wides, follows);
   return plainly(args, m, islandOf, heads, wides, follows);
 }
 
 /** The model the flow's scene draws: the whole picture with no islands, or the kit's plain graph when only that is asked. */
 export function layout(args) {
+  if (args.extras?.args) return { args };
   if (args.extras?.plain) {
     const m = model(args);
     return { all: [...m.nodes.values()], chains: m.chains, ties: m.ties, potential: m.potential, breaks: [], args };
