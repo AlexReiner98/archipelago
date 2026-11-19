@@ -27,6 +27,7 @@ import { boxHeight, listOf, ROLES, STATUS_WORDS } from './cut-item.js';
 import { outlineOf } from './type-outline.js';
 import { rangeKeyPath } from './aim-range.js';
 import { TYPE_WORDS } from './cut-item.js';
+import { holdersOf } from './waymark.js';
 import { boardKeyRows, glyphOf, grammar, itemMarks, itemRules, statusOf, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
@@ -127,7 +128,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // Each island's own layer, from the packs active on it (decision e_gqmavsb7): outlines and dots for its items.
   // A view that says its islands are plain (island_looks) draws each by its own look alone: no island's look or layer.
   const shown = style.island_looks === 'plain' ? (answer.islands ?? []).map(({ look: _l, style: _s, ...i }) => i) : answer.islands ?? [];
-  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, board: ((board) => (board ? { h: z('board_height'), room: z('sign') + z('sign_gap') + z('sign_margin') - z('box_pad') / 2 } : undefined))(grammar(style).board), carve: ((cut) => (cut ? (i, textH) => boxHeight(Object.keys(cut.status).length ? [{ d: cut.most }] : listOf(cut, i, lineageOf(i)), textH, z('cut_pad'), cut.clear) : undefined))(grammar(style).cut), islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
+  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, board: ((board) => (board ? { h: z('board_height'), room: z('sign') + z('sign_gap') + z('sign_margin') - z('box_pad') / 2, ...(board.who && { plate: (i) => (holdersOf(i, statusOf(i, i.phase ?? 'not_started'), answer.viewer).length ? z('who') + z('who_gap') : 0) }) } : undefined))(grammar(style).board), carve: ((cut) => (cut ? (i, textH) => boxHeight(Object.keys(cut.status).length ? [{ d: cut.most }] : listOf(cut, i, lineageOf(i)), textH, z('cut_pad'), cut.clear) : undefined))(grammar(style).cut), islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
@@ -347,14 +348,15 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const ghost = !n.stub && i.pending?.op === 'create';
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', n.shape === 'ridge' && look.ridge && 'ridged', look.board && !n.stub && `boarded bs-${boardWord(i)}`, !n.stub && i.island && lands.classOf(i.island), (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && `ph-${stateOf(i).phase}`, !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
-    const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
+    const hb = n.h - 2 * (n.plate ?? 0);
+    const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: hb, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
     const CARVE = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'], RISES = ['summit'];
     const nameY = (s, y) => (CARVE.includes(s.shape) && look.cut ? (Object.keys(look.cut.status).length ? y + ((s.h - (RISES.includes(s.shape) ? 2 * s.bevel : 0)) * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
-    const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n), viewer: answer.viewer });
+    const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n: n.plate ? { ...n, h: hb } : n, at: [X, Y], phase: stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n), viewer: answer.viewer });
     for (const rule of extra.rules ?? []) colourRules.add(rule);
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
-      ring, ...extra.under, outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel), ...extra.over,
+      ring, ...extra.under, outline(n.shape, X, Y, n.w, hb, CORNER, n.bevel), ...extra.over,
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.

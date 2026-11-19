@@ -69,6 +69,8 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     if (shapes.carve && CARVED.includes(n.shape)) n.h = shapes.carve(n.item, n.lines.length * LINE) + (n.shape === 'summit' ? 2 * need(sizes, BEVEL.summit) : 0);
     // A fingerpost board (pass 8): one height whatever its end, and room at its left for the waymark plate.
     if (shapes.board && BOARDS.includes(n.shape)) [n.h, n.w] = [shapes.board.h + more + (n.shape === 'tallarrow' ? need(sizes, 'flow_board_extra') : 0), n.w + shapes.board.room];
+    // A board with a plate hung under it has the room for it (as much above, so the boards of a row stay level): the layout places the node, the board stands in its middle.
+    if (shapes.board?.plate) (n.plate = shapes.board.plate(n.item)), (n.h += 2 * n.plate);
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
     if (n.shape === 'summit') n.span = need(sizes, 'flow_summit_span');

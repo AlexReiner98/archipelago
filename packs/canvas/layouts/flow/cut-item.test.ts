@@ -250,3 +250,29 @@ test('pass 10: a strip says who holds the item', async () => {
   const mixed = (hex: string) => '#' + [1, 3, 5].map((k) => Math.round(parseInt(hex.slice(k, k + 2), 16) * 0.82).toString(16).padStart(2, '0')).join('');
   for (const [status, f] of Object.entries(p.board_fills) as [string, any][]) for (const t of ['light', 'dark']) assert.ok(contrast(mixed(f[t].fill), f[t].text) >= 4.5, `${status} ${t} strip ${contrast(mixed(f[t].fill), f[t].text).toFixed(2)}`);
 });
+
+test('pass 12: a board with a plate has room for it, and no plate overlaps another item', async () => {
+  const { copyFileSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { pathToFileURL } = await import('node:url');
+  const root = join(import.meta.dirname, '..', '..'), laid = mkdtempSync(join(tmpdir(), 'pelago-plates-'));
+  for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(root, file as string), join(laid, name));
+  const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
+  const w = preset('canvas.waymark').props, style = { ...house, ...w, shape: 'flow', sizes: { ...house.sizes, ...w.sizes } };
+  const task = (id: string, title: string, extra: any = {}) => ({ id, type: 'task', is: ['work'], title, open: true, status: 'doing', phase: 'under_way', ...extra });
+  const answer = {
+    items: [task('e_aaaaaaaa', 'Plated', { holders: [{ how: 'works', id: 'e_sam', name: 'sam' }] }), task('e_bbbbbbbb', 'Below it'), task('e_cccccccc', 'Plain beside'), task('e_dddddddd', 'Below the plain')],
+    links: [{ id: 'r_1', type: 'depends_on', from: 'e_bbbbbbbb', to: 'e_aaaaaaaa' }, { id: 'r_2', type: 'depends_on', from: 'e_dddddddd', to: 'e_cccccccc' }],
+  };
+  const measure = (t: string, px: number) => t.length * px * 0.55;
+  const { scene } = picture({ answer, style, width: 900, height: 700 }, { measure });
+  const at = (id: string) => scene.places.find((p: any) => p.id === id);
+  const room = house.sizes.flow_who + house.sizes.flow_who_gap, board = w.sizes.flow_board_height ?? house.sizes.flow_board_height;
+  // Only the plated board has the extra room, as much above and below; the others stay as tight as before.
+  assert.equal(at('e_aaaaaaaa').h, board + 2 * room);
+  assert.equal(at('e_cccccccc').h, board);
+  // Its plate hangs in the room below the board, so it is inside the node: the node below starts under it, and no two nodes overlap.
+  const plate = { top: at('e_aaaaaaaa').y + board / 2 + house.sizes.flow_who_gap, bottom: at('e_aaaaaaaa').y + board / 2 + room };
+  assert.ok(plate.bottom <= at('e_aaaaaaaa').y + at('e_aaaaaaaa').h / 2);
+  for (const a of scene.places) for (const b of scene.places) if (a.id < b.id) assert.ok(Math.abs(a.x - b.x) * 2 >= a.w + b.w - 1e-6 || Math.abs(a.y - b.y) * 2 >= a.h + b.h - 1e-6, `${a.id} ${b.id} overlap`);
+});

@@ -62,6 +62,8 @@ function acrossTo(n, cx, cy, y, side) {
 
 /** The end of a wire at step `n`, set on its outline, `from` being the point before it on the line. */
 export function landOn(n, cx, cy, end, from) {
+  // A board's plate hangs in room of its own: a wire lands on the board, never on the plate.
+  if (n.plate) n = { ...n, h: n.h - 2 * n.plate, plate: 0 };
   if (end[0] === from[0]) return [end[0], downTo(n, cx, cy, end[0], Math.sign(from[1] - cy) || -1)];
   if (end[1] === from[1]) return [acrossTo(n, cx, cy, end[1], Math.sign(from[0] - cx) || -1), end[1]];
   // A straight line, not at right angles: along it to the outline.
@@ -71,6 +73,7 @@ export function landOn(n, cx, cy, end, from) {
 
 /** Whether point `p` lies on the outline of `n`, within `by`. */
 export function onOutline(n, cx, cy, p, by = 1.5) {
+  if (n.plate) n = { ...n, h: n.h - 2 * n.plate, plate: 0 };
   const way = [Math.sign(p[0] - cx) || 1, Math.sign(p[1] - cy) || 1];
   return near(downTo(n, cx, cy, p[0], way[1]), p[1]) <= by || near(acrossTo(n, cx, cy, p[1], way[0]), p[0]) <= by;
 }
