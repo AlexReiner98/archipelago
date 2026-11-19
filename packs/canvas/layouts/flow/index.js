@@ -157,13 +157,13 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // house style does not, since the order's wire already says it and red is kept for trouble (the owner, 3 Nov 2026).
   const heldUp = (i) => style.held_up === 'trouble' && Boolean(stateOf(i).blocked);
   /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
-  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
+  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''} bs-${boardWord(i)}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
   /** The status a board is painted in: blocked is trouble unless nothing is left to block (./item-look.js statusOf). */
   const boardWord = (i) => statusOf(i, stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase);
   const itemState = String(style.item_state ?? '').split(' '), look = grammar(style);
   const outline = (shape, x, y, w, hgt, rx, cut) => outlineMark(shape, x, y, w, hgt, rx, cut, { span: z('summit_span'), tension: look.cut?.tension });
-  const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : itemState.includes('check') && mark === 'full' && /ph-(finished|ended)/.test(cls)
+  const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : look.board?.mark && /trouble/.test(cls) ? m('g', { class: `lf-dot ${cls}` }, m('path', { d: `M${cx - r} ${cy - r}L${cx + r} ${cy + r}M${cx + r} ${cy - r}L${cx - r} ${cy + r}`, class: 'lf-dot-cross' })) : itemState.includes('check') && mark === 'full' && /ph-(finished|ended)/.test(cls)
     ? m('g', {}, m('circle', { cx, cy, r, class: `lf-dot ${cls}` }), m('path', { d: `M${cx - r * 0.5} ${cy + r * 0.05}L${cx - r * 0.12} ${cy + r * 0.42}L${cx + r * 0.52} ${cy - r * 0.4}`, class: 'lf-dot-check' }))
     : mark === 'half'
     ? m('g', { class: `lf-dot ${cls}` }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-dot-fill' }))
@@ -311,6 +311,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   /** A step's dot where it is drawn: of its own phase, or of the phase a story's step gives it then. */
   const dotPlace = (n) => {
     const [X, Y] = local(n.item?.island, [g.x.get(n.id), g.y.get(n.id)]), point = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? n.bevel : 0;
+    // On a board the mark stands in the room the board keeps at its left, before the name.
+    if (look.board) return [X - n.w / 2 + point + (z('sign') + z('sign_gap') + z('sign_margin')) / 2, Y];
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
     return [left - z('dot_gap'), Y];
   };

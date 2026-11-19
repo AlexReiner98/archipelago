@@ -32,7 +32,7 @@ const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag',
 const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow', 'pennant'];
 
 /** The fingerpost board a style asks for (pass 9): painted whole in its status colour (`board_fills`: per status, light and dark, a fill and the name's ink on it); the outline is the only type signal. */
-const boardOf = (style) => ((fills) => (Object.keys(fills).length ? { fills, who: style.who_strip === true } : null))(record(style.board_fills));
+const boardOf = (style) => ((fills) => (Object.keys(fills).length ? { fills, who: style.who_strip === true, mark: style.board_mark === true } : null))(record(style.board_fills));
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -45,7 +45,7 @@ export function grammar(style) {
     // The state is said once, on the shape: the dot before the title stays only where the style asks for no other say.
     // A ridge says the state itself, in its colours: its palette's, by name, and the form each type stands in.
     ridge: ridgeOf(style), board: boardOf(style), cut: boardOf(style) ? null : cutOf(style),
-    dot: !ridgeOf(style) && !cutOf(style) && !boardOf(style) && fill !== 'terrace' && !['double', 'foot', 'notch'].some((w) => state.has(w)),
+    dot: (boardOf(style)?.mark === true || (!ridgeOf(style) && !cutOf(style) && !boardOf(style))) && fill !== 'terrace' && !['double', 'foot', 'notch'].some((w) => state.has(w)),
     // A check where there is no notch for it keeps the dot's room before the name, empty until the item is finished.
     tick: state.has('check') && (state.has('foot') || state.has('double')) && !state.has('notch'),
   };
@@ -107,6 +107,18 @@ export function itemRules(style) {
       rules.push(`.lf-step.boarded.bs-${k}.you .lf-shape, .lf-step.boarded.bs-${k}.here .lf-shape { fill: ${ld(f, 'fill')}; stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke-lit); }`);
       rules.push(`.lf-step.boarded.bs-${k} .lf-who { fill: color-mix(in srgb, ${ld(f, 'fill')} 82%, black); } .lf-step.boarded.bs-${k} .lf-who-mark, .lf-step.boarded.bs-${k}:is(.lf-step) .lf-who-text { fill: ${ld(f, 'text')}; }`);
       rules.push(`.lf-step.boarded.bs-${k}:is(.lf-step) text { fill: ${ld(f, 'text')}; } .lf-sw.bs-${k} .lf-shape { fill: ${ld(f, 'fill')}; stroke: color-mix(in srgb, ${ld(f, 'fill')} 65%, var(--ln-text)); stroke-width: var(--ln-rule); }`);
+    }
+    // One status vocabulary (the theme's status_*): the board is one neutral card; the state is a mark at its left (ring, half
+    // disc, disc) in the status's colour. Only two states go loud: blocked, a red outline and its cross, and what waits on you, a violet outline. A finished name fades.
+    if (g.board.mark) {
+      const word = { not_started: 'todo', under_way: 'active', waiting: 'waiting', finished: 'done', trouble: 'blocked' };
+      for (const [k, name] of Object.entries(word)) rules.push(`.lf-step.boarded .lf-dot.bs-${k} { --lf-dot: var(--ln-status_${name}); }`);
+      rules.push('.lf-step.boarded .lf-dot-cross { fill: none; stroke: var(--lf-dot); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; }');
+      rules.push('.lf-step.boarded.you .lf-dot { --lf-dot: var(--ln-status_you); } .lf-step.boarded .lf-dot.ph-ended { --lf-dot: var(--ln-status_ended); }');
+      rules.push('.lf-step.boarded .lf-dot, .lf-step.boarded .lf-dot circle { stroke: var(--lf-dot, var(--ln-text)); } .lf-step.boarded .lf-dot.full, .lf-step.boarded .lf-dot-fill { fill: var(--lf-dot, var(--ln-text)); }');
+      rules.push(`.lf-step.boarded.bs-trouble${plain} .lf-shape, .lf-step.boarded.bs-trouble.you .lf-shape { stroke: var(--ln-status_blocked); stroke-width: var(--ln-flow-stroke-lit); }`);
+      rules.push(`.lf-step.boarded.you .lf-shape { stroke: var(--ln-status_you); stroke-width: var(--ln-flow-stroke-lit); }`);
+      rules.push('.lf-step.boarded.bs-finished text:not(.lf-who-text) { opacity: 0.6; }');
     }
     rules.push('.lf-step .lf-who-dormant { opacity: 0.6; }');
     rules.push('.lf-step .lf-who-hanger { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-rule); pointer-events: none; } .lf-step .lf-who { stroke: none; pointer-events: none; } .lf-step .lf-who-text { font-size: var(--ln-flow-who-text); font-family: var(--ln-font); dominant-baseline: middle; pointer-events: none; } .lf-step.boarded .lf-who-text.lf-who-you { fill: var(--ln-you); font-weight: 700; } .lf-step .lf-who-mark { stroke: none; pointer-events: none; }');
@@ -271,5 +283,15 @@ function swatchRunRows(cut, { m, w, h, roles }) {
 export function boardKeyRows(board, { types, m, outline, w, h, margin, shapes, words, statusWords }) {
   const rows = types.filter((t) => shapes[t]).map((t) => ({ glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('g', { class: 'lf-step boardkey' }, outline(shapes[t], w / 2, h / 2, w - 2 * margin, h * 0.62, 0, (h * 0.62) / 3))), label: words[t] ?? t[0].toUpperCase() + t.slice(1), tip: `${words[t] ?? t}: its outline` }));
   const small = Object.keys(statusWords).filter((k) => board.fills[k]).map((k) => ({ glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('g', { class: `lf-step lf-sw bs-${k}` }, outline('plank', w / 2, h / 2, w - 2 * margin, h * 0.45, 0, 0))), label: statusWords[k], tip: `${statusWords[k]}: the colour of its board` }));
+  // One neutral card: the statuses are told by their mark, ring, half disc, disc and the cross, in the status colour.
+  const mark = (k) => {
+    const [cx, cy, r] = [w / 2, h / 2, h * 0.28], at = `bs-${k} ph-${k}`;
+    const body = k === 'trouble' ? m('g', { class: `lf-dot ${at} trouble` }, m('path', { d: `M${cx - r} ${cy - r}L${cx + r} ${cy + r}M${cx + r} ${cy - r}L${cx - r} ${cy + r}`, class: 'lf-dot-cross' }))
+      : k === 'finished' ? m('circle', { cx, cy, r, class: `lf-dot full ${at}` })
+      : k === 'not_started' ? m('circle', { cx, cy, r, class: `lf-dot ${at}` })
+      : m('g', { class: `lf-dot ${at}` }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-dot-fill' }));
+    return m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('g', { class: 'lf-step boarded' }, body));
+  };
+  if (board.mark) return [...rows, ...Object.keys(statusWords).filter((k) => board.fills[k]).map((k) => ({ glyph: mark(k), label: statusWords[k], tip: `${statusWords[k]}: its mark` }))];
   return [...rows, ...small];
 }

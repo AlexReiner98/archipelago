@@ -10,8 +10,8 @@ export const STATES = ['waiting', 'your_move', 'blocked', 'working', 'quiet', 'i
 /** What the key calls each state. */
 export const STATE_WORDS = { waiting: 'Waiting', your_move: 'Your move', blocked: 'Blocked', working: 'Working', quiet: 'Quiet', idle: 'Idle', done: 'Done' };
 /** The shapes a state's mark may take. */
-export const SHAPES = ['disc', 'ring', 'half', 'square', 'diamond', 'triangle', 'inbox'];
-const NAMED = /^[a-z]+$/;
+export const SHAPES = ['disc', 'ring', 'half', 'square', 'diamond', 'triangle', 'inbox', 'cross'];
+const NAMED = /^[a-z_]+$/;
 
 /** A run's session, where the answer gives one. */
 export const sessionOf = (i) => (i?.session && typeof i.session === 'object' && STATES.includes(i.session.state) ? i.session : null);
@@ -83,6 +83,7 @@ export function stateMark(m, state, mark, cx, cy, r) {
   const cls = `lf-ss lf-ss-${state} ${mark.shape}`;
   if (mark.shape === 'disc' || mark.shape === 'ring') return m('circle', { cx, cy, r, class: cls });
   if (mark.shape === 'half') return m('g', { class: cls }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-ss-fill' }));
+  if (mark.shape === 'cross') return m('path', { d: `M${cx - r} ${cy - r}L${cx + r} ${cy + r}M${cx + r} ${cy - r}L${cx - r} ${cy + r}`, class: cls });
   if (mark.shape === 'square') return m('rect', { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r, class: cls });
   if (mark.shape === 'diamond') return m('path', { d: `M${cx} ${cy - r}L${cx + r} ${cy}L${cx} ${cy + r}L${cx - r} ${cy}Z`, class: cls });
   // What waits on the owner, as the page draws it everywhere (packs/surface/page/inbox.svg): a tray open at the top, its
@@ -101,6 +102,6 @@ export const hueRules = (marks) => [...marks].map(([state, s]) => `.lf-ss-${stat
 
 export const css = `
 .lf-ss { fill: var(--lf-ss); stroke: var(--lf-ss); stroke-width: var(--ln-flow-dot-ring); }
-.lf-ss.ring, .lf-ss.half circle, .lf-ss.inbox { fill: none; } .lf-ss-fill { fill: var(--lf-ss); stroke: none; }
+.lf-ss.ring, .lf-ss.half circle, .lf-ss.inbox, .lf-ss.cross { fill: none; } .lf-ss-fill { fill: var(--lf-ss); stroke: none; }
 .lf-ss.inbox { stroke-linejoin: round; }
 `;
