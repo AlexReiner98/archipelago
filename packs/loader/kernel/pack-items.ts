@@ -141,7 +141,8 @@ export function madePacks(items: TypeItem[], found: Map<string, Manifest>, local
   const hash = (t: string) => createHash('sha256').update(t).digest('hex');
   const seen = new Set([...found.keys(), local]);
   const declared = new Set([...found.values()].flatMap((p) => [...parts(p).types, ...parts(p).relations].map((d) => d.id)));
-  for (const item of items.filter((i) => i.type === PACK_ITEM && i.is_open && !text(i.props.version_of))) {
+  // A shipped pack's item (props.shipped) is a server's file on the map: the pack model assembles it (packs/loader/kernel/pack-source.ts), not this.
+  for (const item of items.filter((i) => i.type === PACK_ITEM && i.is_open && !text(i.props.version_of) && !i.props.shipped)) {
     const problems = madeProblems(item, seen, declared);
     if (problems.length) {
       wrong.set(item.id, problems.join('; '));

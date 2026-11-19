@@ -9,8 +9,11 @@ import { test } from 'node:test';
 import { fresh, freshWith, make, PACKS, packsWith, WORDS } from './map.ts';
 import { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { Registry } from '../packs/loader/kernel/packs.ts';
-import { builtAt, factsHead, followRegistry } from '../packs/loader/kernel/registry-log.ts';
+import { builtAt, factsHead, followRegistry, systemItems } from '../packs/loader/kernel/registry-log.ts';
 import { setFloor, setPackModel, systemKinds } from '../packs/loader/kernel/pack-source.ts';
+import { manifestRead } from '../packs/loader/kernel/pack-folders.ts';
+import { madePacks } from '../packs/loader/kernel/pack-items.ts';
+import { createHash } from 'node:crypto';
 
 /** Count the registry's builds from items. */
 const counted = (l: Archipelago) => {
@@ -95,4 +98,26 @@ test('a floor rule the map\'s manifest leaves out is loaded from code all the sa
   setFloor({ packs: ['core'], on: (_pack, id) => id === 'forget' });
   reg.rebuild();
   assert.deepEqual([held(reg).includes('forget'), held(reg).includes('agent_changes')], [true, false], 'only what the floor names comes back');
+});
+
+test('a part is read with the pack it is part_of; the text of a manifest from the model is kept by its hash; a shipped pack item is left to the model', async (t) => {
+  t.after(() => setPackModel(undefined));
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'p', type: 'pack', title: 'Kitchen', props: { name: 'kitchen', manifest: {} } },
+    { op: 'create', ref: 'ty', type: 'type', title: 'Recipe', props: { name: 'local.recipe', extends: 'record' } },
+    { op: 'link', type: 'part_of', from: 'ty', to: 'p' },
+  ]);
+  const items = await systemItems(l);
+  assert.equal(items.find((i) => i.id === made.ty)!.pack, 'kitchen', 'its pack, by the link');
+  assert.equal(items.find((i) => i.id === made.p)!.pack, undefined, 'a pack item is no part');
+
+  const core = JSON.parse(readFileSync(join(PACKS, 'core', 'pack.json'), 'utf8')), text = JSON.stringify(core), hash = createHash('sha256').update(text).digest('hex');
+  setPackModel({ kinds: systemKinds(), manifests: () => new Map([['core', { manifest: core, hash, text }]]) });
+  new Registry([PACKS, WORDS]);
+  assert.equal(manifestRead(hash), text, 'the log can keep the text the manifest from the map was hashed from');
+
+  const shipped = { id: 'e_s', type: 'pack', title: 'Core', body: '', is_open: true, props: { name: 'core', manifest: { id: 'core', version: '1', actions: [] }, shipped: { pack: 'core', version: '1', hash, value: {} } } };
+  const out = madePacks([shipped], new Map(), 'local');
+  assert.deepEqual([out.packs.length, out.wrong.size], [0, 0], 'neither made nor refused: the model assembles it');
 });

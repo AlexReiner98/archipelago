@@ -9,6 +9,7 @@
 
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { systemKinds, type SystemItem } from './pack-source.ts';
+import { PACK_ITEM } from './pack-items.ts';
 
 /** Where a map's registry was last built from the log: the fact position, the system items' ids, and those items as read. */
 interface Built { pos: number; ids: Set<string>; said: string }
@@ -23,10 +24,14 @@ export async function factsHead(l: Archipelago): Promise<number> {
   return Number(rows[0]?.pos ?? 0);
 }
 
-/** The system items on the map now, archived ones left out, in the order they were made. */
+/** The system items on the map now, archived ones left out, in the order they were made; each part with the name of the pack it is part_of, as `pack`. */
 export async function systemItems(l: Archipelago): Promise<SystemItem[]> {
   const { rows } = await l.db.query<SystemItem>(`select id, type, title, body, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by created_at, id`, [systemKinds()]);
-  return rows;
+  const parts = rows.filter((r) => r.type !== PACK_ITEM).map((r) => r.id);
+  if (!parts.length) return rows;
+  const { rows: of } = await l.db.query<{ id: string; pack: string }>(`select r.from_id as id, p.props->>'name' as pack from relation r join entity p on p.id = r.to_id where r.from_id = any($1::text[]) and r.type = any($2::text[]) and p.type = $3 and p.archived_at is null and p.props->>'name' is not null`, [parts, l.registry.relationFamily('part_of'), PACK_ITEM]);
+  const packOf = new Map(of.map((r) => [r.id, r.pack]));
+  return rows.map((r) => (packOf.has(r.id) ? { ...r, pack: packOf.get(r.id) } : r));
 }
 
 /** Whether the facts after position `after`, up to `upto`, touch a system item: one the registry was built from, one of a system kind, or a link to one. */

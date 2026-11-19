@@ -79,7 +79,7 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
   const wrong = packs.flatMap((i) => (trial.madeWrong.has(i.id) ? [`the pack ${String(i.props.name ?? i.title)}: ${trial.madeWrong.get(i.id)}`] : []));
   if (wrong.length) throw new Error(`Change rejected:\n- ${wrong.join('\n- ')}`);
   // A pack made here is checked whole as if the owner had added it, so one that would not load is refused now, not when it is turned on.
-  const names = packs.filter((i) => i.is_open && !i.props.version_of).map((i) => String(i.props.name));
+  const names = packs.filter((i) => i.is_open && !i.props.version_of && !i.props.shipped).map((i) => String(i.props.name)); // a shipped pack's item is a server's file: the pack model reads it
   if (names.length) {
     let added: Registry;
     try {

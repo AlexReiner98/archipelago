@@ -8,7 +8,7 @@
 // kept as items (packs/loader/kernel/type-items.ts, type-overlay.ts, pack-items.ts), laid over the files where they are
 // read today, so it adds no manifest of its own.
 
-import { readPackFolders, type PackFolders } from './pack-folders.ts';
+import { keepRead, readPackFolders, type PackFolders } from './pack-folders.ts';
 import { PACK_ITEM } from './pack-items.ts';
 import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 import type { Manifest } from './manifest.ts';
@@ -16,13 +16,14 @@ import type { Manifest } from './manifest.ts';
 /** The pack files as a registry read them: found, hashes and folders by pack id. */
 export type Seed = PackFolders<Manifest>;
 
-/** An item the registry is built from: a pack's item or one of its parts. */
-export type SystemItem = TypeItem;
+/** An item the registry is built from: a pack's item or one of its parts, with the name of the pack it is part_of (`pack`). */
+export type SystemItem = TypeItem & { pack?: string };
 
 /** What the pack model says of the system items: their types, and the manifests they make (by pack id, with each one's hash). */
 export interface PackModel {
   kinds: readonly string[];
-  manifests(items: SystemItem[]): Map<string, { manifest: Manifest; hash: string }>;
+  /** Each with the text it was hashed from (the hash is its hex SHA-256), which the log keeps as a pack file's. */
+  manifests(items: SystemItem[]): Map<string, { manifest: Manifest; hash: string; text?: string }>;
 }
 
 /** Today's: types, link types and packs kept as items, which the registry already lays over its packs itself. */
@@ -63,6 +64,9 @@ function withFloor(id: string, fromMap: Manifest, file: Manifest | undefined): M
  */
 export function packsOf(seed: Seed, items: SystemItem[]): Seed {
   const found = new Map(seed.found), hashes = new Map(seed.hashes), where = new Map(seed.where);
-  for (const [id, { manifest, hash }] of model.manifests(items)) found.set(id, withFloor(id, manifest, seed.found.get(id))), hashes.set(id, hash);
+  for (const [id, { manifest, hash, text }] of model.manifests(items)) {
+    found.set(id, withFloor(id, manifest, seed.found.get(id))), hashes.set(id, hash);
+    if (text !== undefined) keepRead(hash, text); // the text the log keeps for a pack fact naming this hash (packs/loader/kernel/packstate.ts)
+  }
   return { found, hashes, where };
 }
