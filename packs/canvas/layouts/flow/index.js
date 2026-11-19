@@ -28,6 +28,7 @@ import { outlineOf } from './type-outline.js';
 import { rangeKeyPath } from './aim-range.js';
 import { TYPE_WORDS } from './cut-item.js';
 import { holdersOf } from './waymark.js';
+import { wireNames, wireRules } from './wire-names.js';
 import { boardKeyRows, glyphOf, grammar, itemMarks, itemRules, statusOf, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
@@ -207,8 +208,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
   // Each link type its colour: the one the style names for it (link_colours), else one of link_hues, the same for the
   // same type every time unless another type in this picture has it. A colour is a class with a rule of its own: a drawing sets no style on a mark.
-  const named = style.link_colours && typeof style.link_colours === 'object' ? style.link_colours : {};
-  const hues = Array.isArray(style.link_hues) && style.link_hues.length ? style.link_hues : Array.isArray(style.hues) ? style.hues : [];
+  const named = style.link_colours && typeof style.link_colours === 'object' && style.ink_wires !== true ? style.link_colours : {};
+  const hues = style.ink_wires === true ? [] : Array.isArray(style.link_hues) && style.link_hues.length ? style.link_hues : Array.isArray(style.hues) ? style.hues : [];
   /** The colour of each name: the one `given` names, else the hue its name picks, stepping past those another in this picture has. */
   const coloursOf = (present, given, from) => {
     const taken = new Set(present.filter((name) => HEX.test(String(given[name]))).map((name) => given[name].toLowerCase()));
@@ -292,6 +293,10 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // A wire cut onto a trunk goes on along it (./carried.js): that stretch drawn over the trunk, seen only while lit, so a
   // step hovered lights its way all the way to what it shares and not the other branches of the trunk.
   const C = g.chains.length, wired = [...g.chains, ...g.ties], carry = story ? wired.map(() => []) : carried(wired);
+  // Each wire's link name, riding on its longest run and giving way where it is in the way (./wire-names.js); its words also in the wire's tooltip.
+  const corners = (n) => ((x, y) => [[x - n.w / 2, y - n.h / 2], [x + n.w / 2, y - n.h / 2], [x + n.w / 2, y + n.h / 2], [x - n.w / 2, y + n.h / 2]])(g.x.get(n.id), g.y.get(n.id));
+  const wn = story ? null : wireNames({ style, wired, C, boxes: steps.map(corners), z, measure: (t, px) => measure(t, px), m, order: ORDER_TYPE });
+  if (wn) wired.forEach((w, j) => ((own) => (Array.isArray(own[0]) ? own[0] : own).splice(2, 0, m('title', {}, wn.text(j))))(j < C ? wireLayer[j] : tieLayer[j - C]));
   const keysOf = (j) => (j < C ? { line: `w:${j}`, head: `h:${j}`, on: `wx:${j}` } : { line: `n:${j - C}`, head: `nh:${j - C}`, on: `nx:${j - C}` });
   const trunkLayer = wired.flatMap((w, j) => (carry[j].length ? [m('path', {
     key: keysOf(j).on, d: carry[j].map((c) => drawn(c.points, wired[c.k].gaps, z('break_half'))).join(''),
@@ -390,7 +395,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, lands.sea, lands.land, isles.layer, tieLayer, wireLayer, trunkLayer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
+  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, lands.sea, lands.land, isles.layer, tieLayer, wireLayer, trunkLayer, wn?.layer, stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = [
     ...(parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 })),
@@ -405,7 +410,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const wireKeys = wired.map((w, j) => [...(j < C ? [`w:${j}`, `h:${j}`] : tieKeys(j - C)), ...(carry[j].length ? [keysOf(j).on] : [])]);
   const light = (id) => {
     const on = new Set(id ? wired.flatMap((w, j) => (w.a === id || w.b === id ? [...wireKeys[j], ...carry[j].filter((c) => c.end).map((c) => keysOf(c.k).head)] : [])) : []);
-    return [{ key: 'flow', toggle: { lighting: Boolean(id) } }, ...wireKeys.flat().map((key) => ({ key, toggle: { lit: on.has(key) } }))];
+    return [{ key: 'flow', toggle: { lighting: Boolean(id) } }, ...wireKeys.flat().map((key) => ({ key, toggle: { lit: on.has(key) } })), ...(wn?.force(new Set(wired.flatMap((w, j) => (id && (w.a === id || w.b === id) ? [j] : [])))) ?? [])];
   };
   /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
@@ -437,9 +442,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     size.width = width;
   }
   return {
-    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, itemRules(style), landRules(style), landShades(style), ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ringCss, ...(painting ? [paintedCss] : []), ...ringRules(answer.items), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, itemRules(style), wireRules(style), landRules(style), landShades(style), ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ringCss, ...(painting ? [paintedCss] : []), ...ringRules(answer.items), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: () => (player?.end?.(), painting?.end()),
-    viewport: (v) => (painting?.view(v), []),
+    viewport: (v) => (painting?.view(v), wn?.viewport(v) ?? []),
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);
