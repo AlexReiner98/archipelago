@@ -8,6 +8,7 @@ import { lineageOf } from './graph.js';
 import { colourWays, ridgeMarks } from './ridge-item.js';
 import { bandsFor, cuts as cutsOf, GROWN, inset, listOf, runsOf, slotOf } from './cut-item.js';
 import { seedOf } from './ridge-item.js';
+import { flap, summit as summitOf, tabStrip } from './type-outline.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
 const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -19,6 +20,9 @@ const ridgeOf = (style) => (['bands', 'emerge'].includes(style.ridge_state) ? { 
 
 /** The cut a style asks for: the accent of each phase, the cut of each type, and the dials (depth, softness, room above the name, whether it grows with progress). */
 const cutOf = (style) => ((runs, status) => ((runs || Object.keys(status).length) && Object.keys(record(style.cut_forms)).length ? { runs, status, types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, most: Number(style.cut_most) || 0.92, tension: Number(style.cut_tension), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink', bands: Math.max(1, Math.round(Number(style.cut_bands) || 1)), inset: Number(style.cut_inset) || 0 } : null))(runsOf(record(style.ridge_palettes)[style.cut_palette]), record(style.status_colours));
+
+/** The outlines a carving style gives one height, and a status colour (./type-outline.js). */
+const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hexagon', 'pill', 'tab'];
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -147,15 +151,21 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
     out.over.push(...made.marks);
     out.rules = made.rules;
   }
-  if (g.cut && n.shape === 'carved') {
+  if (g.cut && CARVED.includes(n.shape)) {
     const lineage = lineageOf(item), list = listOf(g.cut, item, lineage), scale = g.cut.scale * (g.cut.grow ? GROWN[phase] ?? 1 : 1), rules = [];
-    const draw = (cls, k) => {
-      for (const c of cutsOf({ l, t, r, b }, inset(list, k, g.cut.inset), { rx: Math.min(corner, n.h / 5), tension: g.cut.tension, scale, seed: seedOf(item.id), most: g.cut.most })) out.over.push(m('path', { d: c.d, class: `lf-cut ${cls}` }));
+    const draw = (cls, k, side = 0) => {
+      for (const c of cutsOf({ l: l + side, t, r: r - side, b }, inset(list, k, g.cut.inset), { rx: side ? 0 : Math.min(corner, n.h / 5), tension: g.cut.tension, scale, seed: seedOf(item.id), most: g.cut.most })) out.over.push(m('path', { d: c.d, class: `lf-cut ${cls}` }));
     };
     if (Object.keys(g.cut.status).length) {
       // One colour for the item, its status's: waiting is the status a task has; an ended item has no fill, its outline and a muted name.
-      const word = statusOf(item, phase);
-      if (word !== 'ended') draw(`lf-cut-s-${word}`, 0);
+      const word = statusOf(item, phase), cls = `lf-cut-s-${word}`, piece = (d) => out.over.push(m('path', { d, class: `lf-cut ${cls}` }));
+      if (word !== 'ended') {
+        // The status colour is a piece of the outline: the fold, the tab, the summit; else the cap under a skyline, between the straight ends of the top.
+        if (n.shape === 'fold') piece(flap(r, t, n.bevel));
+        else if (n.shape === 'tab') piece(tabStrip(l, t, n.w, n.bevel));
+        else if (n.shape === 'summit') piece(summitOf({ l, t, r, b, rise: n.bevel, span: z('summit_span'), tension: g.cut.tension }).fill);
+        else draw(cls, 0, n.shape === 'pill' ? n.h / 2 : n.shape === 'hexagon' || n.shape === 'chamfer' ? n.bevel : 0);
+      }
     } else {
       // What the cuts take off is banded in the palette: the run of the phase, the colour in it the type's.
       bandsFor(g.cut.runs, phase, slotOf(g.cut, lineage), g.cut.bands).forEach((hex, k) => {

@@ -21,6 +21,10 @@ function downTo(n, cx, cy, x, side) {
     return cy + side * Math.sqrt(Math.max(0, hh * hh - over * over));
   }
   if (n.shape === 'sheet' && side > 0) return waveAt(x, cx, cy, n.w, n.h);
+  // A chamfer's cut top corners, a fold's turned one, a summit's rise above its box: the real outline, not its bounds.
+  if (n.shape === 'chamfer' && side < 0) return cy - hh + Math.max(0, (n.bevel ?? 0) - Math.min(x - (cx - hw), cx + hw - x));
+  if (n.shape === 'fold' && side < 0) return cy - hh + Math.max(0, x - (cx + hw - (n.bevel ?? 0)));
+  if (n.shape === 'summit' && side < 0) return cy - hh + (n.bevel ?? 0);
   const b = n.bevel ?? 0, over = Math.max(0, dx - (hw - b));
   if (n.shape === 'cut') return cy + side * (hh - over);
   if (n.shape === 'hexagon' || n.shape === 'lozenge' || (n.shape === 'flag' && x > cx)) return cy + side * hh * (1 - over / b);
@@ -36,6 +40,9 @@ function acrossTo(n, cx, cy, y, side) {
   if (n.shape === 'pill' || n.shape === 'end') return cx + side * (hw - hh + Math.sqrt(Math.max(0, hh * hh - dy * dy)));
   const b = n.bevel ?? 0;
   if (n.shape === 'cut') return cx + side * (hw - Math.max(0, dy - (hh - b)));
+  // A chamfer's and a fold's cut corners, on the right or on both sides, from the top down by the cut.
+  if (n.shape === 'chamfer' && y < cy - hh + b) return cx + side * (hw - (b - (y - (cy - hh))));
+  if (n.shape === 'fold' && side > 0 && y < cy - hh + b) return cx + hw - (b - (y - (cy - hh)));
   if (n.shape === 'hexagon' || n.shape === 'lozenge' || (n.shape === 'flag' && side > 0)) return cx + side * (hw - (b * dy) / hh);
   return cx + side * hw;
 }

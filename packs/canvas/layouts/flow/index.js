@@ -24,6 +24,7 @@ import { effortOf } from './effort.js';
 import { css } from './look.js';
 import { landMarks, landRules, landShades } from './land-look.js';
 import { boxHeight, listOf, ROLES, STATUS_WORDS } from './cut-item.js';
+import { outlineOf } from './type-outline.js';
 import { glyphOf, grammar, itemMarks, itemRules, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
@@ -53,8 +54,11 @@ function lit(i, style, words, state) {
 }
 
 /** A step's outline, centred on x, y, its corners as round as rx, cut into by `cut` (a bevel, a point, a tab). */
-function outline(shape, x, y, w, hgt, rx, cut = 0) {
+function outlineMark(shape, x, y, w, hgt, rx, cut = 0, own = {}) {
   const l = x - w / 2, r = x + w / 2, t = y - hgt / 2, b = y + hgt / 2;
+  // A chamfer, a fold or a summit (./type-outline.js): the pieces of a type's outline that are not a mountain.
+  const piece = outlineOf(shape, l, t, r, b, cut || Math.min(w, hgt) / 4, own);
+  if (piece) return m('path', { d: piece, class: 'lf-shape' });
   if (shape === 'cut') return m('path', { d: `M${l + cut} ${t}H${r - cut}L${r} ${t + cut}V${b - cut}L${r - cut} ${b}H${l + cut}L${l} ${b - cut}V${t + cut}Z`, class: 'lf-shape' });
   if (shape === 'hexagon' || shape === 'lozenge') return m('path', { d: `M${l + cut} ${t}H${r - cut}L${r} ${y}L${r - cut} ${b}H${l + cut}L${l} ${y}Z`, class: 'lf-shape' });
   if (shape === 'flag') return m('path', { d: `M${l} ${t}H${r - cut}L${r} ${y}L${r - cut} ${b}H${l}Z`, class: 'lf-shape' });
@@ -151,6 +155,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
   const itemState = String(style.item_state ?? '').split(' '), look = grammar(style);
+  const outline = (shape, x, y, w, hgt, rx, cut) => outlineMark(shape, x, y, w, hgt, rx, cut, { span: z('summit_span'), tension: look.cut?.tension });
   const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : itemState.includes('check') && mark === 'full' && /ph-(finished|ended)/.test(cls)
     ? m('g', {}, m('circle', { cx, cy, r, class: `lf-dot ${cls}` }), m('path', { d: `M${cx - r * 0.5} ${cy + r * 0.05}L${cx - r * 0.12} ${cy + r * 0.42}L${cx + r * 0.52} ${cy - r * 0.4}`, class: 'lf-dot-check' }))
     : mark === 'half'
@@ -334,7 +339,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
-    const nameY = (s, y) => (s.shape === 'carved' && look.cut ? (Object.keys(look.cut.status).length ? y + (s.h * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
+    const CARVE = ['carved', 'chamfer', 'fold', 'summit', 'hexagon', 'pill', 'tab'];
+    const nameY = (s, y) => (CARVE.includes(s.shape) && look.cut ? (Object.keys(look.cut.status).length ? y + (s.shape === 'summit' ? s.bevel / 2 : 0) + ((s.h - (s.shape === 'summit' ? s.bevel : 0)) * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
     const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n) });
     for (const rule of extra.rules ?? []) colourRules.add(rule);
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
