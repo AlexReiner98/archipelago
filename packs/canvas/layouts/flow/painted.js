@@ -98,6 +98,9 @@ function channels(v) {
  * An island's land: its colour `hue` mixed into the sea at `tint` (0 to 1), as its frame's land is (./islands.js,
  * color-mix in srgb). Answers the sea where the island has no colour.
  */
+/** The ground an island's land is tinted into: the theme's `land_ground` (packs/canvas/pack.json) where it gives one, else the sea. */
+const groundOf = (sea) => (typeof document !== 'undefined' && document.documentElement && getComputedStyle(document.documentElement).getPropertyValue('--land-ground').trim()) || sea;
+
 export function landOf(hue, tint, sea) {
   const a = channels(hue), b = channels(sea);
   if (!a || !b || !(tint >= 0 && tint <= 1)) return sea;
@@ -184,7 +187,7 @@ export function paintIslands({ islands, tools, placed }) {
       // One ground: the look's frame painted in its island's land, under its paint, and that land its theme's sea. An
       // island with no colour of its own is tinted with the line's, as its frame's land is (./islands.js, .lf-island).
       const lens = surface.colours?.lens ?? {};
-      r.land = landOf(isle.hue || lens.line || lens.muted, isle.tint, lens.sea);
+      r.land = landOf(isle.hue || lens.line || lens.muted, isle.tint, groundOf(lens.sea));
       const theme = themeOf(surface.colours, r.land);
       try {
         frames.as(r, () => isle.look.default({

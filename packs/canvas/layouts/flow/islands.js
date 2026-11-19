@@ -150,7 +150,7 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
 
 export const css = `
 /* An island: its shore its frame's outline in its colour, its land a tint of it over the sea, under every wire. */
-.lf-island { --lf-land: color-mix(in srgb, var(--lf-island, var(--ln-line)) var(--ln-flow-island-tint), var(--ln-sea)); }
+.lf-island { --lf-land: color-mix(in srgb, var(--lf-island, var(--ln-line)) var(--ln-flow-island-tint), var(--land-ground, var(--ln-sea))); }
 .lf-region { pointer-events: none; }
 /* A painted island's land takes the pointer for its look, which says when it points at something. */
 .lf-region .lf-painted { pointer-events: all; }
