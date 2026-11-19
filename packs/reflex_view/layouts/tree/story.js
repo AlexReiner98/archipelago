@@ -1,6 +1,6 @@
 // Layer: graph. The one seam where the tree's story comes in (the owner, 19 Nov 2026, on task e_yhqubh9k): over a
 // window of real days, each miss (a refusal, bump or trap no node covered, where it happened, and the trial node
-// written from it if one was), each saying with its verdict (held, came_back, quiet), and each node's tier (core,
+// written from it if one was), each saying with its verdict (held, failed, quiet; quiet lights as held), and each node's tier (core,
 // pack, owner, learned) and standing (trial, current, retired). The reflex_view pack answers it (its view named in
 // the view's sends as `story`):
 //
@@ -20,7 +20,7 @@ const tierOf = (item) => (item?.type === 'reflex' || item?.is?.includes?.('refle
 const statusOf = (item) => (['trial', 'current', 'retired'].includes(item?.status) ? item.status : item?.open === false ? 'retired' : 'current');
 
 /** The story the pack answered, made whole; or, where it answered none, the schematic one. Times are ms. */
-export function storyOf(answer, came, counts, n, now = Date.now()) {
+export function storyOf(answer, came, counts, n, now = Date.now(), tiers = new Map()) {
   if (came && Array.isArray(came.nodes)) {
     const nodes = new Map(came.nodes.filter((x) => x && typeof x.id === 'string').map((x) => [x.id, { tier: TIERS.includes(x.tier) ? x.tier : 'owner', status: statusOf(x), for: x.for, title: x.title }]));
     const time = (v) => Date.parse(v);
@@ -33,7 +33,7 @@ export function storyOf(answer, came, counts, n, now = Date.now()) {
   const items = (answer.items ?? []).filter((i) => !i.pending && ['instruction', 'reflex'].some((t) => i.type === t || i.is?.includes?.(t)));
   const made = items.map((i) => Date.parse(i.created_at)).filter(Number.isFinite);
   const to = now, from = Math.min(to - n('reflex_window_days') * DAY, ...made);
-  const nodes = new Map(items.map((i) => [i.id, { tier: tierOf(i), status: statusOf(i), for: i.fields?.for }]));
+  const nodes = new Map(items.map((i) => [i.id, { tier: TIERS.includes(tiers.get(i.id)) ? tiers.get(i.id) : tierOf(i), status: statusOf(i), for: i.fields?.for }]));
   const misses = items.filter((i) => tierOf(i) === 'learned' && statusOf(i) === 'trial').map((i) => ({ at: Date.parse(i.created_at), where: [i.fields?.for].flat()[0], grew: i.id }));
   const said = items.flatMap((i) => {
     const c = Math.min(counts?.get(i.id) ?? 0, n('reflex_mock_said_most')), start = Math.max(from, Date.parse(i.created_at) || from);

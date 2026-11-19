@@ -56,7 +56,8 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const ids = first.written.map((node) => node.id);
   const [records, told] = await Promise.all([recordsOf(ids, style, tools, n), recordsOf(ids, style, tools, n, 'story')]);
   const counts = new Map((records ?? []).filter((r) => r && Number.isFinite(Number(r.said))).map((r) => [r.id, Number(r.said)]));
-  const story = storyOf(answer, told, records ? counts : null, n);
+  const tiers = new Map((records ?? []).filter((r) => r && typeof r.tier === 'string').map((r) => [r.id, r.tier]));
+  const story = storyOf(answer, told, records ? counts : null, n, Date.now(), tiers);
   const placeOf = new Map([...(records ?? []).filter((r) => r && r.for !== undefined).map((r) => [r.id, r.for]), ...[...story.nodes].filter(([, x]) => x.for !== undefined).map(([id, x]) => [id, x.for])]);
   const presets = [...story.nodes].filter(([, x]) => x.tier === 'core' || x.tier === 'pack').map(([id, x]) => ({ id, ...x }));
   const tree = treeOf(answer, (item) => item.fields?.for ?? placeOf.get(item.id), n, presets);
