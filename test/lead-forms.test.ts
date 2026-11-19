@@ -113,7 +113,7 @@ test('a line: one field as one line, named and cut; a link into it by its far en
   assert.equal(leadMarks({ id: 'e_1', props: {} }, about, null, { links: ties('serves', true) }), null);
 });
 
-test("an open decision: one line per option, what it means after its name, the recommended one marked, three in sight", () => {
+test("an open decision: one per option, what it means in full under its name, the recommended one marked, three in sight", () => {
   const decision = { capabilities: { lead: { form: 'choices' } } };
   const options = [
     { title: 'Count the island', says: 'A bar of its island. Recommended.' },
@@ -127,7 +127,8 @@ test("an open decision: one line per option, what it means after its name, the r
   assert.doesNotMatch(said(lines(two)[1] as Marks), /★/);
   assert.match(said(two), /"tip":"No bar: Only part_of counts."/);
   // What each means is read on its own line, after its name, muted and cut where it does not fit (the owner, 18 Nov 2026).
-  assert.match(said(lines(two)[1] as Marks), /"look":"muted"[^\]]*"Only part_of counts."/, 'what it means follows its name');
+  assert.match(said(lines(two)[1] as Marks), /"look":"muted"[^\]]*"Only part_of counts."/, 'what it means, whole, under its name');
+  assert.doesNotMatch(said(lines(two)[1] as Marks), /"tip":"Only part_of/, "said whole, not cut to a tip");
   assert.match(said(lines(two)[0] as Marks), /"A bar of its island\."/, 'the word that it is recommended is left to the mark');
   assert.doesNotMatch(said(lines(two)[0] as Marks), /"[^"]*Recommended[^"]*"\]/, 'not said again in the words');
   const five = ['A', 'B', 'C', 'D', 'E'].map((t) => ({ title: t, ...(t === 'E' && { recommended: true }) }));

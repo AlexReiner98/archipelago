@@ -56,7 +56,7 @@ const LINKED = ['aim', 'done', 'place', 'actor'];
 const recommended = (x, says) => (x && typeof x === 'object' && x.recommended === true) || /\brecommended\b/i.test(says ?? '');
 
 /**
- * The choices of a question still open, one line each: its name, then what it means, the recommended one
+ * The choices of a question still open, one each: its name, and under it what it means in full, the recommended one
  * marked. As many as the band has room for are in sight, the recommended one always among them, the rest behind a
  * count at the end of the last line. A press on one asks to settle it by that one.
  */
@@ -75,12 +75,14 @@ function choices(c, item, { writes, asking }, room) {
   const more = hidden.length > 0 && (writes
     ? ['menu', { key: 'choices-more', label: `+${hidden.length}`, look: 'quiet' }, ...hidden.map(name)]
     : ['text', { look: 'muted', tip: tip(hidden.map((i) => c.list[i]).join(' · ')) }, `+${hidden.length}`]);
-  // The mark after the name, so every name starts at the band's edge whether or not it is the recommended one; what it
-  // means follows on the same line, muted and cut where it does not fit (the owner, 18 Nov 2026: a choice is read
-  // with what it means, never from its name alone), the word that it is recommended left to the mark.
-  const means = (i) => String(c.says[i] ?? '').replace(/\s*\(?\brecommended\b\)?\.?\s*/gi, ' ').trim();
-  const lines = shown.map((i, n) => line(name(i), ...(rec[i] ? [['text', { tone: 'ok', tip: 'Recommended' }, '★']] : []),
-    means(i) ? rest(means(i), { look: 'muted' }) : ['box', { grow: true }], n === shown.length - 1 && more));
+  // The mark after the name, so every name starts at the band's edge whether or not it is the recommended one; under
+  // it, what it means in full, muted (the owner, 19 Nov 2026: "for decisions lets ensure the full option shows for
+  // each"), the word that it is recommended left to the mark.
+  const means = (i) => String(c.says[i] ?? '').replace(/\s*\(?\brecommended\b\)?[.;,:]?/gi, '').replace(/\s+/g, ' ')
+    .replace(/([.!?]) ([a-z])/g, (_, end, first) => `${end} ${first.toUpperCase()}`).trim();
+  const lines = shown.map((i, n) => ['box', { key: `choice-option:${i}`, flow: 'column', gap: 1 },
+    line(['box', { flow: 'row', grow: true }, name(i), ...(rec[i] ? [['text', { tone: 'ok', tip: 'Recommended' }, '★']] : [])], n === shown.length - 1 && more),
+    ...(means(i) ? [['box', { key: `choice-means:${i}`, flow: 'row' }, ['text', { look: 'muted' }, means(i)]]] : [])]);
   const ask = asking !== undefined && ['box', { flow: 'column', gap: 1, look: 'sunk', pad: 2 },
     ['text', {}, `Settle it: ${c.list[asking]}`],
     ...(c.why ? [['input', { key: 'choice-why', kind: 'text', hint: 'Why? (optional)', grow: true, focus: true }]] : []),

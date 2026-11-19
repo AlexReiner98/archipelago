@@ -217,6 +217,10 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 .pm-box[data-key="lead"] .pm-button { padding-block: 0; }
 .pm-box[data-key="lead"] .pm-grow > .pm-button-quiet { color: var(--text); }
 .pm-box[data-key="lead"] .pm-grow > .pm-button-quiet:hover { color: var(--accent); }
+/* A decision's option: its name on the band's rhythm, and under it what it means in full, wrapping to the lines it
+   needs (the owner, 19 Nov 2026): the one words on the band that are read whole. */
+.pm-box[data-key="lead"] > .pm-box[data-key^="choice-option:"] { align-items: stretch; }
+.pm-box[data-key^="choice-means:"] > .pm-text { white-space: normal; overflow-wrap: anywhere; }
 /* A band that is a picture of what it draws (packs/sheet/page/screens.js, leadPicture): small, as high as the style's lead_picture. */
 .lead-picture { border-bottom: var(--border-1) solid var(--line); padding-bottom: var(--space-5); }
 .lead-picture img { display: block; width: 100%; height: var(--lead-picture, var(--thumb-still)); object-fit: cover; border-radius: var(--radius-1); }
