@@ -96,8 +96,7 @@ function channels(v) {
 
 /**
  * The ground an island's land is tinted into: the sea, lifted toward the text by `lift` (0 to 1) where the theme is dark
- * (its text lighter than its sea), as the theme's `land_ground` colour is for the frame's own land (packs/canvas/pack.json;
- * `flow_island_ground` is the same share). This runs where no page is, so it is worked out here, not read off the page.
+ * (its text lighter than its sea), as the frame's own land is (./islands.js, the theme's `land_lift` colour at the same `flow_island_ground`). This runs where no page is, so it is worked out here, not read off the page.
  */
 export function groundOf(sea, text, lift) {
   const a = channels(sea), b = channels(text);
