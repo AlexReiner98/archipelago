@@ -98,6 +98,8 @@ export function squareLines({ wires, nodes, x, y, sizes }) {
   const edgeId = (i, j, d) => (d === E ? at(i, j) * 2 : d === W ? at(i - 1, j) * 2 : d === S ? at(i, j) * 2 + 1 : at(i, j - 1) * 2 + 1);
   const blocked = (i, j, d) => (d === E ? i >= NX - 1 || hBlock[at(i, j)] : d === W ? i < 1 || hBlock[at(i - 1, j)] : d === S ? j >= NY - 1 || vBlock[at(i, j)] : j < 1 || vBlock[at(i, j - 1)]);
 
+  let work = 0;
+  const MOST = sizes.flow_square_work ?? Infinity;
   const route = (w) => {
     const [qa, qb] = [boxes.get(w.a), boxes.get(w.b)];
     if (!qa || !qb) return null;
@@ -114,6 +116,7 @@ export function squareLines({ wires, nodes, x, y, sizes }) {
       heap.push([g + reach(xs[s.p[0]], ys[s.p[1]]), k, g]);
     }
     while (heap.size) {
+      work++;
       const [, k, g] = heap.pop();
       if (k === -1) {
         const end = from.get('end'), line = [];
@@ -166,7 +169,7 @@ export function squareLines({ wires, nodes, x, y, sizes }) {
   const long = (w) => Math.abs((x.get(w.a) ?? 0) - (x.get(w.b) ?? 0)) + Math.abs((y.get(w.a) ?? 0) - (y.get(w.b) ?? 0));
   const results = new Array(wires.length).fill(null);
   [...wires.keys()].sort((p, q) => long(wires[p]) - long(wires[q]) || p - q).forEach((k) => {
-    const done = route(wires[k]);
+    const done = work < MOST ? route(wires[k]) : null; // past the picture's work a wire goes straight (its budget, as the flow's: counted, never timed)
     if (done) (record(done), (results[k] = done.points));
   });
   return apart(results, sizes.flow_square_track);
