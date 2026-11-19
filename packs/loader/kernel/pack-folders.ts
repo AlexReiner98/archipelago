@@ -20,6 +20,8 @@ const read = new Map<string, string>();
 
 /** The pack.json this process read with that hash, if it has read one. */
 export const manifestRead = (hash: string | undefined): string | undefined => (hash ? read.get(hash) : undefined);
+/** Keep a manifest's text by its hash, as one read from a file is: a pack the map holds as items (packs/loader/kernel/pack-source.ts). */
+export const keepRead = (hash: string, text: string): void => void read.set(hash, text);
 
 export interface PackFolders<P> {
   /** Each workspace pack found, by id. */

@@ -16,7 +16,7 @@ import { LOCAL_PACK, Registry, type TypeDef } from './packs.ts';
 import { followMade, followPacks, islandsOn, packsOff, setIslands, syncPacks } from './packstate.ts';
 import { hostFor } from './packtools.ts';
 import { ISLANDS } from './islands.ts';
-import { takeTypeItems } from './type-items.ts';
+import { followRegistry } from './registry-log.ts';
 import { syncTypes } from './typetable.ts';
 import { judgeExamples } from './rule-check.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
@@ -40,7 +40,7 @@ export const OPEN: RootOpen = {
       const pelago = o.pelago!;
       await syncPacks(pelago); // which packs are present, and as which manifests, is a fact on the log
       pelago.registry.turnOff(await packsOff(pelago), await islandsOn(pelago));
-      await takeTypeItems(pelago);
+      await followRegistry(pelago);
       // The packs kept as items are read with the type items: the log and the packs on take them in now.
       if (pelago.registry.made.size) await followMade(pelago);
     },
@@ -79,7 +79,7 @@ export const FOLLOW: RootFollow = [
     const mark = await followMark(ws.pelago); // read before what it guards, so a change in between is followed next beat
     if (followed.get(ws.pelago) === mark) return;
     if (ws.pelago.registry.followLocal(await localTypes<TypeDef>(ws.pelago.db))) await syncTypes(ws.pelago);
-    if (await takeTypeItems(ws.pelago)) await syncTypes(ws.pelago);
+    if (await followRegistry(ws.pelago)) await syncTypes(ws.pelago);
     await followPacks(ws.pelago);
     followed.set(ws.pelago, mark);
   },
