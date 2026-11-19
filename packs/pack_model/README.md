@@ -34,7 +34,9 @@ A pack kept on the map with no file (core's "Kept as an item") has no
 ## A part
 
 Every declaration of a pack is one item, `part_of` its pack's item, and
-every part keeps its declaration the same way: `spec`.
+every part keeps its declaration the same way: `spec`. Its pack is the pack
+item it is `part_of`, else `shipped.pack`; one the owner made in a pack has
+only the link. A part that is not open is out of its pack's manifest.
 
 | Manifest key | Part type |
 |---|---|
@@ -54,7 +56,8 @@ every part keeps its declaration the same way: `spec`.
 | title, note | The declaration's `title` and `description` (`body` where it says its words there, as an instruction). With no title, its id. |
 | `declares` | Its id as its pack file gives it: `task`, `build.lane`, `agent_changes`, `of:task`. Unique within its pack. |
 | `spec` | The rest of the declaration, whole (a screen's `form` and an instruction's `type` stay in it). |
-| `shipped` | `{ pack, version, hash, value }`: the declaration exactly as the file held it and its hash. Which pack a part is of is `shipped.pack`. |
+| `shipped` | `{ pack, version, hash, value, dropped? }`: the declaration exactly as the file held it and its hash; `dropped` the version that stopped shipping it (install retires it then, and a later version that ships it again brings it back; one the owner retired stays retired). |
+| `pack_merge` | `both` on a change install offers where the owner and the file changed the same field (below). |
 | `runs` | layout, part: `[{ path, hash }]`, the modules it runs. |
 | status | `current` (`kept` for a layout or part); `retired` when a later version of its pack drops it. |
 
@@ -66,16 +69,19 @@ The typed fields a part type had before (a style's colours, a screen's
 
 `packs/loader/kernel/pack-model.ts`: `partsOf(manifest, { folder, files })`
 gives the items a file makes (install), `manifestsOf(items)` the manifests
-the items make, with their hashes (the registry's `PackModel`), and
-`MODEL_KINDS` the item types. Every pack file in `packs/` comes back from its
+the items make, with their text and hashes, and `PACK_MODEL` the
+registry's seam (`setPackModel(PACK_MODEL)`). Install keeps a copy of the
+mapping in its own pack (pack code imports no kernel); a test holds the two
+to the same items. Every pack file in `packs/` comes back from its
 items whole (`test/pack-model-assemble.test.ts`).
 
 ## Hashes
 
-- A declaration's or a manifest's `hash` is `sha256:` and the hex sha256 of
-  its canonical JSON: keys sorted at every depth, no whitespace, arrays in
-  their order, strings as `JSON.stringify` writes them.
-- A file's `hash` in `runs` is `sha256:` and the hex sha256 of its bytes.
+- A declaration's or a manifest's `hash` is the hex sha256 of its canonical
+  JSON: keys sorted at every depth, no whitespace, arrays in their order,
+  strings as `JSON.stringify` writes them. A manifest read from the map is
+  that text, and the registry and the log keep it by that hash.
+- A file's `hash` in `runs` is the hex sha256 of its bytes.
 - A path is from the repository's root, with `/`: `packs/canvas/layouts/flow/index.js`.
 
 ## Upgrade: field by field
@@ -87,7 +93,8 @@ the new file's.
 - Same hash: nothing to do.
 - A field the item still holds as `shipped.value` had it takes the new file's.
 - A field the owner changed stays theirs; where the file changed it too, the
-  owner's is kept and the clash is said on the change.
+  owner's is kept, and install offers the file's as a change of its own
+  carrying `pack_merge: "both"`, which install's rule holds for the owner.
 - A field is the title, the note, or a top-level key of `spec`; for a type,
   each entry of `spec.fields` is a field of its own.
 - `shipped` is then the new file's.

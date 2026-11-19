@@ -27,6 +27,7 @@ test('every part type records what it declares and what it shipped as', () => {
     assert.equal(t.fields.declares?.type, 'string', `${id} has declares`);
     assert.equal(t.fields.shipped?.type, 'json', `${id} has shipped`);
     assert.ok(t.fields.shipped?.large, `${id}'s shipped may hold a large declaration`);
+    assert.equal(t.fields.pack_merge?.type, 'string', `${id} can carry an offer install makes`);
   }
   for (const id of ['type', 'link_type', 'rule', 'view']) assert.equal(reg.type(id)!.fields.spec?.type, 'json', `${id} keeps its declaration in spec`);
   for (const id of ['layout', 'part', 'pack']) assert.equal(reg.type(id)!.fields.runs?.type, 'json', `${id} names its code by path and hash`);
