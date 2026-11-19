@@ -131,7 +131,8 @@ export function kernelProblems(k: unknown): string[] {
   if (s.internal !== true) problems.push('kernel.internal is true: a root or service pack is versioned with the server');
   if (s.modules !== undefined && (typeof s.modules !== 'string' || !/^[\w-]+\/?$/.test(s.modules))) problems.push(`kernel.modules is a folder of the pack's own, such as "kernel/"`);
   const ref = (where: string, r: unknown) => { if (typeof r !== 'string' || !MODULE_REF.test(r) || r.includes('..')) problems.push(`${where} names a function of the pack's modules, <file>.ts#<export>: ${JSON.stringify(r)}`); };
-  for (const [name, p] of Object.entries((s.provides ?? {}) as Record<string, Raw>)) ref(`kernel.provides.${name}`, p?.run);
+  // A setting runs nothing: it is a value the workspace keeps, its shape and default said (packs/loader/kernel/services.ts).
+  for (const [name, p] of Object.entries((s.provides ?? {}) as Record<string, Raw>)) if (!name.startsWith('setting.')) ref(`kernel.provides.${name}`, p?.run);
   // kept: the answer is a read of the map alone, kept until the map moves (packs/loader/kernel/kept.ts).
   for (const [name, p] of Object.entries((s.provides ?? {}) as Record<string, Raw>)) if (p?.kept !== undefined && p.kept !== true) problems.push(`kernel.provides.${name}.kept is true, or absent for a service whose answer is not kept`);
   for (const [point, r] of Object.entries((s.hooks ?? {}) as Record<string, unknown>)) for (const one of [r].flat()) ref(`kernel.hooks.${point}`, one);

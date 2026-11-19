@@ -65,5 +65,3 @@ export async function said_record(ctx: KernelContext, q: { said_record: { ids: u
   });
 }
 
-/** answer.said_record: the record of some instructions, for the view reflex_said.record. */
-export const recordAnswer = (ctx: KernelContext, input: { ids: unknown; days?: unknown }) => said_record(ctx, { said_record: input });

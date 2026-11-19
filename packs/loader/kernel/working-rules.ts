@@ -51,11 +51,17 @@ export function presetsSaid(presets: StyleDef[], where: string): { title: string
     .map(({ title, text }) => ({ title, text }));
 }
 
+/** The working rules file with these rules said in it, one bullet each, where its marker stands. */
+export const rulesFile = (rules: { title: string; text: string }[], root = ROOT): string =>
+  readFileSync(join(root, 'examples/working-rules.md'), 'utf8').replace(MARKER, rules.map((one) => `- **${one.title}.** ${one.text}`).join('\n'));
+
 /** The working rules file, with the working_rules instructions of the packs this server turns on (or these) said in it. */
 export function workingRules(packs: PackFile[] = serverPacks(), root = ROOT): string {
-  const rules = presetsSaid(presetsOf(packs, 'instruction'), 'working_rules').map((one) => `- **${one.title}.** ${one.text}`);
-  return readFileSync(join(root, 'examples/working-rules.md'), 'utf8').replace(MARKER, rules.join('\n'));
+  return rulesFile(presetsSaid(presetsOf(packs, 'instruction'), 'working_rules'), root);
 }
 
-/** The working rules as a plugin ships them: without the bump skill's line, a skill only Archipelago's own work has. */
-export const shippedRules = (): string => workingRules(checkoutPacks()).replace(/^- \*\*When Archipelago gets in your way,\*\*.*\r?\n(?: {2}.*\r?\n)*/m, '');
+/** A rules file without the bump skill's line, a skill only Archipelago's own work has. */
+export const withoutBump = (file: string): string => file.replace(/^- \*\*When Archipelago gets in your way,\*\*.*\r?\n(?: {2}.*\r?\n)*/m, '');
+
+/** The working rules as a plugin ships them: every pack's words, without the bump skill's line. */
+export const shippedRules = (): string => withoutBump(workingRules(checkoutPacks()));

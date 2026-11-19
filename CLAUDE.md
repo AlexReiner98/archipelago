@@ -1,3 +1,5 @@
+<!-- Written from the map: change the instructions for written:CLAUDE.md there; each session start writes this file again. -->
+
 # Archipelago: working rules for agent sessions
 
 Archipelago is a typed map of people, work and dependencies, used by a human and by
@@ -311,7 +313,6 @@ else a pack"). These rules keep it composable while that happens, and
   keeps the mechanism (layouts, renderers, CSS rules reading variables) and
   no values: a colour, a length or a number constant in the page's code is counted,
   and the count only goes down.
-
 - **Every view is drawn by a layout a pack ships** (the owner, 22 Oct 2026):
   code for one form (list, flow, grid...), in `pack.json` `layouts`, changed by the owner on
   the map, run in the sandbox, answering with marks the page checks

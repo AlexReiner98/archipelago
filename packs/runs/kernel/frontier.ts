@@ -217,13 +217,21 @@ export function said(r: FrontierItem['reasons'][number]): string {
   }
 }
 
-/** The frontier as the lines a session is handed as it starts. */
-export function frontierText(f: Awaited<ReturnType<typeof frontier>>): string[] {
-  if (!f.before.sessions) return ['No session has worked here before on this map: nothing to pick up. What you make here is what the next session will find.'];
-  const lines = [
-    `Where this session stands: ${f.before.sessions} earlier ${f.before.sessions === 1 ? 'session' : 'sessions'} worked here. What their work reaches that is open, each with why it needs attention now, the strongest first. Walk from these (brief on one, or query flat) rather than starting fresh, and do not reopen what is decided.`,
-  ];
-  if (!f.items.length) lines.push('Nothing their work reaches is open.');
+/** Where the frontier's sentences are worded: instructions the owner may reword on the map (the runs pack's presets). */
+export const FRONTIER_WORDS = { stands: 'session_start:stands', none: 'session_start:stands_none', empty: 'session_start:stands_empty' } as const;
+
+/** The places a frontier's lines are worded at, those it will say. */
+export const frontierPlaces = (f: Awaited<ReturnType<typeof frontier>>): string[] =>
+  !f.before.sessions ? [FRONTIER_WORDS.none] : [FRONTIER_WORDS.stands, ...(f.items.length ? [] : [FRONTIER_WORDS.empty])];
+
+/** The names in braces filled in; one the fill does not have is left as it is (the agents pack's `filled`, copied). */
+const fillIn = (text: string, fill: Record<string, string>) => text.replace(/\{([a-z_]+)\}/g, (all, name: string) => fill[name] ?? all);
+
+/** The frontier as the lines a session is handed as it starts, in the words at its places (`words`, by place). */
+export function frontierText(f: Awaited<ReturnType<typeof frontier>>, words: Record<string, string>): string[] {
+  if (!f.before.sessions) return [words[FRONTIER_WORDS.none] ?? ''];
+  const lines = [fillIn(words[FRONTIER_WORDS.stands] ?? '', { count: String(f.before.sessions), sessions: f.before.sessions === 1 ? 'session' : 'sessions' })];
+  if (!f.items.length) lines.push(words[FRONTIER_WORDS.empty] ?? '');
   for (const i of f.items) lines.push(`- ${i.title} (${i.id}), ${i.status}: ${i.reasons.map(said).join('; ')}`);
   if (f.more) lines.push(f.more);
   return lines;

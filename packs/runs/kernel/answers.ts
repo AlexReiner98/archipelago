@@ -3,8 +3,8 @@
 // object keyed by run id.
 
 import type { KernelContext } from '#pelago/kernel';
-import { FRONTIER_REASONS, frontier as frontierOf, frontierText, said, workedOn as worked, type FrontierInput } from './frontier.ts';
-import { narrowed as narrowedOf, narrowedText } from './frontier-prompt.ts';
+import { FRONTIER_REASONS, frontier as frontierOf, frontierPlaces, frontierText, said, workedOn as worked, type FrontierInput } from './frontier.ts';
+import { NARROWED_AT, narrowed as narrowedOf, narrowedText } from './frontier-prompt.ts';
 import { livesIn as livesInOf, livesInFor, placeFor as placeOf } from './places.ts';
 import { byAttention, markOf, sessionStates } from './session-state.ts';
 import { sessionsOn } from './sessions-on.ts';
@@ -28,8 +28,12 @@ export async function frontier(ctx: KernelContext, input: FrontierInput & { said
   const f = await frontierOf(ctx, { run, cwd, remote, limit });
   const rank = (r: { why: string }) => FRONTIER_REASONS.indexOf(r.why as (typeof FRONTIER_REASONS)[number]);
   const items = withSaid ? f.items.map((i) => ({ ...i, reasons: [...i.reasons].sort((a, b) => rank(a) - rank(b)).map((r) => ({ ...r, said: said(r) })) })) : f.items;
-  return { ...f, items, ...(lines && { lines: frontierText(f) }) };
+  return { ...f, items, ...(lines && { lines: frontierText(f, await wordsAt(ctx, frontierPlaces(f), run)) }) };
 }
+
+/** The words at some places (the agents pack's instructions, under the owner's), each one string, said to `run` when one is named. */
+const wordsAt = async (ctx: KernelContext, wheres: string[], run?: string) =>
+  (await ctx.call<object, { at: Record<string, string> }>('answer.instructions', { wheres, ...(run && { run }) })).at;
 
 /** What some sessions worked on: what they changed, touched or were set to work on. */
 export const workedOn = async (ctx: KernelContext, input: { runs: string[] }) => ({ ids: await worked(ctx, ids(input?.runs, 'runs')) });
@@ -66,7 +70,9 @@ export const placeFor = async (ctx: KernelContext, input: { remote?: string; cwd
 export const livesIn = (ctx: KernelContext, input: { type?: string }) => ({ kinds: livesInOf(ctx), ...(typeof input?.type === 'string' && { link: livesInFor(ctx, input.type) }) });
 
 /** What the map has settled and left open on some text a session was asked; with said, also as the text a hook hands the session (none when it holds nothing). */
-export async function narrowed(ctx: KernelContext, input: { text: string; said?: boolean }) {
+export async function narrowed(ctx: KernelContext, input: { text: string; said?: boolean; run?: string }) {
   const n = await narrowedOf(ctx, String(input?.text ?? ''));
-  return input?.said ? { ...n, text: narrowedText(n) ?? null } : n;
+  if (!input?.said) return n;
+  const held = n.settled.length || n.open.length;
+  return { ...n, text: (held ? narrowedText(n, (await wordsAt(ctx, [NARROWED_AT], typeof input.run === 'string' ? input.run : undefined))[NARROWED_AT]) : undefined) ?? null };
 }

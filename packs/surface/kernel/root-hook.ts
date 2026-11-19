@@ -8,7 +8,8 @@
 import type { RootCall } from '../../loader/kernel/root-calls.ts';
 import type { ServerPacks } from './server-host.ts';
 import { answerAt } from '../../loader/kernel/server-adapter.ts';
-import { shippedRules } from '../../loader/kernel/working-rules.ts';
+import { withoutBump } from '../../loader/kernel/working-rules.ts';
+import { workspaceRules } from './workspace-rules.ts';
 import { setupVersion } from './server-files.ts';
 import { runsRead } from './packreads-runs.ts';
 
@@ -26,8 +27,12 @@ const joined = (hookEventName: string, ...answers: Told[]): Told => {
   const all = Object.assign({}, ...answers) as Told;
   return words ? { ...all, hookSpecificOutput: { hookEventName, additionalContext: words } } : all;
 };
-/** The working rules a session is handed as it starts: no file of the plugin's is read, since no script runs. */
-const rules = (): Told => ({ hookSpecificOutput: { additionalContext: shippedRules() } });
+/**
+ * The working rules a session is handed as it starts: no file of the plugin's is read, since no script runs. They are
+ * the calling workspace's, so what the owner rewords on the map reaches the next session; a plugin reaches any
+ * repository, so the bump skill's line is left out.
+ */
+const rules = async (l: Parameters<typeof workspaceRules>[0]): Promise<Told> => ({ hookSpecificOutput: { additionalContext: withoutBump(await workspaceRules(l)) } });
 
 /** What the hook tool hands: the event, what Claude Code hands the hook, and what the token may do. */
 export interface HookAsk {
@@ -67,7 +72,7 @@ export async function hookAnswer(call: RootCall, input: HookAsk): Promise<Told> 
     ((await answerAt(packs, surface, event, { pelago: l, within: input.within ?? [], may: input.may as never, body: said, running, origin: packs.origin ?? '' })) ?? {}) as Told;
   // A session not yet started is started at its first prompt: the map has no run by its session id.
   const known = Boolean(await runsRead(l, { run_of: { key: input.session_id } }));
-  if (input.event === 'prompt' && !known) return joined('UserPromptSubmit', rules(), await answer('session-start', { ...body, source: 'startup' }), await answer('prompt', body));
-  if (input.event === 'session-start') return joined('SessionStart', rules(), await answer('session-start', body));
+  if (input.event === 'prompt' && !known) return joined('UserPromptSubmit', await rules(l), await answer('session-start', { ...body, source: 'startup' }), await answer('prompt', body));
+  if (input.event === 'session-start') return joined('SessionStart', await rules(l), await answer('session-start', body));
   return answer(input.event, body);
 }

@@ -116,9 +116,10 @@ test('a setting a pack provides is set by its key, checked by its shape, and rea
   const l = await fresh();
   l.registry.packs.push(pack('clock', { kernel: { provides: { 'setting.zone': { out: 'string', read: 'member' }, 'setting.secret_hour': { out: 'number', read: 'admin' } } } }));
   await assert.rejects(callTool(l, owner, 'workspace_set', { settings: { zone: 3 } }), /The setting "zone" \(clock's\): zone is a string/);
-  await assert.rejects(callTool(l, owner, 'workspace_set', { settings: { tide: 1 } }), /No pack here provides the setting "tide": these do, zone, secret_hour/);
+  await assert.rejects(callTool(l, owner, 'workspace_set', { settings: { tide: 1 } }), /No pack here provides the setting "tide": these do, (.+, )?zone, secret_hour/);
   const info = (await callTool(l, owner, 'workspace_set', { settings: { zone: 'Europe/Berlin', secret_hour: 3 } })) as { settings: Record<string, unknown> };
-  assert.deepEqual(info.settings, { zone: 'Europe/Berlin', secret_hour: 3 });
+  assert.deepEqual({ zone: info.settings.zone, secret_hour: info.settings.secret_hour }, { zone: 'Europe/Berlin', secret_hour: 3 });
+  assert.equal(info.settings.reflex_promote_held, null, 'another pack’s, unset');
   const member = l.as('e_member1');
   assert.equal(await member.setting('member.zone'), 'Europe/Berlin', 'every member reads what the pack opened to members');
   assert.equal(await member.setting('admin.secret_hour'), undefined, 'and not what is an admin’s');

@@ -46,7 +46,7 @@ const firstPlace = (where) => (Array.isArray(where) ? where.find((w) => typeof w
 export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0, presets = []) {
   // The presets the story names (core's and the packs', no item of the map) stand with the rest, under their places.
   // A rule is one of them, under the place it guards (`where`); it is marked a rule.
-  const extra = presets.filter((p) => p && typeof p.id === 'string' && !(answer.items ?? []).some((i) => i.id === p.id)).map((p) => ({ id: p.id, type: 'instruction', title: p.title ?? p.id, preset: true, rule: p.kind === 'rule', fields: { for: p.for } }));
+  const extra = presets.filter((p) => p && typeof p.id === 'string' && !(answer.items ?? []).some((i) => i.id === p.id)).map((p) => ({ id: p.id, type: 'instruction', title: p.title ?? p.id, preset: true, rule: p.kind === 'rule', kind: p.kind ?? 'instruction', fields: { for: p.for } }));
   const items = [...(Array.isArray(answer.items) ? answer.items.filter((i) => !i.pending) : []), ...extra];
   const byId = new Map(items.map((i) => [i.id, i]));
   const up = new Map();
@@ -54,7 +54,7 @@ export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0
   const from = answer.lens?.from && byId.has(answer.lens.from) ? answer.lens.from : undefined;
   const nodes = new Map();
   const make = (id, item, title) => {
-    const node = { id, item: item?.preset ? undefined : item, preset: Boolean(item?.preset), rule: Boolean(item?.rule), title, parent: null, kids: [], depth: 0, born: item?.preset ? -Infinity : item ? Date.parse(item.created_at) : Infinity };
+    const node = { id, item: item?.preset ? undefined : item, preset: Boolean(item?.preset), rule: Boolean(item?.rule), kind: item?.kind ?? 'instruction', title, parent: null, kids: [], depth: 0, born: item?.preset ? -Infinity : item ? Date.parse(item.created_at) : Infinity };
     if (Number.isNaN(node.born)) node.born = Infinity;
     nodes.set(id, node);
     return node;
@@ -99,3 +99,18 @@ export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0
   const born = order.slice(1).sort((a, b) => a.born - b.born || a.depth - b.depth);
   return { root, nodes, order, born, written: born.filter((n) => n.item && isNode(n.item)) };
 }
+
+/** The places a node may be said at by their kind alone, with nothing after it. */
+const PLAIN = ['session_start', 'working_rules', 'server_restarted', 'setup_behind'];
+/**
+ * The place a new node on a bough is said at, or null where none can be (the reflex pack refuses any place that is
+ * never said): a tool's or guide's bough by its name, a rule's by its rule, a deeper rule branch at its tool, a file
+ * folder as every file under it, and the plain places by their kind.
+ */
+export const placeOfBough = (id) => {
+  const key = String(id).replace(/^~for:/, '');
+  const [kind, ...rest] = key.split(':');
+  if (!rest.length) return PLAIN.includes(kind) ? kind : null;
+  if (kind === 'file') return `file:${rest.join(':').replace(/\/?$/, '/')}**`;
+  return ['tool', 'guide', 'rule'].includes(kind) ? `${kind}:${rest[0]}` : null;
+};

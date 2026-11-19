@@ -2,11 +2,25 @@
 // pack's (the read said_record), the runs' names are read here, and rows.js makes the rows.
 
 import { countsOf, rowsOf, RUNS_SHOWN } from './rows.js';
+import { addNodeOps, legendOps } from './legend.js';
 
 /** How many instructions one ask of their counts reads at most: the record's own limit. */
 const MOST = 50;
 
 export default {
+  // A node added on a branch of the tree, sent by its drawing as the person looking: a trial reflex said there.
+  'reflex_view.add': async (input) => addNodeOps(input ?? {}),
+
+  // The legend's toggle, sent by the tree's drawing as the person looking (its view's sends): the view's hidden list.
+  'reflex_view.legend': async (input, ctx) => {
+    const view = String(input?.view ?? '');
+    const asItem = view.startsWith('e_') ? await ctx.read({ get: view }) : null;
+    if (view.startsWith('e_') && !(asItem?.is ?? [asItem?.type]).includes('lens')) throw new Error(`${view} is no view`);
+    const versions = asItem ? [] : await ctx.read({ items: { type: 'lens', where: { preset: view } } });
+    const kept = asItem ?? (Array.isArray(versions) ? versions.find((v) => v.status !== 'retired') : undefined);
+    return legendOps(input ?? {}, kept);
+  },
+
   'reflex_view.said': async (input, ctx) => {
     const about = typeof input?.about === 'string' && input.about ? input.about : undefined;
     if (!about) return { answer: [] };
@@ -22,7 +36,15 @@ export default {
   // What the tree's drawing asks through its sends: every miss lately, as the reflex_said pack reads them.
   'reflex_view.misses': async (input, ctx) => {
     const days = Number.isInteger(input?.days) ? input.days : undefined;
-    const found = await ctx.read({ misses: days === undefined ? {} : { days } });
+    const limit = Number.isInteger(input?.limit) ? input.limit : undefined;
+    const found = await ctx.read({ misses: { ...(days !== undefined && { days }), ...(limit !== undefined && { limit }) } });
+    return { answer: Array.isArray(found) ? found : [] };
+  },
+
+  // What the tree's drawing asks through its sends: every type and the checks it implies, with their refusals.
+  'reflex_view.schema': async (input, ctx) => {
+    const days = Number.isInteger(input?.days) ? input.days : undefined;
+    const found = await ctx.read({ said_schema: days === undefined ? {} : { days } });
     return { answer: Array.isArray(found) ? found : [] };
   },
 
@@ -33,15 +55,8 @@ export default {
     return { answer: Array.isArray(found) ? found : [] };
   },
 
-  // What the tree's drawing asks through its sends: its story over a window, as the reflex_said pack tells it.
-  'reflex_view.story': async (input, ctx) => {
-    const ids = Array.isArray(input?.ids) ? input.ids.filter((id) => typeof id === 'string').slice(0, MOST) : [];
-    const days = Number.isInteger(input?.days) ? input.days : undefined;
-    return { answer: await ctx.read({ said_story: { ids, ...(days !== undefined && { days }) } }) };
-  },
-
   // What the tree's drawing asks through its sends: each node's counts, by the id its item is said under.
-  'reflex_view.said_counts': async (input, ctx) => {
+  'reflex_view.counts': async (input, ctx) => {
     const asked = Array.isArray(input?.ids) ? [...new Set(input.ids.filter((id) => typeof id === 'string' && id))].slice(0, MOST) : [];
     if (!asked.length) return { answer: [] };
     const items = await ctx.read({ ids: asked.filter((id) => id.startsWith('e_')) });

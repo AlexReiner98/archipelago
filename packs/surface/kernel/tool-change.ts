@@ -1,6 +1,7 @@
 // The two tools that write facts: change, the one write path, and undo, which takes a change set back. And where an
 // agent's change points the owner's screen.
 
+import { ownWords } from './tool-words.ts';
 import { z } from 'zod';
 import { callAs } from '../../loader/kernel/kernel-context.ts';
 import { bodyAfter } from '../../write/kernel/ops.ts';
@@ -56,13 +57,7 @@ type Refused = { who: string; input: Record<string, unknown> & { ops: unknown[] 
 
 export const WRITE_TOOLS: Record<string, Tool> = {
   change: {
-    description:
-      'The only way to change the map: a list of ops with a reason. ' +
-      'A create\u2019s ref lets later ops link to it, and a title or note in the same change names what it makes as {ref}. Give the source the facts came from. ' +
-      'Change part of a note with append or replace, of code with edit, not the whole. An update of only the id says it is still true. ' +
-      'A plan or research are items with a view, not one note: a finding is evidence, an item that bears_on the question it helps settle. ' +
-      'Checked whole, then applied or held for a human, by policy. ' +
-      'With holds off it applies at once: public reaches anyone, code runs for all who open it, forget is for good; stakes say what it reached. A refused change is kept a few minutes under a name the refusal gives: send retry and fixes (the wrong ops, by number). A settled decision is put to the owner later (attention, to_confirm).',
+    description: ownWords('tool:change'),
     input: {
       ops: z.array(op).min(1).optional().describe('What to change. Needed, except with retry.'),
       reason: z.string().min(1).optional().describe('Why, as the log shows it. Needed, except with retry.'),
@@ -210,8 +205,7 @@ export const WRITE_TOOLS: Record<string, Tool> = {
     },
   },
   undo: {
-    description:
-      'Reverse one change set (its id is on every event it logged) by applying the opposite as a new change: created items are archived, edits put back, links removed or restored. An edit changed again since is left alone and reported. Subject to the same policy as any change.',
+    description: ownWords('tool:undo'),
     input: { changeset: z.string() },
     run: async (l, actor, input) => undo(l, actor, input),
   },

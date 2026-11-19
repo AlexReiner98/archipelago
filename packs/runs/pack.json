@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "title": "Runs",
   "description": "The reads of core's run and works_on, which any pack may call: where a session stands (the frontier) and what sessions worked on, their states and turns, when they were at work, what they spent, what their turns tell, and the place a session is in. Required, so they answer on every map; what a session is told and kept is the sessions pack's.",
-  "uses": ["service:answer.attention", "service:answer.view_style"],
+  "uses": ["service:answer.attention", "service:answer.view_style", "service:answer.instructions"],
   "kernel": {
     "trust": "service",
     "internal": true,
@@ -78,10 +78,16 @@
         "run": "answers.ts#livesIn"
       },
       "answer.narrowed": {
-        "in": { "text": "string", "said?": "boolean" },
+        "in": { "text": "string", "said?": "boolean", "run?": "id" },
         "out": { "text?": "any", "settled": [{ "id": "id", "title": "string", "status": "string", "chosen?": "string", "why?": "string" }], "open": [{ "id": "id", "title": "string", "status": "string" }] },
         "run": "answers.ts#narrowed"
       }
     }
-  }
+  },
+  "styles": [
+    {"id": "runs.stands", "type": "instruction", "title": "Where this session stands", "body": "Where this session stands: {count} earlier {sessions} worked here. What their work reaches that is open, each with why it needs attention now, the strongest first. Walk from these (brief on one, or query flat) rather than starting fresh, and do not reopen what is decided.", "props": {"for": ["session_start:stands"]}},
+    {"id": "runs.stands_none", "type": "instruction", "title": "No session here before", "body": "No session has worked here before on this map: nothing to pick up. What you make here is what the next session will find.", "props": {"for": ["session_start:stands_none"]}},
+    {"id": "runs.stands_empty", "type": "instruction", "title": "Nothing open their work reaches", "body": "Nothing their work reaches is open.", "props": {"for": ["session_start:stands_empty"]}},
+    {"id": "runs.narrowed", "type": "instruction", "title": "What the map holds on what was asked", "body": "On what you were just asked, the map already holds this. Do not reopen what is settled unless the owner asks; build on it.", "props": {"for": ["prompt:narrowed"]}}
+  ]
 }

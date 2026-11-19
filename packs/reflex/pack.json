@@ -4,7 +4,8 @@
   "title": "Reflexes",
   "description": "A harness that grows from what goes wrong: a reflex (core's type, beside instruction) is an instruction made from a miss nobody covered, a condition (where it is said, for) and what to say there, tried live and kept or retired by its record. A trial reflex is said only on its exact condition and marked as a trial; a current one is said as any instruction is. A reflex never acts itself: it may name a map action for the agent to take through its own tools, and outside the map it only advises. This pack keeps what answers which miss, the answers link. What records each saying and judges whether its miss came back is the reflex_said pack, what draws it is reflex_view.",
   "requires": [
-    "type:instruction"
+    "type:instruction",
+    "type:reflex"
   ],
   "links": [
     {
@@ -19,6 +20,23 @@
         "*"
       ],
       "description": "An instruction (a reflex among them) said so that this miss does not happen again: a bump, an issue, a refusal written down. Whether it did is read per run, from what came after it was said."
+    }
+  ],
+  "rules": [
+    {
+      "id": "known_place",
+      "when": {
+        "op": [
+          "create",
+          "update"
+        ],
+        "type": "reflex",
+        "matches": {
+          "for": "^(?!(session_start|working_rules|server_restarted|setup_behind|connect)$|(tool|guide|file|rule|session_start|prompt|show|connect|written):.+$)"
+        }
+      },
+      "then": "refuse",
+      "say": "A reflex is said only at a place that is said: for is a list of session_start, working_rules, server_restarted, setup_behind, connect, tool:<name>, guide:<name>, file:<glob>, rule:<pack.rule>, session_start:<part>, prompt:<part>, show:<part>, connect:<part> or written:<path>."
     }
   ]
 }

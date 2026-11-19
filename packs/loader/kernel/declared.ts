@@ -267,9 +267,19 @@ export { PAGES, PIECES };
 
 /** Every screen the packs declare, in the order the packs load. */
 export const screensOf = (packs: PackFile[]) => packs.flatMap((pack) => parts(pack).screens.map((s) => ({ ...s, pack: pack.id })));
-/** Every style preset the packs ship, in the order the packs load. */
-/** The presets the packs ship of one system type, each with its pack: styles unless another type is asked for. */
-export const presetsOf = (packs: PackFile[], type = 'style') => packs.flatMap((pack) => (pack.styles ?? []).filter((s) => (s.type ?? 'style') === type).map((s) => ({ ...s, pack: pack.id })));
+/**
+ * A verb's description as the instruction its tool is described by (tool:<verb>): worded once, in the verb, and the
+ * owner's version of it kept on the map as of any preset. Not a style: said only among the instructions.
+ */
+const verbPresets = (pack: PackFile): StyleDef[] =>
+  (pack.actions ?? []).flatMap((a) => {
+    const verb = a as { id?: string; title?: string; description?: string; kernel?: boolean };
+    return verb.kernel && verb.id && verb.description ? [{ id: `${pack.id}.tool_${verb.id}`, type: 'instruction', title: `The ${verb.id} tool`, body: verb.description, props: { for: [`tool:${verb.id}`] } }] : [];
+  });
+
+/** The presets the packs ship of one system type, each with its pack: styles unless another type is asked for. Instructions include each verb's words (verbPresets). */
+export const presetsOf = (packs: PackFile[], type = 'style') =>
+  packs.flatMap((pack) => [...(pack.styles ?? []).filter((s) => (s.type ?? 'style') === type), ...(type === 'instruction' ? verbPresets(pack) : [])].map((s) => ({ ...s, pack: pack.id })));
 export const stylesOf = (packs: PackFile[]) => presetsOf(packs);
 
 /**

@@ -8,6 +8,7 @@ import { MOST, said_record } from './reads.ts';
 import { sayingsOf, tierOf } from './record.ts';
 import { firingsOf, ruleNodes, rulesRead, type RuleDecl } from './rule-nodes.ts';
 import { storyOf, type StoryNode } from './story.ts';
+import { schemaOf } from './schema-read.ts';
 
 const DAYS = 30;
 const DAYS_MOST = 90;
@@ -56,7 +57,12 @@ export async function said_story(ctx: KernelContext, q: { said_story: { ids?: un
   const uses = (await ctx.reads({ uses_lately: { days: range } })) as { facts: unknown[] }[];
   const fired = firingsOf(uses, new Set(rules.map((r) => r.id)), range);
   const trials = new Set(kept.filter((k) => k.status === 'trial').map((k) => k.id));
-  return storyOf({ from: fromAt.toISOString(), to: now.toISOString(), asked: askedNodes, others, rules, fired, sayings, records, misses: await misses(ctx, { misses: { days } }), trials });
+  // The schema: every type and the checks it implies; each check's refusals counted by day beside the rules' firings.
+  const schema = await schemaOf(ctx, days);
+  const checked = new Map<string, number>();
+  for (const n of schema) for (const at of n.fired ?? []) checked.set(`${n.id} ${at.slice(0, 10)}`, (checked.get(`${n.id} ${at.slice(0, 10)}`) ?? 0) + 1);
+  const checks = [...checked].map(([key, n]) => { const [id, d] = key.split(' '); return { id, day: d, effect: 'refused' as const, n }; });
+  return storyOf({ from: fromAt.toISOString(), to: now.toISOString(), asked: askedNodes, others, rules, schema: schema.map(({ fired: _f, ...n }) => n), fired: [...fired, ...checks], sayings, records, misses: await misses(ctx, { misses: { days } }), trials });
 }
 
 /** `said_rules: { days? }`: every rule in force, with where it applies and each time it fired in the window (rule-nodes.ts). */
@@ -69,5 +75,3 @@ export async function said_rules(ctx: KernelContext, q: { said_rules: { days?: u
   return rulesRead(rules, firingsOf(uses, new Set(rules.map((r) => r.id)), range));
 }
 
-/** answer.tree_story: the story, for the view reflex_said.tree_story. */
-export const storyAnswer = (ctx: KernelContext, input: { ids?: unknown; days?: unknown }) => said_story(ctx, { said_story: input ?? {} });

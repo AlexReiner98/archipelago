@@ -12,7 +12,7 @@
 // under the place it guards ("tool:change:task:status"), each firing an event: the harness acting with no model.
 // Until the pack answers it, the story is made from what the map holds (`schematic`): the window is the oldest
 // node's making to now; a reflex is learned, one kept with a preset its pack's, any other the owner's; each said
-// count (the pack's said_counts, when it came) is spread over the node's days as held; a trial reflex grew from a
+// count (the pack's counts, when it came) is spread over the node's days as held; a trial reflex grew from a
 // miss at its making. No miss is made up beyond that.
 
 const TIERS = ['core', 'pack', 'owner', 'learned'];
@@ -58,7 +58,7 @@ export const weekTo = (story, at) => {
 };
 
 /**
- * The story from the reflex_view pack's two reads, as the seam takes it: its said_counts (each node's tier, status,
+ * The story from the reflex_view pack's two reads, as the seam takes it: its counts (each node's tier, status,
  * for, and per_run sayings with their verdicts) and its misses ({ at, where, covered_by }, newest first). A miss no
  * node covers is a gap; one covered by a node still on trial is that trial's making; one a standing node covers was
  * no miss of the tree's. A quiet saying (its miss never showed) lights as held.
@@ -89,3 +89,12 @@ export const packOf = (node, story) => {
 };
 /** The class a pack's hue is drawn by. */
 export const packClass = (pack) => `rt-p-${String(pack).toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`;
+
+/**
+ * The schema the pack answered (its view schema, sent as `schema`): every type and the checks it implies, each
+ * { id, kind (type or check), pack, tier (schema), for, title, words, guards, fired (a check's refusals, as times) }.
+ */
+export const schemaOf = (nodes) =>
+  (Array.isArray(nodes) ? nodes : [])
+    .filter((x) => x && typeof x.id === 'string' && (x.kind === 'type' || x.kind === 'check'))
+    .map((x) => ({ id: x.id, kind: x.kind, pack: x.pack ?? 'core', title: x.title ?? x.id, for: Array.isArray(x.for) ? x.for : [x.for].filter(Boolean), guards: x.guards, words: x.words, fired: (x.fired ?? []).map((at) => Date.parse(at)).filter(Number.isFinite) }));

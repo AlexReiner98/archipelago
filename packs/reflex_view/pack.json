@@ -26,7 +26,7 @@
       "limit_ms": 5000
     },
     {
-      "id": "reflex_view.said_counts",
+      "id": "reflex_view.counts",
       "shape": "rows",
       "description": "The record of some instructions, for the tree's drawing to ask through its sends: one per id asked, in order, each { id, said, runs, places, last, failed, held, quiet, tier, status, for, per_run: [{ said_at, verdict }] } (the item's status and for as given; the record is the reflex_said pack's said_record). An owner's version of a preset is counted under the preset's id.",
       "input": {
@@ -49,39 +49,21 @@
     {
       "id": "reflex_view.misses",
       "shape": "rows",
-      "description": "Every miss lately, for the tree's drawing to ask through its sends, the newest first: { kind (refusal, bump, trap), key, run, at, where, said, covered_by } (the reflex_said pack's misses). Params: days (30 unless said, 90 at most).",
+      "description": "Every miss lately, for the tree's drawing to ask through its sends, the newest first: { kind (refusal, bump, trap), key, run, at, where, said, covered_by } (the reflex_said pack's misses). Params: days (30 unless said, 90 at most), limit (the newest so many).",
       "input": {
         "type": "object",
         "properties": {
           "days": {
             "type": "integer",
             "description": "How far back, in days."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The newest so many, 1000 at most."
           }
         }
       },
       "limit_ms": 5000
-    },
-    {
-      "id": "reflex_view.story",
-      "shape": "rows",
-      "description": "The tree's story over a window, for its drawing to ask through its sends, as one answer (not rows): { from, to, nodes: [{ id, kind (instruction or rule), pack, tier, effect (a rule's), status, for, title }], misses: [{ at, where, kind, grew }], said: [{ id, at, verdict }], fired: [{ id, day, effect (held, refused, asked), n }] }. Nodes are the ids asked, every preset said in the window and every rule in force; a miss is one no settled node covers, grew the trial that covers it. Params: ids (at most 50), days (30 unless said, 90 at most).",
-      "input": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "The nodes in the view, 50 at most."
-          },
-          "days": {
-            "type": "integer",
-            "description": "How far back, in days."
-          }
-        }
-      },
-      "limit_ms": 10000
     },
     {
       "id": "reflex_view.rules",
@@ -97,6 +79,21 @@
         }
       },
       "limit_ms": 5000
+    },
+    {
+      "id": "reflex_view.schema",
+      "shape": "rows",
+      "description": "Every type and the checks it implies, for the tree's drawing to ask through its sends: [{ id (type:<t>, check:<t>:<what>), kind (type or check), pack, tier (schema), for, title, words (a type's description), guards (a check's: fields, status, values, ends, ops), fired (a check's refusals lately, each when) }]. Params: days (30 unless said, 90 at most).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "How far back, in days."
+          }
+        }
+      },
+      "limit_ms": 10000
     },
     {
       "form": "screen",
@@ -129,7 +126,9 @@
         "play.js": "layouts/tree/play.js",
         "marks.js": "layouts/tree/marks.js",
         "names.js": "layouts/tree/names.js",
-        "story.js": "layouts/tree/story.js"
+        "story.js": "layouts/tree/story.js",
+        "reflow.js": "layouts/tree/reflow.js",
+        "legend.js": "layouts/tree/legend.js"
       }
     }
   ],
@@ -155,9 +154,12 @@
         "style": {
           "shape": "reflex_tree",
           "sends": {
-            "said": "reflex_view.said_counts",
+            "said": "reflex_view.counts",
             "misses": "reflex_view.misses",
-            "rules": "reflex_view.rules"
+            "rules": "reflex_view.rules",
+            "legend": "reflex_view.legend",
+            "add": "reflex_view.add",
+            "schema": "reflex_view.schema"
           },
           "colors": {
             "reflex_write": "#e8912d",
@@ -165,7 +167,8 @@
             "reflex_fail": "#d9534f",
             "reflex_fire": "#3fb27f",
             "reflex_owner": "#c58af9",
-            "reflex_learned": "#e8b04a"
+            "reflex_learned": "#e8b04a",
+            "reflex_schema": "#8c9bb0"
           },
           "sizes": {
             "reflex_ring": 60,
@@ -193,7 +196,10 @@
             "reflex_bar_dot": 4,
             "reflex_trial_ring": 1.2,
             "reflex_gap_ring": 2,
-            "reflex_rule_node": 6
+            "reflex_rule_node": 6,
+            "reflex_legend_gap": 6,
+            "reflex_legend_width": "24ch",
+            "reflex_legend_line": 1
           },
           "numbers": {
             "reflex_spread_x": 1.3,
@@ -241,7 +247,10 @@
             "reflex_tier_owner": 1,
             "reflex_tier_learned": 0.8,
             "reflex_retired_ink": 0.35,
-            "reflex_gap_ink": 0.75
+            "reflex_gap_ink": 0.75,
+            "reflex_tier_schema": 1.6,
+            "reflex_reflow": 600,
+            "reflex_reflow_calm": 40
           },
           "hues": [
             "#5aa9e6",
@@ -250,8 +259,70 @@
             "#f2cc8f",
             "#9d79bc",
             "#4ecdc4"
-          ]
+          ],
+          "hidden": []
         }
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "reflex_view.legend",
+      "title": "Hide or show on the tree",
+      "description": "The tree's legend: hide (on false) or show an entry by its view's style.hidden. Sent by the drawing.",
+      "verb": "revise",
+      "input": {
+        "type": "object",
+        "properties": {
+          "view": {
+            "type": "string",
+            "description": "The lens, or a shipped view's id."
+          },
+          "entry": {
+            "type": "string",
+            "description": "kind:, pack:, tier:, status: or event: an entry."
+          },
+          "on": {
+            "type": "boolean",
+            "description": "Show it."
+          },
+          "lens": {
+            "type": "object",
+            "description": "{ style, filter, walk, limit } drawn, for a new version."
+          }
+        },
+        "required": [
+          "view",
+          "entry",
+          "on"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "reflex_view.add",
+      "title": "Add a node here",
+      "description": "A trial reflex added on a branch of the tree, said at its place, its words its name until edited. Sent by the drawing.",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "for": {
+            "type": "string",
+            "description": "Where it is said."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "Its name."
+          }
+        },
+        "required": [
+          "for",
+          "title"
+        ],
+        "additionalProperties": false
       }
     }
   ]

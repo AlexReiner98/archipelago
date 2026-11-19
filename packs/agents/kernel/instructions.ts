@@ -74,6 +74,18 @@ const actionLine = (props: Record<string, unknown>) =>
 Take it with your own tools: ${props.action.trim()}${props.input !== undefined && props.input !== null ? ` ${JSON.stringify(props.input)}` : ''}.` : '';
 /** The mark a trial is said with. */
 export const TRIAL = 'Trial: ';
+/** A trial's title, marked once, though its writer marked it already. */
+const trialTitle = (title: string) => (title.toLowerCase().startsWith(TRIAL.toLowerCase()) ? title : `${TRIAL}${title}`);
+
+/**
+ * Every tool's place at once, asked as a session begins (TOOLS): what is said in the tools' descriptions reaches a
+ * session when its client connects, before it has a run, so it is kept as said to the run once, at its start, each
+ * tool's place apart. An approximation: a session given the tools is counted as told what their descriptions say.
+ */
+export const TOOLS = 'tool:*';
+/** The tool places what is kept and shipped is said at. */
+const toolPlaces = (presets: StyleDef[], kept: KeptInstruction[]) =>
+  [...new Set([...presets.map((p) => p.props), ...kept.filter((k) => k.is_open).map((k) => k.props)].flatMap((props) => listed(props.for)).filter((f) => f.startsWith('tool:') && f !== TOOLS))].sort();
 const globsOf = (fors: string[]) => fors.filter((f) => f.startsWith(FILE)).map((f) => f.slice(FILE.length));
 
 /** What is said where (`for`), to a session about `about`: the presets under what the map keeps, in order. Pure: what is read is handed in. */
@@ -99,7 +111,7 @@ export function said(presets: StyleDef[], kept: KeptInstruction[], where: string
     .sort((a, b) => order(a.props) - order(b.props) || a.at - b.at)
     .map(({ id, title, text, preset, props, trial }) => ({
       id,
-      title: trial ? `${TRIAL}${title}` : title,
+      title: trial ? trialTitle(title) : title,
       text: `${text}${actionLine(props)}`,
       ...(preset && { preset }),
       ...(trial && { trial: true }),
@@ -111,14 +123,31 @@ export function said(presets: StyleDef[], kept: KeptInstruction[], where: string
 export const filled = (text: string, fill: Record<string, string>) => text.replace(/\{([a-z_]+)\}/g, (all, name: string) => fill[name] ?? all);
 
 /** What agents are told where (`for`), to a session about `about`, with the names in braces filled in; on an island, the presets of the version of its pack it runs (packs/loader/kernel/island-pin.ts). */
-export async function instructionsFor(ctx: KernelContext, where: string, input: { about?: string; island?: string; fill?: Record<string, string>; run?: string } = {}): Promise<Said[]> {
+export async function instructionsFor(ctx: KernelContext, where: string, input: { about?: string; island?: string; fill?: Record<string, string>; run?: string; count?: boolean } = {}): Promise<Said[]> {
+  return (await instructionsAt(ctx, [where], input))[where];
+}
+
+/**
+ * What agents are told at each of several places at once, read once: the words a hook or the server composes an
+ * answer from, each place one part of it. Each one said is counted and kept as said to the run, as instructionsFor
+ * does, unless `count` is false (a description the client is handed on every request, counted where it is listed).
+ */
+export async function instructionsAt(ctx: KernelContext, wheres: string[], input: { about?: string; island?: string; fill?: Record<string, string>; run?: string; count?: boolean } = {}): Promise<Record<string, Said[]>> {
   // The presets (of the island's version of each pack, on an island) and every instruction kept, open or retired, with what each is about.
   const { presets, kept } = (await ctx.reads({ told_from: { ...(input.island !== undefined && { island: input.island }) } })) as { presets: StyleDef[]; kept: KeptInstruction[] };
-  const told = said(presets, kept, where, input.about);
-  // Each one said is counted as a use of it (packs/usage/kernel/uses.ts).
-  if (told.length) await ctx.reads({ told: told.map((one) => one.preset ?? one.id) });
-  // Said to a run, each is kept as said there, by the pack that keeps the record; where none does, it is not.
-  const run = input.run ?? input.fill?.run;
-  if (told.length && run) await ctx.reads({ said_here: { ids: told.map((one) => one.preset ?? one.id), run, where } }).catch((err: Error) => ctx.said?.(`keeping what was said to ${run} failed: ${err.message}`));
-  return told.map((one) => ({ ...one, text: filled(one.text, input.fill ?? {}) }));
+  // Each place it is asked at, a session's tools at every tool's place (TOOLS), each said and kept apart.
+  const placesOf = (where: string) => (where === TOOLS ? toolPlaces(presets, kept) : [where]);
+  const each = wheres.map((where) => [where, placesOf(where).map((place) => [place, said(presets, kept, place, input.about)] as const)] as const);
+  const all = each.flatMap(([, places]) => places.flatMap(([, told]) => told));
+  if (input.count !== false && all.length) {
+    // Each one said is counted as a use of it (packs/usage/kernel/uses.ts).
+    await ctx.reads({ told: all.map((one) => one.preset ?? one.id) });
+    // Said to a run, each is kept as said there, by the pack that keeps the record; where none does, it is not.
+    const run = input.run ?? input.fill?.run;
+    if (run)
+      for (const [, places] of each)
+        for (const [place, told] of places)
+          if (told.length) await ctx.reads({ said_here: { ids: told.map((one) => one.preset ?? one.id), run, where: place } }).catch((err: Error) => ctx.said?.(`keeping what was said to ${run} failed: ${err.message}`));
+  }
+  return Object.fromEntries(each.map(([where, places]) => [where, places.flatMap(([, told]) => told).map((one) => ({ ...one, text: filled(one.text, input.fill ?? {}) }))]));
 }
