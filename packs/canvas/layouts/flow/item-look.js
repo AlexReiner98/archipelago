@@ -5,11 +5,15 @@
 // style's (sizes, read as --ln-flow-*). Layer: marks. Pure: a style in, css and marks out.
 
 import { lineageOf } from './graph.js';
+import { colourWays, ridgeMarks } from './ridge-item.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
 const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const one = (v, from, none) => (from.includes(String(v)) ? String(v) : none);
 const PLAIN = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.waiting)';
+
+/** The ridge a style asks for: its state option, its palette's colours (none: the island's hue), the forms by type and by name. */
+const ridgeOf = (style) => (['bands', 'emerge'].includes(style.ridge_state) ? { mode: style.ridge_state, ways: colourWays(record(style.ridge_palettes)[style.ridge_palette] ?? Object.values(record(style.ridge_palettes))[0]), island: !record(style.ridge_palettes)[style.ridge_palette], types: record(style.type_forms), forms: record(style.ridge_forms) } : null);
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -20,7 +24,9 @@ export function grammar(style) {
     ink: one(style.item_ink, ['line', 'ink', 'skyline'], 'line'), fill, state,
     marks: record(style.item_marks), text: { face: one(text.face, ['body', 'display'], 'body'), weight: one(text.weight, ['phase', 'even'], null) },
     // The state is said once, on the shape: the dot before the title stays only where the style asks for no other say.
-    dot: fill !== 'terrace' && !['double', 'foot', 'notch'].some((w) => state.has(w)),
+    // A ridge says the state itself, in its colours: its palette's, by name, and the form each type stands in.
+    ridge: ridgeOf(style),
+    dot: !ridgeOf(style) && fill !== 'terrace' && !['double', 'foot', 'notch'].some((w) => state.has(w)),
     // A check where there is no notch for it keeps the dot's room before the name, empty until the item is finished.
     tick: state.has('check') && (state.has('foot') || state.has('double')) && !state.has('notch'),
   };
@@ -73,6 +79,7 @@ export function itemRules(style) {
     rules.push('.lf-dot-check { fill: none; stroke: var(--ln-land); stroke-width: var(--ln-flow-stroke); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
     rules.push('.lf-tick { fill: none; stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
   }
+  if (g.ridge) rules.push('.lf-step .lf-ridge { stroke: none; pointer-events: none; } .lf-step .lf-ridge-ink { fill: none; stroke: var(--ln-text); stroke-width: var(--ln-flow-ridge-ink); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-rc-island { fill: var(--lf-island, var(--ln-text)); }');
   if (Object.keys(g.marks).length) rules.push('.lf-step .lf-glyph { fill: var(--ln-muted); font-size: var(--ln-flow-glyph-text); font-family: var(--ln-font); text-anchor: end; dominant-baseline: middle; pointer-events: none; }');
   if (g.text.face === 'display') rules.push('.lf-step text { font-family: var(--type-heading-family, var(--face-chart, var(--ln-font))); font-weight: var(--type-heading-weight, 400); }');
   if (g.text.weight === 'phase') {
@@ -114,6 +121,14 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
     for (let j = 0; j < k; j++) out.under.push(m('rect', { class: `lf-tstep lf-tstep-${levels.length - j}`, x: l + (j + 1) * inset, y: b + j * hs - 1, width: Math.max(0, n.w - 2 * (j + 1) * inset), height: hs }));
   }
   if (g.ink === 'skyline') out.over.push(m('path', { class: 'lf-skyline', d: skyline(n, X, Y, round) }));
+  if (g.ridge && n.shape === 'ridge') {
+    // The name is under the ridge, on the land, as a map labels a peak: the mountain stands on a base above its lines.
+    const name = (n.lines?.length ?? 1) * n.line + z('ridge_name_lift') + z('ridge_gap'), base = b - name, side = z('ridge_side');
+    const form = ((own) => g.ridge.forms[own] ?? Object.values(g.ridge.forms)[0] ?? {})(lineageOf(item).map((t) => g.ridge.types[t]).find(Boolean));
+    const made = ridgeMarks({ id: item.id, x0: l + side, x1: r - side, base, hgt: base - t - z('ridge_top'), form, phase, mode: g.ridge.mode, ways: g.ridge.ways, island: g.ridge.island, m, cols: z('ridge_cols'), bands: z('ridge_bands') });
+    out.over.push(...made.marks);
+    out.rules = made.rules;
+  }
   const glyph = glyphOf(g, item);
   if (glyph) out.over.push(m('text', { x: r - z('glyph_inset') - round / 2, y: t + z('glyph_drop'), class: 'lf-glyph' }, glyph));
   return out;

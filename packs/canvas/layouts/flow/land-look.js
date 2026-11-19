@@ -26,7 +26,7 @@ export function landRules(style) {
   const g = landGrammar(style), r = [];
   if (g.sea === 'rows') r.push('.lf-sea-rows { fill: none; stroke: color-mix(in srgb, var(--ln-text) var(--ln-flow-row-mix), transparent); stroke-width: var(--ln-flow-row-stroke); pointer-events: none; }');
   // The ground is drawn under the island's name and key (its own land rect then clear, or left to the marks under it).
-  if (g.ground !== 'tint') r.push(`.lf-region .lf-land rect { fill: ${g.ground === 'clear' ? 'var(--ln-sea)' : 'none'}; } .lf-ground { fill: var(--ln-sea); stroke: none; pointer-events: none; }`);
+  if (g.ground !== 'tint') r.push(`.lf-region .lf-land :is(rect, path) { fill: ${g.ground === 'clear' ? 'var(--ln-sea)' : 'none'}; } .lf-ground { fill: var(--ln-sea); stroke: none; pointer-events: none; }`);
   if (g.ground === 'rows') r.push('.lf-land-rows { fill: none; stroke: color-mix(in srgb, var(--lf-island, var(--ln-line)) var(--ln-flow-land-row-mix), transparent); stroke-width: var(--ln-flow-row-stroke); pointer-events: none; }');
   if (g.ground === 'bands') r.push('.lf-band { fill: color-mix(in srgb, var(--lf-island, var(--ln-line)) var(--lf-band-mix), var(--ln-sea)); stroke: none; pointer-events: none; }');
   if (g.edge !== 'rule') r.push('.lf-region .lf-shore :is(rect, path) { stroke: none; }');

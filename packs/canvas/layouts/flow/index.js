@@ -326,15 +326,18 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', !n.stub && i.island && lands.classOf(i.island), (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && `ph-${stateOf(i).phase}`, !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
+    // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
+    const nameY = (s, y) => (s.shape === 'ridge' && look.ridge ? y + s.h / 2 - z('ridge_name_lift') - (s.lines.length * s.line) / 2 + s.line / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
     const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n) });
+    for (const rule of extra.rules ?? []) colourRules.add(rule);
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
       ring, ...extra.under, outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel), ...extra.over,
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
       n.lines?.length > 1
-        ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
-        : m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
+        ? m('text', { x: left, y: nameY(n, Y) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
+        : m('text', { x: left, y: nameY(n, Y) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
       // In a story, the word a step flags on it then, over its top right corner.
       story && !n.stub && m('text', { key: `f:${n.id}`, x: X + n.w / 2, y: Y - n.h / 2 - z('flag_lift'), class: 'lf-flag' }, ''),
     ];

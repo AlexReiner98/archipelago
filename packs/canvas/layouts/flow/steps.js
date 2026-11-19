@@ -10,7 +10,7 @@ const need = (set, name) => {
 };
 
 /** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
-export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge'];
+export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge'];
 /** The outlines by type an item is drawn by: the view's, under those its island's packs give (`shapes.islands`, by island id; decision e_gqmavsb7). */
 export const shapesFor = (i, shapes = {}) => ({ ...shapes.type, ...(shapes.islands?.[i.island] ?? {}) });
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
@@ -59,6 +59,7 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     const text = Math.min(n.lines.reduce((s, t) => Math.max(s, measure(t, px)), 0), MAX_TEXT), more = (n.lines.length - 1) * LINE;
     if (n.shape === 'diamond') [n.w, n.h] = [text + DIAMOND_PAD, DIAMOND_H + more];
     else if (n.shape === 'end') [n.w, n.h] = [text + END_PAD, END_H];
+    else if (n.shape === 'ridge') [n.w, n.h] = [text + BOX_PAD, need(sizes, 'flow_ridge_height') + more];
     else [n.w, n.h] = [text + BOX_PAD, (n.shape === 'sheet' ? SHEET_H : BOX_H) + more];
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
