@@ -14,7 +14,10 @@ const DAYS_MOST = 90;
 /** The most misses one read answers, the newest first. */
 const MISSES_MOST = 1000;
 
-type Item = { id: string; type?: string; title?: string; status?: string; is_open?: boolean; created_at?: string; props?: Record<string, unknown> };
+type Item = { id: string; type?: string; title?: string; status?: string; is_open?: boolean; created_at?: string | Date; props?: Record<string, unknown> };
+
+/** A time as the reads give it (a Date from the database, a string through JSON), as an ISO string. */
+export const iso = (at: unknown) => (at instanceof Date ? at.toISOString() : typeof at === 'string' ? at : '');
 type Link = { from_id?: string; from?: string; to_id?: string; to?: string };
 type Kept = { id: string; title: string; is_open: boolean; props: Record<string, unknown>; about: string[] };
 
@@ -39,7 +42,7 @@ async function written(ctx: KernelContext, items: Item[]): Promise<Written[]> {
   return items.map((i) => {
     const run = by.find((w) => w.item === i.id)?.run;
     const fors = listed(i.props?.for);
-    return { id: i.id, title: i.title ?? i.id, at: i.created_at ?? '', ...(run && { run }), ...(fors.length && { for: fors }) };
+    return { id: i.id, title: i.title ?? i.id, at: iso(i.created_at), ...(run && { run }), ...(fors.length && { for: fors }) };
   });
 }
 
@@ -54,7 +57,7 @@ export async function misses(ctx: KernelContext, q: { misses: { days?: unknown }
   const nodes = await nodesOf(ctx);
   const runs = (await ctx.reads({ items: { type: 'run', between: { field: 'last_seen', from } }, fields: ['story', 'last_seen'] })) as Item[];
   const stories = Object.fromEntries(runs.map((r) => [r.id, (Array.isArray(r.props?.story) ? r.props!.story : []) as Beat[]]));
-  const recent = (i: Item) => (i.created_at ?? '') >= from;
+  const recent = (i: Item) => iso(i.created_at) >= from;
   const issues = (await itemsOf(ctx, 'issue', { kind: 'problem' })).filter(recent);
   const kept = (await itemsOf(ctx, 'instruction')).filter((i) => recent(i) && listed(i.props?.for).some((f) => f.startsWith('file:')));
   const all = missesOf([refusals(stories, nodes).filter((m) => m.at >= from), bumps(await written(ctx, issues), nodes), traps(await written(ctx, kept), nodes)]);

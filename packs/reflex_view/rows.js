@@ -55,6 +55,12 @@ export async function countsOf(asked, items, read) {
     const r = by.get(under.get(id)) ?? {};
     // Where it is said, as given: the drawing's answer carries no for, and its branches are by it.
     const fors = items.find((e) => e.id === id)?.props?.for;
-    return { id, said: r.said ?? 0, runs: r.runs ?? 0, places: r.places ?? {}, ...(r.last && { last: r.last }), failed: r.failed ?? 0, held: r.held ?? 0, quiet: r.quiet ?? 0, ...(r.tier && { tier: r.tier }), ...(Array.isArray(fors) && { for: fors }) };
+    const item = items.find((e) => e.id === id);
+    return {
+      id, said: r.said ?? 0, runs: r.runs ?? 0, places: r.places ?? {}, ...(r.last && { last: r.last }), failed: r.failed ?? 0, held: r.held ?? 0, quiet: r.quiet ?? 0,
+      ...(r.tier && { tier: r.tier }), ...(item?.status && { status: item.status }), ...(Array.isArray(fors) && { for: fors }),
+      // When each run first heard it and what became of its miss there: the drawing's lights fall on these days.
+      per_run: (r.per_run ?? []).map((v) => ({ said_at: v.said_at, verdict: v.verdict })),
+    };
   });
 }

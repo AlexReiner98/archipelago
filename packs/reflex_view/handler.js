@@ -19,6 +19,13 @@ export default {
     return { answer: rowsOf(item, record, Array.isArray(runs) ? runs : []) };
   },
 
+  // What the tree's drawing asks through its sends: every miss lately, as the reflex_said pack reads them.
+  'reflex_view.misses': async (input, ctx) => {
+    const days = Number.isInteger(input?.days) ? input.days : undefined;
+    const found = await ctx.read({ misses: days === undefined ? {} : { days } });
+    return { answer: Array.isArray(found) ? found : [] };
+  },
+
   // What the tree's drawing asks through its sends: each node's counts, by the id its item is said under.
   'reflex_view.said_counts': async (input, ctx) => {
     const asked = Array.isArray(input?.ids) ? [...new Set(input.ids.filter((id) => typeof id === 'string' && id))].slice(0, MOST) : [];

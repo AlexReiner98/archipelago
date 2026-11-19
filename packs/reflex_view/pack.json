@@ -28,7 +28,7 @@
     {
       "id": "reflex_view.said_counts",
       "shape": "rows",
-      "description": "The record of some instructions, for the tree's drawing to ask through its sends: one per id asked, in order, each { id, said, runs, places, last, failed, held, quiet, tier, for } (where it is said as its for gives it, and the reflex_said pack's said_record, its per-run list left out). An owner's version of a preset is counted under the preset's id.",
+      "description": "The record of some instructions, for the tree's drawing to ask through its sends: one per id asked, in order, each { id, said, runs, places, last, failed, held, quiet, tier, status, for, per_run: [{ said_at, verdict }] } (the item's status and for as given; the record is the reflex_said pack's said_record). An owner's version of a preset is counted under the preset's id.",
       "input": {
         "type": "object",
         "properties": {
@@ -43,6 +43,21 @@
         "required": [
           "ids"
         ]
+      },
+      "limit_ms": 5000
+    },
+    {
+      "id": "reflex_view.misses",
+      "shape": "rows",
+      "description": "Every miss lately, for the tree's drawing to ask through its sends, the newest first: { kind (refusal, bump, trap), key, run, at, where, said, covered_by } (the reflex_said pack's misses). Params: days (30 unless said, 90 at most).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "How far back, in days."
+          }
+        }
       },
       "limit_ms": 5000
     },

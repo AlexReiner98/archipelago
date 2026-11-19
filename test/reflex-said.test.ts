@@ -70,6 +70,7 @@ test('a refusal nothing covers is a miss, and the reply after it is asked once t
   const made = await make(l, [
     { op: 'create', ref: 'run', type: 'run', title: 'A session', props: { last_seen: at } },
     { op: 'create', ref: 'node', type: 'reflex', title: 'Short titles', body: 'Name it in a few words.', status: 'trial', props: { for: ['tool:change'], misses: ['title is too long'] } },
+    { op: 'create', ref: 'trap', type: 'instruction', title: 'Restart after a new page module', body: 'Restart the server.', props: { for: ['file:packs/*/page/*.js'] } },
   ]);
   const story = [
     { n: 1, at, said: 'Change refused (x): the title is too long', about: [], links: [], did: 'refused', by: 'write' },
@@ -78,7 +79,7 @@ test('a refusal nothing covers is a miss, and the reply after it is asked once t
   await l.change(human(), { ops: [{ op: 'update', id: made.run, props: { story } }], reason: 'test: refusals befell it' });
   const ctx = kernelContext(l, 'agents');
   const misses = (await ctx.reads({ misses: {} })) as { where: string; said: string; covered_by: string[] }[];
-  assert.deepEqual(misses.map((m) => [m.where, m.covered_by]).sort(), [['tool:change', []], ['tool:change', [made.node]]]);
+  assert.deepEqual(misses.map((m) => [m.where, m.covered_by]).sort(), [['file:packs/*/page/*.js', [made.trap]], ['tool:change', []], ['tool:change', [made.node]]]);
   assert.equal(await ctx.reads({ missed_here: { run: made.run } }), 1);
   const run = { id: made.run, is_open: true };
   const asked = await askOnReply(ownContext(l, 'sessions'), run, { turn: 't1', reply: { changed: 1 } });

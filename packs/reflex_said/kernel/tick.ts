@@ -4,15 +4,16 @@
 import type { KernelContext } from '#pelago/kernel';
 import { movesOf, thresholdsOf } from './promote.ts';
 import { MOST, said_record } from './reads.ts';
+import { iso } from './misses-read.ts';
 
-type Item = { id: string; status?: string; created_at?: string; props?: Record<string, unknown> };
+type Item = { id: string; status?: string; created_at?: string | Date; props?: Record<string, unknown> };
 
 /** Judge the open reflexes and move those their record says: what moved. */
 export async function tick(ctx: KernelContext): Promise<{ moved: number }> {
   const nodes = ((await ctx.reads({ items: { type: 'reflex', status: ['trial', 'current'] } })) as Item[]).map((i) => ({
     id: i.id,
     status: i.status ?? 'trial',
-    created_at: i.created_at ?? ctx.now().toISOString(),
+    created_at: iso(i.created_at) || ctx.now().toISOString(),
     ...(typeof i.props?.until === 'string' && { until: i.props.until }),
   }));
   if (!nodes.length) return { moved: 0 };
