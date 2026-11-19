@@ -74,8 +74,8 @@ test('in a browser, Ctrl+K finds an island in the side bar as it is typed and En
     await until('the canvas draws it', () => draws('Rebuild the pier again'));
     await until('the side list has it on', () => page.evaluate<boolean>(`document.querySelector('#islands .isl-head').textContent.includes('On · 1') && [...document.querySelectorAll('#islands .isl-row .isl-name')].some((n) => n.textContent === 'Harbour works')`));
     assert.equal(await draws('Cut the stone'), false, 'the other island stays off');
-    // The list is in parts, each a band: On on the canvas's ground, its names larger; every island on has its dot.
-    assert.ok(await page.evaluate<boolean>(`(() => { const on = document.querySelector('#islands .isl-sec-on'), rest = document.querySelector('#islands .isl-sec-recent, #islands .isl-sec-all'); return getComputedStyle(on).backgroundColor !== getComputedStyle(rest).backgroundColor && parseFloat(getComputedStyle(on.querySelector('.isl-name')).fontSize) > parseFloat(getComputedStyle(rest.querySelector('.isl-name')).fontSize); })()`), 'On stands apart');
+    // The list is in parts, each set apart by its line on the one ground (sighting e_bb6tc8gr), On's names larger; every island on has its dot.
+    assert.ok(await page.evaluate<boolean>(`(() => { const on = document.querySelector('#islands .isl-sec-on'), rest = document.querySelector('#islands .isl-sec-recent, #islands .isl-sec-all'); return getComputedStyle(rest).borderTopStyle !== 'none' && getComputedStyle(on).backgroundColor === getComputedStyle(rest).backgroundColor && parseFloat(getComputedStyle(on.querySelector('.isl-name')).fontSize) > parseFloat(getComputedStyle(rest.querySelector('.isl-name')).fontSize); })()`), 'On stands apart');
     // A row under On is its name and ×, without its pack, so the name has the room.
     assert.equal(await page.evaluate<number>(`document.querySelector('#islands .isl-head').nextElementSibling.querySelectorAll('.isl-pack').length`), 0, 'no pack under On');
     // A press on an island under Recent puts it on where its row stands: the row lights and gains ×, and nothing moves.
