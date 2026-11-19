@@ -163,7 +163,8 @@
             "said": "reflex_view.said_counts",
             "misses": "reflex_view.misses",
             "rules": "reflex_view.rules",
-            "legend": "reflex_view.legend"
+            "legend": "reflex_view.legend",
+            "add": "reflex_view.add_node"
           },
           "colors": {
             "reflex_write": "#e8912d",
