@@ -91,12 +91,16 @@ export function records(ids: string[], sayings: Saying[], stories: Record<string
 export const sayingFacts = (ids: string[], run: string, where: string): ['+', string, string, unknown][] =>
   [...new Set(ids)].map((id) => ['+', id, 'said', { run, where }]);
 
-/** A kept entry's facts read back as sayings: those of the field said with a run and a place, at the entry's time. */
-export function sayingsOf(entries: { at: string; facts: unknown[] }[]): Saying[] {
+/**
+ * A kept entry's facts read back as sayings: those of the field said with a run and a place, at the entry's time; of
+ * one instruction only, when named. One entry holds every instruction said together, so a read by one instruction
+ * returns entries that also say others: those are not its sayings.
+ */
+export function sayingsOf(entries: { at: string; facts: unknown[] }[], of?: string): Saying[] {
   const out: Saying[] = [];
   for (const e of entries) {
     for (const f of e.facts) {
-      if (!Array.isArray(f) || f[0] !== '+' || f[2] !== 'said') continue;
+      if (!Array.isArray(f) || f[0] !== '+' || f[2] !== 'said' || (of !== undefined && f[1] !== of)) continue;
       const v = f[3] as { run?: unknown; where?: unknown } | null;
       if (typeof f[1] === 'string' && v && typeof v.run === 'string' && typeof v.where === 'string') out.push({ id: f[1], run: v.run, where: v.where, at: e.at });
     }

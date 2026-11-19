@@ -49,12 +49,14 @@ test('asked through the instructions view by a run, what is said is kept as said
   const made = await make(l, [
     { op: 'create', ref: 'run', type: 'run', title: 'A session' },
     { op: 'create', ref: 'node', type: 'reflex', title: 'Test first', body: 'Run the test.', status: 'current', props: { for: ['tool:test'] } },
+    { op: 'create', ref: 'other', type: 'reflex', title: 'Then commit', body: 'Commit it.', status: 'current', props: { for: ['tool:test'] } },
   ]);
   const answer = (await VIEWS.instructions.run(kernelContext(l, 'query'), { for: 'tool:test', run: made.run })) as { said: { id: string }[] };
-  assert.deepEqual(answer.said.map((one) => one.id), [made.node]);
+  assert.deepEqual(answer.said.map((one) => one.id), [made.node, made.other]);
   await VIEWS.instructions.run(kernelContext(l, 'query'), { for: 'tool:test' });
-  const [rec] = (await kernelContext(l, 'agents').reads({ said_record: { ids: [made.node] } })) as { said: number; runs: number }[];
-  assert.deepEqual({ said: rec.said, runs: rec.runs }, { said: 1, runs: 1 }, 'asked with no run, nothing is kept');
+  const [rec, other] = (await kernelContext(l, 'agents').reads({ said_record: { ids: [made.node, made.other] } })) as { said: number; runs: number }[];
+  assert.deepEqual({ said: rec.said, runs: rec.runs }, { said: 1, runs: 1 }, 'asked with no run, nothing is kept; said together, each counted once');
+  assert.equal(other.said, 1);
 });
 
 const human = () => ({ kind: 'human' as const, name: 'owner' });

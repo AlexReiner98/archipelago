@@ -42,8 +42,8 @@ export async function said_record(ctx: KernelContext, q: { said_record: { ids: u
   const days = Math.min(DAYS_MOST, Math.max(1, Number(q.said_record?.days ?? DAYS) || DAYS));
   const now = ctx.now();
   const range: [string, string] = [day(new Date(now.getTime() - days * 86_400_000)), day(now)];
-  const entries = (await Promise.all(ids.map((id) => ctx.reads({ own_stream: { about: id, days: range, limit: SAYINGS_MOST } }) as Promise<{ at: string; facts: unknown[] }[]>))).flat();
-  const sayings = sayingsOf(entries);
+  // Read by each instruction, each read kept to its own facts: an entry of several said together comes back for each.
+  const sayings = (await Promise.all(ids.map(async (id) => sayingsOf((await ctx.reads({ own_stream: { about: id, days: range, limit: SAYINGS_MOST } })) as { at: string; facts: unknown[] }[], id)))).flat();
   const runs = [...new Set(sayings.map((s) => s.run))].slice(-RUNS_MOST);
   const ran = runs.length ? ((await ctx.reads({ ids: runs })) as Item[]) : [];
   const stories = Object.fromEntries(ran.map((r) => [r.id, (Array.isArray(r.props?.story) ? r.props!.story : []) as Beat[]]));
