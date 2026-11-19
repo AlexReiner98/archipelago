@@ -123,10 +123,9 @@ export function drawPicker() {
   const input = h('input', { class: 'isl-search', type: 'search', placeholder: 'Islands', 'aria-label': 'Find an island', title: 'Enter puts the lit island on, Shift+Enter shows it alone', autocomplete: 'off' });
   // Its shortcut, at the line's right while nothing is typed.
   const key = h('span', { class: 'isl-key', 'aria-hidden': 'true' }, /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘K' : 'Ctrl+K');
-  // The bar's button, first in the band (./canvas.js): a press shows the islands or puts them away; how
-  // many are on is its count.
-  const count = h('span', { class: 'isl-toggle-count' });
-  const fold = h('button', { type: 'button', class: 'isl-toggle', 'aria-label': 'Islands' }, sideMark(), count);
+  // The bar's button, first in the band (./canvas.js): a press shows the islands or puts them away. How many are on is
+  // the Islands row's count, not the button's (Alex, 19 Nov 2026).
+  const fold = h('button', { type: 'button', class: 'isl-toggle', 'aria-label': 'Islands' }, sideMark());
   // The bar's right edge: dragged, it sets the bar's width.
   const edge = h('div', { class: 'isl-edge', 'aria-hidden': 'true', title: 'Drag to widen; double-click for the usual width' });
   // The list is one stop for Tab, worked with arrows (see `keys` below); its rows' presses are for the pointer.
@@ -285,8 +284,7 @@ export function drawPicker() {
       packOf(i));
   const draw = () => {
     const drawn = markedNow(), q = input.value.trim(), shownN = drawn.filter((x) => /^e_/.test(x)).length;
-    count.textContent = shownN ? String(shownN) : '';
-    islandsHead.querySelector('.isl-fold-count').textContent = count.textContent;
+    islandsHead.querySelector('.isl-fold-count').textContent = shownN ? String(shownN) : '';
     found = rankIslands(islands, q);
     // Searching: one list, best first, worked from the keyboard, within the bar (Alex: nothing drops outside it).
     if (q) {
