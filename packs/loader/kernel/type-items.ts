@@ -8,9 +8,11 @@ import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 import { followMade } from './packstate.ts';
 import { syncTypes } from './typetable.ts';
 import { judgeExamples } from './rule-check.ts';
+import { systemKinds } from './pack-source.ts';
+import { rebuildRegistry, systemItems } from './registry-log.ts';
 
-/** What the registry reads from the map: types, link types, and packs made there (packs/loader/kernel/pack-items.ts). */
-const KINDS = [TYPE_ITEM, LINK_ITEM, PACK_ITEM];
+/** What the registry reads from the map (packs/loader/kernel/pack-source.ts): types, link types, and packs made there (packs/loader/kernel/pack-items.ts). */
+const kinds = () => systemKinds();
 
 /** Told when the types kept on the map changed, so the type table follows (packs/loader/kernel/typetable.ts); a test may set another. */
 let typesChanged: (l: Archipelago) => Promise<unknown> = (l) => syncTypes(l);
@@ -37,29 +39,8 @@ function asTypeItem(def: TypeDef): Op {
   return { op: 'create', type: TYPE_ITEM, title, ...(description && { body: description }), props };
 }
 
-/** Every type and link type kept on the map, archived ones left out. */
-export async function typeItems(l: Archipelago): Promise<TypeItem[]> {
-  const { rows } = await l.db.query<TypeItem>(`select id, type, title, body, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by created_at, id`, [KINDS]);
-  return rows;
-}
-
-/** The type items each open workspace's registry last took, to follow another server's change to them. */
-const taken = new WeakMap<Archipelago, string>();
-
-/** Take in the types and link types kept on the map, when they changed: ones that no longer load (a pack gone) are said, and left out. */
-export async function takeTypeItems(pelago: Archipelago): Promise<boolean> {
-  const items = await typeItems(pelago);
-  const now = JSON.stringify(items);
-  if (taken.get(pelago) === now) return false;
-  taken.set(pelago, now);
-  try {
-    pelago.registry.takeItems(items);
-  } catch (err) {
-    console.error(`the types kept on the map in ${pelago.workspace} do not load: ${(err as Error).message}`);
-    return false;
-  }
-  return true;
-}
+/** Every type and link type kept on the map, archived ones left out: the system items the registry is built from (packs/loader/kernel/registry-log.ts). */
+export const typeItems = (l: Archipelago): Promise<TypeItem[]> => systemItems(l);
 
 /**
  * The registry a change is checked and applied against: the workspace's own, or, when the change makes or changes a
@@ -68,14 +49,14 @@ export async function takeTypeItems(pelago: Archipelago): Promise<boolean> {
 export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
   const reg = l.registry;
   const ids = ops.flatMap((op) => ('id' in op && typeof op.id === 'string' && op.op !== 'forget' ? [op.id] : []));
-  const { rows: touched } = ids.length ? await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and type = any($2::text[])`, [ids, KINDS]) : { rows: [] };
+  const { rows: touched } = ids.length ? await l.db.query<{ id: string }>(`select id from entity where id = any($1::text[]) and type = any($2::text[])`, [ids, kinds()]) : { rows: [] };
   const ours = new Set(touched.map((r) => r.id));
-  if (!ours.size && !ops.some((op) => op.op === 'create' && KINDS.includes(op.type))) return reg;
+  if (!ours.size && !ops.some((op) => op.op === 'create' && kinds().includes(op.type))) return reg;
   const items = new Map((await typeItems(l)).map((i) => [i.id, i]));
   const restored = ops.flatMap((op) => (op.op === 'restore' && ours.has(op.id) ? [op.id] : []));
   const { rows: back } = restored.length ? await l.db.query<TypeItem>(`select id, type, title, body, is_open, ${l.props} from entity where id = any($1::text[])`, [restored]) : { rows: [] };
   for (const [i, op] of ops.entries()) {
-    if (op.op === 'create' && KINDS.includes(op.type)) {
+    if (op.op === 'create' && kinds().includes(op.type)) {
       const key = op.ref ?? `#${i + 1}`;
       items.set(key, { id: key, type: op.type, title: op.title, body: op.body ?? '', is_open: reg.isOpen(op.type, op.status ?? 'current'), props: op.props ?? {} });
     } else if (op.op === 'update' && items.has(op.id)) {
@@ -92,7 +73,7 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
     throw new Error(`Change rejected:\n- the types it makes or changes: ${(err as Error).message}`);
   }
   // The registry leaves a workspace's own type that does not resolve to the type table (its pack turned off); one this change makes must resolve.
-  const written = ops.flatMap((op, i) => (op.op === 'create' && KINDS.includes(op.type) ? [items.get(op.ref ?? `#${i + 1}`)!] : op.op === 'update' && items.has(op.id) ? [items.get(op.id)!] : []));
+  const written = ops.flatMap((op, i) => (op.op === 'create' && kinds().includes(op.type) ? [items.get(op.ref ?? `#${i + 1}`)!] : op.op === 'update' && items.has(op.id) ? [items.get(op.id)!] : []));
   const named = written.filter((i) => i.type !== PACK_ITEM);
   const packs = written.filter((i) => i.type === PACK_ITEM);
   const wrong = packs.flatMap((i) => (trial.madeWrong.has(i.id) ? [`the pack ${String(i.props.name ?? i.title)}: ${trial.madeWrong.get(i.id)}`] : []));
@@ -134,11 +115,10 @@ export async function typesApplied(l: Archipelago, ops: Op[], used: Registry): P
 
 /** The registry and the type table brought in line with the type items on the map, and these besides (a backup's, before it is merged). */
 export async function typesTaken(l: Archipelago, besides: TypeItem[] = []): Promise<void> {
-  const here = await typeItems(l);
-  l.registry.takeItems([...here, ...besides.filter((b) => !here.some((i) => i.id === b.id))]);
+  await rebuildRegistry(l, besides);
   await typesChanged(l);
 }
 
 /** A backup's type items: its own types (a name, no preset) are what its items may need. */
 export const typeItemsIn = (rows: Record<string, unknown>[]): TypeItem[] =>
-  rows.filter((r) => KINDS.includes(r.type as string) && !r.archived_at).map((r) => ({ id: r.id as string, type: r.type as string, title: r.title as string, body: (r.body as string) ?? '', is_open: r.is_open !== false, props: (r.props as Record<string, unknown>) ?? {} }));
+  rows.filter((r) => kinds().includes(r.type as string) && !r.archived_at).map((r) => ({ id: r.id as string, type: r.type as string, title: r.title as string, body: (r.body as string) ?? '', is_open: r.is_open !== false, props: (r.props as Record<string, unknown>) ?? {} }));
