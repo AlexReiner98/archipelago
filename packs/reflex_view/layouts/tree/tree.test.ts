@@ -148,11 +148,15 @@ test('grown, no two shown names overlap or cross a wire, and every node is named
   }
   // Zoomed in, more show; every bough that shows outranks a leaf it met.
   assert.ok(namesShown(tree, placed, counts, z, n, 0.5).shown.size >= namesShown(tree, placed, counts, z, n, 1).shown.size);
-  const drawn = await picture({ answer: answer40, style, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {} });
+  const sent: any[] = [];
+  const drawn = await picture({ answer: answer40, style, reduced: true }, { frame: () => new Promise(() => {}), patch: (p: any[]) => sent.push(...p), open() {} });
   const marks = JSON.stringify(drawn.scene.svg);
   for (const one of tree.order.filter((x) => x.parent)) assert.ok(marks.includes(JSON.stringify(['title', {}, one.title]).slice(0, -2)), `${one.title} has its tooltip`);
   assert.ok(marks.includes('rt-quiet'), 'a name that gives way is drawn quiet');
-  assert.ok(drawn.viewport({ x: 0, y: 0, width: 1, height: 1, scale: 0.5 }).some((p: any) => p.set?.transform?.includes('scale(2)')), 'names keep their size on screen');
+  assert.deepEqual(drawn.viewport({ x: 0, y: 0, width: 1, height: 1, scale: 0.5 }), [], 'nothing while the zoom moves');
+  await new Promise((r) => setTimeout(r, style.numbers.reflex_grow));
+  assert.ok(sent.some((p: any) => p.set?.transform?.includes('scale(2)')), 'once it settles, names keep their size on screen');
+  drawn.end();
 });
 
 test('given the room it is shown in, the grown tree closes its rings to fit there, names and all', () => {
@@ -300,4 +304,23 @@ test('types and their checks stand as their own tier: a diamond, a hollow square
   const tree = treeOf(a, (item: any) => item.fields?.for, n, schema.map((x) => ({ id: x.id, title: x.title, for: x.for, kind: x.kind })))!;
   const film = filmOf(tree, { ...storyOf(a, null, null, n), schema: schemaOf(schema) }, n);
   assert.equal(film.events.filter((e: any) => e.kind === 'fired').length, 1, 'a check’s refusal fires');
+});
+
+test('zooming sends nothing until the zoom settles, then one batch with only the names that changed', async () => {
+  const places = ['tool:change', 'tool:query', 'file:packs/canvas/layouts/*.js', 'session_start', 'working_rules', 'guide:style_code'];
+  const items = Array.from({ length: 60 }, (_, i) => node(i, { title: `A rule of the harness, number ${i}`, fields: { for: [places[i % places.length]] } }));
+  const batches: any[][] = [];
+  const drawn = await picture({ answer: { lens: { find: ['zoom'] }, items, links: [] }, style, reduced: true }, { frame: () => new Promise(() => {}), patch: (p: any[]) => batches.push(p), open() {} });
+  const names = (JSON.stringify(drawn.scene.svg).match(/"nm:/g) || []).length;
+  for (let i = 0; i < 30; i++) drawn.viewport({ x: 0, y: 0, width: 1, height: 1, scale: 1 + i / 10 });
+  assert.equal(batches.length, 0, 'no change while the zoom moves');
+  await new Promise((r) => setTimeout(r, style.numbers.reflex_grow));
+  assert.equal(batches.length, 1, 'one batch once it settles');
+  const toggled = batches[0].filter((p) => p.toggle).length, sized = batches[0].filter((p) => p.set).length;
+  assert.ok(toggled + sized < names * 2, `only what changed: ${toggled} shown or hidden, ${sized} resized, of ${names} names`);
+  assert.ok(batches[0].filter((p) => p.set).every((p) => !batches[0].some((q) => q.key === p.key && q.toggle?.['rt-quiet'] === true)), 'a name that goes quiet is not resized');
+  drawn.viewport({ x: 0, y: 0, width: 1, height: 1, scale: 1 + 29 / 10 });
+  await new Promise((r) => setTimeout(r, style.numbers.reflex_grow));
+  assert.equal(batches.length, 1, 'the same zoom again sends nothing');
+  drawn.end();
 });

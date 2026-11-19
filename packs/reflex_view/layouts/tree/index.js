@@ -15,7 +15,7 @@ import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
 import { barOf, cssOf, packHues } from './look.js';
 import { player } from './play.js';
-import { nameTransform, namesShown } from './names.js';
+import { namesShown, rescaler } from './names.js';
 import { at, m } from './marks.js';
 import { hiddenOf, legendCss, legendOf, shownBy } from './legend.js';
 
@@ -156,7 +156,10 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again) {
   const fresh = before && !reduced ? tree.born.filter((node) => !before.has(node.id)) : [];
   const shown = (node) => grown && !fresh.includes(node);
   // Which names show, at full size until the page says its zoom: chosen again as the zoom changes.
-  let scaleAt = 1, named = namesShown(tree, placed, held, z, n, scaleAt);
+  const named = namesShown(tree, placed, held, z, n, 1);
+  // Chosen again as the page zooms, once the zoom settles (reflex_name_settle ms, half a growth where the view says
+  // none), and only what changed sent (./names.js).
+  const names = rescaler({ labels: placed.labels, choose: (f) => namesShown(tree, placed, held, z, n, f).shown, shownAt: named.shown, rescale: n('reflex_name_rescale'), least: n('reflex_name_zoom_least'), settle: Number.isFinite(style.numbers?.reflex_name_settle) ? style.numbers.reflex_name_settle : n('reflex_grow') / 2, at, send: (out) => tools.patch(out) });
   // Grown, the gaps stand already: each place a miss sparked on and grew nothing from.
   const gapped = new Set(grown ? film.events.filter((e) => e.kind === 'miss' && !e.grew).map((e) => e.node.id) : []);
   // A bough whose place can be said takes a new trial node there, where the view sends `add` (the pack's action).
@@ -218,15 +221,10 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again) {
     restyle: () => [],
     // Names keep one size on screen: at a new zoom (by more than reflex_name_rescale), each is laid at its size there
     // and which show is chosen again, so zooming in shows more.
-    viewport(view) {
-      const f = 1 / Math.max(n('reflex_name_zoom_least'), Number(view?.scale) || 1);
-      if (Math.abs(Math.log(f / scaleAt)) < Math.log(n('reflex_name_rescale'))) return [];
-      scaleAt = f;
-      named = namesShown(tree, placed, held, z, n, f);
-      return [...placed.labels.values()].flatMap((l) => [{ key: `nm:${l.id}`, set: { transform: nameTransform(l, f, at) } }, { key: `nm:${l.id}`, toggle: { 'rt-quiet': !named.shown.has(l.id) } }]);
-    },
+    viewport: (view) => names.viewport(view),
     end() {
       alive = false;
+      names.end();
     },
   };
 }

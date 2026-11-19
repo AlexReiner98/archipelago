@@ -55,3 +55,38 @@ export function nameAt(l) {
   const sign = l.right ? 1 : -1, along = l.out * sign;
   return { x: along * l.gap, y: -l.lift * sign, anchor: along > 0 ? 'start' : 'end' };
 }
+
+/**
+ * Names chosen again as the page zooms, once it settles: while the plane moves the names scale with the picture, and
+ * once no move has come for `settle` ms the names are laid at their size there and which show is chosen again, and
+ * only what changed is sent (a name's size where it shows; whether it shows). Applying a change to every name on each
+ * step of a zoom held the page for tens of milliseconds a step on a tree of hundreds of nodes.
+ * `choose(f)` answers the set of ids shown at `f`; `labels` are every name laid out; `send(patches)` sends.
+ */
+export function rescaler({ labels, choose, shownAt, rescale, least, settle, at, send }) {
+  let f = 1, shown = shownAt, timer = null, wanted = 1;
+  const sized = new Map([...labels.values()].map((l) => [l.id, 1]));
+  const apply = () => {
+    timer = null;
+    if (Math.abs(Math.log(wanted / f)) < Math.log(rescale)) return;
+    f = wanted;
+    const next = choose(f), out = [];
+    for (const l of labels.values()) {
+      const on = next.has(l.id);
+      if (on !== shown.has(l.id)) out.push({ key: `nm:${l.id}`, toggle: { 'rt-quiet': !on } });
+      // A name that does not show keeps the size it had: it is laid again when it shows.
+      if (on && sized.get(l.id) !== f) (sized.set(l.id, f), out.push({ key: `nm:${l.id}`, set: { transform: nameTransform(l, f, at) } }));
+    }
+    shown = next;
+    if (out.length) send(out);
+  };
+  return {
+    viewport(view) {
+      wanted = 1 / Math.max(least, Number(view?.scale) || 1);
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(apply, settle);
+      return [];
+    },
+    end: () => timer !== null && clearTimeout(timer),
+  };
+}
