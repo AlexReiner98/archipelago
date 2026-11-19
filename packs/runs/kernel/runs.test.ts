@@ -3,10 +3,16 @@
 // the shims at src/.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { KernelContext } from '#pelago/kernel';
 import { addressKey, placeFor, sameAddress } from './places.ts';
 import { frontier, marks, spent, turns } from './answers.ts';
 import { runSpans } from './sessiontime.ts';
+
+/** The words at some places as the agents pack answers them (answer.instructions): this pack's own presets, as shipped. */
+const shipped: { props: { for: string[] }; body: string }[] = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'pack.json'), 'utf8')).styles.filter((s: { type: string }) => s.type === 'instruction');
+const wordsAt = (wheres: string[]) => ({ at: Object.fromEntries(wheres.flatMap((w) => shipped.filter((s) => s.props.for.includes(w)).map((s) => [w, s.body]))) });
 
 const NOW = new Date('2026-11-12T12:00:00Z');
 const ago = (minutes: number) => new Date(NOW.getTime() - minutes * 60_000);
@@ -31,8 +37,9 @@ function context(rows: Record<string, unknown>, called: Record<string, unknown> 
     if (key in rows) return typeof rows[key] === 'function' ? (rows[key] as (v: unknown) => unknown)(q[key]) : rows[key];
     throw new Error(`not read here: ${key}`);
   };
-  const call = async (name: string) => {
+  const call = async (name: string, ask?: { wheres?: string[] }) => {
     if (name in called) return called[name];
+    if (name === 'answer.instructions') return wordsAt(ask?.wheres ?? []);
     throw new Error(`not called here: ${name}`);
   };
   return { pack: { id: 'runs', version: '0', hash: '' }, workspace: 'w', reads, registry, call, now: () => NOW, asked } as unknown as KernelContext & { asked: string[] };

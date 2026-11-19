@@ -1,10 +1,16 @@
 // Presence and seeing on a fake context: the transient store (root.transient) and the reads are a few rows in memory.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { KernelContext } from '#pelago/kernel';
 import { listening, point, presence, tellStamp, took, watching, looked } from './presence.ts';
 import { inSight, seeing, seeingLine, seen, seenNow } from './seeing.ts';
 import { pointAct, screenAct, sightAnswer, tookAct } from './acts.ts';
+
+/** The words at some places as the agents pack answers them (answer.instructions): this pack's own presets, as shipped. */
+const shipped: { props: { for: string[] }; body: string }[] = JSON.parse(readFileSync(join(import.meta.dirname, '..', 'pack.json'), 'utf8')).styles.filter((s: { type: string }) => s.type === 'instruction');
+const wordsAt = (wheres: string[]) => ({ at: Object.fromEntries(wheres.flatMap((w) => shipped.filter((s) => s.props.for.includes(w)).map((s) => [w, s.body]))) });
 
 type Ask = { keep?: { key: string; value: unknown }; kept?: string; scan?: { keys: string[]; prefixes: string[]; except: string[] } };
 
@@ -15,6 +21,7 @@ function fake(items: Record<string, { id: string; title: string; type: string; p
     workspace: 'w1',
     call: async (name: string, ask: Ask) => {
       calls.push(name);
+      if (name === 'answer.instructions') return wordsAt((ask as unknown as { wheres: string[] }).wheres);
       assert.equal(name, 'root.transient');
       if (ask.keep) return void store.set(ask.keep.key, ask.keep.value);
       if (ask.kept) return store.get(ask.kept);
