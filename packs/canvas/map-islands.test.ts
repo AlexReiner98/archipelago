@@ -139,3 +139,12 @@ test('a picture of no island draws no border', () => {
   assert.ok(scene.key.length > 0, 'and keeps its key');
 });
 
+
+test('island_links: false leaves the links between islands out, and each island keeps its own', () => {
+  const wires = (svg: any) => marks(svg, (m) => /lf-(wire|tie)/.test(String(m[1]?.class ?? '')) && !/lf-wire-hit/.test(String(m[1]?.class ?? '')));
+  // The same answer with its links between islands (and to what stands on none) taken out by hand.
+  const own = { ...answer, links: answer.links.filter((l) => !['e_costzzzz', 'e_alexzzzz'].includes(l.to) || l.from === 'e_costzzzz') };
+  const on = wires(draw(answer).svg), off = wires(draw(answer, { ...house, island_links: false }).svg), mine = wires(draw(own).svg);
+  assert.ok(off.length < on.length, 'fewer wires once the links between islands are left out');
+  assert.deepEqual(off.map((m) => m[1].d), mine.map((m) => m[1].d), 'drawn as if those links were not there: each island keeps its own wires');
+});
