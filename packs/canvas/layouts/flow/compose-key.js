@@ -82,10 +82,10 @@ export function keyOf(at) {
   // (the owner, 6 Nov 2026), and the marks it draws besides: a step dashed until a choice is made, a possible end, the
   // order dashed where it follows an open choice (the owner, 18 Nov 2026: the legend said none of those).
   const packRows = (pack, group, st = group.model.all.filter((n) => !n.dummy)) => [
-    ...pack.types.filter((t) => group.items.some((i) => i.type === t.id)).map((t) => ({ part: t.id, group: 'type', ...((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapeIn({ type: t.id, is: t.is, island: group.id }, shapes)) })),
+    ...pack.types.filter((t) => st.some((n) => !n.stub && n.item?.type === t.id)).map((t) => ({ part: t.id, group: 'type', ...((shape) => mark(m('g', { class: 'lf-step' }, outline(shape, G.x, G.y, G.w, shape === 'diamond' ? G.h + 1 : G.h, CORNER, G.h / 3)), t.title))(shapeIn({ type: t.id, is: t.is, island: group.id }, shapes)) })),
     st.some((n) => n.stub) && { group: 'type', ...mark(m('g', { class: 'lf-step scenario' }, outline('end', G.x, G.y, G.w, G.h, CORNER, G.h / 3)), 'Possible end') },
     ((row) => row && { group: 'type', ...row })(untilDecided(st, group.model)),
-    ...pack.links.filter((r) => group.links.some((l) => (l.type ?? l.kind) === r.id)).map((r) => ({ part: r.id, group: 'link', ...mark(r.id === ORDER_TYPE ? orderKey() : tieKey(r.id, kind(r.id)), r.title) })),
+    ...pack.links.filter((r) => group.model.ties.some((t) => t.type === r.id) || group.model.chains.some((c) => (c.type ?? ORDER_TYPE) === r.id)).map((r) => ({ part: r.id, group: 'link', ...mark(r.id === ORDER_TYPE ? orderKey() : tieKey(r.id, kind(r.id)), r.title) })),
     group.model.chains.some((c) => c.dashed) && { group: 'link', ...mark(orderKey(true), 'If chosen') },
   ].filter(Boolean);
   return { keyRows, packRows };
