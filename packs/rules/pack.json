@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "title": "Rules",
   "description": "Who decides what applies: the judge that reads every pack's rules as data and says whether a change applies, waits for a person or is refused, naming the rule; who may do what, on whose authority, the workspace's standing, and what a drawing may ask. A root pack, started after the loader.",
+  "rules": [
+    { "id": "floor", "when": { "loosens_floor": true }, "then": "refuse", "say": "\"{title}\" would loosen the floor, whose rules only tighten: {loosens}. The floor changes in code (packs/rules/kernel/floor.ts)." },
+    { "id": "rule_items", "when": { "actor": "agent", "rule_item": true }, "then": "hold", "say": "An agent's change to the rule \"{title}\" waits for the owner: rules decide what waits.", "stake": "a rule changed decides what applies, waits or is refused for every change after it" }
+  ],
   "kernel": {
     "trust": "root",
     "internal": true,

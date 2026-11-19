@@ -14,7 +14,7 @@ import { outsideLayout, outsideReach } from './reach-check.ts'; export { outside
 import { COMPARE, fillExamples, fillForms, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
 import { checkForms, checkUnless, holdsUnless, madeIn, missingLinks, overMost, type AtMost, type FormOp, type MustLink, type Unless } from './rule-forms.ts';
 import { apartRefused, type Apart } from './apart.ts'; import { exampleProblems, type Example } from './examples.ts'; export { checkRules } from '../../loader/kernel/rule-check.ts';
-import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts'; import { opFacts } from '../../loader/kernel/part-trial.ts';
+import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts'; import { opFacts } from '../../loader/kernel/part-trial.ts'; import { floorFacts, type FloorFacts } from './floor.ts';
 
 type OneOrMany = string | string[];
 
@@ -85,7 +85,7 @@ export interface RuleDef {
     /** The op writes a version's part code alone, the version pinned on one island at most: a trial (packs/loader/kernel/part-trial.ts). */
     part_trial?: boolean;
     /** The op pins an island to a version carrying code that another island already pins. */
-    spreads?: boolean; /** The op turns a pack that runs code off or on, on one island (its packs_off, packs/loader/kernel/island-off.ts). */ island_code?: boolean; /** It adds an item to an island past its cap (packs/loader/kernel/island-cap.ts); {over_cap} in say is how. */ over_cap?: boolean;
+    spreads?: boolean; /** The op turns a pack that runs code off or on, on one island (its packs_off, packs/loader/kernel/island-off.ts). */ island_code?: boolean; /** It adds an item to an island past its cap (packs/loader/kernel/island-cap.ts); {over_cap} in say is how. */ over_cap?: boolean; /** It writes an item that holds a rule; it loosens a floor rule ({loosens} in say is how: ./floor.ts). */ rule_item?: boolean; loosens_floor?: boolean;
   };
   /** spare: what it matches is let through, every other rule it would be under spared by this one (its pack's bookkeeping only), or with spares, those alone. */
   then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] } | { carry: Carry };
@@ -214,7 +214,7 @@ function capable(reg: Registry, type: string, wanted: string | Record<string, Re
 }
 
 /** What is read of an op before the rules judge it, beside the op itself (packs/loader/kernel/part-trial.ts). */
-export interface OpFacts {
+export interface OpFacts extends FloorFacts {
   part_trial?: boolean;
   spreads?: boolean; island_code?: boolean; /** Of an op that adds to an island past its cap, how far past (packs/loader/kernel/island-cap.ts). */ over_cap?: string;
   /** It makes an item of an island's own pack on that island, in the change that makes the island: in reach of the pack making it. */ own_island?: boolean;
@@ -225,7 +225,7 @@ export interface OpFacts {
 function applies(rule: RuleDef & { pack?: string }, reg: Registry, who: Who, w: Written, targets: Target[], held: boolean, facts: OpFacts = {}): boolean {
   const when = rule.when ?? {};
   if (when.part_trial !== undefined && Boolean(facts.part_trial) !== when.part_trial) return false;
-  if (when.spreads !== undefined && Boolean(facts.spreads) !== when.spreads) return false; if (when.island_code !== undefined && Boolean(facts.island_code) !== when.island_code) return false; if (when.over_cap !== undefined && Boolean(facts.over_cap) !== when.over_cap) return false;
+  if (when.spreads !== undefined && Boolean(facts.spreads) !== when.spreads) return false; if (when.island_code !== undefined && Boolean(facts.island_code) !== when.island_code) return false; if (when.over_cap !== undefined && Boolean(facts.over_cap) !== when.over_cap) return false; if (when.rule_item !== undefined && Boolean(facts.rule_item) !== when.rule_item) return false; if (when.loosens_floor !== undefined && Boolean(facts.loosens) !== when.loosens_floor) return false;
   if (when.actor && (when.actor === 'human') !== who.human) return false;
   if (who.reading && !(rule.readings ?? rule.then !== 'hold')) return false;
   if (when.op && !list(when.op)!.includes(w.op)) return false;
@@ -295,7 +295,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const refusers: Ruled[] = [];
   const title = targets[0]?.title ?? String((w as { title?: string }).title ?? '');
   const said = (rule: Rule, fallback: string) =>
-    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{over_cap}', facts.over_cap ?? '').replaceAll('{missing}', () => facts.missing?.get(keyOf(rule)) ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
+    (rule.say ?? fallback).replaceAll('{title}', title).replaceAll('{pack}', who.pack ?? '').replaceAll('{over_cap}', facts.over_cap ?? '').replaceAll('{loosens}', facts.loosens ?? '').replaceAll('{missing}', () => facts.missing?.get(keyOf(rule)) ?? '').replaceAll('{type}', () => (who.pack && outsideReach(reg, who.pack, w, targets)) || (who.drawing && outsideLayout(reg, who.drawing.writes, w, targets)) || w.type || targets[0]?.type || '');
   const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`), ...(rule.stake && { stake: said({ ...rule, say: rule.stake }, rule.stake) }) });
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
@@ -447,7 +447,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
   for (const [ref, made] of madeIn(reg, ops as FormOp[])) if (!found.has(ref)) found.set(ref, made); // an op on an item the change makes, as a rule's example writes one
   // What is read of each op beside it: a part's trial version, a version spread to another island (packs/loader/kernel/part-trial.ts).
-  const facts = await opFacts(q, reg, ops, found);
+  const facts = (await opFacts(q, reg, ops, found)).map((f, i) => ({ ...f, ...floorFacts(reg, ops[i], on(ops[i]).flatMap((id) => found.get(id) ?? [])) })); // and what it does to rule items (./floor.ts)
   // A rule that holds or refuses unless what a walk from the item reaches holds is spared where it does (./rule-forms.ts).
   const unlessing = [...rules, ...runs.flat().flatMap((run) => (run ? under(run).rules : []))].filter((r) => r.unless);
   if (unlessing.length) await Promise.all(ops.map(async (op, i) => {
