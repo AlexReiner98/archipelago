@@ -6,6 +6,9 @@
 import { at, m } from './marks.js';
 import { cut } from './radial.js';
 
+/** Where a branch's one dash stands while it is not yet grown: wholly off the path, so its round caps draw nothing. */
+export const HIDDEN = 1.5;
+
 /** A glow: three rings, faintest outermost, drawn at unit size and moved and scaled by its group's transform. */
 const glow = (key, kind) => m('g', { key, class: `rt-glow rt-${kind}`, opacity: 0 }, m('circle', { class: 'rt-g1', r: 1 }), m('circle', { class: 'rt-g2', r: 0.6 }), m('circle', { class: 'rt-g3', r: 0.3 }));
 
@@ -14,7 +17,7 @@ export function marksOf(tree, placed, z, n, shown) {
   const { place, branch, width, height, centre } = placed;
   const branches = tree.order.filter((node) => node.parent).map((node) => {
     const on = shown(node);
-    return m('path', { key: `b:${node.id}`, class: `rt-branch rt-b${Math.min(node.depth, n('reflex_branch_levels'))}`, d: branch.get(node.id), pathLength: 1, 'stroke-dasharray': '1 1', 'stroke-dashoffset': on ? 0 : 1 });
+    return m('path', { key: `b:${node.id}`, class: `rt-branch rt-b${Math.min(node.depth, n('reflex_branch_levels'))}`, d: branch.get(node.id), pathLength: 1, 'stroke-dasharray': '1 2', 'stroke-dashoffset': on ? 0 : HIDDEN });
   });
   const gap = z('reflex_name_gap');
   const nodes = tree.order.filter((node) => node.parent).map((node) => {

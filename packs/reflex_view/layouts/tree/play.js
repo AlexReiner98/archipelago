@@ -9,6 +9,7 @@
 import { seeded } from './film.js';
 import { at } from './marks.js';
 import { hash } from './tree.js';
+import { HIDDEN } from './draw.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -98,7 +99,7 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
   };
   const hide = () => {
     const out = [];
-    for (const node of tree.born) out.push({ key: `n:${node.id}`, toggle: { on: false } }, { key: `b:${node.id}`, set: { 'stroke-dashoffset': 1 } });
+    for (const node of tree.born) out.push({ key: `n:${node.id}`, toggle: { on: false } }, { key: `b:${node.id}`, set: { 'stroke-dashoffset': HIDDEN } });
     sparks.fill(null);
     lights.fill(null);
     for (let i = 0; i < pools.sparks; i++) out.push({ key: `sp:${i}`, set: { opacity: 0 } });
