@@ -117,3 +117,40 @@ test('each working rule is said once: in the rules file a project is handed, fro
   for (const p of rules) assert.ok(!template.includes(p.title), `the template does not word "${p.title}" itself`);
   assert.doesNotMatch(WRITE_TOOLS.change.description, /Keep the map true|Settle what/, 'change says what it does, not the rule');
 });
+
+test('what the hooks and the MCP server say is worded on the map: the owner rewords a part, a tool or a rule with no push', async () => {
+  const { connectText } = await import('../packs/surface/kernel/mcp.ts');
+  const { surfaceFor } = await import('../packs/surface/kernel/tools.ts');
+  const { ownWords, wordsFrom } = await import('../packs/surface/kernel/tool-words.ts');
+  const { workspaceRules } = await import('../packs/surface/kernel/workspace-rules.ts');
+  const { callAs } = await import('../packs/loader/kernel/kernel-context.ts');
+  const l = await fresh();
+  const ctx = ownContext(l, 'sessions');
+  const before = await sessionHookPack.hookSessionStart(ctx, { session_id: 'w1', cwd: 'C:\code\words' });
+  assert.match(before, /^This session is registered in Archipelago, the owner's map/);
+  // The owner's versions: a part of the start, a tool's own words, a verb's, and a working rule, each kept with its preset's id.
+  await make(l, [
+    { op: 'create', type: 'instruction', title: 'Registered', body: 'You are run {run} here.', props: { preset: 'agents.registered' } },
+    { op: 'create', type: 'instruction', title: 'Undo', body: 'Take a change set back.', props: { preset: 'surface.tool_undo' } },
+    { op: 'create', type: 'instruction', title: 'Report', body: 'Say what happened.', props: { preset: 'core.tool_report' } },
+    { op: 'create', type: 'instruction', title: 'Search first', body: 'Look before you make.', props: { preset: 'practice.search_first' } },
+  ]);
+  const after = await sessionHookPack.hookSessionStart(ctx, { session_id: 'w2', cwd: 'C:\code\words' });
+  assert.match(after, /^You are run e_\w+ here\.\n/, 'the start says the owner’s words, filled in');
+  assert.doesNotMatch(after, /registered in Archipelago/);
+  // A client listing the tools is told them in the map's words; the server's own words are the presets.
+  const tools = surfaceFor(l.registry).map(([name]) => name);
+  const { at } = await callAs<{ at: Record<string, string> }>(l, 'answer.instructions', { wheres: ['connect', ...tools.map((t) => `tool:${t}`)] });
+  const worded = Object.fromEntries(surfaceFor(l.registry, wordsFrom(at)).map(([name, tool]) => [name, tool.description]));
+  assert.equal(worded.undo, 'Take a change set back.');
+  assert.match(worded.report, /^Say what happened\. Call with the action and its params\. Its actions: session_update/);
+  assert.equal(Object.fromEntries(surfaceFor(l.registry).map(([name, tool]) => [name, tool.description])).undo, ownWords('tool:undo'));
+  assert.equal(connectText(l.registry, wordsFrom(at)), connectText(l.registry), 'what the owner left alone is the preset');
+  // The rules file a session on this map is handed says the owner's rule, in the frame the file has.
+  const rules = await workspaceRules(l);
+  assert.match(rules, /- \*\*Search first\.\*\* Look before you make\./);
+  assert.doesNotMatch(rules, /Query with name search first/);
+  // And as the root service a written .claude/pelago.md is made from (root.rules_file).
+  const { rulesFileOf } = await import('../packs/surface/kernel/workspace-rules.ts');
+  assert.equal((await rulesFileOf({ map: l } as never, {})).text, rules);
+});

@@ -46,10 +46,13 @@ export async function narrowed(ctx: KernelContext, text: string) {
 /** Cut to its first clause, for a line. */
 const gist = (s: string | undefined, n = 140) => (s && s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, '')}…` : s);
 
-/** What is narrowed, as text for the hook to hand the session; nothing when the map holds nothing on it. */
-export function narrowedText(n: Awaited<ReturnType<typeof narrowed>>): string | undefined {
+/** Where the line before what is narrowed is worded: an instruction the owner may reword on the map (the runs pack's preset). */
+export const NARROWED_AT = 'prompt:narrowed';
+
+/** What is narrowed, as text for the hook to hand the session, led by the words at NARROWED_AT; nothing when the map holds nothing on it. */
+export function narrowedText(n: Awaited<ReturnType<typeof narrowed>>, lead: string): string | undefined {
   if (!n.settled.length && !n.open.length) return undefined;
-  const lines = ['On what you were just asked, the map already holds this. Do not reopen what is settled unless the owner asks; build on it.'];
+  const lines = [lead];
   for (const s of n.settled) lines.push(`- Settled: ${s.title} (${s.id}), ${s.status}${s.chosen ? `: ${gist(s.chosen)}` : ''}${s.why ? `. Why: ${gist(s.why)}` : ''}`);
   for (const o of n.open) lines.push(`- Still open: ${o.title} (${o.id}), ${o.status}`);
   return lines.join('\n');

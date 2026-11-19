@@ -97,20 +97,28 @@ export async function seeing(ctx: KernelContext, s: Seen, run?: string): Promise
   return { view, ...(lens && { lens }), ...(item && { item: { id: item.id, title: item.title, type: item.type } }), ago, ...(tab && { tab }) };
 }
 
+/** The names in braces filled in; one the fill does not have is left as it is (the agents pack's `filled`, copied). */
+const fillIn = (text: string, fill: Record<string, string>) => text.replace(/\{([a-z_]+)\}/g, (all, name: string) => fill[name] ?? all);
+/** The words at some places (the agents pack's instructions, which the owner may reword on the map), each one string, said to `run`. */
+const wordsAt = async (ctx: KernelContext, wheres: string[], run?: string) =>
+  (await ctx.call<object, { at: Record<string, string> }>('answer.instructions', { wheres, ...(run && { run }) })).at;
+
 /**
  * One line for an agent (`run`, the session asking): what the owner is looking at, or nothing when no page of theirs
  * said so lately. On another chat's own tab, only whose tab it is: what that tab draws is that chat's, not this one's.
+ * Its sentences are the words at prompt:seeing_<whose> and prompt:seeing_this; where the page stands fills them in.
  */
 export async function seeingLine(ctx: KernelContext, w: Whose, run?: string): Promise<string | undefined> {
   const s = await seenNow(ctx, w);
   if (!s || Date.now() - s.said > NOW_MS) return undefined;
   const v = await seeing(ctx, s, run);
-  if (v.tab?.own && !v.tab.yours) return `The owner's page shows another chat's tab ("${v.tab.title ?? v.tab.chat}"), not yours.`;
-  const whose = v.tab?.yours ? (v.tab.own ? ' On your tab, the' : ' On a tab of theirs following you, the') : ' The';
+  if (v.tab?.own && !v.tab.yours) return fillIn((await wordsAt(ctx, ['prompt:seeing_other'], run))['prompt:seeing_other'] ?? '', { title: v.tab.title ?? v.tab.chat });
+  const whose = `prompt:seeing_${v.tab?.yours ? (v.tab.own ? 'your_tab' : 'following') : 'page'}`;
   const open = v.item && `${v.item.type} "${v.item.title}" (${v.item.id}) open`;
   // An item's page over its own canvas is said once.
   const where = v.screen ? `the ${v.screen} screen` : v.item && v.view === `from ${quoted(v.item.title)}` ? open : `the view ${v.view}${v.lens ? ` (${v.lens})` : ''}${open ? `, with ${open}` : ''}`;
-  return `${whose} owner's page shows ${where}. "This", "here" or "it" may mean that (query seeing has it).`.trimStart();
+  const words = await wordsAt(ctx, [whose, 'prompt:seeing_this'], run);
+  return [fillIn(words[whose] ?? '', { where: String(where) }), words['prompt:seeing_this']].filter(Boolean).join(' ');
 }
 
 /** Whether the owner sees a show of session `run` land, said to the agent that showed it. */
@@ -125,7 +133,8 @@ export interface Sight {
  * Where a show of session `run` reaches the owner: a show never moves their view (decision e_mnuthcap), so it is only
  * whether a page of theirs is open (`open`, from the pages counted in the last few seconds) to light it.
  */
-export async function inSight(_ctx: KernelContext, _w: Whose, _run: string | undefined, open: number): Promise<Sight> {
-  if (!open) return { looking: false, where: 'No page of theirs is open in sight: the islands it names are on their canvas when they look (put_on); the item is lit if they open a page within ten minutes.' };
-  return { looking: false, where: 'Their view stays where it is: an item on an island is lit in their side bar, its island put on their canvas; anything else is not drawn. Tell them where to look.' };
+export async function inSight(ctx: KernelContext, _w: Whose, run: string | undefined, open: number): Promise<Sight> {
+  // Where it lands is worded at show:closed or show:open, which the owner may reword on the map.
+  const at = open ? 'show:open' : 'show:closed';
+  return { looking: false, where: (await wordsAt(ctx, [at], run))[at] ?? '' };
 }

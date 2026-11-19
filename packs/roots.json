@@ -64,6 +64,9 @@
       "query",
       "sessions"
     ],
+    "root.rules_file": [
+      "agents"
+    ],
     "root.server_packs": [
       "connect"
     ],

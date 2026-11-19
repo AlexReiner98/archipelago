@@ -4,7 +4,7 @@
 // session elsewhere is handed nothing of it.
 
 import assert from 'node:assert/strict';
-import { cpSync, mkdtempSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -18,6 +18,10 @@ import { freshWith, human } from './map.ts';
 import { kernelContext, ownContext } from '../packs/loader/kernel/kernel-context.ts';
 
 const agent: Actor = { kind: 'agent', name: 'test' };
+/** The frontier's words as the runs pack ships them, by place: what a map with no version of its own says. */
+const WORDS: Record<string, string> = Object.fromEntries(
+  (JSON.parse(readFileSync(join(import.meta.dirname, '..', 'packs', 'runs', 'pack.json'), 'utf8')).styles as { body: string; props: { for: string[] } }[]).map((p) => [p.props.for[0], p.body]),
+);
 
 test('a worktree is read as the checkout it was made from', () => {
   assert.equal(folderKey('C:\\Work\\App\\.claude\\worktrees\\login-a1\\'), 'c:/work/app');
@@ -63,7 +67,7 @@ test('a second session is placed where the first worked: the owner’s correctio
   assert.ok(why.get(made.hash)?.includes('unsettled'), 'the undecided question is on it');
   assert.ok(why.get(made.form)?.includes('blocked'), 'the step that waits on another says so');
   assert.equal(f.items[0].reasons[0].why, 'corrected', 'what the owner corrected comes first');
-  const text = frontierText(f).join('\n');
+  const text = frontierText(f, WORDS).join('\n');
   assert.match(text, /changed by .* since an agent last did \(title\)/);
   assert.match(text, /added by .*, not yet seen by an agent/);
   assert.ok(!f.items.some((i) => i.id === made.hub), 'a hub with open parts is not itself next');
@@ -77,7 +81,7 @@ test('a second session is placed where the first worked: the owner’s correctio
   const elsewhere = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'three', cwd: 'C:/work/other' }));
   const none = await frontierPack.frontier(kernelContext(l, 'runs'), ({ run: elsewhere.run }));
   assert.equal(none.before.sessions, 0);
-  assert.match(frontierText(none)[0], /No session has worked here before/);
+  assert.match(frontierText(none, WORDS)[0], /No session has worked here before/);
 
   // A chat with no folder (ChatGPT, Grok Bot) is the person's, wherever they worked: it is handed the open work too.
   const chat = await sessionsPack.sessionStart(ownContext(l, 'sessions'), agent as sessionsPack.Actor, ({ session_id: 'four', title: 'A chat', surface: 'chatgpt' }));

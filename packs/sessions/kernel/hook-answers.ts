@@ -9,7 +9,7 @@ import type { KernelContext } from '#pelago/kernel';
 import { askOnReply } from './replies.ts';
 import { pushAnswer } from './push-rules.ts';
 import { hookWithin, labelled, promptNamed, recordUsage, resolveRun, sessionBegan, sessionHeard, sessionPrompted } from './sessions.ts';
-import { HOOK_AGENT as HOOK_ACTOR, hookSessionEnd, hookSessionStart, sessionIsland, toldAt } from './session-hook.ts';
+import { fillIn, HOOK_AGENT as HOOK_ACTOR, hookSessionEnd, hookSessionStart, sessionIsland, toldAt, wordsAt } from './session-hook.ts';
 import { addTouched } from './touched.ts';
 import { fileSaid } from './file-said.ts';
 import { keepStands } from './stands.ts';
@@ -67,9 +67,6 @@ export interface HookAsk {
 const HEARD_MS = 7 * 86_400_000;
 const heardKey = (session: string | undefined) => `heard:${session ?? ''}`;
 
-const LIMITED =
-  'This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one that is theirs: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made in Settings.';
-
 const actionsKey = (session: string | undefined) => `actions:${session ?? ''}`;
 
 /** What one request leaves for the next, in the whole workspace's transient store (root.transient), so a server it has not spoken to before reads it too. */
@@ -83,11 +80,25 @@ const sayAt = async (ctx: KernelContext, where: string, fill: Record<string, str
   return (await toldAt(ctx, where, { fill: { ...(run && { run }), ...fill }, island: await sessionIsland(ctx, run) })).join(' ');
 };
 
+/**
+ * The words of the parts said at a hook, each an instruction at its place (session_start:<part>, prompt:<part>) the
+ * owner may reword on the map, read at once and said to the session's run, on its island; `say` fills one in.
+ */
+const partsAt = async (ctx: KernelContext, places: string[], session?: string) => {
+  const run = session ? (await resolveRun(ctx, session, true))?.id : undefined;
+  const words = places.length ? await wordsAt(ctx, places, { ...(run && { run }), island: await sessionIsland(ctx, run) }) : {};
+  return (place: string, fill: Record<string, string> = {}) => fillIn(words[place] ?? '', fill);
+};
+
 // A client keeps the tools as they were when it connected; what to do about it is practice's instruction for server_restarted.
-const restarted = async (ctx: KernelContext, { started, commit }: HookAsk['running'], added: string[] | undefined, session?: string) =>
-  `The Archipelago server has restarted since this session began (at ${started}${commit ? `, now running commit ${commit.slice(0, 7)}` : ''}). ${
-    added?.length ? `Actions new since you were given the tools: ${added.join('; ')}. ` : added ? 'No action is new since you were given the tools. ' : ''
-  }${await sayAt(ctx, 'server_restarted', {}, session)}`.trimEnd();
+const restarted = async (ctx: KernelContext, { started, commit }: HookAsk['running'], added: string[] | undefined, session?: string) => {
+  const say = await partsAt(ctx, ['prompt:restarted', ...(commit ? ['prompt:restarted_commit'] : []), ...(added?.length ? ['prompt:restarted_new'] : added ? ['prompt:restarted_none'] : [])], session);
+  return [
+    say('prompt:restarted', { started, commit: commit ? say('prompt:restarted_commit', { commit: commit.slice(0, 7) }) : '' }),
+    added?.length ? say('prompt:restarted_new', { actions: added.join('; ') }) : added ? say('prompt:restarted_none') : '',
+    await sayAt(ctx, 'server_restarted', {}, session),
+  ].filter(Boolean).join(' ');
+};
 
 /**
  * What a session is told at a hook, the same for any surface: told, words added to what it reads next; go_on, why it
@@ -128,7 +139,7 @@ export async function sessionAnswer(ctx: KernelContext, event: string, call: Hoo
   if (call.may === 'report') return {};
   // A token within some items registers and speaks for sessions in the places that are theirs, and for no others.
   if (within.length && !(await hookWithin(ctx, within, body, event === 'session-start'))) {
-    return event === 'session-start' ? told(LIMITED) : {};
+    return event === 'session-start' ? told((await partsAt(ctx, ['session_start:limited']))('session_start:limited')) : {};
   }
   // A file read or changed: what bites there, said once (packs/sessions/kernel/file-said.ts). The ids it said go back beside the answer, for the hook to keep.
   if (event === 'file-used') {
@@ -174,18 +185,19 @@ export async function sessionAnswer(ctx: KernelContext, event: string, call: Hoo
     }
     // How many of each, and the newest few: the rest is one query away.
     const counts = changes.length > NEWEST ? countBy(changes, (c) => c.action) : undefined;
-    const tally = counts ? `${changes.length} changes (${Object.entries(counts).map(([action, n]) => `${n} ${action}`).join(', ')}); the newest ${NEWEST}, the rest with query events:\n` : '';
+    const heardSay = changes.length ? await partsAt(ctx, ['prompt:since_heard', ...(counts ? ['prompt:since_heard_tally'] : [])], body.session_id) : undefined;
+    const tally = counts && heardSay ? `${heardSay('prompt:since_heard_tally', { count: String(changes.length), counts: Object.entries(counts).map(([action, n]) => `${n} ${action}`).join(', '), newest: String(NEWEST) })}\n` : '';
     // And what the owner is looking at now, so "this" in their message has a referent (packs/presence/kernel/seeing.ts).
     const asking = body.session_id ? await resolveRun(ctx, body.session_id, true) : undefined;
     const looking = (await ctx.call<object, { line: string | null }>('answer.seeing_line', { whose: await ctx.reads({ whose: true }), ...(asking && { run: asking.id }) }).catch(() => undefined))?.line;
     if (looking) lines.push(looking);
-    if (changes.length) lines.push(`Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:\n${tally}${described}`);
+    if (heardSay) lines.push(`${heardSay('prompt:since_heard')}\n${tally}${described}`);
     // The first thing the owner asks a session narrows where it stands: what the map has settled on it (packs/runs/kernel/frontier-prompt.ts).
     const asked = askedBy(body.prompt);
     const narrowKey = `narrowed:${body.session_id ?? ''}`;
     if (asked && body.session_id && !(await kept(ctx, narrowKey))) {
       await keep(ctx, narrowKey, true, HEARD_MS);
-      const found = await ctx.call<object, { text: string | null }>('answer.narrowed', { text: asked, said: true }).catch((err) => console.error(`hook narrow: ${(err as Error).message}`));
+      const found = await ctx.call<object, { text: string | null }>('answer.narrowed', { text: asked, said: true, ...(run && { run: run.id }) }).catch((err) => console.error(`hook narrow: ${(err as Error).message}`));
       const on = found?.text ?? undefined;
       if (on) lines.push(on);
     }

@@ -4,7 +4,8 @@
   "title": "Presence",
   "description": "Where agents have pointed the owner's screen and the steps they took, what each screen is seeing, and the agents waiting in watch. A server-level service: versioned and pinned with the server by its operator, never turned on, off or versioned per island.",
   "uses": [
-    "service:root.transient"
+    "service:root.transient",
+    "service:answer.instructions"
   ],
   "kernel": {
     "trust": "service",
@@ -115,5 +116,14 @@
         "run": "surface-reads.ts#seeingNow"
       }
     }
-  }
+  },
+  "styles": [
+    {"id": "presence.seeing_page", "type": "instruction", "title": "What the owner's page shows", "body": "The owner's page shows {where}.", "props": {"for": ["prompt:seeing_page"]}},
+    {"id": "presence.seeing_your_tab", "type": "instruction", "title": "Your tab on the owner's page", "body": "On your tab, the owner's page shows {where}.", "props": {"for": ["prompt:seeing_your_tab"]}},
+    {"id": "presence.seeing_following", "type": "instruction", "title": "A tab following you", "body": "On a tab of theirs following you, the owner's page shows {where}.", "props": {"for": ["prompt:seeing_following"]}},
+    {"id": "presence.seeing_this", "type": "instruction", "title": "This means what they see", "body": "\"This\", \"here\" or \"it\" may mean that (query seeing has it).", "props": {"for": ["prompt:seeing_this"]}},
+    {"id": "presence.seeing_other", "type": "instruction", "title": "Another chat's tab", "body": "The owner's page shows another chat's tab (\"{title}\"), not yours.", "props": {"for": ["prompt:seeing_other"]}},
+    {"id": "presence.show_closed", "type": "instruction", "title": "A show with no page open", "body": "No page of theirs is open in sight: the islands it names are on their canvas when they look (put_on); the item is lit if they open a page within ten minutes.", "props": {"for": ["show:closed"]}},
+    {"id": "presence.show_open", "type": "instruction", "title": "Where a show lands", "body": "Their view stays where it is: an item on an island is lit in their side bar, its island put on their canvas; anything else is not drawn. Tell them where to look.", "props": {"for": ["show:open"]}}
+  ]
 }
