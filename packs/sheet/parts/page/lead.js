@@ -56,7 +56,7 @@ const LINKED = ['aim', 'done', 'place', 'actor'];
 const recommended = (x, says) => (x && typeof x === 'object' && x.recommended === true) || /\brecommended\b/i.test(says ?? '');
 
 /**
- * The choices of a question still open, one line each: its name, what it means in the tooltip, the recommended one
+ * The choices of a question still open, one each: its name, and under it what it means in full, the recommended one
  * marked. As many as the band has room for are in sight, the recommended one always among them, the rest behind a
  * count at the end of the last line. A press on one asks to settle it by that one.
  */
@@ -70,14 +70,19 @@ function choices(c, item, { writes, asking }, room) {
     if (r >= room) shown[room - 1] = r;
   }
   const hidden = c.list.map((_, i) => i).filter((i) => !shown.includes(i));
-  const what = (i) => tip(c.says[i] ? `${c.list[i]}: ${c.says[i]}` : c.list[i]);
-  const name = (i) => (writes ? ['button', { key: `choice:${i}`, look: 'quiet', tip: what(i) }, c.list[i]] : ['text', { bold: true, tip: what(i) }, c.list[i]]);
+  // Its meaning is said whole under it, so a choice's tip says only what a press does.
+  const name = (i) => (writes ? ['button', { key: `choice:${i}`, look: 'quiet', tip: tip(`Choose ${c.list[i]}`) }, c.list[i]] : ['text', { bold: true }, c.list[i]]);
   const more = hidden.length > 0 && (writes
     ? ['menu', { key: 'choices-more', label: `+${hidden.length}`, look: 'quiet' }, ...hidden.map(name)]
     : ['text', { look: 'muted', tip: tip(hidden.map((i) => c.list[i]).join(' · ')) }, `+${hidden.length}`]);
-  // The mark after the name, so every name starts at the band's edge whether or not it is the recommended one.
-  const lines = shown.map((i, n) => line(['box', { flow: 'row', grow: true }, name(i), ...(rec[i] ? [['text', { tone: 'ok', tip: 'Recommended' }, '★']] : [])],
-    n === shown.length - 1 && more));
+  // The mark after the name, so every name starts at the band's edge whether or not it is the recommended one; under
+  // it, what it means in full, muted (the owner, 19 Nov 2026: "for decisions lets ensure the full option shows for
+  // each"), the word that it is recommended left to the mark.
+  const means = (i) => String(c.says[i] ?? '').replace(/\s*\(?\brecommended\b\)?[.;,:]?/gi, '').replace(/\s+/g, ' ')
+    .replace(/([.!?]) ([a-z])/g, (_, end, first) => `${end} ${first.toUpperCase()}`).trim();
+  const lines = shown.map((i, n) => ['box', { key: `choice-option:${i}`, flow: 'column', gap: 1 },
+    line(['box', { flow: 'row', grow: true }, name(i), ...(rec[i] ? [['text', { tone: 'ok', tip: 'Recommended' }, '★']] : [])], n === shown.length - 1 && more),
+    ...(means(i) ? [['box', { key: `choice-means:${i}`, flow: 'row' }, ['text', { look: 'muted' }, means(i)]]] : [])]);
   const ask = asking !== undefined && ['box', { flow: 'column', gap: 1, look: 'sunk', pad: 2 },
     ['text', {}, `Settle it: ${c.list[asking]}`],
     ...(c.why ? [['input', { key: 'choice-why', kind: 'text', hint: 'Why? (optional)', grow: true, focus: true }]] : []),
@@ -219,9 +224,10 @@ const LINES = 3;
 
 /**
  * The band an item's page opens on, as marks, or null when its type says none, it holds nothing the title and marks
- * do not already say, and nothing waits on the person looking. `links` are the ties into it ({ type, root, title, open }).
+ * do not already say, and nothing waits on the person looking. `links` are the ties into it ({ type, root, title, open });
+ * `island`, a focus's, the work on its island ({ id, title, open }).
  */
-export function leadMarks(item, type, c, { writes = false, asking, adding, now, waits, me, links, words } = {}) {
+export function leadMarks(item, type, c, { writes = false, asking, adding, now, waits, me, links, island, words } = {}) {
   const lead = leadOf(item, type, c);
   const mine = waitsOnMe(item, waits, me);
   const room = LINES - (mine ? 1 : 0);
@@ -244,8 +250,10 @@ export function leadMarks(item, type, c, { writes = false, asking, adding, now, 
     : lead.form === 'occurrence' ? occurrence(item, type, now)
     : lead.form === 'line' ? oneLine(item, lead, links)
     : [];
-  // The line that it waits on you stands first; the band is never more than its lines.
-  const all = [mine && waitsLine(mine), ...pressed(lines, lead, item, { writes, links, words, adding })].filter(Boolean).slice(0, LINES);
+  // A focus counts the work on its island, whatever its type's form (decision e_4yy5btjq): its work lives there, not
+  // in links into it. The line that it waits on you stands first; the band is never more than its lines.
+  const isle = Array.isArray(island) && island.length ? progress(island) : null;
+  const all = [mine && waitsLine(mine), isle, ...pressed(lines, lead, item, { writes, links, words, adding })].filter(Boolean).slice(0, LINES);
   return all.length ? band(...all) : null;
 }
 

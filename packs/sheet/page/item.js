@@ -53,18 +53,32 @@ const voiceOf = (actor) => (typeof actor !== 'string' ? null : actor.startsWith(
 /** The parts of an item's page its style may fold a click away. */
 const FOLDS = ['head', 'fields', 'source'];
 
-function told(data, owner, count, named, folds, me) {
+/**
+ * A focus's work, which the band counts (decision e_4yy5btjq): the plannable items on the island it is the focus of,
+ * held by the island they live on rather than a link. None for any other item.
+ */
+function islandWork(e) {
+  if (e.props?.focus !== true || e.props?.island !== e.id) return [];
+  // The island's own items alone, bounded by the query's own limit.
+  const params = { filter: { find: [`island ${e.id}`], not: ['kind system'] }, walk: { over: [], steps: 0 } };
+  return api('view', { name: 'flat', params }).then((r) => (r?.items ?? [])
+    .filter((x) => x.id !== e.id && pageType(x.type)?.capabilities?.plannable)
+    .map((x) => ({ id: x.id, title: x.title, open: x.open !== false })), () => []);
+}
+
+function told(data, owner, count, named, folds, me, work = []) {
   const e = data.entity;
   const tie = (r) => ({ type: r.type, root: rootOf(r.type) });
   // What is linked into it, with its name, whether it is still open and its id: the band counts it, and its press lights
-  // it on the canvas (lead.js).
+  // it on the canvas (lead.js). A focus's island work is told beside it.
   const into = (r) => ({ ...tie(r), id: r.id, title: r.title, open: !isClosed(r.entity_type, r.status) });
+  const incoming = data.incoming.map(into);
   return {
     name: 'page',
     item: Object.fromEntries(['id', 'type', 'title', 'body', 'status', 'is_open', 'visibility', 'private_to', 'owner', 'confidence', 'archived_at', 'created_at', 'updated_at', 'props'].filter((k) => e[k] !== undefined).map((k) => [k, e[k]])),
     views: {
       // Who it waits on and for what, and who is looking: the band says when it is them (decision e_xj9cs33u).
-      item: { outgoing: data.outgoing.map(tie), incoming: data.incoming.map(into), titles: named, waits: data.outgoing.filter((r) => rootOf(r.type) === 'waits_on').map((r) => ({ id: r.id, title: r.title, ...(typeof r.props?.for === 'string' && { for: r.props.for.slice(0, 200) }) })), ...(me && { me }), ...(voiceOf(data.note_by) && { voice: voiceOf(data.note_by) }),...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
+      item: { outgoing: data.outgoing.map(tie), incoming, ...(work.length && { island: work }), titles: named, waits: data.outgoing.filter((r) => rootOf(r.type) === 'waits_on').map((r) => ({ id: r.id, title: r.title, ...(typeof r.props?.for === 'string' && { for: r.props.for.slice(0, 200) }) })), ...(me && { me }), ...(voiceOf(data.note_by) && { voice: voiceOf(data.note_by) }),...(owner && { owner: { id: owner.id, title: owner.title } }), ...(data.source && { source: { id: data.source.id, title: data.source.title, uri: data.source.uri } }) },
     },
     ...(count && { count }),
     // The parts its own style folds a click away (page.head, fields, source: folded), a style on its type or about it.
@@ -104,13 +118,14 @@ export async function entity(id, here) {
   };
   const run = isA(e.type, 'run');
   const session = run && e.is_open && !e.archived_at;
-  const [owner, { doc }, plan, shared, ownStyle] = await Promise.all([
+  const [owner, { doc }, plan, shared, ownStyle, work] = await Promise.all([
     // Its owner is at the end of one of its links (owned_by), named there; asked for only where it is not.
     e.owner ? (data.outgoing.find((r) => r.id === e.owner) ??api('get', { id: e.owner }).then((r) => r.entity, () => null)) : null,
     readWhole(e.type) ? readDocument(id) : { doc: null },
     !e.archived_at && data.incoming.some((r) => rootOf(r.type) === 'part_of' && readWhole(r.entity_type)) ? api('publish_plan', { within: id }).catch(() => null) : null,
     sharing,
     styled,
+    islandWork(e),
   ]);
   const shown = doc && type?.public ? await api('published', { id }).catch(() => null) : null;
   const bands = await Promise.all((await heldHere).map((p) => heldBand(p, again)));
@@ -204,7 +219,7 @@ export async function entity(id, here) {
   // A document reads in its note's place as it will publish (the publish pack's reading), above the page's note.
   const reading = doc && readingOf(e, doc, ownStyle ?? state.style, again);
   const me = await whoami().then((w) => w?.actor?.person ?? null, () => null);
-  const said = told(data, owner, countOn(data), named, FOLDS.filter((part) => ownStyle?.page?.[part] === 'folded'), me);
+  const said = told(data, owner, countOn(data), named, FOLDS.filter((part) => ownStyle?.page?.[part] === 'folded'), me, work);
   const sections = sectionsOn(data);
   // What the screens stand in its band (place: lead) comes after what is held on it and a pack's action form.
   const above = [...bands, acting, ...leadsOn(data), reading && h('section', { class: 'page-section note' }, reading)].filter(Boolean);
