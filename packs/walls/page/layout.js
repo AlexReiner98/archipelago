@@ -14,7 +14,7 @@ import { buildKept, keptInto, touched } from './marks-kept.js';
 import { readerAsks, stillReading } from './reader-frame.js';
 import { followSheet, sheetAside } from './sheet-follow.js';
 import { litSwitch, numberOf, sizeOf } from './query-base.js';
-import { surfaceOf } from './surface.js';
+import { heldOver, surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
 import { types as registry, typeTitle } from './words.js';
 import { colours, typeWords } from './layout-input.js';
@@ -286,7 +286,7 @@ export function drawWith(host, answer, style, keep) {
       }
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
       else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });
-      else if (said.type === 'surface-frame') surface?.paint(said.image, said.at);
+      else if (said.type === 'surface-frame') surface?.paint(said.image, said.at, said.tiles);
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
       // A change it asks for is put to the person, and sent as theirs (packs/walls/page/layout-asks.js); what came of it goes back.
       // What it made is not yet in the answer the canvas keeps, which follows only what it holds: the lens is read again.
@@ -415,7 +415,8 @@ export function drawWith(host, answer, style, keep) {
     const told = (now) => (begun ? toDrawing({ type: 'viewport', view: now }) : (view = now));
     // Kept in place, the stage stays where the reader left it, with what changed on it put back: its surface, key and bar.
     if (inPlace) {
-      for (const old of stageWas.querySelectorAll(':scope > .lf-surface, :scope > .lf-legend')) old.remove();
+      // The paint before stays over the new surface until that paints: else it flickers away (surface.js heldOver).
+      for (const old of stageWas.querySelectorAll(':scope > .lf-surface, :scope > .lf-legend')) (old.matches('.lf-legend') || !surface ? old.remove() : surface.first.then(() => old.remove()));
       stageWas.append(...[legend].filter(Boolean));
       if (over) picture.after(over);
       host.querySelector(':scope > .toolbar')?.remove();
@@ -434,7 +435,7 @@ export function drawWith(host, answer, style, keep) {
     }
     const lit = litSwitch(answer.viewer, style, keep, redraw);
     const stage = inPlace ? stageWas : h('div', { class: 'lf-stage' }, picture, over, legend);
-    if (!inPlace) host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
+    if (!inPlace) host.replaceChildren(...[before, beside(stage), after, heldOver(host, surface)].filter(Boolean));
     if (input.height > 0) followShape(scene);
     const moves = inPlace ? host.moves : (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: room(), style, beside: sheetAside, told }));
     if (inPlace) moves.again({ width, height, start: scene.start, aside: room(), told });

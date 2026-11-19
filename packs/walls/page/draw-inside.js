@@ -19,10 +19,12 @@ function inside(home, given) {
    * it cuts a name to fit. Set as a text role (the style's type: weight, style, case, track), it is measured so.
    */
   const widths = new Map();
+  // A text role's weight, as the style may set it (100 to 900, in steps of 50: core's style type), else the plain one.
+  const WEIGHT = 400, WEIGHTS = new Set(Array.from({ length: 17 }, (_, k) => 100 + k * 50));
   let current = '';
   const measure = (words, px, font, as) => {
     const said = as?.case === 'upper' ? String(words).toUpperCase() : String(words);
-    const want = `${as?.style === 'italic' ? 'italic ' : ''}${as?.weight === 600 ? 600 : 400} ${px}px ${font || 'system-ui'}`, key = `${want}|${said}`;
+    const want = `${as?.style === 'italic' ? 'italic ' : ''}${WEIGHTS.has(as?.weight) ? as.weight : WEIGHT} ${px}px ${font || 'system-ui'}`, key = `${want}|${said}`;
     let w = widths.get(key);
     if (w === undefined) {
       if (current !== want) ctx.font = current = want;
@@ -156,10 +158,20 @@ function inside(home, given) {
         // A service worker may not import: a drawing that paints with three.js is drawn by a dedicated worker.
         three: () => (given ? Promise.reject(new Error("three.js is not offered in a service worker")) : import(`${home}/three.js`)),
         resized: (fn) => sized.push(fn),
-        show: () => {
-          const image = canvas.transferToImageBitmap();
-          // With the view the drawing was last told, which it painted at: the page moves the frame from there to where its camera is now.
-          if (!ended) port.postMessage({ type: 'surface-frame', image, at: paintedAt }, [image]);
+        // With nothing given, what is painted on its canvas, with the view the drawing was last told, laid over that view.
+        // Given tiles ([{ key, canvas | image, rect }]), each as an image laid at its place in the picture's units: the
+        // page's camera moves them with the marks, and the drawing is never asked where the camera stands.
+        show: (tiles) => {
+          if (ended) return;
+          if (!Array.isArray(tiles)) {
+            const image = canvas.transferToImageBitmap();
+            return void port.postMessage({ type: 'surface-frame', image, at: paintedAt }, [image]);
+          }
+          const sent = tiles.flatMap((t) => {
+            const image = t?.image instanceof ImageBitmap ? t.image : t?.canvas?.transferToImageBitmap?.();
+            return image ? [{ key: String(t.key ?? ''), image, rect: { ...t.rect } }] : [];
+          });
+          if (sent.length) port.postMessage({ type: 'surface-frame', tiles: sent }, sent.map((t) => t.image));
         },
       };
     };
