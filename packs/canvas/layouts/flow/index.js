@@ -23,8 +23,8 @@ import { layout } from './layout.js';
 import { effortOf } from './effort.js';
 import { css } from './look.js';
 import { landMarks, landRules, landShades } from './land-look.js';
-import { boxHeight, listOf } from './cut-item.js';
-import { glyphOf, grammar, itemMarks, itemRules } from './item-look.js';
+import { boxHeight, listOf, ROLES } from './cut-item.js';
+import { glyphOf, grammar, itemMarks, itemRules, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
@@ -244,7 +244,10 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const [KW, KH] = ['key_width', 'key_height'].map(z);
   // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id, group: 'add' }] : []);
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
+  // A cut's palette, whole: each run of it a row of swatches in every island's key, labelled with the role it plays.
+  const swatches = look.cut ? swatchRows(look.cut, { m, w: KW, h: KH, roles: ROLES }) : { rows: [], rules: [] };
+  for (const rule of swatches.rules) colourRules.add(rule);
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...swatches.rows, ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text')) + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px), openParts(answer, id)); // an open pack's switch is counted
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
@@ -332,7 +335,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
     const nameY = (s, y) => (s.shape === 'carved' && look.cut ? y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2 : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
-    const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n) });
+    const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n) });
     for (const rule of extra.rules ?? []) colourRules.add(rule);
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
       ring, ...extra.under, outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel), ...extra.over,

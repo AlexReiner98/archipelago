@@ -64,8 +64,8 @@ export function skyline(heights, x0, x1, base, hgt) {
 /** A six-digit colour: a pattern, so it is written as text. */
 const HEX6 = new RegExp('^#[0-9a-f]{6}$', 'i');
 const rgb = (hex) => [1, 1 + 2, 1 + 2 * 2].map((k) => parseInt(String(hex).slice(k, k + 2), 0x10));
-const light = (hex) => ((r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b)(...rgb(hex));
-const chroma = (hex) => ((c) => Math.max(...c) - Math.min(...c))(rgb(hex));
+export const light = (hex) => ((r, g, b) => 0.2126 * r + 0.7152 * g + 0.0722 * b)(...rgb(hex));
+export const chroma = (hex) => ((c) => Math.max(...c) - Math.min(...c))(rgb(hex));
 
 /** What a palette gives each state: its neutrals (pale to dark), its land colours, its darkest and its accent. */
 export function colourWays(palette) {

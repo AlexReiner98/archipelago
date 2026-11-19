@@ -6,7 +6,7 @@
 
 import { lineageOf } from './graph.js';
 import { colourWays, ridgeMarks } from './ridge-item.js';
-import { cuts as cutsOf, GROWN, listOf } from './cut-item.js';
+import { bandsFor, cuts as cutsOf, GROWN, inset, listOf, runsOf, slotOf } from './cut-item.js';
 import { seedOf } from './ridge-item.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
@@ -18,7 +18,7 @@ const PLAIN = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.wai
 const ridgeOf = (style) => (['bands', 'emerge'].includes(style.ridge_state) ? { mode: style.ridge_state, ways: colourWays(record(style.ridge_palettes)[style.ridge_palette] ?? Object.values(record(style.ridge_palettes))[0]), island: !record(style.ridge_palettes)[style.ridge_palette], types: record(style.type_forms), forms: record(style.ridge_forms) } : null);
 
 /** The cut a style asks for: the accent of each phase, the cut of each type, and the dials (depth, softness, room above the name, whether it grows with progress). */
-const cutOf = (style) => (Object.keys(record(style.cut_colours)).length && Object.keys(record(style.cut_forms)).length ? { colours: record(style.cut_colours), types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, tension: Number(style.cut_tension), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink' } : null);
+const cutOf = (style) => ((runs) => (runs && Object.keys(record(style.cut_forms)).length ? { runs, types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, tension: Number(style.cut_tension), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink', bands: Math.max(1, Math.round(Number(style.cut_bands) || 1)), inset: Number(style.cut_inset) || 0 } : null))(runsOf(record(style.ridge_palettes)[style.cut_palette]));
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -143,11 +143,14 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
     out.rules = made.rules;
   }
   if (g.cut && n.shape === 'carved') {
-    // What the cuts take off is filled in the accent of the phase (else the role's grey; in trouble the trouble role), then the box's outline is drawn once more over it.
-    const hex = g.cut.colours[phase], named = typeof hex === 'string' && hex.startsWith('#'), cls = named ? `lf-cut-${hex.slice(1).toLowerCase()}` : `lf-cut-${phase === 'trouble' ? 'trouble' : 'none'}`;
-    if (named) out.rules = [`.${cls} { fill: ${hex}; }`];
-    const scale = g.cut.scale * (g.cut.grow ? GROWN[phase] ?? 1 : 1);
-    for (const c of cutsOf({ l, t, r, b }, listOf(g.cut, item, lineageOf(item)), { rx: Math.min(corner, n.h / 5), tension: g.cut.tension, scale, seed: seedOf(item.id) })) out.over.push(m('path', { d: c.d, class: `lf-cut ${cls}` }));
+    // What the cuts take off is banded in the palette: the run of the phase, the colour in it the type's, then the box's outline is drawn once more over it.
+    const lineage = lineageOf(item), list = listOf(g.cut, item, lineage), scale = g.cut.scale * (g.cut.grow ? GROWN[phase] ?? 1 : 1), rules = [];
+    bandsFor(g.cut.runs, phase, slotOf(g.cut, lineage), g.cut.bands).forEach((hex, k) => {
+      const cls = `lf-cut-${hex.slice(1).toLowerCase()}`;
+      rules.push(`.${cls} { fill: ${hex}; }`);
+      for (const c of cutsOf({ l, t, r, b }, inset(list, k, g.cut.inset), { rx: Math.min(corner, n.h / 5), tension: g.cut.tension, scale, seed: seedOf(item.id) })) out.over.push(m('path', { d: c.d, class: `lf-cut ${cls}` }));
+    });
+    out.rules = rules;
     out.over.push(((edge) => (edge[1].class += ' lf-edge', edge))(outline(n.shape, X, Y, n.w, n.h, corner, n.bevel)));
   }
   const glyph = glyphOf(g, item);
@@ -169,4 +172,14 @@ function skyline(n, X, Y, round) {
   if (n.shape === 'hexagon' || n.shape === 'lozenge') return `M${l} ${Y}L${l + round} ${t}H${r - round}L${r} ${Y}`;
   if (n.shape === 'tab') return `M${l} ${t}H${l + n.w / 3}L${l + n.w / 3 + (n.bevel ?? 0)} ${t + (n.bevel ?? 0)}H${r}`;
   return `M${l} ${t}H${r}`;
+}
+
+/** The key's rows for a cut's palette: each run as a row of swatches, labelled with the role it plays (the phase). Colour rules for them too. */
+export function swatchRows(cut, { m, w, h, roles }) {
+  const rules = new Set(), rows = Object.entries(roles).filter(([run]) => cut.runs[run]?.length).map(([run, label]) => {
+    const colours = cut.runs[run], cell = w / colours.length;
+    colours.forEach((hex) => rules.add(`.lf-sw-${hex.slice(1).toLowerCase()} { fill: ${hex}; stroke: none; }`));
+    return { glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, ...colours.map((hex, k) => m('rect', { class: `lf-sw lf-sw-${hex.slice(1).toLowerCase()}`, x: k * cell, y: 0, width: cell, height: h }))), label, tip: `${label}: the ${run} run of the palette` };
+  });
+  return { rows, rules: [...rules] };
 }

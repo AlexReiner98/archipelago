@@ -9,6 +9,9 @@
 // A type names such a list, or a name in `cut_forms` (slope, twin, ring, peak, spire, dome: lists in the style's data), so a
 // pack names its own type's cut with the same two primitives. The only jitter is a small seeded shift of a bell's place. The
 // box grows to hold the deepest cut, and the name sits in the band below it (`boxHeight`).
+// The whole palette is used: a cut is two or three nested bands (the same curves inset), each a colour of the run the phase
+// picks (pale to do, land under way, deep done, greys ended, an accent in trouble), and the item's type picks which colour of
+// the run, so types read apart too (`runsOf`, `bandsFor`).
 // Layer: marks. Pure: a box, a list and a seed in, paths and their cubics out.
 
 /** A small variation from a seed and a key: -1 to 1, the same for the same ones (a text key is hashed). */
@@ -20,6 +23,8 @@ export const vary = (seed, key) => {
 
 /** How much of its depth a cut takes by phase, where the style says it grows with progress. */
 export const GROWN = { not_started: 0.45, under_way: 0.7, finished: 1, ended: 1, trouble: 0.85 };
+
+import { chroma, light } from './ridge-item.js';
 
 const isCorner = (p) => typeof p?.at === 'string';
 
@@ -67,3 +72,29 @@ export function cuts(box, list, { rx, tension, scale = 1, seed = 0 }) {
   }
   return out;
 }
+
+/** The runs of a palette, each a list of its colours: pale (the lightest third), land (the middle), deep (the darkest), grey (the least coloured) and accent (the most). */
+export function runsOf(palette) {
+  const all = [...new Set((palette?.colours ?? []).filter((c) => new RegExp('^#[0-9a-f]{6}$', 'i').test(c)))];
+  if (!all.length) return null;
+  const byLight = [...all].sort((a, b) => light(b) - light(a)), third = Math.max(1, Math.round(all.length / 3));
+  const byChroma = [...all].sort((a, b) => chroma(a) - chroma(b));
+  return { pale: byLight.slice(0, third), land: byLight.slice(third, all.length - third), deep: byLight.slice(all.length - third), grey: byChroma.slice(0, third + 1).sort((a, b) => light(b) - light(a)), accent: byChroma.slice(-third).reverse() };
+}
+
+/** The run each phase takes from a palette's runs: to do its pale, under way its land, done its deep, ended its greys, trouble an accent. */
+export const RUN = { not_started: 'pale', under_way: 'land', finished: 'deep', ended: 'grey', trouble: 'accent' };
+/** What each run is called in the key. */
+export const ROLES = { pale: 'To do', land: 'Under way', deep: 'Done', grey: 'Ended', accent: 'Trouble' };
+
+/** The colours of `n` nested bands for a phase, outermost first: the run's, from the item type's place in it. */
+export function bandsFor(runs, phase, slot, n) {
+  const run = runs?.[RUN[phase] ?? 'grey']?.length ? runs[RUN[phase] ?? 'grey'] : runs?.grey ?? [];
+  return run.length ? Array.from({ length: n }, (_, k) => run[(slot + k) % run.length]) : [];
+}
+
+/** The type a list was named for, as its place among the types the style gives a cut: its colour's place in a run. */
+export const slotOf = (cut, lineage) => Math.max(0, Object.keys(cut.types).indexOf(lineage.find((t) => cut.types[t] !== undefined)));
+
+/** A list drawn inside itself, band `k` of them: the same primitives, narrower and shallower by `inset` each. */
+export const inset = (list, k, share) => list.map((p) => ({ ...p, w: p.w * (1 - k * share), d: p.d * (1 - k * share * 1.4) }));

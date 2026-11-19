@@ -6,9 +6,9 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 // @ts-ignore a page module, untyped
-import { bandOf, boxHeight, cuts, GROWN, listOf } from './cut-item.js';
+import { bandOf, bandsFor, boxHeight, cuts, GROWN, inset, listOf, ROLES, runsOf } from './cut-item.js';
 // @ts-ignore a page module, untyped
-import { grammar, itemMarks } from './item-look.js';
+import { grammar, itemMarks, swatchRows } from './item-look.js';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'pack.json'), 'utf8'));
 const house = pack.styles.find((s: any) => s.id === 'core.house').props;
@@ -69,19 +69,35 @@ test('cuts reach about half the box, the box grows to hold them and the name sit
   assert.ok(GROWN.not_started < GROWN.finished);
 });
 
-test('the item is filled in the accent of its phase, the box outlined once more over it, and the presets name every dial', () => {
+test('a palette makes runs, a phase picks one and the type a colour in it, in nested bands', () => {
+  const runs = runsOf(house.ridge_palettes.faroe);
+  assert.ok(Object.values(runs).every((r: any) => r.length > 0));
+  assert.ok(runs.pale.every((c: string) => !runs.deep.includes(c)));
+  assert.deepEqual(bandsFor(runs, 'finished', 0, 3).every((c: string) => runs.deep.includes(c)), true);
+  assert.deepEqual(bandsFor(runs, 'trouble', 0, 2).every((c: string) => runs.accent.includes(c)), true);
+  assert.notEqual(bandsFor(runs, 'under_way', 0, 1)[0], bandsFor(runs, 'under_way', 1, 1)[0]);
+  const inner = inset(house.cut_forms.peak, 1, 0.22)[0], outer = house.cut_forms.peak[0];
+  assert.ok(inner.w < outer.w && inner.d < outer.d && inner.at === outer.at);
+  for (const k of ['faroe', 'galapagos', 'svalbard', 'hawaii', 'cyclades']) assert.ok(house.ridge_palettes[k].colours.length >= 9, k);
+});
+
+test('the item is banded in its phase run, the box outlined once more over it, the key shows the palette, and the presets name every dial', () => {
   const step = { id: 's', w: 100, h: 60, shape: 'carved', lines: ['x'], line: 16 }, m = (tag: string, attrs: any = {}, ...kids: any[]) => [tag, attrs, ...kids];
-  const style = { ...house, ...preset('canvas.cut_galapagos').props };
+  const style = { ...house, ...preset('canvas.cut_faroe').props };
   const marks = (phase: string, type = 'task') => itemMarks({ g: grammar(style), n: step, at: [50, 30], phase, item: { id: 'e_x', type }, z: () => 3, outline: () => m('rect', { class: 'lf-shape' }), m, corner: 6, dotAt: [0, 0] }).over;
   assert.equal(grammar(style).dot, false);
-  assert.match(marks('under_way')[0][1].class, /lf-cut-52a5e0/);
-  assert.match(marks('trouble')[0][1].class, /lf-cut-94341c/);
+  assert.equal(marks('under_way').length, 4);
+  assert.notEqual(marks('under_way')[0][1].class, marks('under_way')[1][1].class);
+  assert.notEqual(marks('finished')[0][1].class, marks('not_started')[0][1].class);
   assert.match(marks('under_way').at(-1)[1].class, /lf-edge/);
-  assert.equal(marks('under_way', 'work').length, 3);
-  for (const id of ['canvas.cut_galapagos', 'canvas.cut_faroe', 'canvas.cut_grow']) {
+  const key = swatchRows(grammar(style).cut, { m, w: 22, h: 14, roles: ROLES });
+  assert.equal(key.rows.length, 5);
+  assert.ok(key.rules.length >= 5);
+  for (const id of ['canvas.cut_galapagos', 'canvas.cut_faroe', 'canvas.cut_grow', 'canvas.cut_svalbard', 'canvas.cut_hawaii', 'canvas.cut_cyclades']) {
     const p = preset(id).props;
     assert.equal(preset(id).over, 'chosen');
-    for (const k of ['cut_depth', 'cut_tension', 'cut_clear', 'cut_edge', 'cut_colours', 'type_cuts']) assert.ok(k in p, `${id} ${k}`);
+    for (const k of ['cut_depth', 'cut_tension', 'cut_clear', 'cut_edge', 'cut_palette', 'cut_bands', 'cut_inset', 'type_cuts']) assert.ok(k in p, `${id} ${k}`);
+    assert.ok(house.ridge_palettes[p.cut_palette], id);
     assert.ok(Object.values(p.type_shapes).every((s) => s === 'carved'));
   }
   assert.equal(preset('canvas.cut_grow').props.cut_grow, true);
