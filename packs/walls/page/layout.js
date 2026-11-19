@@ -16,7 +16,7 @@ import { followSheet, sheetAside } from './sheet-follow.js';
 import { litSwitch, numberOf, sizeOf } from './query-base.js';
 import { surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
-import { typeTitle } from './words.js';
+import { types as registry, typeTitle } from './words.js';
 import { colours, typeWords } from './layout-input.js';
 import { panZoom } from './pan-zoom.js';
 import { transition } from './transition.js';
