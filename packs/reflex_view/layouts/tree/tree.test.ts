@@ -109,3 +109,31 @@ test('counted, a node never said is never lit', () => {
   said.counts.set(tree.written[0].id, 0);
   assert.equal(film.pick(film.end, rnd), null);
 });
+
+/** Whether two convex shapes (lists of corners) overlap: no axis of either's edges parts them. */
+const overlap = (a: number[][], b: number[][]) => {
+  for (const shape of [a, b]) for (let i = 0; i < shape.length; i++) {
+    const [x1, y1] = shape[i], [x2, y2] = shape[(i + 1) % shape.length], nx = y2 - y1, ny = x1 - x2;
+    const on = (s: number[][]) => s.map(([x, y]) => x * nx + y * ny);
+    const pa = on(a), pb = on(b);
+    if (Math.max(...pa) <= Math.min(...pb) || Math.max(...pb) <= Math.min(...pa)) return false;
+  }
+  return true;
+};
+
+test('grown, no name meets another name or a wire', () => {
+  const places = ['tool:change', 'tool:query', 'file:packs/canvas/layouts/*.js', 'file:packs/*/page/*.js', 'file:ui/*', 'session_start', 'working_rules', 'guide:style_code'];
+  const items = Array.from({ length: 40 }, (_, i) => node(i, { title: `A rule of the harness, number ${i}`, fields: { for: [places[i % places.length]] } }));
+  const links = [partOf(9, 1), partOf(17, 1), partOf(25, 9), partOf(12, 4), partOf(20, 4), partOf(28, 4), partOf(33, 2), partOf(34, 33)];
+  const tree = treeOf({ lens: { find: ['type instruction'] }, items, links }, undefined, n)!;
+  const placed = radial(tree, z, n, (text: string, px: number) => text.length * px * 0.55, 1280 / 640);
+  const boxes = [...placed.names.entries()];
+  assert.equal(boxes.length, tree.nodes.size - 1, 'every node is named');
+  const met: string[] = [];
+  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) if (overlap(boxes[i][1].box, boxes[j][1].box)) met.push(`${boxes[i][1].text} / ${boxes[j][1].text}`);
+  for (const [id, points] of placed.along) for (let k = 1; k < points.length; k++) {
+    const seg = [points[k - 1], points[k]];
+    for (const [other, name] of boxes) if (overlap(seg, name.box)) met.push(`${name.text} / the wire to ${tree.nodes.get(id)!.title}${other === id ? ' (its own)' : ''}`);
+  }
+  assert.deepEqual(met, []);
+});
