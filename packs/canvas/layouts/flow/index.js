@@ -295,7 +295,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const C = g.chains.length, wired = [...g.chains, ...g.ties], carry = story ? wired.map(() => []) : carried(wired);
   // Each wire's link name, riding on its longest run and giving way where it is in the way (./wire-names.js); its words also in the wire's tooltip.
   const corners = (n) => ((x, y) => [[x - n.w / 2, y - n.h / 2], [x + n.w / 2, y - n.h / 2], [x + n.w / 2, y + n.h / 2], [x - n.w / 2, y + n.h / 2]])(g.x.get(n.id), g.y.get(n.id));
-  const wn = story ? null : wireNames({ style, wired, C, boxes: steps.map(corners), z, measure: (t, px) => measure(t, px), m, order: ORDER_TYPE });
+  const wn = story ? null : wireNames({ style, wired, C, boxes: steps.map(corners), ends: (j) => [wired[j].a, wired[j].b].map((id) => steps.find((n) => n.id === id)).filter(Boolean).map(corners), size, z, measure: (t, px) => measure(t, px), m, order: ORDER_TYPE });
   if (wn) wired.forEach((w, j) => ((own) => (Array.isArray(own[0]) ? own[0] : own).splice(2, 0, m('title', {}, wn.text(j))))(j < C ? wireLayer[j] : tieLayer[j - C]));
   const keysOf = (j) => (j < C ? { line: `w:${j}`, head: `h:${j}`, on: `wx:${j}` } : { line: `n:${j - C}`, head: `nh:${j - C}`, on: `nx:${j - C}` });
   const trunkLayer = wired.flatMap((w, j) => (carry[j].length ? [m('path', {
@@ -457,7 +457,10 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
         return on && tipped.has(on) ? [{ tip: { key: on, mark: tipFor(on) } }] : [{ tip: null }];
       }
       // A wire hovered lights as a board does and shows its name, whatever the give-way rule said (its name is drawn last, above the boards).
-      if (String(key).startsWith('wh:')) return name === 'enter' ? light(null, Number(String(key).split(':')[1])) : name === 'leave' ? light(null) : [];
+      if (String(key).startsWith('wh:')) {
+        const j = Number(String(key).split(':')[1]);
+        return name === 'enter' ? light(null, j) : name === 'leave' ? [...light(null), ...wn.rest(j)] : name === 'move' && event.at ? wn.near(j, event.at) : [];
+      }
       if (inPainted.has(keyed.get(key))) painting?.item(keyed.get(key), name === 'enter');
       if (name === 'leave') return [...light(null), { tip: null }];
       if (!keyed.has(key)) return [];

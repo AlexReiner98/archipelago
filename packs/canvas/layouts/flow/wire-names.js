@@ -81,12 +81,26 @@ export const wireRules = (style) => [
 ].filter(Boolean).join('\n');
 
 /**
+ * Where a hovered wire's name stands, a little off the pointer so the cursor does not cover it: above it by default, `offset`
+ * (screen units) plus half the name's height, then below, then to the right, then to the left where that would leave the picture
+ * (`size`) or sit on a board of `avoid` (the wire's own end boards). `w` and `h` are the name's size on the screen, `f` the
+ * picture's units a screen unit takes. Answers the name's middle; where no place is clear, above.
+ */
+export function hoverPlace({ at, w, h, f, offset, size, avoid = [] }) {
+  const [x, y] = at, hw = (w / 2) * f, hh = (h / 2) * f, off = offset * f;
+  const spots = [[x, y - off - hh], [x, y + off + hh], [x + off + hw, y], [x - off - hw, y]];
+  const clear = ([cx, cy]) => cx - hw >= 0 && cx + hw <= size.width && cy - hh >= 0 && cy + hh <= size.height;
+  const free = (spot) => clear(spot) && !avoid.some((box) => overlap(box, [[spot[0] - hw, spot[1] - hh], [spot[0] + hw, spot[1] - hh], [spot[0] + hw, spot[1] + hh], [spot[0] - hw, spot[1] + hh]]));
+  return spots.find(free) ?? spots.find(clear) ?? spots[0];
+}
+
+/**
  * The names of a picture's wires: `wired` its chains then its ties (`C` of them chains), each with its points and type; `boxes`
  * its boards as corner lists; `z` the style's sizes and `measure` a text's width. Answers null where the style asks for none,
  * else the `layer` of names (each keyed `wn:<j>`), `viewport(view)` (the patches that lay them out again when the zoom has
  * changed enough), `force(on)` (a lit wire's name shows whatever) and the `text` of each wire's tooltip.
  */
-export function wireNames({ style, wired, C, boxes, z, measure, m, order }) {
+export function wireNames({ style, wired, C, boxes, ends = () => [], size, z, measure, m, order }) {
   if (style.wire_names !== true) return null;
   const px = z('wire_name_text'), height = px * z('wire_name_leading'), pad = z('wire_name_pad'), knock = z('wire_name_knock');
   const items = wired.map((w, j) => ({ id: j, points: w.points, order: j < C, text: nameOf(w.type ?? order) }));
@@ -102,7 +116,7 @@ export function wireNames({ style, wired, C, boxes, z, measure, m, order }) {
     layer,
     text: (j) => items[j].text,
     /** A hit area for each wire, hovered to light it and show its name: invisible, `flow_wire_hit` wide, drawn under the boards. */
-    hits: (line) => wired.map((w, j) => m('path', { key: `wh:${j}`, d: line(w), class: 'lf-hit', on: ['enter', 'leave'] })),
+    hits: (line) => wired.map((w, j) => m('path', { key: `wh:${j}`, d: line(w), class: 'lf-hit', on: ['enter', 'leave', 'move'] })),
     viewport(view) {
       const f = 1 / Math.max(z('wire_name_zoom_least'), Number(view?.scale) || 1);
       if (Math.abs(Math.log(f / scaleAt)) < Math.log(z('wire_name_rescale'))) return [];
@@ -110,6 +124,13 @@ export function wireNames({ style, wired, C, boxes, z, measure, m, order }) {
       now = namesShown({ wires: items, boxes, width, height, pad, f });
       return items.filter((it) => now.runs.has(it.id)).flatMap((it) => [{ key: `wn:${it.id}`, set: { transform: nameTransform(now.runs.get(it.id), f) } }, { key: `wn:${it.id}`, toggle: { 'lf-wn-quiet': !now.shown.has(it.id) } }]);
     },
+    /** The pointer is at `at` on wire `j`: its name stands off it (hoverPlace). */
+    near(j, at) {
+      const spot = hoverPlace({ at, w: width(items[j].text) + 2 * knock, h: height, f: scaleAt, offset: z('wire_name_offset'), size, avoid: ends(j) });
+      return [{ key: `wn:${j}`, set: { transform: `translate(${+spot[0].toFixed(2)} ${+spot[1].toFixed(2)}) rotate(0) scale(${Math.round(scaleAt * 1000) / 1000})` } }];
+    },
+    /** The pointer has left wire `j`: its name goes back to its run. */
+    rest: (j) => (now.runs.has(j) ? [{ key: `wn:${j}`, set: { transform: nameTransform(now.runs.get(j), scaleAt) } }] : []),
     force: (on) => items.filter((it) => now.runs.has(it.id)).map((it) => ({ key: `wn:${it.id}`, toggle: { 'lf-wn-force': on.has(it.id) } })),
   };
 }

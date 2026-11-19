@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 
 // @ts-ignore a page module, untyped
-import { boxOf, longestRun, nameOf, namesShown, nameTransform, overlap, wireRules } from './wire-names.js';
+import { boxOf, hoverPlace, longestRun, nameOf, namesShown, nameTransform, overlap, wireRules } from './wire-names.js';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'pack.json'), 'utf8'));
 const waymark = pack.styles.find((s: any) => s.id === 'canvas.waymark').props;
@@ -97,4 +97,38 @@ test('pass 15: a wire hovered lights, shows its name whatever the rule said, and
   assert.ok(patches.some((p: any) => p.key === 'wn:1' && p.toggle?.['lf-wn-force'] === false), 'the others stay as the rule said');
   assert.ok(out.on({ name: 'leave', key: hits[0] }).every((p: any) => !p.toggle?.['lf-wn-force'] && !p.toggle?.lit), 'on leave it goes back');
   assert.match(out.scene.css, /\.lf-hit/);
+});
+
+test('pass 16: a hovered name stands above the pointer, and flips below or aside off the edge and off its own end boards', () => {
+  const size = { width: 400, height: 300 }, base = { w: 60, h: 14, f: 1, offset: 14, size };
+  const [x, y] = hoverPlace({ ...base, at: [200, 150] });
+  assert.deepEqual([x, y], [200, 150 - 14 - 7], 'above by the offset and half its height');
+  assert.deepEqual(hoverPlace({ ...base, at: [200, 150], f: 2 }), [200, 150 - 2 * (14 + 7)], 'the offset is in screen units, so it scales with the zoom');
+  assert.deepEqual(hoverPlace({ ...base, at: [200, 10] }), [200, 10 + 14 + 7], 'above would leave the picture: below');
+  assert.deepEqual(hoverPlace({ ...base, at: [200, 150], avoid: [square(170, 110, 30)] }), [200, 150 + 14 + 7], 'above sits on an end board: below');
+  assert.deepEqual(hoverPlace({ ...base, at: [200, 150], avoid: [square(170, 110, 30), square(170, 160, 30)] }), [200 + 14 + 30, 150], 'above and below are taken: to the side');
+  assert.deepEqual(hoverPlace({ ...base, at: [30, 150], avoid: [square(0, 100, 80), square(0, 160, 80)] }).length, 2);
+});
+
+test('pass 16: moving over a wire stands its name off the pointer and leaving puts it back on its run', async () => {
+  const { copyFileSync, mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { pathToFileURL } = await import('node:url');
+  const root = join(import.meta.dirname, '..', '..'), laid = mkdtempSync(join(tmpdir(), 'pelago-near-'));
+  for (const [name, file] of Object.entries(pack.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(root, file as string), join(laid, name));
+  const { picture } = await import(pathToFileURL(join(laid, 'index.js')).href);
+  const house = pack.styles.find((s: any) => s.id === 'core.house').props;
+  const style = { ...house, ...waymark, shape: 'flow', sizes: { ...house.sizes, ...waymark.sizes } };
+  const ids = ['e_aaaaaaaa', 'e_bbbbbbbb'];
+  const items = ids.map((id, k) => ({ id, type: 'task', is: ['work'], title: `Item ${k}`, open: true, status: 'doing', phase: 'under_way' }));
+  const links = [{ id: 'r_0', type: 'depends_on', from: ids[1], to: ids[0] }];
+  const out = picture({ answer: { items, links }, style, width: 700, height: 500 }, { measure: (s: string, px: number) => s.length * px * 0.55 });
+  const at = [out.scene.size.width / 2, out.scene.size.height / 2];
+  const moved = out.on({ name: 'move', key: 'wh:0', at });
+  const put = moved.find((p: any) => p.key === 'wn:0')?.set?.transform as string;
+  assert.ok(put, 'the name is placed');
+  const [px, py] = /translate\(([-\d.]+) ([-\d.]+)\)/.exec(put)!.slice(1).map(Number);
+  assert.ok(py < at[1] || py > at[1] || px !== at[0], 'not on the pointer');
+  assert.ok(Math.hypot(px - at[0], py - at[1]) >= style.sizes.flow_wire_name_offset, 'at least the offset away');
+  assert.ok(out.on({ name: 'leave', key: 'wh:0' }).some((p: any) => p.key === 'wn:0' && /rotate/.test(p.set?.transform)), 'back on its run');
 });
