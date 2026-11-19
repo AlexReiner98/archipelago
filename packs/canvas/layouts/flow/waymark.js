@@ -39,3 +39,27 @@ export function luminance(hex) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 export const contrast = (a, b) => ((x, y) => (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05))(luminance(a), luminance(b));
+
+/**
+ * Who holds an item, for the strip along its board (pass 10): under way, the sessions on it (the answer's `sessions`) and the people
+ * at work on it or owning it; waiting, the people it waits on. A person the answer names (`holders`: { how: works | waits | owner,
+ * id, name }) is their name; the owner the answer only gives as an id is "owner" (or "you" where it is the viewer). Each is
+ * { kind: human | session, name, full, you }. None where nobody holds it or the item is not under way or waiting.
+ */
+export function holdersOf(item, word, viewer) {
+  const named = Array.isArray(item?.holders) ? item.holders : [], person = (h) => ({ kind: 'human', name: h.id === viewer ? 'you' : h.name ?? 'someone', full: h.id === viewer ? 'You' : h.name ?? 'Someone', you: h.id === viewer });
+  if (word === 'waiting') return named.filter((h) => h.how === 'waits').map(person);
+  if (word !== 'under_way') return [];
+  const owner = item.owner && !named.some((h) => h.id === item.owner) ? [person({ id: item.owner, name: 'owner' })] : [];
+  return [
+    ...(Array.isArray(item.sessions) ? item.sessions : []).map((s) => ({ kind: 'session', name: String(s.title ?? 'a session'), full: `${s.title ?? 'A session'} (session)` })),
+    ...named.filter((h) => h.how !== 'waits').map(person), ...owner,
+  ];
+}
+
+/** What the strip says: the first holder, short names whole and long ones by their first word, cut to `most` letters, then "+n" for the rest. */
+export function whoText(list, most) {
+  if (!list.length) return '';
+  const first = list[0].name.length > most / 2 && list[0].kind === 'human' ? list[0].name.split(/[\s@.]/)[0] : list[0].name;
+  return `${first.length > most ? `${first.slice(0, most - 1).trimEnd()}…` : first}${list.length > 1 ? ` +${list.length - 1}` : ''}`;
+}

@@ -10,7 +10,7 @@ import { bandsFor, cuts as cutsOf, GROWN, inset, listOf, runsOf, slotOf } from '
 import { seedOf } from './ridge-item.js';
 import { bandPath } from './type-outline.js';
 import { rangeMarks } from './aim-range.js';
-import { crossPath } from './waymark.js';
+import { crossPath, holdersOf, whoText } from './waymark.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
 const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -30,7 +30,7 @@ const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag',
 const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow'];
 
 /** The fingerpost board a style asks for (pass 9): painted whole in its status colour (`board_fills`: per status, light and dark, a fill and the name's ink on it); the outline is the only type signal. */
-const boardOf = (style) => ((fills) => (Object.keys(fills).length ? { fills } : null))(record(style.board_fills));
+const boardOf = (style) => ((fills) => (Object.keys(fills).length ? { fills, who: style.who_strip === true } : null))(record(style.board_fills));
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -103,8 +103,10 @@ export function itemRules(style) {
       // The whole board in its status colour, the name in the ink that reads on it; "you" keeps its colour as the outline ring.
       rules.push(`.lf-step.boarded.bs-${k}${plain} .lf-shape { fill: ${ld(f, 'fill')}; stroke: color-mix(in srgb, ${ld(f, 'fill')} 65%, var(--ln-text)); stroke-width: var(--ln-flow-stroke); }`);
       rules.push(`.lf-step.boarded.bs-${k}.you .lf-shape, .lf-step.boarded.bs-${k}.here .lf-shape { fill: ${ld(f, 'fill')}; stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke-lit); }`);
+      rules.push(`.lf-step.boarded.bs-${k} .lf-who { fill: color-mix(in srgb, ${ld(f, 'fill')} 82%, black); } .lf-step.boarded.bs-${k} .lf-who-mark, .lf-step.boarded.bs-${k}:is(.lf-step) .lf-who-text { fill: ${ld(f, 'text')}; }`);
       rules.push(`.lf-step.boarded.bs-${k}:is(.lf-step) text { fill: ${ld(f, 'text')}; } .lf-sw.bs-${k} .lf-shape { fill: ${ld(f, 'fill')}; stroke: color-mix(in srgb, ${ld(f, 'fill')} 65%, var(--ln-text)); stroke-width: var(--ln-rule); }`);
     }
+    rules.push('.lf-step .lf-who { stroke: none; pointer-events: none; } .lf-step .lf-who-text { font-size: var(--ln-flow-who-text); font-family: var(--ln-font); dominant-baseline: middle; pointer-events: none; } .lf-step .lf-who-you { font-weight: 700; } .lf-step .lf-who-mark { stroke: none; pointer-events: none; }');
     if (g.board.fills.trouble) rules.push(`.lf-step .lf-cross { fill: none; stroke: ${ld(g.board.fills.trouble, 'text')}; stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; pointer-events: none; }`);
     // An ended board has no fill, a faded outline and a muted name; the key's types are outlines only.
     rules.push('.lf-step.boarded.bs-ended .lf-shape { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-rule); } .lf-step.boarded.bs-ended:is(.lf-step) text { fill: var(--ln-muted); } .lf-step.boardkey .lf-shape { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }');
@@ -141,7 +143,7 @@ const tickPath = (cx, cy, r) => `M${cx - r * 0.5} ${cy + r * 0.05}L${cx - r * 0.
  * the foot, the notch, a check, the glyph). `at` is its middle and `n` its step (w, h, shape, bevel); `z` the style's
  * sizes by name, `outline` the drawing of its outline, `m` the mark maker. A style that asks for none gives none.
  */
-export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner, dotAt }) {
+export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner, dotAt, viewer }) {
   const l = X - n.w / 2, r = X + n.w / 2, t = Y - n.h / 2, b = Y + n.h / 2, ended = phase === 'finished' || phase === 'ended';
   const bevel = n.bevel ?? 0, round = n.shape === 'pill' ? n.h / 2 : bevel, out = { under: [], over: [] };
   if (g.fill === 'stratum' && !ended) out.under.push(addClass(outline(n.shape, X, Y + z('slab'), n.w, n.h, corner, n.bevel), 'lf-slab'));
@@ -176,7 +178,15 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
   if (g.board && BOARDS.includes(n.shape)) {
     // No plate: the outline says the type, the fill the status. Blocked has a small cross at the board's left, never colour alone.
     const size = z('sign');
-    if (statusOf(item, phase) === 'trouble') out.over.push(m('path', { class: 'lf-cross', d: crossPath(l + (/^(hexagon|forward|roundstart)$/.test(n.shape) ? n.bevel : 0) + z('sign_margin'), Y - size / 2, size) }));
+    // The strip along the board's bottom, inside its outline: who is at work on it, or who it waits on.
+    const word = statusOf(item, phase), holders = g.board.who ? holdersOf(item, word, viewer) : [];
+    if (holders.length) {
+      const left = /^(hexagon|roundstart)$/.test(n.shape) ? n.bevel : 0, right = /^(hexagon|forward|flag|tallarrow|roundend)$/.test(n.shape) ? n.bevel : 0, hs = z('who'), pad = z('who_pad'), mk = z('who_mark'), b0 = Y + n.h / 2, x0 = l + left;
+      out.over.push(m('g', {}, m('title', {}, holders.map((h) => h.full).join(', ')), m('rect', { class: 'lf-who', x: x0 + 0.7, y: b0 - hs, width: r - right - x0 - 1.4, height: hs - 0.7 }),
+        holders[0].kind === 'session' ? m('rect', { class: 'lf-who-mark', x: x0 + pad, y: b0 - hs / 2 - mk / 2, width: mk, height: mk }) : m('circle', { class: 'lf-who-mark', cx: x0 + pad + mk / 2, cy: b0 - hs / 2, r: mk / 2 }),
+        m('text', { class: `lf-who-text${holders[0].you ? ' lf-who-you' : ''}`, x: x0 + 2 * pad + mk, y: b0 - hs / 2 }, whoText(holders, z('who_most')))));
+    }
+    if (word === 'trouble') out.over.push(m('path', { class: 'lf-cross', d: crossPath(l + (/^(hexagon|forward|roundstart)$/.test(n.shape) ? n.bevel : 0) + z('sign_margin'), Y - size / 2 - (g.board.who ? z('who') / 2 : 0), size) }));
   } else if (g.cut && CARVED.includes(n.shape)) {
     const lineage = lineageOf(item), list = listOf(g.cut, item, lineage), scale = g.cut.scale * (g.cut.grow ? GROWN[phase] ?? 1 : 1), rules = [];
     const draw = (cls, k, side = 0) => {

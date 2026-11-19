@@ -208,8 +208,8 @@ test('pass 9: a board painted whole in its status colour, the outline the only t
   assert.deepEqual(Object.keys(p.board_fills), ['not_started', 'under_way', 'waiting', 'finished', 'trouble']);
   // Seven outlines, all different, each end 9 deep.
   const shapes = p.type_shapes;
-  assert.deepEqual([shapes.task, shapes.work, shapes.question, shapes.occurrence, shapes.record, shapes.place, shapes.aim], ['flag', 'forward', 'hexagon', 'roundend', 'plank', 'roundstart', 'tallarrow']);
-  const paths = ['flag', 'forward', 'hexagon', 'roundend', 'plank', 'roundstart', 'tallarrow'].map((w) => outlineOf(w, 0, 0, 100, 30, 9) ?? w);
+  assert.deepEqual([shapes.task, shapes.work, shapes.question, shapes.occurrence, shapes.record, shapes.place, shapes.aim], ['flag', 'forward', 'hexagon', 'roundend', 'plank', 'roundstart', 'swallow']);
+  const paths = ['flag', 'forward', 'hexagon', 'roundend', 'plank', 'roundstart', 'swallow'].map((w) => outlineOf(w, 0, 0, 100, 30, 9) ?? w);
   assert.equal(new Set(paths.slice(1, 2).concat(paths.slice(3, 6))).size, 4);
   assert.equal(forward(0, 0, 100, 30, 9), 'M0 0H91L100 15L91 30H0L9 15Z');
   assert.equal(roundStart(0, 0, 100, 30, 9), 'M9 0H100V30H9A9 15 0 0 1 9 0Z');
@@ -225,4 +225,26 @@ test('pass 9: a board painted whole in its status colour, the outline the only t
   assert.equal(landOn({ shape: 'roundstart', w: 100, h: 30, bevel: 9 }, 50, 15, [0, 15], [-20, 15])[0], 0);
   assert.equal(landOn({ shape: 'tallarrow', w: 100, h: 36, bevel: 9 }, 50, 18, [100, 18], [120, 18])[0], 100);
   for (const k of ['flow_sign', 'flow_sign_gap', 'flow_sign_margin', 'flow_board_height', 'flow_end_depth', 'flow_board_extra']) assert.ok(k in house.sizes, k);
+});
+
+test('pass 10: a strip says who holds the item', async () => {
+  // @ts-ignore a page module, untyped
+  const { contrast, holdersOf, whoText } = await import('./waymark.js');
+  const p = preset('canvas.waymark').props;
+  assert.equal(p.who_strip, true);
+  assert.ok(p.sizes.flow_board_height >= 36);
+  assert.ok('flow_who' in house.sizes && 'flow_who_text' in house.sizes && 'flow_who_most' in house.sizes);
+  const item = { id: 'e_x', owner: 'e_sam', sessions: [{ title: 'Round 6 lane' }, { title: 'Spec check' }], holders: [{ how: 'works', id: 'e_alex', name: 'alex@aperture.tools' }] };
+  const list = holdersOf(item, 'under_way', 'e_alex');
+  assert.deepEqual(list.map((h: any) => [h.kind, h.name]), [['session', 'Round 6 lane'], ['session', 'Spec check'], ['human', 'you'], ['human', 'owner']]);
+  assert.equal(list[2].you, true);
+  assert.equal(whoText(list, 16), 'Round 6 lane +3');
+  assert.equal(whoText([{ kind: 'human', name: 'alexandra@aperture.tools' }], 12), 'alexandra');
+  assert.equal(whoText([{ kind: 'session', name: 'A very long session title indeed' }], 10), 'A very lo…');
+  assert.deepEqual(holdersOf({ id: 'e_y', holders: [{ how: 'waits', id: 'e_sam', name: 'Sam' }] }, 'waiting', 'e_alex').map((h: any) => h.name), ['Sam']);
+  assert.deepEqual(holdersOf({ id: 'e_z', sessions: [{ title: 's' }] }, 'finished', 'e_alex'), []);
+  assert.deepEqual(holdersOf({ id: 'e_z' }, 'under_way', 'e_alex'), []);
+  // The text on the strip, a deeper tone (82 percent of the board's fill, the rest black), still reads at 4.5 to 1.
+  const mixed = (hex: string) => '#' + [1, 3, 5].map((k) => Math.round(parseInt(hex.slice(k, k + 2), 16) * 0.82).toString(16).padStart(2, '0')).join('');
+  for (const [status, f] of Object.entries(p.board_fills) as [string, any][]) for (const t of ['light', 'dark']) assert.ok(contrast(mixed(f[t].fill), f[t].text) >= 4.5, `${status} ${t} strip ${contrast(mixed(f[t].fill), f[t].text).toFixed(2)}`);
 });
