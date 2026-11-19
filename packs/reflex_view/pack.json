@@ -156,7 +156,8 @@
           "shape": "reflex_tree",
           "sends": {
             "said": "reflex_view.said_counts",
-            "misses": "reflex_view.misses"
+            "misses": "reflex_view.misses",
+            "rules": "reflex_view.rules"
           },
           "colors": {
             "reflex_write": "#e8912d",
