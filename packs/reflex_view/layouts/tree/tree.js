@@ -34,7 +34,7 @@ export const boughsOf = (where, fileDepth, most) => {
     const folders = tail.split('/').slice(0, -1);
     const plain = folders.slice(0, folders.findIndex((f) => GLOB.test(f)) === -1 ? folders.length : folders.findIndex((f) => GLOB.test(f)));
     plain.slice(0, Math.max(0, fileDepth)).forEach((_, i) => out.push({ key: `file:${plain.slice(0, i + 1).join('/')}/`, title: `${plain[i]}/` }));
-  } else if (tail) out.push({ key: `${kind}:${tail}`, title: tail.replaceAll('_', ' ') });
+  } else if (tail) tail.split(':').forEach((part, i, all) => out.push({ key: `${kind}:${all.slice(0, i + 1).join(':')}`, title: part.replaceAll('_', ' ') }));
   return out.slice(0, Math.max(1, most));
 };
 const firstPlace = (where) => (Array.isArray(where) ? where.find((w) => typeof w === 'string') : typeof where === 'string' ? where : undefined);
@@ -45,7 +45,8 @@ const firstPlace = (where) => (Array.isArray(where) ? where.find((w) => typeof w
  */
 export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0, presets = []) {
   // The presets the story names (core's and the packs', no item of the map) stand with the rest, under their places.
-  const extra = presets.filter((p) => p && typeof p.id === 'string' && !(answer.items ?? []).some((i) => i.id === p.id)).map((p) => ({ id: p.id, type: 'instruction', title: p.title ?? p.id, preset: true, fields: { for: p.for } }));
+  // A rule is one of them, under the place it guards (`where`); it is marked a rule.
+  const extra = presets.filter((p) => p && typeof p.id === 'string' && !(answer.items ?? []).some((i) => i.id === p.id)).map((p) => ({ id: p.id, type: 'instruction', title: p.title ?? p.id, preset: true, rule: p.kind === 'rule', fields: { for: p.for } }));
   const items = [...(Array.isArray(answer.items) ? answer.items.filter((i) => !i.pending) : []), ...extra];
   const byId = new Map(items.map((i) => [i.id, i]));
   const up = new Map();
@@ -53,7 +54,7 @@ export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0
   const from = answer.lens?.from && byId.has(answer.lens.from) ? answer.lens.from : undefined;
   const nodes = new Map();
   const make = (id, item, title) => {
-    const node = { id, item: item?.preset ? undefined : item, preset: Boolean(item?.preset), title, parent: null, kids: [], depth: 0, born: item?.preset ? -Infinity : item ? Date.parse(item.created_at) : Infinity };
+    const node = { id, item: item?.preset ? undefined : item, preset: Boolean(item?.preset), rule: Boolean(item?.rule), title, parent: null, kids: [], depth: 0, born: item?.preset ? -Infinity : item ? Date.parse(item.created_at) : Infinity };
     if (Number.isNaN(node.born)) node.born = Infinity;
     nodes.set(id, node);
     return node;

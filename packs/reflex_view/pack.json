@@ -124,7 +124,10 @@
           "colors": {
             "reflex_write": "#e8912d",
             "reflex_say": "#2f6fe4",
-            "reflex_fail": "#d9534f"
+            "reflex_fail": "#d9534f",
+            "reflex_fire": "#3fb27f",
+            "reflex_owner": "#c58af9",
+            "reflex_learned": "#e8b04a"
           },
           "sizes": {
             "reflex_ring": 60,
@@ -151,7 +154,8 @@
             "reflex_bar_gap": 14,
             "reflex_bar_dot": 4,
             "reflex_trial_ring": 1.2,
-            "reflex_gap_ring": 2
+            "reflex_gap_ring": 2,
+            "reflex_rule_node": 6
           },
           "numbers": {
             "reflex_spread_x": 1.3,
@@ -188,7 +192,7 @@
             "reflex_said_batch": 50,
             "reflex_said_wait": 1500,
             "reflex_file_depth": 2,
-            "reflex_place_depth": 3,
+            "reflex_place_depth": 4,
             "reflex_aspect_follow": 0.5,
             "reflex_pool_sparks": 12,
             "reflex_pool_lights": 16,
@@ -200,7 +204,15 @@
             "reflex_tier_learned": 0.8,
             "reflex_retired_ink": 0.35,
             "reflex_gap_ink": 0.75
-          }
+          },
+          "hues": [
+            "#5aa9e6",
+            "#e07a5f",
+            "#81b29a",
+            "#f2cc8f",
+            "#9d79bc",
+            "#4ecdc4"
+          ]
         }
       }
     }

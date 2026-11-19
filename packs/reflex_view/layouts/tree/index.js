@@ -10,10 +10,10 @@
 
 import { treeOf } from './tree.js';
 import { radial } from './radial.js';
-import { storyOf, toldFrom, weekTo } from './story.js';
+import { packOf, rulesOf, storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
-import { barOf, cssOf, keyOf } from './look.js';
+import { barOf, cssOf, keyOf, packHues } from './look.js';
 import { player } from './play.js';
 import { nameTransform, namesShown } from './names.js';
 import { at } from './marks.js';
@@ -42,9 +42,9 @@ async function recordsOf(ids, style, tools, n, gesture = 'said') {
   return Promise.race([asked, new Promise((r) => setTimeout(() => r(null), n('reflex_said_wait')))]);
 }
 
-/** The misses the pack answers (style.sends.misses: its view misses), over reflex_window_days; null where none. */
-async function missesOf(style, tools, n) {
-  const ask = typeof style.sends?.misses === 'string' && typeof tools.act === 'function' ? style.sends.misses : null;
+/** What the pack answers of the window (style.sends: its views misses or rules), over reflex_window_days; null where none. */
+async function missesOf(style, tools, n, gesture = 'misses') {
+  const ask = typeof style.sends?.[gesture] === 'string' && typeof tools.act === 'function' ? style.sends[gesture] : null;
   if (!ask) return null;
   const asked = tools.act(ask, { days: n('reflex_window_days') }).then((c) => (c && !c.error && Array.isArray(c.answer) ? c.answer : null)).catch(() => null);
   return Promise.race([asked, new Promise((r) => setTimeout(() => r(null), n('reflex_said_wait')))]);
@@ -62,16 +62,22 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const first = treeOf(answer);
   if (!first) return { scene: { message: 'This view holds no instruction or reflex node yet.' } };
   const ids = first.written.map((node) => node.id);
-  const [records, story0, misses] = await Promise.all([recordsOf(ids, style, tools, n), recordsOf(ids, style, tools, n, 'story'), missesOf(style, tools, n)]);
+  const [records, story0, misses, ruled] = await Promise.all([recordsOf(ids, style, tools, n), recordsOf(ids, style, tools, n, 'story'), missesOf(style, tools, n), missesOf(style, tools, n, 'rules')]);
+  const rules = rulesOf(ruled);
   // The pack's own story where the view sends one; else made from its counts and misses where both came, each
   // node's sayings with their days; else schematic.
   const now = Date.now();
-  const told = story0 ?? (misses && records?.some((r) => Array.isArray(r.per_run)) ? toldFrom(records, misses, now, n('reflex_window_days')) : null);
+  const told = story0 ?? (misses && records?.some((r) => Array.isArray(r.per_run)) ? toldFrom(records, misses, now, n('reflex_window_days'), rules) : null);
   const counts = new Map((records ?? []).filter((r) => r && Number.isFinite(Number(r.said))).map((r) => [r.id, Number(r.said)]));
   const tiers = new Map((records ?? []).filter((r) => r && typeof r.tier === 'string').map((r) => [r.id, r.tier]));
   const story = storyOf(answer, told, records ? counts : null, n, now, tiers);
   const placeOf = new Map([...(records ?? []).filter((r) => r && r.for !== undefined).map((r) => [r.id, r.for]), ...[...story.nodes].filter(([, x]) => x.for !== undefined).map(([id, x]) => [id, x.for])]);
-  const presets = [...story.nodes].filter(([, x]) => x.tier === 'core' || x.tier === 'pack').map(([id, x]) => ({ id, ...x }));
+  if (!story.rules?.length) story.rules = rules;
+  // Core's and the packs' presets stand with the rest; each rule under the place it guards, where saying and enforcing meet.
+  const presets = [
+    ...[...story.nodes].filter(([, x]) => x.tier === 'core' || x.tier === 'pack').map(([id, x]) => ({ id, ...x })),
+    ...story.rules.map((r) => ({ id: r.id, title: r.title, for: [r.where], kind: 'rule' })),
+  ];
   const tree = treeOf(answer, (item) => item.fields?.for ?? placeOf.get(item.id), n, presets);
   // How often each held, for which names show first and the tips.
   const held = new Map();
@@ -94,7 +100,10 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   // Grown, the gaps stand already: each place a miss sparked on and grew nothing from.
   const gapped = new Set(grown ? film.events.filter((e) => e.kind === 'miss' && !e.grew).map((e) => e.node.id) : []);
   const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown, story, gapped);
-  const css = cssOf(style, z, n);
+  // Each pack met in the tree its hue, core first.
+  const packs = [...new Set(tree.order.map((node) => packOf(node, story)).filter(Boolean))].sort((a, b) => (a === 'core' ? -1 : b === 'core' ? 1 : 0));
+  const hues = packHues(style, packs);
+  const css = cssOf(style, z, n, hues);
   if (missing.length) return { scene: { message: `This view's style names no ${[...new Set(missing)].slice(0, 2).join(', ')}: draw it with the Reflex tree view, whose preset names them.` } };
   const speed = { now: 1 };
   const from = grown ? film.end : 0;
@@ -118,7 +127,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   if (!reduced) tools.surface?.().then((s) => s?.show()).catch(() => {});
   const byKey = (key) => tree.nodes.get(key.slice(2));
   return {
-    scene: { svg, css, key: keyOf(z, story.schematic), before: bar, size: { width: placed.width, height: placed.height }, ...(!reduced && { surface: { key: 'rt-surface' } }) },
+    scene: { svg, css, key: keyOf(z, story.schematic, hues), before: bar, size: { width: placed.width, height: placed.height }, ...(!reduced && { surface: { key: 'rt-surface' } }) },
     on(event) {
       const key = typeof event.key === 'string' ? event.key : '';
       if (key.startsWith('n:')) {

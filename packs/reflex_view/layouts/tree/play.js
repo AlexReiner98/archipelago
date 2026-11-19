@@ -88,8 +88,9 @@ export function player({ tree, placed, film, story, z, n, pools, from, fresh, sp
       }
       const free = lights.indexOf(null);
       if (free < 0 || !e.node.parent) continue;
-      lights[free] = { node: e.node, start: e.t, route: route(e.node), failed: e.kind === 'failed' };
-      out.push({ key: `lg:${free}`, toggle: { 'rt-failed': e.kind === 'failed' } }, { key: `lt:${free}`, toggle: { 'rt-failed': e.kind === 'failed' } }, { key: `lh:${free}`, toggle: { 'rt-failed': e.kind === 'failed' } });
+      lights[free] = { node: e.node, start: e.t, route: route(e.node), kind: e.kind };
+      const kinds = { 'rt-failed': e.kind === 'failed', 'rt-fired': e.kind === 'fired' };
+      out.push({ key: `lg:${free}`, toggle: kinds }, { key: `lt:${free}`, toggle: kinds }, { key: `lh:${free}`, toggle: kinds });
     }
     lights.forEach((l, i) => {
       if (!l) return;

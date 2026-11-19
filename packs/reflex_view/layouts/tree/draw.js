@@ -6,6 +6,7 @@
 import { at, m } from './marks.js';
 import { cut } from './radial.js';
 import { nameAt, nameTransform } from './names.js';
+import { packClass, packOf } from './story.js';
 
 /** Where a branch's one dash stands while it is not yet grown: wholly off the path, so its round caps draw nothing. */
 export const HIDDEN = 1.5;
@@ -27,14 +28,17 @@ export function marksOf(tree, placed, z, n, shown, named, story, gapped = new Se
   });
   const nodes = tree.order.filter((node) => node.parent).map((node) => {
     const p = place.get(node.id), label = placed.labels.get(node.id), spot = label && nameAt(label);
-    const r = node.kids.length ? z('reflex_node') : z('reflex_leaf');
+    const r = node.kids.length ? z('reflex_node') : z('reflex_leaf'), pack = packOf(node, story);
+    // A rule is a square (reflex_rule_node across), an instruction a round dot; each in its pack's hue.
+    const rule = node.rule && (story.rules ?? []).find((x) => x.id === node.id), side = z('reflex_rule_node');
+    const said = pack ? ` \u00b7 ${rule ? `rule, ${rule.effect ?? 'guards'}` : 'instruction'} \u00b7 ${pack}` : '';
     return m(
       'g',
-      { key: `n:${node.id}`, class: `rt-node rt-${standing(node)}${shown(node) ? ' on' : ''}${node.item || node.preset ? '' : ' rt-bough'}${gapped.has(node.id) ? ' rt-gap' : ''}`, ...(node.item && { item: node.item.id, on: ['click', 'enter', 'leave'], role: 'link' }) },
+      { key: `n:${node.id}`, class: `rt-node rt-${standing(node)}${shown(node) ? ' on' : ''}${node.item || node.preset ? '' : ' rt-bough'}${gapped.has(node.id) ? ' rt-gap' : ''}${pack ? ` ${packClass(pack)}` : ''}${rule ? ' rt-rule' : ''}`, ...(node.item && { item: node.item.id, on: ['click', 'enter', 'leave'], role: 'link' }) },
       // Its whole name is its tooltip, whether its name shows or gives way.
-      m('title', {}, node.title),
+      m('title', {}, `${node.title}${said}`),
       m('circle', { class: 'rt-hit', cx: at(p.x), cy: at(p.y), r: z('reflex_hit') }),
-      m('circle', { class: 'rt-dot', cx: at(p.x), cy: at(p.y), r }),
+      rule ? m('rect', { class: 'rt-dot', x: at(p.x - side / 2), y: at(p.y - side / 2), width: side, height: side }) : m('circle', { class: 'rt-dot', cx: at(p.x), cy: at(p.y), r }),
       label && m('text', { key: `nm:${node.id}`, class: `rt-name${named.has(node.id) ? '' : ' rt-quiet'}`, x: at(spot.x), y: at(spot.y), transform: nameTransform(label, 1, at), 'text-anchor': spot.anchor, 'dominant-baseline': 'middle' }, label.text),
     );
   });

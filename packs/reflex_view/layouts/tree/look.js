@@ -6,15 +6,28 @@
 // reflex_branch_ink, reflex_branch_fade, reflex_branch_faint).
 
 import { HEX, m } from './marks.js';
+import { packClass } from './story.js';
 
 /** The two colours, each checked as a hex colour; the page's accent and warn where the style names none. */
 export const coloursOf = (style) => {
   const hex = (name, or) => (typeof style.colors?.[name] === 'string' && HEX.test(style.colors[name]) ? style.colors[name] : or);
-  return { write: hex('reflex_write', 'var(--warn, var(--accent))'), say: hex('reflex_say', 'var(--accent)'), fail: hex('reflex_fail', 'var(--bad, var(--warn))') };
+  return { write: hex('reflex_write', 'var(--warn, var(--accent))'), say: hex('reflex_say', 'var(--accent)'), fail: hex('reflex_fail', 'var(--bad, var(--warn))'), fire: hex('reflex_fire', 'var(--ok, var(--accent))') };
 };
 
-export function cssOf(style, z, n) {
-  const { write, say, fail } = coloursOf(style);
+/**
+ * Each pack's hue, by the order the packs are met: core's is the page's words (the trunk), the owner's and what is
+ * learned their own (colors reflex_owner, reflex_learned), every other pack the next of the style's hues.
+ */
+export const packHues = (style, packs) => {
+  const hex = (v) => (typeof v === 'string' && HEX.test(v) ? v : null);
+  const hues = (Array.isArray(style.hues) ? style.hues : []).map(hex).filter(Boolean);
+  let next = 0;
+  return new Map(packs.map((pack) => [pack, pack === 'core' ? 'var(--ln-text)' : pack === 'owner' ? hex(style.colors?.reflex_owner) ?? 'var(--ln-muted)' : pack === 'learned' ? hex(style.colors?.reflex_learned) ?? 'var(--ln-muted)' : hues.length ? hues[next++ % hues.length] : 'var(--ln-muted)']));
+};
+
+export function cssOf(style, z, n, hues = new Map()) {
+  const { write, say, fail, fire } = coloursOf(style);
+  const byPack = [...hues].map(([pack, hue]) => `.${packClass(pack)} .rt-dot { fill: ${hue}; }\n.rt-trial.${packClass(pack)} .rt-dot { fill: none; stroke: ${hue}; }\n.rt-k-${packClass(pack)} { fill: ${hue}; }`);
   const levels = n('reflex_branch_levels');
   // A branch's weight by its level, times its tier's (reflex_tier_core, _pack, _owner, _learned): core's the trunk.
   const width = (d) => Math.max(z('reflex_branch_least'), z('reflex_branch') - d * z('reflex_branch_step'));
@@ -36,6 +49,12 @@ ${level.join('\n')}
 .rt-trial .rt-dot { fill: none; stroke: var(--ln-text); stroke-width: ${z('reflex_trial_ring')}; }
 .rt-node.rt-retired.on { opacity: ${n('reflex_retired_ink')}; }
 .rt-gap .rt-dot { stroke: ${write}; stroke-width: ${z('reflex_gap_ring')}; stroke-opacity: ${n('reflex_gap_ink')}; }
+${byPack.join('\n')}
+.rt-rule .rt-dot { fill-opacity: 1; }
+.rt-light.rt-fired circle { fill: ${fire}; }
+.rt-trail.rt-fired { stroke: ${fire}; }
+.rt-head.rt-fired { fill: ${fire}; }
+.rt-k-fire { fill: ${fire}; }
 .rt-light.rt-failed circle { fill: ${fail}; }
 .rt-trail.rt-failed { stroke: ${fail}; }
 .rt-head.rt-failed { fill: ${fail}; }
@@ -71,14 +90,17 @@ ${level.join('\n')}
 `;
 }
 
-const glyph = (kind, z) => ['svg', { width: String(z('reflex_key_glyph')), height: String(z('reflex_key_glyph')), viewBox: '0 0 2 2' }, ['circle', { cx: '1', cy: '1', r: '1', class: `rt-k-${kind}` }]];
+const glyph = (kind, z, square = false) => ['svg', { width: String(z('reflex_key_glyph')), height: String(z('reflex_key_glyph')), viewBox: '0 0 2 2' }, square ? ['rect', { x: '0', y: '0', width: '2', height: '2', class: `rt-k-${kind}` }] : ['circle', { cx: '1', cy: '1', r: '1', class: `rt-k-${kind}` }]];
 
 /** What each mark means, a row each. */
-export const keyOf = (z, schematic) => [
+export const keyOf = (z, schematic, hues = new Map()) => [
   { glyph: glyph('write', z), label: 'A miss: something no node covered (a trial node grows from it, else a gap stays)' },
   { glyph: glyph('say', z), label: schematic ? 'Held: a node said, its miss did not come back (schematic until counted)' : 'Held: a node said, its miss did not come back' },
   { glyph: glyph('fail', z), label: 'Came back: a node said, its miss came back anyway' },
-  { glyph: glyph('node', z), label: 'A node: hollow on trial, solid current, faint retired; the trunk is core’s' },
+  { glyph: glyph('fire', z), label: 'Fired: a rule acted on a write, no model asked' },
+  { glyph: glyph('node', z), label: 'An instruction: hollow on trial, solid current, faint retired' },
+  { glyph: glyph('node', z, true), label: 'A rule: it guards a write (its effect in its tooltip)' },
+  ...[...hues.keys()].map((pack) => ({ glyph: glyph(packClass(pack), z), label: pack === 'core' ? 'Core, the trunk' : pack === 'owner' ? 'Your own' : pack === 'learned' ? 'Learned' : `From ${pack}` })),
 ];
 
 /** The counts over the picture, the week to the film's day: misses against held; and its controls. */
