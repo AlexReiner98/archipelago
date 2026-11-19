@@ -43,8 +43,8 @@ export function radial(tree, z, n, measure, aspect = 1) {
   share(tree.root, -Math.PI / 2, Math.PI * 2);
   const xy = (p) => ({ x: Math.cos(p.a) * p.r * sx, y: Math.sin(p.a) * p.r });
   const place = new Map([...polar].map(([id, p]) => [id, xy(p)]));
-  // Each name runs out from its node along the ray the node stands on, read left to right on either side, cut to
-  // reflex_name_most letters; its far end counts in the picture's bounds.
+  // Each name lies along the ray its node stands on, read left to right on either side, cut to reflex_name_most
+  // letters; its far end counts in the picture's bounds.
   const gap = z('reflex_name_gap');
   const names = new Map(), ends = [...place.values()].map((p) => [p.x, p.y]);
   for (const node of tree.order) {
@@ -52,9 +52,12 @@ export function radial(tree, z, n, measure, aspect = 1) {
     const p = polar.get(node.id), at0 = place.get(node.id);
     const ray = Math.atan2(Math.sin(p.a), Math.cos(p.a) * sx), dx = Math.cos(ray), dy = Math.sin(ray);
     const text = cut(node.title, n('reflex_name_most')), wide = measure(text, z('reflex_name_text'));
-    const right = dx >= 0;
-    names.set(node.id, { text, right, x: at0.x + dx * gap, y: at0.y + dy * gap, turn: ((ray + (right ? 0 : Math.PI)) * 180) / Math.PI });
-    const far = gap + wide;
+    // A leaf's name runs outward; a bough's runs inward along the branch it grows on, beside it, so it never runs
+    // through what grows from it.
+    const out = node.kids.length ? -1 : 1, right = dx >= 0, lift = out > 0 ? 0 : tall / 2;
+    const x = at0.x + dx * gap * out + dy * lift, y = at0.y + dy * gap * out - dx * lift;
+    names.set(node.id, { text, right: out > 0 ? right : !right, x, y, turn: ((ray + (right ? 0 : Math.PI)) * 180) / Math.PI });
+    const far = (gap + wide) * out;
     for (const side of [-1, 1]) ends.push([at0.x + dx * far - (dy * side * tall) / 2, at0.y + dy * far + (dx * side * tall) / 2]);
   }
   // The root at the middle: as far each way as the farthest thing on either side.

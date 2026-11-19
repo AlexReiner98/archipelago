@@ -109,8 +109,8 @@
             "reflex_say": "#2f6fe4"
           },
           "sizes": {
-            "reflex_ring": 110,
-            "reflex_margin": 60,
+            "reflex_ring": 70,
+            "reflex_margin": 30,
             "reflex_node": 3,
             "reflex_leaf": 2,
             "reflex_root": 7,
@@ -133,7 +133,7 @@
           },
           "numbers": {
             "reflex_spread_x": 1.25,
-            "reflex_jitter": 0.35,
+            "reflex_jitter": 0,
             "reflex_curve_steps": 10,
             "reflex_film": 24,
             "reflex_film_lead": 0.6,
@@ -161,7 +161,7 @@
             "reflex_trail_ink": 0.6,
             
             "reflex_name_room": 1.2,
-            "reflex_name_most": 28,
+            "reflex_name_most": 24,
             "reflex_tip_most": 120,
             "reflex_grow": 500,
             "reflex_said_batch": 50, "reflex_said_wait": 1500, "reflex_file_depth": 2, "reflex_place_depth": 3, "reflex_aspect_follow": 0.5,
