@@ -310,6 +310,37 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "id": "reflex_view.add_node",
+      "title": "Add a node here",
+      "description": "A node added on a branch of the tree, sent by its drawing as the person looking: a trial reflex said at the branch's place (for), named as typed, its words what was said or its name. A place that is never said is refused by the reflex pack's rule known_place.",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "for": {
+            "type": "string",
+            "description": "The place the node is said at: tool:<name>, file:<glob>, session_start..."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "What to say there, in a few words."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 4000,
+            "description": "Its words, when more than its name."
+          }
+        },
+        "required": [
+          "for",
+          "title"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

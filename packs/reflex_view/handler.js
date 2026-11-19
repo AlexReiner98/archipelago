@@ -2,12 +2,15 @@
 // pack's (the read said_record), the runs' names are read here, and rows.js makes the rows.
 
 import { countsOf, rowsOf, RUNS_SHOWN } from './rows.js';
-import { legendOps } from './legend.js';
+import { addNodeOps, legendOps } from './legend.js';
 
 /** How many instructions one ask of their counts reads at most: the record's own limit. */
 const MOST = 50;
 
 export default {
+  // A node added on a branch of the tree, sent by its drawing as the person looking: a trial reflex said there.
+  'reflex_view.add_node': async (input) => addNodeOps(input ?? {}),
+
   // The legend's toggle, sent by the tree's drawing as the person looking (its view's sends): the view's hidden list.
   'reflex_view.legend': async (input, ctx) => {
     const view = String(input?.view ?? '');
