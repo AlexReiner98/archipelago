@@ -18,6 +18,7 @@ export function cssOf(style, z, n) {
   const level = Array.from({ length: levels + 1 }, (_, d) => `.rt-b${d} { stroke-width: ${Math.max(z('reflex_branch_least'), z('reflex_branch') - d * z('reflex_branch_step'))}; stroke-opacity: ${Math.max(n('reflex_branch_faint'), n('reflex_branch_ink') - d * n('reflex_branch_fade'))}; }`);
   return `
 .rt { overflow: visible; }
+.rt-frame { fill: none; stroke: none; pointer-events: none; }
 .rt-branch { fill: none; stroke: ${say}; stroke-linecap: round; transition: stroke-dashoffset ${n('reflex_grow')}ms ease-out; }
 ${level.join('\n')}
 .rt-node { opacity: 0; transition: opacity ${n('reflex_grow')}ms ease-out; }

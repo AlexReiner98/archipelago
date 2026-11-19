@@ -110,7 +110,7 @@
           },
           "sizes": {
             "reflex_ring": 70,
-            "reflex_margin": 30,
+            "reflex_margin": 50,
             "reflex_node": 3,
             "reflex_leaf": 2,
             "reflex_root": 7,

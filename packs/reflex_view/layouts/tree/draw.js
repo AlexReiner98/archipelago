@@ -34,6 +34,9 @@ export function marksOf(tree, placed, z, n, shown) {
   const svg = m(
     'svg',
     { class: 'rt', width: at(width), height: at(height), viewBox: `0 0 ${at(width)} ${at(height)}` },
+    // The picture's whole size, drawn as nothing: what the page fits is its marks' bounds, and this keeps them
+    // centred on the root however the tree leans.
+    m('rect', { class: 'rt-frame', x: 0, y: 0, width: at(width), height: at(height) }),
     m(
       'g',
       { key: 'cam' },
