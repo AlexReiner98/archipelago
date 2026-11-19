@@ -18,6 +18,7 @@
         "walk": { "over": ["part_of>"], "steps": 4 },
         "style": {
           "shape": "reflex_tree",
+          "sends": { "said": "reflex_view.said_counts" },
           "colors": { "reflex_write": "#e8912d", "reflex_say": "#2f6fe4" },
           "sizes": {
             "reflex_ring": 110, "reflex_margin": 60, "reflex_node": 3, "reflex_leaf": 2, "reflex_root": 7, "reflex_hit": 8,
@@ -34,7 +35,7 @@
             "reflex_branch_levels": 8, "reflex_branch_ink": 0.72, "reflex_branch_fade": 0.06, "reflex_branch_faint": 0.2,
             "reflex_node_ink": 0.85, "reflex_bough_ink": 0.5, "reflex_glow": 0.25, "reflex_trail_ink": 0.6,
             "reflex_name_depth": 2, "reflex_name_room": 1.2, "reflex_name_most": 28, "reflex_tip_most": 120, "reflex_grow": 500,
-            "reflex_pool_sparks": 12, "reflex_pool_lights": 16
+            "reflex_said_batch": 50, "reflex_pool_sparks": 12, "reflex_pool_lights": 16
           }
         }
       }

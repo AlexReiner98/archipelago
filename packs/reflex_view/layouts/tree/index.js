@@ -10,7 +10,7 @@
 
 import { treeOf } from './tree.js';
 import { radial } from './radial.js';
-import { sayingsOf } from './said.js';
+import { countedFrom, sayingsOf } from './said.js';
 import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
 import { barOf, cssOf, keyOf } from './look.js';
@@ -64,6 +64,20 @@ export function picture({ answer, style, reduced }, tools) {
   // A scene with a surface is drawn afresh each time, never mounted from a picture kept still: a played tree must
   // run. Its first frame is shown at once (nothing on it yet), so the page knows the picture has drawn.
   if (!reduced) tools.surface?.().then((s) => s?.show()).catch(() => {});
+  // The real counts, asked of the pack through the view's sends (style.sends.said: the reflex_view pack's said_counts),
+  // reflex_said_batch ids at a time. Until they come, and where the view sends none, the counts stay schematic.
+  const ask = typeof style.sends?.said === 'string' && typeof tools.act === 'function' ? style.sends.said : null;
+  if (ask) {
+    const ids = tree.written.map((node) => node.id), batch = Math.max(1, n('reflex_said_batch'));
+    Promise.all(Array.from({ length: Math.ceil(ids.length / batch) }, (_, i) => tools.act(ask, { ids: ids.slice(i * batch, (i + 1) * batch) })))
+      .then((came) => {
+        if (!alive && !reduced) return;
+        if (!countedFrom(said, came.flatMap((c) => (c && !c.error && Array.isArray(c.answer) ? c.answer : [])))) return;
+        const now = grown || reduced ? [{ key: 'rt-said-n', text: said.total.toLocaleString('en-US') }] : [];
+        tools.patch([...now, { key: 'rt-schematic', remove: true }]);
+      })
+      .catch(() => {});
+  }
   const byKey = (key) => tree.nodes.get(key.slice(2));
   return {
     scene: { svg, css, key: keyOf(z, said.schematic), before: bar, size: { width: placed.width, height: placed.height }, ...(!reduced && { surface: { key: 'rt-surface' } }) },

@@ -19,3 +19,18 @@ export function sayingsOf(tree, n) {
   const total = [...counts.values()].reduce((s, c) => s + c, 0);
   return { counts, total, schematic: !real };
 }
+
+/**
+ * The counts the reflex_view pack answers (its view said_counts, asked through the view's sends): one record per id,
+ * { id, said, ... }. Each node with a record takes its count; one with none was never said. Changes `said` in place,
+ * so the film and the lights read the counts as they are, and says whether any came.
+ */
+export function countedFrom(said, records) {
+  const got = (Array.isArray(records) ? records : []).filter((r) => r && typeof r.id === 'string' && Number.isFinite(Number(r.said)));
+  if (!got.length) return false;
+  const by = new Map(got.map((r) => [r.id, Math.max(0, Number(r.said))]));
+  for (const id of said.counts.keys()) said.counts.set(id, by.get(id) ?? 0);
+  said.total = [...said.counts.values()].reduce((s, c) => s + c, 0);
+  said.schematic = false;
+  return true;
+}

@@ -71,7 +71,7 @@ export function barOf({ said, written, schematic, speed, speeds }) {
     { key: 'rt-bar', class: 'rt-bar' },
     m('span', { key: 'rt-said', class: 'rt-count rt-say', title: schematic ? 'Answered by the tree, schematic until the reflex pack counts sayings' : 'Answered by the tree on its own' }, m('i', {}, '●'), m('span', { key: 'rt-said-n' }, said.toLocaleString('en-US')), ' said by the tree'),
     m('span', { key: 'rt-written', class: 'rt-count rt-write', title: 'Worked out by the model and written as a node' }, m('i', {}, '●'), m('span', { key: 'rt-written-n' }, written.toLocaleString('en-US')), ' written by the model'),
-    schematic && m('span', { class: 'rt-schematic', title: 'Until the reflex pack counts sayings, how often each node is said is made up' }, 'schematic'),
+    schematic && m('span', { key: 'rt-schematic', class: 'rt-schematic', title: 'Until the reflex pack counts sayings, how often each node is said is made up' }, 'schematic'),
     word('rt:replay', 'Replay', false, 'Grow the tree again from its root'),
     ...speeds.map((s) => word(`rt:speed:${s}`, `${s}×`, s === speed, `Play at ${s} times`)),
   );

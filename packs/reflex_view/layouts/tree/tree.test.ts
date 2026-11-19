@@ -82,3 +82,15 @@ test('played, it patches the tree in as it grows; under reduced motion it stands
   assert.equal(JSON.stringify(still.scene.svg).match(/rt-node on/g)?.length, 12);
   assert.ok(picture({ answer: answer(), style: { shape: 'reflex_tree' }, reduced: true }, tools).scene.message);
 });
+
+test('the counts the pack answers through the view’s sends stand in for the schematic ones', async () => {
+  const patches: any[] = [], asked: any[] = [];
+  const act = async (name: string, params: any) => (asked.push([name, params]), { answer: params.ids.map((one: string, i: number) => ({ id: one, said: i })) });
+  const tools = { frame: () => new Promise(() => {}), patch: (p: any[]) => patches.push(...p), open() {}, act };
+  picture({ answer: { ...answer(), lens: { find: ['counted'] } }, style, reduced: true }, tools);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(asked[0][0], style.sends.said);
+  assert.equal(asked[0][1].ids.length, 12);
+  assert.deepEqual(patches.find((p) => p.key === 'rt-said-n'), { key: 'rt-said-n', text: '66' });
+  assert.ok(patches.some((p) => p.key === 'rt-schematic' && p.remove));
+});
