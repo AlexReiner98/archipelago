@@ -71,7 +71,7 @@ export const nameTransform = (run, f) => `translate(${+run.x.toFixed(2)} ${+run.
 
 /** The css of the names and of ink wires: the theme's ink at a quiet strength, colour only where a wire is lit, held or waits on you. */
 export const wireRules = (style) => [
-  style.ink_wires === true && `.lf-wire, .lf-tie { stroke: color-mix(in srgb, var(--ln-text) var(--ln-flow-wire-ink), transparent); } .lf-head { fill: color-mix(in srgb, var(--ln-text) var(--ln-flow-wire-ink), transparent); }
+  style.ink_wires === true && `.lf-wire, .lf-tie { stroke: color-mix(in srgb, var(--ln-wire, var(--ln-text)) var(--ln-flow-wire-ink), transparent); } .lf-head { fill: color-mix(in srgb, var(--ln-wire, var(--ln-text)) var(--ln-flow-wire-ink), transparent); }
 .lf-wire.lit, .lf-tie.lit { stroke: var(--ln-accent, var(--ln-text)); } .lf-head.lit { fill: var(--ln-accent, var(--ln-text)); }
 .lf-wire.held, .lf-tie.held { stroke: var(--ln-you); } .lf-head.held { fill: var(--ln-you); } .lf-tie.you { stroke: var(--ln-you); } .lf-head.you { fill: var(--ln-you); }`,
   style.wire_names === true && `.lf-wn { pointer-events: none; transition: opacity 0.25s; } .lf-wn rect { fill: var(--ln-sea); stroke: none; }

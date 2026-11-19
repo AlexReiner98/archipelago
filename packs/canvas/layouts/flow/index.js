@@ -33,6 +33,7 @@ import { boardKeyRows, glyphOf, grammar, itemMarks, itemRules, statusOf, swatchR
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks, partsSize } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { cornersOf, grouped, localIslands, localTo, moveTo } from './isle-local.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
+import { colourKey, cssColour, isColour } from './colour.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { looks as kept } from './island-looks.js';
 import { placesAsColours } from './places.js';
@@ -93,7 +94,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   }
   const hidden = story ? { opacity: 0 } : {};
   // A place that holds parts is a colour on them, not a step, where the style gives places colours (place_hues).
-  const placeHues = !story && Array.isArray(style.place_hues) ? style.place_hues.filter((h) => HEX.test(String(h))) : [];
+  const placeHues = !story && Array.isArray(style.place_hues) ? style.place_hues.filter(isColour) : [];
   const shownAs = placesAsColours(answer, placeHues, new Set([style.here, answer.lens?.from].filter(Boolean)));
   answer = { ...answer, items: shownAs.items };
   const hexOf = new Map(shownAs.places.map((p) => [p.id, p.hex]));
@@ -212,9 +213,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const hues = style.ink_wires === true ? [] : Array.isArray(style.link_hues) && style.link_hues.length ? style.link_hues : Array.isArray(style.hues) ? style.hues : [];
   /** The colour of each name: the one `given` names, else the hue its name picks, stepping past those another in this picture has. */
   const coloursOf = (present, given, from) => {
-    const taken = new Set(present.filter((name) => HEX.test(String(given[name]))).map((name) => given[name].toLowerCase()));
-    const out = new Map(present.filter((name) => HEX.test(String(given[name]))).map((name) => [name, given[name]]));
-    for (const name of present.filter((t) => !HEX.test(String(given[t])) && from.length)) {
+    const taken = new Set(present.filter((name) => isColour(given[name])).map((name) => given[name].toLowerCase()));
+    const out = new Map(present.filter((name) => isColour(given[name])).map((name) => [name, given[name]]));
+    for (const name of present.filter((t) => !isColour(given[t]) && from.length)) {
       let k = [...name].reduce((s, ch) => (s * 31 + ch.charCodeAt(0)) >>> 0, 7) % from.length;
       for (let tries = 0; tries < from.length && taken.has(String(from[k]).toLowerCase()); tries++) k = (k + 1) % from.length;
       taken.add(String(from[k]).toLowerCase());
@@ -227,9 +228,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const colourRules = new Set();
   /** A colour is a class with a rule of its own: a drawing sets no style on a mark. */
   const colourClass = (hex, prefix, variable) => {
-    if (typeof hex !== 'string' || !HEX.test(hex)) return '';
-    const cls = `lf-${prefix}-${hex.slice(1).toLowerCase()}`;
-    colourRules.add(`.${cls} { --lf-${variable}: ${hex}; }`);
+    if (!isColour(hex)) return '';
+    const cls = `lf-${prefix}-${colourKey(hex)}`;
+    colourRules.add(`.${cls} { --lf-${variable}: ${cssColour(hex)}; }`);
     return ` ${cls}`;
   };
   const kind = (type) => colourClass(linkColours.get(type), 'k', 'link');
@@ -238,8 +239,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const onYou = (t) => (waits.has(t.type) && answer.viewer && (t.flipped ? t.a : t.b) === answer.viewer ? ' you' : '');
   // A part in its place's colour: a class with a rule of its own, as a link's colour is.
   const placeClass = (hex) => {
-    const cls = `lf-p-${hex.slice(1).toLowerCase()}`;
-    colourRules.add(`.${cls} { --lf-place: ${hex}; }`);
+    const cls = `lf-p-${colourKey(hex)}`;
+    colourRules.add(`.${cls} { --lf-place: ${cssColour(hex)}; }`);
     return cls;
   };
   const partOf = (id) => (hexOf.has(shownAs.of.get(id)) ? placeClass(hexOf.get(shownAs.of.get(id))) : '');
@@ -337,8 +338,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const offOn = (id, f = 'packs_off') => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.[f] ?? answer.items.find((i) => i.id === id)?.fields?.[f]);
   // A parts island draws its pack's parts from its land's top left (./parts-islands.js, ./pack-marks.js partsIslandMarks).
   const headAt = new Map(), header = (id, [x, y], title, open = null, frame) => (headAt.set(id, [[x, y], title, open, frame]), isParts(id) ? ((g) => g && partsIslandMarks({ of: g.of, pack: g.pack, off: offOn(g.of), partsOff: offOn(g.of, 'parts_off'), at: [frame.left, frame.top], z, m, titled, on: gestures.on, measure: (t, px, role) => measure(t, px, role) }))(partsIslands(answer).find((p) => p.id === id)) : packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), partsOff: offOn(id, 'parts_off'), open: open ?? openParts(answer, id), style, at: [x + measure(title, z('island_text'), 'name') + z('island_pack_gap'), y], frame, z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) }));
-  const isles = ((made) => (made.layer.forEach((mk) => corners.has(String(mk[1]?.key).slice(2)) && (mk[1].transform = moveTo(corners.get(String(mk[1].key).slice(2))))), made))(islandMarks({ g: { ...g, islands: localIslands(g, corners) }, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header, part: (id, part) => packOf(id) && partInKey({ island: id, pack: packOf(id), id: part, partsOff: offOn(id, 'parts_off'), on: gestures.on }) }));
-  const lands = landMarks({ style, g, islands: g.islands, size: { width: g.width, height: g.height }, z, m, isHex: (h) => HEX.test(String(h)) }), snap = (y) => (lands.grammar.snap ? Math.round(y / lands.grammar.row) * lands.grammar.row : y);
+  const isles = ((made) => (made.layer.forEach((mk) => corners.has(String(mk[1]?.key).slice(2)) && (mk[1].transform = moveTo(corners.get(String(mk[1].key).slice(2))))), made))(islandMarks({ g: { ...g, islands: localIslands(g, corners) }, legends, islands: answer.islands, style, z, m, titled, isHex: isColour, header, part: (id, part) => packOf(id) && partInKey({ island: id, pack: packOf(id), id: part, partsOff: offOn(id, 'parts_off'), on: gestures.on }) }));
+  const lands = landMarks({ style, g, islands: g.islands, size: { width: g.width, height: g.height }, z, m, isHex: isColour, info: answer.islands ?? [] }), snap = (y) => (lands.grammar.snap ? Math.round(y / lands.grammar.row) * lands.grammar.row : y);
   const drawnBy = new Map((g.islands ?? []).flatMap((isle) => [...(isle.look?.items ?? [])]));
   const stepLayer = steps.map((n) => {
     const [X, Y] = local(n.item?.island, [g.x.get(n.id), snap(g.y.get(n.id))]), i = n.item, [ox, oy] = corners.get(i?.island) ?? [0, 0];
