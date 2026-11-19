@@ -211,12 +211,9 @@ export async function sessionAnswer(ctx: KernelContext, event: string, call: Hoo
       const behind = await sayAt(ctx, 'setup_behind', { command: setupCommand(call.origin) }, body.session_id);
       if (behind) additionalContext += `\n\n${behind}`;
     }
-    // The files written from the map into this checkout, for the hook to write: a CLAUDE.md or a skill (the agents
-    // pack's, by the remote), and in every checkout the working rules as the workspace words them (.claude/pelago.md).
-    const written = typeof body.remote === 'string' ? (await ctx.call<object, { files: unknown[] }>('answer.written', { remote: body.remote }).catch((err) => void console.error(`hook written: ${(err as Error).message}`)))?.files : undefined;
-    const rules = await ctx.call<object, { text: string }>('answer.rules_file', { ...(run && { run: run.id }) }).catch(() => undefined);
-    const files = [...(written ?? []), ...(typeof rules?.text === 'string' && rules.text.trim() ? [{ path: '.claude/pelago.md', text: rules.text }] : [])];
-    return told(additionalContext, files.length ? { files } : {});
+    // The files written from the map into this checkout (the agents pack's: a CLAUDE.md, a skill, the working rules), for the hook to write.
+    const files = (await ctx.call<object, { files: unknown[] }>('answer.written', { ...(typeof body.remote === 'string' && { remote: body.remote }), ...(run && { run: run.id }) }).catch((err) => void console.error(`hook written: ${(err as Error).message}`)))?.files;
+    return told(additionalContext, files?.length ? { files } : {});
   }
   if (event === 'session-end') {
     await hookSessionEnd(ctx, body);

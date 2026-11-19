@@ -85,9 +85,15 @@ export function writtenFiles(presets: StyleDef[], kept: KeptInstruction[], at: {
     .filter((file) => file.from.length);
 }
 
-/** answer.written: the files written from the map into a checkout of `remote`, as its session starts. */
-export async function written(ctx: KernelContext, input: { remote?: string; about?: string; island?: string }) {
-  if (!input?.remote && !input?.about) return { files: [] };
+/** The working rules file every checkout is given, as the workspace words it (root.rules_file); the setup's own, so never an instruction's path. */
+export const RULES_FILE = '.claude/pelago.md';
+
+/** answer.written: the files written from the map into a checkout of `remote`, as its session starts, and in any checkout the working rules. */
+export async function written(ctx: KernelContext, input: { remote?: string; about?: string; island?: string; run?: string }) {
+  // Where the server can word them, every checkout's working rules; a server without it answers no such file.
+  const rules = (await ctx.call<object, { text: string }>('root.rules_file', { ...(typeof input?.run === 'string' && { run: input.run }) }).catch(() => undefined))?.text;
+  const theirs: WrittenFile[] = typeof rules === 'string' && rules.trim() ? [{ path: RULES_FILE, text: rules, from: [] }] : [];
+  if (!input?.remote && !input?.about) return { files: theirs };
   const { presets, kept } = (await ctx.reads({ told_from: { ...(typeof input.island === 'string' && { island: input.island }) } })) as { presets: StyleDef[]; kept: KeptInstruction[] };
-  return { files: writtenFiles(presets, kept, { ...(typeof input.remote === 'string' && { remote: input.remote }), ...(typeof input.about === 'string' && { about: input.about }) }) };
+  return { files: [...writtenFiles(presets, kept, { ...(typeof input.remote === 'string' && { remote: input.remote }), ...(typeof input.about === 'string' && { about: input.about }) }), ...theirs] };
 }
