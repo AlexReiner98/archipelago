@@ -24,7 +24,7 @@ function edge([cx, cy], n, [px, py]) {
  * tall each island's name and legend stand, `wides` how wide its header is, which its frame is at least. Answers what laidOut answers: the model's `x`, `y`, `nodes`, `chains`,
  * `ties` and each island's frame.
  */
-export function placedOut(args, m, islandOf, heads, wides = new Map()) {
+export function placedOut(args, m, islandOf, heads, wides = new Map(), follows = new Map()) {
   const { sizes } = args, GAP = sizes.flow_node_gap, PAD = sizes.flow_island_pad, M = sizes.flow_margin, RISE = args.rise ?? 0;
   const corners = args.placed ?? {}, cellBy = new Map((args.items ?? []).map((i) => [i.id, cellOf(i.fields?.cell)]));
   const list = [...m.nodes.values()];
@@ -34,12 +34,16 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   const x = new Map(), y = new Map(), islands = [];
   let bottom = M;
   // Islands an agent has given a corner stand there; the rest are laid out at the origin, then shelved after them (shelve).
-  const own = [...groups].filter(([id]) => id !== null).sort(([a], [b]) => Number(!cellOf(corners[a])) - Number(!cellOf(corners[b])));
+  const own = [...groups].filter(([id]) => id !== null && !follows.has(id)).sort(([a], [b]) => Number(!cellOf(corners[a])) - Number(!cellOf(corners[b])));
   let right = M - GAP;
   const loose = [];
-  for (const [id, items] of own) {
-    const corner = cellOf(corners[id]), top = heads.get(id) ?? 0;
-    const l = corner ? M + corner[0] * cw : 0, t = corner ? M + RISE + corner[1] * ch : 0;
+  // Each island's frame from its corner [l, t]; a loose one is kept for shelving, the rest widen the picture.
+  const stand = (isle, items, isLoose) => {
+    if (isLoose) loose.push({ isle, items });
+    else (bottom = Math.max(bottom, isle.rect[3])), (right = Math.max(right, isle.rect[2]));
+  };
+  const place = (id, items, l, t, isLoose = false) => {
+    const top = heads.get(id) ?? 0;
     // An island with a look of its own (./looks.js) stands where its look puts what it holds; what the look leaves
     // unplaced is placed by cell beside it.
     const given = args.looks?.get(id), look = given && lookOut(given.look, { ...given, nodes: items, sizes, measure: args.measure });
@@ -52,9 +56,8 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
       for (const n of items) x.set(n.id, lx + w / 2), y.set(n.id, ly + h / 2);
       const r = Math.max(l + (wides.get(id) ?? 0), lx + w + PAD), b = ly + h + PAD;
       islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }], canvas: { at: [lx, ly], size: [w, h] } });
-      if (!corner) loose.push({ isle: islands.at(-1), items });
-      else (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
-      continue;
+      stand(islands.at(-1), items, isLoose);
+      return;
     }
     // Where its focus stands, as the island's style says (look.focus, decision e_up4wjd94): at its cell, in the corner
     // before the rest, or over them; a look of its own places it as it likes.
@@ -77,10 +80,40 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
     const r = Math.max(l + (wides.get(id) ?? 0), look ? lx + look.width + PAD : l, ...items.map((n) => x.get(n.id) + n.w / 2 + PAD));
     const b = Math.max(look ? ly + look.height + PAD : t, ...items.map((n) => y.get(n.id) + n.h / 2 + PAD));
     islands.push({ id, rect: [l, t, r, b], land: [{ l, t, r, b }], ...(look && { look: { at: [lx, ly], paint: look.paint, items: look.items } }) });
-    if (!corner) loose.push({ isle: islands.at(-1), items });
-    else (bottom = Math.max(bottom, b)), (right = Math.max(right, r));
+    stand(islands.at(-1), items, isLoose);
+  };
+  for (const [id, items] of own) {
+    const corner = cellOf(corners[id]);
+    if (corner) place(id, items, M + corner[0] * cw, M + RISE + corner[1] * ch);
+    else place(id, items, 0, 0, true);
   }
   ({ right, bottom } = shelve(loose, { x, y, from: [islands.length > loose.length ? right + sizes.flow_island_sea : M, M + RISE], gap: sizes.flow_island_sea, rise: RISE, aspect: args.aspect, across: args.across, right, bottom }));
+  // An island that follows another (a pack's parts, the island they are of: ../flow/parts-islands.js) stands right
+  // after it, at its top; what stands to its right moves over to make room, and what it would lie on moves down.
+  const move = (isle, dx, dy) => {
+    const [l, t, r, b] = isle.rect;
+    isle.rect = [l + dx, t + dy, r + dx, b + dy];
+    isle.land = isle.land.map((s) => ({ l: s.l + dx, t: s.t + dy, r: s.r + dx, b: s.b + dy }));
+    for (const k of ['look', 'canvas']) if (isle[k]) isle[k] = { ...isle[k], at: [isle[k].at[0] + dx, isle[k].at[1] + dy] };
+    for (const n of groups.get(isle.id) ?? []) x.set(n.id, x.get(n.id) + dx), y.set(n.id, y.get(n.id) + dy);
+  };
+  const meets = (a, b) => a.rect[0] < b.rect[2] + GAP && b.rect[0] < a.rect[2] + GAP && a.rect[1] < b.rect[3] + GAP && b.rect[1] < a.rect[3] + GAP;
+  for (const [id, items] of groups) {
+    if (id === null || !follows.has(id)) continue;
+    const base = islands.find((i) => i.id === follows.get(id));
+    if (!base) { place(id, items, right + GAP, M + RISE); continue; }
+    const [, t0, r0] = base.rect, k = islands.length;
+    place(id, items, r0 + GAP, t0);
+    const me = islands[k], wide = me.rect[2] - me.rect[0] + GAP, others = islands.filter((i) => i !== me && i !== base);
+    for (const isle of others) if (isle.rect[0] >= r0) move(isle, wide, 0);
+    // Only what stands lower than its top: moving what stands higher would move it onto the island they are of.
+    const lower = (i) => i.rect[1] >= t0 && meets(i, me);
+    for (let hit = others.find(lower); hit; hit = others.find(lower)) {
+      const dy = me.rect[3] + GAP - hit.rect[1], from = hit.rect[1];
+      for (const isle of others) if (isle.rect[1] >= from) move(isle, 0, dy);
+    }
+  }
+  bottom = Math.max(bottom, ...islands.map((i) => i.rect[3]));
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
   return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
 }

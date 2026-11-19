@@ -8,7 +8,7 @@ import { markTry, onTries, triedOn, tryOn } from './preview.js';
 import { islandTries } from './island-looks.js';
 import { saidDrawn } from './look.js';
 import { ago, idsAsLinks, isA, titles, types } from './words.js';
-import { drawnKey, narrowed as narrowedFrom, unheard } from './narrow.js';
+import { drawnKey, narrowed as narrowedFrom, opened, unheard } from './narrow.js';
 import { indexNow, indexWhenIdle, narrowPicture } from './narrow-picture.js';
 import { islandsIn } from './islands-list.js';
 import { islandsLens, islandsOfLens } from './islands-lens.js';
@@ -228,7 +228,8 @@ const whole = new Set();
  */
 export function flatView({ lens, style = {}, of, key, only, nest = false, extra, played, quiet = false, before }) {
   const chosen = {};
-  const body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
+  // The view's own element; one that keeps the picture before it on screen takes that picture's element instead (firstFrom).
+  let body = h('div', { class: 'lens-view' }, h('div', { class: 'empty' }, 'Loading…'));
   const host = h('div', { class: 'lens-wrap' }, body);
   const place = { opened: new Map(), ask: {} };
   const keep = (change) => Object.assign(chosen, change);
@@ -244,6 +245,11 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
   // read again; only a link made to something it does not hold reads the lens again, since the walk may now reach more.
   // What is drawn is the answer with what is held for the owner and the links drawn here not yet answered for drawn
   // into it (`shown`, packs/surface/page/replica.js); what the canvas holds (`host.answer`) is the answer alone.
+  /** A value worked out the first time it is asked, and kept. */
+  const once = (make) => {
+    let made;
+    return () => (made ??= make());
+  };
   const draw = (answer, shown, refreshing) => {
     host.earlyDraw = null;
     host.drawnWith = [answer, shown];
@@ -251,13 +257,15 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     if (only) [answer, shown] = [answer, shown].map(narrowed(only));
     if (extra) [answer, shown] = [answer, shown].map((a) => ({ ...a, ...extra, ...(extra.steps && { steps: phased(extra.steps, a.items) }) }));
     if (nest) shown = nested(shown, typeof nest === 'string' ? nest : undefined);
-    const said = JSON.stringify(shown);
-    if (refreshing && said === host.said) return;
+    // What it is drawn from, said only when it is compared with what comes next: an answer said whole costs the page
+    // tens of milliseconds, which a picture drawn early (./narrow.js) would wait for.
+    const said = once(() => JSON.stringify(shown));
+    if (refreshing && host.said && said() === host.said()) return;
     // The server's answer to a query this page answered itself first (./narrow.js): drawn again only where it differs.
     const early = host.early;
     host.early = undefined;
-    if (host.drawingEarly) (host.drawingEarly = false), (host.early = drawnKey(shown));
-    if (early !== undefined && drawnKey(shown) === early) {
+    if (host.drawingEarly) (host.drawingEarly = false), (host.early = once(() => drawnKey(shown)));
+    if (early !== undefined && drawnKey(shown) === early()) {
       Object.assign(host, { said, answer, failed: null });
       for (const item of answer.items) titles.set(item.id, item.title);
       performance.mark('lens-confirmed');
@@ -352,23 +360,34 @@ export function flatView({ lens, style = {}, of, key, only, nest = false, extra,
     if (!was || was.made !== host.made) return;
     const { answer } = was;
     const ctx = { viewer: answer.viewer, typeKnown: (t) => types.has(t), systemType: (t) => Boolean(types.get(t)?.system) };
-    const first = narrowedFrom(was.lens, lens, answer, was.raw.lens, ctx);
-    if (!first) return;
+    const first = narrowedFrom(was.lens, lens, answer, was.raw.lens, ctx) ?? opened(was.lens, lens, answer, was.raw.lens);
+    // An edit it cannot draw early shows the picture before it until the answer is drawn, never an empty canvas
+    // (e_m5x8pmwu). The element it was drawn in becomes this view's, on the page, so it keeps its stylesheet
+    // (data-drawing) and pans as it did, and the new picture is patched into it where it stands: what it says alike is
+    // neither made nor laid out again (packs/walls/page/marks-kept.js).
+    const keepOld = () => ((body = was.body), host.replaceChildren(body));
+    if (!first) return void keepOld();
     const held = new Set(answer.items.map((i) => i.id));
     // What is held for the owner stays drawn where it would land; the server's answer says it again.
     const old = was.shown;
     const flagged = new Map(old.items.map(({ found: _f, terms: _t, step: _s, reasons: _r, ...i }) => [i.id, i]));
     const items = [...first.items.map((i) => ({ ...flagged.get(i.id), ...i })), ...old.items.filter((i) => !held.has(i.id))];
     const ids = new Set(items.map((i) => i.id));
-    const shown = { ...old, lens: first.lens, items, links: old.links.filter((l) => ids.has(l.from) && ids.has(l.to)), ...(first.islands && { islands: first.islands }) };
     look = was.look;
     raw = { ...was.raw, lens: first.lens };
     delete raw.matched;
+    // Drawn from what the server's answer will carry besides its items (that it was cut at its limit, `cut`), as the
+    // server's answer is drawn (`load`: the raw answer under the store's), so the two are alike where they agree.
+    const shown = { ...raw, ...old, lens: first.lens, items, links: old.links.filter((l) => ids.has(l.from) && ids.has(l.to)), ...(first.islands && { islands: first.islands }) };
     performance.mark('lens-narrowed');
-    const early = () => ((host.drawingEarly = true), draw(first, shown));
+    const early = () => ((host.drawingEarly = true), draw({ ...raw, ...first }, shown));
     // The picture on screen narrowed at once (packs/walls/page/narrow-picture.js), and the drawing asked to lay out the
     // new answer once the frame that shows it is painted, unless the server's answer is drawn first.
-    if (!narrowPicture(body, was.body, new Set(old.items.map((i) => i.id).filter((id) => !ids.has(id))))) return early();
+    // Nothing taken out (a pack's parts opened): the picture before stays whole until the new one is drawn.
+    // Laid out once its pane is on the page and has a size, as the answer would be: never at no size, so it is the picture
+    // the same answer always draws, and the server's answer, alike, is not drawn again.
+    const sized = () => host.earlyDraw === early && (body.isConnected && body.clientWidth > 0 ? early() : requestAnimationFrame(sized));
+    if (!narrowPicture(body, was.body, new Set(old.items.map((i) => i.id).filter((id) => !ids.has(id))))) return void (keepOld(), (host.earlyDraw = early), queueMicrotask(sized));
     host.earlyDraw = early;
     requestAnimationFrame(() => setTimeout(() => host.earlyDraw === early && early()));
   }

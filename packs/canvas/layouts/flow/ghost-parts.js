@@ -54,7 +54,7 @@ export function ghostParts({ island, pack, at: [x, y], z, m, titled, measure, gl
   }));
   const frame = m('rect', { x, y, width, height, rx: pad, class: 'lf-ghost' });
   const title = m('text', { x: x + pad, y: y + pad + head / 2, class: 'lf-ghost-title' }, `${pack.title ?? pack.id}: its parts here`);
-  return { marks: [m('g', { key: `gh:${island}`, class: 'lf-ghost-parts' }, frame, title, ...wires, ...rows)], tips, width, height };
+  return { marks: [m('g', { key: `gh:${island}:${pack.id}`, class: 'lf-ghost-parts' }, frame, title, ...wires, ...rows)], tips, width, height };
 }
 
 export const css = `

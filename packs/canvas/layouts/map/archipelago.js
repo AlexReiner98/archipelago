@@ -19,7 +19,8 @@ export function islandModels({ items, links, run }) {
     const own = items.filter((i) => where.get(i.id) === id), set = new Set(own.map((i) => i.id)), inner = links.filter((l) => set.has(l.from) && set.has(l.to));
     return { id, items: own, links: inner, model: run({ items: own, links: inner, extras: { plain: true } }) };
   });
-  const all = run({ items, links, extras: { plain: true } });
+  // The args the whole picture is laid out with: asked of the layout, not made into a graph that would go unread.
+  const all = run({ items, links, extras: { plain: true, args: true } });
   return { groups, where, items, links, args: all.args };
 }
 
