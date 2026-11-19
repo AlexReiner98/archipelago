@@ -6,7 +6,7 @@
 
 import { lineageOf } from './graph.js';
 import { colourWays, ridgeMarks } from './ridge-item.js';
-import { cutPath, depthFor } from './cut-item.js';
+import { cuts as cutsOf, GROWN, listOf } from './cut-item.js';
 import { seedOf } from './ridge-item.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
@@ -18,7 +18,7 @@ const PLAIN = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.wai
 const ridgeOf = (style) => (['bands', 'emerge'].includes(style.ridge_state) ? { mode: style.ridge_state, ways: colourWays(record(style.ridge_palettes)[style.ridge_palette] ?? Object.values(record(style.ridge_palettes))[0]), island: !record(style.ridge_palettes)[style.ridge_palette], types: record(style.type_forms), forms: record(style.ridge_forms) } : null);
 
 /** The cut a style asks for: the accent of each phase, the cut of each type, and the dials (depth, softness, room above the name, whether it grows with progress). */
-const cutOf = (style) => (Object.keys(record(style.cut_colours)).length && Number(style.cut_depth) > 0 ? { colours: record(style.cut_colours), types: record(style.type_cuts), depth: Number(style.cut_depth), soft: Number(style.cut_soft), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true } : null);
+const cutOf = (style) => (Object.keys(record(style.cut_colours)).length && Object.keys(record(style.cut_forms)).length ? { colours: record(style.cut_colours), types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, tension: Number(style.cut_tension), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink' } : null);
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -84,7 +84,7 @@ export function itemRules(style) {
     rules.push('.lf-dot-check { fill: none; stroke: var(--ln-land); stroke-width: var(--ln-flow-stroke); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
     rules.push('.lf-tick { fill: none; stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
   }
-  if (g.cut) rules.push('.lf-step .lf-cut { stroke: none; pointer-events: none; } .lf-step .lf-cut-none { fill: var(--ln-muted); } .lf-step .lf-cut-trouble { fill: var(--ln-blocked); } .lf-step.you .lf-cut { fill: var(--ln-you); }');
+  if (g.cut) rules.push(`.lf-step .lf-cut { stroke: ${g.cut.edge ? 'var(--lf-ink, var(--ln-text))' : 'none'}; stroke-width: var(--ln-rule); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-cut-none { fill: var(--ln-muted); } .lf-step .lf-cut-trouble { fill: var(--ln-blocked); } .lf-step.you .lf-cut { fill: var(--ln-you); } .lf-step .lf-shape.lf-edge { fill: none !important; }`);
   if (g.ridge) {
     rules.push('.lf-step .lf-ridge { stroke: none; pointer-events: none; } .lf-step .lf-ridge-ink { fill: none; stroke: var(--lf-ink, var(--ln-text)); stroke-width: var(--ln-flow-ridge-ink); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-rc-island { fill: var(--lf-island, var(--ln-text)); }');
     // The step's outline is the mountain's ink and its ground line, and its name: what hover, here, focus and you light.
@@ -143,12 +143,12 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
     out.rules = made.rules;
   }
   if (g.cut && n.shape === 'carved') {
-    // The cut off a corner or an edge, in the accent of the item's phase: the phase's colour, else the role's grey, and in trouble the trouble role.
-    const kind = lineageOf(item).map((t) => g.cut.types[t]).find(Boolean), seed = seedOf(item.id);
-    const d = cutPath({ l, t, r, b }, kind, { rx: Math.min(corner, n.h / 5), depth: depthFor({ depth: g.cut.depth, clear: g.cut.clear, grow: g.cut.grow, phase, h: n.h, lines: n.lines?.length ?? 1, line: n.line }), soft: g.cut.soft, seed });
+    // What the cuts take off is filled in the accent of the phase (else the role's grey; in trouble the trouble role), then the box's outline is drawn once more over it.
     const hex = g.cut.colours[phase], named = typeof hex === 'string' && hex.startsWith('#'), cls = named ? `lf-cut-${hex.slice(1).toLowerCase()}` : `lf-cut-${phase === 'trouble' ? 'trouble' : 'none'}`;
     if (named) out.rules = [`.${cls} { fill: ${hex}; }`];
-    if (d) out.over.push(m('path', { d, class: `lf-cut ${cls}` }));
+    const scale = g.cut.scale * (g.cut.grow ? GROWN[phase] ?? 1 : 1);
+    for (const c of cutsOf({ l, t, r, b }, listOf(g.cut, item, lineageOf(item)), { rx: Math.min(corner, n.h / 5), tension: g.cut.tension, scale, seed: seedOf(item.id) })) out.over.push(m('path', { d: c.d, class: `lf-cut ${cls}` }));
+    out.over.push(((edge) => (edge[1].class += ' lf-edge', edge))(outline(n.shape, X, Y, n.w, n.h, corner, n.bevel)));
   }
   const glyph = glyphOf(g, item);
   if (glyph) out.over.push(m('text', { x: r - z('glyph_inset') - round / 2, y: t + z('glyph_drop'), class: 'lf-glyph' }, glyph));

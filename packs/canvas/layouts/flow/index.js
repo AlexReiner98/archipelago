@@ -18,11 +18,12 @@
 // its step), each with a badge keyed `held:<proposal>` that the page answers a click on by putting the change to the person; a
 // link the person just drew (`mine`) is dashed until it is.
 
-import { shownOnly } from './graph.js';
+import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { effortOf } from './effort.js';
 import { css } from './look.js';
 import { landMarks, landRules, landShades } from './land-look.js';
+import { boxHeight, listOf } from './cut-item.js';
 import { glyphOf, grammar, itemMarks, itemRules } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
@@ -120,7 +121,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // Each island's own layer, from the packs active on it (decision e_gqmavsb7): outlines and dots for its items.
   // A view that says its islands are plain (island_looks) draws each by its own look alone: no island's look or layer.
   const shown = style.island_looks === 'plain' ? (answer.islands ?? []).map(({ look: _l, style: _s, ...i }) => i) : answer.islands ?? [];
-  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
+  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, carve: ((cut) => (cut ? (i, textH) => boxHeight(listOf(cut, i, lineageOf(i)), textH, z('cut_pad'), cut.clear) : undefined))(grammar(style).cut), islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
@@ -330,7 +331,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
-    const nameY = (s, y) => (s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
+    const nameY = (s, y) => (s.shape === 'carved' && look.cut ? y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2 : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
     const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n) });
     for (const rule of extra.rules ?? []) colourRules.add(rule);
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
