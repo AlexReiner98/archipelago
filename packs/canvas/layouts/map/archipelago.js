@@ -8,12 +8,20 @@ import { stage } from './stage.js';
 /** The islands an answer's items live on, in the order they come. */
 export const islandsOf = (items) => [...new Set(items.map((i) => i.island).filter(Boolean))];
 
+/** The links whose two ends stand on one island (or both on none): what an islands canvas draws where the style says island_links: false. */
+export const insideIslands = (items, links) => {
+  const where = new Map(items.map((i) => [i.id, i.island ?? null]));
+  return links.filter((l) => where.has(l.from) && where.has(l.to) && where.get(l.from) === where.get(l.to));
+};
+
 /**
  * Each island's items and links, for its legend: the kit's plain graph of each (`run` asked for no places), and the
  * args the whole picture is laid out with.
  */
-export function islandModels({ items, links, run }) {
+export function islandModels({ items, links: given, run, across = true }) {
   const where = new Map(items.map((i) => [i.id, i.island ?? null]));
+  // A link between islands is left out of the whole picture where the style says so: no wire at sea, no gate at a shore.
+  const links = across ? given : insideIslands(items, given);
   const ids = [...islandsOf(items), ...(items.some((i) => !i.island) ? [null] : [])];
   const groups = ids.map((id) => {
     const own = items.filter((i) => where.get(i.id) === id), set = new Set(own.map((i) => i.id)), inner = links.filter((l) => set.has(l.from) && set.has(l.to));
