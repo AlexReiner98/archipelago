@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-expect-error a page module, plain JavaScript
-import { AUTO, atHome, autoToggled, capital, changedWithin, clean, drawnAt, drawnBy, islandsIn, islandsOnMap, pressed, rankIslands, recentFirst } from '../packs/surface/page/islands-list.js';
+import { AUTO, atHome, autoToggled, capital, changedWithin, clean, drawnAt, drawnBy, islandsIn, islandsOnMap, listWith, pressed, rankIslands, recentFirst, viewsIn } from '../packs/surface/page/islands-list.js';
 
 const mine = ['e_xgrowth1'];
 
@@ -64,6 +64,28 @@ test('a person who has chosen no islands sees the map’s latest, until a press 
   assert.deepEqual(await on.islandsOn(), ['e_latest01', 'e_latest02'], 'nothing kept: the map’s latest islands');
   await on.keepList(['e_latest01'], 'test');
   assert.equal(store.get('pelago-islands'), JSON.stringify(['e_latest01']), 'a press keeps the list as theirs');
+});
+
+test('views are kept on the same list as islands, and a press on an island keeps them (e_74ghhvdp)', async () => {
+  const kept = ['e_xgrowth1', 'view:reflex_view.tree', 'frontier', 'view:e_wh44exu2', 'view:bad view', 'view:reflex_view.tree'];
+  assert.deepEqual(clean(kept), ['e_xgrowth1', 'frontier'], 'Home draws no view as an island');
+  assert.deepEqual(viewsIn(kept), ['reflex_view.tree', 'e_wh44exu2']);
+  assert.deepEqual(listWith(['e_xgrowth1'], ['reflex_view.tree', 'not one']), ['e_xgrowth1', 'view:reflex_view.tree']);
+  const { readFileSync } = await import('node:fs');
+  const { pathToFileURL } = await import('node:url');
+  const store = new Map<string, string>();
+  Object.assign(globalThis, { localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v) } });
+  const base = `data:text/javascript,${encodeURIComponent('export const api = async () => { throw new Error("no server"); }; export const whoami = async () => ({});')}`;
+  const list = pathToFileURL('packs/surface/page/islands-list.js').href;
+  const text = readFileSync('packs/surface/page/islands-on.js', 'utf8').replace("'./base.js'", `'${base}'`).replace("'./islands-list.js'", `'${list}'`) + '// views';
+  const on = await import(`data:text/javascript,${encodeURIComponent(text)}`);
+  store.set('pelago-islands', JSON.stringify(kept));
+  assert.deepEqual(await on.viewsKept(), ['reflex_view.tree', 'e_wh44exu2']);
+  await on.keepList(['e_xgrowth1', 'e_lightcor'], 'test');
+  assert.deepEqual(JSON.parse(store.get('pelago-islands') ?? '[]'), ['e_xgrowth1', 'e_lightcor', 'view:reflex_view.tree', 'view:e_wh44exu2']);
+  await on.keepViews(['e_wh44exu2'], 'test');
+  assert.deepEqual(JSON.parse(store.get('pelago-islands') ?? '[]'), ['e_xgrowth1', 'e_lightcor', 'view:e_wh44exu2']);
+  assert.deepEqual(await on.islandsOn(), ['e_xgrowth1', 'e_lightcor']);
 });
 
 test('an address names islands and live reads only', () => {
