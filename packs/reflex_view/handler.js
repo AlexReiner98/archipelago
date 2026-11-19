@@ -2,11 +2,22 @@
 // pack's (the read said_record), the runs' names are read here, and rows.js makes the rows.
 
 import { countsOf, rowsOf, RUNS_SHOWN } from './rows.js';
+import { legendOps } from './legend.js';
 
 /** How many instructions one ask of their counts reads at most: the record's own limit. */
 const MOST = 50;
 
 export default {
+  // The legend's toggle, sent by the tree's drawing as the person looking (its view's sends): the view's hidden list.
+  'reflex_view.legend': async (input, ctx) => {
+    const view = String(input?.view ?? '');
+    const asItem = view.startsWith('e_') ? await ctx.read({ get: view }) : null;
+    if (view.startsWith('e_') && !(asItem?.is ?? [asItem?.type]).includes('lens')) throw new Error(`${view} is no view`);
+    const versions = asItem ? [] : await ctx.read({ items: { type: 'lens', where: { preset: view } } });
+    const kept = asItem ?? (Array.isArray(versions) ? versions.find((v) => v.status !== 'retired') : undefined);
+    return legendOps(input ?? {}, kept);
+  },
+
   'reflex_view.said': async (input, ctx) => {
     const about = typeof input?.about === 'string' && input.about ? input.about : undefined;
     if (!about) return { answer: [] };
@@ -22,7 +33,8 @@ export default {
   // What the tree's drawing asks through its sends: every miss lately, as the reflex_said pack reads them.
   'reflex_view.misses': async (input, ctx) => {
     const days = Number.isInteger(input?.days) ? input.days : undefined;
-    const found = await ctx.read({ misses: days === undefined ? {} : { days } });
+    const limit = Number.isInteger(input?.limit) ? input.limit : undefined;
+    const found = await ctx.read({ misses: { ...(days !== undefined && { days }), ...(limit !== undefined && { limit }) } });
     return { answer: Array.isArray(found) ? found : [] };
   },
 

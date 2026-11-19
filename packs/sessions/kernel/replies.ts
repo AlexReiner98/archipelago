@@ -7,6 +7,9 @@ import { atSetting, holds, isAt, MISSED, onReply, replyFacts, type RuleDef } fro
 import { tell } from './session-life.ts';
 import type { Item } from './types.ts';
 
+/** Where the words a rule asks in are kept: rule:<pack.rule>, a place instructions are said at. */
+export const RULE_PLACE = 'rule:';
+
 /** How long a turn's asking is remembered: past it, the turn is long over. */
 const ASKED_MS = 86_400_000;
 
@@ -44,14 +47,21 @@ export async function askOnReply(ctx: KernelContext, run: Pick<Item, 'id' | 'is_
     asking.push(rule);
   }
   if (!asking.length) return undefined;
+  // Each rule asks in the words kept for it on the map (instructions said at rule:<pack.rule>, the owner's over its
+  // pack's), else its own say: what an agent is asked is reworded on the map, with no push.
+  const words = new Map<Rule, string>();
+  for (const rule of asking) {
+    const kept = await ctx.call<object, { said: { text: string }[] }>('answer.instructions', { where: `${RULE_PLACE}${rule.pack}.${rule.id ?? ''}`, fill: { run: run.id } }).catch(() => ({ said: [] }));
+    words.set(rule, kept.said.map((one) => one.text.replace(/\s+/g, ' ').trim()).filter(Boolean).join(' ') || rule.say!);
+  }
   for (const rule of asking) {
     // Each asking is counted for the Packs screen (root.uses), as a use of the rule.
     await ctx.call('root.uses', { add: [{ key: `asked:${`${rule.pack}.${rule.id ?? ''}`.replace(/\s/g, '_')}` }] }).catch((err) => ctx.said(`counting an asking failed: ${(err as Error).message}`));
-    await tell(ctx, { kind: 'agent', name: rule.pack }, { run: run.id, said: rule.say!, asked: `${rule.pack}.${rule.id ?? ''}` }).catch((err) =>
+    await tell(ctx, { kind: 'agent', name: rule.pack }, { run: run.id, said: words.get(rule)!.slice(0, 280), asked: `${rule.pack}.${rule.id ?? ''}` }).catch((err) =>
       ctx.said(`reply rule ${rule.id}: not kept in the story (${(err as Error).message})`),
     );
   }
   // The beats moved the tell stamp, so a page polling for them hears them (the presence pack's).
   await ctx.call('act.report.told', {});
-  return asking.map((r) => r.say).join('\n');
+  return asking.map((r) => words.get(r)).join('\n');
 }

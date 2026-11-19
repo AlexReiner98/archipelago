@@ -2,7 +2,7 @@
   "id": "reflex_said",
   "version": "0.1.0",
   "title": "Reflex record",
-  "description": "Each time an instruction is said (a reflex among them), which one, to which run and where (its for place), kept on this pack's own stream; and, read back, how often each was said and whether the misses it answers (refusals of a phrase it names, beats about what it answers) came back in a run after it was said there. Said by the agents pack as it says them (the read said_here); read as said_record, by the reflex_view rows and an agent's query. Split from reflex, which keeps the words. It also reads the misses (refusals, bumps, traps) with where each happened and what covers it (misses), asks an agent at a reply's end to write a trial reflex for a refusal nothing covers (rule write_node), and each hour promotes or retires reflexes by their record (thresholds in its memory, key thresholds: promote_held, retire_failed, retire_unsaid_days).",
+  "description": "Each time an instruction is said (a reflex among them), which one, to which run and where (its for place), kept on this pack's own stream; and, read back, how often each was said and whether the misses it answers (refusals of a phrase it names, beats about what it answers) came back in a run after it was said there. Said by the agents pack as it says them (the read said_here); read as said_record, by the reflex_view rows and an agent's query. Split from reflex, which keeps the words. It also reads the misses (refusals, bumps, traps) with where each happened and what covers it (misses), asks an agent at a reply's end to write a trial reflex for a refusal nothing covers (rule write_node), and each hour promotes or retires reflexes by their record (by its settings reflex_promote_held, reflex_retire_failed and reflex_retire_unsaid_days, on its card on the Packs page).",
   "kernel": {
     "trust": "service",
     "internal": true,
@@ -30,7 +30,8 @@
       },
       "answer.misses": {
         "in": {
-          "days?": "number"
+          "days?": "number",
+          "limit?": "number"
         },
         "out": "any",
         "run": "misses-read.ts#missesAnswer"
@@ -44,6 +45,24 @@
         },
         "out": "any",
         "run": "story-read.ts#storyAnswer"
+      },
+      "setting.reflex_promote_held": {
+        "out": "number",
+        "read": "member",
+        "default": 3,
+        "about": "Runs a trial reflex must hold in (its miss stopped or never came back), none failed, before it becomes current."
+      },
+      "setting.reflex_retire_failed": {
+        "out": "number",
+        "read": "member",
+        "default": 2,
+        "about": "Runs a reflex may fail in (its miss came back after it was said) before it retires, when they outnumber its held."
+      },
+      "setting.reflex_retire_unsaid_days": {
+        "out": "number",
+        "read": "member",
+        "default": 30,
+        "about": "Days a reflex may go unsaid before it retires."
       }
     },
     "timers": [
@@ -93,7 +112,7 @@
       "shape": "data",
       "lens": {},
       "answer": "misses",
-      "description": "Every miss lately, the newest first: refusals on runs' stories, bumps (issues kept as problems) and traps (instructions said for files), each with its kind, run, when, where it happened (for place) and the open nodes that cover it (covered_by; none, uncovered). Params: days (30 unless said, 90 at most)."
+      "description": "Every miss lately, the newest first: refusals on runs' stories, bumps (issues kept as problems) and traps (instructions said for files), each with its kind, run, when, where it happened (for place) and the open nodes that cover it (covered_by; none, uncovered). Params: days (30 unless said, 90 at most), limit (the newest so many, 1000 at most)."
     },
     {
       "id": "reflex_said.tree_story",
@@ -101,6 +120,19 @@
       "lens": {},
       "answer": "tree_story",
       "description": "The reflex tree's story over a window: nodes (the ids asked, every preset said in the window, every rule in force; each with kind instruction or rule, pack, tier, a rule's effect, status, for, title), misses no settled node covers (grew: the trial covering it), each saying with its run's verdict, and each rule's firings by day. Params: ids (at most 50), days (30 unless said, 90 at most)."
+    }
+  ],
+  "styles": [
+    {
+      "id": "reflex_said.write_node_words",
+      "type": "instruction",
+      "title": "Write a trial reflex for an uncovered refusal",
+      "body": "A refusal no reflex covers came up in this reply. Search for a reflex that should cover it (query search, type reflex); if there is none, write a trial reflex: type reflex, status trial, for the place it happened (tool:change), misses the refusal's own words, and a note that leads with what fixed it. If it should not be one, say why in a sentence.",
+      "props": {
+        "for": [
+          "rule:reflex_said.write_node"
+        ]
+      }
     }
   ]
 }

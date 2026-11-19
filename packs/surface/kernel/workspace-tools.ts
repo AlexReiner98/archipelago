@@ -33,7 +33,7 @@ export const DRAWINGS_OPEN = 'drawings_open';
 export const packSettings = (l: Archipelago) =>
   l.registry.packs.flatMap((p) => Object.entries(kernelOf(p).provides ?? {}).flatMap(([name, sig]) => {
     const s = serviceName(name);
-    return s?.family === 'setting' && sig.out !== undefined ? [{ key: s.entry, pack: p.id, shape: sig.out, read: sig.read === 'member' ? 'member' : 'admin', stored: `${sig.read === 'member' ? 'member' : 'admin'}.${s.entry}` }] : [];
+    return s?.family === 'setting' && sig.out !== undefined ? [{ key: s.entry, pack: p.id, shape: sig.out, read: sig.read === 'member' ? 'member' : 'admin', stored: `${sig.read === 'member' ? 'member' : 'admin'}.${s.entry}`, ...(sig.default !== undefined && { default: sig.default }), ...(sig.about !== undefined && { about: sig.about }) }] : [];
   }));
 
 /** A setting a pack provides, as the workspace has it; undefined when unset or when no pack here provides it. */
@@ -61,7 +61,7 @@ const settings = async (l: Archipelago) => {
   const lifted = Object.fromEntries(names.map((name) => [name, rows.some((r) => r.key === name && r.value === true)]));
   const set = new Map(rows.filter((r) => ats.includes(r.key) && isAt(r.value)).map((r) => [r.key, r.value as number]));
   const provided = await packSettingValues(l);
-  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), agent_backups, agent_publish, agent_code, drawings_open: await drawingsOpen(l), [ISLANDS]: await islandsOn(l), [HOLDS_OFF]: await holdsOff(l.db), ...(names.length && { lifted, reply_rules: await replyRules(l, lifted, set) }), ...(Object.keys(provided).length && { settings: provided }) };
+  return { id: l.workspace, default_visibility: await l.defaultVisibility(), agent_changes: await l.agentChanges(), agent_backups, agent_publish, agent_code, drawings_open: await drawingsOpen(l), [ISLANDS]: await islandsOn(l), [HOLDS_OFF]: await holdsOff(l.db), ...(names.length && { lifted, reply_rules: await replyRules(l, lifted, set) }), ...(Object.keys(provided).length && { settings: provided, setting_defs: packSettings(l).map(({ key, pack, shape, default: d, about }) => ({ key, pack, shape, ...(d !== undefined && { default: d }), ...(about !== undefined && { about }) })) }) };
 };
 
 /** Whether the owner has turned the sandbox off for drawings here: read whole, since every member's page draws by it (packs/walls/page/style-code.js). */

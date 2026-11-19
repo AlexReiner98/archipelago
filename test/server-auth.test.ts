@@ -304,7 +304,8 @@ test('nothing passes between workspaces: notifications and shares by workspace a
   assert.ok((await call('/api/share_workspace', mine, { id: 'e_aaaaaaaa', workspace: 'acme' })).error);
 
   const set = await call('/api/workspace_set', theirs, { default_visibility: 'shared' });
-  const { reply_rules, ...settings } = set.result;
+  // What the packs' own settings are (setting_defs, settings) is the services test's; here, the workspace's own.
+  const { reply_rules, setting_defs: _defs, settings: _packs, ...settings } = set.result;
   assert.deepEqual(settings, { id: 'acme', default_visibility: 'shared', agent_changes: 'apply', agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: true, holds_off: true, lifted: { reply_draw_answers: false, reply_record_findings: false, reply_reflex_node: false, reply_unshown: false } });
   assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['practice.draw_answers', false], ['practice.record_findings', false], ['reflex_said.write_node', false], ['sessions.show_what_you_saw', false]]);
 });
