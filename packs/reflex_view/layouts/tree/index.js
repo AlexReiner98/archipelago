@@ -10,7 +10,7 @@
 
 import { treeOf } from './tree.js';
 import { radial } from './radial.js';
-import { storyOf, weekTo } from './story.js';
+import { storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
 import { barOf, cssOf, keyOf } from './look.js';
@@ -42,6 +42,14 @@ async function recordsOf(ids, style, tools, n, gesture = 'said') {
   return Promise.race([asked, new Promise((r) => setTimeout(() => r(null), n('reflex_said_wait')))]);
 }
 
+/** The misses the pack answers (style.sends.misses: its view misses), over reflex_window_days; null where none. */
+async function missesOf(style, tools, n) {
+  const ask = typeof style.sends?.misses === 'string' && typeof tools.act === 'function' ? style.sends.misses : null;
+  if (!ask) return null;
+  const asked = tools.act(ask, { days: n('reflex_window_days') }).then((c) => (c && !c.error && Array.isArray(c.answer) ? c.answer : null)).catch(() => null);
+  return Promise.race([asked, new Promise((r) => setTimeout(() => r(null), n('reflex_said_wait')))]);
+}
+
 export async function picture({ answer, style, reduced, width, height }, tools) {
   const missing = [];
   const read = (group) => (name) => {
@@ -54,10 +62,14 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const first = treeOf(answer);
   if (!first) return { scene: { message: 'This view holds no instruction or reflex node yet.' } };
   const ids = first.written.map((node) => node.id);
-  const [records, told] = await Promise.all([recordsOf(ids, style, tools, n), recordsOf(ids, style, tools, n, 'story')]);
+  const [records, story0, misses] = await Promise.all([recordsOf(ids, style, tools, n), recordsOf(ids, style, tools, n, 'story'), missesOf(style, tools, n)]);
+  // The pack's own story where the view sends one; else made from its counts and misses where both came, each
+  // node's sayings with their days; else schematic.
+  const now = Date.now();
+  const told = story0 ?? (misses && records?.some((r) => Array.isArray(r.per_run)) ? toldFrom(records, misses, now, n('reflex_window_days')) : null);
   const counts = new Map((records ?? []).filter((r) => r && Number.isFinite(Number(r.said))).map((r) => [r.id, Number(r.said)]));
   const tiers = new Map((records ?? []).filter((r) => r && typeof r.tier === 'string').map((r) => [r.id, r.tier]));
-  const story = storyOf(answer, told, records ? counts : null, n, Date.now(), tiers);
+  const story = storyOf(answer, told, records ? counts : null, n, now, tiers);
   const placeOf = new Map([...(records ?? []).filter((r) => r && r.for !== undefined).map((r) => [r.id, r.for]), ...[...story.nodes].filter(([, x]) => x.for !== undefined).map(([id, x]) => [id, x.for])]);
   const presets = [...story.nodes].filter(([, x]) => x.tier === 'core' || x.tier === 'pack').map(([id, x]) => ({ id, ...x }));
   const tree = treeOf(answer, (item) => item.fields?.for ?? placeOf.get(item.id), n, presets);

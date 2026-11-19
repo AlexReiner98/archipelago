@@ -2,7 +2,7 @@
 // over reflex_film seconds after the root stands alone (reflex_film_lead). Core's and the packs' presets, and what was
 // made before the window, stand from the start: the trunk. Each node made in the window comes in on its day. Each miss
 // sparks on its day, where it happened (the trial node written from it, else the bough of its place, else the root);
-// each saying runs a light to its node on its day, held or came back; a quiet one runs none.
+// each saying runs a light to its node on its day, held or failed.
 
 import { boughsOf } from './tree.js';
 
@@ -25,7 +25,7 @@ export function filmOf(tree, story, n) {
   };
   const events = [
     ...story.misses.map((m) => ({ kind: 'miss', t: time(m.at), node: (m.grew && tree.nodes.get(m.grew)) || placeOf(m.where), grew: Boolean(m.grew && tree.nodes.get(m.grew)) })),
-    ...story.said.filter((s) => s.verdict !== 'quiet' && tree.nodes.has(s.id)).map((s) => ({ kind: s.verdict === 'failed' || s.verdict === 'came_back' ? 'failed' : 'held', t: time(s.at), node: tree.nodes.get(s.id) })),
+    ...story.said.filter((s) => tree.nodes.has(s.id)).map((s) => ({ kind: s.verdict === 'failed' || s.verdict === 'came_back' ? 'failed' : 'held', t: time(s.at), node: tree.nodes.get(s.id) })),
   ].sort((a, b) => a.t - b.t);
   // A miss that grew a node is that node's birth.
   for (const e of events) if (e.kind === 'miss' && e.grew) born.set(e.node.id, e.t);

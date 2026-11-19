@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { treeOf } from './tree.js';
 import { radial } from './radial.js';
-import { storyOf, weekTo } from './story.js';
+import { storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { picture } from './index.js';
 import { namesShown, overlap } from './names.js';
@@ -76,14 +76,14 @@ test('over real dates: the trunk stands, a miss sparks where it happened or grow
   const film = filmOf(tree, story, n);
   assert.equal(film.born.get('core.say_authority'), 0, 'the trunk is there from the start');
   const kinds = film.events.map((e: any) => e.kind);
-  assert.deepEqual(kinds, ['miss', 'held', 'failed', 'held', 'miss'], 'a quiet saying runs no light');
-  const [grew, , , , gap] = film.events;
+  assert.deepEqual(kinds, ['miss', 'held', 'failed', 'held', 'held', 'miss'], 'a quiet saying (its miss never showed) lights as held');
+  const [grew, , , , , gap] = film.events;
   assert.equal(grew.node.id, a.items[0].id);
   assert.equal(film.born.get(a.items[0].id), grew.t, 'the trial is born of its miss');
   assert.equal(gap.grew, false);
   assert.equal(gap.node.id, '~for:tool:change', 'a miss that grew nothing sparks on the bough of its place');
   assert.deepEqual(weekTo(story, Date.parse(came.to)), { misses: 0, held: 0 }, "the gap is eight days before the end: out of that week");
-  assert.deepEqual(weekTo(story, Date.parse(came.from) + 21 * 864e5), { misses: 1, held: 1 });
+  assert.deepEqual(weekTo(story, Date.parse(came.from) + 21 * 864e5), { misses: 1, held: 2 });
   assert.deepEqual(weekTo(story, Date.parse(came.from) + 16 * 864e5), { misses: 1, held: 2 });
 });
 
@@ -166,4 +166,22 @@ test('given the room it is shown in, the grown tree closes its rings to fit ther
   assert.ok(fitted.width <= room.width + 1 && fitted.height <= room.height + 1, `${fitted.width} x ${fitted.height} in ${room.width} x ${room.height}`);
   assert.ok(fitted.reach < free.reach, 'the rings closed up');
   assert.equal(radial(tree, z, n, measure, 2, { width: free.width * 2, height: free.height * 2 }).reach, free.reach, 'room to spare: the rings stay as they are');
+});
+
+test('the pack’s counts and misses make the story: a gap, a trial’s making, sayings on their days', () => {
+  const records = [
+    { id: 'e_trialaaa', tier: 'learned', status: 'trial', for: ['tool:change'], per_run: [{ said_at: '2026-11-18T10:00:00Z', verdict: 'failed' }] },
+    { id: 'e_standing', tier: 'core', status: 'current', for: ['tool:assign'], per_run: [{ said_at: '2026-11-17T10:00:00Z', verdict: 'held' }, { said_at: '2026-11-17T11:00:00Z', verdict: 'quiet' }] },
+  ];
+  const misses = [
+    { kind: 'refusal', at: '2026-11-18T09:00:00Z', where: 'tool:change', covered_by: ['e_trialaaa'] },
+    { kind: 'refusal', at: '2026-11-16T09:00:00Z', where: 'push', covered_by: [] },
+    { kind: 'trap', at: '2026-11-15T09:00:00Z', where: 'file:ui/*', covered_by: ['e_standing'] },
+  ];
+  const told = toldFrom(records, misses, Date.UTC(2026, 10, 19), 30);
+  assert.deepEqual(told.misses.map((m: any) => [m.where, m.grew]), [['tool:change', 'e_trialaaa'], ['push', undefined]], 'a miss a standing node covers is none of the tree’s');
+  assert.deepEqual(told.said.map((x: any) => x.verdict), ['failed', 'held', 'held']);
+  const story = storyOf(answer(1, []), told, null, n);
+  assert.equal(story.schematic, false);
+  assert.equal(story.nodes.get('e_standing').tier, 'core');
 });

@@ -45,5 +45,26 @@ export function storyOf(answer, came, counts, n, now = Date.now(), tiers = new M
 /** How many misses and held sayings fell in the week to `at`. */
 export const weekTo = (story, at) => {
   const since = at - 7 * DAY;
-  return { misses: story.misses.filter((m) => m.at > since && m.at <= at).length, held: story.said.filter((s) => s.verdict === 'held' && s.at > since && s.at <= at).length };
+  return { misses: story.misses.filter((m) => m.at > since && m.at <= at).length, held: story.said.filter((s) => s.verdict !== 'failed' && s.verdict !== 'came_back' && s.at > since && s.at <= at).length };
 };
+
+/**
+ * The story from the reflex_view pack's two reads, as the seam takes it: its said_counts (each node's tier, status,
+ * for, and per_run sayings with their verdicts) and its misses ({ at, where, covered_by }, newest first). A miss no
+ * node covers is a gap; one covered by a node still on trial is that trial's making; one a standing node covers was
+ * no miss of the tree's. A quiet saying (its miss never showed) lights as held.
+ */
+export function toldFrom(records, misses, now, days) {
+  const trial = new Set(records.filter((r) => r.status === 'trial').map((r) => r.id));
+  return {
+    from: new Date(now - days * DAY).toISOString(), to: new Date(now).toISOString(),
+    nodes: records.map((r) => ({ id: r.id, tier: r.tier, status: r.status, for: r.for })),
+    misses: misses.flatMap((m) => {
+      const covered = Array.isArray(m.covered_by) ? m.covered_by : [];
+      if (!covered.length) return [{ at: m.at, where: m.where }];
+      const grew = covered.find((id) => trial.has(id));
+      return grew ? [{ at: m.at, where: m.where, grew }] : [];
+    }),
+    said: records.flatMap((r) => (Array.isArray(r.per_run) ? r.per_run : []).map((p) => ({ id: r.id, at: p.said_at, verdict: p.verdict === 'quiet' ? 'held' : p.verdict }))),
+  };
+}

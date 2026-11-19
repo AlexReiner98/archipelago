@@ -118,7 +118,8 @@
         "style": {
           "shape": "reflex_tree",
           "sends": {
-            "said": "reflex_view.said_counts"
+            "said": "reflex_view.said_counts",
+            "misses": "reflex_view.misses"
           },
           "colors": {
             "reflex_write": "#e8912d",
