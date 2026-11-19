@@ -138,7 +138,7 @@
             "reflex_film": 24,
             "reflex_film_lead": 0.6,
             "reflex_count_steps": 60,
-            "reflex_frame_most": 0.1,
+            "reflex_frame_most": 0.3,
             "reflex_lights_least": 0.3,
             "reflex_lights_most": 6,
             "reflex_lights_live": 0.8,
