@@ -26,7 +26,7 @@ const SPEEDS = [0.5, 1, 2];
 const SHIPPED = 'reflex_view.tree';
 
 /**
- * What the pack answers of each node (style.sends.said: the reflex_view pack's said_counts), reflex_said_batch ids at
+ * What the pack answers of each node (style.sends.said: the reflex_view pack's counts), reflex_said_batch ids at
  * a time, waited for at most reflex_said_wait ms: each { id, said, for, ... }. None where the view sends nothing.
  */
 async function recordsOf(ids, style, tools, n, gesture = 'said') {
@@ -66,7 +66,7 @@ function legendClick(event, hidden, style, tools, answer, again) {
   const { hidden: _, ...drawnStyle } = style;
   const query = { filter: { find: answer?.lens?.find ?? [], only: answer?.lens?.only ?? [], not: answer?.lens?.not ?? [] }, ...(answer?.lens?.walk && { walk: answer.lens.walk }), ...(answer?.lens?.limit && { limit: answer.lens.limit }) };
   const next = on ? [...hidden].filter((e) => e !== entry) : [...hidden, entry];
-  tools.act(style.sends.legend, { view: SHIPPED, entry, on, style: drawnStyle, ...query }).then((came) => !came?.error && again?.(next)).catch(() => {});
+  tools.act(style.sends.legend, { view: SHIPPED, entry, on, lens: { style: drawnStyle, ...query } }).then((came) => !came?.error && again?.(next)).catch(() => {});
   return [{ key, toggle: { 'rt-off': !on } }];
 }
 
