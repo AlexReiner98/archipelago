@@ -19,10 +19,12 @@ function inside(home, given) {
    * it cuts a name to fit. Set as a text role (the style's type: weight, style, case, track), it is measured so.
    */
   const widths = new Map();
+  // A text role's weight, as the style may set it (100 to 900, in steps of 50: core's style type), else the plain one.
+  const WEIGHT = 400, WEIGHTS = new Set(Array.from({ length: 17 }, (_, k) => 100 + k * 50));
   let current = '';
   const measure = (words, px, font, as) => {
     const said = as?.case === 'upper' ? String(words).toUpperCase() : String(words);
-    const want = `${as?.style === 'italic' ? 'italic ' : ''}${as?.weight === 600 ? 600 : 400} ${px}px ${font || 'system-ui'}`, key = `${want}|${said}`;
+    const want = `${as?.style === 'italic' ? 'italic ' : ''}${WEIGHTS.has(as?.weight) ? as.weight : WEIGHT} ${px}px ${font || 'system-ui'}`, key = `${want}|${said}`;
     let w = widths.get(key);
     if (w === undefined) {
       if (current !== want) ctx.font = current = want;
