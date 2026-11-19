@@ -27,7 +27,7 @@ import { boxHeight, listOf, ROLES, STATUS_WORDS } from './cut-item.js';
 import { outlineOf } from './type-outline.js';
 import { rangeKeyPath } from './aim-range.js';
 import { TYPE_WORDS } from './cut-item.js';
-import { boardKeyRows, glyphOf, grammar, itemMarks, itemRules, swatchRows } from './item-look.js';
+import { boardKeyRows, glyphOf, grammar, itemMarks, itemRules, statusOf, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
@@ -156,6 +156,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
   const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
+  /** The status a board is painted in: blocked is trouble unless nothing is left to block (./item-look.js statusOf). */
+  const boardWord = (i) => statusOf(i, stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase);
   const itemState = String(style.item_state ?? '').split(' '), look = grammar(style);
   const outline = (shape, x, y, w, hgt, rx, cut) => outlineMark(shape, x, y, w, hgt, rx, cut, { span: z('summit_span'), tension: look.cut?.tension });
   const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : itemState.includes('check') && mark === 'full' && /ph-(finished|ended)/.test(cls)
@@ -257,8 +259,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const swatches = look.cut ? swatchRows(look.cut, { m, w: KW, h: KH, roles: ROLES, words: STATUS_WORDS, sw: z('key_swatch') }) : { rows: [], rules: [] };
   for (const rule of swatches.rules) colourRules.add(rule);
   // A fingerpost board's key: the boards with their plates, and the statuses as small plates (pass 8).
-  const boardKey = look.board ? boardKeyRows(look.board, { types: Object.keys(look.board.signs), m, outline, w: KW, h: KH, margin: z('key_margin'), shapes: record(style.type_shapes), words: TYPE_WORDS, statusWords: STATUS_WORDS }) : null;
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(boardKey ? boardKey : looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...swatches.rows, ...addRow(p.id)]]));
+  const boardOn = (p) => [...new Set((p?.model?.all ?? []).filter((n) => !n.dummy && !n.stub).map((n) => n.item.type))];
+  const boardKey = (p) => (look.board ? boardKeyRows(look.board, { types: boardOn(p), m, outline, w: KW, h: KH, margin: z('key_margin'), shapes: record(style.type_shapes), words: TYPE_WORDS, statusWords: STATUS_WORDS }) : null);
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(look.board ? boardKey(p) : looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...swatches.rows, ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text')) + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px), openParts(answer, id)); // an open pack's switch is counted
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
@@ -334,7 +337,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = snap(g.y.get(n.id)), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
-    const point = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? n.bevel : 0, ends = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? 2 * n.bevel : n.shape === 'flag' ? n.bevel : 0;
+    const point = /^(hexagon|lozenge|ticket|forward|roundstart)$/.test(n.shape) ? n.bevel : 0, ends = /^(hexagon|lozenge|ticket|forward)$/.test(n.shape) ? 2 * n.bevel : /^(flag|tallarrow|swallow|roundend|roundstart)$/.test(n.shape) ? n.bevel : 0;
     // No dot before the name (the style says its state on the shape): the room it had is shared, the name set in the middle.
     const bare = !look.dot && !look.tick && !n.stub, glyph = !n.stub && glyphOf(look, i) ? z('glyph_room') : 0;
     const ridged = n.shape === 'ridge' && look.ridge && !n.stub;
@@ -342,7 +345,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const left = ridged ? X : boarded ? X - n.w / 2 + point + board : n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : bare ? z('box_pad') / 2 : z('text_x'));
     const room = ridged ? n.w : boarded ? n.w - ends - board - z('text_after') : (n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : bare ? z('box_pad') : z('text_x') + z('text_after'))) - glyph;
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', n.shape === 'ridge' && look.ridge && 'ridged', look.board && !n.stub && 'boarded', !n.stub && i.island && lands.classOf(i.island), (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && `ph-${stateOf(i).phase}`, !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', n.shape === 'ridge' && look.ridge && 'ridged', look.board && !n.stub && `boarded bs-${boardWord(i)}`, !n.stub && i.island && lands.classOf(i.island), (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && `ph-${stateOf(i).phase}`, !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.

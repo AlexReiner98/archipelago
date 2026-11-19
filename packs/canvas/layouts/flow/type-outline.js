@@ -37,6 +37,11 @@ export function hut({ l, t, r, b, rise }) {
 /** A fingerpost board's ends (pass 8): a swallowtail (a notch cut into the right end), a round end, a flat plank, and a flat plank with a small roof over its left end. */
 export const swallow = (l, t, r, b, k) => `M${l} ${t}H${r}L${r - k} ${(t + b) / 2}L${r} ${b}H${l}Z`;
 export const roundEnd = (l, t, r, b, k) => `M${l} ${t}H${r - k}A${k} ${(b - t) / 2} 0 0 1 ${r - k} ${b}H${l}Z`;
+/** Pass 9: a board that reads forward (a notch at the left end, a point at the right), and one with its left end round (the mirror of a round right end). */
+export const forward = (l, t, r, b, k) => `M${l} ${t}H${r - k}L${r} ${(t + b) / 2}L${r - k} ${b}H${l}L${l + k} ${(t + b) / 2}Z`;
+export const roundStart = (l, t, r, b, k) => `M${l + k} ${t}H${r}V${b}H${l + k}A${k} ${(b - t) / 2} 0 0 1 ${l + k} ${t}Z`;
+/** An arrow end on the right: a flag's, and a taller board's, the aim's. */
+export const arrow = (l, t, r, b, k) => `M${l} ${t}H${r - k}L${r} ${(t + b) / 2}L${r - k} ${b}H${l}Z`;
 export const plank = (l, t, r, b) => `M${l} ${t}H${r}V${b}H${l}Z`;
 import { roofWidth } from './shapes.js';
 export { roofWidth };
@@ -44,6 +49,9 @@ export const roofed = (l, t, r, b, k) => ((rw) => `M${l} ${t + k}L${l + rw / 2} 
 
 /** The outline a shape word draws, where it is one of this module's: `k` is the cut (a chamfer's, a fold's, a summit's rise). Else null. */
 export function outlineOf(shape, l, t, r, b, k, { span, tension } = {}) {
+  if (shape === 'forward') return forward(l, t, r, b, k);
+  if (shape === 'roundstart') return roundStart(l, t, r, b, k);
+  if (shape === 'tallarrow') return arrow(l, t, r, b, k);
   if (shape === 'swallow') return swallow(l, t, r, b, k);
   if (shape === 'roundend') return roundEnd(l, t, r, b, k);
   if (shape === 'plank') return plank(l, t, r, b);

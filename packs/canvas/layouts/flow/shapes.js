@@ -34,7 +34,7 @@ function downTo(n, cx, cy, x, side) {
   if (n.shape === 'hut' && side < 0) return cy - hh + (n.bevel ?? 0) * Math.min(1, near(x, cx) / hw);
   const b = n.bevel ?? 0, over = Math.max(0, dx - (hw - b));
   if (n.shape === 'cut') return cy + side * (hh - over);
-  if (n.shape === 'hexagon' || n.shape === 'lozenge' || (n.shape === 'flag' && x > cx)) return cy + side * hh * (1 - over / b);
+  if (n.shape === 'hexagon' || n.shape === 'lozenge' || ((n.shape === 'flag' || n.shape === 'tallarrow' || n.shape === 'forward') && x > cx)) return cy + side * hh * (1 - over / b);
   // A place's tab stands over the left third of its top; the rest of its top is lower by the tab.
   if (n.shape === 'tab' && side < 0) return x < cx - hw + n.w / 3 ? cy - hh : cy - hh + b;
   return cy + side * hh;
@@ -48,12 +48,15 @@ function acrossTo(n, cx, cy, y, side) {
   const b = n.bevel ?? 0;
   if (n.shape === 'cut') return cx + side * (hw - Math.max(0, dy - (hh - b)));
   // A board's swallowtail notch and round end, on its right.
+  // A forward board's notch on the left, a round start's curve on the left.
+  if (n.shape === 'forward' && side < 0) return cx - hw + b * (1 - dy / hh);
+  if (n.shape === 'roundstart' && side < 0) return cx + side * (hw - b + b * Math.sqrt(Math.max(0, 1 - (dy / hh) ** 2)));
   if (n.shape === 'swallow' && side > 0) return cx + hw - b * (1 - dy / hh);
   if (n.shape === 'roundend' && side > 0) return cx + hw - b + b * Math.sqrt(Math.max(0, 1 - (dy / hh) ** 2));
   // A chamfer's and a fold's cut corners, on the right or on both sides, from the top down by the cut.
   if (n.shape === 'chamfer' && y < cy - hh + b) return cx + side * (hw - (b - (y - (cy - hh))));
   if (n.shape === 'fold' && side > 0 && y < cy - hh + b) return cx + hw - (b - (y - (cy - hh)));
-  if (n.shape === 'hexagon' || n.shape === 'lozenge' || (n.shape === 'flag' && side > 0)) return cx + side * (hw - (b * dy) / hh);
+  if (n.shape === 'hexagon' || n.shape === 'lozenge' || ((n.shape === 'flag' || n.shape === 'tallarrow' || n.shape === 'forward') && side > 0)) return cx + side * (hw - (b * dy) / hh);
   return cx + side * hw;
 }
 

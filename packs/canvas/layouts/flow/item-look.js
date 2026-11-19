@@ -10,7 +10,7 @@ import { bandsFor, cuts as cutsOf, GROWN, inset, listOf, runsOf, slotOf } from '
 import { seedOf } from './ridge-item.js';
 import { bandPath } from './type-outline.js';
 import { rangeMarks } from './aim-range.js';
-import { signMarks } from './waymark.js';
+import { crossPath } from './waymark.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
 const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -27,10 +27,10 @@ const cutOf = (style) => ((runs, status) => ((runs || Object.keys(status).length
 const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'];
 
 /** The ends a fingerpost board may have (./type-outline.js). */
-const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed'];
+const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow'];
 
-/** The fingerpost board a style asks for (pass 8): the wood (`board_colours`, light and dark), the waymark of each type (`type_signs`) and the status colours. */
-const boardOf = (style) => ((colours, signs) => (colours.light && colours.dark && Object.keys(signs).length ? { colours, signs, status: record(style.status_colours) } : null))(record(style.board_colours), record(style.type_signs));
+/** The fingerpost board a style asks for (pass 9): painted whole in its status colour (`board_fills`: per status, light and dark, a fill and the name's ink on it); the outline is the only type signal. */
+const boardOf = (style) => ((fills) => (Object.keys(fills).length ? { fills } : null))(record(style.board_fills));
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -97,17 +97,20 @@ export function itemRules(style) {
     rules.push('.lf-tick { fill: none; stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
   }
   if (g.board) {
-    const c = g.board.colours, ld = (k) => `light-dark(${c.light[k]}, ${c.dark[k]})`, plain = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.waiting)';
-    // The wood, its edge and the name on it; a faded board when ended; "you" keeps its colour as the outline.
-    rules.push(`.lf-step.boarded${plain} .lf-shape { fill: ${ld('board')}; stroke: ${ld('edge')}; stroke-width: var(--ln-flow-stroke); } .lf-step.boarded.you .lf-shape, .lf-step.boarded.here .lf-shape { fill: ${ld('board')}; stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke-lit); }`);
-    rules.push(`.lf-step.boarded:is(.lf-step) text { fill: ${ld('name')}; } .lf-step.boarded.ph-ended { opacity: 0.55; }`);
-    rules.push(`.lf-step .lf-sign { fill: ${ld('sign')}; stroke: ${ld('signEdge')}; stroke-width: var(--ln-rule); pointer-events: none; } .lf-step .lf-sign-mark { stroke: none; pointer-events: none; } .lf-step .lf-cross { fill: none; stroke: light-dark(${g.board.status.trouble?.light ?? '#b3312b'}, ${g.board.status.trouble?.dark ?? '#f08a84'}); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; pointer-events: none; }`);
-  }
-  if ((g.cut && Object.keys(g.cut.status).length) || g.board) {
-    const status = g.cut?.status ?? g.board.status;
-    for (const [k, v] of Object.entries(status)) if (v?.light && v?.dark) rules.push(`.lf-step .lf-cut-s-${k}, .lf-sw.lf-cut-s-${k} { fill: ${k === 'finished' ? `color-mix(in srgb, light-dark(${v.light}, ${v.dark}) var(--ln-flow-done-mix), var(--ln-land))` : `light-dark(${v.light}, ${v.dark})`}; }`);
+    const plain = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.waiting)', ld = (f, k) => `light-dark(${f.light[k]}, ${f.dark[k]})`;
+    for (const [k, f] of Object.entries(g.board.fills)) {
+      if (!f?.light || !f?.dark) continue;
+      // The whole board in its status colour, the name in the ink that reads on it; "you" keeps its colour as the outline ring.
+      rules.push(`.lf-step.boarded.bs-${k}${plain} .lf-shape { fill: ${ld(f, 'fill')}; stroke: color-mix(in srgb, ${ld(f, 'fill')} 65%, var(--ln-text)); stroke-width: var(--ln-flow-stroke); }`);
+      rules.push(`.lf-step.boarded.bs-${k}.you .lf-shape, .lf-step.boarded.bs-${k}.here .lf-shape { fill: ${ld(f, 'fill')}; stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke-lit); }`);
+      rules.push(`.lf-step.boarded.bs-${k}:is(.lf-step) text { fill: ${ld(f, 'text')}; } .lf-sw.bs-${k} .lf-shape { fill: ${ld(f, 'fill')}; stroke: color-mix(in srgb, ${ld(f, 'fill')} 65%, var(--ln-text)); stroke-width: var(--ln-rule); }`);
+    }
+    if (g.board.fills.trouble) rules.push(`.lf-step .lf-cross { fill: none; stroke: ${ld(g.board.fills.trouble, 'text')}; stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; pointer-events: none; }`);
+    // An ended board has no fill, a faded outline and a muted name; the key's types are outlines only.
+    rules.push('.lf-step.boarded.bs-ended .lf-shape { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-rule); } .lf-step.boarded.bs-ended:is(.lf-step) text { fill: var(--ln-muted); } .lf-step.boardkey .lf-shape { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }');
   }
   if (g.cut && Object.keys(g.cut.status).length) {
+    for (const [k, v] of Object.entries(g.cut.status)) if (v?.light && v?.dark) rules.push(`.lf-step .lf-cut-s-${k}, .lf-sw.lf-cut-s-${k} { fill: ${k === 'finished' ? `color-mix(in srgb, light-dark(${v.light}, ${v.dark}) var(--ln-flow-done-mix), var(--ln-land))` : `light-dark(${v.light}, ${v.dark})`}; }`);
     // An ended item has no fill and a muted name; a done one keeps its name's ink.
     rules.push('.lf-step.ph-ended .lf-shape { fill: none; } .lf-step.ph-ended text { fill: var(--ln-muted); } .lf-step.closed:not(.ph-ended):not(.dim) text { fill: var(--ln-text); }');
   }
@@ -171,9 +174,9 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
     out.rules = made.rules;
   }
   if (g.board && BOARDS.includes(n.shape)) {
-    // The waymark plate at the board's left, after a point's width: its symbol the type's, its colour the status's.
-    const word = statusOf(item, phase), size = z('sign'), x0 = l + (n.shape === 'hexagon' ? n.bevel : 0) + z('sign_margin');
-    out.over.push(...signMarks({ sign: lineageOf(item).map((x) => g.board.signs[x]).find(Boolean) ?? 'bar', word, x: x0, y: Y - size / 2 + (n.shape === 'roofed' ? n.bevel / 2 : 0), s: size, gap: z('sign_gap'), m }));
+    // No plate: the outline says the type, the fill the status. Blocked has a small cross at the board's left, never colour alone.
+    const size = z('sign');
+    if (statusOf(item, phase) === 'trouble') out.over.push(m('path', { class: 'lf-cross', d: crossPath(l + (/^(hexagon|forward|roundstart)$/.test(n.shape) ? n.bevel : 0) + z('sign_margin'), Y - size / 2, size) }));
   } else if (g.cut && CARVED.includes(n.shape)) {
     const lineage = lineageOf(item), list = listOf(g.cut, item, lineage), scale = g.cut.scale * (g.cut.grow ? GROWN[phase] ?? 1 : 1), rules = [];
     const draw = (cls, k, side = 0) => {
@@ -246,12 +249,9 @@ function swatchRunRows(cut, { m, w, h, roles }) {
   return { rows, rules: [...rules] };
 }
 
-/** The key's rows for the fingerpost boards: each type's board, its end and its plate, with its word; then the status colours as small plates. */
+/** The key's rows for the fingerpost boards: the types the island draws as outlines with no fill, then the statuses as small filled boards. */
 export function boardKeyRows(board, { types, m, outline, w, h, margin, shapes, words, statusWords }) {
-  const plate = h * 0.5, rows = Object.keys(board.signs).filter((t) => shapes[t] && types.includes(t)).map((t) => {
-    const mark = m('g', { class: 'lf-step boarded' }, outline(shapes[t], w / 2, h / 2, w - 2 * margin, h * 0.7, 0, (h * 0.7) / 3), ...signMarks({ sign: board.signs[t], word: 'under_way', x: margin + 2, y: h / 2 - plate / 2, s: plate, gap: 2, m }));
-    return { glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, mark), label: words[t] ?? t[0].toUpperCase() + t.slice(1), tip: `${words[t] ?? t}: its board and its waymark` };
-  });
-  const small = Object.keys(statusWords).filter((k) => board.status[k]).map((k) => ({ glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('g', { class: 'lf-step boarded' }, ...signMarks({ sign: 'bar', word: k, x: (w - plate) / 2, y: (h - plate) / 2, s: plate, gap: 2, m }))), label: statusWords[k], tip: `${statusWords[k]}: the colour of its waymark` }));
+  const rows = types.filter((t) => shapes[t]).map((t) => ({ glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('g', { class: 'lf-step boardkey' }, outline(shapes[t], w / 2, h / 2, w - 2 * margin, h * 0.62, 0, (h * 0.62) / 3))), label: words[t] ?? t[0].toUpperCase() + t.slice(1), tip: `${words[t] ?? t}: its outline` }));
+  const small = Object.keys(statusWords).filter((k) => board.fills[k]).map((k) => ({ glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('g', { class: `lf-step lf-sw bs-${k}` }, outline('plank', w / 2, h / 2, w - 2 * margin, h * 0.45, 0, 0))), label: statusWords[k], tip: `${statusWords[k]}: the colour of its board` }));
   return [...rows, ...small];
 }
