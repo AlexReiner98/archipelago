@@ -10,7 +10,7 @@ const need = (set, name) => {
 };
 
 /** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
-export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge'];
+export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge', 'carved'];
 /** The outlines by type an item is drawn by: the view's, under those its island's packs give (`shapes.islands`, by island id; decision e_gqmavsb7). */
 export const shapesFor = (i, shapes = {}) => ({ ...shapes.type, ...(shapes.islands?.[i.island] ?? {}) });
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
