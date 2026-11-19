@@ -22,6 +22,9 @@ export interface Signature {
   out?: Shape;
   /** For a setting: whether every member reads it (it is then kept as `member.<key>`, packs/database/kernel/schema.ts), or only an admin. */
   read?: 'member' | 'admin';
+  /** For a setting: what it is while unset (its pack's), and what it does, for the row the owner sets it by. */
+  default?: unknown;
+  about?: string;
 }
 
 /** The part of a pack's `kernel` key this reads: the names it provides and the shapes it calls names with. */
@@ -156,6 +159,7 @@ export function checkServices(pack: object, kernelOwns: Record<Family, readonly 
       if (what === 'provides' && kernelOwns[s.family].includes(s.entry)) problems.push(`${at}: the kernel answers ${s.family} "${s.entry}" itself: one name, one owner`);
       if (s.family === 'setting' && what === 'provides' && (sig.out === undefined || !['member', 'admin'].includes(sig.read ?? ''))) problems.push(`${at}: a setting says its value's shape as out, and who reads it (read: member or admin)`);
       if (s.family !== 'setting' && sig.read !== undefined) problems.push(`${at}: only a setting says who reads it`);
+      if (s.family !== 'setting' && (sig.default !== undefined || sig.about !== undefined)) problems.push(`${at}: only a setting has a default and says what it is (about)`);
     }
   }
   return problems;

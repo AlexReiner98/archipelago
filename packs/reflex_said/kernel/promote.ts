@@ -4,7 +4,7 @@
 
 import type { Record_ } from './record.ts';
 
-/** When a node moves, as the pack's settings (its memory, key thresholds): the owner may keep others. */
+/** When a node moves: the pack's settings (reflex_promote_held, reflex_retire_failed, reflex_retire_unsaid_days), each its default while unset. */
 export interface Thresholds {
   /** Runs it held in (its miss stopped, or never came back) with none failed: a trial becomes current. */
   promote_held: number;

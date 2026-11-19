@@ -67,7 +67,7 @@ export type KernelRead = {
   /** How often each of some instructions was said, and whether its miss came back after (the reflex_said pack's record). */
   said_record?: { ids: string[]; days?: number };
   /** Every miss lately, with where it happened and what covers it (the reflex_said pack's). */
-  misses?: { days?: number };
+  misses?: { days?: number; limit?: number };
   /** How many refusals in a run no node covers came since a node was last asked for there (the reflex_said pack's). */
   missed_here?: { run: string };
   /** The tree's story over a window: its nodes (instructions and rules), misses, sayings and rules' firings (the reflex_said pack's). */

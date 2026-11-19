@@ -22,7 +22,8 @@ export default {
   // What the tree's drawing asks through its sends: every miss lately, as the reflex_said pack reads them.
   'reflex_view.misses': async (input, ctx) => {
     const days = Number.isInteger(input?.days) ? input.days : undefined;
-    const found = await ctx.read({ misses: days === undefined ? {} : { days } });
+    const limit = Number.isInteger(input?.limit) ? input.limit : undefined;
+    const found = await ctx.read({ misses: { ...(days !== undefined && { days }), ...(limit !== undefined && { limit }) } });
     return { answer: Array.isArray(found) ? found : [] };
   },
 

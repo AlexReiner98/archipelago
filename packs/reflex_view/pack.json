@@ -49,13 +49,17 @@
     {
       "id": "reflex_view.misses",
       "shape": "rows",
-      "description": "Every miss lately, for the tree's drawing to ask through its sends, the newest first: { kind (refusal, bump, trap), key, run, at, where, said, covered_by } (the reflex_said pack's misses). Params: days (30 unless said, 90 at most).",
+      "description": "Every miss lately, for the tree's drawing to ask through its sends, the newest first: { kind (refusal, bump, trap), key, run, at, where, said, covered_by } (the reflex_said pack's misses). Params: days (30 unless said, 90 at most), limit (the newest so many).",
       "input": {
         "type": "object",
         "properties": {
           "days": {
             "type": "integer",
             "description": "How far back, in days."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The newest so many, 1000 at most."
           }
         }
       },

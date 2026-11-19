@@ -107,7 +107,10 @@ export async function hookSessionStart(ctx: KernelContext, input: { session_id?:
   }
   // What every session is told is kept on the map as instructions (the agents pack's): the core pack's, under the owner's;
   // on an island that tries a version of its pack, the version's (its task's island, else its repository's).
-  lines.push('', ...(await toldAt(ctx, BEGINS_AT, { about: repo?.id, island: await sessionIsland(ctx, started.run), fill: { run: started.run } })));
+  const island = await sessionIsland(ctx, started.run);
+  lines.push('', ...(await toldAt(ctx, BEGINS_AT, { about: repo?.id, island, fill: { run: started.run } })));
+  // What its tools' descriptions told it is kept as said to its run (the agents pack's TOOLS): not said here again.
+  await toldAt(ctx, 'tool:*', { about: repo?.id, island, fill: { run: started.run } }).catch((err: Error) => ctx.said?.(`tool sayings for ${started.run}: ${err.message}`));
   return lines.join('\n');
 }
 

@@ -163,6 +163,8 @@ export const ACT_TOOLS: Record<string, Tool> = {
       // A session on a task is told what its task's island says: the version of its pack the island runs (packs/loader/kernel/island-pin.ts).
       const island = input.task ? (await l.entity(input.task))?.props.island : undefined;
       const { said: told } = await callAs<{ said: { text: string }[] }>(l, 'answer.instructions', { where: BEGINS_AT, about: started.repo?.id, ...(typeof island === 'string' && { island }), fill: { run: started.run } });
+      // What its tools' descriptions told it, when its client connected, is kept as said to it now that it has a run (the agents pack's TOOLS).
+      await callAs(l, 'answer.instructions', { where: 'tool:*', about: started.repo?.id, ...(typeof island === 'string' && { island }), fill: { run: started.run } }).catch((err: Error) => console.error(`tool sayings for ${started.run}: ${err.message}`));
       // And where it stands: what the sessions before it here worked on that needs attention now (the runs pack's answer.frontier).
       const here = await callAs(l, 'answer.frontier', { run: started.run, cwd: input.cwd, remote: input.remote });
       return { ...started, link: itemLink(l.workspace), frontier: here, ...(told.length && { instructions: told.map((one) => one.text) }) };
