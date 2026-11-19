@@ -38,11 +38,31 @@ export const systemKinds = (): readonly string[] => model.kinds;
 export const readSeed = (dirs: string[], local: string): Seed => readPackFolders<Manifest>(dirs, local);
 
 /**
+ * Which rules are on the floor (lane 4, packs/rules/kernel/floor.ts: onFloor): each is loaded from code always, and a
+ * map's version of it, which the judge let through only as a tightening, stands in its place. Until the floor is set,
+ * every rule a floor pack's file declares is on it, so no rule of the kernel's leaves with an item.
+ */
+export type Floor = { packs: readonly string[]; on: (pack: string, rule: string) => boolean };
+const FLOOR_STUB: Floor = { packs: ['core'], on: () => true };
+let floor: Floor = FLOOR_STUB;
+/** The floor in force; set once as the server starts, or by a test (undefined puts the stub back). */
+export const setFloor = (f: Floor | undefined) => (floor = f ?? FLOOR_STUB);
+
+/** A pack's manifest from the map, with each floor rule its file declares and the map's lacks put back from code. */
+function withFloor(id: string, fromMap: Manifest, file: Manifest | undefined): Manifest {
+  if (!file || !floor.packs.includes(id)) return fromMap;
+  const has = new Set((fromMap.rules ?? []).map((r) => r.id));
+  const back = (file.rules ?? []).filter((r) => r.id && !has.has(r.id) && floor.on(id, r.id));
+  return back.length ? { ...fromMap, rules: [...back, ...(fromMap.rules ?? [])] } : fromMap;
+}
+
+/**
  * The packs a registry loads, as copies it may change: the seed, with each pack the map keeps as items in its file's
- * place. A pack the map holds is the map's, whatever its file now says; one it does not hold yet is still the file.
+ * place. A pack the map holds is the map's, whatever its file now says, its floor rules kept; one it does not hold yet
+ * is still the file.
  */
 export function packsOf(seed: Seed, items: SystemItem[]): Seed {
   const found = new Map(seed.found), hashes = new Map(seed.hashes), where = new Map(seed.where);
-  for (const [id, { manifest, hash }] of model.manifests(items)) found.set(id, manifest), hashes.set(id, hash);
+  for (const [id, { manifest, hash }] of model.manifests(items)) found.set(id, withFloor(id, manifest, seed.found.get(id))), hashes.set(id, hash);
   return { found, hashes, where };
 }

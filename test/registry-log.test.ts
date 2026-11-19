@@ -10,7 +10,7 @@ import { fresh, freshWith, make, PACKS, packsWith, WORDS } from './map.ts';
 import { Archipelago } from '../packs/write/kernel/pelago.ts';
 import { Registry } from '../packs/loader/kernel/packs.ts';
 import { builtAt, factsHead, followRegistry } from '../packs/loader/kernel/registry-log.ts';
-import { setPackModel, systemKinds } from '../packs/loader/kernel/pack-source.ts';
+import { setFloor, setPackModel, systemKinds } from '../packs/loader/kernel/pack-source.ts';
 
 /** Count the registry's builds from items. */
 const counted = (l: Archipelago) => {
@@ -80,4 +80,19 @@ test('the pack model\'s manifests stand in for their files', async (t) => {
   const reg = new Registry([PACKS, WORDS]);
   assert.equal(reg.hashes.get('core'), 'from-the-map');
   assert.ok(reg.type('task')!.fields.effort, 'the map\'s manifest, not the file');
+});
+
+test('a floor rule the map\'s manifest leaves out is loaded from code all the same', async (t) => {
+  t.after(() => (setPackModel(undefined), setFloor(undefined)));
+  const file = JSON.parse(readFileSync(join(PACKS, 'core', 'pack.json'), 'utf8'));
+  const ids = (file.rules as { id?: string }[]).map((r) => r.id).filter(Boolean) as string[];
+  assert.ok(ids.includes('agent_changes') && ids.includes('forget'));
+  const stripped = { ...file, rules: file.rules.filter((r: { id?: string }) => r.id !== 'agent_changes' && r.id !== 'forget') };
+  setPackModel({ kinds: systemKinds(), manifests: () => new Map([['core', { manifest: stripped, hash: 'from-the-map' }]]) });
+  const held = (reg: Registry) => reg.rules.filter((r) => r.pack === 'core').map((r) => r.id);
+  const reg = new Registry([PACKS, WORDS]);
+  assert.ok(held(reg).includes('agent_changes') && held(reg).includes('forget'), 'every core rule is on the floor until the floor is set');
+  setFloor({ packs: ['core'], on: (_pack, id) => id === 'forget' });
+  reg.rebuild();
+  assert.deepEqual([held(reg).includes('forget'), held(reg).includes('agent_changes')], [true, false], 'only what the floor names comes back');
 });
