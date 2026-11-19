@@ -43,7 +43,9 @@ test('a ring of part_of is cut where it closes, a node said somewhere hangs from
 });
 
 test('it is placed the same each time, each child within its parent’s share of the circle', () => {
-  const a = radial(treeOf(answer())!, z, n), b = radial(treeOf(answer())!, z, n);
+  const measure = (text: string, px: number) => text.length * px * 0.55;
+  const a = radial(treeOf(answer())!, z, n, measure), b = radial(treeOf(answer())!, z, n, measure);
+  assert.ok(a.names.size > 0, 'the first levels are named where there is room');
   assert.deepEqual([...a.place], [...b.place]);
   assert.ok(a.width > 0 && a.height > 0);
   for (const p of a.place.values()) assert.ok(p.x >= 0 && p.y >= 0 && p.x <= a.width && p.y <= a.height);
