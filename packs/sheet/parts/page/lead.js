@@ -70,8 +70,8 @@ function choices(c, item, { writes, asking }, room) {
     if (r >= room) shown[room - 1] = r;
   }
   const hidden = c.list.map((_, i) => i).filter((i) => !shown.includes(i));
-  const what = (i) => tip(c.says[i] ? `${c.list[i]}: ${c.says[i]}` : c.list[i]);
-  const name = (i) => (writes ? ['button', { key: `choice:${i}`, look: 'quiet', tip: what(i) }, c.list[i]] : ['text', { bold: true, tip: what(i) }, c.list[i]]);
+  // Its meaning is said whole under it, so a choice's tip says only what a press does.
+  const name = (i) => (writes ? ['button', { key: `choice:${i}`, look: 'quiet', tip: tip(`Choose ${c.list[i]}`) }, c.list[i]] : ['text', { bold: true }, c.list[i]]);
   const more = hidden.length > 0 && (writes
     ? ['menu', { key: 'choices-more', label: `+${hidden.length}`, look: 'quiet' }, ...hidden.map(name)]
     : ['text', { look: 'muted', tip: tip(hidden.map((i) => c.list[i]).join(' · ')) }, `+${hidden.length}`]);

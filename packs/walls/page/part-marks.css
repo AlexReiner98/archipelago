@@ -220,6 +220,18 @@ body[data-dragging] { user-select: none; cursor: grabbing; }
 /* A decision's option: its name on the band's rhythm, and under it what it means in full, wrapping to the lines it
    needs (the owner, 19 Nov 2026): the one words on the band that are read whole. */
 .pm-box[data-key="lead"] > .pm-box[data-key^="choice-option:"] { align-items: stretch; }
+/* An option that can be chosen reads as one: a ring before its name, filled in the accent while the pointer is
+   anywhere on the option, its name and meaning lit with it (the owner, 19 Nov 2026: make choosing one obvious). */
+.pm-box[data-key="lead"] .pm-button[data-key^="choice:"]::before { content: "○"; margin-right: var(--space-4); color: var(--muted); }
+/* No capsule round it under the pointer (no pills): the ring and the accent say it. */
+.pm-box[data-key="lead"] .pm-button[data-key^="choice:"]:is(:hover, :focus) { border-color: transparent; background: none; }
+.pm-box[data-key^="choice-option:"]:has(.pm-button[data-key^="choice:"]) { cursor: pointer; position: relative; }
+/* The whole option is its press: the name's button reaches over its meaning too. */
+.pm-box[data-key="lead"] .pm-button[data-key^="choice:"]::after { content: ""; position: absolute; inset: 0; }
+.pm-box[data-key^="choice-option:"]:has(.pm-button[data-key^="choice:"]):hover .pm-button[data-key^="choice:"] { color: var(--accent); }
+.pm-box[data-key^="choice-option:"]:has(.pm-button[data-key^="choice:"]):hover .pm-button[data-key^="choice:"]::before { content: "●"; color: var(--accent); }
+.pm-box[data-key^="choice-option:"]:has(.pm-button[data-key^="choice:"]) > .pm-box[data-key^="choice-means:"] { padding-left: var(--space-11); }
+.pm-box[data-key^="choice-option:"]:has(.pm-button[data-key^="choice:"]):hover > .pm-box[data-key^="choice-means:"] > .pm-text { color: var(--text); }
 .pm-box[data-key^="choice-means:"] > .pm-text { white-space: normal; overflow-wrap: anywhere; }
 /* A band that is a picture of what it draws (packs/sheet/page/screens.js, leadPicture): small, as high as the style's lead_picture. */
 .lead-picture { border-bottom: var(--border-1) solid var(--line); padding-bottom: var(--space-5); }

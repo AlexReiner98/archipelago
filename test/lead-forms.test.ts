@@ -125,7 +125,7 @@ test("an open decision: one per option, what it means in full under its name, th
   assert.equal(lines(two).length, 2, 'one line each, not two');
   assert.match(said(lines(two)[0] as Marks), /★/);
   assert.doesNotMatch(said(lines(two)[1] as Marks), /★/);
-  assert.match(said(two), /"tip":"No bar: Only part_of counts."/);
+  assert.match(said(two), /"key":"choice:1","look":"quiet","tip":"Choose No bar"/, "a press says what it does");
   // What each means is read on its own line, after its name, muted and cut where it does not fit (the owner, 18 Nov 2026).
   assert.match(said(lines(two)[1] as Marks), /"look":"muted"[^\]]*"Only part_of counts."/, 'what it means, whole, under its name');
   assert.doesNotMatch(said(lines(two)[1] as Marks), /"tip":"Only part_of/, "said whole, not cut to a tip");
