@@ -1,0 +1,29 @@
+{
+  "id": "reflex_view",
+  "version": "0.1.0",
+  "title": "Reflex record, drawn",
+  "description": "What an instruction's record looks like (a reflex among them): on its page, how often it was said lately and, run by run, whether the miss it answers came back after it was said there. Reads the record the reflex_said pack keeps; owns no type, so it is a map pack beside reflex, which keeps the words.",
+  "requires": ["type:instruction"],
+  "views": [
+    {
+      "id": "reflex_view.said",
+      "shape": "rows",
+      "description": "An instruction's record as rows: the first its counts lately (said, to how many runs, came back, held, quiet, when last), then each run it was said to, the newest first, with what became of its miss there.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "about": { "type": "string", "description": "The instruction whose record is drawn." }
+        },
+        "required": ["about"]
+      },
+      "limit_ms": 5000
+    },
+    {
+      "form": "screen",
+      "id": "reflex_view.here",
+      "title": "Said",
+      "on": ["instruction"],
+      "pieces": [{ "piece": "view", "view": "reflex_view.said", "item": "about" }]
+    }
+  ]
+}
