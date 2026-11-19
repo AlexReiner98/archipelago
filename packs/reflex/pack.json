@@ -32,11 +32,11 @@
         ],
         "type": "reflex",
         "matches": {
-          "for": "^(?!(session_start|working_rules|server_restarted|setup_behind|connect)$|(tool|guide|file|rule|session_start|prompt|show|connect):.+$)"
+          "for": "^(?!(session_start|working_rules|server_restarted|setup_behind|connect)$|(tool|guide|file|rule|session_start|prompt|show|connect|written):.+$)"
         }
       },
       "then": "refuse",
-      "say": "A reflex is said only at a place that is said: for is a list of session_start, working_rules, server_restarted, setup_behind, connect, tool:<name>, guide:<name>, file:<glob>, rule:<pack.rule>, session_start:<part>, prompt:<part>, show:<part> or connect:<part>."
+      "say": "A reflex is said only at a place that is said: for is a list of session_start, working_rules, server_restarted, setup_behind, connect, tool:<name>, guide:<name>, file:<glob>, rule:<pack.rule>, session_start:<part>, prompt:<part>, show:<part>, connect:<part> or written:<path>."
     }
   ]
 }
