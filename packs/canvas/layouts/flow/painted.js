@@ -1,19 +1,21 @@
 // Islands whose look paints (decision e_rxj936fk, the owner, 17 Nov 2026: a live canvas per island; Field the first): the
 // map asks for one surface over its picture (docs/layouts.md, surface) and each such island's look runs as a layout's
-// code runs, `default({ canvas, answer, style, theme, size, view, on, open, hand, cursor })`, on a canvas of its own the
-// size of the surface, with that island's items and links alone, and the map's camera on its island's frame (`view`).
-// Each frame the part of each canvas inside its island's frame is laid into the surface, and the surface is shown: the
-// raster carries the look's paint alone. A look runs to rest and then hands each item's place, once, and again only when
+// code runs, `default({ canvas, answer, style, theme, size, view, on, open, hand, cursor })`, on a canvas of its own,
+// with that island's items and links alone. The canvas is a tile of the map's own world (./painted-tiles.js): its
+// island's frame, in the picture's units, painted at a density near the screen's, and the page lays it under the marks
+// with the plane's camera, so paint and marks are one scene that pans and zooms as one (task e_cr98zz2g). The raster
+// carries the look's paint alone. A look runs to rest and then hands each item's place, once, and again only when
 // its answer changes (`hand`, decision e_jfctpqza): the map then ends each wire from another island there and draws the
 // session rings, ghosts, held badges and each item's click target as its own marks (./painted-wires.js), while the look
 // draws everything else on its island, its own lines and hover included (decision e_a6kbgg8c, revised), and its paint
 // goes on moving round still items. The map keeps the frame and the header. Nothing here reaches past the drawing's worker. The pointer over its
-// island's land is handed to the look, in its screen pixels (a move as pointermove, a click as a press and a lift there,
+// island's land is handed to the look, in its canvas's pixels (a move as pointermove, a click as a press and a lift there,
 // leaving as pointerleave), and so is the map's hover on an item it placed, as a move to where it stands; the cursor it
 // asks for is the land's. A look's own frames are stopped when its picture ends: each look's animation frames carry the
 // run that asked for them, and a run that ended is not called again. Layer: marks.
 
 import { handedOf, wirePatches } from './painted-wires.js';
+import { camOf, sizeOf, tileFor } from './painted-tiles.js';
 import { m as mark } from './marks.js';
 
 export { shoreOnly } from './painted-wires.js';
@@ -123,39 +125,48 @@ function themeOf(colours, land) {
   return { sea, text: c.text, muted: c.muted, line: c.line || c.muted, accent: c.accent, dark: lightness(c.text) > lightness(sea) };
 }
 
-/** The animation frames of the worker, each carrying the run that asked for it: a run that ended asks no more. */
+/**
+ * The animation frames of the worker, each carrying the run that asked for it: a run that ended asks no more, one out
+ * of sight is held until it is in sight again, and each frame of a run notes the tile it is painting for (`painted`),
+ * which is what its canvas holds once the frame is done.
+ */
 function framesByRun() {
   const KEY = Symbol.for('pelago.island-frames');
   if (globalThis[KEY]) return globalThis[KEY];
   const raw = globalThis.requestAnimationFrame ? globalThis.requestAnimationFrame.bind(globalThis) : (f) => setTimeout(() => f(performance.now()));
   let running = null;
+  const call = (run, f, t) => {
+    if (run?.ended) return;
+    if (run?.away) return void run.held.push(f);
+    const was = running;
+    running = run;
+    if (run) (run.painted = run.tile), (run.ran = true);
+    try { f(t); } finally { running = was; }
+  };
   globalThis.requestAnimationFrame = (f) => {
     const run = running;
-    return raw((t) => {
-      if (run?.ended) return;
-      const was = running;
-      running = run;
-      try { f(t); } finally { running = was; }
-    });
+    return raw((t) => call(run, f, t));
   };
-  return (globalThis[KEY] = { as: (run, fn) => { const was = running; running = run; try { return fn(); } finally { running = was; } } });
+  /** A run back in sight has the frames it asked for while away. */
+  const back = (run) => run.held.splice(0).forEach((f) => raw((t) => call(run, f, t)));
+  return (globalThis[KEY] = { as: (run, fn) => { const was = running; running = run; try { return fn(); } finally { running = was; } }, back });
 }
 
 /**
  * Start painting `islands` ({ id, at: [x, y], size: [w, h], look, answer, hue?, tint? }: where each stands in the
  * picture, its look's module with its `settings`, what it holds, and its colour and its land's tint, the ground its frame
- * is painted in) into the surface. There is one camera, the map's: each look paints at
- * the screen's own pixels, on a canvas the surface's size, and is handed `view()`, its island's frame ({ width, height },
- * in the picture's units) and where that frame lands on screen ({ k, tx, ty }: a unit of it is k pixels, its corner at
- * tx, ty), heard as 'view' each time the map pans or zooms. A look fits its picture to the frame, not to its canvas, and
- * so follows the map as one with it: no canvas is remade as one zooms, and words are written at their own size. Each
- * frame the part of each canvas inside its island's frame is laid into the surface. What a look hands (`hand`, in its
- * frame's units) is checked and given to `placed(id, handed)`, whose patches are sent to the page. Answers { view, end,
- * pointer, item }: the first view comes once the page has mounted the scene, which is what makes the surface; asked
- * sooner, the page has none to give, and says so for good.
+ * is painted in) into the surface. There is one world and one camera, the map's: each look paints its island on a tile
+ * of the picture (./painted-tiles.js), a canvas of its own, and is handed `view()`, its island's frame ({ width, height },
+ * in the picture's units) and where that frame lands on its canvas ({ k, tx, ty }: a unit of it is k pixels, its corner
+ * at tx, ty), heard as 'view' and 'resize' when the tile changes: on a zoom far enough to need another density, never
+ * on a pan. Each frame the tiles whose look painted are sent, each with the place it was painted for, and the page lays
+ * them under the marks with its own camera, so paint and marks move as one. A look out of sight is held still. What a
+ * look hands (`hand`, in its frame's units) is checked and given to `placed(id, handed)`, whose patches are sent to the
+ * page. `room` is how big a tile may be ({ most, side, margin }: the style's plane_tile_*). Answers { view, end, pointer, item }: the first view comes once the page has mounted the scene, which is what
+ * makes the surface; asked sooner, the page has none to give, and says so for good.
  */
-export function paintIslands({ islands, tools, placed }) {
-  let over = false, view = null, begun;
+export function paintIslands({ islands, tools, placed, room }) {
+  let over = false, view = null, begun, dpr = 1;
   const runs = [];
   const frames = framesByRun();
   const mounted = new Promise((resolve) => (begun = resolve));
@@ -164,41 +175,51 @@ export function paintIslands({ islands, tools, placed }) {
     const [head, ...rest] = String(text ?? '').split('\n');
     tools.patch?.([{ tip: text == null || !r.hot ? null : { key: `s:${r.hot}`, mark: mark('div', { class: 'lf-tip' }, mark('b', {}, head), ...rest.map((t) => mark('span', {}, t))) } }]);
   };
+  /** Each island's tile for the view now: a look whose tile changed is told, one out of sight held, one back in sight let go. */
+  const place = () => {
+    for (const r of runs) {
+      if (r.ended) continue;
+      const tile = tileFor(r.isle, view, dpr, r.tile, room);
+      if (!tile) {
+        r.away = true;
+        continue;
+      }
+      if (r.away) (r.away = false), frames.back(r);
+      if (tile === r.tile && r.dpr === dpr) continue;
+      const [wide, tall, was] = [r.size.width, r.size.height, r.size.dpr];
+      r.tile = tile;
+      r.dpr = dpr;
+      Object.assign(r.cam, camOf(r.isle, tile));
+      Object.assign(r.size, sizeOf(tile, dpr));
+      frames.as(r, () => {
+        if (r.size.width !== wide || r.size.height !== tall || r.size.dpr !== was) r.heard.get('resize')?.();
+        r.heard.get('view')?.();
+      });
+    }
+  };
   (async () => {
     await mounted;
     const surface = over ? null : await tools.surface?.();
     if (!surface || over) return;
-    const ctx = surface.canvas.getContext('2d');
-    const size = { width: 1, height: 1, dpr: 1 };
-    for (const isle of islands) runs.push({ id: isle.id, ended: false, canvas: new OffscreenCanvas(1, 1), w: isle.size[0], h: isle.size[1], at: isle.at, cam: { width: isle.size[0], height: isle.size[1], k: 1, tx: 0, ty: 0 }, heard: new Map(), hot: null, own: new Set((isle.answer.items ?? []).map((i) => i.id)), places: new Map() });
-    /** Where each island's frame lands on screen now, in the surface's own pixels (not the device's); 'view' told where it moved. */
-    const place = () => {
-      const k = size.width / Math.max(1, view.width);
-      for (const r of runs) {
-        const tx = (r.at[0] - view.x) * k, ty = (r.at[1] - view.y) * k;
-        if (r.cam.k === k && r.cam.tx === tx && r.cam.ty === ty) continue;
-        Object.assign(r.cam, { k, tx, ty });
-        if (!r.ended) frames.as(r, () => r.heard.get('view')?.());
-      }
-    };
-    const fit = () => {
-      Object.assign(size, { width: surface.size.width, height: surface.size.height, dpr: surface.size.dpr || 1 });
-      surface.canvas.width = Math.max(1, Math.round(size.width * size.dpr));
-      surface.canvas.height = Math.max(1, Math.round(size.height * size.dpr));
-      place();
-      for (const r of runs) if (!r.ended) frames.as(r, () => r.heard.get('resize')?.());
-    };
-    fit();
-    runs.forEach((r, k) => {
-      const isle = islands[k];
+    dpr = surface.size?.dpr || 1;
+    const lens = surface.colours?.lens ?? {};
+    for (const isle of islands) {
       // One ground: the look's frame painted in its island's land, under its paint, and that land its theme's sea. An
       // island with no colour of its own is tinted with the line's, as its frame's land is (./islands.js, .lf-island).
-      const lens = surface.colours?.lens ?? {};
-      r.land = landOf(isle.hue || lens.line || lens.muted, isle.tint, groundOf(lens.sea, lens.text, isle.ground));
-      const theme = themeOf(surface.colours, r.land);
+      const land = landOf(isle.hue || lens.line || lens.muted, isle.tint, groundOf(lens.sea, lens.text, isle.ground));
+      runs.push({
+        id: isle.id, isle, at: isle.at, land, ended: false, away: false, held: [], grounded: false, tile: null, painted: null, ran: true, dpr,
+        canvas: new OffscreenCanvas(1, 1), out: new OffscreenCanvas(1, 1), size: { width: 1, height: 1, dpr },
+        cam: { width: isle.size[0], height: isle.size[1], k: 1, tx: 0, ty: 0 }, heard: new Map(), hot: null, own: new Set((isle.answer.items ?? []).map((i) => i.id)), places: new Map(),
+      });
+    }
+    place();
+    runs.forEach((r, k) => {
+      const isle = islands[k];
+      r.painted = r.tile;
       try {
         frames.as(r, () => isle.look.default({
-          canvas: r.canvas, answer: isle.answer, style: isle.look.settings ?? {}, theme, size, hot: null, view: () => r.cam,
+          canvas: r.canvas, answer: isle.answer, style: isle.look.settings ?? {}, theme: themeOf(surface.colours, r.land), size: r.size, hot: null, view: () => r.cam,
           on: (name, fn) => r.heard.set(name, fn), open: (id) => (tools.patch?.([{ tip: null }]), tools.open?.(id)), tip: (text) => tipOn(r, text), cursor: (name) => tools.patch?.([{ key: `paint:${r.id}`, toggle: { pointing: name === 'pointer' } }]),
           // Its items' places, once it has settled: the map's tip, hover and lines are drawn there.
           hand: (said) => {
@@ -210,23 +231,35 @@ export function paintIslands({ islands, tools, placed }) {
         r.ended = true;
       }
     });
-    surface.resized?.((now) => ((surface.size = now), fit()));
-    // Each frame of the page: the part of every island's canvas inside its frame, laid where it stands, and the surface shown.
+    surface.resized?.((now) => ((dpr = now?.dpr || dpr), place()));
+    // Each frame of the page: every island in sight whose look painted, its tile laid on its land, sent with the place
+    // it was painted for. Under them, once, each island's land across its whole frame, a pixel stretched, so a tile that
+    // holds only what is in view never leaves the sea showing in the frame.
     while (!over) {
       await tools.frame();
       if (over) break;
-      place();
-      ctx.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
+      const tiles = [];
       for (const r of runs) {
-        // Its ground is laid whatever its look does (one that ended, or has not yet sized its canvas): the frame is cut
-        // out of the island's land, so without it the sea would show there, a shade off the land round the header.
-        const d = size.dpr, x0 = Math.max(0, Math.floor(r.cam.tx * d)), y0 = Math.max(0, Math.floor(r.cam.ty * d));
-        const x1 = Math.min(surface.canvas.width, Math.ceil((r.cam.tx + r.w * r.cam.k) * d)), y1 = Math.min(surface.canvas.height, Math.ceil((r.cam.ty + r.h * r.cam.k) * d));
-        if (x1 > x0 && y1 > y0 && r.land) (ctx.fillStyle = r.land), ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-        const [cx, cy] = [Math.min(x1, r.canvas.width), Math.min(y1, r.canvas.height)];
-        if (!r.ended && r.canvas.width > 1 && cx > x0 && cy > y0) ctx.drawImage(r.canvas, x0, y0, cx - x0, cy - y0, x0, y0, cx - x0, cy - y0);
+        if (!r.grounded) {
+          r.grounded = true;
+          const ground = new OffscreenCanvas(1, 1), g = ground.getContext('2d');
+          g.fillStyle = r.land;
+          g.fillRect(0, 0, 1, 1);
+          tiles.push({ key: `ground:${r.id}`, canvas: ground, rect: { x: r.at[0], y: r.at[1], width: r.isle.size[0], height: r.isle.size[1] } });
+        }
+        if (r.away || !r.ran || !r.painted) continue;
+        const t = r.painted, w = Math.max(1, Math.round(t.rect.width * t.k * r.dpr)), h = Math.max(1, Math.round(t.rect.height * t.k * r.dpr));
+        // A canvas not yet sized for the tile it was painting for holds nothing of it: sent once it is.
+        if (!r.ended && (r.canvas.width !== w || r.canvas.height !== h)) continue;
+        r.ran = false;
+        if (r.out.width !== w || r.out.height !== h) (r.out.width = w), (r.out.height = h);
+        const ctx = r.out.getContext('2d');
+        ctx.fillStyle = r.land;
+        ctx.fillRect(0, 0, w, h);
+        if (!r.ended) ctx.drawImage(r.canvas, 0, 0);
+        tiles.push({ key: `isle:${r.id}`, canvas: r.out, rect: t.rect });
       }
-      surface.show();
+      if (tiles.length) surface.show(tiles);
     }
   })();
   /** The pointer over island `id`'s land: `name` move, leave or click, `at` where, in the picture's units. Answers no patch: the look's cursor comes as it says it. */
@@ -246,5 +279,5 @@ export function paintIslands({ islands, tools, placed }) {
     if (r) r.hot = on ? id : null;
     return r ? pointer(r.id, on ? 'move' : 'leave', r.places.get(id)) : [];
   };
-  return { view: (v) => ((view = v), begun()), end: () => ((over = true), begun(), runs.forEach((r) => (r.ended = true))), pointer, item, painted: (id) => runs.some((r) => r.own.has(id)) };
+  return { view: (v) => ((view = v), place(), begun()), end: () => ((over = true), begun(), runs.forEach((r) => (r.ended = true))), pointer, item, painted: (id) => runs.some((r) => r.own.has(id)) };
 }

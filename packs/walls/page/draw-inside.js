@@ -156,10 +156,20 @@ function inside(home, given) {
         // A service worker may not import: a drawing that paints with three.js is drawn by a dedicated worker.
         three: () => (given ? Promise.reject(new Error("three.js is not offered in a service worker")) : import(`${home}/three.js`)),
         resized: (fn) => sized.push(fn),
-        show: () => {
-          const image = canvas.transferToImageBitmap();
-          // With the view the drawing was last told, which it painted at: the page moves the frame from there to where its camera is now.
-          if (!ended) port.postMessage({ type: 'surface-frame', image, at: paintedAt }, [image]);
+        // With nothing given, what is painted on its canvas, with the view the drawing was last told, laid over that view.
+        // Given tiles ([{ key, canvas | image, rect }]), each as an image laid at its place in the picture's units: the
+        // page's camera moves them with the marks, and the drawing is never asked where the camera stands.
+        show: (tiles) => {
+          if (ended) return;
+          if (!Array.isArray(tiles)) {
+            const image = canvas.transferToImageBitmap();
+            return void port.postMessage({ type: 'surface-frame', image, at: paintedAt }, [image]);
+          }
+          const sent = tiles.flatMap((t) => {
+            const image = t?.image instanceof ImageBitmap ? t.image : t?.canvas?.transferToImageBitmap?.();
+            return image ? [{ key: String(t.key ?? ''), image, rect: { ...t.rect } }] : [];
+          });
+          if (sent.length) port.postMessage({ type: 'surface-frame', tiles: sent }, sent.map((t) => t.image));
         },
       };
     };

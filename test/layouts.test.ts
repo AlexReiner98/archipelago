@@ -107,14 +107,14 @@ test('in a browser, a drawing that asks for a surface paints pixels under its pi
         for (let n = 0; n < 400 && !done(host); n++) await new Promise((r) => setTimeout(r, 25));
         return host;
       };
-      const a = await draw('painter', ${JSON.stringify(painter)}, (h) => h.querySelector('canvas.lf-surface')?.className.includes('got-'));
+      const a = await draw('painter', ${JSON.stringify(painter)}, (h) => h.querySelector('.lf-surface')?.className.includes('got-') && h.querySelector('.lf-surface > canvas'));
       const b = await draw('plain', ${JSON.stringify(plain)}, (h) => h.querySelector('svg')?.getAttribute('class')?.includes('none-'));
-      const c = a.querySelector('canvas.lf-surface'), seen = document.createElement('canvas');
+      const layer = a.querySelector('.lf-surface'), c = layer.querySelector('canvas'), seen = document.createElement('canvas');
       seen.width = seen.height = 4;
       seen.getContext('2d').drawImage(c, 0, 0, 4, 4);
       c.scrollIntoView({ block: 'center' });
-      const still = c.style.transform, box = c.getBoundingClientRect();
-      window.painted = { a, c, b, seen, still, at: { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) } };
+      const box = c.getBoundingClientRect(), still = box.width;
+      window.painted = { a, c, layer, b, seen, still, at: { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) } };
       return window.painted.at;
     })()`);
     // A frame shown at rest is on screen at once, with no move to bring it (as a look takes the page).
@@ -125,18 +125,17 @@ test('in a browser, a drawing that asks for a surface paints pixels under its pi
       img.src = 'data:image/png;base64,${shot}';
     })`);
     const got: any = await page.evaluate(`(async () => {
-      const { a, c, b, seen, still } = window.painted;
-      // The page's camera moves the paint at once, from where it was painted, before the drawing paints again.
+      const { a, c, layer, b, seen, still } = window.painted;
+      // The page's camera moves the paint with the marks, in the frame it moves them, before the drawing paints again.
       a.moves.zoomBy(2);
-      for (let n = 0; n < 2; n++) await new Promise((r) => requestAnimationFrame(r));
-      const under = getComputedStyle(c).zIndex + ' ' + getComputedStyle(c.parentElement).isolation;
-      return { still, moved: c.style.transform, under, cls: c?.className, inside: a.contains(c), pixel: [...seen.getContext('2d').getImageData(1, 1, 1, 1).data], said: a.textContent, plain: b.querySelector('svg')?.getAttribute('class'), surfaces: b.querySelectorAll('canvas').length };
+      await new Promise((r) => requestAnimationFrame(r));
+      const under = getComputedStyle(layer).zIndex + ' ' + getComputedStyle(layer.parentElement).isolation;
+      return { still, moved: c.getBoundingClientRect().width, under, cls: layer?.className, inside: a.contains(layer), pixel: [...seen.getContext('2d').getImageData(1, 1, 1, 1).data], said: a.textContent, plain: b.querySelector('svg')?.getAttribute('class'), surfaces: b.querySelectorAll('canvas').length };
     })()`);
     assert.doesNotMatch(got.said, /This drawing stopped/, 'the painter was not stopped');
     for (const cls of ['got-OffscreenCanvas', 'doc-undefined', 'three-function', 'sized-true']) assert.ok(got.cls.includes(cls), `${cls} in ${got.cls}`);
     assert.ok(got.inside, 'the surface is inside the picture');
-    assert.equal(got.still, '', 'painted where the camera stands, it is not moved');
-    assert.match(got.moved, /scale\(2\)/, `zoomed in twice, the paint is drawn twice as large at once: ${got.moved}`);
+    assert.ok(Math.abs(got.moved - 2 * got.still) < 0.5, `zoomed in twice, the paint is drawn twice as large at once: ${got.still} → ${got.moved}`);
     assert.match(got.under, /^-1 isolate/, `the surface lies under the marks: ${got.under}`);
     assert.deepEqual(got.pixel, [255, 0, 0, 255], 'what it painted is shown');
     assert.deepEqual(onScreen, [255, 0, 0, 255], 'what it painted at rest is on screen, unmoved');

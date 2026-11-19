@@ -384,8 +384,11 @@ export interface Surface {
   colours: { page?: Record<string, string>; lens?: Record<string, string>; [k: string]: unknown };
   three(): Promise<any>;
   resized(fn: (size: { width: number; height: number }) => void): void;
-  /** Sends what is painted to the page. */
-  show(): void;
+  /**
+   * Sends what is painted to the page: with nothing given, the canvas, laid over the view the drawing was last told;
+   * given tiles, each laid at its place in the picture's units, moved by the page's camera with the marks.
+   */
+  show(tiles?: { key: string; canvas?: OffscreenCanvas; image?: ImageBitmap; rect: { x: number; y: number; width: number; height: number } }[]): void;
 }
 
 /** What `picture()` is handed beside its input. */
