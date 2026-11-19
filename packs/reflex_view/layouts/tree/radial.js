@@ -26,7 +26,33 @@ export const cut = (text, most) => (text.length <= most ? text : `${text.slice(0
  * centre (`centre`), so the frame that fits the picture centres the tree. `aspect` is the frame's width over its height:
  * the spread wider than tall follows it by reflex_aspect_follow (0 keeps reflex_spread_x as it is).
  */
-export function radial(tree, z, n, measure, aspect = 1) {
+export function radial(tree, z, n, measure, aspect = 1, room = null) {
+  // Given the room it is shown in (in the picture's units), the rings close up until the grown tree, its names with
+  // it, fits there; never below reflex_ring_least, never past reflex_ring. Names are a fixed length, so it takes a few
+  // tries to close in.
+  const least = z('reflex_ring_least');
+  let ring = z('reflex_ring'), laid = layOut(tree, z, n, measure, aspect, ring);
+  const fits = (l) => !room || (l.width <= room.width && l.height <= room.height);
+  // Its size grows about in line with its rings: each try solves for the ring that fits from the last two.
+  let before = null;
+  for (let k = 0; !fits(laid) && ring > least && k < n('reflex_fit_tries'); k++) {
+    const by = Math.min(room.width / laid.width, room.height / laid.height);
+    let next = ring * by;
+    if (before && before.ring !== ring) {
+      const solve = (size, target) => {
+        const slope = (size(laid) - size(before.laid)) / (ring - before.ring);
+        return slope > 0 ? ring + (target - size(laid)) / slope : next;
+      };
+      next = Math.min(solve((l) => l.width, room.width), solve((l) => l.height, room.height)) * n('reflex_fit_inside');
+    }
+    before = { ring, laid };
+    ring = Math.max(least, Math.min(ring * n('reflex_fit_inside'), next));
+    laid = layOut(tree, z, n, measure, aspect, ring);
+  }
+  return laid;
+}
+
+function layOut(tree, z, n, measure, aspect, ring) {
   const sx = n('reflex_spread_x') * Math.pow(Math.max(0.1, aspect), n('reflex_aspect_follow'));
   const leaves = new Map();
   const count = (node) => {
@@ -36,7 +62,6 @@ export function radial(tree, z, n, measure, aspect = 1) {
   };
   count(tree.root);
   // Each subtree its share of the circle by its leaves, each node in the middle of its share, a ring out a level.
-  const ring = z('reflex_ring');
   const polar = new Map([[tree.root.id, { a: -Math.PI / 2, r: 0 }]]);
   const share = (node, from, span) => {
     let cur = from;

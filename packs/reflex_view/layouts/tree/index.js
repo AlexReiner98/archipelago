@@ -52,7 +52,10 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const tree = treeOf(answer, (item) => item.fields?.for ?? placeOf.get(item.id), n);
   // Names are measured as the page writes them; without a measure (a test), at about half their size a letter.
   const measure = tools.measure ?? ((text, px) => text.length * px * 0.55);
-  const placed = radial(tree, z, n, (text, px) => measure(text, px), width > 0 && height > 0 ? width / height : 1);
+  // The room it is shown in: the pane at the scale the page fits it (reflex_fit_scale, at or over the page's least),
+  // less the share the key and bars take (reflex_fit_room).
+  const fits = width > 0 && height > 0 ? { width: (width * n('reflex_fit_room')) / n('reflex_fit_scale'), height: (height * n('reflex_fit_room')) / n('reflex_fit_scale') } : null;
+  const placed = radial(tree, z, n, (text, px) => measure(text, px), width > 0 && height > 0 ? width / height : 1, fits);
   const said = sayingsOf(tree, n);
   if (records) countedFrom(said, records);
   const film = filmOf(tree, said, n);

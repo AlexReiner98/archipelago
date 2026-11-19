@@ -136,3 +136,16 @@ test('grown, no two shown names overlap or cross a wire, and every node is named
   assert.ok(marks.includes('rt-quiet'), 'a name that gives way is drawn quiet');
   assert.ok(drawn.viewport({ x: 0, y: 0, width: 1, height: 1, scale: 0.5 }).some((p: any) => p.set?.transform?.includes('scale(2)')), 'names keep their size on screen');
 });
+
+test('given the room it is shown in, the grown tree closes its rings to fit there, names and all', () => {
+  const places = ['tool:change', 'tool:query', 'file:packs/canvas/layouts/*.js', 'session_start', 'working_rules', 'guide:style_code'];
+  const items = Array.from({ length: 36 }, (_, i) => node(i, { title: `A rule of the harness, number ${i}`, fields: { for: [places[i % places.length]] } }));
+  const tree = treeOf({ lens: { find: ['fit'] }, items, links: [partOf(7, 1), partOf(13, 7), partOf(19, 13)] }, undefined, n)!;
+  const measure = (text: string, px: number) => text.length * px * 0.55;
+  const free = radial(tree, z, n, measure, 2);
+  const room = { width: free.width * 0.75, height: free.height * 0.75 };
+  const fitted = radial(tree, z, n, measure, 2, room);
+  assert.ok(fitted.width <= room.width + 1 && fitted.height <= room.height + 1, `${fitted.width} x ${fitted.height} in ${room.width} x ${room.height}`);
+  assert.ok(fitted.reach < free.reach, 'the rings closed up');
+  assert.equal(radial(tree, z, n, measure, 2, { width: free.width * 2, height: free.height * 2 }).reach, free.reach, 'room to spare: the rings stay as they are');
+});
