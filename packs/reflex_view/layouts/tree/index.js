@@ -14,7 +14,7 @@ import { rulesOf, schemaOf, storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
 import { barOf, cssOf, packHues, reflowOf } from './look.js';
-import { lastLaid, movesOf } from './reflow.js';
+import { fitOf, lastLaid, movesOf, shownScale } from './reflow.js';
 import { player } from './play.js';
 import { namesShown, rescaler } from './names.js';
 import { at, m } from './marks.js';
@@ -156,8 +156,11 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again, v
   const film = filmOf(tree, story, n);
   film.events = film.events.filter((e) => !hidden.has(`event:${e.kind}`));
   const name = JSON.stringify([answer.lens?.find, answer.lens?.only, answer.lens?.not, answer.lens?.from]);
-  // Drawn before (a legend entry turned, the map changed), it moves from where it stood (./reflow.js).
-  const was = lastLaid(name, placed, reduced);
+  // In place, the new frame is fitted into the box the picture was mounted in: a unit of that box shows `by` of the frame's.
+  const by = box?.width > 0 && box?.height > 0 ? Math.min(box.width / placed.width, box.height / placed.height) : 1;
+  const fit = box?.width > 0 && box?.height > 0 ? fitOf(placed, box, by) : null;
+  // Drawn before (a legend entry turned, the map changed), it moves from where it was seen (./reflow.js).
+  const was = lastLaid(name, placed, reduced, shownScale(placed, box, { width, height }, by));
   const before = drawn.get(name);
   drawn.set(name, new Set(tree.born.map((node) => node.id)));
   const grown = reduced || before !== undefined;
@@ -167,15 +170,13 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again, v
   const named = namesShown(tree, placed, held, z, n, 1);
   // Chosen again as the page zooms, once the zoom settles (reflex_name_settle ms, half a growth where the view says
   // none), and only what changed sent (./names.js).
-  // In place, the new frame is fitted into the box the picture was mounted in: a unit of that box shows `by` of the frame's.
-  const by = box?.width > 0 && box?.height > 0 ? Math.min(box.width / placed.width, box.height / placed.height) : 1;
   const names = rescaler({ by, labels: placed.labels, choose: (f) => namesShown(tree, placed, held, z, n, f).shown, shownAt: named.shown, rescale: n('reflex_name_rescale'), least: n('reflex_name_zoom_least'), settle: Number.isFinite(style.numbers?.reflex_name_settle) ? style.numbers.reflex_name_settle : n('reflex_grow') / 2, at, send: (out) => tools.patch(out) });
   // Grown, the gaps stand already: each place a miss sparked on and grew nothing from.
   const gapped = new Set(grown ? film.events.filter((e) => e.kind === 'miss' && !e.grew).map((e) => e.node.id) : []);
   // A bough whose place can be said takes a new trial node there, where the view sends `add` (the pack's action).
   const adding = typeof style.sends?.add === 'string' && typeof tools.act === 'function';
   const addsAt = (node) => (adding && !node.item && !node.preset && node.parent ? placeOfBough(node.id) : null);
-  const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown, story, gapped, addsAt, was);
+  const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown, story, gapped, addsAt, was, fit);
   const moves = was && movesOf(tree, placed, was, reflowOf(style, n));
   const css = cssOf(style, z, n, hues) + legendCss;
   if (missing.length) return { scene: { message: `This view's style names no ${[...new Set(missing)].slice(0, 2).join(', ')}: draw it with the Reflex tree view, whose preset names them.` } };

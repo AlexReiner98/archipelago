@@ -232,7 +232,8 @@ export function drawWith(host, answer, style, keep) {
     if (name === 'move') return void (moved ? (moved.key = key, moved.at = at) : ((moved = { key, at }), requestAnimationFrame(() => ((moved.at && send({ key: moved.key, name, at: moved.at })), (moved = null)))));
     send({ key, name, ...(at && { at }), ...(from !== undefined && { from: String(from) }) });
   };
-  const run = (now) => step(moving, now) && requestAnimationFrame(run);
+  // One loop moves what moves: a patch that comes while it runs (a drawing patches every frame) starts no second one.
+  let running = false; const run = (now) => (running = step(moving, now)) && requestAnimationFrame(run), play = () => moving.size && !running && ((running = true), requestAnimationFrame(run));
   // What a drawing patches: its marks, and its tip (layout-tip.js), whose marks are checked as every mark is.
   const tip = tipOf(host);
   const apply = (list) => {
@@ -271,7 +272,7 @@ export function drawWith(host, answer, style, keep) {
         // Drawn once its marks are mounted, and a surface over them has shown its first frame.
         (surface ? surface.first : Promise.resolve()).then(() => saidDrawn(host, 'drawn'));
         for (const list of early.splice(0)) apply(list);
-        if (moving.size) requestAnimationFrame(run);
+        play();
         keepScene(named.key, said.scene ?? {}, named.weight);
         if (!said.scene?.surface && !style.still) kept().keep(named.key, said.scene ?? {}, drawing.id, drawing.hash);
         performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got), ...(host.inPlace && { inPlace: true }) } });
@@ -282,7 +283,7 @@ export function drawWith(host, answer, style, keep) {
         const { name, key } = said.answers ?? {};
         if (name === 'enter') ((host.hovered = { key: String(key), list: said.list }), answered(keys.get(String(key))));
         if (name === 'leave' && host.hovered?.key === String(key)) host.hovered = null;
-        if (moving.size) requestAnimationFrame(run);
+        play();
       }
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
       else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });

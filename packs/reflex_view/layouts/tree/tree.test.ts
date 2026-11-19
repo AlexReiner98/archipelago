@@ -389,11 +389,13 @@ test('a legend entry turned, the one tree moves live: what stays moves to its ne
   assert.equal(swaps.length, 1, 'one tree, its marks taken over in place');
   const first = keyed(swaps[0].mark);
   const stay = [...first.keys()].find((k) => k.startsWith('n:e_') && was.has(k))!;
-  assert.equal(first.get(stay).transform, was.get(stay).transform, 'drawn first where it stood');
+  // Where a node is seen: its place, through the group that fits the new frame into the box mounted.
+  const nums = (t: string) => (t.match(/-?\d*\.?\d+/g) ?? []).map(Number);
+  const [bx, by, k, cx, cy] = nums(first.get('rt-fit').transform), [x, y] = nums(first.get(stay).transform), [x0, y0] = nums(was.get(stay).transform);
+  assert.ok(Math.abs(bx + k * (x + cx) - x0) < 0.5 && Math.abs(by + k * (y + cy) - y0) < 0.5, 'drawn first where it was seen');
   assert.ok(first.get('n:core.guard')?.class.includes('rt-leaving'), 'what leaves stands where it stood, to fade');
   const moved = p.patches.find((x) => x.key === stay && x.set?.transform && x.over > 0);
   assert.ok(moved, 'then moves to its new place, played by the page');
-  assert.ok(p.patches.some((x) => x.key === 'rt-svg' && x.set?.viewBox && x.over > 0), 'the frame fits the new tree');
   assert.ok(p.patches.some((x) => x.key === 'n:core.guard' && x.toggle?.['rt-gone']), 'what leaves fades');
   assert.ok(p.patches.some((x) => x.key === 'n:core.guard' && x.remove), 'and is taken out once moved');
   assert.ok(p.patches.some((x) => x.key === 'rt-all' && x.toggle?.['rt-moving'] === false), 'its names show again once it has moved');
@@ -416,8 +418,10 @@ test('an item added on the map, the tree drawn again starts where the last stood
   second.mount();
   const now = keyed(b.scene.svg);
   const stay = [...was.keys()].find((k) => k.startsWith('n:e_'))!;
-  assert.equal(now.get(stay).transform, was.get(stay).transform, 'what stays is drawn first where it stood');
-  assert.equal(now.get('rt-svg').viewBox, was.get('rt-svg').viewBox, 'in the frame it stood in');
+  // Seen from the root: the page fits each picture's frame to the pane about its centre, the root.
+  const xy = (t: string) => (t.match(/-?[0-9.]+/g) ?? []).map(Number), centre = (svg: any) => [svg[1].width / 2, svg[1].height / 2];
+  const [x, y] = xy(now.get(stay).transform), [x0, y0] = xy(was.get(stay).transform), [c, d] = centre(b.scene.svg), [c0, d0] = centre(a.scene.svg);
+  assert.ok(Math.abs(x - c - (x0 - c0)) < 0.5 && Math.abs(y - d - (y0 - d0)) < 0.5, 'what stays is drawn first where it was seen');
   assert.ok(now.has(`n:${id(3)}`), 'the new node is there');
   await wait(80);
   assert.ok(second.patches.some((x) => x.key === stay && x.set?.transform && x.over > 0), 'and the tree moves to its new shape');
