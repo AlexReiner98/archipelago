@@ -21,7 +21,8 @@
 import { shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { effortOf } from './effort.js';
-import { css, itemRules } from './look.js';
+import { css } from './look.js';
+import { glyphOf, grammar, itemMarks, itemRules } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
@@ -145,7 +146,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
   const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
-  const itemState = String(style.item_state ?? '').split(' ');
+  const itemState = String(style.item_state ?? '').split(' '), look = grammar(style);
   const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : itemState.includes('check') && mark === 'full' && /ph-(finished|ended)/.test(cls)
     ? m('g', {}, m('circle', { cx, cy, r, class: `lf-dot ${cls}` }), m('path', { d: `M${cx - r * 0.5} ${cy + r * 0.05}L${cx - r * 0.12} ${cy + r * 0.42}L${cx + r * 0.52} ${cy - r * 0.4}`, class: 'lf-dot-check' }))
     : mark === 'half'
@@ -285,7 +286,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
     return [left - z('dot_gap'), g.y.get(n.id)];
   };
-  const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase, n.item.island), ...dotPlace(n), z('dot'));
+  const dotAt = (n, phase = stateOf(n.item).phase) => look.dot && dot(dotClass(n.item, phase), markOf(phase, n.item.island), ...dotPlace(n), z('dot'));
   const sessionDot = (n) => marked(n.item) && stateMark(m, sessionOf(n.item).state, marked(n.item), ...dotPlace(n), z('dot'));
   // Where a step stands is of the grammar every island shares: its dot says so in a tip of its own, over a ring wider
   // than the dot to hover (`p:<id>`), so an island's legend need not.
@@ -315,14 +316,17 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const X = g.x.get(n.id), Y = g.y.get(n.id), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
     const point = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? n.bevel : 0, ends = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? 2 * n.bevel : n.shape === 'flag' ? n.bevel : 0;
-    const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
-    const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
+    // No dot before the name (the style says its state on the shape): the room it had is shared, the name set in the middle.
+    const bare = !look.dot && !look.tick && !n.stub, glyph = !n.stub && glyphOf(look, i) ? z('glyph_room') : 0;
+    const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : bare ? z('box_pad') / 2 : z('text_x'));
+    const room = (n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : bare ? z('box_pad') : z('text_x') + z('text_after'))) - glyph;
     const ghost = !n.stub && i.pending?.op === 'create';
     const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && `ph-${stateOf(i).phase}`, !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
+    const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n) });
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
-      ring, outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
+      ring, ...extra.under, outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel), ...extra.over,
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
