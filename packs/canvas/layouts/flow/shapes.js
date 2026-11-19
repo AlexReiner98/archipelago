@@ -23,7 +23,7 @@ function downTo(n, cx, cy, x, side) {
   if (n.shape === 'sheet' && side > 0) return waveAt(x, cx, cy, n.w, n.h);
   const b = n.bevel ?? 0, over = Math.max(0, dx - (hw - b));
   if (n.shape === 'cut') return cy + side * (hh - over);
-  if (n.shape === 'hexagon' || (n.shape === 'flag' && x > cx)) return cy + side * hh * (1 - over / b);
+  if (n.shape === 'hexagon' || n.shape === 'lozenge' || (n.shape === 'flag' && x > cx)) return cy + side * hh * (1 - over / b);
   // A place's tab stands over the left third of its top; the rest of its top is lower by the tab.
   if (n.shape === 'tab' && side < 0) return x < cx - hw + n.w / 3 ? cy - hh : cy - hh + b;
   return cy + side * hh;
@@ -36,7 +36,7 @@ function acrossTo(n, cx, cy, y, side) {
   if (n.shape === 'pill' || n.shape === 'end') return cx + side * (hw - hh + Math.sqrt(Math.max(0, hh * hh - dy * dy)));
   const b = n.bevel ?? 0;
   if (n.shape === 'cut') return cx + side * (hw - Math.max(0, dy - (hh - b)));
-  if (n.shape === 'hexagon' || (n.shape === 'flag' && side > 0)) return cx + side * (hw - (b * dy) / hh);
+  if (n.shape === 'hexagon' || n.shape === 'lozenge' || (n.shape === 'flag' && side > 0)) return cx + side * (hw - (b * dy) / hh);
   return cx + side * hw;
 }
 

@@ -87,3 +87,21 @@ export const css = `
 [data-text=names] .lf-says { display: none; }
 .lf-says rect { fill: var(--ln-sea); } .lf-says text { fill: var(--ln-muted); font-size: var(--ln-flow-says-text); font-family: var(--type-water-family, var(--ln-font)); font-weight: var(--type-water-weight, 400); font-style: var(--type-water-style, normal); text-transform: var(--type-water-case, none); letter-spacing: var(--type-water-track, 0); text-anchor: middle; dominant-baseline: middle; }
 `;
+
+/**
+ * What the style's `item_state` (words: weight, check, and for the fill land or lift) adds to how an item stands: by its phase, an item not started a
+ * hairline, one under way in a heavy line, one finished receding to its outline on the land; a finished item's dot a
+ * disc with a check. Lines and fill only, in the ink and grey the colours already name. Pure: a style in, css out.
+ */
+export function itemRules(style) {
+  const on = String(style.item_state ?? '').split(' '), plain = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.waiting)';
+  return [
+    on.includes('weight') && `
+.lf-step.ph-under_way${plain} .lf-shape { stroke: var(--ln-text); stroke-width: var(--ln-flow-stroke-lit); }
+.lf-step.ph-finished${plain} .lf-shape, .lf-step.ph-ended${plain} .lf-shape { fill: none; stroke-width: var(--ln-rule); }
+.lf-step.ph-not_started${plain} .lf-shape { stroke: var(--ln-muted); stroke-width: var(--ln-rule); }`,
+    on.includes('land') && `.lf-step${plain} .lf-shape { fill: none; }`,
+    on.includes('lift') && `.lf-step${plain} .lf-shape { fill: color-mix(in srgb, var(--ln-text) var(--ln-flow-item-lift), transparent); }`,
+    on.includes('check') && '.lf-dot-check { fill: none; stroke: var(--ln-land); stroke-width: var(--ln-flow-stroke); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }',
+  ].filter(Boolean).join('\n');
+}

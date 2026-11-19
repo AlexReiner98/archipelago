@@ -10,7 +10,7 @@ const need = (set, name) => {
 };
 
 /** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
-export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket'];
+export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge'];
 /** The outlines by type an item is drawn by: the view's, under those its island's packs give (`shapes.islands`, by island id; decision e_gqmavsb7). */
 export const shapesFor = (i, shapes = {}) => ({ ...shapes.type, ...(shapes.islands?.[i.island] ?? {}) });
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
@@ -18,7 +18,7 @@ export const shapedBy = (i, shapes = {}) => ((own) => lineageOf(i).find((t) => S
 /** The outline an item is drawn in: its type's, else the nearest flavour's that has one, else a box. */
 export const shapeIn = (i, shapes = {}) => (SHAPES.includes(shapes.ids?.[i.id]) ? shapes.ids[i.id] : shapesFor(i, shapes)[shapedBy(i, shapes)] ?? 'box');
 /** How far each outline cuts into its box, by the size the style names for it: none for a box, diamond, pill or sheet. */
-const BEVEL = { cut: 'flow_cut', hexagon: 'flow_point', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
+const BEVEL = { cut: 'flow_cut', hexagon: 'flow_point', lozenge: 'flow_lozenge', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
 
 /**
  * Each item a step with its size, as the flow sizes them; a choice nothing follows yet is a step of its own. Its outline
@@ -62,7 +62,7 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     else [n.w, n.h] = [text + BOX_PAD, (n.shape === 'sheet' ? SHEET_H : BOX_H) + more];
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
-    if (n.shape === 'hexagon' || n.shape === 'flag' || n.shape === 'ticket') n.w += n.bevel * (n.shape === 'flag' ? 1 : 2);
+    if (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'flag' || n.shape === 'ticket') n.w += n.bevel * (n.shape === 'flag' ? 1 : 2);
     // A focus the style draws bigger (./focus.js): its box, not its words.
     if (!n.stub && shapes.scales?.[n.id] > 0) (n.w *= shapes.scales[n.id]), (n.h *= shapes.scales[n.id]);
   }
