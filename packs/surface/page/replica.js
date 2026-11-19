@@ -24,6 +24,8 @@ const itemRow = (i) => ({
   ...(i.session && { session: i.session }),
   // So are the sessions on it (the runs pack's, task e_7csnapar): a mark every drawing is handed.
   ...(i.sessions && { sessions: i.sessions }),
+  // Who holds it, named (packs/surface/kernel/holders.ts): the people at work on it, who it waits on, its owner.
+  ...(i.holders && { holders: i.holders }),
 });
 const linkRow = (r) => ({ id: r.id, type: r.type, from_id: r.from, to_id: r.to, props: { ...(r.props ?? {}) }, valid_to: null });
 
@@ -107,7 +109,7 @@ export class Store {
     for (const i of answer.items ?? []) {
       if (!(this.at.get(i.id) >= pos)) (this.items.set(i.id, itemRow(i)), this.at.set(i.id, pos));
       // A session's state and line are no facts' (itemRow): the latest answer's are the ones, whatever the row's position.
-      else if (this.items.has(i.id)) Object.assign(this.items.get(i.id), { session: i.session, sessions: i.sessions });
+      else if (this.items.has(i.id)) Object.assign(this.items.get(i.id), { session: i.session, sessions: i.sessions, holders: i.holders });
     }
     for (const r of answer.links ?? []) if (!(this.at.get(r.id) >= pos)) (this.links.set(r.id, linkRow(r)), this.at.set(r.id, pos));
     this.head = Math.max(this.head ?? pos, pos);
@@ -313,6 +315,7 @@ export class View {
       ...(typeof r.props?.island === 'string' && { island: r.props.island }),
       ...(r.session && { session: r.session }),
       ...(r.sessions && { sessions: r.sessions }),
+      ...(r.holders && { holders: r.holders }),
       ...this.why.get(id),
       ...this.placed.get(id),
       ...(this.waiting.has(id) && { waiting: this.waiting.get(id) }),

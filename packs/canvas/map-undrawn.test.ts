@@ -34,7 +34,7 @@ test("the key is data the page draws: a row for every link type drawn, in its co
   assert.equal(scene.legend, undefined, 'the page draws the key');
   assert.ok(Array.isArray(scene.key) && scene.key.every((e: any) => typeof e.label === 'string' && e.glyph?.[0] === 'svg'), 'each row a glyph and its words');
   const labels = scene.key.map((e: any) => e.label);
-  for (const label of ['Work', 'Leads to', 'Part of', 'Tagged']) assert.ok(labels.includes(label), `the key says ${label}: ${labels.join(', ')}`);
+  for (const label of ['Task', 'Leads to', 'Part of', 'Tagged']) assert.ok(labels.includes(label), `the key says ${label}: ${labels.join(', ')}`);
   // Each link type's row carries the class its wires are drawn in, so the key and the picture cannot disagree.
   const tagged = scene.key.find((e: any) => e.label === 'Tagged');
   const cls = JSON.stringify(tagged.glyph).match(/lf-k-[0-9a-f]+/)?.[0];

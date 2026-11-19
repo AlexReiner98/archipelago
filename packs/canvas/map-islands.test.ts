@@ -79,8 +79,8 @@ const SHARED = ['Not started', 'Under way', 'Finished', 'Ended', 'Trouble', 'Hel
 test('each island carries its own legend and the corner has none', () => {
   const scene = draw(answer);
   assert.deepEqual(scene.key, [], 'no key in the corner');
-  assert.ok(legendOf(scene, 'e_grantsis').includes('Work') && legendOf(scene, 'e_grantsis').includes('Leads to'), legendOf(scene, 'e_grantsis').join(', '));
-  assert.ok(legendOf(scene, 'e_lablabis').includes('Record'), 'Lab’s says what a record is');
+  assert.ok(legendOf(scene, 'e_grantsis').includes('Task') && legendOf(scene, 'e_grantsis').includes('Leads to'), legendOf(scene, 'e_grantsis').join(', '));
+  assert.ok(legendOf(scene, 'e_lablabis').includes('Task'), 'Lab’s says what its item is');
   assert.ok(!legendOf(scene, 'e_grantsis').includes('Record'), 'Grants’ says only what it draws');
 });
 
@@ -128,7 +128,7 @@ test('a picture of one island is framed, with its own legend and none in the cor
   const one = { ...answer, items: answer.items.filter((i) => i.island !== 'e_lablabis') };
   const scene = draw(one);
   assert.ok(marks(scene.svg, (m) => String(m[1]?.class ?? '').includes('lf-island')).length > 0, 'its island is drawn as a region');
-  assert.ok(legendOf(scene, 'e_grantsis').includes('Work'), `its legend names what it draws: ${legendOf(scene, 'e_grantsis').join(', ')}`);
+  assert.ok(legendOf(scene, 'e_grantsis').includes('Task'), `its legend names what it draws: ${legendOf(scene, 'e_grantsis').join(', ')}`);
   assert.equal(scene.key.length, 0, 'the corner key gives way to the island’s legend');
 });
 

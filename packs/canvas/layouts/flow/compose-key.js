@@ -14,7 +14,7 @@ import { shapedBy, shapeIn } from './steps.js';
 export const ORDER_TYPE = 'depends_on';
 /** What the key calls the outline of each of core's starter types, and the order its rows go in. */
 const KIND_WORDS = { work: 'Work', question: 'Question', occurrence: 'Event', record: 'Record', system: 'System', actor: 'Person', aim: 'Aim', place: 'Place' };
-const KEY_ORDER = ['box', 'diamond', 'pill', 'sheet', 'ticket', 'cut', 'hexagon', 'flag', 'tab', 'end'];
+const KEY_ORDER = ['box', 'diamond', 'pill', 'sheet', 'ticket', 'cut', 'hexagon', 'lozenge', 'flag', 'tab', 'end'];
 /** What the key calls each phase, in its order; what only stands has no dot and no row. */
 export const PHASE_WORDS = { not_started: 'Not started', under_way: 'Under way', finished: 'Finished', ended: 'Ended', trouble: 'Trouble' };
 /** A link type as the key says it: its name without its pack, in words ("could_fund" is "Could fund"). */

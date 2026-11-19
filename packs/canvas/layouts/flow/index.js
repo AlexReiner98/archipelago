@@ -18,10 +18,18 @@
 // its step), each with a badge keyed `held:<proposal>` that the page answers a click on by putting the change to the person; a
 // link the person just drew (`mine`) is dashed until it is.
 
-import { shownOnly } from './graph.js';
+import { lineageOf, shownOnly } from './graph.js';
 import { layout } from './layout.js';
 import { effortOf } from './effort.js';
 import { css } from './look.js';
+import { landMarks, landRules, landShades } from './land-look.js';
+import { boxHeight, listOf, ROLES, STATUS_WORDS } from './cut-item.js';
+import { outlineOf } from './type-outline.js';
+import { rangeKeyPath } from './aim-range.js';
+import { TYPE_WORDS } from './cut-item.js';
+import { holdersOf } from './waymark.js';
+import { wireNames, wireRules } from './wire-names.js';
+import { boardKeyRows, glyphOf, grammar, itemMarks, itemRules, statusOf, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks, partsSize } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { cornersOf, grouped, localIslands, localTo, moveTo } from './isle-local.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
@@ -50,13 +58,18 @@ function lit(i, style, words, state) {
 }
 
 /** A step's outline, centred on x, y, its corners as round as rx, cut into by `cut` (a bevel, a point, a tab). */
-function outline(shape, x, y, w, hgt, rx, cut = 0) {
+function outlineMark(shape, x, y, w, hgt, rx, cut = 0, own = {}) {
   const l = x - w / 2, r = x + w / 2, t = y - hgt / 2, b = y + hgt / 2;
+  // A chamfer, a fold or a summit (./type-outline.js): the pieces of a type's outline that are not a mountain.
+  const piece = outlineOf(shape, l, t, r, b, cut || Math.min(w, hgt) / 4, own);
+  if (piece) return m('path', { d: piece, class: 'lf-shape' });
   if (shape === 'cut') return m('path', { d: `M${l + cut} ${t}H${r - cut}L${r} ${t + cut}V${b - cut}L${r - cut} ${b}H${l + cut}L${l} ${b - cut}V${t + cut}Z`, class: 'lf-shape' });
-  if (shape === 'hexagon') return m('path', { d: `M${l + cut} ${t}H${r - cut}L${r} ${y}L${r - cut} ${b}H${l + cut}L${l} ${y}Z`, class: 'lf-shape' });
+  if (shape === 'hexagon' || shape === 'lozenge') return m('path', { d: `M${l + cut} ${t}H${r - cut}L${r} ${y}L${r - cut} ${b}H${l + cut}L${l} ${y}Z`, class: 'lf-shape' });
   if (shape === 'flag') return m('path', { d: `M${l} ${t}H${r - cut}L${r} ${y}L${r - cut} ${b}H${l}Z`, class: 'lf-shape' });
   // A place: a tab over the left third of its top.
   if (shape === 'tab') return m('path', { d: `M${l} ${t}H${l + w / 3}L${l + w / 3 + cut} ${t + cut}H${r}V${b}H${l}Z`, class: 'lf-shape' });
+  // A mountain's step has no box: its ground line through the middle, where wires land, and a clear area to hover.
+  if (shape === 'ridge') return m('g', {}, m('rect', { x: l, y: t, width: w, height: hgt, class: 'lf-hit' }), m('path', { d: `M${l} ${y}H${r}`, class: 'lf-shape' }));
   if (shape === 'diamond') return m('path', { d: `M${x} ${t}L${r} ${y}L${x} ${b}L${l} ${y}Z`, class: 'lf-shape' });
   // A finding: a ticket, a notch in each end, what is handed from one island to another.
   if (shape === 'ticket') return m('path', { d: `M${l} ${t}H${r}V${y - cut}A${cut} ${cut} 0 0 0 ${r} ${y + cut}V${b}H${l}V${y + cut}A${cut} ${cut} 0 0 0 ${l} ${y - cut}Z`, class: 'lf-shape' });
@@ -116,7 +129,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // Each island's own layer, from the packs active on it (decision e_gqmavsb7): outlines and dots for its items.
   // A view that says its islands are plain (island_looks) draws each by its own look alone: no island's look or layer.
   const shown = style.island_looks === 'plain' ? (answer.islands ?? []).map(({ look: _l, style: _s, ...i }) => i) : answer.islands ?? [];
-  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
+  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, board: ((board) => (board ? { h: z('board_height'), room: z('sign') + z('sign_gap') + z('sign_margin') - z('box_pad') / 2, ...(board.who && { plate: (i) => (holdersOf(i, statusOf(i, i.phase ?? 'not_started'), answer.viewer).length ? z('who') + z('who_gap') : 0) }) } : undefined))(grammar(style).board), carve: ((cut) => (cut ? (i, textH) => boxHeight(Object.keys(cut.status).length ? [{ d: cut.most }] : listOf(cut, i, lineageOf(i)), textH, z('cut_pad'), cut.clear) : undefined))(grammar(style).cut), islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
@@ -145,7 +158,13 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
   const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
-  const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : mark === 'half'
+  /** The status a board is painted in: blocked is trouble unless nothing is left to block (./item-look.js statusOf). */
+  const boardWord = (i) => statusOf(i, stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase);
+  const itemState = String(style.item_state ?? '').split(' '), look = grammar(style);
+  const outline = (shape, x, y, w, hgt, rx, cut) => outlineMark(shape, x, y, w, hgt, rx, cut, { span: z('summit_span'), tension: look.cut?.tension });
+  const dot = (cls, mark, cx, cy, r) => (mark === 'none' ? null : itemState.includes('check') && mark === 'full' && /ph-(finished|ended)/.test(cls)
+    ? m('g', {}, m('circle', { cx, cy, r, class: `lf-dot ${cls}` }), m('path', { d: `M${cx - r * 0.5} ${cy + r * 0.05}L${cx - r * 0.12} ${cy + r * 0.42}L${cx + r * 0.52} ${cy - r * 0.4}`, class: 'lf-dot-check' }))
+    : mark === 'half'
     ? m('g', { class: `lf-dot ${cls}` }, m('circle', { cx, cy, r }), m('path', { d: `M${cx} ${cy - r}A${r} ${r} 0 0 0 ${cx} ${cy + r}Z`, class: 'lf-dot-fill' }))
     : m('circle', { cx, cy, r, class: `lf-dot ${cls}` }));
   // The start of a note: its first paragraph, cut where the style says a note's opening is cut.
@@ -189,8 +208,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const pend = (p) => (p ? ` held${p.mine ? ' mine' : ''}` : '');
   // Each link type its colour: the one the style names for it (link_colours), else one of link_hues, the same for the
   // same type every time unless another type in this picture has it. A colour is a class with a rule of its own: a drawing sets no style on a mark.
-  const named = style.link_colours && typeof style.link_colours === 'object' ? style.link_colours : {};
-  const hues = Array.isArray(style.link_hues) && style.link_hues.length ? style.link_hues : Array.isArray(style.hues) ? style.hues : [];
+  const named = style.link_colours && typeof style.link_colours === 'object' && style.ink_wires !== true ? style.link_colours : {};
+  const hues = style.ink_wires === true ? [] : Array.isArray(style.link_hues) && style.link_hues.length ? style.link_hues : Array.isArray(style.hues) ? style.hues : [];
   /** The colour of each name: the one `given` names, else the hue its name picks, stepping past those another in this picture has. */
   const coloursOf = (present, given, from) => {
     const taken = new Set(present.filter((name) => HEX.test(String(given[name]))).map((name) => given[name].toLowerCase()));
@@ -229,14 +248,22 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
 
   // The key: what each mark this picture uses means, one to a row (./compose-key.js). A row's mark is drawn in a box of
   // its own: G is where its middle is, how wide and tall a step is in it, and a dot's size.
-  const G = { x: 11, y: 7, w: 20, h: 11, r: 4 };
-  const { keyRows, packRows } = keyOf({ z, G, corner: CORNER, story, steps: answer.steps, shapes, sessions, shownAs, model: () => g, stateOf, sessionOf, marked, markOf, heldUp, yours, kind, onYou, placeClass, headless, endsOf, dot, outline });
+  const G = { x: z('key_width') / 2, y: z('key_height') / 2, w: z('key_width') - 2 * z('key_margin'), h: z('key_height') - 2 * z('key_margin'), r: 4 };
+  // The key draws the aim whole, its range over its box, in the swatch's own box.
+  const keyOutline = (shape, x, y, w, hgt, rx, cut) => (shape === 'summit' && look.cut ? m('g', {}, outline('box', x, y + hgt * 0.2, w, hgt * 0.6, rx), m('path', { class: 'lf-range-ink', d: rangeKeyPath(x - w / 2, x + w / 2, y + hgt * 0.5 - hgt * 0.8, y - hgt * 0.3, z('ridge_cols')) })) : outline(shape, x, y, w, hgt, rx, cut));
+  const { keyRows, packRows } = keyOf({ z, G, corner: CORNER, story, steps: answer.steps, shapes, sessions, shownAs, model: () => g, stateOf, sessionOf, marked, markOf, heldUp, yours, kind, onYou, placeClass, headless, endsOf, dot, outline: keyOutline });
   const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack, capOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.cap;
   // An island's findings are items, drawn as any item is where its query holds them; its shore lists none (the owner, 10 Nov 2026).
   const [KW, KH] = ['key_width', 'key_height'].map(z);
   // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id, group: 'add' }] : []);
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...addRow(p.id)]]));
+  // A cut's palette, whole: each run of it a row of swatches in every island's key, labelled with the role it plays.
+  const swatches = look.cut ? swatchRows(look.cut, { m, w: KW, h: KH, roles: ROLES, words: STATUS_WORDS, sw: z('key_swatch') }) : { rows: [], rules: [] };
+  for (const rule of swatches.rules) colourRules.add(rule);
+  // A fingerpost board's key: the boards with their plates, and the statuses as small plates (pass 8).
+  const boardOn = (p) => [...new Set((p?.model?.all ?? []).filter((n) => !n.dummy && !n.stub).map((n) => n.item.type))];
+  const boardKey = (p) => (look.board ? boardKeyRows(look.board, { types: boardOn(p), m, outline, w: KW, h: KH, margin: z('key_margin'), shapes: record(style.type_shapes), words: TYPE_WORDS, statusWords: STATUS_WORDS }) : null);
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(look.board ? boardKey(p) : looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...swatches.rows, ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'name') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
@@ -266,6 +293,10 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // A wire cut onto a trunk goes on along it (./carried.js): that stretch drawn over the trunk, seen only while lit, so a
   // step hovered lights its way all the way to what it shares and not the other branches of the trunk.
   const C = g.chains.length, wired = [...g.chains, ...g.ties], carry = story ? wired.map(() => []) : carried(wired);
+  // Each wire's link name, riding on its longest run and giving way where it is in the way (./wire-names.js); its words also in the wire's tooltip.
+  const boardBox = (n) => ((x, y) => [[x - n.w / 2, y - n.h / 2], [x + n.w / 2, y - n.h / 2], [x + n.w / 2, y + n.h / 2], [x - n.w / 2, y + n.h / 2]])(g.x.get(n.id), g.y.get(n.id));
+  const wn = story ? null : wireNames({ style, wired, C, boxes: steps.map(boardBox), ends: (j) => [wired[j].a, wired[j].b].map((id) => steps.find((n) => n.id === id)).filter(Boolean).map(boardBox), size, z, measure: (t, px) => measure(t, px), m, order: ORDER_TYPE });
+  if (wn) wired.forEach((w, j) => ((own) => (Array.isArray(own[0]) ? own[0] : own).splice(2, 0, m('title', {}, wn.text(j))))(j < C ? wireLayer[j] : tieLayer[j - C]));
   const keysOf = (j) => (j < C ? { line: `w:${j}`, head: `h:${j}`, on: `wx:${j}` } : { line: `n:${j - C}`, head: `nh:${j - C}`, on: `nx:${j - C}` });
   const trunkLayer = wired.flatMap((w, j) => (carry[j].length ? [m('path', {
     key: keysOf(j).on, d: carry[j].map((c) => drawn(c.points, wired[c.k].gaps, z('break_half'))).join(''),
@@ -278,11 +309,11 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const linkBadges = wiresIn(g).map((l, n) => [l, n]).filter(([l]) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map(([l, n]) => ({ n, mark: badge(l.pending, middleOf(l.points)) }));
   /** A step's dot where it is drawn: of its own phase, or of the phase a story's step gives it then. */
   const dotPlace = (n) => {
-    const [X, Y] = local(n.item?.island, [g.x.get(n.id), g.y.get(n.id)]), point = n.shape === 'hexagon' || n.shape === 'ticket' ? n.bevel : 0;
+    const [X, Y] = local(n.item?.island, [g.x.get(n.id), g.y.get(n.id)]), point = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? n.bevel : 0;
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
     return [left - z('dot_gap'), Y];
   };
-  const dotAt = (n, phase = stateOf(n.item).phase) => dot(dotClass(n.item, phase), markOf(phase, n.item.island), ...dotPlace(n), z('dot'));
+  const dotAt = (n, phase = stateOf(n.item).phase) => look.dot && dot(dotClass(n.item, phase), markOf(phase, n.item.island), ...dotPlace(n), z('dot'));
   const sessionDot = (n) => marked(n.item) && stateMark(m, sessionOf(n.item).state, marked(n.item), ...dotPlace(n), z('dot'));
   // Where a step stands is of the grammar every island shares: its dot says so in a tip of its own, over a ring wider
   // than the dot to hover (`p:<id>`), so an island's legend need not.
@@ -307,25 +338,36 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // A parts island draws its pack's parts from its land's top left (./parts-islands.js, ./pack-marks.js partsIslandMarks).
   const headAt = new Map(), header = (id, [x, y], title, open = null, frame) => (headAt.set(id, [[x, y], title, open, frame]), isParts(id) ? ((g) => g && partsIslandMarks({ of: g.of, pack: g.pack, off: offOn(g.of), partsOff: offOn(g.of, 'parts_off'), at: [frame.left, frame.top], z, m, titled, on: gestures.on, measure: (t, px, role) => measure(t, px, role) }))(partsIslands(answer).find((p) => p.id === id)) : packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), partsOff: offOn(id, 'parts_off'), open: open ?? openParts(answer, id), style, at: [x + measure(title, z('island_text'), 'name') + z('island_pack_gap'), y], frame, z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) }));
   const isles = ((made) => (made.layer.forEach((mk) => corners.has(String(mk[1]?.key).slice(2)) && (mk[1].transform = moveTo(corners.get(String(mk[1].key).slice(2))))), made))(islandMarks({ g: { ...g, islands: localIslands(g, corners) }, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header, part: (id, part) => packOf(id) && partInKey({ island: id, pack: packOf(id), id: part, partsOff: offOn(id, 'parts_off'), on: gestures.on }) }));
+  const lands = landMarks({ style, g, islands: g.islands, size: { width: g.width, height: g.height }, z, m, isHex: (h) => HEX.test(String(h)) }), snap = (y) => (lands.grammar.snap ? Math.round(y / lands.grammar.row) * lands.grammar.row : y);
   const drawnBy = new Map((g.islands ?? []).flatMap((isle) => [...(isle.look?.items ?? [])]));
   const stepLayer = steps.map((n) => {
-    const [X, Y] = local(n.item?.island, [g.x.get(n.id), g.y.get(n.id)]), i = n.item, [ox, oy] = corners.get(i?.island) ?? [0, 0];
+    const [X, Y] = local(n.item?.island, [g.x.get(n.id), snap(g.y.get(n.id))]), i = n.item, [ox, oy] = corners.get(i?.island) ?? [0, 0];
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
-    const point = n.shape === 'hexagon' || n.shape === 'ticket' ? n.bevel : 0, ends = n.shape === 'hexagon' || n.shape === 'ticket' ? 2 * n.bevel : n.shape === 'flag' ? n.bevel : 0;
-    const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : z('text_x'));
-    const room = n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : z('text_x') + z('text_after'));
+    const point = /^(hexagon|lozenge|ticket|forward|roundstart)$/.test(n.shape) ? n.bevel : 0, ends = /^(hexagon|lozenge|ticket|forward)$/.test(n.shape) ? 2 * n.bevel : /^(flag|tallarrow|swallow|pennant|roundend|roundstart)$/.test(n.shape) ? n.bevel : 0;
+    // No dot before the name (the style says its state on the shape): the room it had is shared, the name set in the middle.
+    const bare = !look.dot && !look.tick && !n.stub, glyph = !n.stub && glyphOf(look, i) ? z('glyph_room') : 0;
+    const ridged = n.shape === 'ridge' && look.ridge && !n.stub;
+    const boarded = look.board && !n.stub, board = boarded ? z('sign') + z('sign_gap') + z('sign_margin') : 0;
+    const left = ridged ? X : boarded ? X - n.w / 2 + point + board : n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : bare ? z('box_pad') / 2 : z('text_x'));
+    const room = ridged ? n.w : boarded ? n.w - ends - board - z('text_after') : (n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : bare ? z('box_pad') : z('text_x') + z('text_after'))) - glyph;
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', n.shape === 'ridge' && look.ridge && 'ridged', look.board && !n.stub && `boarded bs-${boardWord(i)}`, !n.stub && i.island && lands.classOf(i.island), (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && `ph-${stateOf(i).phase}`, !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
-    const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
+    const hb = n.h - 2 * (n.plate ?? 0);
+    const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: hb, corner: CORNER, bevel: n.bevel, z, outline, m, style, noTag: (n.plate ?? 0) > 0 });
+    // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
+    const CARVE = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'], RISES = ['summit'];
+    const nameY = (s, y) => (CARVE.includes(s.shape) && look.cut ? (Object.keys(look.cut.status).length ? y + ((s.h - (RISES.includes(s.shape) ? 2 * s.bevel : 0)) * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
+    const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n: n.plate ? { ...n, h: hb } : n, smarks: sessions, at: [X, Y], phase: stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n), viewer: answer.viewer });
+    for (const rule of extra.rules ?? []) colourRules.add(rule);
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
-      ring, outline(n.shape, X, Y, n.w, n.h, CORNER, n.bevel),
+      ring, ...extra.under, outline(n.shape, X, Y, n.w, hb, CORNER, n.bevel), ...extra.over,
       // In a story, the dot is in a group of its own, for each step to give the dot of where it stood then.
       !n.stub && (story ? m('g', { key: `d:${n.id}` }, dotAt(n)) : hoverDot(n)),
       // Its name in the lines the layout gave it (./lines.js): a second line under the first, the two about the middle.
       n.lines?.length > 1
-        ? m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
-        : m('text', { x: left, y: Y - (n.shape === 'sheet' ? z('sheet_lift') : 0) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
+        ? m('text', { x: left, y: nameY(n, Y) }, ...n.lines.map((line, k) => m('tspan', { x: left, dy: k ? n.line : (-(n.lines.length - 1) * n.line) / 2 }, fit(line, room, n.stub ? STUB_TEXT : TEXT))))
+        : m('text', { x: left, y: nameY(n, Y) }, fit(i.title, room, n.stub ? STUB_TEXT : TEXT)),
       // In a story, the word a step flags on it then, over its top right corner.
       story && !n.stub && m('text', { key: `f:${n.id}`, x: X + n.w / 2, y: Y - n.h / 2 - z('flag_lift'), class: 'lf-flag' }, ''),
     ];
@@ -353,7 +395,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, isles.layer, tieLayer, wireLayer, trunkLayer, grouped(steps, stepLayer, corners, m), saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark));
+  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, lands.sea, lands.land, isles.layer, tieLayer, wireLayer, trunkLayer, wn?.hits(line), grouped(steps, stepLayer, corners, m), saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark), wn?.layer);
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = [
     ...(parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 })),
@@ -366,9 +408,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   for (const id of dimmed(style)) addClass(dims.get(id), 'dim');
   /** Light the wires and ties of a step, or of none: while one is lit, the rest fade. One on a trunk is lit along it, to its head. */
   const wireKeys = wired.map((w, j) => [...(j < C ? [`w:${j}`, `h:${j}`] : tieKeys(j - C)), ...(carry[j].length ? [keysOf(j).on] : [])]);
-  const light = (id) => {
-    const on = new Set(id ? wired.flatMap((w, j) => (w.a === id || w.b === id ? [...wireKeys[j], ...carry[j].filter((c) => c.end).map((c) => keysOf(c.k).head)] : [])) : []);
-    return [{ key: 'flow', toggle: { lighting: Boolean(id) } }, ...wireKeys.flat().map((key) => ({ key, toggle: { lit: on.has(key) } }))];
+  const light = (id, only = null) => {
+    const on = new Set(only !== null ? [...wireKeys[only], ...carry[only].filter((c) => c.end).map((c) => keysOf(c.k).head)] : id ? wired.flatMap((w, j) => (w.a === id || w.b === id ? [...wireKeys[j], ...carry[j].filter((c) => c.end).map((c) => keysOf(c.k).head)] : [])) : []);
+    return [{ key: 'flow', toggle: { lighting: Boolean(id) || only !== null } }, ...wireKeys.flat().map((key) => ({ key, toggle: { lit: on.has(key) } })), ...(wn?.force(new Set(only !== null ? [only] : wired.flatMap((w, j) => (id && (w.a === id || w.b === id) ? [j] : [])))) ?? [])];
   };
   /** A step's tip: its title, that it waits on you where it does (a colour no legend explains), and the start of its note. */
   const tipFor = (key) => {
@@ -400,9 +442,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     size.width = width;
   }
   return {
-    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ringCss, ...(painting ? [paintedCss] : []), ...ringRules(answer.items), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
+    scene: { ...(painting && { surface: { key: 'islands-painted' } }), css: [css, itemRules(style), wireRules(style), landRules(style), landShades(style), ...(parts ? [islandCss, packCss, ...packRules(style), ...isles.rules] : []), sessionCss, ...hueRules(sessions), ringCss, ...(painting ? [paintedCss] : []), ...ringRules(answer.items), ...colourRules, ...(story ? [storyCss] : [])].join('\n'), svg, key, ...(player && { before: player.before, aside: player.after }), size, places: steps.filter((n) => !n.stub).map((n) => ({ id: n.item.id, x: g.x.get(n.id), y: g.y.get(n.id), w: n.w, h: n.h })), start: start ? [g.x.get(start), g.y.get(start)] : undefined, shaped: !story && FOLLOW !== 0 },
     end: () => (player?.end?.(), painting?.end()),
-    viewport: (v) => (painting?.view(v), []),
+    viewport: (v) => (painting?.view(v), wn?.viewport(v) ?? []),
     on(event) {
       const { name, key } = event;
       if (player?.hears(key)) return player.on(event);
@@ -413,6 +455,11 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
         if (name !== 'leave') return [];
         const on = String(key).startsWith('p:') ? `s:${String(key).slice(2)}` : null;
         return on && tipped.has(on) ? [{ tip: { key: on, mark: tipFor(on) } }] : [{ tip: null }];
+      }
+      // A wire hovered lights as a board does and shows its name, whatever the give-way rule said (its name is drawn last, above the boards).
+      if (String(key).startsWith('wh:')) {
+        const j = Number(String(key).split(':')[1]);
+        return name === 'enter' ? light(null, j) : name === 'leave' ? [...light(null), ...wn.rest(j)] : name === 'move' && event.at ? wn.near(j, event.at) : [];
       }
       if (inPainted.has(keyed.get(key))) painting?.item(keyed.get(key), name === 'enter');
       if (name === 'leave') return [...light(null), { tip: null }];
