@@ -10,7 +10,7 @@ const need = (set, name) => {
 };
 
 /** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
-export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge', 'carved', 'chamfer', 'fold', 'summit', 'hut'];
+export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge', 'carved', 'chamfer', 'fold', 'summit', 'hut', 'swallow', 'roundend', 'plank', 'roofed'];
 /** The outlines by type an item is drawn by: the view's, under those its island's packs give (`shapes.islands`, by island id; decision e_gqmavsb7). */
 export const shapesFor = (i, shapes = {}) => ({ ...shapes.type, ...(shapes.islands?.[i.island] ?? {}) });
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
@@ -20,7 +20,9 @@ export const shapeIn = (i, shapes = {}) => (SHAPES.includes(shapes.ids?.[i.id]) 
 /** The outlines a carving style gives one height (hexagon and pill among them). */
 const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'];
 /** How far each outline cuts into its box, by the size the style names for it: none for a box, diamond, pill or sheet. */
-const BEVEL = { chamfer: 'flow_chamfer', fold: 'flow_fold', summit: 'flow_summit', hut: 'flow_hut', cut: 'flow_cut', hexagon: 'flow_point', lozenge: 'flow_lozenge', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
+/** The ends a fingerpost board may have. */
+const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed'];
+const BEVEL = { chamfer: 'flow_chamfer', fold: 'flow_fold', summit: 'flow_summit', hut: 'flow_hut', swallow: 'flow_end_depth', roundend: 'flow_end_depth', roofed: 'flow_roof', cut: 'flow_cut', hexagon: 'flow_point', lozenge: 'flow_lozenge', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
 
 /**
  * Each item a step with its size, as the flow sizes them; a choice nothing follows yet is a step of its own. Its outline
@@ -65,10 +67,12 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     else [n.w, n.h] = [text + BOX_PAD, (n.shape === 'sheet' ? SHEET_H : BOX_H) + more];
     // Where the style carves its boxes every type is the same height, whatever its outline; a summit rises above that.
     if (shapes.carve && CARVED.includes(n.shape)) n.h = shapes.carve(n.item, n.lines.length * LINE) + (n.shape === 'summit' ? 2 * need(sizes, BEVEL.summit) : 0);
+    // A fingerpost board (pass 8): one height whatever its end, and room at its left for the waymark plate.
+    if (shapes.board && BOARDS.includes(n.shape)) [n.h, n.w] = [shapes.board.h + more, n.w + shapes.board.room];
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
     if (n.shape === 'summit') n.span = need(sizes, 'flow_summit_span');
-    if (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'flag' || n.shape === 'ticket') n.w += n.bevel * (n.shape === 'flag' ? 1 : 2);
+    if (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'flag' || n.shape === 'ticket' || n.shape === 'swallow' || n.shape === 'roundend') n.w += n.bevel * (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? 2 : 1);
     // A focus the style draws bigger (./focus.js): its box, not its words.
     if (!n.stub && shapes.scales?.[n.id] > 0) (n.w *= shapes.scales[n.id]), (n.h *= shapes.scales[n.id]);
   }

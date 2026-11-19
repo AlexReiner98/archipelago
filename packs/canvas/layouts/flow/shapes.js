@@ -4,6 +4,9 @@
 
 const near = (a, b) => Math.abs(a - b);
 
+/** How wide a fingerpost board's roof is: over the left end, a third of the board at most, or four of its depths. */
+export const roofWidth = (w, k) => Math.min(w / 3, k * 2 * 2);
+
 /** The foot of a sheet at `x`: its wave, two curves, read at enough points to land on. */
 function waveAt(x, cx, cy, w, h) {
   const [l, r, b] = [cx - w / 2, cx + w / 2, cy + h / 2];
@@ -24,6 +27,8 @@ function downTo(n, cx, cy, x, side) {
   // A chamfer's cut top corners, a fold's turned one, a summit's rise above its box: the real outline, not its bounds.
   if (n.shape === 'chamfer' && side < 0) return cy - hh + Math.max(0, (n.bevel ?? 0) - Math.min(x - (cx - hw), cx + hw - x));
   if (n.shape === 'fold' && side < 0) return cy - hh + Math.max(0, x - (cx + hw - (n.bevel ?? 0)));
+  // A fingerpost board's roof over its left end.
+  if (n.shape === 'roofed' && side < 0) return ((k, rw) => cy - hh + k * (x < cx - hw + rw ? Math.min(1, near(x, cx - hw + rw / 2) / (rw / 2)) : 1))(n.bevel ?? 0, roofWidth(n.w, n.bevel ?? 0));
   // A summit: down its slope inside its foot, else the box's top; a hut: down its roof from the ridge.
   if (n.shape === 'summit') return side < 0 ? cy - hh + (near(x, cx) < (n.span ?? 0) * hw ? 0 : (n.bevel ?? 0)) : cy + hh - (n.bevel ?? 0);
   if (n.shape === 'hut' && side < 0) return cy - hh + (n.bevel ?? 0) * Math.min(1, near(x, cx) / hw);
@@ -42,6 +47,9 @@ function acrossTo(n, cx, cy, y, side) {
   if (n.shape === 'pill' || n.shape === 'end') return cx + side * (hw - hh + Math.sqrt(Math.max(0, hh * hh - dy * dy)));
   const b = n.bevel ?? 0;
   if (n.shape === 'cut') return cx + side * (hw - Math.max(0, dy - (hh - b)));
+  // A board's swallowtail notch and round end, on its right.
+  if (n.shape === 'swallow' && side > 0) return cx + hw - b * (1 - dy / hh);
+  if (n.shape === 'roundend' && side > 0) return cx + hw - b + b * Math.sqrt(Math.max(0, 1 - (dy / hh) ** 2));
   // A chamfer's and a fold's cut corners, on the right or on both sides, from the top down by the cut.
   if (n.shape === 'chamfer' && y < cy - hh + b) return cx + side * (hw - (b - (y - (cy - hh))));
   if (n.shape === 'fold' && side > 0 && y < cy - hh + b) return cx + hw - (b - (y - (cy - hh)));

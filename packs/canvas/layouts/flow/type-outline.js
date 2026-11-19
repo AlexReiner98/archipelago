@@ -34,8 +34,20 @@ export function hut({ l, t, r, b, rise }) {
   return { outline: `M${l} ${top}L${mid} ${t}L${r} ${top}V${b}H${l}Z` };
 }
 
+/** A fingerpost board's ends (pass 8): a swallowtail (a notch cut into the right end), a round end, a flat plank, and a flat plank with a small roof over its left end. */
+export const swallow = (l, t, r, b, k) => `M${l} ${t}H${r}L${r - k} ${(t + b) / 2}L${r} ${b}H${l}Z`;
+export const roundEnd = (l, t, r, b, k) => `M${l} ${t}H${r - k}A${k} ${(b - t) / 2} 0 0 1 ${r - k} ${b}H${l}Z`;
+export const plank = (l, t, r, b) => `M${l} ${t}H${r}V${b}H${l}Z`;
+import { roofWidth } from './shapes.js';
+export { roofWidth };
+export const roofed = (l, t, r, b, k) => ((rw) => `M${l} ${t + k}L${l + rw / 2} ${t}L${l + rw} ${t + k}H${r}V${b}H${l}Z`)(roofWidth(r - l, k));
+
 /** The outline a shape word draws, where it is one of this module's: `k` is the cut (a chamfer's, a fold's, a summit's rise). Else null. */
 export function outlineOf(shape, l, t, r, b, k, { span, tension } = {}) {
+  if (shape === 'swallow') return swallow(l, t, r, b, k);
+  if (shape === 'roundend') return roundEnd(l, t, r, b, k);
+  if (shape === 'plank') return plank(l, t, r, b);
+  if (shape === 'roofed') return roofed(l, t, r, b, k);
   if (shape === 'chamfer') return chamfer(l, t, r, b, k);
   if (shape === 'fold') return fold(l, t, r, b, k);
   if (shape === 'hut') return hut({ l, t, r, b, rise: k }).outline;

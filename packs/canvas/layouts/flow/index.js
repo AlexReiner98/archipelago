@@ -26,7 +26,8 @@ import { landMarks, landRules, landShades } from './land-look.js';
 import { boxHeight, listOf, ROLES, STATUS_WORDS } from './cut-item.js';
 import { outlineOf } from './type-outline.js';
 import { rangeKeyPath } from './aim-range.js';
-import { glyphOf, grammar, itemMarks, itemRules, swatchRows } from './item-look.js';
+import { TYPE_WORDS } from './cut-item.js';
+import { boardKeyRows, glyphOf, grammar, itemMarks, itemRules, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
@@ -126,7 +127,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // Each island's own layer, from the packs active on it (decision e_gqmavsb7): outlines and dots for its items.
   // A view that says its islands are plain (island_looks) draws each by its own look alone: no island's look or layer.
   const shown = style.island_looks === 'plain' ? (answer.islands ?? []).map(({ look: _l, style: _s, ...i }) => i) : answer.islands ?? [];
-  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, carve: ((cut) => (cut ? (i, textH) => boxHeight(Object.keys(cut.status).length ? [{ d: cut.most }] : listOf(cut, i, lineageOf(i)), textH, z('cut_pad'), cut.clear) : undefined))(grammar(style).cut), islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
+  const isleStyle = (id) => record(shown.find((i) => i.id === id)?.style), focus = focusOf(shown, style, SHAPES), shapes = { type: record(style.type_shapes), ids: focus.shapes, scales: focus.scales, board: ((board) => (board ? { h: z('board_height'), room: z('sign') + z('sign_gap') + z('sign_margin') - z('box_pad') / 2 } : undefined))(grammar(style).board), carve: ((cut) => (cut ? (i, textH) => boxHeight(Object.keys(cut.status).length ? [{ d: cut.most }] : listOf(cut, i, lineageOf(i)), textH, z('cut_pad'), cut.clear) : undefined))(grammar(style).cut), islands: Object.fromEntries(shown.map((i) => [i.id, record(record(i.style).type_shapes)])) };
   // A run's session (./session.js): its state a mark, its line its one line, what the style lights laid out first.
   const sessions = sessionMarks(style);
   // A focus is its island (decisions e_mqex8wrf, e_53tcvjbv): a box with a mark of its own, placed like any, what other islands read.
@@ -255,7 +256,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // A cut's palette, whole: each run of it a row of swatches in every island's key, labelled with the role it plays.
   const swatches = look.cut ? swatchRows(look.cut, { m, w: KW, h: KH, roles: ROLES, words: STATUS_WORDS, sw: z('key_swatch') }) : { rows: [], rules: [] };
   for (const rule of swatches.rules) colourRules.add(rule);
-  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...swatches.rows, ...addRow(p.id)]]));
+  // A fingerpost board's key: the boards with their plates, and the statuses as small plates (pass 8).
+  const boardKey = look.board ? boardKeyRows(look.board, { types: Object.keys(look.board.signs), m, outline, w: KW, h: KH, margin: z('key_margin'), shapes: record(style.type_shapes), words: TYPE_WORDS, statusWords: STATUS_WORDS }) : null;
+  const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(boardKey ? boardKey : looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...swatches.rows, ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
   const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text')) + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px), openParts(answer, id)); // an open pack's switch is counted
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
@@ -335,10 +338,11 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     // No dot before the name (the style says its state on the shape): the room it had is shared, the name set in the middle.
     const bare = !look.dot && !look.tick && !n.stub, glyph = !n.stub && glyphOf(look, i) ? z('glyph_room') : 0;
     const ridged = n.shape === 'ridge' && look.ridge && !n.stub;
-    const left = ridged ? X : n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : bare ? z('box_pad') / 2 : z('text_x'));
-    const room = ridged ? n.w : (n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : bare ? z('box_pad') : z('text_x') + z('text_after'))) - glyph;
+    const boarded = look.board && !n.stub, board = boarded ? z('sign') + z('sign_gap') + z('sign_margin') : 0;
+    const left = ridged ? X : boarded ? X - n.w / 2 + point + board : n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + (n.stub ? z('stub_text_x') : bare ? z('box_pad') / 2 : z('text_x'));
+    const room = ridged ? n.w : boarded ? n.w - ends - board - z('text_after') : (n.shape === 'diamond' ? n.w - z('diamond_pad') : n.w - ends - (n.stub ? 2 * z('stub_text_x') : bare ? z('box_pad') : z('text_x') + z('text_after'))) - glyph;
     const ghost = !n.stub && i.pending?.op === 'create';
-    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', n.shape === 'ridge' && look.ridge && 'ridged', !n.stub && i.island && lands.classOf(i.island), (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && `ph-${stateOf(i).phase}`, !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
+    const cls = ['lf-step', !n.stub && partOf(n.id) && `placed ${partOf(n.id)}`, n.stub && 'stub', n.shape === 'ridge' && look.ridge && 'ridged', look.board && !n.stub && 'boarded', !n.stub && i.island && lands.classOf(i.island), (n.stub || g.potential.has(n.id)) && 'scenario', !i.open && 'closed', !n.stub && `ph-${stateOf(i).phase}`, !n.stub && yours(i) && 'you', i.id === style.here && !n.stub && 'here', ghost ? 'ghost' : !n.stub && held(i.pending) && 'held', !n.stub && i.waiting && 'waiting', !n.stub && isles.found.get(n.id), foci.has(i.id) && 'focus', inPainted.has(n.id) && 'painted unplaced'].filter(Boolean).join(' ');
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.

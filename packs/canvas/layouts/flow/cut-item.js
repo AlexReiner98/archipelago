@@ -94,6 +94,8 @@ export function runsOf(palette) {
 
 /** The run each phase takes from a palette's runs: to do its pale, under way its land, done its deep, ended its greys, trouble an accent. */
 export const RUN = { not_started: 'pale', under_way: 'land', finished: 'deep', ended: 'grey', trouble: 'accent' };
+/** What each type is called in the key where the style names it otherwise than by its id. */
+export const TYPE_WORDS = { question: 'Decision' };
 /** What each status is called in the key. */
 export const STATUS_WORDS = { not_started: 'To do', under_way: 'In progress', waiting: 'Waiting', finished: 'Done', trouble: 'Blocked' };
 /** What each run is called in the key. */

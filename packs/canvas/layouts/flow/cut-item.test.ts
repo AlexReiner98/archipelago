@@ -194,3 +194,35 @@ test('pass 7: the aim is a seeded range of layers, the front its status colour',
   assert.ok(top >= 20 - 18 - 4, `rises ${20 - top}`);
   assert.ok(rangeMarks({ id: 'e_x', form, x0: 0, x1: 80, base: 20, rise: 18, word: 'ended', m, cols: 22 }).every((k: any) => /bare|ink/.test(k[1].class)));
 });
+
+test('pass 8: a fingerpost board carrying a waymark plate', async () => {
+  // @ts-ignore a page module, untyped
+  const { contrast, crossPath, signMarks, signPath } = await import('./waymark.js');
+  // @ts-ignore a page module, untyped
+  const { outlineOf, roofWidth, swallow } = await import('./type-outline.js');
+  // @ts-ignore a page module, untyped
+  const { landOn } = await import('./shapes.js');
+  const p = preset('canvas.waymark').props, m = (tag: string, attrs: any = {}, ...kids: any[]) => [tag, attrs, ...kids];
+  assert.deepEqual(Object.values(p.type_signs).slice(0, 7), ['bar', 'bars', 'turn', 'disc', 'slash', 'tee', 'triangle']);
+  assert.equal(new Set(['bar', 'bars', 'turn', 'disc', 'slash', 'tee', 'triangle'].map((w) => signPath(w, 0, 0, 16))).size, 7);
+  // The name reads on its wood in both themes.
+  for (const t of ['light', 'dark']) assert.ok(contrast(p.board_colours[t].board, p.board_colours[t].name) >= 4.5, t);
+  // The ends: depth 9 for the arrow, the notch and the round end; the roof over the left end only.
+  assert.equal(swallow(0, 0, 100, 30, 9), 'M0 0H100L91 15L100 30H0Z');
+  assert.match(outlineOf('roundend', 0, 0, 100, 30, 9), /^M0 0H91A9 15 0 0 1 91 30H0Z$/);
+  assert.equal(outlineOf('plank', 0, 0, 100, 30, 0), 'M0 0H100V30H0Z');
+  assert.match(outlineOf('roofed', 0, 0, 100, 30, 7), /^M0 7L14 0L28 7H100V30H0Z$/);
+  assert.equal(roofWidth(100, 7), 28);
+  // The plate: white, its symbol in the status colour; blocked adds a cross; ended an empty plate.
+  const marks = (word: string) => signMarks({ sign: 'bar', word, x: 5, y: 7, s: 16, gap: 6, m });
+  assert.equal(marks('under_way').length, 2);
+  assert.match(marks('under_way')[1][1].class, /lf-cut-s-under_way/);
+  assert.equal(marks('trouble').length, 3);
+  assert.equal(marks('ended').length, 1);
+  assert.match(crossPath(0, 0, 8), /^M0 0l8 8M8 0l-8 8$/);
+  // A wire lands on the swallowtail's notch and the round end's curve.
+  assert.equal(landOn({ shape: 'swallow', w: 100, h: 30, bevel: 9 }, 50, 15, [100, 15], [120, 15])[0], 91);
+  assert.equal(landOn({ shape: 'roundend', w: 100, h: 30, bevel: 9 }, 50, 15, [100, 15], [120, 15])[0], 100);
+  assert.ok(landOn({ shape: 'roofed', w: 100, h: 30, bevel: 7 }, 50, 15, [14, 0], [14, -9])[1] === 0);
+  for (const k of ['flow_sign', 'flow_sign_gap', 'flow_sign_margin', 'flow_board_height', 'flow_end_depth', 'flow_roof']) assert.ok(k in house.sizes, k);
+});
