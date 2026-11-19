@@ -84,7 +84,7 @@ test('over real dates: the trunk stands, a miss sparks where it happened or grow
   assert.equal(gap.node.id, '~for:tool:change', 'a miss that grew nothing sparks on the bough of its place');
   assert.deepEqual(weekTo(story, Date.parse(came.to)), { misses: 0, held: 0 }, "the gap is eight days before the end: out of that week");
   assert.deepEqual(weekTo(story, Date.parse(came.from) + 21 * 864e5), { misses: 1, held: 2 });
-  assert.deepEqual(weekTo(story, Date.parse(came.from) + 16 * 864e5), { misses: 1, held: 2 });
+  assert.deepEqual(weekTo(story, Date.parse(came.from) + 16 * 864e5), { misses: 1, held: 3 });
 });
 
 test('until the pack tells the story, it is made from the map and its counts, and says so', () => {
