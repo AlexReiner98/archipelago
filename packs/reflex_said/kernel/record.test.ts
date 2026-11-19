@@ -33,4 +33,5 @@ test('sayings go in as one fact per instruction and come back out', () => {
   assert.deepEqual(facts, [['+', 'e_one', 'said', { run: 'e_run', where: 'session_start' }], ['+', 'core.estimate', 'said', { run: 'e_run', where: 'session_start' }]]);
   const back = sayingsOf([{ at: '2026-11-19T10:00:00Z', facts: [...facts, ['+', 'e_x', 'other', {}], ['-', 'e_one', 'said']] }]);
   assert.deepEqual(back, [said('e_one', 'e_run', '2026-11-19T10:00:00Z'), said('core.estimate', 'e_run', '2026-11-19T10:00:00Z')]);
+  assert.deepEqual(sayingsOf([{ at: '2026-11-19T10:00:00Z', facts }], 'e_one'), [said('e_one', 'e_run', '2026-11-19T10:00:00Z')], 'read for one, the others said with it are not its');
 });
