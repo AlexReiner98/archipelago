@@ -3,8 +3,8 @@
 //
 // A miss is a refusal in a run's story (a beat that befell it, did "refused") whose words hold a phrase the instruction
 // names (its field misses), or one about an item it answers (its answers links). Per run, an instruction is judged
-// from the first time it was said there: a miss after it came back; a miss before and none after was held; none at all
-// is quiet, which says nothing either way.
+// from the first time it was said there (the owner's meanings, 19 Nov 2026): the same miss after it is failed; a miss
+// before and none after is held; none at all is quiet: said, and its miss did not come back, the weaker held.
 
 /** One saying, as the stream keeps it. */
 export interface Saying {
@@ -39,8 +39,14 @@ export interface RunVerdict {
   /** Misses it answers before it was first said, and after. */
   before: number;
   after: number;
-  verdict: 'came_back' | 'held' | 'quiet';
+  verdict: Verdict;
 }
+
+/** What became of a node's miss in one run: failed (it came back), held (it stopped) or quiet (it never showed). */
+export type Verdict = 'failed' | 'held' | 'quiet';
+
+/** Whose a node is: core's own preset, another pack's, the owner's (kept on the map) or learned (a reflex). */
+export type Tier = 'core' | 'pack' | 'owner' | 'learned';
 
 /** One instruction's record. */
 export interface Record_ {
@@ -50,7 +56,8 @@ export interface Record_ {
   /** How many times it was said at each place. */
   places: Record<string, number>;
   last?: string;
-  came_back: number;
+  tier?: Tier;
+  failed: number;
   held: number;
   quiet: number;
   per_run: RunVerdict[];
@@ -80,10 +87,10 @@ export function records(ids: string[], sayings: Saying[], stories: Record<string
       const misses = (stories[run] ?? []).filter((b) => isMiss(b, by.get(id)));
       const before = misses.filter((b) => b.at < said_at).length;
       const after = misses.length - before;
-      return { run, said_at, said: here.length, before, after, verdict: after ? 'came_back' : before ? 'held' : 'quiet' };
+      return { run, said_at, said: here.length, before, after, verdict: after ? 'failed' : before ? 'held' : 'quiet' };
     });
-    const count = (v: RunVerdict['verdict']) => per_run.filter((r) => r.verdict === v).length;
-    return { id, said: mine.length, runs: runs.length, places, ...(mine.length && { last: mine.at(-1)!.at }), came_back: count('came_back'), held: count('held'), quiet: count('quiet'), per_run };
+    const count = (v: Verdict) => per_run.filter((r) => r.verdict === v).length;
+    return { id, said: mine.length, runs: runs.length, places, ...(mine.length && { last: mine.at(-1)!.at }), failed: count('failed'), held: count('held'), quiet: count('quiet'), per_run };
   });
 }
 
@@ -106,4 +113,13 @@ export function sayingsOf(entries: { at: string; facts: unknown[] }[], of?: stri
     }
   }
   return out;
+}
+
+/**
+ * A node's tier, by its id: a kept one is learned when it is a reflex, else the owner's; a preset is core's when core
+ * ships it or it keeps core's name (core.<name>, split into other packs with its id kept), else its pack's.
+ */
+export function tierOf(id: string, kept: { type?: string } | undefined, shippedBy: string | undefined): Tier {
+  if (id.startsWith('e_')) return kept?.type === 'reflex' ? 'learned' : 'owner';
+  return shippedBy === 'core' || id.startsWith('core.') ? 'core' : 'pack';
 }

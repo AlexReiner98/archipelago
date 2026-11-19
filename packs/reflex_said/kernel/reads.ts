@@ -3,7 +3,7 @@
 // stories and what each instruction answers, and record.ts judges it.
 
 import type { KernelContext } from '#pelago/kernel';
-import { records, sayingFacts, sayingsOf, type Answering, type Beat } from './record.ts';
+import { records, sayingFacts, sayingsOf, tierOf, type Answering, type Beat } from './record.ts';
 
 /** The stream sayings are kept on: this pack's own, kept by its rule said. */
 export const STREAM = 'pack:reflex_said';
@@ -56,7 +56,9 @@ export async function said_record(ctx: KernelContext, q: { said_record: { ids: u
     misses: Array.isArray(it.props?.misses) ? (it.props!.misses as unknown[]).map(String) : [],
     answers: links.filter((k) => (k.from_id ?? k.from) === it.id).map((k) => String(k.to_id ?? k.to)),
   }));
-  return records(ids, sayings, stories, answering);
+  // Whose each is: what ships a preset is read off the registry, what a kept one is off its type.
+  const shipped = (id: string) => ctx.registry.packs.find((p) => (p.styles ?? []).some((st) => st.id === id))?.id;
+  return records(ids, sayings, stories, answering).map((r) => ({ ...r, tier: tierOf(r.id, items.find((it) => it.id === r.id), shipped(r.id)) }));
 }
 
 /** answer.said_record: the record of some instructions, for the view reflex_said.record. */

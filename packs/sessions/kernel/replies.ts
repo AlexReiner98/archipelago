@@ -3,7 +3,7 @@
 // to count for the owner (root-sessions.ts, askedLately), as the whole workspace.
 
 import type { KernelContext } from '#pelago/kernel';
-import { atSetting, holds, isAt, onReply, replyFacts, type RuleDef } from './reply-rules.ts';
+import { atSetting, holds, isAt, MISSED, onReply, replyFacts, type RuleDef } from './reply-rules.ts';
 import { tell } from './session-life.ts';
 import type { Item } from './types.ts';
 
@@ -30,6 +30,10 @@ export async function askOnReply(ctx: KernelContext, run: Pick<Item, 'id' | 'is_
   if (body.stop_hook_active === true || !facts || !turn || !run?.is_open) return undefined;
   const rules = (ctx.registry.rules as Rule[]).filter(onReply);
   const { off, at } = await liftedHere(ctx, rules);
+  // Missed is counted here, from the run's story, by the pack that keeps what covers a miss (the read missed_here);
+  // only when a rule on, and with none to answer it, none.
+  if (rules.some((r) => !off.has(r.lifted!) && r.when?.reply?.[MISSED] !== undefined))
+    facts[MISSED] = (await ctx.reads({ missed_here: { run: run.id } }).catch(() => 0)) as number;
   const asking: Rule[] = [];
   for (const rule of rules) {
     if (off.has(rule.lifted!) || !holds(rule, facts, at.get(atSetting(rule)))) continue;

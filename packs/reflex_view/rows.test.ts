@@ -4,9 +4,9 @@ import { countsOf, countsRow, rowsOf, RUNS_SHOWN } from './rows.js';
 
 const item = { id: 'e_one', type: 'reflex', title: 'Short titles', status: 'trial' };
 const record = {
-  id: 'e_one', said: 3, runs: 2, places: { session_start: 2, 'file:src/a.ts': 1 }, last: '2026-11-19T11:00:00Z', came_back: 1, held: 1, quiet: 0,
+  id: 'e_one', said: 3, runs: 2, places: { session_start: 2, 'file:src/a.ts': 1 }, last: '2026-11-19T11:00:00Z', failed: 1, held: 1, quiet: 0, tier: 'learned',
   per_run: [
-    { run: 'e_r1', said_at: '2026-11-19T10:00:00Z', said: 2, before: 0, after: 1, verdict: 'came_back' },
+    { run: 'e_r1', said_at: '2026-11-19T10:00:00Z', said: 2, before: 0, after: 1, verdict: 'failed' },
     { run: 'e_r2', said_at: '2026-11-19T11:00:00Z', said: 1, before: 1, after: 0, verdict: 'held' },
   ],
 };
@@ -33,7 +33,7 @@ test("counts for the drawing: one per id asked, an owner's version under its pre
   const counts = await countsOf(['e_mine', 'e_never'], [{ id: 'e_mine', props: { preset: 'core.estimate', for: ['file:packs/*/page/*.js'] } }], read);
   assert.deepEqual(asked, [['core.estimate', 'e_never']]);
   assert.deepEqual(counts, [
-    { id: 'e_mine', said: 3, runs: 2, places: record.places, last: record.last, came_back: 1, held: 1, quiet: 0, for: ['file:packs/*/page/*.js'] },
-    { id: 'e_never', said: 0, runs: 0, places: {}, came_back: 0, held: 0, quiet: 0 },
+    { id: 'e_mine', said: 3, runs: 2, places: record.places, last: record.last, failed: 1, held: 1, quiet: 0, tier: 'learned', for: ['file:packs/*/page/*.js'] },
+    { id: 'e_never', said: 0, runs: 0, places: {}, failed: 0, held: 0, quiet: 0 },
   ]);
 });
