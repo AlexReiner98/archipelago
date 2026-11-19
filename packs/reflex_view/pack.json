@@ -103,6 +103,21 @@
       "limit_ms": 5000
     },
     {
+      "id": "reflex_view.schema",
+      "shape": "rows",
+      "description": "Every type and the checks it implies, for the tree's drawing to ask through its sends: [{ id (type:<t>, check:<t>:<what>), kind (type or check), pack, tier (schema), for, title, words (a type's description), guards (a check's: fields, status, values, ends, ops), fired (a check's refusals lately, each when) }]. Params: days (30 unless said, 90 at most).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "How far back, in days."
+          }
+        }
+      },
+      "limit_ms": 10000
+    },
+    {
       "form": "screen",
       "id": "reflex_view.here",
       "title": "Said",

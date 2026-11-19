@@ -4,7 +4,7 @@
 // version of it (a lens naming it as its preset), its style the one drawn with.
 
 /** The entries a legend may hide: what the tree tells apart. */
-export const ENTRY = /^(kind:(rule|instruction)|pack:[a-z][a-z0-9_]*|tier:(core|pack|owner|learned)|status:(trial|current|retired)|event:(miss|held|failed|fired))$/;
+export const ENTRY = /^(kind:(rule|instruction|type|check)|pack:[a-z][a-z0-9_]*|tier:(core|pack|owner|learned|schema)|status:(trial|current|retired)|event:(miss|held|failed|fired))$/;
 
 /** The hidden list after a toggle: an entry hidden when off, shown again when on, each once, in order. */
 export const toggled = (hidden, entry, on) => {
@@ -17,7 +17,7 @@ export const toggled = (hidden, entry, on) => {
  * hidden into its own style; or, where the view is a preset with no version yet, the version made with the style drawn.
  */
 export function legendOps({ view, entry, on, style, filter, walk, limit }, kept) {
-  if (!ENTRY.test(String(entry ?? ''))) throw new Error(`entry is one of kind:rule|instruction, pack:<id>, tier:core|pack|owner|learned, status:trial|current|retired, event:miss|held|failed|fired: not "${entry}"`);
+  if (!ENTRY.test(String(entry ?? ''))) throw new Error(`entry is one of kind:rule|instruction|type|check, pack:<id>, tier:core|pack|owner|learned|schema, status:trial|current|retired, event:miss|held|failed|fired: not "${entry}"`);
   if (typeof on !== 'boolean') throw new Error('on is true (show it) or false (hide it)');
   if (kept) {
     const own = kept.props?.style && typeof kept.props.style === 'object' ? kept.props.style : {};

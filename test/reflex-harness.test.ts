@@ -28,8 +28,8 @@ test("what a session's tools say is kept to its run once, each tool's place apar
 
 test('a reflex is said only at a place that is said: another is refused, naming the places', async () => {
   const l = await fresh();
-  await assert.rejects(make(l, [{ op: 'create', type: 'reflex', title: 'For a pack', body: 'x', status: 'trial', props: { for: ['tool:change', 'pack:build'] } }]), /session_start, working_rules, server_restarted, setup_behind, tool:<name>/);
-  const made = await make(l, [{ op: 'create', ref: 'ok', type: 'reflex', title: 'For a tool and a file', body: 'x', status: 'trial', props: { for: ['tool:change', 'file:src/**/*.ts', 'rule:sessions.show_what_you_saw'] } }]);
+  await assert.rejects(make(l, [{ op: 'create', type: 'reflex', title: 'For a pack', body: 'x', status: 'trial', props: { for: ['tool:change', 'pack:build'] } }]), /session_start, working_rules, server_restarted, setup_behind, connect, tool:<name>/);
+  const made = await make(l, [{ op: 'create', ref: 'ok', type: 'reflex', title: 'For a tool and a file', body: 'x', status: 'trial', props: { for: ['tool:change', 'file:src/**/*.ts', 'rule:sessions.show_what_you_saw', 'session_start:handoff', 'prompt:seeing', 'show:landed', 'connect', 'connect:intro'] } }]);
   await assert.rejects(l.change(owner, { ops: [{ op: 'update', id: made.ok, props: { for: ['pack:ui'] } }], reason: 'test' }), /place that is said/);
 });
 
