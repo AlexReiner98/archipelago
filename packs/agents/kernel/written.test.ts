@@ -43,9 +43,17 @@ test('a skill opens on its frontmatter, its first paragraph the description', ()
 
 test('answer.written reads the instructions once, and nothing without a checkout', async () => {
   let reads = 0;
-  const ctx = { reads: async () => (reads++, { presets: [], kept: [kept('a', 'Hi.', { for: ['written:CLAUDE.md'], remote: 'o/r' })] }) } as unknown as KernelContext;
+  const ctx = { reads: async () => (reads++, { presets: [], kept: [kept('a', 'Hi.', { for: ['written:CLAUDE.md'], remote: 'o/r' })] }), call: async () => { throw new Error('no root.rules_file here'); } } as unknown as KernelContext;
   assert.deepEqual(await written(ctx, {}), { files: [] });
   assert.equal(reads, 0);
   const { files } = await written(ctx, { remote: 'git@github.com:o/r.git' });
-  assert.equal(files[0].path, 'CLAUDE.md');
+  assert.deepEqual(files.map((f) => f.path), ['CLAUDE.md'], 'a server that cannot word the rules file hands none');
+});
+
+test('every checkout is given the working rules as the server words them, with the run they are said to', async () => {
+  const asked: unknown[] = [];
+  const ctx = { reads: async () => ({ presets: [], kept: [] }), call: async (name: string, input: unknown) => (asked.push([name, input]), { text: '# Working with Archipelago\n' }) } as unknown as KernelContext;
+  const { files } = await written(ctx, { run: 'e_run' });
+  assert.deepEqual(files.map((f) => [f.path, f.text]), [['.claude/pelago.md', '# Working with Archipelago\n']]);
+  assert.deepEqual(asked, [['root.rules_file', { run: 'e_run' }]]);
 });
