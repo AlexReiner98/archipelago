@@ -47,8 +47,8 @@ export function namesShown(tree, placed, counts, z, n, f) {
   return { shown, boxes };
 }
 
-/** A name's transform at `f`: at its node, turned along its ray, scaled. Its text stands at `nameAt`, in that frame. */
-export const nameTransform = (l, f, at) => `translate(${at(l.x)} ${at(l.y)}) rotate(${at(l.turn)}) scale(${Math.round(f * 1000) / 1000})`;
+/** A name's transform at `f`, in its node's group (which stands at the node): turned along its ray, scaled. Its text stands at `nameAt`, in that frame. */
+export const nameTransform = (l, f, at) => `rotate(${at(l.turn)}) scale(${Math.round(f * 1000) / 1000})`;
 /** Where a name's text stands in its own frame, and how it is anchored: outward or inward, read left to right. */
 export function nameAt(l) {
   // Read left to right: on the left the frame is turned half round, so along the ray is its negative x.
@@ -63,7 +63,7 @@ export function nameAt(l) {
  * step of a zoom held the page for tens of milliseconds a step on a tree of hundreds of nodes.
  * `choose(f)` answers the set of ids shown at `f`; `labels` are every name laid out; `send(patches)` sends.
  */
-export function rescaler({ labels, choose, shownAt, rescale, least, settle, at, send }) {
+export function rescaler({ labels, choose, shownAt, rescale, least, settle, at, send, by = 1 }) {
   let f = 1, shown = shownAt, timer = null, wanted = 1;
   const sized = new Map([...labels.values()].map((l) => [l.id, 1]));
   const apply = () => {
@@ -82,7 +82,8 @@ export function rescaler({ labels, choose, shownAt, rescale, least, settle, at, 
   };
   return {
     viewport(view) {
-      wanted = 1 / Math.max(least, Number(view?.scale) || 1);
+      // `by`: the picture's units a unit of its box shows at, where its frame is fitted into a box of another size.
+      wanted = 1 / Math.max(least, (Number(view?.scale) || 1) * by);
       if (timer !== null) clearTimeout(timer);
       timer = setTimeout(apply, settle);
       return [];

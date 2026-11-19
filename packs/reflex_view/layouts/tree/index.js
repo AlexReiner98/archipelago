@@ -13,7 +13,8 @@ import { radial } from './radial.js';
 import { rulesOf, schemaOf, storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
-import { barOf, cssOf, packHues } from './look.js';
+import { barOf, cssOf, packHues, reflowOf } from './look.js';
+import { lastLaid, movesOf } from './reflow.js';
 import { player } from './play.js';
 import { namesShown, rescaler } from './names.js';
 import { at, m } from './marks.js';
@@ -75,19 +76,24 @@ function legendClick(event, hidden, style, tools, answer, again) {
  * is the same view's, so it is built again from it (grown, as one already seen) and its marks take the old ones' place.
  */
 export async function picture(input, tools) {
-  let now = null;
+  // The page's last view, and the box the picture was mounted in: drawn again in place, the tree's frame is fitted
+  // into that box (./reflow.js), so its names are laid for the two together.
+  let now = null, view = null;
+  const box = {};
+  const viewNow = () => view;
   const again = async (hidden) => {
-    const next = await drawn1({ ...input, style: { ...input.style, hidden } }, tools, again);
+    const next = await drawn1({ ...input, style: { ...input.style, hidden } }, tools, again, viewNow, box);
     now?.end?.();
     now = next;
     const all = next.scene.svg?.[2];
     tools.patch([...(all ? [{ key: 'rt-all', mark: all }] : []), ...(next.scene.aside ? [{ key: 'rt-legend', mark: next.scene.aside }] : []), ...(next.scene.before ? [{ key: 'rt-bar', mark: next.scene.before }] : [])]);
   };
-  now = await drawn1(input, tools, again);
-  return { ...now, on: (event) => now.on?.(event) ?? [], viewport: (view) => now.viewport?.(view) ?? [], restyle: () => [], end: () => now.end?.() };
+  now = await drawn1(input, tools, again, viewNow);
+  Object.assign(box, now.scene.size ?? {});
+  return { ...now, on: (event) => now.on?.(event) ?? [], viewport: (v) => ((view = v), now.viewport?.(v) ?? []), restyle: () => [], end: () => now.end?.() };
 }
 
-async function drawn1({ answer, style, reduced, width, height }, tools, again) {
+async function drawn1({ answer, style, reduced, width, height }, tools, again, viewNow = () => null, box = null) {
   const missing = [];
   const read = (group) => (name) => {
     const v = style[group]?.[name];
@@ -150,6 +156,8 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again) {
   const film = filmOf(tree, story, n);
   film.events = film.events.filter((e) => !hidden.has(`event:${e.kind}`));
   const name = JSON.stringify([answer.lens?.find, answer.lens?.only, answer.lens?.not, answer.lens?.from]);
+  // Drawn before (a legend entry turned, the map changed), it moves from where it stood (./reflow.js).
+  const was = lastLaid(name, placed, reduced);
   const before = drawn.get(name);
   drawn.set(name, new Set(tree.born.map((node) => node.id)));
   const grown = reduced || before !== undefined;
@@ -159,13 +167,16 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again) {
   const named = namesShown(tree, placed, held, z, n, 1);
   // Chosen again as the page zooms, once the zoom settles (reflex_name_settle ms, half a growth where the view says
   // none), and only what changed sent (./names.js).
-  const names = rescaler({ labels: placed.labels, choose: (f) => namesShown(tree, placed, held, z, n, f).shown, shownAt: named.shown, rescale: n('reflex_name_rescale'), least: n('reflex_name_zoom_least'), settle: Number.isFinite(style.numbers?.reflex_name_settle) ? style.numbers.reflex_name_settle : n('reflex_grow') / 2, at, send: (out) => tools.patch(out) });
+  // In place, the new frame is fitted into the box the picture was mounted in: a unit of that box shows `by` of the frame's.
+  const by = box?.width > 0 && box?.height > 0 ? Math.min(box.width / placed.width, box.height / placed.height) : 1;
+  const names = rescaler({ by, labels: placed.labels, choose: (f) => namesShown(tree, placed, held, z, n, f).shown, shownAt: named.shown, rescale: n('reflex_name_rescale'), least: n('reflex_name_zoom_least'), settle: Number.isFinite(style.numbers?.reflex_name_settle) ? style.numbers.reflex_name_settle : n('reflex_grow') / 2, at, send: (out) => tools.patch(out) });
   // Grown, the gaps stand already: each place a miss sparked on and grew nothing from.
   const gapped = new Set(grown ? film.events.filter((e) => e.kind === 'miss' && !e.grew).map((e) => e.node.id) : []);
   // A bough whose place can be said takes a new trial node there, where the view sends `add` (the pack's action).
   const adding = typeof style.sends?.add === 'string' && typeof tools.act === 'function';
   const addsAt = (node) => (adding && !node.item && !node.preset && node.parent ? placeOfBough(node.id) : null);
-  const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown, story, gapped, addsAt);
+  const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown, story, gapped, addsAt, was);
+  const moves = was && movesOf(tree, placed, was, reflowOf(style, n));
   const css = cssOf(style, z, n, hues) + legendCss;
   if (missing.length) return { scene: { message: `This view's style names no ${[...new Set(missing)].slice(0, 2).join(', ')}: draw it with the Reflex tree view, whose preset names them.` } };
   const speed = { now: 1 };
@@ -173,7 +184,7 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again) {
   const play = player({ tree, placed, film, story, z, n, pools: { sparks, lights }, from, fresh, speed });
   const start = grown ? story.to : story.from;
   const bar = barOf({ ...weekTo(story, start), day: new Date(start).toISOString().split('T')[0], schematic: story.schematic, speed: speed.now, speeds: reduced ? [] : SPEEDS });
-  let alive = !reduced, last = null, frames = 0;
+  let alive = !reduced, last = null, frames = 0, movedAt = null;
   const loop = async () => {
     while (alive) {
       await tools.frame();
@@ -185,6 +196,9 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again) {
       // first: one with none has no image to show.
       if (++frames === 2) tools.surface?.().then((s) => s && (s.canvas.getContext('2d'), s.show())).catch(() => {});
       const now = performance.now(), dt = last === null ? 0 : Math.min(n('reflex_frame_most'), (now - last) / 1000);
+      // Drawn where it stood, it moves once its marks are on the page; moved, its names are chosen again.
+      if (moves && frames === 2) (tools.patch(moves.start), (movedAt = now));
+      if (movedAt !== null && now - movedAt >= reflowOf(style, n)) (tools.patch(moves.end), (movedAt = null), names.viewport(viewNow() ?? {}));
       last = now;
       const out = play.step(dt);
       if (out.length) tools.patch(out);

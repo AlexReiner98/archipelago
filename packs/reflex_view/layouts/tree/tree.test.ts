@@ -361,3 +361,69 @@ test('zooming sends nothing until the zoom settles, then one batch with only the
   assert.equal(batches.length, 1, 'the same zoom again sends nothing');
   drawn.end();
 });
+
+/** Each keyed mark's attributes in a scene or a mark, by key. */
+const keyed = (mark: any, out = new Map<string, any>()): Map<string, any> => {
+  if (!Array.isArray(mark)) return out;
+  // A list of marks, or a mark: [tag, attributes, ...what is in it].
+  if (typeof mark[0] !== 'string') return (mark.forEach((kid) => keyed(kid, out)), out);
+  const [, attrs, ...kids] = mark;
+  if (attrs?.key) out.set(attrs.key, attrs);
+  kids.forEach((kid) => keyed(kid, out));
+  return out;
+};
+const quick = { ...style, numbers: { ...style.numbers, reflex_reflow: 20, reflex_film_lead: 0.01 } };
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+test('a legend entry turned, the one tree moves live: what stays moves to its new place, what leaves fades, and it keeps playing', async () => {
+  const a = { ...answer(3, []), lens: { find: ['reflow-legend'] } };
+  const rules = [{ id: 'core.guard', title: 'A guard', pack: 'core', effect: 'refuse', where: 'tool:change', fired: [] }];
+  const act = async (name: string, params: any) => (name === 'rules' ? { answer: rules } : name === 'legend' ? { answer: { changed: true } } : { answer: params.ids.map((one: string) => ({ id: one, said: 0 })) });
+  const p = page();
+  const drawn = await picture({ answer: a, style: { ...quick, sends: { ...quick.sends, rules: 'rules', legend: 'legend' } }, reduced: false }, { ...p.tools, act });
+  p.mount();
+  const was = keyed(drawn.scene.svg);
+  drawn.on({ name: 'click', key: 'lg:kind:rule' });
+  await wait(60);
+  const swaps = p.patches.filter((x) => x.key === 'rt-all' && x.mark);
+  assert.equal(swaps.length, 1, 'one tree, its marks taken over in place');
+  const first = keyed(swaps[0].mark);
+  const stay = [...first.keys()].find((k) => k.startsWith('n:e_') && was.has(k))!;
+  assert.equal(first.get(stay).transform, was.get(stay).transform, 'drawn first where it stood');
+  assert.ok(first.get('n:core.guard')?.class.includes('rt-leaving'), 'what leaves stands where it stood, to fade');
+  const moved = p.patches.find((x) => x.key === stay && x.set?.transform && x.over > 0);
+  assert.ok(moved, 'then moves to its new place, played by the page');
+  assert.ok(p.patches.some((x) => x.key === 'rt-svg' && x.set?.viewBox && x.over > 0), 'the frame fits the new tree');
+  assert.ok(p.patches.some((x) => x.key === 'n:core.guard' && x.toggle?.['rt-gone']), 'what leaves fades');
+  assert.ok(p.patches.some((x) => x.key === 'n:core.guard' && x.remove), 'and is taken out once moved');
+  assert.ok(p.patches.some((x) => x.key === 'rt-all' && x.toggle?.['rt-moving'] === false), 'its names show again once it has moved');
+  const cams = p.patches.filter((x) => x.key === 'cam').length;
+  await wait(20);
+  assert.ok(p.patches.filter((x) => x.key === 'cam').length > cams, 'it keeps playing');
+  drawn.end();
+});
+
+test('an item added on the map, the tree drawn again starts where the last stood, moves, and grows the new node', async () => {
+  const lens = { find: ['reflow-add'] };
+  const first = page();
+  const a = await picture({ answer: { ...answer(3, []), lens }, style: quick, reduced: false }, first.tools);
+  first.mount();
+  await wait(20);
+  const was = keyed(a.scene.svg);
+  const second = page();
+  const b = await picture({ answer: { ...answer(4, []), lens }, style: quick, reduced: false }, second.tools);
+  a.end();
+  second.mount();
+  const now = keyed(b.scene.svg);
+  const stay = [...was.keys()].find((k) => k.startsWith('n:e_'))!;
+  assert.equal(now.get(stay).transform, was.get(stay).transform, 'what stays is drawn first where it stood');
+  assert.equal(now.get('rt-svg').viewBox, was.get('rt-svg').viewBox, 'in the frame it stood in');
+  assert.ok(now.has(`n:${id(3)}`), 'the new node is there');
+  await wait(80);
+  assert.ok(second.patches.some((x) => x.key === stay && x.set?.transform && x.over > 0), 'and the tree moves to its new shape');
+  assert.ok(second.patches.some((x) => x.key === `n:${id(3)}` && x.toggle?.on === true), 'the new node grows in');
+  const cams = second.patches.filter((x) => x.key === 'cam').length;
+  await wait(20);
+  assert.ok(second.patches.filter((x) => x.key === 'cam').length > cams, 'it keeps playing');
+  b.end();
+});

@@ -72,6 +72,9 @@ ${byPack.join('\n')}
 .rt-name { fill: var(--ln-text); font-size: var(--ln-reflex-name-text); font-weight: 600; pointer-events: none; }
 .rt-bough .rt-name { fill: var(--ln-muted); }
 .rt-name.rt-quiet { opacity: 0; transition: opacity ${n('reflex_grow')}ms ease-out; }
+.rt-moving .rt-node .rt-name, .rt-moving .rt-node.rt-lit .rt-name.rt-quiet { opacity: 0; transition: none; }
+.rt-leaving { transition: opacity ${reflowOf(style, n)}ms ease-out; }
+.rt-leaving.rt-gone { opacity: 0; }
 .rt-node.rt-lit .rt-name.rt-quiet { opacity: 1; }
 .rt-glow { pointer-events: none; }
 .rt-spark circle { fill: ${write}; }
@@ -125,3 +128,6 @@ export function barOf({ misses, held, day, schematic, speed, speeds }) {
     ...speeds.map((s) => word(`rt:speed:${s}`, `${s}×`, s === speed, `Play at ${s} times`)),
   );
 }
+
+/** How long the tree takes to move to a new shape (./reflow.js): reflex_reflow ms, or one growth where a view kept before it says none. */
+export const reflowOf = (style, n) => (Number.isFinite(style.numbers?.reflex_reflow) ? style.numbers.reflex_reflow : n('reflex_grow'));

@@ -127,6 +127,7 @@
         "marks.js": "layouts/tree/marks.js",
         "names.js": "layouts/tree/names.js",
         "story.js": "layouts/tree/story.js",
+        "reflow.js": "layouts/tree/reflow.js",
         "legend.js": "layouts/tree/legend.js"
       }
     }
@@ -247,7 +248,8 @@
             "reflex_tier_learned": 0.8,
             "reflex_retired_ink": 0.35,
             "reflex_gap_ink": 0.75,
-            "reflex_tier_schema": 1.6
+            "reflex_tier_schema": 1.6,
+            "reflex_reflow": 600
           },
           "hues": [
             "#5aa9e6",
