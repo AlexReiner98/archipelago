@@ -241,7 +241,9 @@ test('the legend is the filter: entries off leave the tree, every entry keeps it
   const reflexOnly = (await picture({ answer: { ...a, lens: { find: ['legend-click'] } }, style: { ...style, sends, hidden: ['kind:rule'] }, reduced: false }, { ...tools, surface: async () => null }));
   const patched = reflexOnly.on({ name: 'click', key: 'lg:kind:rule' });
   reflexOnly.end();
-  assert.deepEqual(asked.filter((x) => x[0] === 'legend').at(-1), ['legend', { entry: 'kind:rule', on: true }], 'a click asks the pack to turn it back on');
+  const sent = asked.filter((x) => x[0] === 'legend').at(-1)[1];
+  assert.deepEqual([sent.view, sent.entry, sent.on], ['reflex_view.tree', 'kind:rule', true], 'a click asks the pack to turn it back on, on the owner’s version of the shipped view');
+  assert.ok(sent.style.shape === 'reflex_tree' && !('hidden' in sent.style) && sent.filter.find.length, 'with the style and query drawn, should it have to make that version');
   assert.deepEqual(patched, [{ key: 'lg:kind:rule', toggle: { 'rt-off': false } }]);
   const none = await picture({ answer: { ...a, lens: { find: ['legend-none'] } }, style: { ...style, sends, hidden: ['kind:rule', 'kind:instruction'] }, reduced: true }, tools);
   assert.ok(none.scene.aside, 'everything filtered out, the legend stays to bring it back');

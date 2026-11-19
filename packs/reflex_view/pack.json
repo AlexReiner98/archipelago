@@ -162,7 +162,8 @@
           "sends": {
             "said": "reflex_view.said_counts",
             "misses": "reflex_view.misses",
-            "rules": "reflex_view.rules"
+            "rules": "reflex_view.rules",
+            "legend": "reflex_view.legend"
           },
           "colors": {
             "reflex_write": "#e8912d",

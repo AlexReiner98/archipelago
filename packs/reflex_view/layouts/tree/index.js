@@ -22,6 +22,8 @@ import { hiddenOf, legendCss, legendOf, shownBy } from './legend.js';
 /** What each view drew last, by its query: opened again, it stands grown. */
 const drawn = new Map();
 const SPEEDS = [0.5, 1, 2];
+/** The view this drawing ships as (reflex_view's preset): a legend's change goes to its owner's version. */
+const SHIPPED = 'reflex_view.tree';
 
 /**
  * What the pack answers of each node (style.sends.said: the reflex_view pack's said_counts), reflex_said_batch ids at
@@ -55,11 +57,15 @@ async function missesOf(style, tools, n, gesture = 'misses') {
  * A click on a legend entry: the view's pack is asked to turn it off or on (sends.legend), as the person. The view
  * changes, and the picture is drawn again from it; meanwhile the entry looks as it will.
  */
-function legendClick(event, hidden, style, tools) {
+function legendClick(event, hidden, style, tools, answer) {
   const key = typeof event.key === 'string' ? event.key : '';
   if (event.name !== 'click' || !key.startsWith('lg:') || typeof style.sends?.legend !== 'string' || typeof tools.act !== 'function') return [];
   const entry = key.slice('lg:'.length), on = hidden.has(entry);
-  tools.act(style.sends.legend, { entry, on }).catch(() => {});
+  // The view changed is the owner's version of the shipped one (a drawing is not told its view's id); where none is
+  // kept yet, the pack makes it from the style and query drawn here.
+  const { hidden: _, ...drawnStyle } = style;
+  const query = { filter: { find: answer?.lens?.find ?? [], only: answer?.lens?.only ?? [], not: answer?.lens?.not ?? [] }, ...(answer?.lens?.walk && { walk: answer.lens.walk }), ...(answer?.lens?.limit && { limit: answer.lens.limit }) };
+  tools.act(style.sends.legend, { view: SHIPPED, entry, on, style: drawnStyle, ...query }).catch(() => {});
   return [{ key, toggle: { 'rt-off': !on } }];
 }
 
@@ -108,7 +114,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const happened = { miss: story.misses.length, held: story.said.filter((x) => x.verdict !== 'failed' && x.verdict !== 'came_back').length, failed: story.said.filter((x) => x.verdict === 'failed' || x.verdict === 'came_back').length, fired: story.rules.reduce((sum, r) => sum + r.fired.length, 0) };
   const toggles = typeof style.sends?.legend === 'string' && typeof tools.act === 'function';
   const legend = legendOf({ nodes: everyNode, events: happened, hidden, hues, toggles, schematic: story.schematic });
-  if (!tree) return { scene: { svg: m('svg', { class: 'rt', width: z('reflex_margin'), height: z('reflex_margin') }), css: cssOf(style, z, n, hues) + legendCss, aside: legend, size: { width: z('reflex_margin'), height: z('reflex_margin') } }, on: (event) => legendClick(event, hidden, style, tools) };
+  if (!tree) return { scene: { svg: m('svg', { class: 'rt', width: z('reflex_margin'), height: z('reflex_margin') }), css: cssOf(style, z, n, hues) + legendCss, aside: legend, size: { width: z('reflex_margin'), height: z('reflex_margin') } }, on: (event) => legendClick(event, hidden, style, tools, answer) };
   // How often each held, for which names show first and the tips.
   const held = new Map();
   for (const one of story.said) if (one.verdict === 'held') held.set(one.id, (held.get(one.id) ?? 0) + 1);
@@ -174,7 +180,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
         if (event.name === 'leave') return [{ tip: null }];
         return [];
       }
-      if (key.startsWith('lg:')) return legendClick(event, hidden, style, tools);
+      if (key.startsWith('lg:')) return legendClick(event, hidden, style, tools, answer);
       if (event.name !== 'click' || reduced) return [];
       if (key === 'rt:replay') return play.replay();
       if (key.startsWith('rt:speed:')) {
