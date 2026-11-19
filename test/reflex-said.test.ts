@@ -40,6 +40,7 @@ test('what is said to a run is kept, and its record says whether its miss came b
   assert.deepEqual(rec.places, { 'tool:change': 2 });
   assert.equal(rec.failed, 1);
   assert.equal(rec.tier, 'learned');
+  assert.equal((rec as { pack?: string }).pack, 'reflex');
   assert.equal(file.tier, 'owner');
   assert.equal(rec.quiet, 1);
   assert.deepEqual({ said: file.said, places: file.places }, { said: 1, places: { 'file:src/a.ts': 1 } });
@@ -110,6 +111,27 @@ test('each hour a reflex is promoted or retired by its record, as the pack, with
   const status = new Map([good, gone].map((i) => [i.id, i.status]));
   assert.deepEqual([status.get(made.good), status.get(made.gone)], ['current', 'retired']);
   assert.deepEqual(await tick(kernelContext(l, 'reflex_said')), { moved: 0 }, 'nothing more moves');
+});
+
+test("the tree's story: its instructions and every rule in force, by pack and kind, misses, sayings and verdicts", async () => {
+  const l = await fresh();
+  const at = new Date().toISOString();
+  const made = await make(l, [
+    { op: 'create', ref: 'run', type: 'run', title: 'A session', props: { last_seen: at } },
+    { op: 'create', ref: 'node', type: 'reflex', title: 'Short titles', body: 'Name it in a few words.', status: 'trial', props: { for: ['tool:change'], misses: ['title is too long'] } },
+  ]);
+  await instructionsFor(kernelContext(l, 'agents'), 'tool:change', { run: made.run });
+  await new Promise((r) => setTimeout(r, 5));
+  const story = [{ n: 1, at: new Date().toISOString(), said: 'Change refused (x): the title is too long', about: [], links: [], did: 'refused', by: 'write' }, { n: 2, at: new Date().toISOString(), said: 'Change refused (y): no such field', about: [], links: [], did: 'refused', by: 'write' }];
+  await l.change(human(), { ops: [{ op: 'update', id: made.run, props: { story } }], reason: 'test: refusals befell it' });
+  const told = (await kernelContext(l, 'agents').reads({ said_story: { ids: [made.node] } })) as { nodes: { id: string; kind: string; pack: string; tier: string; effect?: string; for: string[] }[]; misses: { where: string; grew?: string }[]; said: { id: string; verdict: string }[]; fired: unknown[] };
+  const node = told.nodes.find((n) => n.id === made.node)!;
+  assert.deepEqual({ kind: node.kind, pack: node.pack, tier: node.tier }, { kind: 'instruction', pack: 'reflex', tier: 'learned' });
+  const rule = told.nodes.find((n) => n.id === 'core.agent_changes')!;
+  assert.deepEqual({ kind: rule.kind, pack: rule.pack, tier: rule.tier }, { kind: 'rule', pack: 'core', tier: 'core' });
+  assert.ok(told.nodes.some((n) => n.id === 'reflex_said.write_node' && n.for[0] === 'reply_ended:missed'), 'a reply rule under reply_ended');
+  assert.deepEqual(told.misses.map((m) => m.grew ?? '').sort(), ['', made.node], 'one grew a trial, one nothing covers');
+  assert.deepEqual(told.said.filter((s) => s.id === made.node).map((s) => s.verdict), ['failed']);
 });
 
 const human = () => ({ kind: 'human' as const, name: 'owner' });

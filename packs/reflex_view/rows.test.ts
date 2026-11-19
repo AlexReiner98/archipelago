@@ -29,11 +29,11 @@ test('then each run, the newest first, named, with what became of its miss', () 
 
 test("counts for the drawing: one per id asked, an owner's version under its preset's id, none read as zeros", async () => {
   const asked: string[][] = [];
-  const read = async (ids: string[]) => (asked.push(ids), [{ ...record, id: 'core.estimate' }]);
+  const read = async (ids: string[]) => (asked.push(ids), [{ ...record, id: 'core.estimate', pack: 'sessions' }]);
   const counts = await countsOf(['e_mine', 'e_never'], [{ id: 'e_mine', status: 'current', props: { preset: 'core.estimate', for: ['file:packs/*/page/*.js'] } }], read);
   assert.deepEqual(asked, [['core.estimate', 'e_never']]);
   assert.deepEqual(counts, [
-    { id: 'e_mine', said: 3, runs: 2, places: record.places, last: record.last, failed: 1, held: 1, quiet: 0, tier: 'learned', status: 'current', for: ['file:packs/*/page/*.js'], per_run: [{ said_at: '2026-11-19T10:00:00Z', verdict: 'failed' }, { said_at: '2026-11-19T11:00:00Z', verdict: 'held' }] },
+    { id: 'e_mine', said: 3, runs: 2, places: record.places, last: record.last, failed: 1, held: 1, quiet: 0, tier: 'learned', pack: 'sessions', status: 'current', for: ['file:packs/*/page/*.js'], per_run: [{ said_at: '2026-11-19T10:00:00Z', verdict: 'failed' }, { said_at: '2026-11-19T11:00:00Z', verdict: 'held' }] },
     { id: 'e_never', said: 0, runs: 0, places: {}, failed: 0, held: 0, quiet: 0, per_run: [] },
   ]);
 });
