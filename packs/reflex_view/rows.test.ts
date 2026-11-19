@@ -30,10 +30,10 @@ test('then each run, the newest first, named, with what became of its miss', () 
 test("counts for the drawing: one per id asked, an owner's version under its preset's id, none read as zeros", async () => {
   const asked: string[][] = [];
   const read = async (ids: string[]) => (asked.push(ids), [{ ...record, id: 'core.estimate' }]);
-  const counts = await countsOf(['e_mine', 'e_never'], [{ id: 'e_mine', props: { preset: 'core.estimate' } }], read);
+  const counts = await countsOf(['e_mine', 'e_never'], [{ id: 'e_mine', props: { preset: 'core.estimate', for: ['file:packs/*/page/*.js'] } }], read);
   assert.deepEqual(asked, [['core.estimate', 'e_never']]);
   assert.deepEqual(counts, [
-    { id: 'e_mine', said: 3, runs: 2, places: record.places, last: record.last, came_back: 1, held: 1, quiet: 0 },
+    { id: 'e_mine', said: 3, runs: 2, places: record.places, last: record.last, came_back: 1, held: 1, quiet: 0, for: ['file:packs/*/page/*.js'] },
     { id: 'e_never', said: 0, runs: 0, places: {}, came_back: 0, held: 0, quiet: 0 },
   ]);
 });
