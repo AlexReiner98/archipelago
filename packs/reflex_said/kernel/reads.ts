@@ -58,7 +58,11 @@ export async function said_record(ctx: KernelContext, q: { said_record: { ids: u
   }));
   // Whose each is: what ships a preset is read off the registry, what a kept one is off its type.
   const shipped = (id: string) => ctx.registry.packs.find((p) => (p.styles ?? []).some((st) => st.id === id))?.id;
-  return records(ids, sayings, stories, answering).map((r) => ({ ...r, tier: tierOf(r.id, items.find((it) => it.id === r.id), shipped(r.id)) }));
+  return records(ids, sayings, stories, answering).map((r) => {
+    const tier = tierOf(r.id, items.find((it) => it.id === r.id), shipped(r.id));
+    const pack = tier === 'learned' ? 'reflex' : shipped(r.id);
+    return { ...r, tier, ...(pack && { pack }) };
+  });
 }
 
 /** answer.said_record: the record of some instructions, for the view reflex_said.record. */

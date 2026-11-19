@@ -62,6 +62,43 @@
       "limit_ms": 5000
     },
     {
+      "id": "reflex_view.story",
+      "shape": "rows",
+      "description": "The tree's story over a window, for its drawing to ask through its sends, as one answer (not rows): { from, to, nodes: [{ id, kind (instruction or rule), pack, tier, effect (a rule's), status, for, title }], misses: [{ at, where, kind, grew }], said: [{ id, at, verdict }], fired: [{ id, day, effect (held, refused, asked), n }] }. Nodes are the ids asked, every preset said in the window and every rule in force; a miss is one no settled node covers, grew the trial that covers it. Params: ids (at most 50), days (30 unless said, 90 at most).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The nodes in the view, 50 at most."
+          },
+          "days": {
+            "type": "integer",
+            "description": "How far back, in days."
+          }
+        }
+      },
+      "limit_ms": 10000
+    },
+    {
+      "id": "reflex_view.rules",
+      "shape": "rows",
+      "description": "Every rule in force, for the tree's drawing to ask through its sends: [{ id, title, pack, effect (hold, refuse, ask, requires...), where (tool:change:<type>:<fields>, reply_ended:<fact>, or the event it is on), fired: [each time it held, refused or asked in the window, as the start of its day] }]. Params: days (30 unless said, 90 at most).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "How far back, in days."
+          }
+        }
+      },
+      "limit_ms": 5000
+    },
+    {
       "form": "screen",
       "id": "reflex_view.here",
       "title": "Said",

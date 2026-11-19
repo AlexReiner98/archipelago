@@ -26,6 +26,20 @@ export default {
     return { answer: Array.isArray(found) ? found : [] };
   },
 
+  // What the tree's drawing asks through its sends: every rule in force and when each fired.
+  'reflex_view.rules': async (input, ctx) => {
+    const days = Number.isInteger(input?.days) ? input.days : undefined;
+    const found = await ctx.read({ said_rules: days === undefined ? {} : { days } });
+    return { answer: Array.isArray(found) ? found : [] };
+  },
+
+  // What the tree's drawing asks through its sends: its story over a window, as the reflex_said pack tells it.
+  'reflex_view.story': async (input, ctx) => {
+    const ids = Array.isArray(input?.ids) ? input.ids.filter((id) => typeof id === 'string').slice(0, MOST) : [];
+    const days = Number.isInteger(input?.days) ? input.days : undefined;
+    return { answer: await ctx.read({ said_story: { ids, ...(days !== undefined && { days }) } }) };
+  },
+
   // What the tree's drawing asks through its sends: each node's counts, by the id its item is said under.
   'reflex_view.said_counts': async (input, ctx) => {
     const asked = Array.isArray(input?.ids) ? [...new Set(input.ids.filter((id) => typeof id === 'string' && id))].slice(0, MOST) : [];

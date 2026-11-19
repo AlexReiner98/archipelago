@@ -57,6 +57,8 @@ export interface Record_ {
   places: Record<string, number>;
   last?: string;
   tier?: Tier;
+  /** The pack it came from: the one that ships a preset, reflex for a learned one; none for the owner's own. */
+  pack?: string;
   failed: number;
   held: number;
   quiet: number;
