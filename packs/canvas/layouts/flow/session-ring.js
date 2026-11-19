@@ -29,10 +29,10 @@ export function opacityOf(s, style) {
  * The rings round a step, under it: `outline(shape, x, y, w, h, rx, cut)` draws the step's own shape, here grown by the
  * style's flow_session_gap for each ring outward. None where nobody is on it.
  */
-export function sessionRings({ item, shape, x, y, w, h, corner, bevel, z, outline, m, style }) {
+export function sessionRings({ item, shape, x, y, w, h, corner, bevel, z, outline, m, style, noTag = false }) {
   const on = sessionsOn(item);
   if (!on.length) return null;
-  const gap = z('session_gap'), tags = tagSizes(style);
+  const gap = z('session_gap'), tags = noTag ? null : tagSizes(style);
   return m('g', { class: 'lf-srs', 'aria-hidden': 'true' }, ...on.map((s, k) => {
     const out = gap * (k + 1), faint = opacityOf(s, style);
     // The tags stand one over another, the first session's nearest its step, each clear of the outermost ring. A tag

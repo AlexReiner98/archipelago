@@ -7,6 +7,7 @@
 // Wires are straight, from box edge to box edge. Layer: metrics. Pure: the layout's args in, the model out.
 
 import { frameOut, framed, lookOut, paints } from './looks.js';
+import { squareLines } from './square.js';
 
 /** A place [column, row] of whole cells, or nothing. */
 const cellOf = (v) => (Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0) ? v : null);
@@ -70,10 +71,13 @@ export function placedOut(args, m, islandOf, heads, wides = new Map(), follows =
     const unplaced = rest.filter((n) => !cellBy.get(n.id)), taken = new Set(rest.filter((n) => cellBy.get(n.id)).map((n) => String(cellBy.get(n.id))));
     const block = unplaced.length ? blockOf(unplaced, m, columns(rest.length, args.aspect, cw, ch), [cw, ch], taken) : [];
     // Each box in the middle of its cell, so a column of mixed kinds (a decision is wider than a task) keeps one line.
-    const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + (cw - GAP) / 2), y.set(n.id, ly + dy + r * ch + (ch - GAP) / 2));
+    // Each row is as tall as the tallest box in it and no taller (a box with room of its own, a plate hung under it, makes only its row taller); a row nothing stands in keeps the height of the tallest.
+    const cells = [...block, ...rest.filter((n) => cellBy.get(n.id)).map((n) => [n, cellBy.get(n.id)])], rowH = new Map();
+    for (const [n, [, r]] of cells) rowH.set(r, Math.max(rowH.get(r) ?? 0, n.h));
+    const high = (r) => rowH.get(r) ?? ch - GAP, rowTop = (r) => Array.from({ length: r }, (_, q) => high(q) + GAP).reduce((sum, v) => sum + v, 0);
+    const at = (n, [c, r]) => (x.set(n.id, lx + after + dx + c * cw + (cw - GAP) / 2), y.set(n.id, ly + dy + rowTop(r) + high(r) / 2));
     // Row by row across the block, what is linked together kept together (blockOf).
-    for (const [n, cell] of block) at(n, cell);
-    for (const n of rest) if (cellBy.get(n.id)) at(n, cellBy.get(n.id));
+    for (const [n, cell] of cells) at(n, cell);
     // Over the rest it stands in the middle of their width; in the corner, first.
     const wide = Math.max(fn?.w ?? 0, ...rest.map((n) => x.get(n.id) + n.w / 2 - lx));
     if (fn) x.set(fn.id, fat === 'top' ? lx + wide / 2 : lx + fn.w / 2), y.set(fn.id, ly + fn.h / 2);
@@ -115,7 +119,7 @@ export function placedOut(args, m, islandOf, heads, wides = new Map(), follows =
   }
   bottom = Math.max(bottom, ...islands.map((i) => i.rect[3]));
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
-  return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
+  return { m, nodes: m.nodes, x, y, ...straight(m, x, y, sizes), islands, ports: [] };
 }
 
 /**
@@ -201,12 +205,19 @@ export function shelve(loose, { x, y, from: [x0, y0], gap, rise = 0, aspect, acr
 /** How many columns `n` boxes of cells `cw` by `ch` take to stand in a block of `aspect` (width over height): one with no aspect. */
 export const columns = (n, aspect, cw, ch) => (aspect > 0 ? Math.max(1, Math.min(n, Math.round(Math.sqrt((n * aspect * ch) / cw)))) : 1);
 
-/** The kit's graph `m` wired straight, from box edge to box edge, its boxes standing at `x`, `y`: its chains and ties. */
-export function straight(m, x, y) {
+/**
+ * The kit's graph `m` wired from box to box, its boxes standing at `x`, `y`: its chains and ties. Run square, in the
+ * gutters (./square.js), where the style's `sizes` are given; else, and for a wire that found no way, straight from edge to edge.
+ */
+export function straight(m, x, y, sizes) {
   const line = (w) => {
     const a = m.nodes.get(w.a), b = m.nodes.get(w.b), pa = [x.get(w.a), y.get(w.a)], pb = [x.get(w.b), y.get(w.b)];
     return { ...w, points: [edge(pa, a, pb), edge(pb, b, pa)] };
   };
   const drawn = (w) => m.nodes.has(w.a) && m.nodes.has(w.b) && w.a !== w.b;
-  return { chains: m.chains.filter(drawn).map(line), ties: m.ties.filter(drawn).map(line) };
+  const [chains, ties] = [m.chains.filter(drawn), m.ties.filter(drawn)];
+  if (!sizes?.flow_square_clear) return { chains: chains.map(line), ties: ties.map(line) };
+  const runs = squareLines({ wires: [...chains, ...ties], nodes: m.nodes, x, y, sizes });
+  const lay = (w, k) => (runs[k] ? { ...w, points: runs[k] } : line(w));
+  return { chains: chains.map((w, k) => lay(w, k)), ties: ties.map((w, k) => lay(w, chains.length + k)) };
 }

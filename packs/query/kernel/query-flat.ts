@@ -135,6 +135,8 @@ interface Seeded {
   found: Record<string, Found[]>;
   terms: Record<string, string[]>;
   step: Record<string, number>;
+  /** Who holds each item (the people at work on it, who it waits on, its owner), by item id. */
+  holders?: Record<string, { how: 'works' | 'waits'; id: string; name: string }[]>;
   on_islands: boolean;
   /** Each island as the read gives it, passed to the answer whole: only its pack is built here (bug e_e5vwnpg6). */
   islands: IslandRow[];
@@ -233,6 +235,7 @@ export async function flatRead(ctx: KernelContext, input: Record<string, unknown
       const fields = Object.fromEntries(Object.entries(e.props ?? {}).filter(([key, value]) => (allFields ? Object.hasOwn(defs, key) : defs[key]?.shown) && value != null));
       return {
         id: e.id, type: e.type,
+        ...(seeded.holders?.[e.id] && { holders: seeded.holders[e.id] }),
         // What its type is a flavour of, nearest first (task: work), as a link says it: a drawing reads shapes and colours by it.
         ...(type && type.lineage.length > 1 && { is: type.lineage.slice(1) }),
         title: e.title,
