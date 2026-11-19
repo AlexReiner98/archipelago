@@ -8,9 +8,13 @@
 import type { Registry } from '../../loader/kernel/packs.ts';
 import type { RuleDef, Target, Written } from './rules.ts';
 
-/** The packs whose types exist before any map: the item head (packs/loader/kernel/head.ts) is core's, and the packs pack's
- *  types (pack, type, rule... as lane 1 names them) are what every other declaration is an item of. */
-export const FLOOR_PACKS = ['core', 'packs'] as const;
+/**
+ * The packs whose declarations exist before any map: core alone. Its item head (packs/loader/kernel/head.ts) and its part
+ * types (pack, type, link type, rule, view...: packs/pack_model/README.md) are what every other declaration is an item
+ * of, so they cannot be items first. pack_model is not on the floor: it is words only (requires, flavour_of,
+ * stands_over), each drawn from a field that stays the truth, and nothing here reads its links.
+ */
+export const FLOOR_PACKS = ['core'] as const;
 
 /**
  * Core's rules on the floor, each with why: every rule of core's that judges (hold, refuse, spare). Each keeps a person
@@ -51,7 +55,7 @@ export const FLOOR: Readonly<Record<string, string>> = {
   agent_harness_settings: "an agent writes no harness file but the owner's two",
 };
 
-/** The capability a type declares when its items are rules the judge reads (the packs pack's rule type, lane 1). */
+/** The capability a type declares when its items are rules the judge reads: core's rule type (packs/pack_model/README.md), so the kernel names no type. */
 export const RULE_CAPABILITY = 'judges';
 
 /** Whether this rule is on the floor. */
@@ -61,11 +65,18 @@ export const onFloor = (pack: unknown, id: unknown): boolean => pack === 'core' 
 export const floorRules = (core: { rules?: RuleDef[] }): (RuleDef & { pack: string })[] =>
   (core.rules ?? []).filter((r) => onFloor('core', r.id)).map((r) => ({ ...r, pack: 'core' }));
 
-/** The rule an item holds, from its fields: its pack, and rule (its id in the pack), its definition in def or the fields themselves. */
+/**
+ * The rule an item holds, from its fields (packs/pack_model/README.md): its id is declares (an owner's version: the
+ * preset it stands over), its pack shipped.pack, its definition spec. An owner's version of a floor rule is core's.
+ * The older shape (pack, rule, def) is read too.
+ */
 export function ruleOf(props: Record<string, unknown> | undefined): (RuleDef & { pack?: string }) | undefined {
   if (!props) return undefined;
-  const def = (props.def && typeof props.def === 'object' ? props.def : props) as RuleDef & Record<string, unknown>;
-  return { ...def, id: (props.rule ?? def.id) as string | undefined, pack: (props.pack ?? def.pack) as string | undefined };
+  const obj = (v: unknown) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : undefined);
+  const def = (obj(props.spec) ?? obj(props.def) ?? props) as RuleDef & Record<string, unknown>;
+  const id = (props.declares ?? props.preset ?? props.rule ?? def.id) as string | undefined;
+  const pack = (obj(props.shipped)?.pack ?? props.pack ?? def.pack ?? (props.preset !== undefined && onFloor('core', id) ? 'core' : undefined)) as string | undefined;
+  return { ...def, id, pack };
 }
 
 type OneOrMany = string | string[] | undefined;

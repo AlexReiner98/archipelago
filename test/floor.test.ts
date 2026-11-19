@@ -14,13 +14,13 @@ import { agent, freshWith, human, packsWith, PACKS } from './map.ts';
 const core = JSON.parse(readFileSync(join(PACKS, 'core', 'pack.json'), 'utf8')) as { rules: RuleDef[] };
 const judging = core.rules.filter((r) => r.then !== undefined);
 
-/** A pack whose items are rules, as the packs pack's rule type will be (lane 1): it opens the capability the judge reads. */
+/** A pack whose items are rules, shaped as core's rule type (packs/pack_model/README.md), opening the capability the judge also reads. */
 const RULEBOOK: PackFile = {
   id: 'rulebook', version: '1', title: 'Rulebook', requires: ['core'], uses: ['service:capability.judges'],
   types: [{
     id: 'rulebook.rule', title: 'Rule', description: '', extends: 'record',
-    statuses: { open: ['active'], closed: ['retired'] },
-    fields: { pack: { type: 'string' }, rule: { type: 'string' }, def: { type: 'json' } },
+    statuses: { open: ['current'], closed: ['retired'] },
+    fields: { declares: { type: 'string' }, spec: { type: 'json' }, shipped: { type: 'json' }, preset: { type: 'string' } },
     capabilities: { judges: {} } as never, // a capability its pack opens (uses), which the kernel's list does not know
   }],
 } as PackFile;
@@ -30,7 +30,10 @@ async function map(): Promise<Archipelago> {
 }
 
 const change = (l: Archipelago, who: typeof agent, ops: Op[]) => l.change(who, { reason: 'test', ops });
-const item = (r: RuleDef, pack = 'core') => ({ op: 'create', type: 'rulebook.rule', title: `${pack}.${r.id}`, status: 'active', props: { pack, rule: r.id, def: r } }) as Op;
+const spec = ({ id: _, ...r }: RuleDef) => r;
+const item = (r: RuleDef, pack = 'core') => ({ op: 'create', type: 'rulebook.rule', title: `${pack}.${r.id}`, status: 'current', props: { declares: r.id, spec: spec(r), shipped: { pack, version: '1', hash: 'sha256:0', value: r } } }) as Op;
+/** The owner's version of a rule: an item naming it by preset, read over it. */
+const version = (r: RuleDef) => ({ op: 'create', type: 'rulebook.rule', title: `${r.id}, ours`, props: { preset: r.id, spec: spec(r) } }) as Op;
 
 /** The floor's rules as items, made by a person as a map begins: each matches code, so each passes. */
 async function seeded(l: Archipelago) {
@@ -96,8 +99,8 @@ test('an agent cannot retire, loosen or override any floor rule', async () => {
       ['forgets it', [{ op: 'forget', id }]],
       ['retires it by status', [{ op: 'update', id, status: 'retired' }]],
       ['merges it away', [{ op: 'merge', keep: items.get(judging.find((x) => x.id !== r.id)!.id!)!, drop: id }]],
-      ...loosenings(r).map(([how, def]) => [`edits it so it ${how}`, [{ op: 'update', id, props: { rule: def.id, def } }]] as [string, Op[]]),
-      ...loosenings(r).filter(([how]) => how !== 'is renamed').map(([how, def]) => [`overrides it with a copy that ${how}`, [item(def)]] as [string, Op[]]),
+      ...loosenings(r).map(([how, def]) => [`edits it so it ${how}`, [{ op: 'update', id, props: { declares: def.id, spec: spec(def) } }]] as [string, Op[]]),
+      ...loosenings(r).filter(([how]) => how !== 'is renamed').flatMap(([how, def]) => [[`overrides it with a copy that ${how}`, [item(def)]], [`makes an owner's version that ${how}`, [version(def)]]] as [string, Op[]][]),
     ];
     for (const [how, ops] of tried) assert.match(await outcome(l, agent, ops), /^refused: .*loosen the floor/s, `an agent ${how}: ${r.id}`);
   }
@@ -110,25 +113,25 @@ test('an agent cannot spare a floor rule by a new rule', async () => {
   assert.match(await outcome(l, agent, [item(bookkeeping, 'sessions')]), /^refused: .*spares floor rules/s, 'a spare of every rule');
   assert.match(await outcome(l, agent, [item({ id: 'let', when: { actor: 'agent' }, then: 'spare', spares: ['agent_changes'] })]), /^refused: .*floor rule/s, 'a core spare naming a floor rule');
   const plain = (await change(l, human, [{ ...item({ id: 'quiet', when: { actor: 'agent', op: 'publish' }, then: 'hold' }, 'practice'), ref: 'q' } as Op])) as { created: Record<string, string> };
-  assert.match(await outcome(l, agent, [{ op: 'update', id: plain.created.q, props: { pack: 'core', rule: 'agent_changes', def: { id: 'agent_changes', when: { actor: 'human' }, then: 'hold' } } }]), /^refused: .*overrides a floor rule/s, "a rule renamed into a floor rule's place");
+  assert.match(await outcome(l, agent, [{ op: 'update', id: plain.created.q, props: { declares: 'agent_changes', shipped: { pack: 'core' }, spec: { when: { actor: 'human' }, then: 'hold' } } }]), /^refused: .*overrides a floor rule/s, "a rule renamed into a floor rule's place");
 });
 
 test("an agent's change to any rule item waits for the owner, a tightening included", async () => {
   const l = await map();
   const items = await seeded(l);
   const r = judging.find((x) => x.id === 'public')!;
-  const tighter = await change(l, agent, [{ op: 'update', id: items.get('public')!, props: { def: { ...r, then: 'refuse' } } }]);
+  const tighter = await change(l, agent, [{ op: 'update', id: items.get('public')!, props: { spec: spec({ ...r, then: 'refuse' }) } }]);
   assert.equal(tighter.status, 'proposed', 'a tightening by an agent waits');
   assert.equal((tighter as { held_by?: { rule: string } }).held_by?.rule ?? 'rule_items', 'rule_items');
   assert.equal((await change(l, agent, [item({ id: 'new_one', when: { actor: 'agent', op: 'publish' }, then: 'hold' }, 'practice')])).status, 'proposed', 'a new rule by an agent waits');
-  assert.equal((await change(l, agent, [{ op: 'create', type: 'rulebook.rule', title: 'core.public', props: { pack: 'core', rule: 'public', def: { ...r, then: 'refuse' } } } as Op])).status, 'proposed', 'a tighter copy waits');
+  assert.equal((await change(l, agent, [version({ ...r, then: 'refuse' })])).status, 'proposed', "an agent's tighter version waits");
 });
 
 test('a person tightens a floor rule, and is refused a loosening: the floor changes in code', async () => {
   const l = await map();
   const items = await seeded(l);
   const r = judging.find((x) => x.id === 'agent_changes')!;
-  assert.equal((await change(l, human, [{ op: 'update', id: items.get('agent_changes')!, props: { def: { ...r, lifted: undefined, server: undefined } } }])).status, 'applied');
-  assert.match(await outcome(l, human, [{ op: 'update', id: items.get('agent_changes')!, props: { def: r } }]), /^refused: .*is lifted by agent_changes/s, 'a tightened rule stays tightened: its lift does not come back');
+  assert.equal((await change(l, human, [{ op: 'update', id: items.get('agent_changes')!, props: { spec: spec({ ...r, lifted: undefined, server: undefined }) } }])).status, 'applied');
+  assert.match(await outcome(l, human, [{ op: 'update', id: items.get('agent_changes')!, props: { spec: spec(r) } }]), /^refused: .*is lifted by agent_changes/s, 'a tightened rule stays tightened: its lift does not come back');
   assert.match(await outcome(l, human, [{ op: 'archive', id: items.get('forget')! }]), /^refused: .*retires the rule/s);
 });
