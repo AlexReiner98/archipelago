@@ -204,7 +204,8 @@ export const WRITE_TOOLS: Record<string, Tool> = {
         const forgot = (input.ops as { op: string }[]).some((o) => o.op === 'forget');
         result = { ...result, stakes: [...result.stakes, forgot ? 'What was forgotten cannot be undone; the rest of this change can: undo with its changeset.' : `It can be undone: undo with changeset ${result.changeset}.`] };
       }
-      if (actor.kind === 'agent' && result.status !== 'proposed' && (await holdsOff(l.db))) return { ...result, holds: 'off' };
+      // A hold asked for is not kept where holds are off (packs/rules/kernel/rules.ts, HOLDS_OFF): the answer says so plainly.
+      if (actor.kind === 'agent' && result.status !== 'proposed' && (await holdsOff(l.db))) return { ...result, holds: 'off', ...(input.hold && { hold: 'Not kept: holds are off on this workspace, so this change applied as made.' }) };
       return result;
     },
   },

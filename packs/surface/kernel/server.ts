@@ -307,11 +307,12 @@ export function createHttpServer(workspaces: Workspaces, port: number, options: 
           // The page's reads asked together, each answered as alone (./reads.ts).
           if (surface === 'api' && name === 'reads') return send(res, 200, { result: await readsTogether(pelago, actor, body, Boolean(look)) });
           if (surface === 'api') return send(res, 200, { result: await callTool(pelago, actor(), name, body) });
-          // Scripts say which one they are in the body, as MCP callers do in their arguments.
+          // A caller says which one it is in the body, as MCP callers do in their arguments; one that does not acts as its
+          // token, the same actor its MCP calls are (once logged as "<token>/script", which the log keeps as it was).
           const { actor: label, ...input } = body;
           // An old name answers for one release, saying the call that replaces it (packs/surface/kernel/surface.ts).
           const moved_to = replacementOf(pelago.registry, name);
-          return send(res, 200, { result: await callTool(pelago, actor((label as string) || 'script'), name, input), ...(moved_to && { moved_to }) });
+          return send(res, 200, { result: await callTool(pelago, actor(typeof label === 'string' ? label : undefined), name, input), ...(moved_to && { moved_to }) });
         } catch (err) {
           if (err instanceof Refused) throw err;
           return send(res, 400, { error: (err as Error).message });

@@ -79,8 +79,10 @@ reply ending) is `docs/agents.md`.
   made when you are done (`undo` with the change set). Drive a browser only
   when you need to click, and then a visible one on that same server. To see
   how a held change looks there, send it with `hold: true` (core's rule
-  `asked` holds it); it leaves the
-  queue by itself when the same change is then sent unheld.
+  `asked` holds it) on a server whose holds are on (`workspace_set`
+  `holds_off: false` on a scratch copy): where holds are off a hold is not
+  kept and the change applies. A held one leaves the queue by itself when
+  the same change is then sent unheld.
 - **Name what a change makes by its ref.** A title or note in the same change
   as a new item names it as `{ref}`, which becomes the item's id when the
   change is applied. Do not write an id you have not been given.
