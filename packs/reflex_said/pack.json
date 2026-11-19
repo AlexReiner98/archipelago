@@ -1,0 +1,39 @@
+{
+  "id": "reflex_said",
+  "version": "0.1.0",
+  "title": "Reflex record",
+  "description": "Each time an instruction is said (a reflex among them), which one, to which run and where (its for place), kept on this pack's own stream; and, read back, how often each was said and whether the misses it answers (refusals of a phrase it names, beats about what it answers) came back in a run after it was said there. Said by the agents pack as it says them (the read said_here); read as said_record, by the reflex_view rows and an agent's query. Split from reflex, which keeps the words.",
+  "kernel": {
+    "trust": "service",
+    "internal": true,
+    "modules": "kernel/",
+    "hooks": {
+      "surface.reads": ["reads.ts#said_here", "reads.ts#said_record"]
+    },
+    "provides": {
+      "answer.said_record": {
+        "in": { "ids": ["string"], "days?": "number" },
+        "out": "any",
+        "run": "reads.ts#recordAnswer"
+      }
+    }
+  },
+  "rules": [
+    {
+      "id": "said",
+      "when": { "fields": ["said"] },
+      "stream": "pack:reflex_said",
+      "keep": { "history": "P90D" },
+      "say": "Each instruction said, to which run and where, 90 days of it."
+    }
+  ],
+  "views": [
+    {
+      "id": "reflex_said.record",
+      "shape": "data",
+      "lens": {},
+      "answer": "said_record",
+      "description": "How often each of some instructions was said, to how many runs and where, and per run whether a miss it answers came back after it was said there (came_back), stopped (held: a miss before, none after) or never showed (quiet). Params: ids (required, at most 50), days (how far back, 30 unless said, 90 at most)."
+    }
+  ]
+}

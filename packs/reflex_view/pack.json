@@ -2,10 +2,83 @@
   "id": "reflex_view",
   "version": "0.1.0",
   "title": "Reflex tree",
-  "description": "How the reflex tree is seen: the harness's instructions and reflex nodes as one tree growing from its root, an amber spark where the model writes a node, a blue light running out to a node as it is said (after Sihan Xu's essay on a growing behaviour tree). A map pack: the reflex pack's types stay words only.",
+  "description": "What an instruction's record looks like (a reflex among them): on its page, how often it was said lately and, run by run, whether the miss it answers came back after it was said there. Reads the record the reflex_said pack keeps; owns no type, so it is a map pack beside reflex, which keeps the words. And the reflex tree: the instructions and reflex nodes as one tree growing from its root, amber where the model writes a node, blue where one is said (after Sihan Xu's essay on a growing behaviour tree).",
+  "requires": [
+    "type:instruction"
+  ],
+  "views": [
+    {
+      "id": "reflex_view.said",
+      "shape": "rows",
+      "description": "An instruction's record as rows: the first its counts lately (said, to how many runs, came back, held, quiet, when last), then each run it was said to, the newest first, with what became of its miss there.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "about": {
+            "type": "string",
+            "description": "The instruction whose record is drawn."
+          }
+        },
+        "required": [
+          "about"
+        ]
+      },
+      "limit_ms": 5000
+    },
+    {
+      "id": "reflex_view.said_counts",
+      "shape": "rows",
+      "description": "The record of some instructions, for the tree's drawing to ask through its sends: one per id asked, in order, each { id, said, runs, places, last, came_back, held, quiet } (the reflex_said pack's said_record, its per-run list left out). An owner's version of a preset is counted under the preset's id.",
+      "input": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The instructions (reflexes among them), 50 at most."
+          }
+        },
+        "required": [
+          "ids"
+        ]
+      },
+      "limit_ms": 5000
+    },
+    {
+      "form": "screen",
+      "id": "reflex_view.here",
+      "title": "Said",
+      "on": [
+        "instruction"
+      ],
+      "pieces": [
+        {
+          "piece": "view",
+          "view": "reflex_view.said",
+          "item": "about"
+        }
+      ]
+    }
+  ],
   "layouts": [
-    { "id": "reflex_view.tree", "title": "Reflex tree", "shape": "reflex_tree",
-      "modules": { "index.js": "layouts/tree/index.js", "tree.js": "layouts/tree/tree.js", "radial.js": "layouts/tree/radial.js", "said.js": "layouts/tree/said.js", "film.js": "layouts/tree/film.js", "draw.js": "layouts/tree/draw.js", "look.js": "layouts/tree/look.js", "play.js": "layouts/tree/play.js", "marks.js": "layouts/tree/marks.js" } }
+    {
+      "id": "reflex_view.tree",
+      "title": "Reflex tree",
+      "shape": "reflex_tree",
+      "modules": {
+        "index.js": "layouts/tree/index.js",
+        "tree.js": "layouts/tree/tree.js",
+        "radial.js": "layouts/tree/radial.js",
+        "said.js": "layouts/tree/said.js",
+        "film.js": "layouts/tree/film.js",
+        "draw.js": "layouts/tree/draw.js",
+        "look.js": "layouts/tree/look.js",
+        "play.js": "layouts/tree/play.js",
+        "marks.js": "layouts/tree/marks.js"
+      }
+    }
   ],
   "styles": [
     {
@@ -14,28 +87,86 @@
       "title": "Reflex tree",
       "description": "The harness's instructions and reflex nodes as one tree, grown from its root: amber where the model writes a node, blue where a node is said on its own.",
       "props": {
-        "filter": { "find": ["instruction"], "not": [] },
-        "walk": { "over": ["part_of>"], "steps": 4 },
+        "filter": {
+          "find": [
+            "instruction"
+          ],
+          "not": []
+        },
+        "walk": {
+          "over": [
+            "part_of>"
+          ],
+          "steps": 4
+        },
         "style": {
           "shape": "reflex_tree",
-          "sends": { "said": "reflex_view.said_counts" },
-          "colors": { "reflex_write": "#e8912d", "reflex_say": "#2f6fe4" },
+          "sends": {
+            "said": "reflex_view.said_counts"
+          },
+          "colors": {
+            "reflex_write": "#e8912d",
+            "reflex_say": "#2f6fe4"
+          },
           "sizes": {
-            "reflex_ring": 110, "reflex_margin": 60, "reflex_node": 3, "reflex_leaf": 2, "reflex_root": 7, "reflex_hit": 8,
-            "reflex_branch": 3.2, "reflex_branch_step": 0.45, "reflex_branch_least": 0.8,
-            "reflex_spark": 4, "reflex_spark_grow": 18, "reflex_light": 8, "reflex_flash": 24, "reflex_head": 2.5, "reflex_trail": 2.2,
-            "reflex_name_text": 11, "reflex_name_gap": 8, "reflex_key_glyph": 10, "reflex_tip_width": "36ch", "reflex_bar_gap": 14, "reflex_bar_dot": 4
+            "reflex_ring": 110,
+            "reflex_margin": 60,
+            "reflex_node": 3,
+            "reflex_leaf": 2,
+            "reflex_root": 7,
+            "reflex_hit": 8,
+            "reflex_branch": 3.2,
+            "reflex_branch_step": 0.45,
+            "reflex_branch_least": 0.8,
+            "reflex_spark": 4,
+            "reflex_spark_grow": 18,
+            "reflex_light": 8,
+            "reflex_flash": 24,
+            "reflex_head": 2.5,
+            "reflex_trail": 2.2,
+            "reflex_name_text": 11,
+            "reflex_name_gap": 8,
+            "reflex_key_glyph": 10,
+            "reflex_tip_width": "36ch",
+            "reflex_bar_gap": 14,
+            "reflex_bar_dot": 4
           },
           "numbers": {
-            "reflex_spread_x": 1.25, "reflex_jitter": 0.35, "reflex_curve_steps": 10,
-            "reflex_film": 24, "reflex_film_lead": 0.6, "reflex_count_steps": 60, "reflex_frame_most": 0.1,
-            "reflex_lights_least": 0.3, "reflex_lights_most": 6, "reflex_lights_live": 0.8, "reflex_light_after": 0.6, "reflex_mock_said": 400,
-            "reflex_pulse": 0.95, "reflex_flash_time": 0.35, "reflex_spark_life": 0.9,
-            "reflex_zoom_most": 3, "reflex_zoom_ease": 2.2, "reflex_spark_zoom_least": 0.5, "reflex_spark_zoom_most": 1.4,
-            "reflex_branch_levels": 8, "reflex_branch_ink": 0.72, "reflex_branch_fade": 0.06, "reflex_branch_faint": 0.2,
-            "reflex_node_ink": 0.85, "reflex_bough_ink": 0.5, "reflex_glow": 0.25, "reflex_trail_ink": 0.6,
-            "reflex_name_depth": 2, "reflex_name_room": 1.2, "reflex_name_most": 28, "reflex_tip_most": 120, "reflex_grow": 500,
-            "reflex_said_batch": 50, "reflex_pool_sparks": 12, "reflex_pool_lights": 16
+            "reflex_spread_x": 1.25,
+            "reflex_jitter": 0.35,
+            "reflex_curve_steps": 10,
+            "reflex_film": 24,
+            "reflex_film_lead": 0.6,
+            "reflex_count_steps": 60,
+            "reflex_frame_most": 0.1,
+            "reflex_lights_least": 0.3,
+            "reflex_lights_most": 6,
+            "reflex_lights_live": 0.8,
+            "reflex_light_after": 0.6,
+            "reflex_mock_said": 400,
+            "reflex_pulse": 0.95,
+            "reflex_flash_time": 0.35,
+            "reflex_spark_life": 0.9,
+            "reflex_zoom_most": 3,
+            "reflex_zoom_ease": 2.2,
+            "reflex_spark_zoom_least": 0.5,
+            "reflex_spark_zoom_most": 1.4,
+            "reflex_branch_levels": 8,
+            "reflex_branch_ink": 0.72,
+            "reflex_branch_fade": 0.06,
+            "reflex_branch_faint": 0.2,
+            "reflex_node_ink": 0.85,
+            "reflex_bough_ink": 0.5,
+            "reflex_glow": 0.25,
+            "reflex_trail_ink": 0.6,
+            "reflex_name_depth": 2,
+            "reflex_name_room": 1.2,
+            "reflex_name_most": 28,
+            "reflex_tip_most": 120,
+            "reflex_grow": 500,
+            "reflex_said_batch": 50,
+            "reflex_pool_sparks": 12,
+            "reflex_pool_lights": 16
           }
         }
       }
