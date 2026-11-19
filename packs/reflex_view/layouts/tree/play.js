@@ -131,6 +131,7 @@ export function player({ tree, placed, film, story, z, n, pools, from, fresh, sp
   };
   // What is new since last drawn is born a moment after the picture opens.
   for (const node of fresh) reborn.set(node.id, from + n('reflex_film_lead'));
-  for (const node of tree.born) if (!reborn.has(node.id) && film.born.get(node.id) <= from) shown.add(node.id);
+  // Opened grown, what was born by then is drawn already; played from the start, even the trunk comes in.
+  if (from > 0) for (const node of tree.born) if (!reborn.has(node.id) && film.born.get(node.id) <= from) shown.add(node.id);
   return { step, replay: () => { const out = hide(); reborn.clear(); reset(0); return out; } };
 }

@@ -207,3 +207,14 @@ test('rules stand on the tree where they guard, beside what is said there: a squ
   const film = filmOf(tree, { ...storyOf(a, null, null, n), rules: rulesOf(rules) }, n);
   assert.equal(film.events.filter((e: any) => e.kind === 'fired').length, 2, 'each firing is a light of its own');
 });
+
+test('played from the start, the trunk comes in too: a rule there from the first frame is switched on', async () => {
+  const a = { ...answer(2, []), lens: { find: ['trunk'] } };
+  const rules = [{ id: 'core.guard', title: 'A guard', pack: 'core', effect: 'refuse', where: 'tool:change', fired: [] }];
+  const on = new Set<string>();
+  const act = async (name: string, params: any) => (name === 'rules' ? { answer: rules } : { answer: params.ids.map((one: string) => ({ id: one, said: 0 })) });
+  const played = await picture({ answer: a, style: { ...style, sends: { ...style.sends, rules: 'rules' } }, reduced: false }, { frame: () => new Promise((r) => setTimeout(r, 1)), patch: (p: any[]) => p.forEach((x) => x.toggle?.on && on.add(x.key)), open() {}, act, surface: async () => null });
+  await new Promise((r) => setTimeout(r, 40));
+  played.end();
+  assert.ok(on.has('n:core.guard'));
+});
