@@ -6,8 +6,11 @@
 import { at } from './marks.js';
 import { hash } from './tree.js';
 
+/** A text cut to `most` letters, the cut marked. */
+export const cut = (text, most) => (text.length <= most ? text : `${text.slice(0, Math.max(1, most - 1))}…`);
+
 /** Each node's place ({ x, y } about the root) and its branch's path, in the picture's units with the root at `centre`. */
-export function radial(tree, z, n) {
+export function radial(tree, z, n, measure) {
   const ring = z('reflex_ring'), sx = n('reflex_spread_x'), jitter = n('reflex_jitter');
   const leaves = new Map();
   const count = (node) => {
@@ -29,7 +32,27 @@ export function radial(tree, z, n) {
   share(tree.root, -Math.PI / 2, Math.PI * 2);
   const xy = (p) => ({ x: Math.cos(p.a) * p.r * sx, y: Math.sin(p.a) * p.r });
   const place = new Map([...polar].map(([id, p]) => [id, xy(p)]));
-  const xs = [...place.values()].map((p) => p.x), ys = [...place.values()].map((p) => p.y);
+  // A name is written on the first levels (reflex_name_depth), beside its node and outward, shallow and full boughs
+  // first: one whose box would meet a name already written, or a node, is left to its tip. Its width counts in the
+  // picture's bounds. Boxes are a line tall (reflex_name_text, times reflex_name_room).
+  const gap = z('reflex_name_gap'), tall = z('reflex_name_text') * n('reflex_name_room');
+  const names = new Map(), ends = [...place.values()].map((p) => [p.x, p.y]), boxes = [];
+  const meets = (b) => boxes.some((o) => b[0] < o[2] && o[0] < b[2] && b[1] < o[3] && o[1] < b[3]);
+  const dot = z('reflex_node');
+  for (const p of place.values()) boxes.push([p.x - dot, p.y - dot, p.x + dot, p.y + dot]);
+  const asked = tree.order.filter((node) => node.parent && node.title && node.depth <= n('reflex_name_depth'));
+  asked.sort((a, b) => a.depth - b.depth || leaves.get(b.id) - leaves.get(a.id));
+  for (const node of asked) {
+    const p = polar.get(node.id), at0 = place.get(node.id);
+    const text = cut(node.title, n('reflex_name_most')), right = Math.cos(p.a) >= -0.2, wide = measure(text, z('reflex_name_text'));
+    const x0 = right ? at0.x + gap : at0.x - gap - wide;
+    const box = [x0, at0.y - tall / 2, x0 + wide, at0.y + tall / 2];
+    if (meets(box)) continue;
+    boxes.push(box);
+    names.set(node.id, { text, right });
+    ends.push([box[0], box[1]], [box[2], box[3]]);
+  }
+  const xs = ends.map((e) => e[0]), ys = ends.map((e) => e[1]);
   const room = z('reflex_margin');
   const left = Math.min(...xs) - room, top = Math.min(...ys) - room;
   const width = Math.max(...xs) + room - left, height = Math.max(...ys) + room - top;
@@ -53,5 +76,5 @@ export function radial(tree, z, n) {
   }
   // How far out the tree reaches, from the root: the camera pulls back as it grows to this.
   const reach = Math.max(ring, ...[...polar.values()].map((p) => p.r));
-  return { place, polar, branch, along, width, height, centre, reach, leaves };
+  return { place, polar, branch, along, names, width, height, centre, reach, leaves };
 }

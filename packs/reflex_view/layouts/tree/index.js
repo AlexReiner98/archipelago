@@ -30,7 +30,9 @@ export function picture({ answer, style, reduced }, tools) {
   const z = read('sizes'), n = read('numbers');
   const tree = treeOf(answer);
   if (!tree) return { scene: { message: 'This view holds no instruction or reflex node yet.' } };
-  const placed = radial(tree, z, n);
+  // Names are measured as the page writes them; without a measure (a test), at about half their size a letter.
+  const measure = tools.measure ?? ((text, px) => text.length * px * 0.55);
+  const placed = radial(tree, z, n, (text, px) => measure(text, px));
   const said = sayingsOf(tree, n);
   const film = filmOf(tree, said, n);
   const name = JSON.stringify([answer.lens?.find, answer.lens?.only, answer.lens?.not, answer.lens?.from]);

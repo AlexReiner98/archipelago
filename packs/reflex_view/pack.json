@@ -26,14 +26,14 @@
             "reflex_name_text": 11, "reflex_name_gap": 8, "reflex_key_glyph": 10, "reflex_tip_width": "36ch", "reflex_bar_gap": 14, "reflex_bar_dot": 4
           },
           "numbers": {
-            "reflex_spread_x": 1.25, "reflex_jitter": 0.5, "reflex_curve_steps": 10,
+            "reflex_spread_x": 1.25, "reflex_jitter": 0.35, "reflex_curve_steps": 10,
             "reflex_film": 24, "reflex_film_lead": 0.6, "reflex_count_steps": 60, "reflex_frame_most": 0.1,
             "reflex_lights_least": 0.3, "reflex_lights_most": 6, "reflex_lights_live": 0.8, "reflex_light_after": 0.6, "reflex_mock_said": 400,
             "reflex_pulse": 0.95, "reflex_flash_time": 0.35, "reflex_spark_life": 0.9,
             "reflex_zoom_most": 3, "reflex_zoom_ease": 2.2, "reflex_spark_zoom_least": 0.5, "reflex_spark_zoom_most": 1.4,
             "reflex_branch_levels": 8, "reflex_branch_ink": 0.72, "reflex_branch_fade": 0.06, "reflex_branch_faint": 0.2,
             "reflex_node_ink": 0.85, "reflex_bough_ink": 0.5, "reflex_glow": 0.25, "reflex_trail_ink": 0.6,
-            "reflex_name_depth": 2, "reflex_name_room": 1.4, "reflex_name_most": 28, "reflex_tip_most": 120, "reflex_grow": 500,
+            "reflex_name_depth": 2, "reflex_name_room": 1.2, "reflex_name_most": 28, "reflex_tip_most": 120, "reflex_grow": 500,
             "reflex_pool_sparks": 12, "reflex_pool_lights": 16
           }
         }
