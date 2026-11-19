@@ -249,7 +249,8 @@
             "reflex_retired_ink": 0.35,
             "reflex_gap_ink": 0.75,
             "reflex_tier_schema": 1.6,
-            "reflex_reflow": 600
+            "reflex_reflow": 600,
+            "reflex_reflow_calm": 40
           },
           "hues": [
             "#5aa9e6",

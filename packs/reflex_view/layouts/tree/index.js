@@ -193,7 +193,11 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again, v
   const play = player({ tree, placed, film, story, z, n, pools: { sparks, lights }, from, fresh, speed });
   const start = grown ? story.to : story.from;
   const bar = barOf({ ...weekTo(story, start), day: new Date(start).toISOString().split('T')[0], schematic: story.schematic, speed: speed.now, speeds: reduced ? [] : SPEEDS });
-  let alive = !reduced, last = null, frames = 0, movedAt = null;
+  let alive = !reduced, last = null, frames = 0, movedAt = null, mountedAt = null;
+  // The page is busy a while after it mounts a picture: the move waits until its frames come within reflex_reflow_calm
+  // ms of each other (a tenth of the move where the view says none), or reflex_said_wait ms at most, else it is over
+  // before the page has shown a step of it.
+  const calm = Number.isFinite(style.numbers?.reflex_reflow_calm) ? style.numbers.reflex_reflow_calm : reflowOf(style, n) / 10;
   const loop = async () => {
     while (alive) {
       await tools.frame();
@@ -206,7 +210,8 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again, v
       if (++frames === 2) tools.surface?.().then((s) => s && (s.canvas.getContext('2d'), s.show())).catch(() => {});
       const now = performance.now(), dt = last === null ? 0 : Math.min(n('reflex_frame_most'), (now - last) / 1000);
       // Drawn where it stood, it moves once its marks are on the page; moved, its names are chosen again.
-      if (moves && frames === 2) (tools.patch(moves.start), (movedAt = now));
+      if (moves && frames === 2) mountedAt = now;
+      if (mountedAt !== null && frames > 2 && (dt * 1000 < calm || now - mountedAt > n('reflex_said_wait'))) (tools.patch(moves.start), (movedAt = now), (mountedAt = null));
       if (movedAt !== null && now - movedAt >= reflowOf(style, n)) (tools.patch(moves.end), (movedAt = null), names.viewport(viewNow() ?? {}));
       last = now;
       const out = play.step(dt);
