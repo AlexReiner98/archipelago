@@ -20,6 +20,8 @@ import type { Actor, Archipelago } from '../../write/kernel/pelago.ts';
 import { serverFillings } from './server-fillings.ts';
 import { annotationsOf } from './surface.ts';
 import { callTool, surfaceFor, type Tool } from './tools.ts';
+import { CONNECT_PLACES, fillIn, ownWords, TOOL_PLACES, wordsFrom, type Words } from './tool-words.ts';
+import { callAs } from '../../loader/kernel/kernel-context.ts';
 
 /** What a pack adds to the MCP server (surface.mcp, ./server-fillings.ts): the capability it speaks, what a tool's listing carries, a resource it offers. */
 interface McpFilling {
@@ -64,7 +66,7 @@ export interface Caller {
 }
 
 /** What an agent is offered: query, change, undo, the six verbs, a pack's own verbs, and draw (packs/surface/kernel/surface.ts). */
-const offered = (registry: Archipelago['registry']) => surfaceFor(registry);
+const offered = (registry: Archipelago['registry'], words?: Words) => surfaceFor(registry, words === ownWords ? undefined : words);
 
 /** A tool's inputs as MCP is given them, made once per tool rather than for every request. */
 const schemas = new WeakMap<Tool, Record<string, z.ZodType>>();
@@ -90,20 +92,39 @@ export function contentOf(result: unknown) {
 
 /**
  * What any client is told on connecting: one with no hooks has nothing else to go by. It names only the views this
- * workspace's packs answer, so an agent on a map without a repository's views is not sent to one.
+ * workspace's packs answer, so an agent on a map without a repository's views is not sent to one. Its words are the
+ * instructions at connect and connect:<part> (`words`: the surface's presets, or the map's).
  */
-export function connectText(registry: Archipelago['registry']): string {
+export function connectText(registry: Archipelago['registry'], words: Words = ownWords): string {
   const has = new Set(viewNames(registry));
-  const stands = [has.has('frontier') && 'frontier for where this session stands', has.has('handoff') && 'handoff with repo for where a repository stands'].filter(Boolean);
-  const where = stands.length ? `name ${stands.join(', ')}, brief with task for one task` : 'name brief with task for where one task stands, search with open true for the open work';
-  return `Archipelago is a shared map of people, work and what waits on what. To work here: start with capture, action session_start, params cwd, remote, session_id and title (what your chat is called), and keep the run it gives; when the chat is renamed, report session_update with title. Read with query: ${where}; query with no name lists every view here, and with name actions says what each action takes. Write only with change, giving run and authority. Say what you conclude with report, action tell. Name an item to a person as [its name](link), never a bare id; ids stay in tool calls (link is the pattern session_start answers with). Finish with report, action session_end, and a summary; when the chat itself ends, add its reason (closed, archived), and its tab on the owner’s page closes. A person token reaches every workspace its person is a member of: connect at /mcp/<workspace id>, or give any call a workspace argument (its id); else it acts in its home workspace.`;
+  const stands = [has.has('frontier') && words('connect:frontier'), has.has('handoff') && words('connect:handoff')].filter(Boolean);
+  const reads = stands.length ? fillIn(words('connect:reads'), { stands: stands.join(', ') }) : words('connect:reads_none');
+  return fillIn(words('connect'), { reads });
 }
 
-/** A server for one request, with the tools the caller's workspace offers now. */
-function serverFor(caller: Caller): McpServer {
-  const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true }, extensions: VIEW_CAPABILITY }, instructions: connectText(caller.pelago.registry) });
+/** The JSON-RPC method a POST asks (the first of a batch). */
+const methodOf = (body: unknown) => {
+  const first = Array.isArray(body) ? body[0] : body;
+  return first && typeof first === 'object' ? String((first as { method?: unknown }).method ?? '') : '';
+};
+
+/**
+ * The words a request is answered in: on initialize, the greeting's; on tools/list, the tools'; each the map's (the
+ * owner's version over the surface's preset), and counted as said there, since that is when a client is told them.
+ * Any other request is answered in the surface's own words, read from no map.
+ */
+async function wordsFor(caller: Caller, method: string, tools: string[]): Promise<Words> {
+  const wheres = method === 'initialize' ? CONNECT_PLACES : method === 'tools/list' ? TOOL_PLACES(tools) : [];
+  if (!wheres.length) return ownWords;
+  const answer = await callAs<{ at: Record<string, string> }>(caller.pelago, 'answer.instructions', { wheres }).catch(() => undefined);
+  return answer ? wordsFrom(answer.at) : ownWords;
+}
+
+/** A server for one request, with the tools the caller's workspace offers now, described in `words`. */
+function serverFor(caller: Caller, words: Words = ownWords): McpServer {
+  const mcp = new McpServer({ name: 'pelago', version: '0.1.0' }, { capabilities: { tools: { listChanged: true }, extensions: VIEW_CAPABILITY }, instructions: connectText(caller.pelago.registry, words) });
   registerView(mcp);
-  for (const [name, tool] of offered(caller.pelago.registry)) {
+  for (const [name, tool] of offered(caller.pelago.registry, words)) {
     // The title is said twice, as the tool's own and among its annotations: MCP reads either, and the connectors
     // directory's review asks for a title without saying which. A pack's own verb is annotated as revise is.
     const annotations = annotationsOf(caller.pelago.registry, name);
@@ -162,7 +183,7 @@ export async function serveMcp(req: IncomingMessage, res: ServerResponse, caller
   // There is no session to end: each request stood on its own.
   if (req.method === 'DELETE') return void res.writeHead(200).end();
   if (req.method !== 'POST') return fail(res, 405, 'Method not allowed.');
-  const mcp = serverFor(caller);
+  const mcp = serverFor(caller, await wordsFor(caller, methodOf(body), offered(caller.pelago.registry).map(([name]) => name)));
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableDnsRebindingProtection: true, allowedHosts });
   res.on('close', () => {
     void transport.close();

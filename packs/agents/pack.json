@@ -37,12 +37,15 @@
           "island?": "string",
           "where?": "string",
           "fill?": "any",
-          "run?": "string"
+          "run?": "string",
+          "wheres?": ["string"],
+          "count?": "boolean"
         },
         "out": {
-          "said": [
+          "said?": [
             "any"
-          ]
+          ],
+          "at?": "any"
         },
         "run": "query-answers.ts#told"
       },
@@ -71,5 +74,33 @@
     "hooks": {
       "surface.reads": "reads.ts#instructions"
     }
-  }
+  },
+  "styles": [
+    {"id": "agents.registered", "type": "instruction", "title": "Registered as a run", "body": "This session is registered in Archipelago, the owner's map of work and dependencies, as run {run}, called \"{title}\" after this chat, on the workspace \"{workspace}\" ({workspace_id}).", "props": {"for": ["session_start:registered"]}},
+    {"id": "agents.item_link", "type": "instruction", "title": "Name an item by its link", "body": "Name an item to a person as [its name]({link}), never a bare id; ids stay in tool calls.", "props": {"for": ["session_start:item_link"]}},
+    {"id": "agents.repository", "type": "instruction", "title": "The repository it is in", "body": "Repository: {title} ({id}).", "props": {"for": ["session_start:repository"]}},
+    {"id": "agents.handoff", "type": "instruction", "title": "Where things stand", "body": "Where things stand: view \"handoff\" with repo {repo}. {since}: {counts}.", "props": {"for": ["session_start:handoff"]}},
+    {"id": "agents.handoff_since", "type": "instruction", "title": "Since the last session ended", "body": "Since the last session here to end, {title}, began ({began} UTC)", "props": {"for": ["session_start:handoff_since"]}},
+    {"id": "agents.handoff_week", "type": "instruction", "title": "Since a week ago", "body": "In the last week", "props": {"for": ["session_start:handoff_week"]}},
+    {"id": "agents.handoff_marks", "type": "instruction", "title": "What was left and bites", "body": "And {marks}.", "props": {"for": ["session_start:handoff_marks"]}},
+    {"id": "agents.ready", "type": "instruction", "title": "Open work nothing blocks", "body": "Open work and issues here that nothing blocks:", "props": {"for": ["session_start:ready"]}},
+    {"id": "agents.stale", "type": "instruction", "title": "Not confirmed for long", "body": "not confirmed for {days} days: check it before relying on it", "props": {"for": ["session_start:stale"]}},
+    {"id": "agents.blocked", "type": "instruction", "title": "Blocked work", "body": "Blocked work here:", "props": {"for": ["session_start:blocked"]}},
+    {"id": "agents.hubs", "type": "instruction", "title": "Hubs with no view", "body": "Hubs here with no view of their own (each holds enough to be the hub of its problem; when you work in one, give it its views: lens items about it, named for the questions they answer. View \"hubs\" says how much each holds):", "props": {"for": ["session_start:hubs"]}},
+    {"id": "agents.no_place", "type": "instruction", "title": "A folder the map does not know", "body": "Archipelago does not know a {place} for this folder{remote}. If its work belongs in the map, give a {place} there this address as its {address}.", "props": {"for": ["session_start:no_place"]}},
+    {"id": "agents.no_place_remote", "type": "instruction", "title": "Whose checkout it is", "body": "(a checkout of {remote})", "props": {"for": ["session_start:no_place_remote"]}},
+    {"id": "agents.to_confirm", "type": "instruction", "title": "Put what agents settled to the owner", "body": "For the owner, in your first reply: since they last looked, agents have settled {count} {questions} on their own judgment{owners}. Show them these, a line for each, and ask them to confirm or correct. When they have answered, call settle with action confirmed, upto {upto} and what they said; change or reopen what they correct.", "props": {"for": ["session_start:to_confirm"]}},
+    {"id": "agents.to_confirm_owners", "type": "instruction", "title": "Answers kept as the owner's", "body": "(and recorded {count} more as the owner's own answers in chat: say how many, and list them only if asked, with query \"attention\", reason to_confirm)", "props": {"for": ["session_start:to_confirm_owners"]}},
+    {"id": "agents.to_confirm_more", "type": "instruction", "title": "More to confirm", "body": "and {count} more: query \"attention\" with person \"me\" and reasons [\"to_confirm\"].", "props": {"for": ["session_start:to_confirm_more"]}},
+    {"id": "agents.resource", "type": "instruction", "title": "An exclusive resource", "body": "Exclusive resource \"{title}\" ({id}) is {state}. Claim it with the pelago assign tool, action claim (holder {run}), before using it, and give it back with revise, action release, after.", "props": {"for": ["session_start:resource"]}},
+    {"id": "agents.resource_held", "type": "instruction", "title": "A resource held", "body": "HELD by {holder}: do not use it", "props": {"for": ["session_start:resource_held"]}},
+    {"id": "agents.resource_free", "type": "instruction", "title": "A resource free", "body": "free", "props": {"for": ["session_start:resource_free"]}},
+    {"id": "agents.limited", "type": "instruction", "title": "A token limited elsewhere", "body": "This machine’s Archipelago token is limited to some repositories, and this folder is not a checkout of one that is theirs: the session is not registered in Archipelago, and its work is not kept there. Tell the owner in your first reply; a token for this repository is made in Settings.", "props": {"for": ["session_start:limited"]}},
+    {"id": "agents.restarted", "type": "instruction", "title": "The server restarted", "body": "The Archipelago server has restarted since this session began (at {started}{commit}).", "props": {"for": ["prompt:restarted"]}},
+    {"id": "agents.restarted_commit", "type": "instruction", "title": "The commit it runs now", "body": ", now running commit {commit}", "props": {"for": ["prompt:restarted_commit"]}},
+    {"id": "agents.restarted_new", "type": "instruction", "title": "Actions new since", "body": "Actions new since you were given the tools: {actions}.", "props": {"for": ["prompt:restarted_new"]}},
+    {"id": "agents.restarted_none", "type": "instruction", "title": "No action new", "body": "No action is new since you were given the tools.", "props": {"for": ["prompt:restarted_none"]}},
+    {"id": "agents.since_heard", "type": "instruction", "title": "What the owner did since", "body": "Since you last heard from Archipelago, the owner did this in the map (web UI or CLI). Take it into account, and act on it if it is addressed to you:", "props": {"for": ["prompt:since_heard"]}},
+    {"id": "agents.since_heard_tally", "type": "instruction", "title": "How many changes", "body": "{count} changes ({counts}); the newest {newest}, the rest with query events:", "props": {"for": ["prompt:since_heard_tally"]}}
+  ]
 }

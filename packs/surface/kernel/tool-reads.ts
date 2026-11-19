@@ -1,6 +1,7 @@
 // The tools that only read: the model, a search, one item, a view, the log, what waits for a person, an image kept
 // for an item, and listening for what the owner does. Agents reach each of them through query.
 
+import { ownWords } from './tool-words.ts';
 import { z } from 'zod';
 import { headOf } from '../../log/kernel/log.ts';
 import { lastSeq, readEvents } from '../../log/kernel/eventlog.ts';
@@ -443,7 +444,7 @@ export const READ_TOOLS: Record<string, Tool> = {
   // The one tool that names the page in a chat (packs/mcp_apps/kernel/mcp-view.ts). The page takes the look, at the size it has: this only
   // refuses what could not be drawn. Its inputs are cut short, since the tool list carries them on every request.
   draw: {
-    description: 'Draw a view in this chat, for the person reading it, in a client that draws MCP Apps (Claude chat). Elsewhere nothing is drawn: report show opens it on their canvas, query look gives you the picture.',
+    description: ownWords('tool:draw'),
     input: {
       entity: VIEW_INPUT.entity.describe('A view kept on the map (type lens), or any item.'),
       query: VIEW_INPUT.query.describe('A query, as query flat takes it.'),

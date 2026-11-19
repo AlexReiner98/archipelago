@@ -21,6 +21,7 @@ import { withinScope } from './scope.ts';
 import { viewsSaid } from './view-words.ts';
 import { actionsOf, listedChange, movedTo, route, surfaceNames, surfaceTools, type Action } from './surface.ts';
 import { packAct } from './surface-slots.ts';
+import type { Words } from './tool-words.ts';
 import { ACT_TOOLS } from './tool-acts.ts';
 import { WRITE_TOOLS } from './tool-change.ts';
 import { restartSaid } from './restart-said.ts';
@@ -131,8 +132,17 @@ function surfaceOf(reg: Registry): Record<string, Tool> {
 
 const CHANGE = listedChange(TOOLS.change);
 
-/** What an agent is offered, in order: query, change, undo, the six verbs, any verb a pack declares, and draw. */
-export const surfaceFor = (reg: Registry): [string, Tool][] => surfaceNames(reg).map((name) => [name, name === 'change' ? CHANGE : (TOOLS[name] ?? surfaceOf(reg)[name])]);
+/**
+ * What an agent is offered, in order: query, change, undo, the six verbs, any verb a pack declares, and draw. Each is
+ * described in the surface's words (its presets at tool:<name>), or in `words` where given: the map's, which the owner
+ * may have reworded (./mcp.ts reads them for a client listing the tools).
+ */
+export const surfaceFor = (reg: Registry, words?: Words): [string, Tool][] => {
+  if (!words) return surfaceNames(reg).map((name) => [name, name === 'change' ? CHANGE : (TOOLS[name] ?? surfaceOf(reg)[name])]);
+  const worded = surfaceTools(reg, TOOLS, offered, words);
+  const own = (name: string): Tool => ({ ...TOOLS[name], description: words(`tool:${name}`) });
+  return surfaceNames(reg).map((name) => [name, name === 'change' ? listedChange(TOOLS.change, words) : worded[name] ?? own(name)]);
+};
 
 /** The call that replaces a tool's old name, for one release (packs/surface/kernel/surface.ts); undefined for a name that stays. */
 export const replacementOf = (reg: Registry, name: string) => movedTo(reg, TOOLS, FORMER_NAMES[name] ?? name);
