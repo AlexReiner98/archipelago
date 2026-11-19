@@ -19,3 +19,10 @@ export async function told(ctx: KernelContext, input: { where?: string; for?: st
   const fill = input?.fill && typeof input.fill === 'object' ? Object.fromEntries(Object.entries(input.fill).map(([k, v]) => [k, String(v)])) : undefined;
   return { said: await instructionsFor(ctx, where, { ...(typeof input?.about === 'string' && { about: input.about }), ...(typeof input?.island === 'string' && { island: input.island }), ...(fill && { fill }), ...(typeof input?.run === 'string' && input.run && { run: input.run }) }) };
 }
+
+/**
+ * `answer.rules_file`: the working rules file (.claude/pelago.md) as this map says it, written into each checkout from
+ * the map at a session's start: the server's frame with the map's working_rules (root.rules_file, the surface's).
+ */
+export const rulesFile = (ctx: KernelContext, input: { run?: string }) =>
+  ctx.call<object, { text: string }>('root.rules_file', { ...(typeof input?.run === 'string' && input.run && { run: input.run }) });

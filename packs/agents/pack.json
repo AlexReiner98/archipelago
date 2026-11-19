@@ -2,6 +2,7 @@
   "id": "agents",
   "version": "0.1.0",
   "title": "Agents",
+  "uses": ["service:root.rules_file"],
   "description": "What agents are told: the instructions the packs ship under those the map keeps, said where each is for (a session's start, the working rules, a tool, a file); the brief a launched session starts from; and the schema an agent is given unless it asks for more.",
   "kernel": {
     "trust": "service",
@@ -48,6 +49,15 @@
           "at?": "any"
         },
         "run": "query-answers.ts#told"
+      },
+      "answer.rules_file": {
+        "in": {
+          "run?": "string"
+        },
+        "out": {
+          "text": "string"
+        },
+        "run": "query-answers.ts#rulesFile"
       },
       "answer.schema_brief": {
         "in": {},

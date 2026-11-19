@@ -153,4 +153,5 @@ test('what the hooks and the MCP server say is worded on the map: the owner rewo
   // And as the root service a written .claude/pelago.md is made from (root.rules_file).
   const { rulesFileOf } = await import('../packs/surface/kernel/workspace-rules.ts');
   assert.equal((await rulesFileOf({ map: l } as never, {})).text, rules);
+  assert.equal((await callAs<{ text: string }>(l, 'answer.rules_file', {})).text, rules, 'and as the agents pack answers it, for the written files');
 });
