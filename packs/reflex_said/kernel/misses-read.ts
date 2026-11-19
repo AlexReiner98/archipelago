@@ -50,8 +50,9 @@ async function written(ctx: KernelContext, items: Item[]): Promise<Written[]> {
 const itemsOf = async (ctx: KernelContext, type: string, where?: Record<string, unknown>) =>
   ctx.registry.type(type) ? ((await ctx.reads({ items: { type, ...(where && { where }) } })) as Item[]) : [];
 
-/** `misses: { days? }`: every miss lately (refusals on runs' stories, bumps, traps), the newest first, each with where and what covers it. */
-export async function misses(ctx: KernelContext, q: { misses: { days?: unknown } }) {
+/** `misses: { days?, limit? }`: the misses lately (refusals on runs' stories, bumps, traps), the newest first, each with where and what covers it; limit of them at most (MISSES_MOST). */
+export async function misses(ctx: KernelContext, q: { misses: { days?: unknown; limit?: unknown } }) {
+  const most = Math.min(MISSES_MOST, Math.max(1, Math.floor(Number(q.misses?.limit ?? MISSES_MOST)) || MISSES_MOST));
   const days = Math.min(DAYS_MOST, Math.max(1, Number(q.misses?.days ?? DAYS) || DAYS));
   const from = new Date(ctx.now().getTime() - days * 86_400_000).toISOString();
   const nodes = await nodesOf(ctx);
@@ -61,7 +62,7 @@ export async function misses(ctx: KernelContext, q: { misses: { days?: unknown }
   const issues = (await itemsOf(ctx, 'issue', { kind: 'problem' })).filter(recent);
   const kept = (await itemsOf(ctx, 'instruction')).filter((i) => recent(i) && listed(i.props?.for).some((f) => f.startsWith('file:')));
   const all = missesOf([refusals(stories, nodes).filter((m) => m.at >= from), bumps(await written(ctx, issues), nodes), traps(await written(ctx, kept), nodes)]);
-  return all.slice(0, MISSES_MOST);
+  return all.slice(0, most);
 }
 
 /** `missed_here: { run }`: how many refusals in the run no node covers came since the rule write_node last asked there. */
@@ -75,4 +76,4 @@ export async function missed_here(ctx: KernelContext, q: { missed_here: { run: u
 }
 
 /** answer.misses: every miss lately, for the view reflex_said.misses. */
-export const missesAnswer = (ctx: KernelContext, input: { days?: unknown }) => misses(ctx, { misses: input ?? {} });
+export const missesAnswer = (ctx: KernelContext, input: { days?: unknown; limit?: unknown }) => misses(ctx, { misses: input ?? {} });

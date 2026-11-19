@@ -10,6 +10,7 @@
 import { api, ask, h, may, state, tell } from './base.js';
 import { screenRows } from './screen-rows.js';
 import { checkRow } from './agents-card.js';
+import { settingRows } from './setting-rows.js';
 import { line, secretBox } from './workspace-cards.js';
 import { plate } from './plates.js';
 
@@ -104,7 +105,7 @@ export function packsCard({ info, then, goTo }) {
         t.unused > 0 && h('span', { class: 'mark warn' }, `${t.unused} unused`),
       );
     };
-    return { open, rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : [], ...secretRows(p)] };
+    return { open, rows: [h('li', { class: 'touches' }, touched.map(cell)), open ? group(p, open) : [], ...(on ? settingRows(info, p.id, then) : []), ...secretRows(p)] };
   };
   // The secrets its hosts and webhooks need, one line each for the owner: its name, whether it is set, a field to give
   // or replace it, and for a webhook's a Make whose value is shown once, under it, until the page is drawn again.

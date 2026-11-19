@@ -42,6 +42,8 @@ export type ServiceRead = {
   corrections?: string[];
   /** The asking pack's own stream (pack:<its id>), opened, oldest first: in these days (UTC, first and last), of facts about one id, OWN_ENTRIES at most. */
   own_stream?: { about?: string; days?: [string, string]; limit?: number };
+  /** A setting the asking pack provides (setting.<key> in its manifest), as set here; null when unset. */
+  pack_setting?: string;
   /** The uses stream's entries written in these days (UTC, first and last; at most USE_ENTRIES), each its facts: what the Packs screen counts. */
   uses_lately?: { days: [string, string] };
   /** Of some types and link types, the items and open links standing, and how many of them were made since a time. */
@@ -53,7 +55,7 @@ export type ServiceRead = {
 };
 
 /** The reads of this module, by name. */
-const SERVICE_READS = ['link', 'log_head', 'memory', 'islands_off', 'public_views', 'public_view_at', 'public_document', 'published_row', 'shared', 'picture', 'counts', 'own_stream', 'corrections', 'uses_lately', 'type_counts', 'workspace_name', 'unplaced'] as const satisfies readonly (keyof ServiceRead)[];
+const SERVICE_READS = ['link', 'log_head', 'memory', 'islands_off', 'public_views', 'public_view_at', 'public_document', 'published_row', 'shared', 'picture', 'counts', 'own_stream', 'pack_setting', 'corrections', 'uses_lately', 'type_counts', 'workspace_name', 'unplaced'] as const satisfies readonly (keyof ServiceRead)[];
 /** The most items one read of what is on no island answers. */
 export const UNPLACED = 500;
 /** The most entries one read of a count stream answers. */
@@ -147,6 +149,12 @@ export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string)
     if (!ID.test(id)) return null;
     const { rows } = await l.db.query<{ content_type: string; data: string; size: number }>(`select content_type, encode(bytes, 'base64') as data, size from picture where entity_id = $1`, [id]);
     return rows[0] ? { content_type: rows[0].content_type, size: rows[0].size, data: rows[0].data.replaceAll('\n', '') } : null;
+  }
+  if (q.pack_setting !== undefined) {
+    const key = String(q.pack_setting);
+    const sig = l.registry.packs.find((p) => p.id === pack)?.kernel?.provides?.[`setting.${key}`] as { read?: string } | undefined;
+    if (!sig) throw new Error(`The ${pack} pack provides no setting "${key}"`);
+    return (await l.setting(`${sig.read === 'member' ? 'member' : 'admin'}.${key}`)) ?? null;
   }
   if (q.own_stream !== undefined) {
     loggedIn(l, 'stream');

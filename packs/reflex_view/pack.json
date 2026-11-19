@@ -49,13 +49,17 @@
     {
       "id": "reflex_view.misses",
       "shape": "rows",
-      "description": "Every miss lately, for the tree's drawing to ask through its sends, the newest first: { kind (refusal, bump, trap), key, run, at, where, said, covered_by } (the reflex_said pack's misses). Params: days (30 unless said, 90 at most).",
+      "description": "Every miss lately, for the tree's drawing to ask through its sends, the newest first: { kind (refusal, bump, trap), key, run, at, where, said, covered_by } (the reflex_said pack's misses). Params: days (30 unless said, 90 at most), limit (the newest so many).",
       "input": {
         "type": "object",
         "properties": {
           "days": {
             "type": "integer",
             "description": "How far back, in days."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The newest so many, 1000 at most."
           }
         }
       },
@@ -97,6 +101,21 @@
         }
       },
       "limit_ms": 5000
+    },
+    {
+      "id": "reflex_view.schema",
+      "shape": "rows",
+      "description": "Every type and the checks it implies, for the tree's drawing to ask through its sends: [{ id (type:<t>, check:<t>:<what>), kind (type or check), pack, tier (schema), for, title, words (a type's description), guards (a check's: fields, status, values, ends, ops), fired (a check's refusals lately, each when) }]. Params: days (30 unless said, 90 at most).",
+      "input": {
+        "type": "object",
+        "properties": {
+          "days": {
+            "type": "integer",
+            "description": "How far back, in days."
+          }
+        }
+      },
+      "limit_ms": 10000
     },
     {
       "form": "screen",
@@ -252,6 +271,84 @@
             "#4ecdc4"
           ]
         }
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "reflex_view.legend",
+      "title": "Hide or show on the tree",
+      "description": "A toggle of the tree's legend, sent by its drawing as the person looking: hides one entry (on false) or shows it again (on true) by the view's style, its hidden list. On a view a pack ships, the first toggle makes the owner's version of it, with the style and query drawn.",
+      "verb": "revise",
+      "input": {
+        "type": "object",
+        "properties": {
+          "view": {
+            "type": "string",
+            "description": "The view the legend is on: a lens's id, or the id of the view a pack ships."
+          },
+          "entry": {
+            "type": "string",
+            "description": "kind:rule|instruction, pack:<id>, tier:core|pack|owner|learned, status:trial|current|retired or event:miss|held|failed|fired."
+          },
+          "on": {
+            "type": "boolean",
+            "description": "true shows it, false hides it."
+          },
+          "style": {
+            "type": "object",
+            "description": "The style the tree is drawn with: kept in a new version of a shipped view."
+          },
+          "filter": {
+            "type": "object",
+            "description": "The view's filter, for a new version."
+          },
+          "walk": {
+            "type": "object",
+            "description": "The view's walk, for a new version."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The view's limit, for a new version."
+          }
+        },
+        "required": [
+          "view",
+          "entry",
+          "on"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "reflex_view.add_node",
+      "title": "Add a node here",
+      "description": "A node added on a branch of the tree, sent by its drawing as the person looking: a trial reflex said at the branch's place (for), named as typed, its words what was said or its name. A place that is never said is refused by the reflex pack's rule known_place.",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "for": {
+            "type": "string",
+            "description": "The place the node is said at: tool:<name>, file:<glob>, session_start..."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "What to say there, in a few words."
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 4000,
+            "description": "Its words, when more than its name."
+          }
+        },
+        "required": [
+          "for",
+          "title"
+        ],
+        "additionalProperties": false
       }
     }
   ]

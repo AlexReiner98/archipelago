@@ -1,5 +1,6 @@
 // The pack's clock: each hour, every open reflex is judged by its record (promote.ts) and the moves are sent as this
-// pack's change, on the record's authority (decided, e_qmx3v2bx). The thresholds are the pack's memory (thresholds).
+// pack's change, on the record's authority (decided, e_qmx3v2bx). The thresholds are the pack's settings, set on its
+// card on the Packs page (workspace_set settings).
 
 import type { KernelContext } from '#pelago/kernel';
 import { movesOf, thresholdsOf } from './promote.ts';
@@ -17,7 +18,8 @@ export async function tick(ctx: KernelContext): Promise<{ moved: number }> {
     ...(typeof i.props?.until === 'string' && { until: i.props.until }),
   }));
   if (!nodes.length) return { moved: 0 };
-  const t = thresholdsOf(await ctx.reads({ memory: { key: 'thresholds' } }));
+  const setting = (key: string) => ctx.reads({ pack_setting: `reflex_${key}` });
+  const t = thresholdsOf({ promote_held: await setting('promote_held'), retire_failed: await setting('retire_failed'), retire_unsaid_days: await setting('retire_unsaid_days') });
   const records = new Map<string, Awaited<ReturnType<typeof said_record>>[number]>();
   for (let i = 0; i < nodes.length; i += MOST) {
     for (const r of await said_record(ctx, { said_record: { ids: nodes.slice(i, i + MOST).map((n) => n.id), days: Math.max(t.retire_unsaid_days, 30) } })) records.set(r.id, r);

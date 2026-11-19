@@ -67,13 +67,15 @@ export type KernelRead = {
   /** How often each of some instructions was said, and whether its miss came back after (the reflex_said pack's record). */
   said_record?: { ids: string[]; days?: number };
   /** Every miss lately, with where it happened and what covers it (the reflex_said pack's). */
-  misses?: { days?: number };
+  misses?: { days?: number; limit?: number };
   /** How many refusals in a run no node covers came since a node was last asked for there (the reflex_said pack's). */
   missed_here?: { run: string };
   /** The tree's story over a window: its nodes (instructions and rules), misses, sayings and rules' firings (the reflex_said pack's). */
   said_story?: { ids?: string[]; days?: number };
   /** Every rule in force, where it applies and each time it fired lately (the reflex_said pack's). */
   said_rules?: { days?: number };
+  /** Every type and the checks it implies, each with its refusals lately (the reflex_said pack's). */
+  said_schema?: { days?: number };
   /** The owner's versions of presets, open or retired: of the packs' style presets, or of their drawings (layout). */
   versions?: 'style' | 'layout';
   /** Every style or layout (of these types) kept on the map, with what each is about; and one named outright, retired or not. */
@@ -246,6 +248,7 @@ async function lookRead(l: Archipelago, q: KernelRead, pack?: string): Promise<u
   if (q.missed_here !== undefined) return filled(l, 'missed_here', q, pack);
   if (q.said_story !== undefined) return filled(l, 'said_story', q, pack);
   if (q.said_rules !== undefined) return filled(l, 'said_rules', q, pack);
+  if (q.said_schema !== undefined) return filled(l, 'said_schema', q, pack);
   if (q.versions !== undefined) {
     const { rows } = await l.db.query(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null and props ->> 'preset' is not null order by updated_at, id`, [l.registry.family(q.versions === 'layout' ? 'layout' : 'style')]);
     return rows;
