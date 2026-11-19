@@ -7,33 +7,33 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import type { Archipelago, Op } from '../packs/write/kernel/pelago.ts';
 import { Registry, type PackFile } from '../packs/loader/kernel/packs.ts';
-import { FLOOR, floorRules, loosens, onFloor } from '../packs/rules/kernel/floor.ts';
+import { FLOOR, floorRules, loosens, onFloor, RULE_TYPE } from '../packs/rules/kernel/floor.ts';
 import type { RuleDef } from '../packs/rules/kernel/rules.ts';
 import { agent, freshWith, human, packsWith, PACKS } from './map.ts';
 
 const core = JSON.parse(readFileSync(join(PACKS, 'core', 'pack.json'), 'utf8')) as { rules: RuleDef[] };
 const judging = core.rules.filter((r) => r.then !== undefined);
 
-/** A pack whose items are rules, shaped as core's rule type (packs/pack_model/README.md), opening the capability the judge also reads. */
+/** Core's rule type, as lane 1 declares it (packs/pack_model/README.md), for a core that has none yet: a pack of its own here. */
 const RULEBOOK: PackFile = {
-  id: 'rulebook', version: '1', title: 'Rulebook', requires: ['core'], uses: ['service:capability.judges'],
+  id: 'rulebook', version: '1', title: 'Rulebook', requires: ['core'],
   types: [{
-    id: 'rulebook.rule', title: 'Rule', description: '', extends: 'record',
+    id: RULE_TYPE, title: 'Rule', description: '', extends: 'record', // core's extends system, which is the kernel's alone
     statuses: { open: ['current'], closed: ['retired'] },
     fields: { declares: { type: 'string' }, spec: { type: 'json' }, shipped: { type: 'json' }, preset: { type: 'string' } },
-    capabilities: { judges: {} } as never, // a capability its pack opens (uses), which the kernel's list does not know
   }],
-} as PackFile;
+};
+const coreHasRule = (JSON.parse(readFileSync(join(PACKS, 'core', 'pack.json'), 'utf8')) as { types: { id: string }[] }).types.some((t) => t.id === RULE_TYPE);
 
 async function map(): Promise<Archipelago> {
-  return freshWith(new Registry(packsWith(RULEBOOK)), { create: 'auto', update: 'auto', link: 'auto', archive: 'auto', merge: 'auto', restore: 'auto' });
+  return freshWith(new Registry(packsWith(coreHasRule ? undefined : RULEBOOK)), { create: 'auto', update: 'auto', link: 'auto', archive: 'auto', merge: 'auto', restore: 'auto' });
 }
 
 const change = (l: Archipelago, who: typeof agent, ops: Op[]) => l.change(who, { reason: 'test', ops });
 const spec = ({ id: _, ...r }: RuleDef) => r;
-const item = (r: RuleDef, pack = 'core') => ({ op: 'create', type: 'rulebook.rule', title: `${pack}.${r.id}`, status: 'current', props: { declares: r.id, spec: spec(r), shipped: { pack, version: '1', hash: 'sha256:0', value: r } } }) as Op;
+const item = (r: RuleDef, pack = 'core') => ({ op: 'create', type: RULE_TYPE, title: `${pack}.${r.id}`, status: 'current', props: { declares: r.id, spec: spec(r), shipped: { pack, version: '1', hash: 'sha256:0', value: r } } }) as Op;
 /** The owner's version of a rule: an item naming it by preset, read over it. */
-const version = (r: RuleDef) => ({ op: 'create', type: 'rulebook.rule', title: `${r.id}, ours`, props: { preset: r.id, spec: spec(r) } }) as Op;
+const version = (r: RuleDef) => ({ op: 'create', type: RULE_TYPE, title: `${r.id}, ours`, props: { preset: r.id, spec: spec(r) } }) as Op;
 
 /** The floor's rules as items, made by a person as a map begins: each matches code, so each passes. */
 async function seeded(l: Archipelago) {

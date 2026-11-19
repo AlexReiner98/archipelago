@@ -55,8 +55,8 @@ export const FLOOR: Readonly<Record<string, string>> = {
   agent_harness_settings: "an agent writes no harness file but the owner's two",
 };
 
-/** The capability a type declares when its items are rules the judge reads: core's rule type (packs/pack_model/README.md), so the kernel names no type. */
-export const RULE_CAPABILITY = 'judges';
+/** Core's part type for a rule (packs/pack_model/README.md): its items, and its flavours', are the rules the judge guards. */
+export const RULE_TYPE = 'rule';
 
 /** Whether this rule is on the floor. */
 export const onFloor = (pack: unknown, id: unknown): boolean => pack === 'core' && typeof id === 'string' && Object.hasOwn(FLOOR, id);
@@ -141,7 +141,7 @@ export interface FloorFacts {
   loosens?: string;
 }
 
-const isRule = (reg: Registry, type: string | undefined) => Boolean(type && (reg.types.get(type)?.capabilities as Record<string, unknown> | undefined)?.[RULE_CAPABILITY] !== undefined);
+const isRule = (reg: Registry, type: string | undefined) => Boolean(type && reg.types.has(RULE_TYPE) && reg.isA(type, RULE_TYPE));
 
 /**
  * A new or changed rule loosens the floor where it takes a floor rule's name but does less than the floor's own, as code
