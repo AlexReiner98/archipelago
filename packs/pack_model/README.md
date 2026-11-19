@@ -25,45 +25,50 @@ from a field that stays the truth.
 | `name` | The pack's id (`core`, `build`, `reflex`). |
 | `version` | The file's `version`. |
 | `manifest` | What the file declares that is no part: `id`, `version`, `requires`, `uses`, `actions`, `handlers`, `reach`, `kernel`, `app`, `shared`, `moved_from`. Every key that makes parts is left out (below). |
-| `shipped` | `{ pack, version, hash, value }` of the file as a whole, `value` the manifest as above. |
-| `runs` | Its code, `[{ path, hash }]`: `handler.js`, a kernel pack's modules, by path from the repository's root. |
+| `shipped` | `{ pack, version, hash, value }`, `value` the whole file and `hash` its hash: the order of the parts comes from it. |
+| `runs` | Its code no part names, `[{ path, hash }]`: `handler.js`, a kernel pack's modules. |
 
 A pack kept on the map with no file (core's "Kept as an item") has no
-`shipped`; its parts are items as any other's.
+`shipped`, and is read as it is today (`packs/loader/kernel/pack-items.ts`).
 
 ## A part
 
-Every declaration of a pack is one item, `part_of` its pack's item.
+Every declaration of a pack is one item, `part_of` its pack's item, and
+every part keeps its declaration the same way: `spec`.
 
-| Manifest key | Part type | Where its value goes |
-|---|---|---|
-| `types` | `type` | `spec` |
-| `types`, an entry `{ of, fields }` | `type` | `spec`; `declares` is `of:<type>` |
-| `links` | `link_type` | `spec` |
-| `rules` | `rule` | `spec` |
-| `views`, `form: "screen"` | `screen` | its own fields (`pieces`, `on`, `nav`, `home`) |
-| `views`, any other | `view` | `spec` |
-| `styles`, `type: "instruction"` | `instruction` | its own fields (`for`, `order`, ...); `body` the note |
-| `styles`, `type: "lens"` | `lens` | its own fields (`filter`, `walk`, ...) |
-| `styles`, a look | `style` | its own fields |
-| `layouts` | `layout` | its own fields; the code by `runs` |
-| `parts` | `part` | its own fields (`slot`, `reads`, `sends`, `opens`); the modules by `runs` |
-| (none yet) | `automation` | its own fields |
-
-Two families, then: a kind the map already held as items keeps its value in
-its own fields, as today; a kind that lived only in files (type, link type,
-rule, view) keeps it in `spec`, the declaration whole but its id, title and
-description.
+| Manifest key | Part type |
+|---|---|
+| `types` | `type`; an entry `{ of, fields }` too, `declares` `of:<type>` |
+| `links` | `link_type` |
+| `rules` | `rule` |
+| `views`, `form: "screen"` | `screen` |
+| `views`, any other | `view` |
+| `styles`, `type` `instruction`, `lens` or `reflex` | that type |
+| `styles`, any other (a look) | `style` |
+| `layouts` | `layout` |
+| `parts` | `part` |
+| (none yet) | `automation` |
 
 | Field | Holds |
 |---|---|
-| title, note | The declaration's `title` and `description` (an instruction's `body`). A rule with no title takes its id. |
+| title, note | The declaration's `title` and `description` (`body` where it says its words there, as an instruction). With no title, its id. |
 | `declares` | Its id as its pack file gives it: `task`, `build.lane`, `agent_changes`, `of:task`. Unique within its pack. |
-| `spec` | type, link type, rule, view: the rest of the declaration. |
-| `shipped` | `{ pack, version, hash, value }`: the declaration exactly as the file held it, id, title and description included, and its hash. |
-| `runs` | layout, part: `[{ path, hash }]`, the files it runs. |
+| `spec` | The rest of the declaration, whole (a screen's `form` and an instruction's `type` stay in it). |
+| `shipped` | `{ pack, version, hash, value }`: the declaration exactly as the file held it and its hash. Which pack a part is of is `shipped.pack`. |
+| `runs` | layout, part: `[{ path, hash }]`, the modules it runs. |
 | status | `current` (`kept` for a layout or part); `retired` when a later version of its pack drops it. |
-| visibility | as its pack's item. |
+
+The typed fields a part type had before (a style's colours, a screen's
+`pieces`, a layout's `code`) stay what they were: an owner's version
+(`preset`) or an item the owner made. A shipped part fills only `spec`.
+
+## Both ways, in code
+
+`packs/loader/kernel/pack-model.ts`: `partsOf(manifest, { folder, files })`
+gives the items a file makes (install), `manifestsOf(items)` the manifests
+the items make, with their hashes (the registry's `PackModel`), and
+`MODEL_KINDS` the item types. Every pack file in `packs/` comes back from its
+items whole (`test/pack-model-assemble.test.ts`).
 
 ## Hashes
 
@@ -83,8 +88,8 @@ the new file's.
 - A field the item still holds as `shipped.value` had it takes the new file's.
 - A field the owner changed stays theirs; where the file changed it too, the
   owner's is kept and the clash is said on the change.
-- For `spec`, a field is a top-level key, and for a type each entry of
-  `spec.fields` and of `spec.statuses` is a field of its own.
+- A field is the title, the note, or a top-level key of `spec`; for a type,
+  each entry of `spec.fields` is a field of its own.
 - `shipped` is then the new file's.
 
 ## The owner's version
