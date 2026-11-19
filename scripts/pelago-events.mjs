@@ -147,8 +147,10 @@ export const eventsPost = ({ base, token, session_id, source, events }) => [
 
 // What the map may write into a checkout, and the mark a file it wrote carries (packs/agents/kernel/written.ts, the same).
 // Here beside the events, since this file is handed out wherever the hook is (the setup, the plugin, the installer).
-const WRITABLE = /^(CLAUDE(\.local)?\.md|\.claude\/skills\/[A-Za-z0-9_-]+\/SKILL\.md)$/;
+const WRITABLE = /^(CLAUDE(\.local)?\.md|\.claude\/skills\/[A-Za-z0-9_-]+\/SKILL\.md|\.claude\/pelago\.md)$/;
 const MAP_MARK = '<!-- Written from the map';
+// The working rules are the setup's own file, never a person's: written whatever they say at their head.
+const SETUP_OWNS = '.claude/pelago.md';
 
 /**
  * The files the map writes into a checkout (packs/agents/kernel/written.ts), taken out of the session start's answer
@@ -172,7 +174,7 @@ export function writeFiles(answer, root, read, write) {
     const at = `${root.replace(/[\\/]+$/, '')}/${file.path}`;
     const was = read(at)?.replace(/\r\n/g, '\n') ?? null;
     if (was === file.text) continue;
-    if (was !== null && !was.split('\n').slice(0, 8).some((line) => line.startsWith(MAP_MARK))) {
+    if (was !== null && file.path !== SETUP_OWNS && !was.split('\n').slice(0, 8).some((line) => line.startsWith(MAP_MARK))) {
       lines.push(`${file.path} here was written by hand, so the map's version of it was not written over it: the owner chooses which to keep.`);
       continue;
     }

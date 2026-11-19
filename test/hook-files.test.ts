@@ -36,6 +36,12 @@ test("the map's files are written over its own and where none is, never over a p
   assert.match(out.hookSpecificOutput.additionalContext, /CLAUDE\.local\.md here was written by hand/);
 });
 
+test("the working rules are the setup's own file: written over whatever the setup left there", () => {
+  const d = disk({ 'C:/repo/.claude/pelago.md': '# Working with Archipelago in this project\n' });
+  writeFiles(answer([{ path: '.claude/pelago.md', text: '# Working with Archipelago, as the workspace words it\n' }]), 'C:/repo', d.read, d.write);
+  assert.deepEqual(Object.keys(d.wrote), ['C:/repo/.claude/pelago.md']);
+});
+
 test('a file already as the map has it is left alone, line ends aside, and an answer with no files is passed as it is', () => {
   const d = disk({ 'C:/repo/CLAUDE.md': MARKED.replace(/\n/g, '\r\n') });
   const out = JSON.parse(writeFiles(answer([{ path: 'CLAUDE.md', text: MARKED }]), 'C:/repo', d.read, d.write));
