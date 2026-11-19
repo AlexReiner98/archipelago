@@ -6,7 +6,7 @@ export const RUNS_SHOWN = 12;
 
 /** What became of a miss in one run, as a mark: a glyph, its word in the tooltip. */
 const VERDICT = {
-  came_back: { text: '↺', tone: 'bad', tip: 'Its miss came back after it was said' },
+  failed: { text: '↺', tone: 'bad', tip: 'Failed: its miss came back after it was said' },
   held: { text: '✓', tone: 'ok', tip: 'Its miss came before it was said, and not after' },
   quiet: { text: '·', tip: 'No miss it answers in this run' },
 };
@@ -15,11 +15,11 @@ const times = (n) => `${n}×`;
 
 /** The counts row: the instruction itself, with how often it was said and how its runs went. */
 export function countsRow(item, record) {
-  const r = record ?? { said: 0, runs: 0, came_back: 0, held: 0, quiet: 0 };
+  const r = record ?? { said: 0, runs: 0, failed: 0, held: 0, quiet: 0 };
   const places = Object.entries(r.places ?? {}).sort((a, b) => b[1] - a[1]).map(([where, n]) => `${where} ${n}`).join(', ');
   const marks = [
     { text: times(r.said), tip: `Said ${r.said} times to ${r.runs} runs${places ? `: ${places}` : ''}` },
-    ...(r.came_back ? [{ ...VERDICT.came_back, text: `↺ ${r.came_back}`, tip: `Its miss came back in ${r.came_back} runs after it was said` }] : []),
+    ...(r.failed ? [{ ...VERDICT.failed, text: `↺ ${r.failed}`, tip: `Failed in ${r.failed} runs: its miss came back after it was said` }] : []),
     ...(r.held ? [{ ...VERDICT.held, text: `✓ ${r.held}`, tip: `Its miss stopped in ${r.held} runs once it was said` }] : []),
     ...(r.quiet ? [{ text: `· ${r.quiet}`, tip: `${r.quiet} runs had no miss it answers` }] : []),
     ...(r.last ? [{ ago: r.last, tip: 'Last said' }] : []),
@@ -55,6 +55,6 @@ export async function countsOf(asked, items, read) {
     const r = by.get(under.get(id)) ?? {};
     // Where it is said, as given: the drawing's answer carries no for, and its branches are by it.
     const fors = items.find((e) => e.id === id)?.props?.for;
-    return { id, said: r.said ?? 0, runs: r.runs ?? 0, places: r.places ?? {}, ...(r.last && { last: r.last }), came_back: r.came_back ?? 0, held: r.held ?? 0, quiet: r.quiet ?? 0, ...(Array.isArray(fors) && { for: fors }) };
+    return { id, said: r.said ?? 0, runs: r.runs ?? 0, places: r.places ?? {}, ...(r.last && { last: r.last }), failed: r.failed ?? 0, held: r.held ?? 0, quiet: r.quiet ?? 0, ...(r.tier && { tier: r.tier }), ...(Array.isArray(fors) && { for: fors }) };
   });
 }

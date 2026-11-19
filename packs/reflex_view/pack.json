@@ -28,7 +28,7 @@
     {
       "id": "reflex_view.said_counts",
       "shape": "rows",
-      "description": "The record of some instructions, for the tree's drawing to ask through its sends: one per id asked, in order, each { id, said, runs, places, last, came_back, held, quiet, for } (where it is said as its for gives it, and the reflex_said pack's said_record, its per-run list left out). An owner's version of a preset is counted under the preset's id.",
+      "description": "The record of some instructions, for the tree's drawing to ask through its sends: one per id asked, in order, each { id, said, runs, places, last, failed, held, quiet, tier, for } (where it is said as its for gives it, and the reflex_said pack's said_record, its per-run list left out). An owner's version of a preset is counted under the preset's id.",
       "input": {
         "type": "object",
         "properties": {
