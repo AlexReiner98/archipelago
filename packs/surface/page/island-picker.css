@@ -105,18 +105,18 @@ body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) 
 /* What waits on the owner, wherever it is drawn: the inbox (inbox.svg), painted in the colour of what holds it. */
 .on-you { display: inline-block; width: var(--text-6); height: var(--text-6); vertical-align: middle; background: currentColor; -webkit-mask: url(/inbox.svg) center / contain no-repeat; mask: url(/inbox.svg) center / contain no-repeat; }
 
-/* The bar's two rows (e_spqgn9td): each a head that folds what is under it, small and spaced as a part's head is; the
-   one drawn on the canvas now marked by the accent bar at its left, as the island the canvas was brought to is. */
-#islands .isl-fold { flex: none; display: flex; align-items: center; gap: var(--space-4); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-8); padding: 0 var(--space-6); border: 0; border-bottom: var(--border-1) solid var(--line); background: none; font: inherit; font-size: var(--text-1); text-transform: uppercase; letter-spacing: var(--track-3); color: var(--muted); text-align: left; white-space: nowrap; cursor: pointer; }
+/* The bar's two rows (e_spqgn9td): each a head that folds what is under it, small and spaced as a part's head is, square
+   and set apart by a line alone; the one drawn on the canvas now in full colour. */
+#islands .isl-fold { flex: none; display: flex; align-items: center; gap: var(--space-4); box-sizing: border-box; width: 100%; min-width: 0; height: var(--box-8); padding: 0 var(--space-6); border: 0; border-radius: 0; border-bottom: var(--border-1) solid var(--line); background: none; box-shadow: none; font: inherit; font-size: var(--text-1); text-transform: uppercase; letter-spacing: var(--track-3); color: var(--muted); text-align: left; white-space: nowrap; cursor: pointer; }
 #islands .isl-fold:is(:hover, :focus-visible) { color: var(--text); outline: none; }
-#islands .isl-fold[data-up] { color: var(--text); box-shadow: inset var(--border-3) 0 0 var(--accent); }
+#islands .isl-fold[data-up] { color: var(--text); }
 #islands .isl-fold-mark { flex: none; width: var(--space-5); text-align: center; }
 #islands .isl-fold-mark::before { content: '▸'; }
 #islands .isl-fold[aria-expanded="true"] .isl-fold-mark::before { content: '▾'; }
 #islands .isl-fold-word { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 #islands .isl-fold-count { flex: none; color: var(--muted); }
 #islands .isl-fold[aria-expanded="false"] + .isl-fold-body { display: none; }
-#islands .isl-fold-body + .isl-fold { border-top: var(--border-1) solid var(--line); }
+#islands .isl-fold[aria-expanded="true"] + .isl-fold-body { border-bottom: var(--border-1) solid var(--line); }
 /* Islands takes the room the views leave; the views, a few rows, scroll on their own where they are many. */
 #islands .isl-fold-body[data-fold="islands"] { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 #islands .isl-fold-body[data-fold="views"] { flex: none; max-height: 40%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding: var(--space-3) 0 var(--space-5); }
