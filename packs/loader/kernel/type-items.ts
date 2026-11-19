@@ -7,6 +7,7 @@ import { PACK_ITEM } from './pack-items.ts'; import { versionRegistry } from './
 import { LINK_ITEM, TYPE_ITEM, type TypeItem } from './type-overlay.ts';
 import { followMade } from './packstate.ts';
 import { syncTypes } from './typetable.ts';
+import { judgeExamples } from './rule-check.ts';
 
 /** What the registry reads from the map: types, link types, and packs made there (packs/loader/kernel/pack-items.ts). */
 const KINDS = [TYPE_ITEM, LINK_ITEM, PACK_ITEM];
@@ -108,9 +109,12 @@ export async function typesAfter(l: Archipelago, ops: Op[]): Promise<Registry> {
     // Off even once added: the island rules do not take it (one that waits for a pack still to come is let be).
     const refused = names.flatMap((n) => (added.states.get(n)?.state === 'off' ? [`the pack ${n} is ${added.states.get(n)!.why}`] : []));
     if (refused.length) throw new Error(`Change rejected:\n- ${refused.join('\n- ')}`);
+    // Each rule's examples come to what they say under the manifest as it will be (packs/rules/kernel/examples.ts).
+    const off = (await Promise.all(names.map(async (n) => (await judgeExamples(added, n)).map((p) => `the pack ${n}: ${p}`)))).flat();
+    if (off.length) throw new Error(`Change rejected:\n- ${off.join('\n- ')}`);
   }
   // A version of a pack is checked as an island would run it, so one that would not load is refused now, not when an island names it.
-  const broken = packs.filter((i) => i.is_open && i.props.version_of).flatMap((i) => { const run = versionRegistry(trial, i.id); return run instanceof Error ? [`the version ${i.title} of ${String(i.props.version_of)}: ${run.message}`] : []; });
+  const broken = (await Promise.all(packs.filter((i) => i.is_open && i.props.version_of).map(async (i) => { const run = versionRegistry(trial, i.id), of = String(i.props.version_of); return run instanceof Error ? [`the version ${i.title} of ${of}: ${run.message}`] : run ? (await judgeExamples(run, of)).map((p) => `the version ${i.title} of ${of}: ${p}`) : []; }))).flat();
   if (broken.length) throw new Error(`Change rejected:\n- ${broken.join('\n- ')}`);
   // A workspace's own is named local.<name>, so a pack added later never takes its name.
   const misnamed = named.filter((i) => typeof i.props.name === 'string' && !i.props.preset && !/^local\.[a-z][a-z0-9_]*$/.test(i.props.name));

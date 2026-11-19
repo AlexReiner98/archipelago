@@ -16,13 +16,13 @@ import { followSheet, sheetAside } from './sheet-follow.js';
 import { litSwitch, numberOf, sizeOf } from './query-base.js';
 import { surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
-import { typeTitle } from './words.js';
+import { types as registry, typeTitle } from './words.js';
 import { colours, typeWords } from './layout-input.js';
 import { panZoom } from './pan-zoom.js';
 import { transition } from './transition.js';
 import { pictureKey } from './picture-name.js';
 import { keepScene, keptHere, scenes } from './pictures-kept.js';
-import { looksModules, withLooks } from './island-looks.js';
+import { looksModules, withLooks } from './island-looks.js'; import { heldBare } from './island-hold.js';
 
 /** A held change's id, as a drawing names it in the key of the mark that decides it: `held:<id>`. */
 export const HELD = /^held:(p_[a-z0-9]+)/;
@@ -125,6 +125,7 @@ const plain = (value) => JSON.parse(JSON.stringify(value ?? null));
 
 /** Draw the answer in host with the drawing its style names. The same call as any of the kernel's shapes. */
 export function drawWith(host, answer, style, keep) {
+  if (heldBare(host, answer, [...registry.values()].some((t) => t.fields?.island), numberOf(style, 'island_hold_ms'))) return; // its items back on no island while the map keeps them: the picture stays, asked again (./island-hold.js)
   // Islands with looks of their own are drawn by the drawing with their code beside its own (./island-looks.js).
   const drawing = withLooks(style.drawing, answer, (hash) => layouts.get(hash), style.island_looks === 'plain');
   // One that says it is laid out by the page has its box now, before it is measured: drawn once, at the size it will have.

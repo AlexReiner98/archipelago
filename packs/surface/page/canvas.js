@@ -16,6 +16,7 @@ import { autoIslands, onAuto } from './islands-auto.js';
 import { unfollow } from './replica.js';
 import { keyOf } from './marks.js';
 import { drawBand } from './bar-band.js';
+import { edgeNames } from './canvas-edge.js';
 import './sessions-open.js';
 
 /** What lives on these islands (a list as a person keeps it: islands by id, live reads by name, which are not islands). */
@@ -326,10 +327,21 @@ export function canvasIn(host, pane) {
     fit() {
       if (at?.kept) return;
       if (at) at.kept = null;
-      // Never smaller than reads (the style's plane_fit_least): a big island is panned, from its top left (e_5cp4fw78).
-      c.moves()?.fit(0, ...bars(host), true);
+      // A size that reads wins over all of it in sight (verdict e_amqnqtsn): the canvas opens on as many of its islands
+      // as read whole together, in the order they are read, standing under the bars; the rest are named at the frame's
+      // edge (./canvas-edge.js). A lens that is no list of islands fits all of it, never smaller than reads (e_5cp4fw78).
+      const moves = c.moves(), isles = islandBoxes(), [top, bottom] = bars(host), boxes = isles.map(([, , box]) => box);
+      if (!isles.length) moves?.fit(0, top, bottom, true);
+      else if (moves) {
+        // Opened once, the bands of names it leaves out take their room, and it opens again beside them.
+        moves.openOn(boxes, 0, top, bottom);
+        const [right, foot] = edges?.now() ?? [0, 0];
+        if (right || foot) (moves.openOn(boxes, right, top, bottom + foot), edges.now());
+      }
       if (at) at.fitted = c.moves()?.state();
     },
+    /** The islands it draws as [id, title, box], in the order they are read: by their top, then their left. */
+    islands: () => islandBoxes(),
     /** This item's mark (an island's land, an item's box) in sight at a size that reads, kept there as a reader's move is. */
     toItem(id) {
       const moves = c.moves(), name = host.querySelector(`.lf-stage svg [data-item="${id}"]`);
@@ -347,6 +359,21 @@ export function canvasIn(host, pane) {
     },
   };
   all.add(c);
+  /** Each island the lens lists with its title and where its land lies, by its name's mark, read top down, those level across. */
+  const islandBoxes = () => {
+    const moves = c.moves(), items = at?.view?.answer?.items ?? [];
+    // Its title from the answer, else as its name's mark says it (an island the answer holds no item of).
+    if (!moves || !at) return [];
+    return islandsOf(at.lens)
+      .map((id) => {
+        const name = host.querySelector(`.lf-stage svg [data-item="${id}"]`), box = name && moves.boxOf(name);
+        return box && [id, items.find((i) => i.id === id)?.title ?? name.querySelector('text')?.textContent ?? id, box];
+      })
+      .filter(Boolean)
+      // Two that stand level (their spans down overlap: one shelf) are read from the left, else from the top.
+      .sort(([, , a], [, , b]) => (a[1] < b[3] && b[1] < a[3] ? a[0] - b[0] : a[1] - b[1]) || a[1] - b[1]);
+  };
+  let edges = null;
   // Where the reader left it, each time they move it: a drawing drawn again (the map changed) is put back there. A click
   // that moved nothing leaves it where it was fitted, so it is fitted again.
   const keepIt = () => at && c.moves() && (at.kept = moved() ?? at.kept);
@@ -360,6 +387,9 @@ export function canvasIn(host, pane) {
     sized.disconnect();
     const stage = host.querySelector('.lf-stage');
     if (stage) sized.observe(stage);
+    // The islands it leaves out of sight, named at the frame's edge, on each new stage.
+    edges?.stop();
+    edges = stage && c.moves() ? edgeNames(stage, c.moves(), { islands: islandBoxes, room: () => c.moves().room(0, ...bars(host)), go: (id) => c.toItem(id) }) : null;
     if (at?.kept) c.moves()?.restore(at.kept);
     else c.fit();
     if (at?.shows) bringIn();
@@ -432,7 +462,9 @@ const bars = (host) => {
   // The plane, which starts under the bars (ui/shell.css), else the canvas; a bar over another pane covers none of it.
   const box = (host.querySelector('.lf-stage') ?? host).getBoundingClientRect();
   const over = (id) => { const r = document.getElementById(id)?.getBoundingClientRect(); return r && r.right > box.left && r.left < box.right; };
-  const foot = (over('query') && edge('query', 'bottom')) || (over('nav') && edge('nav', 'bottom')) || box.top, find = over('find') ? edge('find', 'top') : undefined;
+  // The band's line (the page's ::before) is the least: on a still page (a look) the bar sits inside the band, its foot above that line.
+  const line = (() => { const b = getComputedStyle(document.body, '::before'); return b.content === 'none' ? 0 : (parseFloat(b.top) || 0) + (parseFloat(b.height) || 0); })();
+  const foot = Math.max(line, (over('query') && edge('query', 'bottom')) || (over('nav') && edge('nav', 'bottom')) || box.top), find = over('find') ? edge('find', 'top') : undefined;
   return [Math.max(0, foot - box.top), find === undefined ? 0 : Math.max(0, box.bottom - find)];
 };
 const fitAll = () => all.forEach((c) => c.fit());

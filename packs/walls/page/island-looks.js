@@ -14,6 +14,13 @@ const LOOKS = 'island-looks.js';
 /** Each look's files as fetched, by its id and when it last changed. */
 const fetched = new Map();
 
+/** A try of a look's code, sent by the person looking (packs/surface/page/preview.js hands it here): `{ value, at }`, or none. */
+let triedOf = () => undefined;
+export const triesFrom = (find) => void (triedOf = find);
+
+/** The tries the islands of an answer would be drawn with, said as one key: what a page draws again by when they move. */
+export const islandTries = (answer) => lookedOf(answer).map((i) => triedOf(i.look.id, false)?.at ?? '').join(',');
+
 /** The islands of an answer that a layout draws, in a steady order. */
 const lookedOf = (answer) => (answer?.islands ?? []).filter((i) => i.look?.kind === 'layout' && i.look.coded !== false && typeof i.look.id === 'string').sort((a, b) => (a.id < b.id ? -1 : 1));
 
@@ -25,9 +32,11 @@ const lookedOf = (answer) => (answer?.islands ?? []).filter((i) => i.look?.kind 
 export function withLooks(drawing, answer, have, plain = false) {
   const looked = plain ? [] : lookedOf(answer), base = drawing?.modules ?? have(drawing?.hash);
   if (!looked.length || !base || typeof base[LOOKS] !== 'string') return drawing;
-  const said = looked.map((i) => `${i.id}${i.look.id}${String(i.look.at ?? '').replace(/\D/g, '')}`).join('');
+  // A look drawn with a try is another picture: the try's time is in its name, and its code is the try's.
+  const tried = looked.map((i) => triedOf(i.look.id, true));
+  const said = looked.map((i, k) => `${i.id}${i.look.id}${String(i.look.at ?? '').replace(/\D/g, '')}${tried[k] ? `t${tried[k].at}` : ''}`).join('');
   const { modules: _m, ...rest } = drawing;
-  return { ...rest, hash: `${drawing.hash}-${said}`, looks: { base, looked } };
+  return { ...rest, hash: `${drawing.hash}-${said}`, looks: { base, looked, tried } };
 }
 
 /** A look's files: one text is its index.js. */
@@ -40,10 +49,13 @@ const codeOf = (look) => {
   return fetched.get(key);
 };
 
+/** A look's code as it is drawn: a try's in place of the map's, with the map's settings. */
+const drawnCode = async (look, tried) => (tried ? { ...(await codeOf(look)), files: filesOf(tried.value) } : codeOf(look));
+
 /** The modules of a drawing `withLooks` answered: the drawing's, each look's files under its own names, and the module naming them. */
-export async function looksModules({ base, looked }) {
+export async function looksModules({ base, looked, tried = [] }) {
   const out = { ...base }, lines = [], entries = [];
-  const codes = await Promise.all(looked.map((i) => codeOf(i.look)));
+  const codes = await Promise.all(looked.map((i, k) => drawnCode(i.look, tried[k])));
   codes.forEach(({ files, settings }, k) => {
     if (typeof files['index.js'] !== 'string') return;
     const own = (name) => `look.${k}.${name}`;

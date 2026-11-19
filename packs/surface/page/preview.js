@@ -4,6 +4,7 @@
 // else's page hears of it.
 
 import { api, h, loadMay, may } from './base.js';
+import { triesFrom } from './island-looks.js';
 
 /** The tries now, by `${item} ${field}`. */
 const held = new Map();
@@ -23,9 +24,21 @@ export function triedOn(style, coder) {
   return id && !((typeof style.code === 'string' && style.code.trim()) || (style.code && typeof style.code === 'object')) ? [...held.values()].find((p) => p.drawing?.id === id) : undefined;
 }
 
+/** The tries a drawing on this page was drawn with, for a look to say (packs/look_draw/kernel/look-draw.ts). */
+const drewWith = new Map();
+globalThis.lookTried = () => [...drewWith.values()];
+
+// An island's own look (packs/walls/page/island-looks.js) is drawn with a try of its code, as a view's layout is; drawing marks it drawn with.
+triesFrom((id, drawing) => {
+  const preview = held.get(`${id} code`);
+  if (preview && drawing) drewWith.set(`${preview.item} ${preview.field}`, { item: preview.item, field: preview.field });
+  return preview;
+});
+
 /** Put the try a style is drawn with in its place, in the style itself; answers the try. */
 export function tryOn(style, coder) {
   const preview = triedOn(style, coder);
+  if (preview) drewWith.set(`${preview.item} ${preview.field}`, { item: preview.item, field: preview.field });
   if (preview?.drawing) style.drawing = preview.drawing;
   else if (preview) style.code = preview.value;
   return preview;

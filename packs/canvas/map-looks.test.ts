@@ -93,7 +93,7 @@ test('an island’s style says where its focus stands, its outline and size', ()
     const answer = { items: held, links: [], islands: [{ id: 'e_islandaa', title: 'Here', focus: true, ...(focus && { style: { focus } }) }] };
     return draw({ answer, style: { ...house, placed: { e_islandaa: [0, 0] } }, reduced: true, width: 1200, height: 800 }, { measure, gestures: () => ({ on: () => [] }) }).scene;
   };
-  const box = (scene: any, id: string) => find(scene.svg, (k: any) => k[1]?.href === `#/e/${id}`)?.[3];
+  const box = (scene: any, id: string) => find(scene.svg, (k: any) => k[1]?.key === `s:${id}`)?.[3]; // its step, not the island's name (a link to it too)
   const rect = (b: any) => (b?.[0] === 'rect' ? b[1] : null);
   // At the top: over the two others, which now stand lower than it.
   const top = drawFocus({ at: 'top' });

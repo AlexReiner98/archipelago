@@ -11,6 +11,9 @@ test('what a look hands is checked, its own items alone, moved to the picture by
   const h = handedOf({ places: { a: [10, 20, 4], b: [5, 5], z: [1, 1], c: 'no' } }, new Set(['a', 'b', 'c']), [100, 200]);
   assert.deepEqual([...h.places], [['a', [110, 220, 4]], ['b', [105, 205, 0]]], 'places of its own items only, a radius where given');
   assert.equal(handedOf({}, new Set(['a']), [0, 0]), null, 'no places, nothing handed');
+  assert.equal(h.tags, false, 'a look that says nothing of tags leaves them to the map');
+  assert.equal(handedOf({ places: {}, tags: true }, new Set(), [0, 0]).tags, true, 'a look that writes its tags says so');
+  assert.equal(handedOf({ places: {}, tags: 'yes' }, new Set(), [0, 0]).tags, false, 'only true says so');
 });
 
 test('the links among one painted island’s items are left to its look; those across its shore stay', () => {

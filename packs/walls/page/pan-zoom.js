@@ -13,19 +13,50 @@ import { pinchOf } from './pinch.js';
 export const tierOf = (px, { text_least, more_from }) => (px < text_least ? 'none' : px < more_from ? 'names' : 'all');
 
 /** The numbers a plane moves by, the style's (the house style names every one). */
-const planeOf = (style) => Object.fromEntries(['zoom_least', 'zoom_most', 'open_least', 'fit_least', 'text_least', 'more_from', 'margin', 'wheel', 'drag_from', 'fit_pad'].map((n) => [n, numberOf(style, `plane_${n}`)]));
+const planeOf = (style) => Object.fromEntries(['zoom_least', 'zoom_most', 'open_least', 'fit_least', 'open_across', 'text_least', 'more_from', 'margin', 'wheel', 'drag_from', 'fit_pad'].map((n) => [n, numberOf(style, `plane_${n}`)]));
 
 /**
  * Where to stand to see the box [l, t, r, b] of a picture in a room `room` [left, top, width, height] of the frame,
  * `pad` kept round it: all of it, centred, when that is at least `least` a unit; else at `least`, from its top left, each
- * way it does not fit (a way it fits is still centred). Answers the view { s, x, y } and the scale that shows all of it.
+ * way it does not fit (a way it fits is still centred, or down from the room's top where `high`: a page read from its top;
+ * across from the room's left too where `left`: the room beside it then shows what lies beside it, not an empty band).
+ * Answers the view { s, x, y } and the scale that shows all of it.
  */
-export function framed([l, t, r, b], [rl, rt, rw, rh], pad, least = 0) {
+export function framed([l, t, r, b], [rl, rt, rw, rh], pad, least = 0, high = false, left = false) {
   const w = Math.max(1, r - l), hh = Math.max(1, b - t);
   const whole = Math.min(1, (rw - pad) / w, (rh - pad) / hh);
   const s = Math.max(whole, least);
-  const along = (from, size, start, room) => (size * s <= room - pad ? from - (start + (room - size * s) / 2) / s : from - (start + pad / 2) / s);
-  return { s, x: along(l, w, rl, rw), y: along(t, hh, rt, rh), whole };
+  const along = (from, size, start, room, centred) => (centred && size * s <= room - pad ? from - (start + (room - size * s) / 2) / s : from - (start + pad / 2) / s);
+  return { s, x: along(l, w, rl, rw, !left), y: along(t, hh, rt, rh, !high), whole };
+}
+
+/**
+ * Which of these boxes [l, t, r, b] (islands, in the order they are read) open in sight together at a size that reads:
+ * from the first, each that still reads whole with those before it at `least` or more as `framed` shows their union,
+ * one too big passed over so a later one that fits still comes in (round 2 of "The canvas, by eye": a second island
+ * that fits readable opens too). Answers their count, the union, and whether one left out stands beside it (`beside`);
+ * none (a first box too big to read whole) answers that first box alone: `across`, whole across its width with its
+ * height running on, where that is at `across` a unit or more (a second floor, the opening island's own); else shown at
+ * `least` from its top left, the rest reached by panning (round 3's verdict, option C).
+ */
+export function leading(boxes, room, pad, least, across = least) {
+  let union = null, n = 0;
+  const out = [];
+  for (const [l, t, r, b] of boxes) {
+    const next = union ? [Math.min(union[0], l), Math.min(union[1], t), Math.max(union[2], r), Math.max(union[3], b)] : [l, t, r, b];
+    if (framed(next, room, pad).whole < least) {
+      if (!union) break;
+      out.push([l, t, r, b]);
+      continue;
+    }
+    union = next;
+    n += 1;
+  }
+  // One left out stands beside them, to their right, level with them: the room beside them is its to show.
+  if (n) return { n, box: union, across: false, beside: out.some(([l, t, , b]) => l >= union[2] && t < union[3] && b > union[1]) };
+  if (!boxes.length) return { n: 0, box: null, across: false };
+  const [l, t, r] = boxes[0];
+  return { n: 1, box: boxes[0], across: framed([l, t, r, t], room, pad).whole >= across };
 }
 
 /**
@@ -45,6 +76,8 @@ export function panZoom(frame, svg, given) {
   const view = { s: 1, x: 0, y: 0 };
   let fitted = 1;
   let drag = null;
+  /** Who hears each view drawn, beside the drawing (`told`): what stands over the frame and follows it (./canvas-edge.js). */
+  const watching = new Set();
   const size = () => [Math.max(1, frame.clientWidth), Math.max(1, frame.clientHeight)];
 
   // ---- What is drawn: each mark of the picture with where it lies, read once and again when the drawing moves one.
@@ -111,6 +144,9 @@ export function panZoom(frame, svg, given) {
     queued = 0;
     const v = inView();
     svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.width} ${v.height}`);
+    for (const f of watching) f(v);
+    // The scale, for what keeps its size on screen at any zoom (an island's header text, lane 2, overlap e_mb3n6uwb).
+    frame.style.setProperty('--ln-plane-scale', String(v.scale));
     cull(v);
     const said = `${v.x} ${v.y} ${v.width} ${v.height}`;
     if (told && said !== last) ((last = said), told(v));
@@ -123,9 +159,10 @@ export function panZoom(frame, svg, given) {
    * All of it in sight, centred in the room beside what floats on the left and what covers the frame's right (`right`),
    * and between what floats over its top and its foot (`top`, `bottom`: the bars). `readable`: never smaller than the
    * style's least readable scale (`plane_fit_least`), what does not fit then reached by panning from its top left.
+   * `high`: standing at the top of the room, under the bars, not centred down it (the canvas, opened on its islands).
    */
-  const fit = (right = 0, top = 0, bottom = 0, readable = false) => {
-    fitted = toBox([0, 0, width, height], right, top, bottom, readable);
+  const fit = (right = 0, top = 0, bottom = 0, readable = false, high = false) => {
+    fitted = toBox([0, 0, width, height], right, top, bottom, readable, high);
   };
   /** The room the picture is seen in, beside and between what covers the frame. */
   const roomOf = (right, top, bottom) => {
@@ -133,12 +170,30 @@ export function panZoom(frame, svg, given) {
     return [aside, top, Math.max(1, W - aside - right), Math.max(1, H - top - bottom)];
   };
   /** A box of the picture [l, t, r, b] in sight as fit puts all of it (an island, by whoever knows where it lies): the scale that shows all of it. */
-  const toBox = (box, right = 0, top = 0, bottom = 0, readable = true) => {
-    const { s, x, y, whole } = framed(box, roomOf(right, top, bottom), plane.fit_pad, readable ? plane.fit_least : 0);
+  const toBox = (box, right = 0, top = 0, bottom = 0, readable = true, high = false, left = false) => {
+    const { s, x, y, whole } = framed(box, roomOf(right, top, bottom), plane.fit_pad, readable ? plane.fit_least : 0, high, left);
     Object.assign(view, { s, x, y });
     now();
     return whole;
   };
+  /**
+   * Open readable on these boxes (islands, in reading order): as many from the first as read whole together, standing at
+   * the top of the room, or the first alone, whole across down to its own floor (`plane_open_across`), else from its top
+   * left at the least that reads; zooming out still reaches all of it. With one left out beside them it stands at their
+   * top left, not centred, so the room they leave shows the start of that land, not an empty band either side (round 2
+   * of "The canvas, by eye"). Answers how many are in sight.
+   */
+  const openOn = (boxes, right = 0, top = 0, bottom = 0) => {
+    const { n, box, across, beside } = leading(boxes, roomOf(right, top, bottom), plane.fit_pad, plane.fit_least, plane.open_across);
+    if (!box) return 0;
+    fitted = Math.min(fitted, framed([0, 0, width, height], roomOf(right, top, bottom), plane.fit_pad).whole);
+    // Whole across, its height left to run on: fitted as a box of its width and no height, from the room's top.
+    if (across) toBox([box[0], box[1], box[2], box[1]], right, top, bottom, false, true);
+    else toBox(box, right, top, bottom, true, true, beside);
+    return n;
+  };
+  /** Hear each view as it is drawn; answers how to stop. */
+  const watch = (f) => (watching.add(f), () => watching.delete(f));
   const open = () => {
     fit();
     if (fitted >= plane.open_least) return;
@@ -264,5 +319,5 @@ export function panZoom(frame, svg, given) {
     if (!marks) read();
     return marks.find((m) => m.el.contains(el))?.at ?? null;
   };
-  return { zoomBy, fit, toBox, boxOf, open, show, state, restore, inView, stop, again };
+  return { zoomBy, fit, toBox, openOn, watch, boxOf, open, show, state, restore, inView, stop, room: roomOf, again };
 }

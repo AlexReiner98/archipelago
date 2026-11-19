@@ -66,6 +66,8 @@ A query's answer carries the drawing as `style.drawing`: its id, the hash of its
 
 **A layout's code may be files** (task e_4pfjppqg, the owner, 14 Nov 2026): `code` is one text, as before, or files by path, `{ "index.js": …, "physics.js": … }`, entered at `index.js`, one importing another as `'./name.js'` (flat names ending `.js`; the field is declared `files`, checked in `packs/loader/kernel/fields.ts`). The frame links them as a pack drawing's modules are linked (`load` in `packs/walls/page/draw.js`), behind the same walls. An edit names its file (`edit.file`); a try (look's `tries`) sends the files whole; a pull lays them out at their paths, and a file new in the folder joins the code, which then is files. A one-line edit of one file logs that file alone. A string stays valid: old layouts, and agents that send one text, work as they did.
 
+**Try a drawing before you keep it:** `report` action `preview` (the field whole), then `query look`, which draws your own live tries as your open page does and names them (`tries: [{ item, field }]`; `tries: false` draws the map as it is), then `change` once it looks right.
+
 ## What a drawing is
 
 Modules, entered at `index.js`; one imports another as `'./name.js'`, and nothing else. `index.js` exports:

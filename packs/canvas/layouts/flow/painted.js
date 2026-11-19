@@ -17,27 +17,35 @@ import { handedOf, wirePatches } from './painted-wires.js';
 import { m as mark } from './marks.js';
 
 export { shoreOnly } from './painted-wires.js';
-import { hueClass, opacityOf, sessionsOn } from './session-ring.js';
+import { hueClass, opacityOf, paintedTag, sessionsOn } from './session-ring.js';
 
 /**
  * An item a look draws, as the map marks it: where it stands (`at:<id>`, moved when the look hands its place), the
- * rings of the sessions on it and the area that takes the pointer, each sized round the radius the look hands.
+ * rings of the sessions on it, each ring's tag over them (./session-ring.js), and the area that takes the pointer, each
+ * sized round the radius the look hands.
  * Hidden (`unplaced`) until then.
  */
 export function paintedBody({ item, x, y, gap, style, m }) {
   const on = sessionsOn(item), id = item.id;
   return m('g', { key: `at:${id}`, transform: `translate(${x} ${y})` },
     on.length && m('g', { class: 'lf-srs', 'aria-hidden': 'true' }, ...on.map((s, k) => ((faint) => m('g', { class: `lf-sr ${hueClass(s.hue)}${s.dormant ? ' dormant' : ''}`, ...(faint !== undefined && { opacity: faint }) },
-      m('circle', { key: `ring:${id}:${k}`, class: 'lf-shape', r: gap * (k + 1) })))(opacityOf(s, style)))),
+      m('circle', { key: `ring:${id}:${k}`, class: 'lf-shape', r: gap * (k + 1) }),
+      paintedTag({ s, item, k, rings: on.length, gap, style, m })))(opacityOf(s, style)))),
     m('circle', { key: `hit:${id}`, class: 'lf-hit', r: gap }));
 }
 
-/** The patches that stand a placed item where its look drew it, its rings and pointer area round its radius. */
-export const itemPatches = (placed, items, gap, over = 0) => [...placed].flatMap(([id, [x, y, r]]) => [
+/**
+ * The patches that stand a placed item where its look drew it, its rings, their tags and pointer area round its radius.
+ * A look that writes the rings' tags itself (it hands `tags: true`, overlap e_jhqsvwwh) has the map's tags hidden.
+ */
+export const itemPatches = (placed, items, gap, over = 0, ownTags = false) => [...placed].flatMap(([id, [x, y, r]]) => [
   { key: `s:${id}`, toggle: { unplaced: false } },
   { key: `at:${id}`, set: { transform: `translate(${x} ${y})` }, ...(over && { over }) },
   { key: `hit:${id}`, set: { r: Math.max(r, gap) } },
-  ...sessionsOn(items.get(id)).map((_, k) => ({ key: `ring:${id}:${k}`, set: { r: r + gap * (k + 1) } })),
+  ...sessionsOn(items.get(id)).flatMap((_, k, on) => [
+    { key: `ring:${id}:${k}`, set: { r: r + gap * (k + 1) } },
+    { key: `tag:${id}:${k}`, set: { transform: `translate(0 ${-(r + gap * on.length)})` }, toggle: { written: ownTags === true } },
+  ]),
 ]);
 
 /**
@@ -54,22 +62,65 @@ export function placer({ g, painted, gap, draw, heads, order, over }) {
     const again = [...handed.places.keys()].some((id) => placed.has(id)), changed = new Set(handed.places.keys());
     for (const [id, at] of handed.places) placed.set(id, at);
     const moving = again ? over : 0;
-    return [...itemPatches(handed.places, items, gap, moving), ...wirePatches({ wires, boxes, placed, painted, changed, draw, heads, over: moving })];
+    return [...itemPatches(handed.places, items, gap, moving, handed.tags), ...wirePatches({ wires, boxes, placed, painted, changed, draw, heads, over: moving })];
   };
 }
 
 export const css = `
 .lf-step.unplaced, .lf-wire.unplaced, .lf-tie.unplaced, .lf-head.unplaced { visibility: hidden; pointer-events: none; }
 .lf-step .lf-sr circle.lf-shape { fill: none; }
+.lf-step .lf-sr g.written { display: none; }
 `;
 
 /** How light a colour the page gives is: the sum of its channels, as rgb() writes them. */
 const lightness = (v) => (([r = 0, g = 0, b = 0]) => Number(r) + Number(g) + Number(b))(String(v ?? '').match(/\d+(\.\d+)?/g) ?? []);
 
-/** The page's colours as a layout's code reads its theme: the island's land as its sea, and dark where its text is lighter than its land. */
-function themeOf(colours) {
-  const c = colours?.lens ?? {};
-  return { sea: c.land || c.sea, text: c.text, muted: c.muted, line: c.line || c.muted, accent: c.accent, dark: lightness(c.text) > lightness(c.land || c.sea) };
+/** A colour as a canvas writes it back (#rrggbb or rgba()), where there is a canvas to ask; else as it was given. */
+function asCanvasSays(v) {
+  try {
+    const c = new OffscreenCanvas(1, 1).getContext('2d');
+    c.fillStyle = v;
+    return c.fillStyle;
+  } catch {
+    return v;
+  }
+}
+
+/** A colour's red, green and blue, as #rrggbb or rgb() write it, or as a canvas reads any other; null where it is none. */
+function channels(v) {
+  const given = String(v ?? '').trim(), t = /^(#|rgba?\()/i.test(given) ? given : asCanvasSays(given);
+  const hex = /^#[0-9a-f]+$/i.test(t) ? t.slice(1).match(/[0-9a-f]{2}/gi) : null;
+  const [r, g, b] = hex ? hex.map((h) => Number(`0x${h}`)) : /^rgba?\(/i.test(t) ? (t.match(/\d+(?:\.\d+)?/g) ?? []).map(Number) : [];
+  return [r, g, b].every(Number.isFinite) ? [r, g, b] : null;
+}
+
+/**
+ * The ground an island's land is tinted into: the sea, lifted toward the text by `lift` (0 to 1) where the theme is dark
+ * (its text lighter than its sea), as the frame's own land is (./islands.js, the theme's `land_lift` colour at the same `flow_island_ground`). This runs where no page is, so it is worked out here, not read off the page.
+ */
+export function groundOf(sea, text, lift) {
+  const a = channels(sea), b = channels(text);
+  if (!a || !b || !(lift > 0 && lift <= 1) || b[0] + b[1] + b[2] <= a[0] + a[1] + a[2]) return sea;
+  return `rgb(${a.map((v, k) => Math.round(b[k] * lift + v * (1 - lift))).join(', ')})`;
+}
+
+/**
+ * An island's land: its colour `hue` mixed into the sea at `tint` (0 to 1), as its frame's land is (./islands.js,
+ * color-mix in srgb). Answers the sea where the island has no colour.
+ */
+export function landOf(hue, tint, sea) {
+  const a = channels(hue), b = channels(sea);
+  if (!a || !b || !(tint >= 0 && tint <= 1)) return sea;
+  return `rgb(${a.map((v, k) => Math.round(v * tint + b[k] * (1 - tint))).join(', ')})`;
+}
+
+/**
+ * The page's colours as a layout's code reads its theme: its island's land as its sea (`land`, else the page's), and
+ * dark where its text is lighter than its land.
+ */
+function themeOf(colours, land) {
+  const c = colours?.lens ?? {}, sea = land || c.land || c.sea;
+  return { sea, text: c.text, muted: c.muted, line: c.line || c.muted, accent: c.accent, dark: lightness(c.text) > lightness(sea) };
 }
 
 /** The animation frames of the worker, each carrying the run that asked for it: a run that ended asks no more. */
@@ -91,8 +142,9 @@ function framesByRun() {
 }
 
 /**
- * Start painting `islands` ({ id, at: [x, y], size: [w, h], look, answer }: where each stands in the picture, its look's
- * module with its `settings`, and what it holds) into the surface. There is one camera, the map's: each look paints at
+ * Start painting `islands` ({ id, at: [x, y], size: [w, h], look, answer, hue?, tint? }: where each stands in the
+ * picture, its look's module with its `settings`, what it holds, and its colour and its land's tint, the ground its frame
+ * is painted in) into the surface. There is one camera, the map's: each look paints at
  * the screen's own pixels, on a canvas the surface's size, and is handed `view()`, its island's frame ({ width, height },
  * in the picture's units) and where that frame lands on screen ({ k, tx, ty }: a unit of it is k pixels, its corner at
  * tx, ty), heard as 'view' each time the map pans or zooms. A look fits its picture to the frame, not to its canvas, and
@@ -137,9 +189,13 @@ export function paintIslands({ islands, tools, placed }) {
       for (const r of runs) if (!r.ended) frames.as(r, () => r.heard.get('resize')?.());
     };
     fit();
-    const theme = themeOf(surface.colours);
     runs.forEach((r, k) => {
       const isle = islands[k];
+      // One ground: the look's frame painted in its island's land, under its paint, and that land its theme's sea. An
+      // island with no colour of its own is tinted with the line's, as its frame's land is (./islands.js, .lf-island).
+      const lens = surface.colours?.lens ?? {};
+      r.land = landOf(isle.hue || lens.line || lens.muted, isle.tint, groundOf(lens.sea, lens.text, isle.ground));
+      const theme = themeOf(surface.colours, r.land);
       try {
         frames.as(r, () => isle.look.default({
           canvas: r.canvas, answer: isle.answer, style: isle.look.settings ?? {}, theme, size, hot: null, view: () => r.cam,
@@ -162,10 +218,13 @@ export function paintIslands({ islands, tools, placed }) {
       place();
       ctx.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
       for (const r of runs) {
-        if (r.ended || r.canvas.width <= 1) continue;
+        // Its ground is laid whatever its look does (one that ended, or has not yet sized its canvas): the frame is cut
+        // out of the island's land, so without it the sea would show there, a shade off the land round the header.
         const d = size.dpr, x0 = Math.max(0, Math.floor(r.cam.tx * d)), y0 = Math.max(0, Math.floor(r.cam.ty * d));
-        const x1 = Math.min(r.canvas.width, surface.canvas.width, Math.ceil((r.cam.tx + r.w * r.cam.k) * d)), y1 = Math.min(r.canvas.height, surface.canvas.height, Math.ceil((r.cam.ty + r.h * r.cam.k) * d));
-        if (x1 > x0 && y1 > y0) ctx.drawImage(r.canvas, x0, y0, x1 - x0, y1 - y0, x0, y0, x1 - x0, y1 - y0);
+        const x1 = Math.min(surface.canvas.width, Math.ceil((r.cam.tx + r.w * r.cam.k) * d)), y1 = Math.min(surface.canvas.height, Math.ceil((r.cam.ty + r.h * r.cam.k) * d));
+        if (x1 > x0 && y1 > y0 && r.land) (ctx.fillStyle = r.land), ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+        const [cx, cy] = [Math.min(x1, r.canvas.width), Math.min(y1, r.canvas.height)];
+        if (!r.ended && r.canvas.width > 1 && cx > x0 && cy > y0) ctx.drawImage(r.canvas, x0, y0, cx - x0, cy - y0, x0, y0, cx - x0, cy - y0);
       }
       surface.show();
     }

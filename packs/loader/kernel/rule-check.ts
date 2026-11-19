@@ -27,6 +27,12 @@ export const fillForms = (filled: NonNullable<typeof forms>): void => void (form
 /** The slot loader.rule_apart: the rules' check of apart (packs/rules/kernel/apart.ts), filled as it loads. */
 let apart: FormCheck | undefined;
 export const fillApart = (filled: FormCheck): void => void (apart = filled);
+/** The slot loader.rule_examples: the rules' judge of a pack's rule examples (packs/rules/kernel/examples.ts), filled as they load. */
+type ExampleJudge = (reg: Registry, pack: string) => Promise<string[]>;
+let examples: ExampleJudge | undefined;
+export const fillExamples = (filled: ExampleJudge): void => void (examples = filled);
+/** Each example of a pack's rules that does not come to what it says; until the rules fill the slot, one there is is said unjudged. */
+export const judgeExamples: ExampleJudge = async (reg, pack) => (examples ? examples(reg, pack) : reg.rules.some((r) => r.pack === pack && r.examples) ? [`pack ${pack}'s rule examples are the rules' to judge, not loaded`] : []);
 /** A rule's comparison: a field, an operator, and a number or a field. */
 export const COMPARE = /^\s*([a-z_][a-z0-9_]*)\s*(>=|<=|!=|>|<|=)\s*(-?\d+(?:\.\d+)?|[a-z_][a-z0-9_]*)\s*$/;
 

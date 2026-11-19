@@ -22,7 +22,7 @@ export function localIslands(g, corners) {
   return (g.islands ?? []).map((i) => {
     const c = corners.get(i.id);
     if (!c) return i;
-    return { ...i, land: i.land.map(by(c)), name: at(c, i.name), entries: i.entries.map((e) => at(c, e)), ...(i.look && { look: { ...i.look, at: at(c, i.look.at) } }), ...(i.canvas && { canvas: { ...i.canvas, at: at(c, i.canvas.at) } }) };
+    return { ...i, land: i.land.map(by(c)), name: at(c, i.name), entries: i.entries.map((e) => at(c, e)), ...(Number.isFinite(i.foot) && { foot: near(i.foot - c[1]) }), ...(i.look && { look: { ...i.look, at: at(c, i.look.at) } }), ...(i.canvas && { canvas: { ...i.canvas, at: at(c, i.canvas.at) } }) };
   });
 }
 

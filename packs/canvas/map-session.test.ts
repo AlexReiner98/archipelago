@@ -1,5 +1,5 @@
 // A run's session on the flow (layouts/flow/session.js, the wired shape in docs/sessions.md): a run in each state draws
-// its state's mark and its line as its one line, whole in its title; what the style lights (waiting, your_move in core's
+// its state's mark and its name as its one line, its line whole in its title; what the style lights (waiting, your_move in core's
 // preset) is drawn as what waits on you and laid out first; a state the style names no mark for keeps the dot. Fixtures
 // stand in for the server's wiring: each run carries `session` as the flat answer gives it.
 
@@ -15,7 +15,9 @@ const read = (folder: string) => JSON.parse(readFileSync(join(import.meta.dirnam
 const canvas = read('canvas');
 const styles = [...canvas.styles, ...read('sessions').styles];
 const preset = (id: string) => styles.find((s: any) => s.id === id);
-const house = { ...preset('core.house').props, ...preset('core.sessions_look').props, shape: 'flow' };
+// Merged as styles are, a field that names things (sizes, numbers) name by name (packs/styles/kernel/styles.ts).
+const [base, look] = [preset('core.house').props, preset('core.sessions_look').props];
+const house = { ...base, ...look, sizes: { ...base.sizes, ...look.sizes }, numbers: { ...base.numbers, ...look.numbers }, shape: 'flow' };
 // The drawing's modules laid out by name in one folder, as the sandbox has them.
 const laid = mkdtempSync(join(tmpdir(), 'pelago-flow-session-'));
 for (const [name, file] of Object.entries(canvas.layouts.find((d: any) => d.id === 'core.map').modules)) copyFileSync(join(import.meta.dirname, file as string), join(laid, name));
@@ -44,7 +46,7 @@ const marks = (node: any): any[] => (Array.isArray(node) && typeof node[0] === '
 const text = (mark: any): string => mark.slice(2).map((k: any) => (typeof k === 'string' ? k : Array.isArray(k) && k[0] !== 'title' ? text(k) : '')).join('');
 const stepOf = (svg: any, id: string) => marks(svg).find((x) => x[0] === 'a' && x[1].href === `#/e/${id}`);
 
-test('a run in each state draws its mark and its line', () => {
+test('a run in each state draws its mark and its name, its line in its title', () => {
   const { scene } = picture({ answer, style: house }, tools);
   for (const r of runs) {
     const step = stepOf(scene.svg, r.id);
@@ -53,12 +55,11 @@ test('a run in each state draws its mark and its line', () => {
     assert.ok(mark, `${r.session.state} has a state mark`);
     assert.ok(mark[1].class.includes(`lf-ss-${r.session.state}`) && mark[1].class.includes(house.session_marks[r.session.state].shape), `${r.session.state}'s mark is its own shape`);
     assert.ok(!marks(step).some((x) => String(x[1].class ?? '').includes('lf-dot')), `${r.session.state} has no phase dot`);
-    // Its line is its one line, and its title is the line whole.
+    // Its name is its one line (never its last beat), and its title is its line whole.
     const shown = text(marks(step).find((x) => x[0] === 'text'));
     assert.ok(!marks(step).some((x) => x[0] === 'tspan'), 'one line, never two');
     assert.equal(marks(step).find((x) => x[0] === 'title').slice(2).join(''), r.session.line);
-    if (r.session.line === LONG) assert.ok(shown.endsWith('…') && LONG.startsWith(shown.slice(0, -1)), 'a long line is cut');
-    else assert.equal(shown, r.session.line);
+    assert.equal(shown, r.title, 'the step says which session, not what it last said');
   }
   // Each state's colour is a rule of the scene, and the key names every state drawn.
   for (const s of STATES) assert.ok(scene.css.includes(`.lf-ss-${s} {`), `${s} has its colour`);
@@ -117,4 +118,19 @@ test('only a held change named as a word of its own is what a run asks', async (
   assert.equal(askedOf({ state: 'your_move', line: 'Approve p_abcd1234x_y?' }), null);
   assert.equal(askedOf({ state: 'working', line: 'Approve p_a4knhcvf?' }), null);
   assert.equal(askedOf(null), null);
+});
+
+test('a run whose session rings a step is told by the ring\'s tag, not again as a step', () => {
+  // Task 3 is worked on by the working run and by the waiting one; each rings it.
+  const on = (r: any, hue: string) => ({ run: r.id, title: r.title, hue, state: r.session.state, since: null, age: 1, fresh: 1, dormant: false });
+  const [waiting, , , working] = runs;
+  const ringed = { ...task(3), sessions: [on(working, '#2f5fb3'), on(waiting, '#b23a48')] };
+  const { scene } = picture({ answer: { items: [ringed, working, waiting], links: answer.links.filter((l) => l.to === ringed.id || l.from === waiting.id) }, style: house }, tools);
+  assert.ok(!stepOf(scene.svg, working.id), 'the working run is its tag, not a step in the sea');
+  assert.ok(stepOf(scene.svg, waiting.id), 'a run waiting on you stays a step, to be answered');
+  const tags = marks(stepOf(scene.svg, ringed.id)).filter((x) => x[0] === 'text' && String(x[1].class ?? '').includes('lf-sr-tag'));
+  assert.deepEqual(tags.map(text), ['Working · Run working', 'Waiting · Run waiting'], 'each tag says what and who');
+  assert.equal(tags[0][1].dy, undefined, 'the first tag sits on the rings');
+  assert.equal(tags[1][1].dy, `${-house.numbers.session_tag_leading}em`, 'the next stands over it, in its own em');
+  assert.match(scene.css, /lf-sr-tag \{[^}]*var\(--ln-plane-scale, 1\)/, 'a tag keeps its screen size at any zoom');
 });

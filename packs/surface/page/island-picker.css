@@ -1,5 +1,6 @@
+/* One ground (sighting e_bb6tc8gr): the side bar stands on the canvas's sea, set apart by its edge's line alone; its sections by their lines. */
 /* The island picker (packs/surface/page/island-picker.js): a list at the canvas's left edge, folded to it or open, the canvas beside it. */
-#islands { position: fixed; z-index: 3; top: var(--band); bottom: 0; left: 0; display: flex; box-sizing: border-box; width: min(var(--isl-width, var(--side-least)), 60%); border-right: var(--border-1) solid var(--line); background: var(--panel); font-size: var(--text-4); }
+#islands { position: fixed; z-index: 3; top: var(--band); bottom: 0; left: 0; display: flex; box-sizing: border-box; width: min(var(--isl-width, var(--side-least)), 60%); border-right: var(--border-1) solid var(--line); background: var(--ln-sea, var(--bg)); font-size: var(--text-4); }
 #islands[hidden] { display: none; }
 /* The canvas, and its pane (fixed to the window, packs/surface/page/shell.css), start at the bar's edge; put away, the bar is gone and the canvas has the width. */
 body[data-islands="open"] :is(#canvas, #canvas > .pane) { left: var(--active-left); }
@@ -15,7 +16,8 @@ body[data-islands="open"]:not([data-islands-over="on"]) { --active-left: min(var
 body[data-islands="folded"] #islands { display: none; }
 /* The band keeps the whole width: the bar opens under it, beside the canvas or over it, never pushing it. */
 body[data-islands] #query { left: 0; }
-body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip)); }
+/* Under the bar where it is a strip of its own (a pane alone); on a still page (a look) the bar is in the band, and the side bar starts at the band's line. */
+body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip)); }
 #islands .isl-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 /* The bar's right edge: a strip to drag, drawn only as the line it already has, lit while pointed at. */
 #islands .isl-edge { position: absolute; top: 0; bottom: 0; right: 0; width: var(--space-4); cursor: col-resize; }
@@ -39,7 +41,7 @@ body:has(#query:not([hidden])) #islands { top: calc(var(--band) + var(--strip));
 #islands .isl-sec + .isl-sec { border-top: var(--border-1) solid var(--line); }
 #islands .isl-head { padding: var(--space-8) var(--space-6) var(--space-4); color: var(--muted); font-size: var(--text-1); text-transform: uppercase; letter-spacing: var(--track-3); }
 /* On: what the canvas draws, on the canvas's own ground, its names the largest and brightest in the bar. */
-#islands .isl-sec-on { background: var(--bg); }
+#islands .isl-sec-on { background: none; }
 #islands .isl-sec-on .isl-row { height: var(--box-8); font-size: var(--text-5); }
 #islands .isl-sec-on .isl-head { color: var(--text); }
 /* Auto, at the search line's right: a quiet word, its dot lit while it is on. */

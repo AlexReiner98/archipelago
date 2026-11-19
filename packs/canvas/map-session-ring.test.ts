@@ -51,3 +51,27 @@ test('the key has a row for a session on a step', () => {
   const none = picture({ answer: { items: [task(3)], links: [] }, style: house }, tools).scene;
   assert.ok(!none.key.some((row: any) => row.label === 'A session on it'));
 });
+
+test('on a painted island each ring has its tag, moved out with the radius the look hands', async () => {
+  const { paintedBody, itemPatches } = await import(pathToFileURL(join(laid, 'painted.js')).href);
+  const look = read('sessions').styles.find((s: any) => s.id === 'core.sessions_look').props;
+  const style = { ...house, ...look, sizes: { ...house.sizes, ...look.sizes }, numbers: { ...house.numbers, ...look.numbers } };
+  const item = task(1, [on(0), on(1)]);
+  const m = (tag: string, attrs: any, ...kids: any[]) => [tag, attrs, ...kids.filter((k) => k != null && k !== false)];
+  const body = paintedBody({ item, x: 0, y: 0, gap: 4, style, m });
+  const tags = marks(body).filter((x) => x[0] === 'text' && String(x[1].class).includes('lf-sr-tag'));
+  assert.deepEqual(tags.map((t) => t[2]), ['Working · Chat 0', 'Working · Chat 1'], 'what and who, on each ring');
+  assert.ok(tags.every((t) => t[1].class.includes('mid')), 'centred over a round item');
+  const patches = itemPatches(new Map([[item.id, [10, 20, 9]]]), new Map([[item.id, item]]), 4);
+  assert.deepEqual(patches.find((p: any) => p.key === `tag:${item.id}:1`).set, { transform: 'translate(0 -17)' }, 'over the outermost ring');
+  const none = paintedBody({ item, x: 0, y: 0, gap: 4, style: house, m });
+  assert.ok(!marks(none).some((x) => x[0] === 'text'), 'a style that names no tag size draws none');
+});
+
+test('a look that writes the rings\' tags itself has the map\'s hidden', async () => {
+  const { itemPatches } = await import(pathToFileURL(join(laid, 'painted.js')).href);
+  const item = task(1, [on(0)]), places = new Map([[item.id, [10, 20, 9]]]), items = new Map([[item.id, item]]);
+  const tagOfPatch = (own?: boolean) => itemPatches(places, items, 4, 0, own).find((p: any) => p.key === `tag:${item.id}:0`);
+  assert.deepEqual(tagOfPatch(true).toggle, { written: true }, 'hidden where the look says it writes them');
+  assert.deepEqual(tagOfPatch().toggle, { written: false }, 'drawn by the map otherwise');
+});
