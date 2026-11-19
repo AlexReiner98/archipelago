@@ -77,7 +77,7 @@ test('install: the pack is an item, every declaration an item of its type part o
   assert.equal(pack.title, 'Recipes');
   assert.equal(pack.body, 'Dishes we cook.');
   assert.deepEqual(pack.props.manifest, { id: 'recipes', version: '0.1.0', requires: ['type:record'], actions: v1.actions }, 'what makes no part stays on the item');
-  assert.match(pack.props.shipped.hash, /^sha256:[0-9a-f]{64}$/);
+  assert.match(pack.props.shipped.hash, /^[0-9a-f]{64}$/);
   assert.deepEqual(parts.map((p) => `${p.type}:${p.props.declares}`), [
     'type:recipes.dish', 'type:recipes.course', 'type:of:task', 'rule:recipes.serves', 'view:recipes.menu', 'screen:recipes.page', 'instruction:recipes.how', 'lens:recipes.all',
   ]);
@@ -194,15 +194,15 @@ test('a part the owner retired stays retired when the pack ships it again', () =
 
 test('code is named by runs, never put on the map', () => {
   const withLayout = next('0.1.0', (x) => { x.layouts = [{ id: 'recipes.plate', title: 'Plate', shape: 'plate', modules: { 'index.js': 'layouts/plate/index.js' } }]; });
-  const files = { 'handler.js': 'sha256:aa', 'layouts/plate/index.js': 'sha256:bb' };
+  const files = { 'handler.js': 'aa11', 'layouts/plate/index.js': 'bb22' };
   const m = map();
   m.apply(plan(withLayout, [], { files }).ops);
   const plate = m.get('layout', 'recipes.plate');
   assert.equal(plate.status, 'kept');
-  assert.deepEqual(plate.props.runs, [{ path: 'packs/recipes/layouts/plate/index.js', hash: 'sha256:bb' }]);
-  assert.deepEqual(m.of('recipes')[0].props.runs, [{ path: 'packs/recipes/handler.js', hash: 'sha256:aa' }], "what no part claims is the pack's");
-  const done = plan(withLayout, m.of('recipes'), { files: { ...files, 'handler.js': 'sha256:cc' } });
-  assert.deepEqual(done.ops, [{ op: 'update', id: m.of('recipes')[0].id, props: { runs: [{ path: 'packs/recipes/handler.js', hash: 'sha256:cc' }] } }], 'a file changed is a change of runs alone');
+  assert.deepEqual(plate.props.runs, [{ path: 'packs/recipes/layouts/plate/index.js', hash: 'bb22' }]);
+  assert.deepEqual(m.of('recipes')[0].props.runs, [{ path: 'packs/recipes/handler.js', hash: 'aa11' }], "what no part claims is the pack's");
+  const done = plan(withLayout, m.of('recipes'), { files: { ...files, 'handler.js': 'cc33' } });
+  assert.deepEqual(done.ops, [{ op: 'update', id: m.of('recipes')[0].id, props: { runs: [{ path: 'packs/recipes/handler.js', hash: 'cc33' }] } }], 'a file changed is a change of runs alone');
 });
 
 test('an item never shipped differs where both are taken to have changed it', () => {

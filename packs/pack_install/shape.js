@@ -32,8 +32,8 @@ export const canonical = (v) =>
   Array.isArray(v) ? `[${v.map(canonical).join(',')}]`
   : v && typeof v === 'object' ? `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`
   : JSON.stringify(v);
-/** sha256: and the hex sha256 of a value's canonical JSON. */
-export const hashOf = (v) => `sha256:${createHash('sha256').update(canonical(v === undefined ? null : v)).digest('hex')}`;
+/** The hex sha256 of a value's canonical JSON. */
+export const hashOf = (v) => createHash('sha256').update(canonical(v === undefined ? null : v)).digest('hex');
 
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : undefined);
 const str = (v) => (typeof v === 'string' ? v : undefined);
