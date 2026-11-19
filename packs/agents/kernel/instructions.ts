@@ -119,6 +119,6 @@ export async function instructionsFor(ctx: KernelContext, where: string, input: 
   if (told.length) await ctx.reads({ told: told.map((one) => one.preset ?? one.id) });
   // Said to a run, each is kept as said there, by the pack that keeps the record; where none does, it is not.
   const run = input.run ?? input.fill?.run;
-  if (told.length && run) await ctx.reads({ said_here: { ids: told.map((one) => one.preset ?? one.id), run, where } }).catch((err: Error) => ctx.said(`keeping what was said to ${run} failed: ${err.message}`));
+  if (told.length && run) await ctx.reads({ said_here: { ids: told.map((one) => one.preset ?? one.id), run, where } }).catch((err: Error) => ctx.said?.(`keeping what was said to ${run} failed: ${err.message}`));
   return told.map((one) => ({ ...one, text: filled(one.text, input.fill ?? {}) }));
 }
