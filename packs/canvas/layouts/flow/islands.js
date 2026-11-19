@@ -8,8 +8,8 @@
 // When the finding moves, a pulse runs from its gate across the sea to each reader's (task e_fqhbp4yq).
 // Layer: marks. Pure: the composed model and each island's legend rows in, marks and colour rules out.
 
-/** An island's name as its header says it: its title, and the pack it speaks. */
-export const nameOf = (i) => (i?.focus ? i?.pack?.title ?? '' : `${i?.title ?? ''}${i?.pack?.title ? ` · ${i.pack.title}` : ''}`);
+/** An island's name as its header says it: its own title alone, a focus island's too; the pack it speaks is set after it in quiet words (./pack-marks.js). */
+export const nameOf = (i) => i?.title ?? '';
 
 /**
  * The colour of the `k`th island the picture draws: the style's island_hues, else its hues, each a colour (`isHex`),
@@ -167,7 +167,7 @@ export const css = `
 .lf-shore :is(rect, path), .lf-crown-shore { fill: none; stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-island-stroke); }
 .lf-island-name { pointer-events: auto; cursor: pointer; }
 /* Its name in the plain face, near the text's colour: the region's small-caps serif read as a whisper at this size (study e_unru8ftt). */
-.lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-island-name-mix)); font-size: var(--ln-flow-island-text); font-family: var(--ln-font); dominant-baseline: central; }
+.lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-island-name-mix)); font-size: var(--ln-flow-island-text); font-family: var(--ln-font); font-weight: bold; dominant-baseline: central; }
 /* Its header kept at its size on screen: 1 over the camera's scale (--ln-plane-scale, set on the frame), within the style's least and most. */
 .lf-region { --lf-head: clamp(var(--ln-flow-island-head-least), calc(1 / var(--ln-plane-scale)), var(--ln-flow-island-head-most)); }
 .lf-head-scale, .lf-crown-scale { transform-box: view-box; transform-origin: 0 0; }

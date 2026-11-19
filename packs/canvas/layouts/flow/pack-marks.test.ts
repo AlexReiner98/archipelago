@@ -137,18 +137,18 @@ test("off a part is dashed, waiting faded and dashed, in its state's colour, eac
   for (const state of ['active', 'waiting', 'off']) assert.ok(css.includes(`.lf-part.st-${state} { --lf-pack: var(--ln-${house.pack_marks[state].hue}); }`), `the ${state} colour comes from the style`);
 });
 
-test("the island's key toggles a type it shows, and counts each pack's other parts", () => {
+test("the island's key toggles a type it shows, and the pack's tip counts its other parts", () => {
   const typed = {
     ...answer,
     islands: [{ ...answer.islands[0], pack: { ...answer.islands[0].pack, types: [{ id: 'build.feature', title: 'Feature', is: ['work'] }, { id: 'build.lane', title: 'Lane', is: ['work'] }] } }],
     items: [{ ...item('e_buildisl', 'Build the thing'), type: 'build.feature' }, { ...item('e_lanezzzz', 'A lane'), type: 'build.lane' }],
   };
-  const svg = draw(typed, writer).scene.svg;
+  const drawn = draw(typed, writer), svg = drawn.scene.svg;
   const keyRow = (id: string) => keyed(svg, `pt:e_buildisl:${id}:key`)[0];
   assert.ok(keyRow('build.feature')[1].on.includes('toggle') && keyRow('build.feature')[1].pack === 'build.feature', 'a type in the key is a toggle naming its part');
   assert.match(keyRow('build.lane')[1].class, /\bst-off\b/, 'a type off here is drawn off in the key');
-  const count = '0/1 rule · 1 view';
-  assert.ok(texts(svg).includes(count), "a row for the pack's other parts, each kind counted in words, its mark the pack's glyph");
+  assert.ok(!texts(svg).includes('0/1 rule · 1 view'), 'the header no longer counts the pack in a line of its own');
+  assert.match(texts(drawn.on({ name: 'enter', key: 'pk:e_buildisl:build' }).find((x: any) => x.tip)?.tip.mark).join('\n'), /0\/1 rule · 1 view/, "the pack's tip counts its other parts, each kind in words");
   assert.equal(keyed(draw(typed).scene.svg, 'pt:e_buildisl:build.feature:key')[0][1].pack, undefined, 'a reader toggles nothing');
 });
 
