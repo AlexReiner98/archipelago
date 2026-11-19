@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import { instructionsFor } from '../packs/agents/kernel/instructions.ts';
 import { kernelContext } from '../packs/loader/kernel/kernel-context.ts';
 import { fresh, make } from './map.ts';
+import { VIEWS } from '../packs/query/kernel/views.ts';
 
 test('what is said to a run is kept, and its record says whether its miss came back', async () => {
   const l = await fresh();
@@ -41,6 +42,19 @@ test('what is said to a run is kept, and its record says whether its miss came b
   await instructionsFor(ctx, 'tool:change');
   const [again] = (await ctx.reads({ said_record: { ids: [made.trial] } })) as { said: number }[];
   assert.equal(again.said, 2);
+});
+
+test('asked through the instructions view by a run, what is said is kept as said to it', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'run', type: 'run', title: 'A session' },
+    { op: 'create', ref: 'node', type: 'reflex', title: 'Test first', body: 'Run the test.', status: 'current', props: { for: ['tool:test'] } },
+  ]);
+  const answer = (await VIEWS.instructions.run(kernelContext(l, 'query'), { for: 'tool:test', run: made.run })) as { said: { id: string }[] };
+  assert.deepEqual(answer.said.map((one) => one.id), [made.node]);
+  await VIEWS.instructions.run(kernelContext(l, 'query'), { for: 'tool:test' });
+  const [rec] = (await kernelContext(l, 'agents').reads({ said_record: { ids: [made.node] } })) as { said: number; runs: number }[];
+  assert.deepEqual({ said: rec.said, runs: rec.runs }, { said: 1, runs: 1 }, 'asked with no run, nothing is kept');
 });
 
 const human = () => ({ kind: 'human' as const, name: 'owner' });
