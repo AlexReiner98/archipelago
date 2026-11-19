@@ -19,7 +19,6 @@ export function marksOf(tree, placed, z, n, shown) {
     const on = shown(node);
     return m('path', { key: `b:${node.id}`, class: `rt-branch rt-b${Math.min(node.depth, n('reflex_branch_levels'))}`, d: branch.get(node.id), pathLength: 1, 'stroke-dasharray': '1 2', 'stroke-dashoffset': on ? 0 : HIDDEN });
   });
-  const gap = z('reflex_name_gap');
   const nodes = tree.order.filter((node) => node.parent).map((node) => {
     const p = place.get(node.id), name = placed.names.get(node.id);
     const r = node.kids.length ? z('reflex_node') : z('reflex_leaf');
@@ -28,7 +27,7 @@ export function marksOf(tree, placed, z, n, shown) {
       { key: `n:${node.id}`, class: `rt-node${shown(node) ? ' on' : ''}${node.item ? '' : ' rt-bough'}`, ...(node.item && { item: node.item.id, on: ['click', 'enter', 'leave'], role: 'link' }) },
       m('circle', { class: 'rt-hit', cx: at(p.x), cy: at(p.y), r: z('reflex_hit') }),
       m('circle', { class: 'rt-dot', cx: at(p.x), cy: at(p.y), r }),
-      name && m('text', { class: 'rt-name', x: at(p.x + (name.right ? gap : -gap)), y: at(p.y), 'text-anchor': name.right ? 'start' : 'end', 'dominant-baseline': 'middle' }, name.text),
+      name && m('text', { class: 'rt-name', x: at(name.x), y: at(name.y), transform: `rotate(${at(name.turn)} ${at(name.x)} ${at(name.y)})`, 'text-anchor': name.right ? 'start' : 'end', 'dominant-baseline': 'middle' }, name.text),
     );
   });
   const sparks = n('reflex_pool_sparks'), lights = n('reflex_pool_lights');

@@ -159,12 +159,12 @@
             "reflex_bough_ink": 0.5,
             "reflex_glow": 0.25,
             "reflex_trail_ink": 0.6,
-            "reflex_name_depth": 2,
+            
             "reflex_name_room": 1.2,
             "reflex_name_most": 28,
             "reflex_tip_most": 120,
             "reflex_grow": 500,
-            "reflex_said_batch": 50,
+            "reflex_said_batch": 50, "reflex_said_wait": 1500, "reflex_file_depth": 2, "reflex_place_depth": 3, "reflex_aspect_follow": 0.5,
             "reflex_pool_sparks": 12,
             "reflex_pool_lights": 16
           }

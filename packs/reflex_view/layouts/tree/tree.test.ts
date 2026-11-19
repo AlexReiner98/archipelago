@@ -33,9 +33,10 @@ test('the tree hangs each node from what it is part of, and the loose ones from 
 test('a ring of part_of is cut where it closes, a node said somewhere hangs from that bough, and the view’s item is the root', () => {
   const ring = treeOf(answer(4, [partOf(1, 2), partOf(2, 1)]))!;
   assert.equal(ring.nodes.size, 5);
-  const said = treeOf({ ...answer(3, []), items: [node(0, { fields: { for: ['file:src/**'] } }), node(1, { fields: { for: ['file:ui/*'] } }), node(2)] })!;
-  assert.equal(said.nodes.get(id(0))!.parent!.id, '~for:file');
-  assert.equal(said.nodes.get(id(1))!.parent!.id, '~for:file');
+  const said = treeOf({ ...answer(3, []), items: [node(0, { fields: { for: ['file:src/**'] } }), node(1, { fields: { for: ['file:ui/*'] } }), node(2)] }, undefined, n)!;
+  assert.equal(said.nodes.get(id(0))!.parent!.id, '~for:file:src/');
+  assert.equal(said.nodes.get(id(0))!.parent!.parent!.id, '~for:file');
+  assert.equal(said.nodes.get(id(1))!.parent!.parent, said.nodes.get(id(0))!.parent!.parent, 'two folders under one file bough');
   const hub = { id: 'e_hubhubhu', type: 'task', title: 'Hub', created_at: node(0).created_at };
   const of = treeOf({ lens: { from: hub.id }, items: [hub, node(1), node(2)], links: [partOf(1, 2)] })!;
   assert.equal(of.root.id, hub.id);
@@ -47,6 +48,8 @@ test('it is placed the same each time, each child within its parent’s share of
   const a = radial(treeOf(answer())!, z, n, measure), b = radial(treeOf(answer())!, z, n, measure);
   assert.ok(a.names.size > 0, 'the first levels are named where there is room');
   assert.deepEqual([...a.place], [...b.place]);
+  assert.equal(a.names.size, a.place.size - 1, 'every node but the root is named');
+  assert.deepEqual([a.centre.x * 2, a.centre.y * 2], [a.width, a.height], 'the root stands at the middle');
   assert.ok(a.width > 0 && a.height > 0);
   for (const p of a.place.values()) assert.ok(p.x >= 0 && p.y >= 0 && p.x <= a.width && p.y <= a.height);
   assert.ok(a.branch.get(id(6))!.startsWith('M'));
@@ -70,29 +73,31 @@ test('played, it patches the tree in as it grows; under reduced motion it stands
   const patches: any[] = [];
   let frames = 0;
   const tools = { frame: () => new Promise((r) => setTimeout(r, 1)).then(() => frames++), patch: (p: any[]) => patches.push(...p), open() {}, surface: async () => null };
-  const played = picture({ answer: answer(), style, reduced: false }, tools);
+  const played = await picture({ answer: answer(), style, reduced: false }, tools);
   assert.ok(played.scene.surface, 'a played tree is never mounted from a picture kept still');
   await new Promise((r) => setTimeout(r, 60));
   assert.ok(frames > 2);
   assert.ok(patches.some((p) => p.key === 'cam' && p.set?.transform));
   assert.ok(played.on({ name: 'click', key: 'rt:replay' }).some((p: any) => p.toggle?.on === false));
   played.end();
-  const still = picture({ answer: { ...answer(), lens: { find: ['still'] } }, style, reduced: true }, tools);
+  const still = await picture({ answer: { ...answer(), lens: { find: ['still'] } }, style, reduced: true }, tools);
   assert.equal(still.scene.surface, undefined);
   assert.equal(JSON.stringify(still.scene.svg).match(/rt-node on/g)?.length, 12);
-  assert.ok(picture({ answer: answer(), style: { shape: 'reflex_tree' }, reduced: true }, tools).scene.message);
+  assert.ok((await picture({ answer: answer(), style: { shape: 'reflex_tree' }, reduced: true }, tools)).scene.message);
 });
 
 test('the counts the pack answers through the view’s sends stand in for the schematic ones', async () => {
   const patches: any[] = [], asked: any[] = [];
   const act = async (name: string, params: any) => (asked.push([name, params]), { answer: params.ids.map((one: string, i: number) => ({ id: one, said: i })) });
   const tools = { frame: () => new Promise(() => {}), patch: (p: any[]) => patches.push(...p), open() {}, act };
-  picture({ answer: { ...answer(), lens: { find: ['counted'] } }, style, reduced: true }, tools);
-  await new Promise((r) => setTimeout(r, 5));
+  const act2 = async (name: string, params: any) => ((await act(name, params)) as any);
+  const counted = await picture({ answer: { ...answer(), lens: { find: ['counted'] } }, style, reduced: true }, { ...tools, act: async (name: string, params: any) => { const got = await act2(name, params); got.answer.forEach((r: any, i: number) => (r.for = i < 3 ? ['tool:change'] : undefined)); return got; } });
   assert.equal(asked[0][0], style.sends.said);
   assert.equal(asked[0][1].ids.length, 12);
-  assert.deepEqual(patches.find((p) => p.key === 'rt-said-n'), { key: 'rt-said-n', text: '66' });
-  assert.ok(patches.some((p) => p.key === 'rt-schematic' && p.remove));
+  const svg = JSON.stringify(counted.scene.svg);
+  assert.ok(svg.includes('66 said') || JSON.stringify(counted.scene.before).includes('66'), 'the counts it answered are the ones shown');
+  assert.ok(!JSON.stringify(counted.scene.before).includes('schematic'));
+  assert.ok(svg.includes('n:~for:tool:change'), 'a node part of nothing hangs from the boughs of where it is said');
 });
 
 test('counted, a node never said is never lit', () => {

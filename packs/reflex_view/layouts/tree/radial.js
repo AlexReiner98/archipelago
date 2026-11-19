@@ -1,6 +1,7 @@
 // Layer: metrics. Where each node of the tree stands: a radial tree about the root, each subtree given a share of the
 // circle in proportion to its leaves, a ring out for each level (reflex_ring), each node a little nearer or farther
-// by its id (reflex_jitter), the whole spread wider than tall (reflex_spread_x). Each branch is an S-curve: out of the
+// by its id (reflex_jitter), the whole spread wider than tall (reflex_spread_x, following the frame's shape), the root
+// at the centre. Each branch is an S-curve: out of the
 // parent along its own direction, into the child along the child's. The same tree is placed the same each time.
 
 import { at } from './marks.js';
@@ -9,9 +10,14 @@ import { hash } from './tree.js';
 /** A text cut to `most` letters, the cut marked. */
 export const cut = (text, most) => (text.length <= most ? text : `${text.slice(0, Math.max(1, most - 1))}…`);
 
-/** Each node's place ({ x, y } about the root) and its branch's path, in the picture's units with the root at `centre`. */
-export function radial(tree, z, n, measure) {
-  const ring = z('reflex_ring'), sx = n('reflex_spread_x'), jitter = n('reflex_jitter');
+/**
+ * Each node's place ({ x, y } about the root) and its branch's path, in the picture's units, the root at the picture's
+ * centre (`centre`), so the frame that fits the picture centres the tree. `aspect` is the frame's width over its height:
+ * the spread wider than tall follows it by reflex_aspect_follow (0 keeps reflex_spread_x as it is).
+ */
+export function radial(tree, z, n, measure, aspect = 1) {
+  const jitter = n('reflex_jitter');
+  const sx = n('reflex_spread_x') * Math.pow(Math.max(0.1, aspect), n('reflex_aspect_follow'));
   const leaves = new Map();
   const count = (node) => {
     const c = node.kids.length ? node.kids.reduce((s, k) => s + count(k), 0) : 1;
@@ -19,6 +25,11 @@ export function radial(tree, z, n, measure) {
     return c;
   };
   count(tree.root);
+  // Every node is named, along its ray: the rings stand far enough apart that the leaves nearest the root each have a
+  // line of room (a name reflex_name_text tall, times reflex_name_room), and never nearer than reflex_ring.
+  const tall = z('reflex_name_text') * n('reflex_name_room');
+  const nearest = Math.max(1, Math.min(...tree.order.filter((node) => node.parent && !node.kids.length).map((node) => node.depth)));
+  const ring = Math.max(z('reflex_ring'), (tall * leaves.get(tree.root.id)) / (Math.PI * 2 * nearest));
   const polar = new Map([[tree.root.id, { a: -Math.PI / 2, r: 0 }]]);
   const share = (node, from, span) => {
     let cur = from;
@@ -32,32 +43,27 @@ export function radial(tree, z, n, measure) {
   share(tree.root, -Math.PI / 2, Math.PI * 2);
   const xy = (p) => ({ x: Math.cos(p.a) * p.r * sx, y: Math.sin(p.a) * p.r });
   const place = new Map([...polar].map(([id, p]) => [id, xy(p)]));
-  // A name is written on the first levels (reflex_name_depth), beside its node and outward, shallow and full boughs
-  // first: one whose box would meet a name already written, or a node, is left to its tip. Its width counts in the
-  // picture's bounds. Boxes are a line tall (reflex_name_text, times reflex_name_room).
-  const gap = z('reflex_name_gap'), tall = z('reflex_name_text') * n('reflex_name_room');
-  const names = new Map(), ends = [...place.values()].map((p) => [p.x, p.y]), boxes = [];
-  const meets = (b) => boxes.some((o) => b[0] < o[2] && o[0] < b[2] && b[1] < o[3] && o[1] < b[3]);
-  const dot = z('reflex_node');
-  for (const p of place.values()) boxes.push([p.x - dot, p.y - dot, p.x + dot, p.y + dot]);
-  const asked = tree.order.filter((node) => node.parent && node.title && node.depth <= n('reflex_name_depth'));
-  asked.sort((a, b) => a.depth - b.depth || leaves.get(b.id) - leaves.get(a.id));
-  for (const node of asked) {
+  // Each name runs out from its node along the ray the node stands on, read left to right on either side, cut to
+  // reflex_name_most letters; its far end counts in the picture's bounds.
+  const gap = z('reflex_name_gap');
+  const names = new Map(), ends = [...place.values()].map((p) => [p.x, p.y]);
+  for (const node of tree.order) {
+    if (!node.parent || !node.title) continue;
     const p = polar.get(node.id), at0 = place.get(node.id);
-    const text = cut(node.title, n('reflex_name_most')), right = Math.cos(p.a) >= -0.2, wide = measure(text, z('reflex_name_text'));
-    const x0 = right ? at0.x + gap : at0.x - gap - wide;
-    const box = [x0, at0.y - tall / 2, x0 + wide, at0.y + tall / 2];
-    if (meets(box)) continue;
-    boxes.push(box);
-    names.set(node.id, { text, right });
-    ends.push([box[0], box[1]], [box[2], box[3]]);
+    const ray = Math.atan2(Math.sin(p.a), Math.cos(p.a) * sx), dx = Math.cos(ray), dy = Math.sin(ray);
+    const text = cut(node.title, n('reflex_name_most')), wide = measure(text, z('reflex_name_text'));
+    const right = dx >= 0;
+    names.set(node.id, { text, right, x: at0.x + dx * gap, y: at0.y + dy * gap, turn: ((ray + (right ? 0 : Math.PI)) * 180) / Math.PI });
+    const far = gap + wide;
+    for (const side of [-1, 1]) ends.push([at0.x + dx * far - (dy * side * tall) / 2, at0.y + dy * far + (dx * side * tall) / 2]);
   }
-  const xs = ends.map((e) => e[0]), ys = ends.map((e) => e[1]);
+  // The root at the middle: as far each way as the farthest thing on either side.
   const room = z('reflex_margin');
-  const left = Math.min(...xs) - room, top = Math.min(...ys) - room;
-  const width = Math.max(...xs) + room - left, height = Math.max(...ys) + room - top;
-  const centre = { x: -left, y: -top };
+  const half = { x: Math.max(...ends.map((e) => Math.abs(e[0]))) + room, y: Math.max(...ends.map((e) => Math.abs(e[1]))) + room };
+  const width = half.x * 2, height = half.y * 2;
+  const centre = { x: half.x, y: half.y };
   for (const p of place.values()) (p.x += centre.x), (p.y += centre.y);
+  for (const nm of names.values()) (nm.x += centre.x), (nm.y += centre.y);
   const pt = (a, r) => `${at(centre.x + Math.cos(a) * r * sx)} ${at(centre.y + Math.sin(a) * r)}`;
   const branch = new Map(), along = new Map();
   const steps = Math.max(1, n('reflex_curve_steps'));

@@ -1,8 +1,10 @@
 // Layer: graph. The reflex tree a view's answer holds. Its nodes are the instructions and reflex nodes (a type that is
 // one or a flavour of one), each under its branch by part_of; a branch is any item of the answer a node is part of, so
 // a project or a folder of rules stands in the tree as the bough its rules grow from. A node part of nothing in the
-// answer hangs from a bough named for where it is said (its `for`: file, tool, guide, session_start...), so a map of
-// loose rules still reads as a tree. The root is what the view is of (its `from`), else the harness itself.
+// answer hangs from boughs named for where it is said (its first `for` place), the general nearest the root: tool,
+// then tool's name; file, then its glob's top folders (reflex_file_depth of them: file, packs/, packs/canvas/);
+// session_start and working_rules each a bough of their own. At most reflex_place_depth boughs deep. So a map of
+// loose rules reads as a tree, not a table. The root is what the view is of (its `from`), else the harness itself.
 //
 // Each node is { id, item, title, parent, kids, depth, born }: `born` the time its item was made (its create in the
 // log), a bough made for it born with its first node; `item` is absent on a bough the tree made.
@@ -18,15 +20,30 @@ export const hash = (text) => {
 
 const isNode = (item) => ['instruction', 'reflex'].some((t) => item.type === t || (Array.isArray(item.is) && item.is.includes(t)));
 const isPartOf = (link) => link.type === 'part_of' || (Array.isArray(link.is) && link.is.includes('part_of'));
-/** Where a node is said, its first place's kind: "file:packs/**" is said at file. */
-const saidAt = (item) => {
-  const where = item.fields?.for;
-  const first = Array.isArray(where) ? where[0] : typeof where === 'string' ? where : undefined;
-  return typeof first === 'string' && first ? first.split(':')[0] : undefined;
+const GLOB = /[*?[{]/;
+/**
+ * The boughs a place is said under, general first: "tool:change" is [tool, change]; "file:packs/canvas/x/*.js" is
+ * [file, packs/, packs/canvas/] for a file depth of 2; "session_start" is [session start]. Each { key, title }.
+ */
+export const boughsOf = (where, fileDepth, most) => {
+  if (typeof where !== 'string' || !where) return [];
+  const [kind, ...rest] = where.split(':');
+  const out = [{ key: kind, title: kind.replaceAll('_', ' ') }];
+  const tail = rest.join(':');
+  if (tail && kind === 'file') {
+    const folders = tail.split('/').slice(0, -1);
+    const plain = folders.slice(0, folders.findIndex((f) => GLOB.test(f)) === -1 ? folders.length : folders.findIndex((f) => GLOB.test(f)));
+    plain.slice(0, Math.max(0, fileDepth)).forEach((_, i) => out.push({ key: `file:${plain.slice(0, i + 1).join('/')}/`, title: `${plain[i]}/` }));
+  } else if (tail) out.push({ key: `${kind}:${tail}`, title: tail.replaceAll('_', ' ') });
+  return out.slice(0, Math.max(1, most));
 };
+const firstPlace = (where) => (Array.isArray(where) ? where.find((w) => typeof w === 'string') : typeof where === 'string' ? where : undefined);
 
-/** The tree in the answer, or null when it holds no node. */
-export function treeOf(answer) {
+/**
+ * The tree in the answer, or null when it holds no node. `placeOf(item)` is where it is said (its `for`), from the
+ * answer's fields or from what the pack answered of it; `n` the style's numbers.
+ */
+export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0) {
   const items = Array.isArray(answer.items) ? answer.items.filter((i) => !i.pending) : [];
   const byId = new Map(items.map((i) => [i.id, i]));
   const up = new Map();
@@ -49,8 +66,11 @@ export function treeOf(answer) {
     const parentId = up.get(item.id);
     let parent = parentId === root.id ? root : parentId !== undefined && !visiting.has(parentId) ? place(byId.get(parentId)) : undefined;
     if (!parent) {
-      const kind = saidAt(item);
-      parent = kind ? nodes.get(`~for:${kind}`) ?? attach(make(`~for:${kind}`, undefined, kind.replaceAll('_', ' ')), root) : root;
+      parent = root;
+      for (const b of boughsOf(firstPlace(placeOf(item)), n('reflex_file_depth'), n('reflex_place_depth'))) {
+        const id = `~for:${b.key}`;
+        parent = nodes.get(id) ?? attach(make(id, undefined, b.title), parent);
+      }
     }
     visiting.delete(item.id);
     return attach(node, parent);
