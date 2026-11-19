@@ -89,8 +89,9 @@ test('install: the pack is an item, every declaration an item of its type part o
   assert.deepEqual(dish.props.shipped, { pack: 'recipes', version: '0.1.0', hash: hashOf(v1.types[0]), value: v1.types[0] });
   const how = m.get('instruction', 'recipes.how');
   assert.equal(how.body, 'Always say how many it serves.');
-  assert.deepEqual(how.props.for, ['session_start']);
-  assert.deepEqual(m.get('screen', 'recipes.page').props.on, ['recipes.dish']);
+  assert.deepEqual(how.props.spec, { type: 'instruction', props: { for: ['session_start'] } }, 'every part keeps its declaration in spec');
+  assert.deepEqual(m.get('screen', 'recipes.page').props.spec, { form: 'screen', on: ['recipes.dish'], pieces: [] });
+  assert.deepEqual(pack.props.shipped.value, v1, "the pack's is the whole file");
   assert.equal(m.get('rule', 'recipes.serves').title, 'recipes.serves', 'a rule with no title takes its id');
 });
 
@@ -167,11 +168,11 @@ test('upgrade: a dropped part is retired, unless the owner changed it; shipped a
   m.apply(plan(v1, []).ops);
   const course = m.get('type', 'recipes.course');
   const all = m.get('lens', 'recipes.all');
-  m.apply([{ op: 'update', id: all.id, props: { filter: { find: ['type recipes.dish', 'type task'] } } }]);
+  m.apply([{ op: 'update', id: all.id, props: { spec: { ...all.props.spec, props: { filter: { find: ['type recipes.dish', 'type task'] } } } } }]);
   const v2 = next('0.2.0', (x) => { x.types.splice(1, 1); x.styles.pop(); });
   const done = plan(v2, m.of('recipes'));
   assert.deepEqual(done.summary.retired, ['type:recipes.course']);
-  assert.deepEqual(done.summary.left, [{ key: 'lens:recipes.all', fields: ['filter'] }]);
+  assert.deepEqual(done.summary.left, [{ key: 'lens:recipes.all', fields: ['spec.props'] }]);
   assert.ok(!done.ops.some((o: Op) => ['archive', 'forget'].includes(o.op)), 'nothing is deleted');
   m.apply(done.ops);
   assert.equal(m.items.get(course.id)!.status, 'retired');
@@ -192,18 +193,16 @@ test('a part the owner retired stays retired when the pack ships it again', () =
 });
 
 test('code is named by runs, never put on the map', () => {
-  const withLayout = next('0.1.0', (x) => { x.layouts = [{ id: 'recipes.plate', title: 'Plate', shape: 'plate', modules: ['index.js'] }]; });
-  const runs = { pack: [{ path: 'packs/recipes/handler.js', hash: 'sha256:aa' }], 'layout:recipes.plate': [{ path: 'packs/recipes/layouts/plate/index.js', hash: 'sha256:bb' }] };
+  const withLayout = next('0.1.0', (x) => { x.layouts = [{ id: 'recipes.plate', title: 'Plate', shape: 'plate', modules: { 'index.js': 'layouts/plate/index.js' } }]; });
+  const files = { 'handler.js': 'sha256:aa', 'layouts/plate/index.js': 'sha256:bb' };
   const m = map();
-  m.apply(plan(withLayout, [], runs).ops);
+  m.apply(plan(withLayout, [], { files }).ops);
   const plate = m.get('layout', 'recipes.plate');
   assert.equal(plate.status, 'kept');
-  assert.equal(plate.props.modules, undefined);
-  assert.deepEqual(plate.props.runs, runs['layout:recipes.plate']);
-  assert.deepEqual(m.of('recipes')[0].props.runs, runs.pack);
-  const changed = { ...runs, pack: [{ path: 'packs/recipes/handler.js', hash: 'sha256:cc' }] };
-  const done = plan(withLayout, m.of('recipes'), changed);
-  assert.deepEqual(done.ops.map((o: Op) => o.props.runs), [changed.pack, changed['layout:recipes.plate']]);
+  assert.deepEqual(plate.props.runs, [{ path: 'packs/recipes/layouts/plate/index.js', hash: 'sha256:bb' }]);
+  assert.deepEqual(m.of('recipes')[0].props.runs, [{ path: 'packs/recipes/handler.js', hash: 'sha256:aa' }], "what no part claims is the pack's");
+  const done = plan(withLayout, m.of('recipes'), { files: { ...files, 'handler.js': 'sha256:cc' } });
+  assert.deepEqual(done.ops, [{ op: 'update', id: m.of('recipes')[0].id, props: { runs: [{ path: 'packs/recipes/handler.js', hash: 'sha256:cc' }] } }], 'a file changed is a change of runs alone');
 });
 
 test('an item never shipped differs where both are taken to have changed it', () => {
@@ -213,9 +212,9 @@ test('an item never shipped differs where both are taken to have changed it', ()
   assert.deepEqual(merged, { apply: {}, asked: { body: 'Where in the meal.', 'spec.extends': 'record' }, kept: [] });
 });
 
-test("a type's spec is compared by its fields and statuses one by one, and put back together", () => {
-  const item = { title: 'Dish', body: '', fields: { spec: { extends: 'record', fields: { a: { type: 'string' } }, statuses: { open: ['x'] } } } };
-  assert.deepEqual(flat(item), { title: 'Dish', body: '', 'spec.extends': 'record', 'spec.fields.a': { type: 'string' }, 'spec.statuses.open': ['x'] });
+test("a type's spec is compared by its fields one by one, and put back together", () => {
+  const item = { type: 'type', title: 'Dish', body: '', fields: { spec: { extends: 'record', fields: { a: { type: 'string' } }, statuses: { open: ['x'] } } } };
+  assert.deepEqual(flat(item), { title: 'Dish', body: '', 'spec.extends': 'record', 'spec.fields.a': { type: 'string' }, 'spec.statuses': { open: ['x'] } });
   assert.deepEqual(unflat(item, { 'spec.fields.b': { type: 'number' }, 'spec.fields.a': null, title: 'Plate' }), { title: 'Plate', spec: { extends: 'record', fields: { b: { type: 'number' } }, statuses: { open: ['x'] } } });
 });
 

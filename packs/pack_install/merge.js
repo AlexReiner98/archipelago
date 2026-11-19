@@ -7,18 +7,18 @@
 // both_changed holds and the page draws as a ghost. A part the new version drops is retired, not deleted, unless the
 // owner changed it. Everything but those offers is one change set, so one undo takes the install or upgrade back.
 
-import { canonical, createOp, flat, onMap, openStatus, RETIRED, SHIPPED, MERGE_MARK, shipped, stampOf, unflat, updateOp } from './shape.js';
+import { canonical, createOp, flat, onMap, openStatus, RETIRED, RUNS, SHIPPED, MERGE_MARK, shipped, stampOf, unflat, updateOp } from './shape.js';
 
 const same = (a, b) => canonical(a === undefined ? null : a) === canonical(b === undefined ? null : b);
 
 /**
  * What installing or upgrading to this manifest comes to on a map that holds these items of its pack (its item and
- * its parts, retired ones too). runs: the code files of the pack and its parts, { pack: [{ path, hash }], '<key>': [...] },
- * when the caller read them.
+ * its parts, retired ones too). facts: { folder, files }, the pack's folder and its files' hashes by path within it,
+ * when the caller read them: they give what the pack and its parts run (runs).
  * Answers { ops, reason, changes: [{ ops, reason }] (each an offer held for the owner), summary }.
  */
-export function plan(manifest, items = [], runs = {}) {
-  const ship = shipped(manifest);
+export function plan(manifest, items = [], facts = {}) {
+  const ship = shipped(manifest, facts);
   const onmap = items.map(onMap).filter((i) => i.key);
   const byKey = new Map(onmap.map((i) => [i.key, i]));
   const packItem = byKey.get(ship.pack.key);
@@ -26,13 +26,12 @@ export function plan(manifest, items = [], runs = {}) {
   const reason = !packItem ? `Install ${ship.id} ${ship.version}` : from === ship.version ? `Reinstall ${ship.id} ${ship.version}` : `Upgrade ${ship.id} ${from} → ${ship.version}`;
   const ops = [], changes = [];
   const summary = { pack: ship.id, from: from ?? null, to: ship.version, made: [], applied: [], kept: [], asked: [], retired: [], left: [] };
-  const runsOf = (key) => (Array.isArray(runs[key]) ? { runs: runs[key] } : {});
 
-  const merged = (item, part, runKey) => {
+  const merged = (item, part) => {
     const m = mergeOne(item, part);
     const stamp = stampOf(ship, part);
     const back = item.status === RETIRED && item.stamp?.dropped ? { status: openStatus(item.type) } : {};
-    const extra = { ...(!same(item.stamp, stamp) && { [SHIPPED]: stamp }), ...runsOf(runKey) };
+    const extra = { ...(!same(item.stamp, stamp) && { [SHIPPED]: stamp }), ...(part.runs && !same(item.runs, part.runs) && { [RUNS]: part.runs }) };
     const apply = unflat(item, m.apply);
     if (Object.keys(apply).length || back.status || Object.keys(extra).length) ops.push({ ...updateOp(item.id, apply, extra), ...back });
     if (Object.keys(m.apply).length) summary.applied.push({ key: part.key, fields: Object.keys(m.apply) });
@@ -51,18 +50,18 @@ export function plan(manifest, items = [], runs = {}) {
   let packRef;
   if (packItem) {
     packRef = packItem.id;
-    merged(packItem, ship.pack, 'pack');
+    merged(packItem, ship.pack);
   } else {
     packRef = 'pack';
-    ops.push(createOp(ship, ship.pack, packRef, runsOf('pack')));
+    ops.push(createOp(ship, ship.pack, packRef));
     summary.made.push(ship.pack.key);
   }
 
   ship.parts.forEach((part, i) => {
     const item = byKey.get(part.key);
-    if (item) return merged(item, part, part.key);
+    if (item) return merged(item, part);
     const ref = `part${i}`;
-    ops.push(createOp(ship, part, ref, runsOf(part.key)), { op: 'link', type: 'part_of', from: ref, to: packRef });
+    ops.push(createOp(ship, part, ref), { op: 'link', type: 'part_of', from: ref, to: packRef });
     summary.made.push(part.key);
   });
 

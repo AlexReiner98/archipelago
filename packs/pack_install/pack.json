@@ -38,9 +38,13 @@
             "type": "object",
             "description": "The pack file (pack.json) as an object."
           },
-          "runs": {
+          "folder": {
+            "type": "string",
+            "description": "The pack's folder from the repository's root (packs/<id> unless said)."
+          },
+          "files": {
             "type": "object",
-            "description": "The code each runs, when read from the repository: { pack: [{ path, hash }], \"<type>:<declares>\": [...] }, path from the repository root, hash sha256: of its bytes."
+            "description": "The hashes of the pack's code files by path within its folder ({ \"handler.js\": \"sha256:...\" }), sha256 of each file's bytes: what the pack and its layouts and parts run."
           }
         },
         "required": [

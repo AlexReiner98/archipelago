@@ -21,8 +21,9 @@ export default {
   'pack_install.install': async (input, ctx) => {
     const manifest = input?.manifest;
     if (!manifest || typeof manifest !== 'object' || Array.isArray(manifest)) throw new Error('manifest is the pack file, as an object');
-    const runs = input.runs && typeof input.runs === 'object' && !Array.isArray(input.runs) ? input.runs : {};
-    const done = plan(manifest, await itemsOf(String(manifest.id ?? ''), ctx), runs);
+    const files = input.files && typeof input.files === 'object' && !Array.isArray(input.files) ? input.files : undefined;
+    const facts = { ...(typeof input.folder === 'string' && input.folder && { folder: input.folder }), ...(files && { files }) };
+    const done = plan(manifest, await itemsOf(String(manifest.id ?? ''), ctx), facts);
     return { ops: done.ops, reason: done.reason, changes: done.changes, answer: done.summary };
   },
 };
