@@ -266,3 +266,17 @@ test('a branch whose place can be said takes a new trial node there, through the
   const none = await picture({ answer: { ...a, lens: { find: ['no-add'] } }, style: { ...style, sends: noAdd }, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
   assert.ok(!JSON.stringify(none.scene.svg).includes('rt-adds'), 'where the view sends no add, a branch takes nothing');
 });
+
+test('a legend entry turned, the tree is drawn again in place from the changed view', async () => {
+  const a = { ...answer(3, []), lens: { find: ['redraw'] } };
+  const rules = [{ id: 'core.guard', title: 'A guard', pack: 'core', effect: 'refuse', where: 'tool:change', fired: [] }];
+  const patches: any[] = [];
+  const act = async (name: string, params: any) => (name === 'rules' ? { answer: rules } : name === 'legend' ? { answer: { changed: true } } : { answer: params.ids.map((one: string) => ({ id: one, said: 0 })) });
+  const drawn = await picture({ answer: a, style: { ...style, sends: { ...style.sends, rules: 'rules', legend: 'legend' } }, reduced: true }, { frame: () => new Promise(() => {}), patch: (p: any[]) => patches.push(...p), open() {}, act });
+  assert.ok(JSON.stringify(drawn.scene.svg).includes('n:core.guard'));
+  drawn.on({ name: 'click', key: 'lg:kind:rule' });
+  await new Promise((r) => setTimeout(r, 10));
+  const all = patches.find((p) => p.key === 'rt-all');
+  assert.ok(all && !JSON.stringify(all.mark).includes('n:core.guard'), 'the rule leaves the tree once the view has changed');
+  assert.ok(patches.some((p) => p.key === 'rt-legend' && JSON.stringify(p.mark).includes('rt-off')), 'and the legend says it is off');
+});

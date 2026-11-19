@@ -57,7 +57,7 @@ async function missesOf(style, tools, n, gesture = 'misses') {
  * A click on a legend entry: the view's pack is asked to turn it off or on (sends.legend), as the person. The view
  * changes, and the picture is drawn again from it; meanwhile the entry looks as it will.
  */
-function legendClick(event, hidden, style, tools, answer) {
+function legendClick(event, hidden, style, tools, answer, again) {
   const key = typeof event.key === 'string' ? event.key : '';
   if (event.name !== 'click' || !key.startsWith('lg:') || typeof style.sends?.legend !== 'string' || typeof tools.act !== 'function') return [];
   const entry = key.slice('lg:'.length), on = hidden.has(entry);
@@ -65,11 +65,29 @@ function legendClick(event, hidden, style, tools, answer) {
   // kept yet, the pack makes it from the style and query drawn here.
   const { hidden: _, ...drawnStyle } = style;
   const query = { filter: { find: answer?.lens?.find ?? [], only: answer?.lens?.only ?? [], not: answer?.lens?.not ?? [] }, ...(answer?.lens?.walk && { walk: answer.lens.walk }), ...(answer?.lens?.limit && { limit: answer.lens.limit }) };
-  tools.act(style.sends.legend, { view: SHIPPED, entry, on, style: drawnStyle, ...query }).catch(() => {});
+  const next = on ? [...hidden].filter((e) => e !== entry) : [...hidden, entry];
+  tools.act(style.sends.legend, { view: SHIPPED, entry, on, style: drawnStyle, ...query }).then((came) => !came?.error && again?.(next)).catch(() => {});
   return [{ key, toggle: { 'rt-off': !on } }];
 }
 
-export async function picture({ answer, style, reduced, width, height }, tools) {
+/**
+ * The tree, drawn again in place when a legend entry turns: the pack has changed the view, and the picture now drawn
+ * is the same view's, so it is built again from it (grown, as one already seen) and its marks take the old ones' place.
+ */
+export async function picture(input, tools) {
+  let now = null;
+  const again = async (hidden) => {
+    const next = await drawn1({ ...input, style: { ...input.style, hidden } }, tools, again);
+    now?.end?.();
+    now = next;
+    const all = next.scene.svg?.[2];
+    tools.patch([...(all ? [{ key: 'rt-all', mark: all }] : []), ...(next.scene.aside ? [{ key: 'rt-legend', mark: next.scene.aside }] : []), ...(next.scene.before ? [{ key: 'rt-bar', mark: next.scene.before }] : [])]);
+  };
+  now = await drawn1(input, tools, again);
+  return { ...now, on: (event) => now.on?.(event) ?? [], viewport: (view) => now.viewport?.(view) ?? [], restyle: () => [], end: () => now.end?.() };
+}
+
+async function drawn1({ answer, style, reduced, width, height }, tools, again) {
   const missing = [];
   const read = (group) => (name) => {
     const v = style[group]?.[name];
@@ -114,7 +132,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const happened = { miss: story.misses.length, held: story.said.filter((x) => x.verdict !== 'failed' && x.verdict !== 'came_back').length, failed: story.said.filter((x) => x.verdict === 'failed' || x.verdict === 'came_back').length, fired: story.rules.reduce((sum, r) => sum + r.fired.length, 0) };
   const toggles = typeof style.sends?.legend === 'string' && typeof tools.act === 'function';
   const legend = legendOf({ nodes: everyNode, events: happened, hidden, hues, toggles, schematic: story.schematic });
-  if (!tree) return { scene: { svg: m('svg', { class: 'rt', width: z('reflex_margin'), height: z('reflex_margin') }), css: cssOf(style, z, n, hues) + legendCss, aside: legend, size: { width: z('reflex_margin'), height: z('reflex_margin') } }, on: (event) => legendClick(event, hidden, style, tools, answer) };
+  if (!tree) return { scene: { svg: m('svg', { class: 'rt', width: z('reflex_margin'), height: z('reflex_margin') }, m('g', { key: 'rt-all' })), css: cssOf(style, z, n, hues) + legendCss, aside: legend, size: { width: z('reflex_margin'), height: z('reflex_margin') } }, on: (event) => legendClick(event, hidden, style, tools, answer, again) };
   // How often each held, for which names show first and the tips.
   const held = new Map();
   for (const one of story.said) if (one.verdict === 'held') held.set(one.id, (held.get(one.id) ?? 0) + 1);
@@ -180,7 +198,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
         if (event.name === 'leave') return [{ tip: null }];
         return [];
       }
-      if (key.startsWith('lg:')) return legendClick(event, hidden, style, tools, answer);
+      if (key.startsWith('lg:')) return legendClick(event, hidden, style, tools, answer, again);
       if (event.name !== 'click' || reduced) return [];
       if (key === 'rt:replay') return play.replay();
       if (key.startsWith('rt:speed:')) {

@@ -48,6 +48,10 @@ export function marksOf(tree, placed, z, n, shown, named, story, gapped = new Se
     { class: 'rt', width: at(width), height: at(height), viewBox: `0 0 ${at(width)} ${at(height)}` },
     // The picture's whole size, drawn as nothing: what the page fits is its marks' bounds, and this keeps them
     // centred on the root however the tree leans.
+    // All of it in one group, so the tree drawn again (a legend entry turned) takes its place whole.
+    m(
+    'g',
+    { key: 'rt-all' },
     m('rect', { class: 'rt-frame', x: 0, y: 0, width: at(width), height: at(height) }),
     m(
       'g',
@@ -58,6 +62,7 @@ export function marksOf(tree, placed, z, n, shown, named, story, gapped = new Se
       m('circle', { class: 'rt-root', cx: at(centre.x), cy: at(centre.y), r: z('reflex_root'), ...(tree.root.item && { item: tree.root.item.id, key: `n:${tree.root.id}`, on: ['click', 'enter', 'leave'], role: 'link' }) }),
       m('g', {}, Array.from({ length: sparks }, (_, i) => glow(`sp:${i}`, 'spark'))),
       m('g', {}, Array.from({ length: lights }, (_, i) => [glow(`lg:${i}`, 'light'), m('circle', { key: `lh:${i}`, class: 'rt-head', cx: at(centre.x), cy: at(centre.y), r: z('reflex_head'), opacity: 0 })])),
+    ),
     ),
   );
   return { svg, sparks, lights };
