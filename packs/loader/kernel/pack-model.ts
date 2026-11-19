@@ -7,12 +7,15 @@
 import { createHash } from 'node:crypto';
 import type { Manifest } from './manifest.ts';
 
-/** An item as the model reads and makes it: its type, head and fields. */
+/** An item as the model reads and makes it: its type, head and fields; as the registry reads it, whether it is open and the pack it is part_of. */
 export interface ModelItem {
   type: string;
   title: string;
   body: string;
   props: Record<string, unknown>;
+  is_open?: boolean;
+  /** The name of the pack item it is part_of, where the reader has the link: a part the owner made says its pack so. */
+  pack?: string;
 }
 
 /** What a part shipped as: its pack, that pack's version, the declaration as the file held it, and its hash. */
@@ -21,6 +24,8 @@ export interface Shipped {
   version: string;
   hash: string;
   value: Record<string, unknown>;
+  /** The version of its pack that stopped shipping it: install retires it then, and brings it back if a later one ships it again. */
+  dropped?: string;
 }
 
 /** A file a part or pack runs, from the repository's root, and the sha256 of its bytes. */
@@ -51,10 +56,10 @@ export function canonical(v: unknown): string {
   return JSON.stringify(v);
 }
 
-/** The hash of a declaration or a manifest: sha256 of its canonical JSON. */
-export const hashOf = (v: unknown) => `sha256:${createHash('sha256').update(canonical(v)).digest('hex')}`;
-/** The hash of a file's bytes, as runs records it. */
-export const hashFile = (bytes: string | Uint8Array) => `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+/** The hash of a file's bytes or a text: the hex sha256, as the registry keeps a pack's. */
+export const hashFile = (bytes: string | Uint8Array) => createHash('sha256').update(bytes).digest('hex');
+/** The hash of a declaration or a manifest: that of its canonical JSON. */
+export const hashOf = (v: unknown) => hashFile(canonical(v));
 
 type Entry = Record<string, unknown>;
 const obj = (v: unknown): Entry | undefined => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Entry) : undefined);
@@ -134,18 +139,18 @@ export function entryOf(item: ModelItem): Entry {
   };
 }
 
-/** Which pack a part is of: the pack it shipped in. A part the owner made has none, and stays the map's own. */
-const packOfPart = (item: ModelItem) => str(obj(item.props.shipped)?.pack);
+/** Which pack a part is of: the pack item it is part_of, else the pack it shipped in. One with neither is the map's own. */
+const packOfPart = (item: ModelItem) => item.pack ?? str(obj(item.props.shipped)?.pack);
 
 /**
  * The manifests the map's items make, by pack id, each with its hash: a pack's item with what it shipped as (a pack
  * kept as an item with no file is read where it was), and its parts in their file's order, the owner's after them.
  */
-export function manifestsOf(items: readonly ModelItem[]): Map<string, { manifest: Manifest; hash: string }> {
-  const out = new Map<string, { manifest: Manifest; hash: string }>();
+export function manifestsOf(items: readonly ModelItem[]): Map<string, { manifest: Manifest; hash: string; text: string }> {
+  const out = new Map<string, { manifest: Manifest; hash: string; text: string }>();
   const byPack = new Map<string, ModelItem[]>();
-  for (const i of items) if (i.type !== PACK) { const p = packOfPart(i); if (p) byPack.set(p, [...(byPack.get(p) ?? []), i]); }
-  for (const pack of items.filter((i) => i.type === PACK && obj(i.props.shipped))) {
+  for (const i of items) if (i.type !== PACK && i.is_open !== false) { const p = packOfPart(i); if (p) byPack.set(p, [...(byPack.get(p) ?? []), i]); }
+  for (const pack of items.filter((i) => i.type === PACK && i.is_open !== false && obj(i.props.shipped))) {
     const id = String(pack.props.name ?? '');
     const shipped = obj(pack.props.shipped)!.value as Entry | undefined;
     const manifest: Entry = { ...(obj(pack.props.manifest) ?? {}), id, version: String(pack.props.version ?? '0.1.0'), title: pack.title, ...(pack.body && { description: pack.body }) };
@@ -161,7 +166,11 @@ export function manifestsOf(items: readonly ModelItem[]): Map<string, { manifest
       if (!key) continue;
       manifest[key] = [...((manifest[key] as Entry[] | undefined) ?? []), entryOf(item)];
     }
-    out.set(id, { manifest: manifest as unknown as Manifest, hash: hashOf(manifest) });
+    const text = canonical(manifest);
+    out.set(id, { manifest: manifest as unknown as Manifest, hash: hashFile(text), text });
   }
   return out;
 }
+
+/** The pack model as the registry's seam takes it (pack-source.ts setPackModel): the item types, and the manifests they make. */
+export const PACK_MODEL = { kinds: MODEL_KINDS, manifests: manifestsOf };
