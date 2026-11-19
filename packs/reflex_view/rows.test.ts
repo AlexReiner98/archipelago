@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { countsRow, rowsOf, RUNS_SHOWN } from './rows.js';
+import { countsOf, countsRow, rowsOf, RUNS_SHOWN } from './rows.js';
 
 const item = { id: 'e_one', type: 'reflex', title: 'Short titles', status: 'trial' };
 const record = {
@@ -25,4 +25,15 @@ test('then each run, the newest first, named, with what became of its miss', () 
   assert.deepEqual(rows[2].marks.map((m: { text?: string }) => m.text), ['↺', '2×', undefined]);
   const many = { ...record, per_run: Array.from({ length: RUNS_SHOWN + 5 }, (_, i) => ({ ...record.per_run[0], run: `e_r${i}`, said_at: `2026-11-${String(i + 1).padStart(2, '0')}T00:00:00Z` })) };
   assert.equal(rowsOf(item, many, []).length, RUNS_SHOWN + 1);
+});
+
+test("counts for the drawing: one per id asked, an owner's version under its preset's id, none read as zeros", async () => {
+  const asked: string[][] = [];
+  const read = async (ids: string[]) => (asked.push(ids), [{ ...record, id: 'core.estimate' }]);
+  const counts = await countsOf(['e_mine', 'e_never'], [{ id: 'e_mine', props: { preset: 'core.estimate' } }], read);
+  assert.deepEqual(asked, [['core.estimate', 'e_never']]);
+  assert.deepEqual(counts, [
+    { id: 'e_mine', said: 3, runs: 2, places: record.places, last: record.last, came_back: 1, held: 1, quiet: 0 },
+    { id: 'e_never', said: 0, runs: 0, places: {}, came_back: 0, held: 0, quiet: 0 },
+  ]);
 });
