@@ -8,7 +8,7 @@ import { lineageOf } from './graph.js';
 import { colourWays, ridgeMarks } from './ridge-item.js';
 import { bandsFor, cuts as cutsOf, GROWN, inset, listOf, runsOf, slotOf } from './cut-item.js';
 import { seedOf } from './ridge-item.js';
-import { cap, flap, hut as hutOf, summit as summitOf, tabStrip } from './type-outline.js';
+import { bandPath } from './type-outline.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
 const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -89,7 +89,7 @@ export function itemRules(style) {
     rules.push('.lf-tick { fill: none; stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
   }
   if (g.cut && Object.keys(g.cut.status).length) {
-    for (const [k, v] of Object.entries(g.cut.status)) if (v?.light && v?.dark) rules.push(`.lf-step .lf-cut-s-${k}, .lf-sw.lf-cut-s-${k} { fill: light-dark(${v.light}, ${v.dark}); }`);
+    for (const [k, v] of Object.entries(g.cut.status)) if (v?.light && v?.dark) rules.push(`.lf-step .lf-cut-s-${k}, .lf-sw.lf-cut-s-${k} { fill: ${k === 'finished' ? `color-mix(in srgb, light-dark(${v.light}, ${v.dark}) var(--ln-flow-done-mix), var(--ln-land))` : `light-dark(${v.light}, ${v.dark})`}; }`);
     // An ended item has no fill and a muted name; a done one keeps its name's ink.
     rules.push('.lf-step.ph-ended .lf-shape { fill: none; } .lf-step.ph-ended text { fill: var(--ln-muted); } .lf-step.closed:not(.ph-ended):not(.dim) text { fill: var(--ln-text); }');
   }
@@ -160,16 +160,9 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
       // One colour for the item, its status's: waiting is the status a task has; an ended item has no fill, its outline and a muted name.
       const word = statusOf(item, phase), cls = `lf-cut-s-${word}`, piece = (d) => out.over.push(m('path', { d, class: `lf-cut ${cls}` }));
       if (word !== 'ended') {
-        // The status colour is a piece of the outline: the fold, the tab, the summit; else the cap under a skyline, between the straight ends of the top.
-        if (n.shape === 'fold') piece(flap(r, t, n.bevel));
-        else if (n.shape === 'tab') piece(tabStrip(l, t, n.w, n.bevel));
-        else if (n.shape === 'hut') piece(hutOf({ l, t, r, b, rise: n.bevel }).fill);
-        else if (n.shape === 'summit') piece(summitOf({ l, t, r, b, rise: n.bevel, span: z('summit_span'), tension: g.cut.tension }).fill);
-        else {
-          // A plain cap, not a skyline: a flat band, a trapezoid, a point or a round arc, by type (`type_caps`), between the straight ends of the top.
-          const end = n.shape === 'pill' ? n.h / 2 : n.shape === 'hexagon' || n.shape === 'chamfer' || n.shape === 'flag' ? n.bevel : 0, start = n.shape === 'flag' ? 0 : end, kind = lineage.map((x) => g.cut.caps[x]).find(Boolean);
-          piece(cap(kind, l + start, r - end, t, g.cut.scale * n.h * 0.5, start || end ? 0 : Math.min(corner, n.h / 5)));
-        }
+        // One band of paint along the top of every marker, the same depth for all; the fold, the roof and the summit are outline only.
+        const rise = n.shape === 'summit' || n.shape === 'hut' ? n.bevel : 0, box = rise && n.shape === 'summit' ? t + rise : t, deep = g.cut.scale * (b - box) * 0.5;
+        piece(bandPath(n.shape, { l, t: n.shape === 'summit' ? t : t, r, b, k: n.bevel ?? 0, d: deep, rx: n.shape === 'carved' ? Math.min(corner, n.h / 5) : 0 }));
       }
     } else {
       // What the cuts take off is banded in the palette: the run of the phase, the colour in it the type's.

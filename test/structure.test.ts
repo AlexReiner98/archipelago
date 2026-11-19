@@ -429,7 +429,7 @@ test("a drawing's list holds every module it reaches", () => {
 // axes (design e_49yk2trw). Counted, as of 30 Oct 2026: a bare number of 3 or more that does not multiply or divide
 // (under 3 is arithmetic), and every px in a string. It catches more than lengths, and only ever goes down.
 const LENGTHS_IN_DRAWINGS: Record<string, number> = {
-  'flow/direction.js': 1, 'flow/index.js': 13,
+  'flow/direction.js': 1, 'flow/index.js': 10,
   'flow/shapes.js': 9,
 };
 const BARE = /(?<![\w.$#])\d+(?:\.\d+)?(?![\w.])/g;

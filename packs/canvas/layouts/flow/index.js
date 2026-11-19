@@ -242,7 +242,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
 
   // The key: what each mark this picture uses means, one to a row (./compose-key.js). A row's mark is drawn in a box of
   // its own: G is where its middle is, how wide and tall a step is in it, and a dot's size.
-  const G = { x: 11, y: 7, w: 20, h: 11, r: 4 };
+  const G = { x: z('key_width') / 2, y: z('key_height') / 2, w: z('key_width') - 2, h: z('key_height') - 3, r: 4 };
   const { keyRows, packRows } = keyOf({ z, G, corner: CORNER, story, steps: answer.steps, shapes, sessions, shownAs, model: () => g, stateOf, sessionOf, marked, markOf, heldUp, yours, kind, onYou, placeClass, headless, endsOf, dot, outline });
   const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack, capOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.cap;
   // An island's findings are items, drawn as any item is where its query holds them; its shore lists none (the owner, 10 Nov 2026).
@@ -339,7 +339,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     // An item its island's look draws is drawn as it says, about its middle; the link, tip and badges stay the map's. Either way under the rings of the sessions on it.
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
-    const CARVE = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'], RISES = ['summit', 'hut'];
+    const CARVE = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'], RISES = ['summit'];
     const nameY = (s, y) => (CARVE.includes(s.shape) && look.cut ? (Object.keys(look.cut.status).length ? y + (RISES.includes(s.shape) ? s.bevel / 2 : 0) + ((s.h - (RISES.includes(s.shape) ? s.bevel : 0)) * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
     const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n) });
     for (const rule of extra.rules ?? []) colourRules.add(rule);

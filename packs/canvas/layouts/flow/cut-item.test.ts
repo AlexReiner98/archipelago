@@ -147,33 +147,30 @@ test('pass 4: one colour per item by status, a small cut, and every box the same
   }
 });
 
-test('pass 5: a type by its outline, the status colour only in a piece of it', async () => {
+test('pass 6: markers by outline, one band of paint each, the same size for every type', async () => {
   // @ts-ignore a page module, untyped
-  const { cap, chamfer, flap, fold, hut, outlineOf, summit, tabStrip } = await import('./type-outline.js');
+  const { areaOf, bandPoints, chamfer, fold, hut, outlineOf, summit } = await import('./type-outline.js');
   // @ts-ignore a page module, untyped
   const { landOn } = await import('./shapes.js');
   assert.match(chamfer(0, 0, 100, 40, 9), /^M9 0H91L100 9V40H0V9Z$/);
-  assert.match(fold(0, 0, 100, 40, 13), /^M0 0H87L100 13V40H0Z$/);
-  assert.match(flap(100, 0, 13), /^M87 0L100 13H87Z$/);
-  assert.match(tabStrip(0, 0, 90, 8), /^M0 0H30L38 8H0Z$/);
-  const s = summit({ l: 0, t: 0, r: 100, b: 54, rise: 14, span: 0.4, tension: 0.75 });
-  assert.deepEqual(s.cubics[0][3], s.cubics[1][0]);
-  assert.equal(s.cubics[0][3][1], 0);
-  assert.ok(s.cubics.every((c: number[][]) => c[0][1] === c[1][1] || c[2][1] === c[3][1]));
-  assert.ok(s.outline.endsWith('V54H0Z') && s.fill.endsWith('Z'));
-  assert.equal(outlineOf('box', 0, 0, 1, 1, 3), null);
+  assert.match(fold(0, 0, 100, 40, 13), /^M0 0H87L100 13V40H0ZM87 0V13H100$/);
   assert.match(hut({ l: 0, t: 0, r: 100, b: 50, rise: 8 }).outline, /^M0 8L50 0L100 8V50H0Z$/);
-  assert.match(cap('band', 0, 100, 0, 8), /^M0 0H100V8H0Z$/);
-  assert.doesNotMatch(cap('arc', 0, 100, 0, 8), /C/);
-  assert.equal(landOn({ shape: 'hut', w: 100, h: 58, bevel: 8 }, 50, 29, [10, 0], [10, -9])[1], 8);
-  assert.equal(preset('canvas.status_field').props.sizes.flow_point, 7);
-  // The same height whatever the outline: carved, chamfer, hexagon... each type of the preset has one of the shapes.
+  const s = summit({ l: 0, t: 0, r: 100, b: 54, rise: 9, span: 0.3 });
+  assert.match(s.outline, /^M0 9H35L50 0L65 9H100V54H0Z$/);
+  assert.equal(outlineOf('box', 0, 0, 1, 1, 3), null);
   const shapes = preset('canvas.status_field').props.type_shapes;
   assert.deepEqual([shapes.task, shapes.work, shapes.question, shapes.aim, shapes.occurrence, shapes.record, shapes.place], ['carved', 'flag', 'hexagon', 'summit', 'pill', 'fold', 'hut']);
-  // Wires land on the real outline: on a chamfer's cut corner, a fold's, and below a summit's rise.
-  const box = { shape: 'chamfer', w: 100, h: 40, bevel: 10 };
-  assert.equal(landOn(box, 50, 20, [0 + 52, 0], [52, -9])[1], 0);
-  assert.equal(landOn(box, 50, 20, [3, 0], [3, -9])[1], 0 + 7);
+  // The same painted area for every type at equal width (within 15 percent).
+  const sizes = preset('canvas.status_field').props.sizes, h = 41, d = 0.2 * h, w = 150;
+  const areas = Object.entries({ carved: { k: 0, rx: 6 }, flag: { k: sizes.flow_point }, hexagon: { k: sizes.flow_point }, pill: { k: 0 }, fold: { k: 13 }, hut: { k: sizes.flow_hut }, summit: { k: sizes.flow_summit } }).map(([shape, o]: any) => [shape, areaOf(bandPoints(shape, { l: 0, t: 0, r: w, b: h, d, ...o }))]);
+  const mean = areas.reduce((sum, [, a]: any) => sum + a, 0) / areas.length;
+  for (const [shape, a] of areas as any) assert.ok(Math.abs(a - mean) / mean <= 0.15, `${shape} paints ${a} against ${mean}`);
+  // Wires land on the real outline: a chamfer's corner, a fold's, down a roof, down a summit's slope and beside it.
   assert.equal(landOn({ shape: 'fold', w: 100, h: 40, bevel: 10 }, 50, 20, [98, 0], [98, -9])[1], 8);
-  assert.equal(landOn({ shape: 'summit', w: 100, h: 54, bevel: 14 }, 50, 27, [10, 0], [10, -9])[1], 14);
+  assert.equal(landOn({ shape: 'hut', w: 100, h: 50, bevel: 8 }, 50, 25, [50, 0], [50, -9])[1], 0);
+  assert.equal(landOn({ shape: 'hut', w: 100, h: 50, bevel: 8 }, 50, 25, [0, 0], [0, -9])[1], 8);
+  assert.equal(landOn({ shape: 'summit', w: 100, h: 54, bevel: 9, span: 0.3 }, 50, 27, [10, 0], [10, -9])[1], 9);
+  assert.ok(landOn({ shape: 'summit', w: 100, h: 54, bevel: 9, span: 0.3 }, 50, 27, [60, 0], [60, -9])[1] > 0);
+  assert.equal(sizes.flow_summit, 9);
+  assert.equal(preset('canvas.status_field').props.item_state, 'none');
 });
