@@ -90,7 +90,8 @@ body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) 
 #islands .isl-chat-mark.shape-half::before { background: linear-gradient(90deg, var(--session-hue) 50%, transparent 50%); }
 #islands .isl-chat-mark.shape-diamond::before { transform: rotate(45deg) scale(0.8); }
 #islands .isl-chat-mark.shape-triangle::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-#islands .isl-chat-mark.on-you { color: var(--session-hue, var(--warn)); }
+#islands .isl-chat-mark.shape-cross::before { background: linear-gradient(45deg, transparent 43%, var(--session-hue) 43% 57%, transparent 57%), linear-gradient(-45deg, transparent 43%, var(--session-hue) 43% 57%, transparent 57%); }
+#islands .isl-chat-mark.on-you { color: var(--session-hue, var(--ln-status_you)); }
 #islands .isl-chat .isl-name { color: var(--text); }
 /* An island a show added: its row on the soft ground and its name bold until it is pressed (decision e_mnuthcap). */
 #islands .isl-row.shown { background: var(--accent-soft); }
@@ -100,7 +101,7 @@ body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) 
 #query .q-waiting { position: relative; flex: none; display: inline-grid; place-items: center; width: var(--box-7); height: var(--box-7); padding: 0; border: 0; border-radius: 0; background: none; font: inherit; color: var(--text); cursor: pointer; }
 #query .q-waiting[hidden] { display: none; }
 #query .q-waiting:hover { background: var(--accent-soft); }
-#query .q-waiting-badge { position: absolute; top: 0; right: 0; color: var(--warn); font-size: var(--text-1); font-weight: 700; line-height: 1; }
+#query .q-waiting-badge { position: absolute; top: 0; right: 0; color: var(--ln-status_you); font-size: var(--text-1); font-weight: 700; line-height: 1; }
 
 /* What waits on the owner, wherever it is drawn: the inbox (inbox.svg), painted in the colour of what holds it. */
 .on-you { display: inline-block; width: var(--text-6); height: var(--text-6); vertical-align: middle; background: currentColor; -webkit-mask: url(/inbox.svg) center / contain no-repeat; mask: url(/inbox.svg) center / contain no-repeat; }

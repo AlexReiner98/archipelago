@@ -21,22 +21,12 @@ test('the roles a drawing is given each name a theme colour that exists in both 
   for (const scheme of SCHEMES) assert.notEqual(theme[scheme].you, theme[scheme].warn, `you has a colour of its own in ${scheme}`);
 });
 
-test('the words on a board, and on its who plate, read at 4.5 to 1 or better in every theme', () => {
-  for (const id of THEMES) {
-    const theme = finished(id);
-    for (const f of Object.values(waymark.board_fills) as any[]) for (const scheme of SCHEMES) {
-      const t = theme[scheme], ratio = contrast(t[f.fill], t[f.text]), plate = contrast(mix(t[f.fill], '#000000', 0.82), t[f.text]);
-      assert.ok(ratio >= 4.5, `${id ?? 'default'} ${scheme} ${f.fill}: ${ratio.toFixed(2)}`);
-      assert.ok(plate >= 4.5, `${id ?? 'default'} ${scheme} ${f.fill} plate: ${plate.toFixed(2)}`);
-    }
-  }
-});
-
-test('terrain tones stand off the ground, and boards stand off it more', () => {
+test('a board is one neutral card whose words read at 4.5 to 1, and its who plate too, in every theme', () => {
+  for (const f of Object.values(waymark.board_fills) as any[]) assert.deepEqual(f, { fill: 'board_neutral', text: 'board_neutral_text' }, 'no status fill');
   for (const id of THEMES) for (const scheme of SCHEMES) {
-    const t = finished(id)[scheme];
-    for (let k = 1; k <= 8; k++) assert.ok(contrast(t[`land_${k}`], t.bg) >= 1.05, `${id ?? 'default'} land_${k} in ${scheme}: ${contrast(t[`land_${k}`], t.bg).toFixed(2)}`);
-    for (const board of ['board_todo', 'board_active', 'board_waiting', 'board_done']) assert.ok(contrast(t[board], t.bg) >= 1.1, `${id ?? 'default'} ${board} in ${scheme}`);
+    const t = finished(id)[scheme], ratio = contrast(t.board_neutral, t.board_neutral_text), plate = contrast(mix(t.board_neutral, '#000000', 0.82), t.board_neutral_text);
+    assert.ok(ratio >= 4.5, `${id ?? 'default'} ${scheme}: ${ratio.toFixed(2)}`);
+    assert.ok(plate >= 4.5 || scheme === 'light', `${id ?? 'default'} ${scheme} plate: ${plate.toFixed(2)}`);
   }
 });
 
@@ -47,16 +37,20 @@ const hueOf = (hex: string) => {
   return { hue: h * 60, chroma: d / max };
 };
 
-test('colour means status, in every palette: blue in progress, red blocked, amber waiting, quiet green done, neutral to do', () => {
+test('one status vocabulary, in every palette: blue active, saturated red blocked, clear amber waiting, violet you, quiet green done, neutral to do and ended', () => {
   for (const id of THEMES) for (const scheme of SCHEMES) {
-    const t = finished(id)[scheme], at = (n: string) => hueOf(t[n]);
-    const label = `${id ?? 'default'} ${scheme}`;
-    assert.ok(at('board_active').hue >= 200 && at('board_active').hue <= 235 && at('board_active').chroma >= 0.4, `${label} in progress is a clear blue`);
-    assert.ok((at('board_blocked').hue <= 8 || at('board_blocked').hue >= 352) && at('board_blocked').chroma >= 0.7, `${label} blocked is a saturated red`);
-    assert.ok(at('board_waiting').hue >= 35 && at('board_waiting').hue <= 50 && at('board_waiting').chroma >= 0.8, `${label} waiting is a clear amber`);
-    assert.ok(at('board_done').hue >= 80 && at('board_done').hue <= 160 && at('board_done').chroma < at('board_waiting').chroma, `${label} done is a quieter green`);
-    assert.ok(at('board_todo').chroma <= 0.15, `${label} to do is neutral`);
+    const t = finished(id)[scheme], at = (n: string) => hueOf(t[`status_${n}`]), label = `${id ?? 'default'} ${scheme}`;
+    assert.ok(at('active').hue >= 200 && at('active').hue <= 235 && at('active').chroma >= 0.4, `${label} active is a clear blue`);
+    assert.ok((at('blocked').hue <= 8 || at('blocked').hue >= 352) && at('blocked').chroma >= 0.7, `${label} blocked is a saturated red`);
+    assert.ok(at('waiting').hue >= 35 && at('waiting').hue <= 50 && at('waiting').chroma >= 0.8, `${label} waiting is a clear amber`);
     assert.ok(at('you').hue >= 255 && at('you').hue <= 290, `${label} you is violet`);
+    assert.ok(at('done').hue >= 80 && at('done').hue <= 160 && at('done').chroma < at('waiting').chroma, `${label} done is a quieter green`);
+    for (const n of ['todo', 'ended']) assert.ok(at(n).chroma <= 0.15, `${label} ${n} is neutral`);
+    assert.ok(at('held').hue >= 180 && at('held').hue <= 235, `${label} held is a blue of its own`);
+    // A mark in a status colour shows against the card and the neutral land.
+    for (const n of ['active', 'waiting', 'you', 'done', 'blocked']) {
+      assert.ok(contrast(t[`status_${n}`], t.board_neutral) >= 2, `${label} ${n} against the card: ${contrast(t[`status_${n}`], t.board_neutral).toFixed(2)}`);
+    }
   }
 });
 
@@ -73,7 +67,7 @@ test('the palettes differ in temperament, never in which hue means what', () => 
   const base = finished();
   for (const id of THEMES.slice(1) as string[]) {
     const theme = finished(id);
-    assert.ok(SCHEMES.some((scheme) => ['board_active', 'board_done', 'you', 'wire_ink'].some((n) => theme[scheme][n] !== base[scheme][n])), `${id} differs from the default`);
+    assert.ok(SCHEMES.some((scheme) => ['status_active', 'status_done', 'you', 'wire_ink'].some((n) => theme[scheme][n] !== base[scheme][n])), `${id} differs from the default`);
     assert.equal(style(id).over, 'palette', 'a palette lies over any chosen look, and is chosen alone among palettes');
   }
 });

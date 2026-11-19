@@ -37,7 +37,7 @@ const load = (name) => {
 export const markOf = (at) => {
   const s = state.style?.session_marks?.[at];
   if (!s || typeof s !== 'object') return null;
-  return { shape: /^[a-z]+$/.test(s.shape) ? s.shape : 'disc', hue: `var(--ln-${/^[a-z]+$/.test(s.hue ?? '') ? s.hue : 'text'})`, ...(typeof s.word === 'string' && s.word.trim() && { word: s.word.trim() }) };
+  return { shape: /^[a-z]+$/.test(s.shape) ? s.shape : 'disc', hue: `var(--ln-${/^[a-z_]+$/.test(s.hue ?? '') ? s.hue : 'text'})`, ...(typeof s.word === 'string' && s.word.trim() && { word: s.word.trim() }) };
 };
 
 /** The pieces the style names for a chat's row, in its order. */
