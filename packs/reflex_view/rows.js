@@ -44,7 +44,7 @@ export const rowsOf = (item, record, runs) => [countsRow(item, record), ...runRo
 
 /**
  * Each asked id's counts, in the order asked: an item kept as the owner's version of a preset is counted under the
- * preset's id, and answered under its own. `read` is the record's read, handed the ids to read.
+ * preset's id, and answered under its own, with where it is said (its for, as given). `read` is the record's read, handed the ids to read.
  */
 export async function countsOf(asked, items, read) {
   const under = new Map(asked.map((id) => { const it = items.find((e) => e.id === id); return [id, typeof it?.props?.preset === 'string' ? it.props.preset : id]; }));
@@ -53,6 +53,8 @@ export async function countsOf(asked, items, read) {
   const by = new Map((Array.isArray(got) ? got : []).map((r) => [r.id, r]));
   return asked.map((id) => {
     const r = by.get(under.get(id)) ?? {};
-    return { id, said: r.said ?? 0, runs: r.runs ?? 0, places: r.places ?? {}, ...(r.last && { last: r.last }), came_back: r.came_back ?? 0, held: r.held ?? 0, quiet: r.quiet ?? 0 };
+    // Where it is said, as given: the drawing's answer carries no for, and its branches are by it.
+    const fors = items.find((e) => e.id === id)?.props?.for;
+    return { id, said: r.said ?? 0, runs: r.runs ?? 0, places: r.places ?? {}, ...(r.last && { last: r.last }), came_back: r.came_back ?? 0, held: r.held ?? 0, quiet: r.quiet ?? 0, ...(Array.isArray(fors) && { for: fors }) };
   });
 }
