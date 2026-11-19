@@ -98,7 +98,14 @@ export function panZoom(frame, svg, given) {
     const els = [...svg.children].flatMap((el) => (el.tagName === 'g' && !el.attributes.length ? [...el.children] : [el])).filter((el) => el.tagName !== 'defs' && el.tagName !== 'title');
     for (const el of els) el.removeAttribute('display');
     marks = els.map((el) => ({ el, at: box(el), off: false }));
+    byEl = new Map(marks.map((m) => [m.el, m]));
+    changed.clear();
     readText();
+  };
+  /** Measured again where it lies now, drawn so it has a box. */
+  const measure = (m) => {
+    if (m.off) ((m.off = false), m.el.removeAttribute('display'));
+    m.at = box(m.el);
   };
   const readText = () => {
     const text = svg.querySelector('text');
@@ -108,8 +115,53 @@ export function panZoom(frame, svg, given) {
   // painted: reading where each of its marks lies would hold the page for as long as laying all of them out takes.
   let reading = 0;
   const readSoon = () => (reading ||= requestAnimationFrame(() => setTimeout(() => ((reading = 0), (first = false), frame.isConnected && cull(inView())))));
-  // A drawing that moves, adds or takes away a mark has it read again before the plane next moves.
-  const reshaped = new MutationObserver(() => (marks = null));
+  // A drawing that adds or takes away a mark has all of them read again before the plane next moves. One that moves a
+  // mark, or changes what is in it, has that mark alone drawn until it is measured again, once the frame showing it is
+  // painted: never in the frame, where reading where it lies would lay out the whole picture again. A drawing that
+  // answers each move of the plane (names kept at their size on screen) or plays (the reflex tree) changes some mark
+  // every frame, and read whole that held each frame for as long as laying out all of it takes (60 to 90 ms).
+  let byEl = new Map(), measuring = 0;
+  const changed = new Set();
+  // The mark a changed node is in; null for the picture or a layer; undefined for a node no longer in the picture.
+  const markOf = (node) => {
+    let el = node;
+    for (; el && el !== svg; el = el.parentNode) if (byEl.has(el)) return byEl.get(el);
+    return el ? null : undefined;
+  };
+  const measureSoon = () =>
+    (measuring ||= requestAnimationFrame(() =>
+      setTimeout(() => {
+        measuring = 0;
+        if (!marks || !frame.isConnected) return;
+        for (const m of changed) m.el.isConnected && measure(m);
+        changed.clear();
+        cull(inView());
+      }),
+    ));
+  // The scale, for what keeps its size on screen at any zoom (an island's header, lane 2, overlap e_mb3n6uwb): given
+  // (--ln-plane-scale) to each mark of the picture that asks for it with the class `ln-plane`, and what is in it. Given
+  // to the frame, every mark of the picture had its style worked out again on each frame of a zoom.
+  const asking = svg.getElementsByClassName('ln-plane');
+  let scaleGiven = '';
+  const giveScale = (again = false) => {
+    const s = String(view.s);
+    if (s === scaleGiven && !again) return;
+    scaleGiven = s;
+    for (const el of asking) el.style.setProperty('--ln-plane-scale', s);
+  };
+  const reshaped = new MutationObserver((records) => {
+    // A mark come into the picture is given the scale before it is drawn.
+    if (scaleGiven && records.some((r) => r.addedNodes.length)) giveScale(true);
+    if (!marks) return;
+    for (const r of records) {
+      const m = markOf(r.target);
+      if (m === undefined) continue;
+      // The picture itself or a layer in it changed: what its marks are.
+      if (!m) return void ((marks = null), changed.clear());
+      if (!changed.has(m)) ((m.at = null), changed.add(m));
+    }
+    if (changed.size) measureSoon();
+  });
   reshaped.observe(svg, { subtree: true, childList: true, attributes: true, attributeFilter: ['d', 'transform', 'x', 'y', 'cx', 'cy', 'width', 'height', 'points'] });
 
   /** What is in view, in the picture's units, a margin round it drawn too so a short move shows nothing missing. */
@@ -144,10 +196,10 @@ export function panZoom(frame, svg, given) {
     queued = 0;
     const v = inView();
     svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.width} ${v.height}`);
-    for (const f of watching) f(v);
-    // The scale, for what keeps its size on screen at any zoom (an island's header text, lane 2, overlap e_mb3n6uwb).
-    frame.style.setProperty('--ln-plane-scale', String(v.scale));
+    giveScale();
     cull(v);
+    // Told once all of it is written: one who reads where something lies on the page lays it out once, not twice.
+    for (const f of watching) f(v);
     const said = `${v.x} ${v.y} ${v.width} ${v.height}`;
     if (told && said !== last) ((last = said), told(v));
   };
@@ -294,7 +346,7 @@ export function panZoom(frame, svg, given) {
     stop();
     reshaped.observe(svg, { subtree: true, childList: true, attributes: true, attributeFilter: ['d', 'transform', 'x', 'y', 'cx', 'cy', 'width', 'height', 'points'] });
     resized.observe(frame);
-    (marks = null), (first = true), (last = '');
+    (marks = null), (first = true), (last = ''), (scaleGiven = '');
     now();
   };
   const resized = new ResizeObserver(() => {
@@ -317,7 +369,9 @@ export function panZoom(frame, svg, given) {
   // Measured as the cull measures it (a mark out of sight has no box of its own now).
   const boxOf = (el) => {
     if (!marks) read();
-    return marks.find((m) => m.el.contains(el))?.at ?? null;
+    const m = marks.find((m) => m.el.contains(el));
+    if (m && changed.has(m)) (measure(m), changed.delete(m));
+    return m?.at ?? null;
   };
   return { zoomBy, fit, toBox, openOn, watch, boxOf, open, show, state, restore, inView, stop, room: roomOf, again };
 }

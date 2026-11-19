@@ -53,15 +53,42 @@ export function outOfSight(boxes, [rl, rt, rw, rh], v) {
  * order, `room()` the room the camera fits in, `go(id)` brings one into sight. Answers `stop`, and `now()`, which
  * draws them at once and answers the room their bands take [right, foot] (what the camera keeps clear as it opens).
  */
-export function edgeNames(stage, moves, { islands, room, go }) {
+export function edgeNames(stage, moves, { islands, room: room_, go }) {
   const layer = h('div', { class: 'lf-edge-names' });
   stage.append(layer);
   let queued = 0;
+  // What the last draw made: which island is named in which band, the room, and what it measured. A frame that names
+  // the same islands in the same bands only moves the side bands: it adds nothing to the page, since an element added
+  // there has the page's style worked out again (a `:has()` rule can hang on it), and reads nothing, since what it
+  // would read is what it measured then.
+  let kept = null;
+  /** Where a side's band of `bw` by `bh` stands down its edge, naming `ids`, above a foot band `footH` tall: undefined where no sea is left. */
+  const standAt = (key, bw, bh, footH, ids, list, land, v, [rl, rt, rw, rh]) => {
+    const [sx] = key.split(',').map(Number);
+    const x0 = sx > 0 ? rl + rw - bw : rl, x1 = x0 + bw, low = rt, high = rt + rh - footH - bh;
+    const shore = land.filter(([l, , r]) => r > x0 && l < x1);
+    const clear = (y) => y >= low && y <= high && shore.every(([, t, , b]) => b <= y || t >= y + bh);
+    // Where they would stand: level with the middle of what they name, else the nearest gap of sea along that edge.
+    const named = ids.map((id) => list.find(([i]) => i === id)?.[2]).filter(Boolean);
+    const want = named.length ? named.reduce((a, [, t, , b]) => a + ((t + b) / 2 - v.y) * v.s, 0) / named.length - bh / 2 : low;
+    return [low, Math.min(Math.max(want, low), high), ...shore.flatMap(([, t, , b]) => [b, t - bh])].filter(clear).sort((a, b) => Math.abs(a - want) - Math.abs(b - want))[0];
+  };
   const draw = () => {
     queued = 0;
     const list = islands(), titles = new Map(list.map(([id, title]) => [id, title]));
-    const [rl, rt, rw, rh] = room();
+    const room = room_(), [rl, rt, rw, rh] = room;
     const out = outOfSight(list.map(([id, , box]) => [id, box]), [rl, rt, rw, rh], moves.state());
+    // The land in sight, on screen: a side's names stand on the sea beside it, never on its shore.
+    const v = moves.state(), land = list.map(([, , [l, t, r, b]]) => [(l - v.x) * v.s, (t - v.y) * v.s, (r - v.x) * v.s, (b - v.y) * v.s]);
+    const shape = JSON.stringify([room, out.map(([id, side, cut]) => [id, titles.get(id), side, cut])]);
+    if (kept?.shape === shape && layer.isConnected) {
+      const at = kept.sides.map((s) => standAt(s.key, s.bw, s.bh, s.footH, s.ids, list, land, v, room));
+      // The same bands, each where it stands now; one that would fold into the foot's band now, or come out of it, is made again.
+      if (kept.sides.every((s, n) => (at[n] === undefined) === s.folded)) {
+        kept.sides.forEach((s, n) => !s.folded && (s.band.style.cssText = `top:${at[n]}px;left:${s.key.startsWith('1') ? rl + rw : rl}px`));
+        return kept.answer;
+      }
+    }
     const bands = new Map();
     for (const [id, side, cut] of out) {
       const key = `${side}`, arrow = h('span', { class: 'lf-edge-arrow' }, ARROWS[key]), word = h('span', { class: 'lf-edge-word' }, titles.get(id));
@@ -71,23 +98,17 @@ export function edgeNames(stage, moves, { islands, room, go }) {
       bands.get(key).append(name);
     }
     layer.replaceChildren(...bands.values());
-    // The land in sight, on screen: a side's names stand on the sea beside it, never on its shore.
-    const v = moves.state(), land = list.map(([, , [l, t, r, b]]) => [(l - v.x) * v.s, (t - v.y) * v.s, (r - v.x) * v.s, (b - v.y) * v.s]);
     for (const key of ['0,1', '0,-1']) if (bands.has(key)) bands.get(key).style.cssText = `left:${rl}px;width:${rw}px;top:${key === '0,1' ? rt + rh : rt}px`;
     const foot = () => bands.get('0,1')?.offsetHeight ?? 0;
+    const sides = [];
     for (const key of ['1,0', '-1,0']) {
       const band = bands.get(key);
       if (!band) continue;
-      const [sx] = key.split(',').map(Number), bw = band.offsetWidth, bh = band.offsetHeight;
-      const x0 = sx > 0 ? rl + rw - bw : rl, x1 = x0 + bw, low = rt, high = rt + rh - foot() - bh;
-      const shore = land.filter(([l, , r]) => r > x0 && l < x1);
-      const clear = (y) => y >= low && y <= high && shore.every(([, t, , b]) => b <= y || t >= y + bh);
-      // Where they would stand: level with the middle of what they name, else the nearest gap of sea along that edge.
-      const named = [...band.children].map((el) => list.find(([id]) => id === el.dataset.item)?.[2]).filter(Boolean);
-      const want = named.length ? named.reduce((a, [, t, , b]) => a + ((t + b) / 2 - v.y) * v.s, 0) / named.length - bh / 2 : low;
-      const at = [low, Math.min(Math.max(want, low), high), ...shore.flatMap(([, t, , b]) => [b, t - bh])].filter(clear).sort((a, b) => Math.abs(a - want) - Math.abs(b - want))[0];
+      const bw = band.offsetWidth, bh = band.offsetHeight, footH = foot(), ids = [...band.children].map((el) => el.dataset.item);
+      const at = standAt(key, bw, bh, footH, ids, list, land, v, room);
+      sides.push({ key, band, bw, bh, footH, ids, folded: at === undefined });
       if (at !== undefined) {
-        band.style.cssText = `top:${at}px;left:${sx > 0 ? rl + rw : rl}px`;
+        band.style.cssText = `top:${at}px;left:${key.startsWith('1') ? rl + rw : rl}px`;
         continue;
       }
       // No sea at that edge: its names go in the foot's band, each with its arrow toward where it lies.
@@ -99,7 +120,9 @@ export function edgeNames(stage, moves, { islands, room, go }) {
     layer.replaceChildren(...bands.values());
     const size = (key, way) => bands.get(key)?.[way] ?? 0;
     // Only the foot's band is kept clear as the camera opens: a side's names stand on a gap of sea the land leaves.
-    return [0, size('0,1', 'offsetHeight')];
+    const answer = [0, size('0,1', 'offsetHeight')];
+    kept = { shape, sides, answer };
+    return answer;
   };
   const soon = () => (queued ||= requestAnimationFrame(draw));
   const unwatch = moves.watch(soon);

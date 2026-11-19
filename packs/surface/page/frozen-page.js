@@ -98,6 +98,9 @@ function drawDoc() {
   // A map shared at /p/<workspace>/<id> may be copied into a guest map of one's own, opened as Try it with your agent
   // opens one (packs/identity/page/guest.js).
   const yours = published && !d.site?.host && h('button', { class: 'primary', title: 'A copy of this map, yours to change, with your agent drawing on it', onclick: () => location.assign(`/#/try?from=${encodeURIComponent(here)}`) }, 'Make it yours');
+  // A site's page says so on its main (chart.css `main.site`): asked with `:has()` of every main, Chrome worked out the
+  // style of every link on the app's canvas again on each element added to it.
+  main.classList.toggle('site', Boolean(d.site));
   main.replaceChildren(
     ...[
       d.site && siteHead(d.site),
