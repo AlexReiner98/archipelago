@@ -191,7 +191,7 @@ test('rules stand on the tree where they guard, beside what is said there: a squ
   a.items[0].fields = { for: ['tool:change'] };
   const rules = [
     { id: 'core.status_owner', title: 'Only the owner closes', pack: 'core', effect: 'hold', where: 'tool:change:task:status', fired: ['2026-11-18T09:00:00Z', '2026-11-18T10:00:00Z'] },
-    { id: 'build.ci_green', title: 'CI green before done', pack: 'build', effect: 'refuse', where: 'tool:change:task', fired: [] },
+    { id: 'build.ci_green', title: '"{title}" waits for CI', pack: 'build', effect: 'refuse', where: 'tool:change:task', fired: [] },
   ];
   const act = async (name: string, params: any) => (name === 'rules' ? { answer: rules } : { answer: params.ids.map((one: string) => ({ id: one, said: 0 })) });
   const drawn = await picture({ answer: a, style: { ...style, sends: { ...style.sends, rules: 'rules' } }, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
@@ -203,6 +203,7 @@ test('rules stand on the tree where they guard, beside what is said there: a squ
   assert.ok(svg.includes('Only the owner closes · rule, hold · core'), 'its effect and pack in its tooltip');
   assert.ok(css.includes('.rt-p-build .rt-dot { fill: #'), 'a pack beyond core takes the next of the style’s hues');
   assert.ok(key.includes('From build') && key.includes('Core, the trunk') && key.includes('Fired'));
+  assert.ok(svg.includes('ci green · rule, refuse · build'), 'a rule whose title is a message with blanks goes by its own name');
   const tree = treeOf(a, (item: any) => item.fields?.for, n, rules.map((r) => ({ id: r.id, title: r.title, for: [r.where], kind: 'rule' })))!;
   const film = filmOf(tree, { ...storyOf(a, null, null, n), rules: rulesOf(rules) }, n);
   assert.equal(film.events.filter((e: any) => e.kind === 'fired').length, 2, 'each firing is a light of its own');

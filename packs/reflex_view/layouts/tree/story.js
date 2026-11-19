@@ -21,9 +21,12 @@ const DAY = 864e5;
 const tierOf = (item) => (item?.type === 'reflex' || item?.is?.includes?.('reflex') ? 'learned' : item?.fields?.preset ? 'pack' : 'owner');
 const statusOf = (item) => (['trial', 'current', 'retired'].includes(item?.status) ? item.status : item?.open === false ? 'retired' : 'current');
 
+/** A rule's name: its title, unless that is a message with blanks in it ("{title}"), then its own name, pack.rule. */
+const nameOfRule = (r) => (typeof r.title === 'string' && r.title && !/[{}]/.test(r.title) ? r.title : String(r.id).split('.').slice(1).join('.').replaceAll('_', ' ') || r.id);
+
 /** The rules the pack answered, each with its firings as times. */
 export const rulesOf = (rules) =>
-  (Array.isArray(rules) ? rules : []).filter((r) => r && typeof r.id === 'string' && typeof r.where === 'string').map((r) => ({ id: r.id, title: r.title ?? r.id, pack: r.pack ?? 'core', effect: r.effect, where: r.where, fired: (r.fired ?? []).map((at) => Date.parse(at)).filter(Number.isFinite) }));
+  (Array.isArray(rules) ? rules : []).filter((r) => r && typeof r.id === 'string' && typeof r.where === 'string').map((r) => ({ id: r.id, title: nameOfRule(r), pack: r.pack ?? 'core', effect: r.effect, where: r.where, fired: (r.fired ?? []).map((at) => Date.parse(at)).filter(Number.isFinite) }));
 
 /** The story the pack answered, made whole; or, where it answered none, the schematic one. Times are ms. */
 export function storyOf(answer, came, counts, n, now = Date.now(), tiers = new Map()) {
