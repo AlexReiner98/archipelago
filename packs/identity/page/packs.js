@@ -61,7 +61,7 @@ export function packsCard({ info, then, goTo }) {
     if (key === 'styles') {
       const styles = of(schema.styles);
       // A theme is a preset used only once chosen; changing a preset is the styles pack's card (packs/styles/parts/presets).
-      const themes = styles.filter((s) => s.over === 'chosen');
+      const themes = styles.filter((s) => s.over === 'chosen' || s.over === 'palette');
       // Its themes are each listed by name; one is chosen for the whole map, on the Map section.
       const choose = themes.length > 0 && line(h('span', { class: 'grow muted small' }, 'One theme is chosen for the whole map'), h('button', { onclick: () => goTo('map') }, 'Choose'));
       return { covers: [], rows: [], after: choose ? [choose] : [] };

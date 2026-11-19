@@ -4,6 +4,7 @@
 // roles the page has (land, sea, text, line, muted, you): the looks differ by form, never by a new hue. Every length is the
 // style's (sizes, read as --ln-flow-*). Layer: marks. Pure: a style in, css and marks out.
 
+import { cssColour, isColour } from './colour.js';
 import { lineageOf } from './graph.js';
 import { colourWays, ridgeMarks } from './ridge-item.js';
 import { bandsFor, cuts as cutsOf, GROWN, inset, listOf, runsOf, slotOf } from './cut-item.js';
@@ -98,9 +99,9 @@ export function itemRules(style) {
     rules.push('.lf-tick { fill: none; stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
   }
   if (g.board) {
-    const plain = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.waiting)', ld = (f, k) => `light-dark(${f.light[k]}, ${f.dark[k]})`;
+    const plain = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.waiting)', ld = (f, k) => (f.light ? `light-dark(${cssColour(f.light[k])}, ${cssColour(f.dark[k])})` : cssColour(f[k]));
     for (const [k, f] of Object.entries(g.board.fills)) {
-      if (!f?.light || !f?.dark) continue;
+      if (!(f?.light && f?.dark) && !(isColour(f?.fill) && isColour(f?.text))) continue;
       // The whole board in its status colour, the name in the ink that reads on it; "you" keeps its colour as the outline ring.
       rules.push(`.lf-step.boarded.bs-${k}${plain} .lf-shape { fill: ${ld(f, 'fill')}; stroke: color-mix(in srgb, ${ld(f, 'fill')} 65%, var(--ln-text)); stroke-width: var(--ln-flow-stroke); }`);
       rules.push(`.lf-step.boarded.bs-${k}.you .lf-shape, .lf-step.boarded.bs-${k}.here .lf-shape { fill: ${ld(f, 'fill')}; stroke: var(--ln-you); stroke-width: var(--ln-flow-stroke-lit); }`);

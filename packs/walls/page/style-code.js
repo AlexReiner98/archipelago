@@ -5,7 +5,7 @@
 // it (a view-drawn event, as ui/look.js says it), so it imports nothing of the app.
 
 import { api, authHeaders, call, drawingsOpen, frameSandbox, h, may, tell } from './base.js';
-import { STYLE_COLORS, litSwitch } from './query-base.js';
+import { colourRoles, litSwitch } from './query-base.js';
 
 /** Say on `el` how its drawing went, as look mode listens for it (ui/look.js, saidDrawn). */
 const saidDrawn = (el, state, why) => el.dispatchEvent(new CustomEvent('view-drawn', { bubbles: true, detail: { state, why } }));
@@ -45,7 +45,7 @@ export function drawCode(host, answer, style, keep, _place, coder) {
   if (warm) return void (Object.assign(was, { code, fields: JSON.stringify(fields), style: fields, data, keep, coder }), was.swap());
   const error = h('div', { class: 'lens-error', hidden: true });
   const stage = h('div', { class: 'code-stage' });
-  const colours = () => Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(host).getPropertyValue(`--ln-${name}`).trim()]));
+  const colours = () => Object.fromEntries(colourRoles(fields).map((name) => [name, getComputedStyle(host).getPropertyValue(`--ln-${name}`).trim()]));
   if (host.coded) window.removeEventListener('message', host.coded.hear);
   // What the frame draws, kept where a swap changes it: every message below reads it from here.
   const run = (host.coded = { code, fields: JSON.stringify(fields), style: fields, data, keep, coder, frame: undefined, hear: undefined, sent: false, open: false });

@@ -29,7 +29,7 @@ export interface StyleDef {
   title: string;
   body?: string;
   on?: string[];
-  over?: 'workspace' | 'chosen';
+  over?: 'workspace' | 'chosen' | 'palette';
   props: Record<string, unknown>;
 }
 
@@ -128,10 +128,10 @@ export async function styleFor(ctx: KernelContext, kept: Kept[], ask: StyleAsk, 
   const layers: { weight: number; id: string; title: string; preset?: string; props: Record<string, unknown> }[] = [];
   for (const p of presets) {
     const mine = versions.find((v) => v.props.preset === p.id);
-    const tried = p.over === 'chosen' && p.id === ask.try;
-    if (!tried && ((mine && !mine.is_open) || (p.over === 'chosen' && !mine))) continue;
+    const chosen = p.over === 'chosen' || p.over === 'palette', tried = chosen && p.id === ask.try;
+    if (!tried && ((mine && !mine.is_open) || (chosen && !mine))) continue;
     const on = mine && listed(mine.props.on).length ? listed(mine.props.on) : (p.on ?? []);
-    const weight = !on.length ? (p.over === 'workspace' ? 1.5 : tried ? 0.6 : p.over === 'chosen' ? 0.5 : 0) : onIt(on) ? 2 : -1;
+    const weight = !on.length ? (p.over === 'workspace' ? 1.5 : tried ? 0.6 : p.over === 'palette' ? 0.55 : p.over === 'chosen' ? 0.5 : 0) : onIt(on) ? 2 : -1;
     if (weight < 0) continue;
     layers.push({ weight, id: mine?.id ?? p.id, title: mine?.title || p.title, preset: p.id, props: mine ? over(p.props, fields(mine.props)) : p.props });
   }

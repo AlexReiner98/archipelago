@@ -8,14 +8,18 @@
 // When the finding moves, a pulse runs from its gate across the sea to each reader's (task e_fqhbp4yq).
 // Layer: marks. Pure: the composed model and each island's legend rows in, marks and colour rules out.
 
+import { colourKey, cssColour } from './colour.js';
+
 /** An island's name as its header says it: its own title alone, a focus island's too; the pack it speaks is set after it in quiet words (./pack-marks.js). */
 export const nameOf = (i) => i?.title ?? '';
 
 /**
- * The colour of the `k`th island the picture draws: the style's island_hues, else its hues, each a colour (`isHex`),
- * in turn; null where it gives none. Exported so a drawing on an island (./painted.js) takes the same hue.
+ * The colour of the `k`th island the picture draws: the terrain it names (`info.terrain`, a theme colour), or its pack's (the
+ * style's pack_terrain, by pack), else the style's island_hues, else its hues, each a colour (`isHex`), in turn; null where it gives none. Exported so a drawing on an island (./painted.js) takes the same hue.
  */
-export function islandHue(style, isHex, k) {
+export function islandHue(style, isHex, k, info) {
+  const own = info?.terrain ?? style?.pack_terrain?.[info?.pack];
+  if (isHex(own)) return own;
   const given = Array.isArray(style?.island_hues) && style.island_hues.length ? style.island_hues : Array.isArray(style?.hues) ? style.hues : [];
   const hues = given.filter(isHex);
   return hues.length ? hues[k % hues.length] : null;
@@ -57,10 +61,10 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
   const named = new Map(islands.map((i) => [i.id, nameOf(i)]));
   const rules = new Set(), classes = new Map();
   g.islands.forEach((isle, k) => {
-    const hex = islandHue(style, isHex, k);
+    const hex = islandHue(style, isHex, k, islands.find((i) => i.id === isle.id));
     if (!hex) return classes.set(isle.id, 'lf-island');
-    const cls = `lf-i-${hex.slice(1).toLowerCase()}`;
-    rules.add(`.${cls} { --lf-island: ${hex}; }`);
+    const cls = `lf-i-${colourKey(hex)}`;
+    rules.add(`.${cls} { --lf-island: ${cssColour(hex)}; }`);
     classes.set(isle.id, `lf-island ${cls}`);
   });
   // A pack's parts as an island (./parts-islands.js) is in the colour of the island it is of: it reads as that island's.
@@ -167,7 +171,7 @@ export const css = `
 .lf-island-add:is(:hover, :focus-visible) { color: var(--accent, var(--ln-text)); }
 .lf-island-add text { fill: currentColor; }
 .lf-add-mark { stroke: currentColor; stroke-width: var(--ln-flow-stroke-hover); fill: none; }
-.lf-shore :is(rect, path), .lf-crown-shore { fill: none; stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-island-stroke); }
+.lf-shore :is(rect, path), .lf-crown-shore { fill: none; stroke: color-mix(in srgb, var(--lf-island, var(--ln-line)), var(--ln-text) var(--ln-flow-island-frame, 0%)); stroke-width: var(--ln-flow-island-stroke); }
 .lf-island-name { pointer-events: auto; cursor: pointer; }
 /* Its name in the plain face, near the text's colour: the region's small-caps serif read as a whisper at this size (study e_unru8ftt). */
 .lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-island-name-mix)); font-size: var(--ln-flow-island-text); font-family: var(--type-name-family, var(--ln-font)); font-weight: var(--type-name-weight, bold); dominant-baseline: central; }
