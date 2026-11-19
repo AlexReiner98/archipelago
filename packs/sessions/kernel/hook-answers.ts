@@ -223,7 +223,9 @@ export async function sessionAnswer(ctx: KernelContext, event: string, call: Hoo
       const behind = await sayAt(ctx, 'setup_behind', { command: setupCommand(call.origin) }, body.session_id);
       if (behind) additionalContext += `\n\n${behind}`;
     }
-    return told(additionalContext);
+    // The files written from the map into this checkout (the agents pack's: a CLAUDE.md, a skill, the working rules), for the hook to write.
+    const files = (await ctx.call<object, { files: unknown[] }>('answer.written', { ...(typeof body.remote === 'string' && { remote: body.remote }), ...(run && { run: run.id }) }).catch((err) => void console.error(`hook written: ${(err as Error).message}`)))?.files;
+    return told(additionalContext, files?.length ? { files } : {});
   }
   if (event === 'session-end') {
     await hookSessionEnd(ctx, body);

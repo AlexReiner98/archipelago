@@ -56,7 +56,7 @@ export interface RuleDef {
     visibility?: OneOrMany;
     /** A field against a number or another field, as the item will be: "total > 500", "paid < total". */
     compare?: string;
-    /** Patterns what the op itself writes must match, each field its own (the title and body read from the op, never from the item as it was); a list matches when any of its values does. */
+    /** Patterns what the op itself writes must match, each field its own (the title and body read from the op, never from the item as it was); a list matches where one of its entries does. */
     matches?: Record<string, string>;
     /** Written to a type or link type whose pack is gone. */
     dormant?: boolean;
@@ -271,6 +271,7 @@ function applies(rule: RuleDef & { pack?: string }, reg: Registry, who: Who, w: 
     // Only what this op writes is read: an item already unreadable may still be withdrawn or said still true.
     const written = { ...w.props, ...(w as unknown as Record<string, unknown>) };
     for (const [f, pattern] of Object.entries(when.matches)) {
+      // A list (an instruction's for) matches where one of its entries does.
       if (![written[f]].flat().some((v) => typeof v === 'string' && regex(pattern)!.test(v))) return false;
     }
   }
