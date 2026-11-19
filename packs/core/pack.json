@@ -331,6 +331,19 @@
       }
     },
     {
+      "id": "reflex",
+      "extends": "instruction",
+      "title": "Reflex",
+      "description": "An instruction grown from a miss: where it is said (for, its condition) and what to say (its note). A trial one is said only where its for names the place exactly, marked as a trial; its record promotes it to current or retires it. It never acts: it may name a map action (action, with its inputs) for the agent to take with its own tools.",
+      "statuses": { "open": ["trial", "current"], "closed": ["retired"] },
+      "fields": {
+        "until": { "type": "string", "description": "When the situation it answers ends, as a date or a condition in words: past it, it is retired." },
+        "action": { "type": "string", "description": "A map action the agent is asked to take when this is said, as verb.action (report.tell, change): named, never taken by the reflex itself." },
+        "input": { "type": "json", "description": "The inputs of its action, as the action takes them; a name in braces ({run}) is filled in where it is said." },
+        "misses": { "type": "json", "description": "The refusals it answers, as a list of phrases: a refused change of a run whose reason holds one of them is that miss." }
+      }
+    },
+    {
       "id": "type",
       "extends": "system",
       "title": "Type",

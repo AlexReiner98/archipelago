@@ -8,6 +8,7 @@ import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { unmoved } from './marks-moved.ts';
 import { pathToFileURL } from 'node:url';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
@@ -33,7 +34,8 @@ const answer = {
     { type: 'waits_on', from: 'e_sendzzzz', to: 'e_alexzzzz' },
   ],
 };
-const draw = (a: any, style: any = house) => picture({ answer: a, style, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene;
+// Read where the marks stand on the picture: each island is drawn about its own corner, in a group moved there.
+const draw = (a: any, style: any = house) => ((scene) => ({ ...scene, ...(scene.svg && { svg: unmoved(scene.svg) }) }))(picture({ answer: a, style, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene);
 
 /** Every mark under `mark` that `test` holds of, depth first. */
 const marks = (mark: any, hold: (m: any) => boolean): any[] => {
@@ -77,7 +79,7 @@ const SHARED = ['Not started', 'Under way', 'Finished', 'Ended', 'Trouble', 'Hel
 test('each island carries its own legend and the corner has none', () => {
   const scene = draw(answer);
   assert.deepEqual(scene.key, [], 'no key in the corner');
-  assert.ok(legendOf(scene, 'e_grantsis').includes('Work') && legendOf(scene, 'e_grantsis').includes('Leads to'), legendOf(scene, 'e_grantsis').join(', '));
+  assert.ok(legendOf(scene, 'e_grantsis').includes('Task') && legendOf(scene, 'e_grantsis').includes('Leads to'), legendOf(scene, 'e_grantsis').join(', '));
   assert.ok(legendOf(scene, 'e_lablabis').includes('Record'), 'Lab’s says what a record is');
   assert.ok(!legendOf(scene, 'e_grantsis').includes('Record'), 'Grants’ says only what it draws');
 });
@@ -126,7 +128,7 @@ test('a picture of one island is framed, with its own legend and none in the cor
   const one = { ...answer, items: answer.items.filter((i) => i.island !== 'e_lablabis') };
   const scene = draw(one);
   assert.ok(marks(scene.svg, (m) => String(m[1]?.class ?? '').includes('lf-island')).length > 0, 'its island is drawn as a region');
-  assert.ok(legendOf(scene, 'e_grantsis').includes('Work'), `its legend names what it draws: ${legendOf(scene, 'e_grantsis').join(', ')}`);
+  assert.ok(legendOf(scene, 'e_grantsis').includes('Task'), `its legend names what it draws: ${legendOf(scene, 'e_grantsis').join(', ')}`);
   assert.equal(scene.key.length, 0, 'the corner key gives way to the island’s legend');
 });
 

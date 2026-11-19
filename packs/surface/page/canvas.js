@@ -14,6 +14,7 @@ import { cornersOf, corners, islandsOn, onIslands } from './islands-on.js';
 import { AUTO, clean, islandsOnMap } from './islands-list.js';
 import { autoIslands, onAuto } from './islands-auto.js';
 import { unfollow } from './replica.js';
+import { keyOf } from './marks.js';
 import { drawBand } from './bar-band.js';
 import { edgeNames } from './canvas-edge.js';
 import './sessions-open.js';
@@ -96,6 +97,8 @@ export const goQuery = (lens) => {
 };
 /** What the canvas a query was edited on held then, for the canvas that draws that query next, once. */
 let handed = null;
+/** Where the reader was looking when a gesture on the picture edited its query, for the canvas that draws that query next, once. */
+let staying = null;
 const handedOn = (lens) => {
   const was = handed;
   handed = null;
@@ -159,11 +162,13 @@ hooks.go = (address) => {
   // A saved view, by its id: opened as the bar's switcher opens one (hooks.openView, packs/surface/page/views-kept.js).
   if (typeof address.view === 'string' && /^e_[a-z0-9]{8}$/.test(address.view)) return void hooks.openView?.(address.view);
   // A term added to the lens up or taken out of it (`add`, `take`): the runtime makes the lens, so no part keeps the algebra.
+  // Said to `stay` (a gesture on the picture), the picture stays where the reader is looking.
   // Built on the lens this canvas last went to while it has not drawn another, so two quick moves each count.
   if (address.add || address.take) {
     const up = current.home ? home() : current.lens;
     const next = moved(current.wanted && current.wantedFrom === up ? current.wanted : up, address);
     if (next) Object.assign(current, { wanted: next, wantedFrom: up });
+    staying = next && address.stay === true && current.moves() ? { address: addressOf(next), state: current.moves().state(), shows: typeof address.shows === 'string' ? address.shows : null } : null;
     return void (next && goQuery(next));
   }
   let lens = null;
@@ -270,7 +275,11 @@ export function canvasIn(host, pane) {
       // The same lens drawn again (an item's page opened over it says it anew) stays where the reader moved it, and one
       // they have not moved fits the room beside the page.
       const same = at && JSON.stringify(at.lens) === JSON.stringify(lens);
-      at = { key, view: null, lens, home: isHome, here, kept: same ? (c.moves() ? moved() : at.kept) : null, fitted: same ? at.fitted : null, style, asked };
+      // A term added or taken by a gesture on the picture (a pack's glyph) leaves it where the reader was looking, though
+      // a new pane draws it (packs/panes/page/panes.js draws each address anew).
+      const stays = !same && staying?.address === addressOf(lens) ? staying : null;
+      staying = null;
+      at = { key, view: null, lens, home: isHome, here, kept: same ? (c.moves() ? moved() : at.kept) : stays?.state ?? null, fitted: same ? at.fitted : stays?.state ?? null, shows: stays?.shows ?? null, style, asked };
       c.draw();
     },
     /** Draw nothing: a replay's pane before its first milestone (ui/panes.js). */
@@ -373,8 +382,8 @@ export function canvasIn(host, pane) {
   // never once the reader has moved it. At the next frame, once the plane has kept its middle (packs/walls/page/pan-zoom.js).
   const sized = new ResizeObserver(() => requestAnimationFrame(() => c.fit()));
   // A drawing mounted anew (a new view, the map changed under it): back where the reader left it, else fitted.
-  new MutationObserver((list) => {
-    if (!list.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches('.lf-stage') || n.querySelector?.('.lf-stage'))))) return;
+  // One kept in place with a new picture on it (packs/walls/page/marks-kept.js) is put back the same way.
+  const remounted = () => {
     sized.disconnect();
     const stage = host.querySelector('.lf-stage');
     if (stage) sized.observe(stage);
@@ -383,7 +392,21 @@ export function canvasIn(host, pane) {
     edges = stage && c.moves() ? edgeNames(stage, c.moves(), { islands: islandBoxes, room: () => c.moves().room(0, ...bars(host)), go: (id) => c.toItem(id) }) : null;
     if (at?.kept) c.moves()?.restore(at.kept);
     else c.fit();
-  }).observe(host, { childList: true, subtree: true });
+    if (at?.shows) bringIn();
+  };
+  new MutationObserver((list) => list.some((m) => [...m.addedNodes].some((n) => n.nodeType === 1 && (n.matches('.lf-stage') || n.querySelector?.('.lf-stage')))) && remounted()).observe(host, { childList: true, subtree: true });
+  host.addEventListener('stage-kept', remounted);
+  // What a find said to bring into sight (packs/walls/page/marks-find.js `shows`), once a picture holds it: panned to,
+  // at the scale the reader had, as little as puts it in sight.
+  const bringIn = () => {
+    const moves = c.moves(), el = [...host.querySelectorAll('.lf-stage *')].find((e) => keyOf.get(e) === at.shows), box = el && moves?.boxOf(el);
+    if (!box) return;
+    at.shows = null;
+    const v = moves.inView(), x = box[2] > v.x + v.width ? Math.min(box[0], box[2] - v.width) : box[0] < v.x ? box[0] : v.x;
+    const y = box[3] > v.y + v.height ? Math.min(box[1], box[3] - v.height) : box[1] < v.y ? box[1] : v.y;
+    moves.restore({ ...moves.state(), x, y });
+    at.kept = moves.state();
+  };
   // A click on an item drawn opens its page over the canvas, the lens as it was: reading an item does not reshape what
   // is drawn (the owner, 28 Oct 2026, e_jedng69e).
   host.addEventListener('click', (ev) => {

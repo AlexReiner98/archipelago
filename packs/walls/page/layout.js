@@ -7,25 +7,17 @@
 
 import { api, drawFrame, h, state, whoami } from './base.js';
 import { drawingActs, drawingAsked } from './layout-asks.js';
-import { tipOf } from './layout-tip.js';
+import { pictureAt, tipOf } from './layout-tip.js';
 import { answered } from './tip.js';
-
-/** Where a pointer event is in the picture's units: in its mark's outermost svg, rounded to a tenth; null off a picture. */
-function pictureAt(ev) {
-  let svg = ev?.currentTarget?.ownerSVGElement ?? null;
-  while (svg?.ownerSVGElement) svg = svg.ownerSVGElement;
-  const m = svg?.getScreenCTM?.();
-  if (!m || !Number.isFinite(ev.clientX)) return null;
-  const p = new DOMPoint(ev.clientX, ev.clientY).matrixTransform(m.inverse());
-  return [Math.round(p.x * 10) / 10, Math.round(p.y * 10) / 10];
-}
 import { build, cssFor, patch, step } from './marks.js';
+import { buildKept, keptInto, touched } from './marks-kept.js';
 import { readerAsks, stillReading } from './reader-frame.js';
 import { followSheet, sheetAside } from './sheet-follow.js';
-import { STYLE_COLORS, litSwitch, numberOf, sizeOf } from './query-base.js';
-import { surfaceOf } from './surface.js';
+import { litSwitch, numberOf, sizeOf } from './query-base.js';
+import { heldOver, surfaceOf } from './surface.js';
 import { saidDrawn } from './look.js';
-import { relations, types as registry, typeTitle } from './words.js';
+import { types as registry, typeTitle } from './words.js';
+import { colours, typeWords } from './layout-input.js';
 import { panZoom } from './pan-zoom.js';
 import { transition } from './transition.js';
 import { pictureKey } from './picture-name.js';
@@ -90,8 +82,8 @@ export function warmLayouts() {
   const frame = given && given.getAttribute('sandbox') === want.sandbox && new URL(given.src).origin === new URL(want.src, location.href).origin ? given : h('iframe', { class: 'drawing-sandbox', sandbox: want.sandbox, src: want.src, title: 'Where drawings run', tabindex: '-1', 'aria-hidden': 'true' });
   if (given && given !== frame) given.remove();
   const loads = new Map();
-  sandbox = { frame, loads, ready: null, started: null };
-  sandbox.ready = new Promise((resolve) => (sandbox.started = resolve));
+  const box = (sandbox = { frame, loads, ready: null, started: null, isReady: false });
+  box.ready = new Promise((resolve) => (box.started = () => ((box.isReady = true), resolve())));
   if (!hearing) ((hearing = true), addEventListener('message', hear));
   // Beside the body, not in it, so a page that draws its body anew does not take it away.
   if (frame !== given) document.documentElement.append(frame);
@@ -131,24 +123,6 @@ function adopt(id, css) {
 
 const plain = (value) => JSON.parse(JSON.stringify(value ?? null));
 
-/** What a drawing is told of the types and links an answer holds, as this page knows them: the values each type's
- * fields may take (`fields`, by type then field) and each link's title (`relations`). A drawing has no registry. */
-function typeWords(answer) {
-  const held = [...new Set((answer.items ?? []).map((i) => i.type).filter(Boolean))];
-  const fields = Object.fromEntries(held.map((t) => [t, Object.fromEntries(Object.entries(registry.get(t)?.fields ?? {}).filter(([, f]) => Array.isArray(f?.values)).map(([name, f]) => [name, f.values]))]).filter(([, f]) => Object.keys(f).length));
-  const kinds = [...new Set((answer.links ?? []).map((l) => l.kind).filter(Boolean))];
-  return { fields, relations: Object.fromEntries(kinds.map((k) => [k, relations.get(k)?.title ?? k])) };
-}
-
-/** The colours a picture is drawn in, as the page has them now: the page's own (by the theme's names) and the lens's. */
-function colours(host, style) {
-  const css = getComputedStyle(host), read = (name) => css.getPropertyValue(name).trim();
-  return {
-    page: Object.fromEntries(Object.keys(style.theme?.light ?? {}).map((name) => [name, read(`--${name.replaceAll('_', '-')}`)])),
-    lens: Object.fromEntries(STYLE_COLORS.map((name) => [name, read(`--ln-${name}`)])),
-  };
-}
-
 /** Draw the answer in host with the drawing its style names. The same call as any of the kernel's shapes. */
 export function drawWith(host, answer, style, keep) {
   if (heldBare(host, answer, [...registry.values()].some((t) => t.fields?.island), numberOf(style, 'island_hold_ms'))) return; // its items back on no island while the map keeps them: the picture stays, asked again (./island-hold.js)
@@ -184,6 +158,7 @@ export function drawWith(host, answer, style, keep) {
   // How long a picture took, for whoever measures the page: waiting, in the drawing, and on the page.
   const began = performance.now();
   const keys = new Map(), moving = new Set();
+  let drawnSvg = null;
   let mounted = false, ended = false;
   // Patches that come before the scene they change (a drawing may start moving at once) wait for it.
   const early = [];
@@ -218,11 +193,16 @@ export function drawWith(host, answer, style, keep) {
     begun = true;
     performance.mark('drawing-begun', { detail: drawing.id });
     // Told what to draw before anything else, so what happens on the page waits behind it: the channel keeps it until the worker has the other end.
-    port.postMessage({ type: 'start', input });
+    // As its text: it crosses to the worker at once, where the answer as objects is copied piece by piece on the way in.
+    port.postMessage({ type: 'start', text: JSON.stringify(input) });
     if (view) port.postMessage({ type: 'viewport', view });
+    // A drawing the frame has loaded already is handed the picture's channel now, not once the page has done all it
+    // does for this edit: it lays out while the page goes on.
+    const box = sandbox?.frame.isConnected && sandbox.isReady && sandbox.loads.has(drawing.hash) ? sandbox : null;
+    if (box) box.frame.contentWindow.postMessage({ type: 'picture', hash: drawing.hash }, '*', [channel.port2]);
     code.then((modules) => {
       if (layouts.get(drawing.hash) !== modules || [...layouts.keys()].at(-1) !== drawing.hash) keepDrawing(drawing.hash, modules);
-      return loaded(drawing.hash, modules, ended ? undefined : channel.port2);
+      return loaded(drawing.hash, modules, ended || box ? undefined : channel.port2);
     }).then(
       () => {
         if (ended) return;
@@ -233,7 +213,7 @@ export function drawWith(host, answer, style, keep) {
     );
   };
   const toDrawing = (message) => !ended && (begin(), port.postMessage(message));
-  const end = () => ((ended = true), reshape?.disconnect(), host.moves?.stop(), surface?.end(), begun && port.postMessage({ type: 'end' }), port.close());
+  const end = () => ((ended = true), moving.clear(), reshape?.disconnect(), host.moves?.stop(), surface?.end(), begun && port.postMessage({ type: 'end' }), port.close());
   host.endDrawing = end;
   // What this host shows, while it shows it: what the picture is drawn from, and the marks it mounted (null until then).
   let showing = null;
@@ -258,6 +238,7 @@ export function drawWith(host, answer, style, keep) {
   const apply = (list) => {
     const all = Array.isArray(list) ? list : [];
     // The marks first, so the tip is placed off what they light.
+    touched(drawnSvg, all, keys);
     patch(all.filter((p) => !(p && 'tip' in p)), keys, tell, moving);
     for (const p of all.filter((p) => p && 'tip' in p)) p.tip ? tip.show(keys.get(String(p.tip.key)), build(p.tip.mark, keys, tell)) : tip.hide();
   };
@@ -282,6 +263,7 @@ export function drawWith(host, answer, style, keep) {
     try {
       // A scene already mounted from what was kept is the same scene: the worker's is for what comes after (hovering, lighting).
       if (said.type === 'scene' && given) return;
+      if (said.type === 'scene' && typeof said.text === 'string') said.scene = JSON.parse(said.text);
       if (said.type === 'scene') {
         const got = performance.now();
         mounted = true;
@@ -292,7 +274,7 @@ export function drawWith(host, answer, style, keep) {
         if (moving.size) requestAnimationFrame(run);
         keepScene(named.key, said.scene ?? {}, named.weight);
         if (!said.scene?.surface && !style.still) kept().keep(named.key, said.scene ?? {}, drawing.id, drawing.hash);
-        performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got) } });
+        performance.measure(`drawing ${drawing.id}`, { start: began, detail: { drawing: Math.round(said.took ?? 0), mount: Math.round(performance.now() - got), ...(host.inPlace && { inPlace: true }) } });
       }
       else if (said.type === 'patch' && !mounted) early.push(said.list);
       else if (said.type === 'patch') {
@@ -304,7 +286,7 @@ export function drawWith(host, answer, style, keep) {
       }
       else if (said.type === 'frame?') requestAnimationFrame((t) => !ended && port.postMessage({ type: 'frame', t }));
       else if (said.type === 'surface?') surface ? surface.give() : port.postMessage({ type: 'surface', none: true });
-      else if (said.type === 'surface-frame') surface?.paint(said.image, said.at);
+      else if (said.type === 'surface-frame') surface?.paint(said.image, said.at, said.tiles);
       else if (said.type === 'open' && /^e_[a-z0-9]{8}$/.test(said.id)) location.hash = `#/e/${said.id}`;
       // A change it asks for is put to the person, and sent as theirs (packs/walls/page/layout-asks.js); what came of it goes back.
       // What it made is not yet in the answer the canvas keeps, which follows only what it holds: the lens is read again.
@@ -390,8 +372,12 @@ export function drawWith(host, answer, style, keep) {
     // What a look hands on as marks (ui/look-marks.js): the scene the sandbox answered with, as it answered.
     host.scene = scene;
     adopt(id, scene.css);
+    // A picture drawn again over this drawing's last one here is patched where it stands, what it says alike kept (./marks-kept.js).
+    const stageWas = host.moves && host.dataset.drawing === id && !style.still && !scene.flat && !scene.before && !scene.aside && !scene.after && host.querySelector(':scope > .lf-stage');
     host.dataset.drawing = id;
-    const picture = build(scene.svg, keys, tell);
+    const svgWas = stageWas ? stageWas.querySelector(':scope > svg') : null, inPlace = Boolean(svgWas) && keptInto(svgWas, scene.svg, keys, tell);
+    const picture = (drawnSvg = inPlace ? svgWas : buildKept(scene.svg, keys, tell));
+    host.inPlace = inPlace;
     const legend = keyOf(scene, style, keys, tell);
     const bar = scene.bar ? build(scene.bar, keys, tell) : null;
     // What goes above the picture, beside it and below it (a rail of chapters, what was said), drawn and checked as the
@@ -425,9 +411,19 @@ export function drawWith(host, answer, style, keep) {
       return;
     }
     const { width, height } = scene.size ?? {};
+    const room = () => (!legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'));
+    const told = (now) => (begun ? toDrawing({ type: 'viewport', view: now }) : (view = now));
+    // Kept in place, the stage stays where the reader left it, with what changed on it put back: its surface, key and bar.
+    if (inPlace) {
+      // The paint before stays over the new surface until that paints: else it flickers away (surface.js heldOver).
+      for (const old of stageWas.querySelectorAll(':scope > .lf-surface, :scope > .lf-legend')) (old.matches('.lf-legend') || !surface ? old.remove() : surface.first.then(() => old.remove()));
+      stageWas.append(...[legend].filter(Boolean));
+      if (over) picture.after(over);
+      host.querySelector(':scope > .toolbar')?.remove();
+    }
     // The stage drawn before goes, and its observers with it.
-    host.moves?.stop();
-    host.moves = undefined;
+    else host.moves?.stop();
+    if (!inPlace) host.moves = undefined;
     // Read on a published page, a picture holds still: all of it in sight at the width it is given, its key open
     // above it, where it covers no part and no wire.
     if (style.still) {
@@ -438,10 +434,11 @@ export function drawWith(host, answer, style, keep) {
       return host.replaceChildren(...[before, legend, beside(h('div', { class: 'lf-stage still' }, picture, over)), after].filter(Boolean));
     }
     const lit = litSwitch(answer.viewer, style, keep, redraw);
-    const stage = h('div', { class: 'lf-stage' }, picture, over, legend);
-    host.replaceChildren(...[before, beside(stage), after].filter(Boolean));
+    const stage = inPlace ? stageWas : h('div', { class: 'lf-stage' }, picture, over, legend);
+    if (!inPlace) host.replaceChildren(...[before, beside(stage), after, heldOver(host, surface)].filter(Boolean));
     if (input.height > 0) followShape(scene);
-    const moves = (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: !legend || legend.hidden ? 0 : legend.offsetWidth + sizeOf(style, 'flow_legend_room'), style, beside: sheetAside, told: (now) => (begun ? toDrawing({ type: 'viewport', view: now }) : (view = now)) }));
+    const moves = inPlace ? host.moves : (host.moves = panZoom(stage, picture, { width, height, start: scene.start, aside: room(), style, beside: sheetAside, told }));
+    if (inPlace) moves.again({ width, height, start: scene.start, aside: room(), told });
     const zoom = h(
       'span',
       { class: 'switch' },
@@ -450,6 +447,8 @@ export function drawWith(host, answer, style, keep) {
       h('button', { title: 'Zoom in', onclick: () => moves.zoomBy(numberOf(style, 'zoom_step')) }, '+'),
     );
     host.prepend(h('div', { class: 'toolbar fold-bar' }, bar, h('span', { class: 'grow' }), lit, zoom));
+    // Whoever keeps where the reader looks hears that the picture under it is new (packs/surface/page/canvas.js).
+    if (inPlace) host.dispatchEvent(new CustomEvent('stage-kept', { bubbles: true }));
   }
 }
 

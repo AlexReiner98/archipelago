@@ -1,5 +1,5 @@
 // An island's declarations on the map (feature e_knepxwmn): its header shows a mark for its pack, then one for each
-// pack that pack requires (decision e_cy9dfsna), each its glyph or initial (decision e_e3ss8nqm), its tip the pack, its
+// pack that pack requires (decision e_cy9dfsna), each its name in quiet words (round 4 of e_unru8ftt), its tip the pack, its
 // state and why, and where the session may write a toggle the page answers (packs/walls/page/marks-toggle.js). An item
 // waiting on its pack is drawn faint at its cell, why in its tip (decision e_57bjxy2x).
 
@@ -41,8 +41,8 @@ const writer = ({ island = (_: string) => null, pack = (_: string) => false } = 
 test('the header shows the island pack, then what it requires, in order', () => {
   const svg = draw(answer).scene.svg, found = packsIn(svg);
   assert.deepEqual(found.map((m) => m[1].key), ['pk:e_buildisl:build', 'pk:e_buildisl:core', 'pk:e_buildisl:runs']);
-  assert.deepEqual(found.map((m) => texts(m).at(-1)), ['⚒', 'C', 'R'], 'its glyph, else its initial');
-  const xs = found.map((m) => Number(marks(m, (k) => k[0] === 'circle')[0][1].cx));
+  assert.deepEqual(found.map((m) => texts(m).at(-1)), ['Build', 'Core', 'Runs'], 'each its name, in quiet words');
+  const xs = found.map((m) => Number(marks(m, (k) => k[0] === 'text')[0][1].x));
   assert.ok(xs[0] < xs[1] && xs[1] < xs[2], 'in a row, the island pack first');
   const name = marks(svg, (m) => m[1]?.class === 'lf-island-name')[0], nameX = Number(marks(name, (k) => k[0] === 'text')[0][1].x);
   assert.ok(xs[0] > nameX, 'after the island name');
@@ -51,8 +51,8 @@ test('the header shows the island pack, then what it requires, in order', () => 
 test('the island frame is wide enough for its header', () => {
   const svg = draw(answer).scene.svg, found = packsIn(svg);
   const land = marks(svg, (m) => m[1]?.class === 'lf-land')[0], rect = marks(land, (k) => k[0] === 'rect')[0][1];
-  const last = marks(found.at(-1), (k) => k[0] === 'circle')[0][1];
-  assert.ok(Number(last.cx) + Number(last.r) <= Number(rect.x) + Number(rect.width), 'the last mark stands inside the frame');
+  const last = marks(found.at(-1), (k) => k[0] === 'rect')[0][1];
+  assert.ok(Number(last.x) + Number(last.width) <= Number(rect.x) + Number(rect.width), 'the last mark stands inside the frame');
 });
 
 test('each mark says its state as a class, its tip the pack, its state and why', () => {

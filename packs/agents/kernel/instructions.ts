@@ -8,6 +8,11 @@
 // preset's place; retired, it is not said. A pack's preset that replaces another (its prop `replaces`, a preset's id) is
 // said in that one's place when its pack is on, so core can word a rule in its own types and a pack in its richer ones.
 // Read each time, so a change is said to the next session.
+//
+// A kept one in trial (a reflex being tried, the reflex pack's) is said only where its for names the place exactly,
+// never by a glob or under file: alone, and marked as a trial. One that names a map action (action, with its input)
+// asks the agent to take it with its own tools: the instruction never acts. Each one said to a run is kept as said
+// there (the read said_here, the reflex_said pack's), so its record can say whether it stopped its miss.
 
 import type { KernelContext } from '#pelago/kernel';
 
@@ -28,6 +33,8 @@ export interface KeptInstruction {
   title: string;
   body: string | null;
   is_open: boolean;
+  /** Its status: trial for a reflex being tried. */
+  status?: string | null;
   props: Record<string, unknown>;
   about: string[];
 }
@@ -40,6 +47,8 @@ export interface Said {
   preset?: string;
   /** For one said for files: the globs it names. */
   files?: string[];
+  /** Said as a trial: a reflex being tried. */
+  trial?: true;
 }
 
 const listed = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
@@ -57,11 +66,19 @@ export const globNames = (glob: string, path: string) => new RegExp(`(^|/)${glob
 /** Whether what is said at `where` is said by these `for`s: the same place, or a file one of its globs names (any file, for file: alone). */
 const saidAt = (fors: string[], where: string) =>
   fors.includes(where) || (where.startsWith(FILE) && fors.some((f) => f.startsWith(FILE) && (where === FILE || globNames(f.slice(FILE.length), where.slice(FILE.length)))));
+/** Where a trial is said: only where one of its fors names the place exactly. */
+const trialAt = (fors: string[], where: string) => fors.includes(where);
+/** What a kept instruction's action asks the agent to do, as the line said after its words. */
+const actionLine = (props: Record<string, unknown>) =>
+  typeof props.action === 'string' && props.action.trim() ? `
+Take it with your own tools: ${props.action.trim()}${props.input !== undefined && props.input !== null ? ` ${JSON.stringify(props.input)}` : ''}.` : '';
+/** The mark a trial is said with. */
+export const TRIAL = 'Trial: ';
 const globsOf = (fors: string[]) => fors.filter((f) => f.startsWith(FILE)).map((f) => f.slice(FILE.length));
 
 /** What is said where (`for`), to a session about `about`: the presets under what the map keeps, in order. Pure: what is read is handed in. */
 export function said(presets: StyleDef[], kept: KeptInstruction[], where: string, about?: string): Said[] {
-  const named = new Map<string, { weight: number; at: number; id: string; title: string; open: boolean; text: string; props: Record<string, unknown>; preset?: string }>();
+  const named = new Map<string, { weight: number; at: number; id: string; title: string; open: boolean; text: string; props: Record<string, unknown>; preset?: string; trial?: boolean }>();
   presets.forEach((p, at) => {
     const key = typeof p.props.replaces === 'string' ? p.props.replaces : p.id;
     // A preset that replaces another takes its place; the one replaced, if it comes later, does not take it back.
@@ -74,24 +91,34 @@ export function said(presets: StyleDef[], kept: KeptInstruction[], where: string
     const key = [...named.entries()].find(([, n]) => n.preset === namedAs)?.[0] ?? namedAs;
     const under = named.get(key);
     const props = { ...under?.props, ...Object.fromEntries(Object.entries(one.props).filter(([, v]) => v != null)) };
-    named.set(key, { weight, at: under?.at ?? presets.length + i, id: one.id, title: one.title || under?.title || '', open: one.is_open, text: one.body?.trim() ? one.body : (under?.text ?? ''), props, ...(under?.preset && { preset: under.preset }) });
+    named.set(key, { weight, at: under?.at ?? presets.length + i, id: one.id, title: one.title || under?.title || '', open: one.is_open, text: one.body?.trim() ? one.body : (under?.text ?? ''), props, ...(under?.preset && { preset: under.preset }), ...(one.status === 'trial' && { trial: true }) });
   }
   const order = (props: Record<string, unknown>) => (typeof props.order === 'number' ? props.order : Infinity);
   return [...named.values()]
-    .filter((one) => one.open && one.text.trim() && saidAt(listed(one.props.for), where))
+    .filter((one) => one.open && one.text.trim() && (one.trial ? trialAt : saidAt)(listed(one.props.for), where))
     .sort((a, b) => order(a.props) - order(b.props) || a.at - b.at)
-    .map(({ id, title, text, preset, props }) => ({ id, title, text, ...(preset && { preset }), ...(where.startsWith(FILE) && { files: globsOf(listed(props.for)) }) }));
+    .map(({ id, title, text, preset, props, trial }) => ({
+      id,
+      title: trial ? `${TRIAL}${title}` : title,
+      text: `${text}${actionLine(props)}`,
+      ...(preset && { preset }),
+      ...(trial && { trial: true }),
+      ...(where.startsWith(FILE) && { files: globsOf(listed(props.for)) }),
+    }));
 }
 
 /** A name in braces filled in from `fill`; one it does not have is left as it is. */
 export const filled = (text: string, fill: Record<string, string>) => text.replace(/\{([a-z_]+)\}/g, (all, name: string) => fill[name] ?? all);
 
 /** What agents are told where (`for`), to a session about `about`, with the names in braces filled in; on an island, the presets of the version of its pack it runs (packs/loader/kernel/island-pin.ts). */
-export async function instructionsFor(ctx: KernelContext, where: string, input: { about?: string; island?: string; fill?: Record<string, string> } = {}): Promise<Said[]> {
+export async function instructionsFor(ctx: KernelContext, where: string, input: { about?: string; island?: string; fill?: Record<string, string>; run?: string } = {}): Promise<Said[]> {
   // The presets (of the island's version of each pack, on an island) and every instruction kept, open or retired, with what each is about.
   const { presets, kept } = (await ctx.reads({ told_from: { ...(input.island !== undefined && { island: input.island }) } })) as { presets: StyleDef[]; kept: KeptInstruction[] };
   const told = said(presets, kept, where, input.about);
   // Each one said is counted as a use of it (packs/usage/kernel/uses.ts).
   if (told.length) await ctx.reads({ told: told.map((one) => one.preset ?? one.id) });
+  // Said to a run, each is kept as said there, by the pack that keeps the record; where none does, it is not.
+  const run = input.run ?? input.fill?.run;
+  if (told.length && run) await ctx.reads({ said_here: { ids: told.map((one) => one.preset ?? one.id), run, where } }).catch((err: Error) => ctx.said?.(`keeping what was said to ${run} failed: ${err.message}`));
   return told.map((one) => ({ ...one, text: filled(one.text, input.fill ?? {}) }));
 }

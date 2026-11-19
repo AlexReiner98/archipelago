@@ -8,6 +8,7 @@ import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { unmoved } from '../../marks-moved.ts';
 import { pathToFileURL } from 'node:url';
 
 const root = join(import.meta.dirname, '..', '..');
@@ -39,7 +40,8 @@ const answer = {
   links: [],
 };
 const writer = ({ island = (_: string) => null, pack = (_: string) => false } = {}) => ({ on: (key: string) => (island(key) ? ['add'] : pack(key) ? ['toggle'] : []), hear: () => false });
-const draw = (a: any, gestures?: any) => picture({ answer: a, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, ...(gestures && { gestures }) });
+// Read where the marks stand on the picture: each island is drawn about its own corner, in a group moved there.
+const draw = (a: any, gestures?: any) => ((p) => ({ ...p, scene: { ...p.scene, svg: unmoved(p.scene.svg) } }))(picture({ answer: a, style: house, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, ...(gestures && { gestures }) }));
 
 const marks = (mark: any, hold: (m: any) => boolean): any[] => {
   if (!Array.isArray(mark)) return [];
@@ -57,7 +59,8 @@ const opened = (a: any, ...packs: string[]) => {
 };
 /** A parts island's rows, by the part each names. */
 const ghostRows = (svg: any) => new Map(keyed(keyed(svg, 'gh:')[0] ?? [], 'pt:').map((m) => [m[1].key.split(':')[2], m]));
-const xOf = (m: any) => Number(marks(m, (k) => k[0] === 'circle')[0][1].cx);
+const xOf = (m: any) => Number(marks(m, (k) => k[0] === 'text')[0][1].x);
+const yOf = (m: any) => Number(marks(m, (k) => k[0] === 'text')[0][1].y);
 /** The land of an island, by its region's key: its first rect. */
 const landOf = (svg: any, id: string) => marks(keyed(svg, `i:${id}`)[0], (k) => k[0] === 'rect')[0]?.[1];
 
@@ -73,7 +76,8 @@ test("a pack with parts asks the page to add its term to the canvas query, and n
 test("the answer's parts island is placed by the layout as an island of its own: what is written left, what acts right", () => {
   const svg = draw(opened(answer, 'build'), writer).scene.svg;
   assert.equal(keyed(svg, 'gh:').length, 1, 'one parts island');
-  assert.equal(keyed(svg, 'pw:')[0][1].key, 'pw:e_buildisl:build', 'the whole pack\'s switch beside its mark, open');
+  assert.equal(keyed(svg, 'pw:')[0][1].key, 'pw:e_buildisl:build', 'the whole pack\'s switch, on its parts island');
+  assert.equal(keyed(keyed(svg, 'i:e_buildisl')[0], 'pw:').length, 0, 'not in the header: the header names packs in words alone');
   assert.match(keyed(svg, 'pk:e_buildisl:build')[0][1].class, /\bopen\b/);
   assert.match(texts(keyed(svg, 'pk:e_buildisl:build')[0]).join('\n'), /Click to close its parts/);
   const rows = ghostRows(svg);
@@ -82,7 +86,7 @@ test("the answer's parts island is placed by the layout as an island of its own:
   // Laid out as an island: its parts do not lie on the island it is of.
   const land = landOf(svg, 'e_buildisl'), x0 = Number(land.x), x1 = x0 + Number(land.width), y0 = Number(land.y), y1 = y0 + Number(land.height);
   for (const m of rows.values()) {
-    const [x, y] = [xOf(m), Number(marks(m, (k) => k[0] === 'circle')[0][1].cy)];
+    const [x, y] = [xOf(m), yOf(m)];
     assert.ok(!(x >= x0 && x <= x1 && y >= y0 && y <= y1), `${m[1].key} stands off the island's land`);
   }
   assert.equal(keyed(svg, 'i:parts:e_buildisl:build').length, 1, 'it is an island of the drawing');
@@ -98,7 +102,7 @@ test('a wire runs from each part that acts to each type it names, each in its ow
   const wire = wires.find((w: any) => /\bst-waiting\b/.test(w[1].class));
   assert.ok(wire, "a waiting rule's wire is drawn waiting");
   const rows = ghostRows(svg), gate = rows.get('build.gate');
-  assert.equal(Number(/^M(-?[\d.]+) (-?[\d.]+)/.exec(String(wire[1].d))![2]), Number(marks(gate, (k) => k[0] === 'circle')[0][1].cy), 'from the row that acts');
+  assert.equal(Number(/^M(-?[\d.]+) (-?[\d.]+)/.exec(String(wire[1].d))![2]), yOf(gate), 'from the row that acts');
 });
 
 test('two packs open are two parts islands', () => {
@@ -126,13 +130,19 @@ test("a reader sees a pack's parts but switches nothing", () => {
   for (const m of [...keyed(svg, 'pw:'), ...rows]) assert.ok(!m[1].on.includes('toggle') && m[1].pack === undefined, `${m[1].key} is no button`);
 });
 
-test("off a part is dashed, waiting faded and dashed, in its state's colour, each with its kind's glyph", () => {
-  const p = draw(opened(answer, 'build')), by = ghostRows(p.scene.svg);
+test("a parts island reads as an island: its land, its name bold, its kinds quiet, each part its id; off crossed out, waiting faded", () => {
+  const p = draw(opened(answer, 'build'), writer), by = ghostRows(p.scene.svg), isle = keyed(p.scene.svg, 'i:parts:e_buildisl:build')[0];
   assert.match(by.get('build.lane')[1].class, /\bst-off\b/);
   assert.match(by.get('build.gate')[1].class, /\bst-waiting\b/);
-  const glyph = (m: any) => texts(marks(m, (k) => k[0] === 'text')[0]).join('');
-  for (const [id, m] of by) assert.equal(glyph(m), house.pack_marks.kinds[parts.find((x) => x.id === id)!.kind]);
+  for (const [id, m] of by) assert.deepEqual(marks(m, (k) => k[0] === 'text').flatMap(texts), [id], 'a part is its id, in words: no glyph');
+  assert.equal(marks(isle, (k) => k[0] === 'circle').length, 0, 'no rings');
+  assert.ok(marks(isle, (k) => /\blf-land\b/.test(k[1]?.class ?? '')).length && marks(isle, (k) => /\blf-shore\b/.test(k[1]?.class ?? '')).length, 'land and a shore, as any island');
+  assert.equal(isle[1].class, keyed(p.scene.svg, 'i:e_buildisl')[0][1].class, 'in the colour of the island it is of');
+  assert.deepEqual(texts(marks(isle, (k) => k[1]?.class === 'lf-parts-name')[0]), ['Build'], 'named by its pack, bold');
+  assert.deepEqual(marks(keyed(isle, 'pw:')[0], (k) => k[0] === 'text').flatMap(texts), ['On here'], 'its switch in words');
+  assert.deepEqual(marks(isle, (k) => k[1]?.class === 'lf-part-kind').flatMap(texts), ['Types', 'Link types', 'Rules', 'Views'], 'each kind named over its parts');
   const css = p.scene.css;
+  assert.ok(css.includes('.lf-part-row.st-off text.lf-part-name { text-decoration: line-through; }'), 'off: crossed out, as an off pack\'s name');
   assert.ok(css.includes('.lf-part.st-waiting { opacity: var(--ln-flow-waiting); }'), 'waiting: faded, as a waiting step');
   for (const state of ['active', 'waiting', 'off']) assert.ok(css.includes(`.lf-part.st-${state} { --lf-pack: var(--ln-${house.pack_marks[state].hue}); }`), `the ${state} colour comes from the style`);
 });
@@ -176,18 +186,39 @@ test('a pack the answer names no parts of is its own switch, as before; the kern
   assert.equal(keyed(p.scene.svg, 'pw:').length, 0, 'and no row to open');
 });
 
-test('the open row is counted in how wide the header stands', () => {
-  const z = (n: string) => house.sizes[`flow_${n}`];
-  assert.ok(packsWidth(answer.islands[0].pack, z, null, measure, new Set(['build'])) > packsWidth(answer.islands[0].pack, z, null, measure));
-  assert.equal(packsWidth(answer.islands[0].pack, z, null, measure, new Set(['nothing'])), packsWidth(answer.islands[0].pack, z, null, measure));
+test('the header stands as wide open as shut: what opens is an island of its own', () => {
+  const head = (a: any) => marks(keyed(draw(a, writer).scene.svg, 'ph:e_buildisl')[0], (k) => k[0] === 'rect' || k[0] === 'text').length;
+  assert.equal(head(opened(answer, 'build')), head(answer));
+  assert.ok(packsWidth(answer.islands[0].pack, (n: string) => house.sizes[`flow_${n}`], null, measure) > 0);
 });
 
 test('a parts island is shelved right after the island it is of, before any other', () => {
   const two = { ...answer, islands: [...answer.islands, { id: 'e_aaneighb', title: 'Neighbour' }], items: [{ ...item('e_aan1zzzz', 'Neighbour one'), island: 'e_aaneighb' }, ...answer.items] };
   const svg = draw(opened(two, 'build'), writer).scene.svg;
-  const ghost = marks(keyed(svg, 'gh:')[0], (k) => k[1]?.class === 'lf-ghost')[0][1], own = landOf(svg, 'e_buildisl'), other = landOf(svg, 'e_aaneighb');
+  const ghost = landOf(svg, 'parts:e_buildisl:build'), own = landOf(svg, 'e_buildisl'), other = landOf(svg, 'e_aaneighb');
   const at = (r: any) => [Number(r.x), Number(r.y)];
   const [gx, gy] = at(ghost), [ox, oy] = at(own), [nx, ny] = at(other);
   assert.ok(gy > oy || gx > ox, 'after its own island');
   assert.ok(gy < ny || (gy === ny && gx < nx) || ny < oy || (ny === oy && nx < ox), 'and before the neighbour that comes after its own');
+});
+
+test('in a view whose islands stand at corners, a parts island stands beside its own and moves what it would lie on', () => {
+  // Islands at corners (or with looks of their own) are laid out by ../map/placed.js, which once put a parts island after
+  // every other, out of sight (e_m5x8pmwu).
+  const two = { ...answer, islands: [...answer.islands, { id: 'e_aaneighb', title: 'Neighbour' }], items: [{ ...item('e_aan1zzzz', 'Neighbour one'), island: 'e_aaneighb' }, ...answer.items] };
+  const placed = (corners: any) => unmoved(picture({ answer: opened(two, 'build'), style: { ...house, placed: corners }, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {}, gestures: writer }).scene.svg);
+  const box = (r: any) => [Number(r.x), Number(r.y), Number(r.x) + Number(r.width), Number(r.y) + Number(r.height)];
+  const meets = (a: number[], b: number[]) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+  for (const corners of [{ e_buildisl: [0, 0], e_aaneighb: [3, 0] }, { e_buildisl: [0, 0], e_aaneighb: [1, 1] }, { e_buildisl: [0, 0] }]) {
+    const svg = placed(corners), ghost = box(landOf(svg, 'parts:e_buildisl:build')), own = box(landOf(svg, 'e_buildisl')), other = box(landOf(svg, 'e_aaneighb'));
+    assert.ok(ghost[0] > own[2] && ghost[1] === own[1], `beside its own island, at its top (${JSON.stringify(corners)})`);
+    assert.ok(!meets(ghost, other), `on no other island (${JSON.stringify(corners)}: ${JSON.stringify({ ghost, own, other })})`);
+  }
+});
+
+test("a pack's mark that opens its parts names their island as what to bring into sight", () => {
+  const closed = keyed(draw(answer, writer).scene.svg, 'pk:e_buildisl:build')[0][1], open = keyed(draw(opened(answer, 'build'), writer).scene.svg, 'pk:e_buildisl:build')[0][1];
+  assert.equal(closed.shows, 'gh:e_buildisl:build');
+  assert.equal(open.shows, undefined, 'closing brings nothing into sight');
+  assert.equal(keyed(draw(opened(answer, 'build'), writer).scene.svg, 'gh:e_buildisl:build').length, 1, 'the key it names');
 });

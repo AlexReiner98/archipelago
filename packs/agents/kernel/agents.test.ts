@@ -30,7 +30,8 @@ test("what is said where, the owner's version over the preset, each counted once
   }, asked);
   const said = await instructionsFor(ctx, 'session_start', { fill: { run: 'r1' } });
   assert.deepEqual(said.map((s) => [s.id, s.text, s.preset]), [['i1', 'Run r1 here.', 'core.start']]);
-  assert.deepEqual(asked.at(-1), { told: ['core.start'] });
+  // Counted once as a use, then kept as said to the run where it was said (the reflex_said pack's record).
+  assert.deepEqual(asked.slice(-2), [{ told: ['core.start'] }, { said_here: { ids: ['core.start'], run: 'r1', where: 'session_start' } }]);
 });
 
 test('a launch is a person\'s, and its brief is the brief view\'s', async () => {

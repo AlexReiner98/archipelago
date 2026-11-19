@@ -45,7 +45,7 @@ export type KernelRead = {
   /** The items of some kinds across the map a lens of the whole map reads (packs/surface/kernel/region.ts, scanKinds). */
   kinds?: { types: string[]; fold: string[]; by: string; over: string[] | null };
   /** What agents are told where (`file:`...), to a session about an item (packs/agents/kernel/instructions.ts). */
-  instructions?: { where: string; about?: string };
+  instructions?: { where: string; about?: string; run?: string };
   /** The workspace's owner, as its setting names them. */
   owner?: boolean;
   /** The open items a person owns, not archived; also: the open items of these types that nobody owns. */
@@ -62,6 +62,18 @@ export type KernelRead = {
   told_from?: { island?: string };
   /** Count each of these instructions (a preset's id, or a kept one's) as said once (packs/usage/kernel/uses.ts): answered true. */
   told?: string[];
+  /** Keep these instructions as said to a run at a place (the reflex_said pack's stream): answered true. */
+  said_here?: { ids: string[]; run: string; where: string };
+  /** How often each of some instructions was said, and whether its miss came back after (the reflex_said pack's record). */
+  said_record?: { ids: string[]; days?: number };
+  /** Every miss lately, with where it happened and what covers it (the reflex_said pack's). */
+  misses?: { days?: number };
+  /** How many refusals in a run no node covers came since a node was last asked for there (the reflex_said pack's). */
+  missed_here?: { run: string };
+  /** The tree's story over a window: its nodes (instructions and rules), misses, sayings and rules' firings (the reflex_said pack's). */
+  said_story?: { ids?: string[]; days?: number };
+  /** Every rule in force, where it applies and each time it fired lately (the reflex_said pack's). */
+  said_rules?: { days?: number };
   /** The owner's versions of presets, open or retired: of the packs' style presets, or of their drawings (layout). */
   versions?: 'style' | 'layout';
   /** Every style or layout (of these types) kept on the map, with what each is about; and one named outright, retired or not. */
@@ -221,13 +233,19 @@ async function lookRead(l: Archipelago, q: KernelRead, pack?: string): Promise<u
     const island = q.told_from.island;
     const presets = presetsOf((await islandRegistry(l, island)).packs, 'instruction');
     const { rows } = await l.db.query<{ id: string }>(
-      `select id, title, body, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by updated_at, id -- index entity_type_created`,
+      `select id, title, body, is_open, status, ${l.props} from entity where type = any($1::text[]) and archived_at is null order by updated_at, id -- index entity_type_created`,
       [l.registry.family('instruction')],
     );
     const links = await aboutOf(l, rows.map((r) => r.id));
     return { presets, kept: rows.map((r) => ({ ...r, about: links.filter((link) => link.from_id === r.id).map((link) => link.to_id) })) };
   }
   if (q.told !== undefined) return filled(l, 'told', q, pack);
+  if (q.said_here !== undefined) return filled(l, 'said_here', q, pack);
+  if (q.said_record !== undefined) return filled(l, 'said_record', q, pack);
+  if (q.misses !== undefined) return filled(l, 'misses', q, pack);
+  if (q.missed_here !== undefined) return filled(l, 'missed_here', q, pack);
+  if (q.said_story !== undefined) return filled(l, 'said_story', q, pack);
+  if (q.said_rules !== undefined) return filled(l, 'said_rules', q, pack);
   if (q.versions !== undefined) {
     const { rows } = await l.db.query(`select id, title, is_open, ${l.props} from entity where type = any($1::text[]) and archived_at is null and props ->> 'preset' is not null order by updated_at, id`, [l.registry.family(q.versions === 'layout' ? 'layout' : 'style')]);
     return rows;

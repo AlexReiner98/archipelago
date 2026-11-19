@@ -55,13 +55,20 @@ export function model({ items: asked, links: linked = [], undrawn = [], headless
   const toActor = (l) => actor.has(l.to) && !actor.has(l.from);
   const chains = edges.map((e) => ({ ...e, dashed: potential.has(e.b) }));
   const ties = links.filter((l) => l.type !== ORDER).map((l) => ({ ...(toActor(l) ? { a: l.to, b: l.from, flipped: true } : { a: l.from, b: l.to }), type: l.type, ...(l.pending && { pending: l.pending }) }));
-  const ways = directions(chains, ties, headless);
-  const made = (id) => nodes.get(id).made;
-  const near = new Map([...nodes.keys()].map((id) => [id, new Set()]));
-  for (const w of [...chains, ...ties]) if (near.has(w.a) && near.has(w.b)) (near.get(w.a).add(w.b), near.get(w.b).add(w.a));
-  const order = sorted([...nodes.keys()], ways, made, near), rank = new Map(order.map((id, k) => [id, k]));
+  // The order is worked out when it is first read: a layout that places by cell (the map) never reads it, and it is
+  // most of what the graph costs on a large map.
+  let laid = null;
+  const ordered = () => {
+    if (laid) return laid;
+    const ways = directions(chains, ties, headless);
+    const made = (id) => nodes.get(id).made;
+    const near = new Map([...nodes.keys()].map((id) => [id, new Set()]));
+    for (const w of [...chains, ...ties]) if (near.has(w.a) && near.has(w.b)) (near.get(w.a).add(w.b), near.get(w.b).add(w.a));
+    const order = sorted([...nodes.keys()], ways, made, near);
+    return (laid = { order, rank: new Map(order.map((id, k) => [id, k])) });
+  };
   // Which end should stand over: the depended on, a headed link's tail, what holds what a headless link ties to it.
   const upper = (w) => (w.type && headless.includes(w.type) ? w.b : w.a);
-  const against = (w) => rank.get(upper(w)) > rank.get(upper(w) === w.a ? w.b : w.a);
-  return { nodes, chains, ties, potential, order, rank, against };
+  const against = (w) => ordered().rank.get(upper(w)) > ordered().rank.get(upper(w) === w.a ? w.b : w.a);
+  return { nodes, chains, ties, potential, get order() { return ordered().order; }, get rank() { return ordered().rank; }, against };
 }

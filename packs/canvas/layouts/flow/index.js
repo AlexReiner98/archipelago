@@ -31,7 +31,7 @@ import { holdersOf } from './waymark.js';
 import { wireNames, wireRules } from './wire-names.js';
 import { boardKeyRows, glyphOf, grammar, itemMarks, itemRules, statusOf, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
-import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
+import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks, partsSize } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { cornersOf, grouped, localIslands, localTo, moveTo } from './isle-local.js';
 import { compose, islandModels, islandsOf } from './archipelago.js';
 import { addClass, HEX, m, titled } from './marks.js';
 import { looks as kept } from './island-looks.js';
@@ -265,17 +265,17 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const boardKey = (p) => (look.board ? boardKeyRows(look.board, { types: boardOn(p), m, outline, w: KW, h: KH, margin: z('key_margin'), shapes: record(style.type_shapes), words: TYPE_WORDS, statusWords: STATUS_WORDS }) : null);
   const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(look.board ? boardKey(p) : looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...swatches.rows, ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
-  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text')) + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px), openParts(answer, id)); // an open pack's switch is counted
+  const nameWidth = (id) => z('island_name_x') + measure(nameOf((answer.islands ?? []).find((i) => i.id === id)), z('island_text'), 'name') + packsWidth(packOf(id), z, capOf(id), (t, px) => measure(t, px));
   // What a link across names takes room at sea like a box: as wide as its words, cut to what the style lets it take.
-  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map((row) => ({ w: entryWidth(row), group: row.group ?? null }))])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, numbers: style.numbers ?? {}, effort, rooms: partsRoom(answer, (pack) => ghostSize(pack, z, (t, px) => measure(t, px))), follows: new Map(partsIslands(answer).map((p) => [p.id, p.of])) });
+  if (parts) g = compose(parts, { legends: new Map([...legends].map(([id, rows]) => [id, rows.map((row) => ({ w: entryWidth(row), group: row.group ?? null }))])), names: new Map([...legends.keys()].map((id) => [id, nameWidth(id)])), sizes: style.sizes, numbers: style.numbers ?? {}, effort, rooms: partsRoom(answer, (pack) => partsSize(pack, z, (t, px, role) => measure(t, px, role))), follows: new Map(partsIslands(answer).map((p) => [p.id, p.of])) });
   // Islands whose look paints (./painted.js): their items and the links among them painted by it; the map marks each item, and ends the wires from other islands, where the look hands its place.
   const canvases = (g.islands ?? []).filter((i) => i.canvas), inPainted = new Set(answer.items.filter((i) => canvases.some((c) => c.id === i.island)).map((i) => i.id)), unplaced = (w) => (inPainted.has(w.a) || inPainted.has(w.b) ? ' unplaced' : '');
   g = shoreOnly(g, (id) => g.nodes.get(id)?.item?.island, inPainted);
   g = { ...g, all: g.all.filter((n) => !n.item?.ghost) }; // a parts island's placeholder (./parts-islands.js) is never drawn
-  const steps = g.all.filter((n) => !n.dummy);
+  const steps = g.all.filter((n) => !n.dummy), corners = cornersOf(g), local = localTo(corners); // each island drawn about its own corner (./isle-local.js)
   if (!steps.length && !canvases.length) return { scene: { message: 'Nothing here yet.' } };
   const size = { width: g.width, height: g.height };
-  const painting = canvases.length ? paintIslands({ tools, placed: placer({ g, painted: inPainted, gap: z('session_gap'), draw: line, heads, order: ORDER_TYPE, over: style.numbers?.motion_move }), islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, hue: islandHue(style, (h) => HEX.test(String(h)), g.islands.findIndex((i) => i.id === c.id)), tint: parseFloat(style.sizes?.flow_island_tint) / 100, ground: parseFloat(style.sizes?.flow_island_ground) / 100, answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
+  const painting = canvases.length ? paintIslands({ tools, room: { most: style.numbers?.plane_tile_pixels, side: style.numbers?.plane_tile_side, margin: style.numbers?.plane_tile_margin }, placed: placer({ g, painted: inPainted, gap: z('session_gap'), draw: line, heads, order: ORDER_TYPE, over: style.numbers?.motion_move }), islands: canvases.map((c) => ((own) => ({ id: c.id, at: c.canvas.at, size: c.canvas.size, look: looks.get(c.id).look, hue: islandHue(style, (h) => HEX.test(String(h)), g.islands.findIndex((i) => i.id === c.id)), tint: parseFloat(style.sizes?.flow_island_tint) / 100, ground: parseFloat(style.sizes?.flow_island_ground) / 100, answer: { items: answer.items.filter((i) => own.has(i.id)), links: (answer.links ?? []).filter((l) => own.has(l.from) && own.has(l.to)), islands: shown.filter((i) => i.id === c.id) } }))(new Set(answer.items.filter((i) => i.island === c.id).map((i) => i.id)))) }) : null;
 
   // A read that ends on a finding's name has no head there: the wire from the name to the finding carries it.
   const tieHeads = g.ties.map((t) => heads(t, t.type)), chainHeads = g.chains.map((c) => heads(c, ORDER_TYPE));
@@ -294,8 +294,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // step hovered lights its way all the way to what it shares and not the other branches of the trunk.
   const C = g.chains.length, wired = [...g.chains, ...g.ties], carry = story ? wired.map(() => []) : carried(wired);
   // Each wire's link name, riding on its longest run and giving way where it is in the way (./wire-names.js); its words also in the wire's tooltip.
-  const corners = (n) => ((x, y) => [[x - n.w / 2, y - n.h / 2], [x + n.w / 2, y - n.h / 2], [x + n.w / 2, y + n.h / 2], [x - n.w / 2, y + n.h / 2]])(g.x.get(n.id), g.y.get(n.id));
-  const wn = story ? null : wireNames({ style, wired, C, boxes: steps.map(corners), ends: (j) => [wired[j].a, wired[j].b].map((id) => steps.find((n) => n.id === id)).filter(Boolean).map(corners), size, z, measure: (t, px) => measure(t, px), m, order: ORDER_TYPE });
+  const boardBox = (n) => ((x, y) => [[x - n.w / 2, y - n.h / 2], [x + n.w / 2, y - n.h / 2], [x + n.w / 2, y + n.h / 2], [x - n.w / 2, y + n.h / 2]])(g.x.get(n.id), g.y.get(n.id));
+  const wn = story ? null : wireNames({ style, wired, C, boxes: steps.map(boardBox), ends: (j) => [wired[j].a, wired[j].b].map((id) => steps.find((n) => n.id === id)).filter(Boolean).map(boardBox), size, z, measure: (t, px) => measure(t, px), m, order: ORDER_TYPE });
   if (wn) wired.forEach((w, j) => ((own) => (Array.isArray(own[0]) ? own[0] : own).splice(2, 0, m('title', {}, wn.text(j))))(j < C ? wireLayer[j] : tieLayer[j - C]));
   const keysOf = (j) => (j < C ? { line: `w:${j}`, head: `h:${j}`, on: `wx:${j}` } : { line: `n:${j - C}`, head: `nh:${j - C}`, on: `nx:${j - C}` });
   const trunkLayer = wired.flatMap((w, j) => (carry[j].length ? [m('path', {
@@ -309,9 +309,9 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const linkBadges = wiresIn(g).map((l, n) => [l, n]).filter(([l]) => held(l.pending) && !madeBy(l.a, l.pending) && !madeBy(l.b, l.pending)).map(([l, n]) => ({ n, mark: badge(l.pending, middleOf(l.points)) }));
   /** A step's dot where it is drawn: of its own phase, or of the phase a story's step gives it then. */
   const dotPlace = (n) => {
-    const X = g.x.get(n.id), point = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? n.bevel : 0;
+    const [X, Y] = local(n.item?.island, [g.x.get(n.id), g.y.get(n.id)]), point = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? n.bevel : 0;
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
-    return [left - z('dot_gap'), g.y.get(n.id)];
+    return [left - z('dot_gap'), Y];
   };
   const dotAt = (n, phase = stateOf(n.item).phase) => look.dot && dot(dotClass(n.item, phase), markOf(phase, n.item.island), ...dotPlace(n), z('dot'));
   const sessionDot = (n) => marked(n.item) && stateMark(m, sessionOf(n.item).state, marked(n.item), ...dotPlace(n), z('dot'));
@@ -336,12 +336,12 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // The packs (parts) this island turned off, as the answer's island says (packs_off, parts_off), else its item where the answer holds it.
   const offOn = (id, f = 'packs_off') => ((v) => (Array.isArray(v) ? v : []))(answer.islands?.find((i) => i.id === id)?.[f] ?? answer.items.find((i) => i.id === id)?.fields?.[f]);
   // A parts island draws its pack's parts from its land's top left (./parts-islands.js, ./pack-marks.js partsIslandMarks).
-  const headAt = new Map(), header = (id, [x, y], title, open = null, frame) => (headAt.set(id, [[x, y], title, open, frame]), isParts(id) ? ((g) => g && partsIslandMarks({ of: g.of, pack: g.pack, partsOff: offOn(g.of, 'parts_off'), at: [frame.left, frame.top], style, z, m, titled, on: gestures.on, measure: (t, px) => measure(t, px) }))(partsIslands(answer).find((p) => p.id === id)) : packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), partsOff: offOn(id, 'parts_off'), open: open ?? openParts(answer, id), style, at: [x + measure(title, z('island_text')) + z('island_pack_gap'), y], frame, z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) }));
-  const isles = islandMarks({ g, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header, part: (id, part) => packOf(id) && partInKey({ island: id, pack: packOf(id), id: part, partsOff: offOn(id, 'parts_off'), on: gestures.on }) });
+  const headAt = new Map(), header = (id, [x, y], title, open = null, frame) => (headAt.set(id, [[x, y], title, open, frame]), isParts(id) ? ((g) => g && partsIslandMarks({ of: g.of, pack: g.pack, off: offOn(g.of), partsOff: offOn(g.of, 'parts_off'), at: [frame.left, frame.top], z, m, titled, on: gestures.on, measure: (t, px, role) => measure(t, px, role) }))(partsIslands(answer).find((p) => p.id === id)) : packOf(id) && packMarks({ island: id, pack: packOf(id), off: offOn(id), partsOff: offOn(id, 'parts_off'), open: open ?? openParts(answer, id), style, at: [x + measure(title, z('island_text'), 'name') + z('island_pack_gap'), y], frame, z, m, titled, on: gestures.on, cap: capOf(id), measure: (t, px) => measure(t, px) }));
+  const isles = ((made) => (made.layer.forEach((mk) => corners.has(String(mk[1]?.key).slice(2)) && (mk[1].transform = moveTo(corners.get(String(mk[1].key).slice(2))))), made))(islandMarks({ g: { ...g, islands: localIslands(g, corners) }, legends, islands: answer.islands, style, z, m, titled, isHex: (h) => HEX.test(String(h)), header, part: (id, part) => packOf(id) && partInKey({ island: id, pack: packOf(id), id: part, partsOff: offOn(id, 'parts_off'), on: gestures.on }) }));
   const lands = landMarks({ style, g, islands: g.islands, size: { width: g.width, height: g.height }, z, m, isHex: (h) => HEX.test(String(h)) }), snap = (y) => (lands.grammar.snap ? Math.round(y / lands.grammar.row) * lands.grammar.row : y);
   const drawnBy = new Map((g.islands ?? []).flatMap((isle) => [...(isle.look?.items ?? [])]));
   const stepLayer = steps.map((n) => {
-    const X = g.x.get(n.id), Y = snap(g.y.get(n.id)), i = n.item;
+    const [X, Y] = local(n.item?.island, [g.x.get(n.id), snap(g.y.get(n.id))]), i = n.item, [ox, oy] = corners.get(i?.island) ?? [0, 0];
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
     const point = /^(hexagon|lozenge|ticket|forward|roundstart)$/.test(n.shape) ? n.bevel : 0, ends = /^(hexagon|lozenge|ticket|forward)$/.test(n.shape) ? 2 * n.bevel : /^(flag|tallarrow|swallow|pennant|roundend|roundstart)$/.test(n.shape) ? n.bevel : 0;
     // No dot before the name (the style says its state on the shape): the room it had is shared, the name set in the middle.
@@ -375,7 +375,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     keyed.set(key, i.id);
     if (n.stub) return titled(m('g', { key, on: ['enter', 'leave'], class: cls, ...hidden }, body), `${i.title}\nA choice nothing follows yet`);
     // Held for the owner: a new item is a faint step that opens its change; an edit is marked on its step, with a badge on its corner. A run asking you to decide one (./session.js, askedOf) is where it is decided: its click puts it to you (packs/write/page/canvas-wires.js).
-    if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + n.w / 2, Y - n.h / 2]));
+    if (held(i.pending)) stepBadges.set(n.id, badge(i.pending, [X + ox + n.w / 2, Y + oy - n.h / 2]));
     if (!inPainted.has(n.id)) tipped.add(key); // one a look paints says what it is in its look's own tip (./painted.js)
     const decides = ghost ? i.pending.proposal : i.asks, step = m(decides ? 'g' : 'a', { key, on: ['enter', 'leave'], ...(!decides && { href: `#/e/${i.id}` }), class: cls, ...hidden }, body);
     if (!ghost) dims.set(n.id, step);
@@ -395,7 +395,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const text = saysText(c), w = saysWide(c), [lx, ly] = saysAt(g, c), sh = z('says_height');
     return titled(m('g', { key: `t:${g.chains.indexOf(c)}`, class: 'lf-says', ...hidden }, m('rect', { x: lx - w / 2, y: ly - sh / 2, width: w, height: sh, rx: sh / 2 }), m('text', { x: lx, y: ly }, text)), c.says);
   });
-  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, lands.sea, lands.land, isles.layer, tieLayer, wireLayer, trunkLayer, wn?.hits(line), stepLayer, saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark), wn?.layer);
+  const svg = m('svg', { key: 'flow', viewBox: `0 0 ${size.width} ${size.height}`, role: 'img', 'aria-label': `A graph of ${steps.length} steps` }, lands.sea, lands.land, isles.layer, tieLayer, wireLayer, trunkLayer, wn?.hits(line), grouped(steps, stepLayer, corners, m), saysLayer, isles.gates, [...stepBadges.values()], linkBadges.map((b) => b.mark), wn?.layer);
   // The picture's key; on an archipelago none, each island carrying its own.
   const key = [
     ...(parts ? [] : keyRows({ st: steps, chains: g.chains, ties: g.ties, breaks: g.breaks.length > 0, heldHere: stepBadges.size > 0 || linkBadges.length > 0 })),

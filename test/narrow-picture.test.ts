@@ -25,12 +25,14 @@ test('in a browser, a narrowing edit takes what left out of the picture at once,
     assert.ok(await page.until(`${drawn}.length >= 7`), `the canvas is drawn: ${page.logs().join('\n')}`);
     const all = await page.evaluate<number>(`${drawn}.length`);
     assert.ok(await page.still());
-    // When the old picture went and the new scene came, on the page's clock.
+    // When the new scene came, on the page's clock.
     await page.evaluate(`(() => {
       const first = document.querySelector('#canvas .lf-stage svg');
       window.sceneAt = null;
       new MutationObserver(() => { const svg = document.querySelector('#canvas .lf-stage svg'); if (svg && svg !== first && window.sceneAt === null) window.sceneAt = performance.now(); })
         .observe(document.getElementById('canvas'), { childList: true, subtree: true });
+      // A scene patched into the svg shown (packs/walls/page/marks-kept.js) keeps the svg: its drawing says when it mounted.
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) if (e.name.startsWith('drawing ') && window.sceneAt === null) window.sceneAt = e.startTime + e.duration; }).observe({ type: 'measure' });
       performance.clearMarks();
       performance.clearMeasures();
       // Each frame until it happens: whether every item that leaves is fading out of the picture shown.
