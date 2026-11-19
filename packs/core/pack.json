@@ -436,7 +436,8 @@
         "declares": { "type": "string", "system": true, "description": "What it declares in its pack, by the id its pack file gives it (task, build.lane, agent_changes), or of:<type> for the fields its pack adds to another pack's type. Set by install, with shipped: it is that pack's part, part_of the pack's item (packs/pack_model/README.md)." },
         "spec": { "type": "json", "large": true, "description": "The rule whole, as its pack file declares it, but its id (declares), title (the title) and description (the note). An owner's edit of a shipped one is an edit here, kept over an upgrade field by field." },
         "shipped": { "type": "json", "large": true, "system": true, "description": "What it last came from in its pack's file: { pack, version, hash, value }, value the declaration as that file held it and hash the sha256 of its canonical JSON (packs/pack_model/README.md). An upgrade merges field by field: what still holds the value it came with takes the new file's; what the owner changed stays theirs." },
-        "pack_merge": { "type": "string", "system": true, "description": "both on a change install offers where the owner and the pack's new file changed the same field: the file's value, held for the owner to take or leave (packs/pack_model/README.md, Upgrade)." }
+        "pack_merge": { "type": "string", "system": true, "description": "both on a change install offers where the owner and the pack's new file changed the same field: the file's value, held for the owner to take or leave (packs/pack_model/README.md, Upgrade)." },
+        "preset": { "type": "string", "description": "The id of a floor rule of core's this is the owner's version of, read over it: it may only tighten that rule (packs/rules/kernel/floor.ts)." }
       }
     },
     {

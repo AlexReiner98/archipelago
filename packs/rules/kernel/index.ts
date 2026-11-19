@@ -5,8 +5,11 @@
 // loads nothing at boot that the server did not load before: it answers its parts, each loaded when first asked for.
 
 import type { RootContext, RootStarted } from '../../../src/boot.ts';
+import { setFloor } from '../../loader/kernel/pack-source.ts';
+import { FLOOR_PACKS, onFloor } from './floor.ts';
 
 export function start(_ctx: RootContext): RootStarted {
+  setFloor({ packs: FLOOR_PACKS, on: onFloor }); // the floor rules a map's pack items cannot drop (./floor.ts)
   return {
     rules: () => import('./rules.ts'),
     events: () => import('../../loader/kernel/rule-events.ts'), // the loader reads the slot's fillings from the manifests
