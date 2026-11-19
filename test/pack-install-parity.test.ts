@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
+// @ts-expect-error a pack's module, plain JavaScript
 import { shipped, stampOf } from '../packs/pack_install/shape.js';
 
 const ROOT = join(import.meta.dirname, '..');
