@@ -10,13 +10,14 @@
 
 import { treeOf } from './tree.js';
 import { radial } from './radial.js';
-import { packOf, rulesOf, storyOf, toldFrom, weekTo } from './story.js';
+import { rulesOf, storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
-import { barOf, cssOf, keyOf, packHues } from './look.js';
+import { barOf, cssOf, packHues } from './look.js';
 import { player } from './play.js';
 import { nameTransform, namesShown } from './names.js';
-import { at } from './marks.js';
+import { at, m } from './marks.js';
+import { hiddenOf, legendCss, legendOf, shownBy } from './legend.js';
 
 /** What each view drew last, by its query: opened again, it stands grown. */
 const drawn = new Map();
@@ -50,6 +51,18 @@ async function missesOf(style, tools, n, gesture = 'misses') {
   return Promise.race([asked, new Promise((r) => setTimeout(() => r(null), n('reflex_said_wait')))]);
 }
 
+/**
+ * A click on a legend entry: the view's pack is asked to turn it off or on (sends.legend), as the person. The view
+ * changes, and the picture is drawn again from it; meanwhile the entry looks as it will.
+ */
+function legendClick(event, hidden, style, tools) {
+  const key = typeof event.key === 'string' ? event.key : '';
+  if (event.name !== 'click' || !key.startsWith('lg:') || typeof style.sends?.legend !== 'string' || typeof tools.act !== 'function') return [];
+  const entry = key.slice('lg:'.length), on = hidden.has(entry);
+  tools.act(style.sends.legend, { entry, on }).catch(() => {});
+  return [{ key, toggle: { 'rt-off': !on } }];
+}
+
 export async function picture({ answer, style, reduced, width, height }, tools) {
   const missing = [];
   const read = (group) => (name) => {
@@ -78,7 +91,24 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
     ...[...story.nodes].filter(([, x]) => x.tier === 'core' || x.tier === 'pack').map(([id, x]) => ({ id, ...x })),
     ...story.rules.map((r) => ({ id: r.id, title: r.title, for: [r.where], kind: 'rule' })),
   ];
-  const tree = treeOf(answer, (item) => item.fields?.for ?? placeOf.get(item.id), n, presets);
+  // The legend filters (./legend.js): what its entries turn off leaves the tree, which fits itself again; a bough with
+  // nothing left under it goes with it. Every node the view holds is counted, filter or no.
+  const hidden = hiddenOf(style);
+  const infoOf = (id, rule) => {
+    const r = rule ? story.rules.find((x) => x.id === id) : null, x = story.nodes.get(id);
+    return { id, rule: Boolean(rule), pack: r ? r.pack : x?.pack ?? x?.tier ?? 'owner', tier: r ? (r.pack === 'core' ? 'core' : 'pack') : x?.tier ?? 'owner', status: r ? 'current' : x?.status ?? 'current' };
+  };
+  const everyNode = [...first.written.map((node) => infoOf(node.id, false)), ...presets.map((p) => infoOf(p.id, p.kind === 'rule'))];
+  const keep = new Set(everyNode.filter(shownBy(hidden)).map((x) => x.id)), counted = new Set(everyNode.map((x) => x.id));
+  const shownAnswer = { ...answer, items: (answer.items ?? []).filter((i) => !counted.has(i.id) || keep.has(i.id)) };
+  const tree = treeOf(shownAnswer, (item) => item.fields?.for ?? placeOf.get(item.id), n, presets.filter((p) => keep.has(p.id)));
+  // Each pack the view holds its hue, core first; and every event of the window, counted for the legend.
+  const packs = [...new Set(everyNode.map((x) => x.pack))].sort((a, b) => (a === 'core' ? -1 : b === 'core' ? 1 : 0));
+  const hues = packHues(style, packs);
+  const happened = { miss: story.misses.length, held: story.said.filter((x) => x.verdict !== 'failed' && x.verdict !== 'came_back').length, failed: story.said.filter((x) => x.verdict === 'failed' || x.verdict === 'came_back').length, fired: story.rules.reduce((sum, r) => sum + r.fired.length, 0) };
+  const toggles = typeof style.sends?.legend === 'string' && typeof tools.act === 'function' && !reduced;
+  const legend = legendOf({ nodes: everyNode, events: happened, hidden, hues, toggles, schematic: story.schematic });
+  if (!tree) return { scene: { svg: m('svg', { class: 'rt', width: z('reflex_margin'), height: z('reflex_margin') }), css: cssOf(style, z, n, hues) + legendCss, aside: legend, size: { width: z('reflex_margin'), height: z('reflex_margin') } }, on: (event) => legendClick(event, hidden, style, tools) };
   // How often each held, for which names show first and the tips.
   const held = new Map();
   for (const one of story.said) if (one.verdict === 'held') held.set(one.id, (held.get(one.id) ?? 0) + 1);
@@ -89,6 +119,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const fits = width > 0 && height > 0 ? { width: (width * n('reflex_fit_room')) / n('reflex_fit_scale'), height: (height * n('reflex_fit_room')) / n('reflex_fit_scale') } : null;
   const placed = radial(tree, z, n, (text, px) => measure(text, px), width > 0 && height > 0 ? width / height : 1, fits);
   const film = filmOf(tree, story, n);
+  film.events = film.events.filter((e) => !hidden.has(`event:${e.kind}`));
   const name = JSON.stringify([answer.lens?.find, answer.lens?.only, answer.lens?.not, answer.lens?.from]);
   const before = drawn.get(name);
   drawn.set(name, new Set(tree.born.map((node) => node.id)));
@@ -100,10 +131,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   // Grown, the gaps stand already: each place a miss sparked on and grew nothing from.
   const gapped = new Set(grown ? film.events.filter((e) => e.kind === 'miss' && !e.grew).map((e) => e.node.id) : []);
   const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown, story, gapped);
-  // Each pack met in the tree its hue, core first.
-  const packs = [...new Set(tree.order.map((node) => packOf(node, story)).filter(Boolean))].sort((a, b) => (a === 'core' ? -1 : b === 'core' ? 1 : 0));
-  const hues = packHues(style, packs);
-  const css = cssOf(style, z, n, hues);
+  const css = cssOf(style, z, n, hues) + legendCss;
   if (missing.length) return { scene: { message: `This view's style names no ${[...new Set(missing)].slice(0, 2).join(', ')}: draw it with the Reflex tree view, whose preset names them.` } };
   const speed = { now: 1 };
   const from = grown ? film.end : 0;
@@ -127,7 +155,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   if (!reduced) tools.surface?.().then((s) => s?.show()).catch(() => {});
   const byKey = (key) => tree.nodes.get(key.slice(2));
   return {
-    scene: { svg, css, key: keyOf(z, story.schematic, hues), before: bar, size: { width: placed.width, height: placed.height }, ...(!reduced && { surface: { key: 'rt-surface' } }) },
+    scene: { svg, css, aside: legend, before: bar, size: { width: placed.width, height: placed.height }, ...(!reduced && { surface: { key: 'rt-surface' } }) },
     on(event) {
       const key = typeof event.key === 'string' ? event.key : '';
       if (key.startsWith('n:')) {
@@ -138,6 +166,7 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
         if (event.name === 'leave') return [{ tip: null }];
         return [];
       }
+      if (key.startsWith('lg:')) return legendClick(event, hidden, style, tools);
       if (event.name !== 'click' || reduced) return [];
       if (key === 'rt:replay') return play.replay();
       if (key.startsWith('rt:speed:')) {

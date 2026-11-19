@@ -129,7 +129,8 @@
         "play.js": "layouts/tree/play.js",
         "marks.js": "layouts/tree/marks.js",
         "names.js": "layouts/tree/names.js",
-        "story.js": "layouts/tree/story.js"
+        "story.js": "layouts/tree/story.js",
+        "legend.js": "layouts/tree/legend.js"
       }
     }
   ],
@@ -193,7 +194,10 @@
             "reflex_bar_dot": 4,
             "reflex_trial_ring": 1.2,
             "reflex_gap_ring": 2,
-            "reflex_rule_node": 6
+            "reflex_rule_node": 6,
+            "reflex_legend_gap": 6,
+            "reflex_legend_width": "24ch",
+            "reflex_legend_line": 1
           },
           "numbers": {
             "reflex_spread_x": 1.3,
@@ -250,7 +254,8 @@
             "#f2cc8f",
             "#9d79bc",
             "#4ecdc4"
-          ]
+          ],
+          "hidden": []
         }
       }
     }
