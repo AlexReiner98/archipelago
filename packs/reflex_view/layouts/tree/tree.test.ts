@@ -94,3 +94,13 @@ test('the counts the pack answers through the view’s sends stand in for the sc
   assert.deepEqual(patches.find((p) => p.key === 'rt-said-n'), { key: 'rt-said-n', text: '66' });
   assert.ok(patches.some((p) => p.key === 'rt-schematic' && p.remove));
 });
+
+test('counted, a node never said is never lit', () => {
+  const tree = treeOf(answer())!, said = sayingsOf(tree, n);
+  for (const id of said.counts.keys()) said.counts.set(id, id === tree.written[0].id ? 3 : 0);
+  said.schematic = false;
+  const film = filmOf(tree, said, n), rnd = () => 0.9;
+  assert.equal(film.pick(film.end, rnd)!.id, tree.written[0].id);
+  said.counts.set(tree.written[0].id, 0);
+  assert.equal(film.pick(film.end, rnd), null);
+});

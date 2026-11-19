@@ -32,9 +32,12 @@ export function filmOf(tree, said, n) {
   const pick = (t, rnd) => {
     const ready = tree.written.filter((node) => born.get(node.id) <= t - after);
     if (!ready.length) return null;
-    const weigh = (node) => said.counts.get(node.id) + 1;
-    let at = rnd() * ready.reduce((s, node) => s + weigh(node), 0);
-    for (const node of ready) if ((at -= weigh(node)) <= 0) return node;
+    // Schematic, every node may light; counted, only one that was said, as often as it was.
+    const weigh = (node) => said.counts.get(node.id) + (said.schematic ? 1 : 0);
+    const sum = ready.reduce((s, node) => s + weigh(node), 0);
+    if (sum <= 0) return null;
+    let at = rnd() * sum;
+    for (const node of ready) if (weigh(node) > 0 && (at -= weigh(node)) <= 0) return node;
     return ready[ready.length - 1];
   };
   return { born, end, writtenAt, saidAt, rate, pick };
