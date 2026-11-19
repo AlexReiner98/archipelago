@@ -15,7 +15,7 @@ test("a kept view's style takes the hidden list, the rest of it kept", () => {
 });
 
 test("a shipped view's first toggle makes the owner's version, with the style and query drawn", () => {
-  const ops = legendOps({ view: 'reflex_view.tree', entry: 'pack:core', on: false, style: { layout: 'reflex_view.tree', title: 'Reflex tree' }, filter: { find: ['type instruction'] }, limit: 300 }, undefined);
+  const ops = legendOps({ view: 'reflex_view.tree', entry: 'pack:core', on: false, lens: { style: { layout: 'reflex_view.tree', title: 'Reflex tree' }, filter: { find: ['type instruction'] }, limit: 300 } }, undefined);
   assert.deepEqual(ops, { ops: [{ op: 'create', type: 'lens', title: 'Reflex tree', props: { preset: 'reflex_view.tree', filter: { find: ['type instruction'] }, limit: 300, style: { layout: 'reflex_view.tree', title: 'Reflex tree', hidden: ['pack:core'] } } }] });
 });
 

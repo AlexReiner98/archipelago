@@ -75,5 +75,3 @@ export async function said_rules(ctx: KernelContext, q: { said_rules: { days?: u
   return rulesRead(rules, firingsOf(uses, new Set(rules.map((r) => r.id)), range));
 }
 
-/** answer.tree_story: the story, for the view reflex_said.tree_story. */
-export const storyAnswer = (ctx: KernelContext, input: { ids?: unknown; days?: unknown }) => said_story(ctx, { said_story: input ?? {} });

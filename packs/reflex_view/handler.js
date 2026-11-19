@@ -9,7 +9,7 @@ const MOST = 50;
 
 export default {
   // A node added on a branch of the tree, sent by its drawing as the person looking: a trial reflex said there.
-  'reflex_view.add_node': async (input) => addNodeOps(input ?? {}),
+  'reflex_view.add': async (input) => addNodeOps(input ?? {}),
 
   // The legend's toggle, sent by the tree's drawing as the person looking (its view's sends): the view's hidden list.
   'reflex_view.legend': async (input, ctx) => {
@@ -55,15 +55,8 @@ export default {
     return { answer: Array.isArray(found) ? found : [] };
   },
 
-  // What the tree's drawing asks through its sends: its story over a window, as the reflex_said pack tells it.
-  'reflex_view.story': async (input, ctx) => {
-    const ids = Array.isArray(input?.ids) ? input.ids.filter((id) => typeof id === 'string').slice(0, MOST) : [];
-    const days = Number.isInteger(input?.days) ? input.days : undefined;
-    return { answer: await ctx.read({ said_story: { ids, ...(days !== undefined && { days }) } }) };
-  },
-
   // What the tree's drawing asks through its sends: each node's counts, by the id its item is said under.
-  'reflex_view.said_counts': async (input, ctx) => {
+  'reflex_view.counts': async (input, ctx) => {
     const asked = Array.isArray(input?.ids) ? [...new Set(input.ids.filter((id) => typeof id === 'string' && id))].slice(0, MOST) : [];
     if (!asked.length) return { answer: [] };
     const items = await ctx.read({ ids: asked.filter((id) => id.startsWith('e_')) });

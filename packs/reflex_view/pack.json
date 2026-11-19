@@ -26,7 +26,7 @@
       "limit_ms": 5000
     },
     {
-      "id": "reflex_view.said_counts",
+      "id": "reflex_view.counts",
       "shape": "rows",
       "description": "The record of some instructions, for the tree's drawing to ask through its sends: one per id asked, in order, each { id, said, runs, places, last, failed, held, quiet, tier, status, for, per_run: [{ said_at, verdict }] } (the item's status and for as given; the record is the reflex_said pack's said_record). An owner's version of a preset is counted under the preset's id.",
       "input": {
@@ -64,28 +64,6 @@
         }
       },
       "limit_ms": 5000
-    },
-    {
-      "id": "reflex_view.story",
-      "shape": "rows",
-      "description": "The tree's story over a window, for its drawing to ask through its sends, as one answer (not rows): { from, to, nodes: [{ id, kind (instruction or rule), pack, tier, effect (a rule's), status, for, title }], misses: [{ at, where, kind, grew }], said: [{ id, at, verdict }], fired: [{ id, day, effect (held, refused, asked), n }] }. Nodes are the ids asked, every preset said in the window and every rule in force; a miss is one no settled node covers, grew the trial that covers it. Params: ids (at most 50), days (30 unless said, 90 at most).",
-      "input": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            },
-            "description": "The nodes in the view, 50 at most."
-          },
-          "days": {
-            "type": "integer",
-            "description": "How far back, in days."
-          }
-        }
-      },
-      "limit_ms": 10000
     },
     {
       "id": "reflex_view.rules",
@@ -175,11 +153,11 @@
         "style": {
           "shape": "reflex_tree",
           "sends": {
-            "said": "reflex_view.said_counts",
+            "said": "reflex_view.counts",
             "misses": "reflex_view.misses",
             "rules": "reflex_view.rules",
             "legend": "reflex_view.legend",
-            "add": "reflex_view.add_node",
+            "add": "reflex_view.add",
             "schema": "reflex_view.schema"
           },
           "colors": {
@@ -288,38 +266,26 @@
     {
       "id": "reflex_view.legend",
       "title": "Hide or show on the tree",
-      "description": "A toggle of the tree's legend, sent by its drawing as the person looking: hides one entry (on false) or shows it again (on true) by the view's style, its hidden list. On a view a pack ships, the first toggle makes the owner's version of it, with the style and query drawn.",
+      "description": "The tree's legend: hide (on false) or show an entry by its view's style.hidden. Sent by the drawing.",
       "verb": "revise",
       "input": {
         "type": "object",
         "properties": {
           "view": {
             "type": "string",
-            "description": "The view the legend is on: a lens's id, or the id of the view a pack ships."
+            "description": "The lens, or a shipped view's id."
           },
           "entry": {
             "type": "string",
-            "description": "kind:rule|instruction, pack:<id>, tier:core|pack|owner|learned, status:trial|current|retired or event:miss|held|failed|fired."
+            "description": "kind:, pack:, tier:, status: or event: an entry."
           },
           "on": {
             "type": "boolean",
-            "description": "true shows it, false hides it."
+            "description": "Show it."
           },
-          "style": {
+          "lens": {
             "type": "object",
-            "description": "The style the tree is drawn with: kept in a new version of a shipped view."
-          },
-          "filter": {
-            "type": "object",
-            "description": "The view's filter, for a new version."
-          },
-          "walk": {
-            "type": "object",
-            "description": "The view's walk, for a new version."
-          },
-          "limit": {
-            "type": "integer",
-            "description": "The view's limit, for a new version."
+            "description": "{ style, filter, walk, limit } drawn, for a new version."
           }
         },
         "required": [
@@ -331,27 +297,22 @@
       }
     },
     {
-      "id": "reflex_view.add_node",
+      "id": "reflex_view.add",
       "title": "Add a node here",
-      "description": "A node added on a branch of the tree, sent by its drawing as the person looking: a trial reflex said at the branch's place (for), named as typed, its words what was said or its name. A place that is never said is refused by the reflex pack's rule known_place.",
+      "description": "A trial reflex added on a branch of the tree, said at its place, its words its name until edited. Sent by the drawing.",
       "verb": "capture",
       "input": {
         "type": "object",
         "properties": {
           "for": {
             "type": "string",
-            "description": "The place the node is said at: tool:<name>, file:<glob>, session_start..."
+            "description": "Where it is said."
           },
           "title": {
             "type": "string",
             "minLength": 1,
             "maxLength": 60,
-            "description": "What to say there, in a few words."
-          },
-          "body": {
-            "type": "string",
-            "maxLength": 4000,
-            "description": "Its words, when more than its name."
+            "description": "Its name."
           }
         },
         "required": [

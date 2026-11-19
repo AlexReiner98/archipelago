@@ -21,7 +21,10 @@ test("what a session's tools say is kept to its run once, each tool's place apar
   ]);
   const ctx = kernelContext(l, 'agents');
   const told = await instructionsFor(ctx, TOOLS, { run: made.run });
-  assert.deepEqual(told.map((one) => one.title).sort(), ['Search first', 'Trial: unlink takes the id'], 'marked once though its writer marked it');
+  // Beside the packs' own (each tool's description is a preset said at its place), these two, the trial marked once.
+  const titles = told.map((one) => one.title);
+  assert.ok(titles.includes('Search first') && titles.includes('Trial: unlink takes the id'), titles.join(' | '));
+  assert.ok(!titles.some((t) => t.startsWith('Trial: Trial:')), 'marked once though its writer marked it');
   const record = (await ctx.reads({ said_record: { ids: [made.change, made.query] } })) as { said: number; places: Record<string, number> }[];
   assert.deepEqual(record.map((r) => r.places), [{ 'tool:change': 1 }, { 'tool:query': 1 }]);
 });

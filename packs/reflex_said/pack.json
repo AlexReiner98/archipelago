@@ -19,16 +19,6 @@
       ]
     },
     "provides": {
-      "answer.said_record": {
-        "in": {
-          "ids": [
-            "string"
-          ],
-          "days?": "number"
-        },
-        "out": "any",
-        "run": "reads.ts#recordAnswer"
-      },
       "answer.misses": {
         "in": {
           "days?": "number",
@@ -36,16 +26,6 @@
         },
         "out": "any",
         "run": "misses-read.ts#missesAnswer"
-      },
-      "answer.tree_story": {
-        "in": {
-          "ids?": [
-            "string"
-          ],
-          "days?": "number"
-        },
-        "out": "any",
-        "run": "story-read.ts#storyAnswer"
       },
       "setting.reflex_promote_held": {
         "out": "number",
@@ -64,13 +44,6 @@
         "read": "member",
         "default": 30,
         "about": "Days a reflex may go unsaid before it retires."
-      },
-      "answer.tree_schema": {
-        "in": {
-          "days?": "number"
-        },
-        "out": "any",
-        "run": "schema-read.ts#schemaAnswer"
       }
     },
     "timers": [
@@ -109,32 +82,11 @@
   ],
   "views": [
     {
-      "id": "reflex_said.record",
-      "shape": "data",
-      "lens": {},
-      "answer": "said_record",
-      "description": "How often each of some instructions was said, to how many runs and where, and per run whether a miss it answers came back after it was said there (failed), stopped (held: a miss before, none after) or never showed (quiet), and whose it is (tier: core, pack, owner or learned). Params: ids (required, at most 50), days (how far back, 30 unless said, 90 at most)."
-    },
-    {
       "id": "reflex_said.misses",
       "shape": "data",
       "lens": {},
       "answer": "misses",
       "description": "Every miss lately, the newest first: refusals on runs' stories, bumps (issues kept as problems) and traps (instructions said for files), each with its kind, run, when, where it happened (for place) and the open nodes that cover it (covered_by; none, uncovered). Params: days (30 unless said, 90 at most), limit (the newest so many, 1000 at most)."
-    },
-    {
-      "id": "reflex_said.tree_story",
-      "shape": "data",
-      "lens": {},
-      "answer": "tree_story",
-      "description": "The reflex tree's story over a window: nodes (the ids asked, every preset said in the window, every rule in force; each with kind instruction or rule, pack, tier, a rule's effect, status, for, title), misses no settled node covers (grew: the trial covering it), each saying with its run's verdict, and each rule's firings by day. Params: ids (at most 50), days (30 unless said, 90 at most)."
-    },
-    {
-      "id": "reflex_said.tree_schema",
-      "shape": "data",
-      "lens": {},
-      "answer": "tree_schema",
-      "description": "Every type in force and the checks it implies, as nodes of the reflex tree: a type (kind type: its words its description, its pack, tier schema, for tool:change:<type>) and each check (kind check: its fields, its statuses, a field's values, a link's ends, the shape of a change's ops), each check with the times it refused a change lately (fired). Params: days (30 unless said, 90 at most)."
     }
   ],
   "styles": [

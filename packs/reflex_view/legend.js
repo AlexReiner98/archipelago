@@ -16,7 +16,8 @@ export const toggled = (hidden, entry, on) => {
  * The op a toggle makes: an update of the kept lens (the view itself, or the owner's version of a preset), merging
  * hidden into its own style; or, where the view is a preset with no version yet, the version made with the style drawn.
  */
-export function legendOps({ view, entry, on, style, filter, walk, limit }, kept) {
+export function legendOps({ view, entry, on, lens }, kept) {
+  const { style, filter, walk, limit } = lens && typeof lens === 'object' ? lens : {};
   if (!ENTRY.test(String(entry ?? ''))) throw new Error(`entry is one of kind:rule|instruction|type|check, pack:<id>, tier:core|pack|owner|learned|schema, status:trial|current|retired, event:miss|held|failed|fired: not "${entry}"`);
   if (typeof on !== 'boolean') throw new Error('on is true (show it) or false (hide it)');
   if (kept) {

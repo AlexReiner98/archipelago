@@ -27,5 +27,3 @@ export async function schemaOf(ctx: KernelContext, days: number): Promise<Schema
 export const said_schema = (ctx: KernelContext, q: { said_schema: { days?: unknown } }) =>
   schemaOf(ctx, Math.min(DAYS_MOST, Math.max(1, Number(q.said_schema?.days ?? DAYS) || DAYS)));
 
-/** answer.tree_schema: the schema as nodes, for the view reflex_said.tree_schema. */
-export const schemaAnswer = (ctx: KernelContext, input: { days?: unknown }) => said_schema(ctx, { said_schema: input ?? {} });
