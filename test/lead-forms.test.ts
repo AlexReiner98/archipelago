@@ -113,7 +113,7 @@ test('a line: one field as one line, named and cut; a link into it by its far en
   assert.equal(leadMarks({ id: 'e_1', props: {} }, about, null, { links: ties('serves', true) }), null);
 });
 
-test("an open decision: one line per option, its says in the tooltip, the recommended one marked, three in sight", () => {
+test("an open decision: one per option, what it means in full under its name, the recommended one marked, three in sight", () => {
   const decision = { capabilities: { lead: { form: 'choices' } } };
   const options = [
     { title: 'Count the island', says: 'A bar of its island. Recommended.' },
@@ -125,8 +125,12 @@ test("an open decision: one line per option, its says in the tooltip, the recomm
   assert.equal(lines(two).length, 2, 'one line each, not two');
   assert.match(said(lines(two)[0] as Marks), /★/);
   assert.doesNotMatch(said(lines(two)[1] as Marks), /★/);
-  assert.match(said(two), /"tip":"No bar: Only part_of counts."/);
-  assert.doesNotMatch(said(two), /"look":"muted"[^\]]*Only part_of/, 'what it says is in the tooltip, not a line of its own');
+  assert.match(said(two), /"key":"choice:1","look":"quiet","tip":"Choose No bar"/, "a press says what it does");
+  // What each means is read on its own line, after its name, muted and cut where it does not fit (the owner, 18 Nov 2026).
+  assert.match(said(lines(two)[1] as Marks), /"look":"muted"[^\]]*"Only part_of counts."/, 'what it means, whole, under its name');
+  assert.doesNotMatch(said(lines(two)[1] as Marks), /"tip":"Only part_of/, "said whole, not cut to a tip");
+  assert.match(said(lines(two)[0] as Marks), /"A bar of its island\."/, 'the word that it is recommended is left to the mark');
+  assert.doesNotMatch(said(lines(two)[0] as Marks), /"[^"]*Recommended[^"]*"\]/, 'not said again in the words');
   const five = ['A', 'B', 'C', 'D', 'E'].map((t) => ({ title: t, ...(t === 'E' && { recommended: true }) }));
   const m = leadMarks({ id: 'e_1', is_open: true, props: { options: five } }, decision, c(five), { writes: true });
   valid(m);
@@ -137,4 +141,19 @@ test("an open decision: one line per option, its says in the tooltip, the recomm
   valid(mine);
   assert.equal(lines(mine).length, 3, 'the line that it waits on you takes one of the three');
   assert.match(said(lines(mine)[2] as Marks), /"\+3"/);
+});
+
+test("a focus counts the work on its island, whatever its type's form", () => {
+  const feature = { capabilities: { lead: { form: 'alert', unless: 'seen_working', says: 'to_see' } } };
+  const island = [{ id: 'e_a', title: 'A', open: false }, { id: 'e_b', title: 'B', open: true }, { id: 'e_c', title: 'C', open: false }];
+  const m = leadMarks({ id: 'e_f', props: { focus: true, island: 'e_f' } }, feature, null, { island });
+  valid(m);
+  assert.equal(lines(m).length, 2, 'its island work, then its alert');
+  assert.match(said(lines(m)[0] as Marks), /"2 of 3 done".*"key":"lead-bar"/);
+  assert.match(said(lines(m)[1] as Marks), /Not yet seen working/);
+  const none = leadMarks({ id: 'e_f', props: { focus: true } }, { capabilities: { lead: 'none' } }, null, { island });
+  valid(none);
+  assert.match(said(none), /"2 of 3 done"/, 'a type with no band of its own still counts its island');
+  const done = island.map((t) => ({ ...t, open: false }));
+  assert.equal(leadMarks({ id: 'e_f', props: { focus: true, seen_working: true } }, feature, null, { island: done }), null, 'all done is what its status says');
 });
