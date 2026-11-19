@@ -63,6 +63,8 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     rules.add(`.${cls} { --lf-island: ${hex}; }`);
     classes.set(isle.id, `lf-island ${cls}`);
   });
+  // A pack's parts as an island (./parts-islands.js) is in the colour of the island it is of: it reads as that island's.
+  for (const isle of g.islands) if (String(isle.id).startsWith('parts:') && classes.has(isle.id.split(':')[1])) classes.set(isle.id, classes.get(isle.id.split(':')[1]));
   const [PAD, CORNER, ROW, KEY_W, KEY_H, MARK_GAP] = ['island_pad', 'island_corner', 'island_legend_row', 'key_width', 'key_height', 'island_legend_mark_gap'].map(z);
   const tips = new Map();
   // What scales about the point [x, y] by a class's transform (its origin the point: a group moved there, and back inside it).
@@ -91,7 +93,8 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
       ? m('g', { class: 'lf-shore' }, m('path', { d: shoreBelow(isle.land[0], isle.foot, CORNER) }), grownFrom(crownAt, 'lf-crown-scale', m('path', { d: crownOf(isle.land[0], isle.foot, CORNER), class: 'lf-crown-shore' })))
       : m('g', { class: 'lf-shore' }, ...rects.map((r) => m('rect', r)));
     const crown = crowned ? m('g', { class: 'lf-land lf-crown' }, grownFrom(crownAt, 'lf-crown-scale', m('path', { d: crownOf(isle.land[0], isle.foot, CORNER) + 'Z', class: 'lf-crown-land' }))) : null;
-    // A pack's parts as an island of the query (./parts-islands.js) is its parts' drawing alone: no land, shore, name or key of its own.
+    // A pack's parts as an island of the query (./parts-islands.js) has land and a shore as any island has; its name and
+    // what it holds are its parts' drawing (./ghost-parts.js), and it has no key.
     const ghost = String(isle.id).startsWith('parts:'), title = ghost ? null : named.get(isle.id);
     const name = title && titled(m('a', { href: `#/e/${isle.id}`, class: 'lf-island-name' }, m('text', { x: isle.name[0] + z('island_name_x'), y: isle.name[1] }, title)), title);
     // After its name, what the header shows of it: its pack and what that pack requires (./pack-marks.js).
@@ -119,7 +122,7 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
     const headed = [name, ...(head?.marks ?? []), ...(ghost ? [] : legend)].filter(Boolean);
     const from = crowned ? [frame.left, isle.foot] : [frame.left, frame.top];
     const top = ghost ? headed : headed.length ? [grownFrom(from, 'lf-head-scale', ...headed)] : [];
-    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, ...(ghost ? [] : [land, crown, shore]), painted, ...top);
+    return m('g', { key: `i:${isle.id}`, class: `${classes.get(isle.id)} lf-region` }, land, crown, shore, painted, ...top);
   });
   // A gate on each shore a link between islands crosses: a bar across the wire in its island's colour, as long as the
   // port it marks. A finding
@@ -167,7 +170,7 @@ export const css = `
 .lf-shore :is(rect, path), .lf-crown-shore { fill: none; stroke: var(--lf-island, var(--ln-line)); stroke-width: var(--ln-flow-island-stroke); }
 .lf-island-name { pointer-events: auto; cursor: pointer; }
 /* Its name in the plain face, near the text's colour: the region's small-caps serif read as a whisper at this size (study e_unru8ftt). */
-.lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-island-name-mix)); font-size: var(--ln-flow-island-text); font-family: var(--ln-font); font-weight: bold; dominant-baseline: central; }
+.lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-island-name-mix)); font-size: var(--ln-flow-island-text); font-family: var(--type-name-family, var(--ln-font)); font-weight: var(--type-name-weight, bold); dominant-baseline: central; }
 /* Its header kept at its size on screen: 1 over the camera's scale (--ln-plane-scale, set on the frame), within the style's least and most. */
 .lf-region { --lf-head: clamp(var(--ln-flow-island-head-least), calc(1 / var(--ln-plane-scale)), var(--ln-flow-island-head-most)); }
 .lf-head-scale, .lf-crown-scale { transform-box: view-box; transform-origin: 0 0; }
