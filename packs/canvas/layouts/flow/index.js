@@ -143,7 +143,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const run = (part) => layout({ effort, items: part.items, links: part.links, ...Object.fromEntries(['ports', 'extras', 'combed', 'held', 'rewire', 'apart'].filter((k) => part[k] !== undefined).map((k) => [k, part[k]])), undrawn: Array.isArray(style.undrawn) ? style.undrawn : [], headless: Array.isArray(style.headless) ? style.headless : [], measure, sizes: style.sizes, aspect, across: width > 0 ? width : 0, shapes, ...(style.placed && typeof style.placed === 'object' && { placed: style.placed }), ...(looks.size && { looks }), ...(focus.at.size && { focusAt: focus.at }) });
   // A picture of items on islands is an archipelago (./archipelago.js): each island laid out alone, a sea between. One
   // island is framed too, with its own legend in place of the key (task e_5rh5ysut).
-  const parts = !story && islandsOf(answer.items).length > 0 ? islandModels({ items: answer.items, links: answer.links ?? [], run }) : null;
+  const parts = !story && islandsOf(answer.items).length > 0 ? islandModels({ items: answer.items, links: answer.links ?? [], run, across: style.island_links !== false }) : null;
   let g = parts ? null : run({ items: answer.items, links: answer.links ?? [] });
 
   // Where each step stands, read from what is drawn (./state.js): its phase, whether it waits on you, whether it is held up.
