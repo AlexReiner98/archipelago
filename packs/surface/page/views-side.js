@@ -47,7 +47,7 @@ export function viewsList(list, { done = () => {}, counted = () => {} } = {}) {
     const row = (v, isKept) => {
       const on = up === v;
       const back = () => ((location.hash = '#/'), done());
-      return h('div', { class: `isl-row isl-view${on ? ' on' : ''}${isKept ? '' : ' isl-offered'}`, role: 'listitem', 'data-id': v.id, ...(on && { 'aria-current': 'page' }) },
+      return h('div', { class: `isl-row isl-view${on ? ' on' : ''}${isKept ? '' : ' isl-offered'}`, role: 'listitem', 'data-view': v.id, ...(on && { 'aria-current': 'page' }) },
         h('button', { type: 'button', class: 'isl-name', tabindex: '-1', title: on ? `${v.title}: up in place of the islands` : `Put ${v.title} up in place of the islands`, onclick: () => ((location.hash = canvasAt(v)), done()) }, v.title),
         isKept
           ? h('button', { type: 'button', class: `isl-off${on ? '' : ' isl-unkeep'}`, tabindex: '-1', title: on ? 'Back to the islands' : `Take ${v.title} off your list`, 'aria-label': on ? 'Back to the islands' : `Take ${v.title} off your list`, onclick: () => (on ? back() : keepViews(kept.filter((id) => id !== keptBy(v)), `${v.title} taken off the list`).catch((err) => console.warn(err.message))) }, '×')
