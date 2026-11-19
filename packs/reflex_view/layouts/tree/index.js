@@ -30,7 +30,7 @@ async function recordsOf(ids, style, tools, n, gesture = 'said') {
   const ask = typeof style.sends?.[gesture] === 'string' && typeof tools.act === 'function' ? style.sends[gesture] : null;
   if (!ask || !ids.length) return null;
   const batch = Math.max(1, n('reflex_said_batch'));
-  const asked = Promise.all(Array.from({ length: Math.ceil(ids.length / batch) }, (_, i) => tools.act(ask, { ids: ids.slice(i * batch, (i + 1) * batch), days: n('reflex_window_days') })))
+  const asked = Promise.all(Array.from({ length: Math.ceil(ids.length / batch) }, (_, i) => tools.act(ask, { ids: ids.slice(i * batch, (i + 1) * batch), ...(gesture === 'story' && { days: n('reflex_window_days') }) })))
     .then((came) => {
       const answers = came.filter((c) => c && !c.error && c.answer).map((c) => c.answer);
       if (gesture === 'said') return answers.flatMap((a) => (Array.isArray(a) ? a : []));
