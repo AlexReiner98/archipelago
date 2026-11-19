@@ -259,6 +259,8 @@ test('drawn again (the map changed), the new tree shows its surface, so the one 
   assert.equal(first.patches.length, before, 'the tree replaced draws nothing more');
   assert.ok(second.patches.some((p) => p.key === 'cam'), 'the new tree keeps playing');
   b.end();
+});
+
 test('the legend is the filter: entries off leave the tree, every entry keeps its count, and a click asks the view’s pack', async () => {
   const a = { ...answer(3, []), lens: { find: ['legend'] } };
   const rules = [
