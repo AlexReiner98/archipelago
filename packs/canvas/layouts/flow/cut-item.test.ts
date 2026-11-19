@@ -21,7 +21,8 @@ const near = (a: number, b: number) => Math.abs(a - b) < 1e-6;
 test('every named cut is a list of the two primitives, and the types name them', () => {
   for (const [name, list] of Object.entries(house.cut_forms) as [string, any[]][]) for (const p of list) assert.ok(typeof p.at === 'string' ? ['tl', 'tr', 'bl', 'br'].includes(p.at) : p.at >= 0 && p.at <= 1, name);
   for (const t of ['task', 'work', 'place', 'record', 'question', 'decision', 'aim', 'occurrence', 'actor', 'system']) assert.ok(house.cut_forms[preset('canvas.cut_faroe').props.type_cuts[t]], t);
-  assert.equal(cutOf('twin').length, 2);
+  assert.equal(cutOf('twin').length, 1);
+  assert.equal(cutOf('twin')[0].cubics.length, 4);
   assert.equal(cutOf('ring').length, 4);
 });
 
@@ -34,12 +35,14 @@ test('a list in a type, or a name, gives the same cut; a flavour takes its start
 test('no kinks: every curve meets the box edge, and its neighbour, along the same tangent', () => {
   for (const name of Object.keys(house.cut_forms)) for (const seed of [1, 2, 3]) for (const region of cutOf(name, seed)) {
     const c = region.cubics;
-    if (c.length === 2) {
-      // A bell: level where it leaves the top edge, level at its low point on both sides, level where it comes back.
-      assert.ok(near(c[0][0][1], box.t) && near(c[0][1][1], box.t), `${name} leaves the edge level`);
-      assert.ok(near(c[0][2][1], c[0][3][1]) && near(c[1][1][1], c[1][0][1]), `${name} low point level`);
-      assert.deepEqual(c[0][3], c[1][0]);
-      assert.ok(near(c[1][2][1], box.t) && near(c[1][3][1], box.t), `${name} returns level`);
+    if (c.length > 1) {
+      // A skyline: level at each foot and at each summit, where two halves share a point their handles are level too.
+      for (const [i, seg] of c.entries()) {
+        assert.ok(near(seg[0][1], seg[1][1]) && near(seg[2][1], seg[3][1]), `${name} level at both ends of a half`);
+        if (i) assert.ok(near(c[i - 1][3][1], seg[0][1]), `${name} halves join, or by a level saddle`);
+      }
+      const peak = Math.min(...c.map((seg: number[][]) => seg[3][1]));
+      assert.ok(near(peak, box.t), `${name} a summit touches the top edge`);
     } else {
       // A corner arc: along the side where it starts, along the top or foot where it ends.
       const [p0, p1, p2, p3] = c[0], [u, v] = [unit(p0, p1), unit(p2, p3)];
@@ -50,9 +53,23 @@ test('no kinks: every curve meets the box edge, and its neighbour, along the sam
   }
 });
 
+test('a cut never comes below the top of the name, whatever the lines', () => {
+  const [pad, clear, line] = [10, 7, 16];
+  for (const name of Object.keys(house.cut_forms)) for (const lines of [1, 2, 3]) for (const seed of [1, 9]) {
+    const list = house.cut_forms[name], h = boxHeight(list, lines * line, pad, clear), tall = { l: 0, t: 0, r: 160, b: h }, textTop = h - pad - lines * line;
+    for (const region of cuts(tall, list.filter((p: any) => p.at[0] !== 'b'), { rx: 6, tension: 0.75, seed })) for (const seg of region.cubics) for (const [, y] of seg) assert.ok(y <= textTop - clear + 1e-6, `${name} ${lines} lines: ${y} > ${textTop}`);
+  }
+});
+
+test('a pack names its cut with the primitives: two summits make one skyline with a saddle', () => {
+  const [region] = cuts(box, [{ at: 0.25, w: 0.4, d: 0.5 }, { at: 0.75, w: 0.4, d: 0.5 }], { rx: 6, tension: 0.75, seed: 1 });
+  assert.equal(region.cubics.length, 4);
+  assert.ok(region.cubics.every((seg: number[][]) => seg.every(([, y]) => y >= box.t - 1e-6)));
+});
+
 test('one tension: a tighter one pulls the handles in, everywhere', () => {
   const at = (k: number) => cuts(box, house.cut_forms.peak, { rx: 6, tension: k, seed: 1 })[0].cubics[0];
-  assert.ok(at(0.3)[1][0] < at(0.55)[1][0]);
+  assert.ok(Math.abs(at(0.3)[1][0] - at(0.3)[0][0]) < Math.abs(at(0.55)[1][0] - at(0.55)[0][0]));
 });
 
 test('the same seed gives the same cut, and a bell\'s foot shifts only a little', () => {
@@ -77,7 +94,7 @@ test('a palette makes runs, a phase picks one and the type a colour in it, in ne
   assert.deepEqual(bandsFor(runs, 'trouble', 0, 2).every((c: string) => runs.accent.includes(c)), true);
   assert.notEqual(bandsFor(runs, 'under_way', 0, 1)[0], bandsFor(runs, 'under_way', 1, 1)[0]);
   const inner = inset(house.cut_forms.peak, 1, 0.22)[0], outer = house.cut_forms.peak[0];
-  assert.ok(inner.w < outer.w && inner.d < outer.d && inner.at === outer.at);
+  assert.ok(inner.w === outer.w && inner.d < outer.d && inner.at === outer.at);
   for (const k of ['faroe', 'galapagos', 'svalbard', 'hawaii', 'cyclades']) assert.ok(house.ridge_palettes[k].colours.length >= 9, k);
 });
 

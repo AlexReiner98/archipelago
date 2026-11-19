@@ -4,10 +4,12 @@
 // one tension (a style value) so every curve meets the box edge, and its neighbour, with a matching tangent:
 //   corner { at: 'tl' | 'tr' | 'bl' | 'br', w, d }: an arc filling a corner, tangent to both edges it meets (w a share of the
 //     width, d of the height);
-//   bell { at, w, d, skew }: a hill hanging from the top edge, flat where it leaves the edge and flat at its lowest point;
-//     its middle at `at` (a share of the width), `skew` (-1 to 1) moving the low point and making one side steeper.
+//   summit { at, w, d, skew }: a mountain on the box's top edge: its summit touches the edge at `at` (a share of the width), it
+//     falls `d` (a share of the height) over `w` of the width to flat feet, level at the summit and level at the feet;
+//     `skew` (-1 to 1) makes one side steeper. What is cut is the sky: between the top edge and that skyline, the box under
+//     it the mountain. All the summits of a list make one skyline, with a saddle between neighbours.
 // A type names such a list, or a name in `cut_forms` (slope, twin, ring, peak, spire, dome: lists in the style's data), so a
-// pack names its own type's cut with the same two primitives. The only jitter is a small seeded shift of a bell's place. The
+// pack names its own type's cut with the same two primitives. The only jitter is a small seeded shift of a summit's place. The
 // box grows to hold the deepest cut, and the name sits in the band below it (`boxHeight`).
 // The whole palette is used: a cut is two or three nested bands (the same curves inset), each a colour of the run the phase
 // picks (pale to do, land under way, deep done, greys ended, an accent in trouble), and the item's type picks which colour of
@@ -50,26 +52,33 @@ const draw = (c) => `C${at(c[1])} ${at(c[2])} ${at(c[3])}`;
  * `scale` multiplies every depth (the style's dial, and the phase's where it grows) and `seed` the item's id's number.
  */
 export function cuts(box, list, { rx, tension, scale = 1, seed = 0 }) {
-  const w = box.r - box.l, h = box.b - box.t, out = [];
+  const w = box.r - box.l, h = box.b - box.t, out = [], summits = [];
   for (const p of list) {
     const d = Math.min(0.92, p.d * scale);
-    if (isCorner(p)) {
-      // Along the edge by `a`, down the other by `c`; a quarter of an ellipse, tangent to both. The box's own corner is followed round.
-      const sx = p.at[1] === 'l' ? 1 : -1, sy = p.at[0] === 't' ? 1 : -1, cx = sx > 0 ? box.l : box.r, cy = sy > 0 ? box.t : box.b;
-      const a = Math.max(rx + 1, Math.min(0.9 * w, p.w * w)), c = Math.max(rx + 1, Math.min(0.9 * h, d * h)), q = (u, v) => [cx + sx * u, cy + sy * v];
-      const arc = [q(0, c), [q(0, c)[0], q(0, c)[1] - sy * tension * c], [q(a, 0)[0] - sx * tension * a, q(a, 0)[1]], q(a, 0)];
-      const sweep = sx * sy < 0 ? 1 : 0;
-      out.push({ cubics: [arc], d: `M${at(q(a, 0))}L${at(q(rx, 0))}A${rx} ${rx} 0 0 ${sweep} ${at(q(0, rx))}L${at(q(0, c))}${draw(arc)}Z` });
-      continue;
-    }
-    // A bell: flat where it leaves the top edge and flat at its lowest point, the low point shifted by the skew.
-    const half = (p.w * w) / 2, mid = box.l + (p.at + vary(seed, `at${p.at}`) * 0.03) * w, depth = d * h;
-    const xa = Math.max(box.l + rx, mid - half), xb = Math.min(box.r - rx, mid + half), low = Math.min(xb - 1, Math.max(xa + 1, mid + (p.skew ?? 0) * (xb - xa) * 0.28));
-    // Each half has both handles along the level: level at the edge, level at the low point, so no kink at either.
-    const half2 = (x0, y0, x1, y1) => [[x0, y0], [x0 + tension * (x1 - x0), y0], [x1 - tension * (x1 - x0), y1], [x1, y1]];
-    const left = half2(xa, box.t, low, box.t + depth), right = half2(low, box.t + depth, xb, box.t);
-    out.push({ cubics: [left, right], d: `M${at(left[0])}${draw(left)}${draw(right)}Z` });
+    if (!isCorner(p)) { summits.push({ p, d }); continue; }
+    // Along the edge by `a`, down the other by `c`; a quarter of an ellipse, tangent to both. The box's own corner is followed round.
+    const sx = p.at[1] === 'l' ? 1 : -1, sy = p.at[0] === 't' ? 1 : -1, cx = sx > 0 ? box.l : box.r, cy = sy > 0 ? box.t : box.b;
+    const a = Math.max(rx + 1, Math.min(0.9 * w, p.w * w)), c = Math.max(rx + 1, Math.min(0.9 * h, d * h)), q = (u, v) => [cx + sx * u, cy + sy * v];
+    const arc = [q(0, c), [q(0, c)[0], q(0, c)[1] - sy * tension * c], [q(a, 0)[0] - sx * tension * a, q(a, 0)[1]], q(a, 0)];
+    const sweep = sx * sy < 0 ? 1 : 0;
+    out.push({ cubics: [arc], d: `M${at(q(a, 0))}L${at(q(rx, 0))}A${rx} ${rx} 0 0 ${sweep} ${at(q(0, rx))}L${at(q(0, c))}${draw(arc)}Z` });
   }
+  if (!summits.length) return out;
+  // The skyline: flat at the deepest foot's level, each summit rising from it to the top edge (less where it is less deep),
+  // level at both ends of each half so there is no kink at the summit or the foot. The sky above it is the cut.
+  const level = Math.max(rx + 1, Math.max(...summits.map((m) => m.d)) * h), peaks = summits.map(({ p, d }) => {
+    const half = (p.w * w) / 2, skew = (p.skew ?? 0) * 0.6, mid = box.l + (p.at + vary(seed, `at${p.at}`) * 0.03) * w;
+    return { xm: mid, xa: Math.max(box.l + rx, mid - half * (1 - skew)), xb: Math.min(box.r - rx, mid + half * (1 + skew)), y: box.t + level - d * h };
+  }).sort((u, v) => u.xm - v.xm);
+  const half2 = (x0, y0, x1, y1) => [[x0, y0], [x0 + tension * (x1 - x0), y0], [x1 - tension * (x1 - x0), y1], [x1, y1]];
+  const cubics = [];
+  let d = `M${at([box.l + rx, box.t])}H${box.r - rx}A${rx} ${rx} 0 0 1 ${at([box.r, box.t + rx])}V${box.t + level}`;
+  for (const k of [...peaks].reverse()) {
+    const right = half2(k.xb, box.t + level, k.xm, k.y), left = half2(k.xm, k.y, k.xa, box.t + level);
+    cubics.push(right, left);
+    d += `H${+k.xb.toFixed(2)}${draw(right)}${draw(left)}`;
+  }
+  out.push({ cubics, d: `${d}H${box.l}V${box.t + rx}A${rx} ${rx} 0 0 1 ${at([box.l + rx, box.t])}Z` });
   return out;
 }
 
@@ -96,5 +105,5 @@ export function bandsFor(runs, phase, slot, n) {
 /** The type a list was named for, as its place among the types the style gives a cut: its colour's place in a run. */
 export const slotOf = (cut, lineage) => Math.max(0, Object.keys(cut.types).indexOf(lineage.find((t) => cut.types[t] !== undefined)));
 
-/** A list drawn inside itself, band `k` of them: the same primitives, narrower and shallower by `inset` each. */
-export const inset = (list, k, share) => list.map((p) => ({ ...p, w: p.w * (1 - k * share), d: p.d * (1 - k * share * 1.4) }));
+/** A list drawn inside itself, band `k` of them: the same primitives, shallower by `inset` each (a corner narrower too). */
+export const inset = (list, k, share) => list.map((p) => ({ ...p, ...(isCorner(p) && { w: p.w * (1 - k * share) }), d: p.d * (1 - k * share * 1.4) }));
