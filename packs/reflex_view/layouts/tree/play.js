@@ -33,10 +33,17 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
   // A node new since this view was last drawn is born now, once the film is past.
   const reborn = new Map();
   const xy = (id) => place.get(id);
+  // A node lit (born, or reached by a light) shows its name though it gives way, for reflex_name_linger seconds.
+  const litUntil = new Map();
+  const lit = (node, out) => {
+    if (!litUntil.has(node.id)) out.push({ key: `n:${node.id}`, toggle: { 'rt-lit': true } });
+    litUntil.set(node.id, t + n('reflex_name_linger'));
+  };
   const sparkAt = (node, start, out) => {
     const i = nextSpark++ % sparks.length;
     sparks[i] = { node, start };
     out.push({ key: `sp:${i}`, set: { opacity: 1 } });
+    lit(node, out);
   };
   // The points a light runs along, root first.
   const route = (node) => {
@@ -79,6 +86,7 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
       if (!l) return;
       const u = Math.min(1, (t - l.start) / pulse), last = l.route.length - 1;
       const flash = u < 1 ? 1 : 1 - (t - l.start - pulse) / flashFor;
+      if (u >= 1 && !l.reached) (l.reached = true), lit(l.node, out);
       if (flash <= 0) return void ((lights[i] = null), out.push({ key: `lt:${i}`, set: { opacity: 0 } }, { key: `lg:${i}`, set: { opacity: 0 } }, { key: `lh:${i}`, set: { opacity: 0 } }));
       const head = u * last, k = Math.min(last - 1, Math.floor(head)), f = head - k;
       const a = l.route[k], b = l.route[k + 1], hx = a[0] + (b[0] - a[0]) * f, hy = a[1] + (b[1] - a[1]) * f;
@@ -90,6 +98,7 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
         { key: `lh:${i}`, set: { cx: at(hx), cy: at(hy), opacity: u < 1 ? 1 : 0 } },
       );
     });
+    for (const [id, until] of litUntil) if (t > until) litUntil.delete(id), out.push({ key: `n:${id}`, toggle: { 'rt-lit': false } });
     // The counts: written by the model, said by the tree.
     const written = film.writtenAt(t), saidNow = film.saidAt(t);
     if (written !== counts.written) out.push({ key: 'rt-written-n', text: written.toLocaleString('en-US') });
@@ -102,6 +111,8 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
     for (const node of tree.born) out.push({ key: `n:${node.id}`, toggle: { on: false } }, { key: `b:${node.id}`, set: { 'stroke-dashoffset': HIDDEN } });
     sparks.fill(null);
     lights.fill(null);
+    for (const id of litUntil.keys()) out.push({ key: `n:${id}`, toggle: { 'rt-lit': false } });
+    litUntil.clear();
     for (let i = 0; i < pools.sparks; i++) out.push({ key: `sp:${i}`, set: { opacity: 0 } });
     for (let i = 0; i < pools.lights; i++) out.push({ key: `lt:${i}`, set: { opacity: 0 } }, { key: `lg:${i}`, set: { opacity: 0 } }, { key: `lh:${i}`, set: { opacity: 0 } });
     return out;

@@ -76,7 +76,7 @@
         "draw.js": "layouts/tree/draw.js",
         "look.js": "layouts/tree/look.js",
         "play.js": "layouts/tree/play.js",
-        "marks.js": "layouts/tree/marks.js"
+        "marks.js": "layouts/tree/marks.js", "names.js": "layouts/tree/names.js"
       }
     }
   ],
@@ -109,7 +109,7 @@
             "reflex_say": "#2f6fe4"
           },
           "sizes": {
-            "reflex_ring": 45,
+            "reflex_ring": 60,
             "reflex_margin": 50,
             "reflex_node": 3,
             "reflex_leaf": 2,
@@ -125,7 +125,7 @@
             "reflex_head": 2.5,
             "reflex_trail": 2.2,
             "reflex_name_text": 11,
-            "reflex_name_gap": 8,
+            "reflex_name_gap": 8, "reflex_name_pad": 2,
             "reflex_key_glyph": 10,
             "reflex_tip_width": "36ch",
             "reflex_bar_gap": 14,
@@ -160,7 +160,7 @@
             "reflex_glow": 0.25,
             "reflex_trail_ink": 0.6,
             
-            "reflex_name_room": 1.9, "reflex_name_lift": 0.75,
+            "reflex_name_lift": 0.75, "reflex_name_linger": 1.5, "reflex_name_rescale": 1.15, "reflex_name_zoom_least": 0.25,
             "reflex_name_most": 22,
             "reflex_tip_most": 120,
             "reflex_grow": 500,

@@ -5,6 +5,7 @@
 
 import { at, m } from './marks.js';
 import { cut } from './radial.js';
+import { nameAt, nameTransform } from './names.js';
 
 /** Where a branch's one dash stands while it is not yet grown: wholly off the path, so its round caps draw nothing. */
 export const HIDDEN = 1.5;
@@ -13,21 +14,23 @@ export const HIDDEN = 1.5;
 const glow = (key, kind) => m('g', { key, class: `rt-glow rt-${kind}`, opacity: 0 }, m('circle', { class: 'rt-g1', r: 1 }), m('circle', { class: 'rt-g2', r: 0.6 }), m('circle', { class: 'rt-g3', r: 0.3 }));
 
 /** The scene's svg, and how many sparks and lights its pools hold. */
-export function marksOf(tree, placed, z, n, shown) {
+export function marksOf(tree, placed, z, n, shown, named) {
   const { place, branch, width, height, centre } = placed;
   const branches = tree.order.filter((node) => node.parent).map((node) => {
     const on = shown(node);
     return m('path', { key: `b:${node.id}`, class: `rt-branch rt-b${Math.min(node.depth, n('reflex_branch_levels'))}`, d: branch.get(node.id), pathLength: 1, 'stroke-dasharray': '1 2', 'stroke-dashoffset': on ? 0 : HIDDEN });
   });
   const nodes = tree.order.filter((node) => node.parent).map((node) => {
-    const p = place.get(node.id), name = placed.names.get(node.id);
+    const p = place.get(node.id), label = placed.labels.get(node.id), spot = label && nameAt(label);
     const r = node.kids.length ? z('reflex_node') : z('reflex_leaf');
     return m(
       'g',
       { key: `n:${node.id}`, class: `rt-node${shown(node) ? ' on' : ''}${node.item ? '' : ' rt-bough'}`, ...(node.item && { item: node.item.id, on: ['click', 'enter', 'leave'], role: 'link' }) },
+      // Its whole name is its tooltip, whether its name shows or gives way.
+      m('title', {}, node.title),
       m('circle', { class: 'rt-hit', cx: at(p.x), cy: at(p.y), r: z('reflex_hit') }),
       m('circle', { class: 'rt-dot', cx: at(p.x), cy: at(p.y), r }),
-      name && m('text', { class: 'rt-name', x: at(name.x), y: at(name.y), transform: `rotate(${at(name.turn)} ${at(name.x)} ${at(name.y)})`, 'text-anchor': name.right ? 'start' : 'end', 'dominant-baseline': 'middle' }, name.text),
+      label && m('text', { key: `nm:${node.id}`, class: `rt-name${named.has(node.id) ? '' : ' rt-quiet'}`, x: at(spot.x), y: at(spot.y), transform: nameTransform(label, 1, at), 'text-anchor': spot.anchor, 'dominant-baseline': 'middle' }, label.text),
     );
   });
   const sparks = n('reflex_pool_sparks'), lights = n('reflex_pool_lights');

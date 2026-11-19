@@ -30,6 +30,8 @@ ${level.join('\n')}
 .rt-root { fill: var(--ln-text); }
 .rt-name { fill: var(--ln-text); font-size: var(--ln-reflex-name-text); font-weight: 600; pointer-events: none; }
 .rt-bough .rt-name { fill: var(--ln-muted); }
+.rt-name.rt-quiet { opacity: 0; transition: opacity ${n('reflex_grow')}ms ease-out; }
+.rt-node.rt-lit .rt-name.rt-quiet { opacity: 1; }
 .rt-glow { pointer-events: none; }
 .rt-spark circle { fill: ${write}; }
 .rt-light circle { fill: ${say}; }

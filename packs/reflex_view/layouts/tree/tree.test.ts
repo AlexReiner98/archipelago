@@ -9,6 +9,7 @@ import { radial } from './radial.js';
 import { sayingsOf } from './said.js';
 import { filmOf } from './film.js';
 import { picture } from './index.js';
+import { namesShown, overlap } from './names.js';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, '..', '..', 'pack.json'), 'utf8'));
 const style = pack.styles.find((s: any) => s.id === 'reflex_view.tree').props.style;
@@ -46,9 +47,8 @@ test('a ring of part_of is cut where it closes, a node said somewhere hangs from
 test('it is placed the same each time, each child within its parent’s share of the circle', () => {
   const measure = (text: string, px: number) => text.length * px * 0.55;
   const a = radial(treeOf(answer())!, z, n, measure), b = radial(treeOf(answer())!, z, n, measure);
-  assert.ok(a.names.size > 0, 'the first levels are named where there is room');
   assert.deepEqual([...a.place], [...b.place]);
-  assert.equal(a.names.size, a.place.size - 1, 'every node but the root is named');
+  assert.equal(a.labels.size, a.place.size - 1, 'every node but the root has a name laid out');
   assert.deepEqual([a.centre.x * 2, a.centre.y * 2], [a.width, a.height], 'the root stands at the middle');
   assert.ok(a.width > 0 && a.height > 0);
   for (const p of a.place.values()) assert.ok(p.x >= 0 && p.y >= 0 && p.x <= a.width && p.y <= a.height);
@@ -110,30 +110,29 @@ test('counted, a node never said is never lit', () => {
   assert.equal(film.pick(film.end, rnd), null);
 });
 
-/** Whether two convex shapes (lists of corners) overlap: no axis of either's edges parts them. */
-const overlap = (a: number[][], b: number[][]) => {
-  for (const shape of [a, b]) for (let i = 0; i < shape.length; i++) {
-    const [x1, y1] = shape[i], [x2, y2] = shape[(i + 1) % shape.length], nx = y2 - y1, ny = x1 - x2;
-    const on = (s: number[][]) => s.map(([x, y]) => x * nx + y * ny);
-    const pa = on(a), pb = on(b);
-    if (Math.max(...pa) <= Math.min(...pb) || Math.max(...pb) <= Math.min(...pa)) return false;
-  }
-  return true;
-};
-
-test('grown, no name meets another name or a wire', () => {
+test('grown, no two shown names overlap or cross a wire, and every node is named or a dot with its name as tooltip', async () => {
   const places = ['tool:change', 'tool:query', 'file:packs/canvas/layouts/*.js', 'file:packs/*/page/*.js', 'file:ui/*', 'session_start', 'working_rules', 'guide:style_code'];
   const items = Array.from({ length: 40 }, (_, i) => node(i, { title: `A rule of the harness, number ${i}`, fields: { for: [places[i % places.length]] } }));
   const links = [partOf(9, 1), partOf(17, 1), partOf(25, 9), partOf(12, 4), partOf(20, 4), partOf(28, 4), partOf(33, 2), partOf(34, 33)];
-  const tree = treeOf({ lens: { find: ['type instruction'] }, items, links }, undefined, n)!;
-  const placed = radial(tree, z, n, (text: string, px: number) => text.length * px * 0.55, 1280 / 640);
-  const boxes = [...placed.names.entries()];
-  assert.equal(boxes.length, tree.nodes.size - 1, 'every node is named');
-  const met: string[] = [];
-  for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) if (overlap(boxes[i][1].box, boxes[j][1].box)) met.push(`${boxes[i][1].text} / ${boxes[j][1].text}`);
-  for (const [id, points] of placed.along) for (let k = 1; k < points.length; k++) {
-    const seg = [points[k - 1], points[k]];
-    for (const [other, name] of boxes) if (overlap(seg, name.box)) met.push(`${name.text} / the wire to ${tree.nodes.get(id)!.title}${other === id ? ' (its own)' : ''}`);
+  const answer40 = { lens: { find: ['forty'] }, items, links };
+  const tree = treeOf(answer40, undefined, n)!;
+  const placed = radial(tree, z, n, (text: string, px: number) => text.length * px * 0.55, 2);
+  const counts = new Map(tree.written.map((one, i) => [one.id, i % 5]));
+  for (const f of [1.4, 1, 0.5]) {
+    const { shown, boxes } = namesShown(tree, placed, counts, z, n, f);
+    const ids = [...shown];
+    for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) assert.ok(!overlap(boxes.get(ids[i]), boxes.get(ids[j])), `${ids[i]} and ${ids[j]} at ${f}`);
+    for (const id of ids) {
+      const own = new Set([id, ...tree.nodes.get(id)!.kids.map((k) => k.id)]);
+      for (const [to, points] of placed.along) if (!own.has(to)) for (let k = 1; k < points.length; k++) assert.ok(!overlap([points[k - 1], points[k]], boxes.get(id)), `${id} and the wire to ${to} at ${f}`);
+    }
+    if (f === 1) assert.ok(shown.size > 0 && shown.size < placed.labels.size, 'some names show and some give way');
   }
-  assert.deepEqual(met, []);
+  // Zoomed in, more show; every bough that shows outranks a leaf it met.
+  assert.ok(namesShown(tree, placed, counts, z, n, 0.5).shown.size >= namesShown(tree, placed, counts, z, n, 1).shown.size);
+  const drawn = await picture({ answer: answer40, style, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {} });
+  const marks = JSON.stringify(drawn.scene.svg);
+  for (const one of tree.order.filter((x) => x.parent)) assert.ok(marks.includes(JSON.stringify(['title', {}, one.title])), `${one.title} has its tooltip`);
+  assert.ok(marks.includes('rt-quiet'), 'a name that gives way is drawn quiet');
+  assert.ok(drawn.viewport({ x: 0, y: 0, width: 1, height: 1, scale: 0.5 }).some((p: any) => p.set?.transform?.includes('scale(2)')), 'names keep their size on screen');
 });

@@ -15,6 +15,8 @@ import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
 import { barOf, cssOf, keyOf } from './look.js';
 import { player } from './play.js';
+import { nameTransform, namesShown } from './names.js';
+import { at } from './marks.js';
 
 /** What each view drew last, by its query: opened again, it stands grown. */
 const drawn = new Map();
@@ -60,7 +62,9 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const grown = reduced || before !== undefined;
   const fresh = before && !reduced ? tree.born.filter((node) => !before.has(node.id)) : [];
   const shown = (node) => grown && !fresh.includes(node);
-  const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown);
+  // Which names show, at full size until the page says its zoom: chosen again as the zoom changes.
+  let scaleAt = 1, named = namesShown(tree, placed, said.counts, z, n, scaleAt);
+  const { svg, sparks, lights } = marksOf(tree, placed, z, n, shown, named.shown);
   const css = cssOf(style, z, n);
   if (missing.length) return { scene: { message: `This view's style names no ${[...new Set(missing)].slice(0, 2).join(', ')}: draw it with the Reflex tree view, whose preset names them.` } };
   const speed = { now: 1 };
@@ -105,6 +109,15 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
       return [];
     },
     restyle: () => [],
+    // Names keep one size on screen: at a new zoom (by more than reflex_name_rescale), each is laid at its size there
+    // and which show is chosen again, so zooming in shows more.
+    viewport(view) {
+      const f = 1 / Math.max(n('reflex_name_zoom_least'), Number(view?.scale) || 1);
+      if (Math.abs(Math.log(f / scaleAt)) < Math.log(n('reflex_name_rescale'))) return [];
+      scaleAt = f;
+      named = namesShown(tree, placed, said.counts, z, n, f);
+      return [...placed.labels.values()].flatMap((l) => [{ key: `nm:${l.id}`, set: { transform: nameTransform(l, f, at) } }, { key: `nm:${l.id}`, toggle: { 'rt-quiet': !named.shown.has(l.id) } }]);
+    },
     end() {
       alive = false;
     },
