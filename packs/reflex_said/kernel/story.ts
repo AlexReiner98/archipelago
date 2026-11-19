@@ -9,11 +9,13 @@ import type { Fired, RuleNode } from './rule-nodes.ts';
 
 export interface StoryNode {
   id: string;
-  /** Said (an instruction) or enforced (a rule). */
-  kind: 'instruction' | 'rule';
+  /** Said (an instruction), enforced (a rule), or the schema: a type and the checks it implies. */
+  kind: 'instruction' | 'rule' | 'type' | 'check';
   /** The pack it came from; workspace or repository for the owner's own; reflex for learned. */
   pack: string;
-  tier: Tier;
+  tier: Tier | 'schema';
+  /** A type's words: its description. */
+  words?: string;
   /** A rule's: hold, refuse, ask, requires... */
   effect?: string;
   status?: string;
@@ -36,11 +38,11 @@ export interface Story {
  * each miss no open node covers, or that only a trial covers (that trial grew from it); each saying with what became
  * of its miss in its run.
  */
-export function storyOf(input: { from: string; to: string; asked: StoryNode[]; others: StoryNode[]; rules?: RuleNode[]; fired?: Fired[]; sayings: Saying[]; records: Pick<Record_, 'id' | 'per_run'>[]; misses: Miss[]; trials: Set<string> }): Story {
+export function storyOf(input: { from: string; to: string; asked: StoryNode[]; others: StoryNode[]; rules?: RuleNode[]; schema?: StoryNode[]; fired?: Fired[]; sayings: Saying[]; records: Pick<Record_, 'id' | 'per_run'>[]; misses: Miss[]; trials: Set<string> }): Story {
   const verdict = new Map(input.records.flatMap((r) => r.per_run.map((v) => [`${r.id} ${v.run}`, v.verdict] as const)));
   const shown = new Set(input.asked.map((n) => n.id));
   // Every rule in force is drawn, fired or not: a rule is there whether or not it was met.
-  const nodes = [...input.asked, ...input.others.filter((n) => !shown.has(n.id) && input.sayings.some((s) => s.id === n.id)), ...(input.rules ?? []).filter((r) => !shown.has(r.id))];
+  const nodes = [...input.asked, ...input.others.filter((n) => !shown.has(n.id) && input.sayings.some((s) => s.id === n.id)), ...(input.rules ?? []).filter((r) => !shown.has(r.id)), ...(input.schema ?? []).filter((n) => !shown.has(n.id))];
   const misses = input.misses
     .filter((m) => m.at >= input.from && m.at <= input.to && m.covered_by.every((id) => input.trials.has(id)))
     .map((m) => ({ at: m.at, where: m.where, kind: m.kind, ...(m.covered_by.length && { grew: m.covered_by[0] }) }));

@@ -41,6 +41,13 @@ export default {
     return { answer: Array.isArray(found) ? found : [] };
   },
 
+  // What the tree's drawing asks through its sends: every type and the checks it implies, with their refusals.
+  'reflex_view.schema': async (input, ctx) => {
+    const days = Number.isInteger(input?.days) ? input.days : undefined;
+    const found = await ctx.read({ said_schema: days === undefined ? {} : { days } });
+    return { answer: Array.isArray(found) ? found : [] };
+  },
+
   // What the tree's drawing asks through its sends: every rule in force and when each fired.
   'reflex_view.rules': async (input, ctx) => {
     const days = Number.isInteger(input?.days) ? input.days : undefined;
