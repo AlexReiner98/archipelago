@@ -144,3 +144,44 @@ export const eventsPost = ({ base, token, session_id, source, events }) => [
   `${String(base).replace(/\/$/, '')}/hooks/events`,
   { method: 'POST', headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) }, body: JSON.stringify({ session_id, source, events }) },
 ];
+
+// What the map may write into a checkout, and the mark a file it wrote carries (packs/agents/kernel/written.ts, the same).
+// Here beside the events, since this file is handed out wherever the hook is (the setup, the plugin, the installer).
+const WRITABLE = /^(CLAUDE(\.local)?\.md|\.claude\/skills\/[A-Za-z0-9_-]+\/SKILL\.md)$/;
+const MAP_MARK = '<!-- Written from the map';
+
+/**
+ * The files the map writes into a checkout (packs/agents/kernel/written.ts), taken out of the session start's answer
+ * and written at the checkout's root (root) by the hook's read and write: only a path the map may write (never
+ * settings or hooks), and only over a file the map wrote before (its mark in the first lines) or none, so a file a
+ * person wrote is never lost. The session is told what changed, since Claude Code read its CLAUDE.md before the hook
+ * ran. The answer is handed back without them.
+ */
+export function writeFiles(answer, root, read, write) {
+  let parsed;
+  try {
+    parsed = JSON.parse(answer || '{}');
+  } catch {
+    return answer;
+  }
+  const { files, ...rest } = parsed ?? {};
+  if (!Array.isArray(files) || !files.length) return answer;
+  const lines = [];
+  for (const file of root ? files : []) {
+    if (!file || typeof file.path !== 'string' || typeof file.text !== 'string' || !WRITABLE.test(file.path)) continue;
+    const at = `${root.replace(/[\\/]+$/, '')}/${file.path}`;
+    const was = read(at)?.replace(/\r\n/g, '\n') ?? null;
+    if (was === file.text) continue;
+    if (was !== null && !was.split('\n').slice(0, 8).some((line) => line.startsWith(MAP_MARK))) {
+      lines.push(`${file.path} here was written by hand, so the map's version of it was not written over it: the owner chooses which to keep.`);
+      continue;
+    }
+    write(at, file.text);
+    lines.push(`${file.path} was written again from the map: read it again, as this session was handed the one before.`);
+  }
+  if (lines.length) {
+    const said = rest.hookSpecificOutput?.additionalContext;
+    rest.hookSpecificOutput = { ...rest.hookSpecificOutput, hookEventName: 'SessionStart', additionalContext: [said, lines.join('\n')].filter(Boolean).join('\n\n') };
+  }
+  return JSON.stringify(rest);
+}

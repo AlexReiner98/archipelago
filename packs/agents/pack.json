@@ -46,6 +46,19 @@
         },
         "run": "query-answers.ts#told"
       },
+      "answer.written": {
+        "in": {
+          "remote?": "string",
+          "about?": "string",
+          "island?": "string"
+        },
+        "out": {
+          "files": [
+            "any"
+          ]
+        },
+        "run": "written.ts#written"
+      },
       "answer.schema_brief": {
         "in": {},
         "out": {

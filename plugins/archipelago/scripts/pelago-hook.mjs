@@ -233,8 +233,8 @@ function runFile(said) {
   }
 }
 
-// What the session did, as the events of docs/sessions.md (pelago-events.mjs, handed out beside this). One
-// missing (a copy from before it) tells nothing: the hook goes on as before.
+// What the session did, as the events of docs/sessions.md, and the files the map writes into the checkout at its
+// start (pelago-events.mjs, handed out beside this, writeFiles). One missing (a copy from before it) tells nothing: the hook goes on as before.
 const adapter = await import('./pelago-events.mjs').catch(() => null);
 
 /** A wait the session stopped for, kept outside any checkout until something shows it was answered. */
@@ -433,10 +433,10 @@ try {
     }
     out = rest;
   } else if (res.ok) {
-    out = answer;
+    out = name === 'session-start' && adapter?.writeFiles ? adapter.writeFiles(answer, gitState(said.cwd)?.worktree, (at) => { try { return readFileSync(at, 'utf8'); } catch { return null; } }, (at, text) => (mkdirSync(dirname(at), { recursive: true }), writeFileSync(at, text))) : answer;
     if (name === 'session-start') {
       const run = keepRun(res.headers.get('x-pelago-run'), body);
-      if (plugin) (out = plugin.fromServer(answer)), context.push(plugin.rules(), plugin.trailer(run, said.cwd));
+      if (plugin) (out = plugin.fromServer(out)), context.push(plugin.rules(), plugin.trailer(run, said.cwd));
     }
   } else notice = sayOnce(`status-${res.status}`, `Archipelago ${name} hook: ${base} answered ${res.status}${res.status === 401 || res.status === 403 ? `: this machine ${token ? 'has a token the server refused' : 'has no token for it'}, so this session is not on the map` : ''}.`);
 } catch (err) {
