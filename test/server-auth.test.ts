@@ -305,8 +305,8 @@ test('nothing passes between workspaces: notifications and shares by workspace a
 
   const set = await call('/api/workspace_set', theirs, { default_visibility: 'shared' });
   const { reply_rules, ...settings } = set.result;
-  assert.deepEqual(settings, { id: 'acme', default_visibility: 'shared', agent_changes: 'apply', agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: true, holds_off: true, lifted: { reply_draw_answers: false, reply_record_findings: false, reply_unshown: false } });
-  assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['practice.draw_answers', false], ['practice.record_findings', false], ['sessions.show_what_you_saw', false]]);
+  assert.deepEqual(settings, { id: 'acme', default_visibility: 'shared', agent_changes: 'apply', agent_backups: false, agent_publish: false, agent_code: false, drawings_open: false, islands: true, holds_off: true, lifted: { reply_draw_answers: false, reply_record_findings: false, reply_reflex_node: false, reply_unshown: false } });
+  assert.deepEqual(reply_rules.map((r: { rule: string; off: boolean }) => [r.rule, r.off]), [['practice.draw_answers', false], ['practice.record_findings', false], ['reflex_said.write_node', false], ['sessions.show_what_you_saw', false]]);
 });
 
 test('dev mode turns review off and offers agents a restart; without it neither holds', async () => {

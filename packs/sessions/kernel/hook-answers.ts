@@ -77,8 +77,11 @@ const kept = async <T = unknown>(ctx: KernelContext, key: string) => (await ctx.
 const keep = (ctx: KernelContext, key: string, value: unknown, ms: number) => ctx.call('root.transient', { keep: { key, value, ms } });
 
 /** What is said at `where` (an instruction's `for`), one after another: what to do about it is the instructions'. */
-const sayAt = async (ctx: KernelContext, where: string, fill: Record<string, string>, session?: string) =>
-  (await toldAt(ctx, where, { fill, island: await sessionIsland(ctx, session && (await resolveRun(ctx, session, true))?.id) })).join(' ');
+const sayAt = async (ctx: KernelContext, where: string, fill: Record<string, string>, session?: string) => {
+  const run = session ? (await resolveRun(ctx, session, true))?.id : undefined;
+  // Said to that run: the fill names it, so what is said is kept as said to it (the agents pack's).
+  return (await toldAt(ctx, where, { fill: { ...(run && { run }), ...fill }, island: await sessionIsland(ctx, run) })).join(' ');
+};
 
 // A client keeps the tools as they were when it connected; what to do about it is practice's instruction for server_restarted.
 const restarted = async (ctx: KernelContext, { started, commit }: HookAsk['running'], added: string[] | undefined, session?: string) =>

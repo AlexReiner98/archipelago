@@ -72,6 +72,7 @@ export const VIEWS_OPERATIONAL: Record<string, string> = {
  */
 export const RECORDS: Record<string, string> = {
   drew: "What a page drew with (packs/loader/kernel/pack-versions.ts, Drew): the host's commit, the packs a run records and each part's hash, recorded by the parts read (packs/loader/kernel/parts-read.ts) as the person looking, about the island (or `map`), once for each set that differs from their last. In the observations stream, kept by core's rule drew: the latest and 90 days.",
+  said: "Each instruction said to a run (packs/agents/kernel/instructions.ts, the read said_here): which one (a preset's id or a kept one's), the run and where (its for place), recorded by the reflex_said pack as the system, about the instruction, read back as its record (packs/reflex_said/kernel/record.ts). In that pack's own stream, pack:reflex_said, kept by its rule said: 90 days.",
 };
 
 /** Restoring a backup writes the map's rows as they were, in packs/write/kernel/pelago.ts (restoreRows): never re-applied as changes. */

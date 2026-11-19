@@ -6,7 +6,7 @@
 
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 import { headPos } from '../../log/kernel/tail.ts';
-import { opEntries, type OpStream } from '../../log/kernel/streams.ts';
+import { opEntries, readOps, type OpStream } from '../../log/kernel/streams.ts';
 import { isCountStream } from '../../log/kernel/retention.ts';
 import { publicViewAt, publicViews } from './public-views.ts';
 import { draftDocument, publicDocument } from './public-documents.ts';
@@ -40,6 +40,8 @@ export type ServiceRead = {
   counts?: { stream: string; after?: number };
   /** Of some items, the fields a person said after any agent last did (an item a person made counts whole), with who and when. */
   corrections?: string[];
+  /** The asking pack's own stream (pack:<its id>), opened, oldest first: in these days (UTC, first and last), of facts about one id, OWN_ENTRIES at most. */
+  own_stream?: { about?: string; days?: [string, string]; limit?: number };
   /** The uses stream's entries written in these days (UTC, first and last; at most USE_ENTRIES), each its facts: what the Packs screen counts. */
   uses_lately?: { days: [string, string] };
   /** Of some types and link types, the items and open links standing, and how many of them were made since a time. */
@@ -51,11 +53,13 @@ export type ServiceRead = {
 };
 
 /** The reads of this module, by name. */
-const SERVICE_READS = ['link', 'log_head', 'memory', 'islands_off', 'public_views', 'public_view_at', 'public_document', 'published_row', 'shared', 'picture', 'counts', 'corrections', 'uses_lately', 'type_counts', 'workspace_name', 'unplaced'] as const satisfies readonly (keyof ServiceRead)[];
+const SERVICE_READS = ['link', 'log_head', 'memory', 'islands_off', 'public_views', 'public_view_at', 'public_document', 'published_row', 'shared', 'picture', 'counts', 'own_stream', 'corrections', 'uses_lately', 'type_counts', 'workspace_name', 'unplaced'] as const satisfies readonly (keyof ServiceRead)[];
 /** The most items one read of what is on no island answers. */
 export const UNPLACED = 500;
 /** The most entries one read of a count stream answers. */
 export const COUNT_ENTRIES = 1000;
+/** The most entries one read of a pack's own stream answers. */
+export const OWN_ENTRIES = 2000;
 /** A key of a pack's memory: a short word of letters, digits, _, -, : and . */
 const KEY = /^[A-Za-z0-9_.:-]{1,120}$/;
 const ID = /^e_[a-z0-9]{8}$/;
@@ -143,6 +147,15 @@ export async function serviceRead(l: Archipelago, q: ServiceRead, pack?: string)
     if (!ID.test(id)) return null;
     const { rows } = await l.db.query<{ content_type: string; data: string; size: number }>(`select content_type, encode(bytes, 'base64') as data, size from picture where entity_id = $1`, [id]);
     return rows[0] ? { content_type: rows[0].content_type, size: rows[0].size, data: rows[0].data.replaceAll('\n', '') } : null;
+  }
+  if (q.own_stream !== undefined) {
+    loggedIn(l, 'stream');
+    const { about, days, limit } = q.own_stream;
+    if (about !== undefined && (typeof about !== 'string' || !about)) throw new Error('own_stream.about is an id');
+    if (days !== undefined && (!Array.isArray(days) || days.length !== 2 || days.some((d) => !/^\d{4}-\d{2}-\d{2}$/.test(String(d))))) throw new Error('own_stream.days is two dates, the first and the last');
+    const most = Math.min(OWN_ENTRIES, Math.max(1, Math.floor(Number(limit ?? OWN_ENTRIES)) || OWN_ENTRIES));
+    const entries = await readOps(l.db, `pack:${pack}` as OpStream, { ...(about !== undefined && { field: about }), ...(days && { days }), limit: most });
+    return entries.map((e) => ({ pos: e.pos, at: e.at, facts: e.facts }));
   }
   if (q.counts !== undefined) {
     const stream = String(q.counts.stream);

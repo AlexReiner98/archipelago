@@ -25,9 +25,12 @@ export const REPLY_ENDED = 'reply_ended';
  * several items (search, a lens, a view), not one item's get nor a read of what the tools take or where to start;
  * told, the beats it told (report, action tell); worked, its calls to tools other than the map's (a file read or
  * written, a command run); edited counts the files it wrote; looked, the images it looked at (a tool's answer holding
- * one); unshown, those of them it did not put before the owner (image files sent, a show, a draw).
+ * one); unshown, those of them it did not put before the owner (image files sent, a show, a draw). missed is the
+ * server's, never the hook's: the refusals in the run no node covers since the rule asking last asked there (MISSED).
  */
-export const REPLY_FACTS = ['read', 'surveyed', 'showed', 'changed', 'told', 'worked', 'edited', 'committed', 'pushed', 'looked', 'unshown'] as const;
+export const REPLY_FACTS = ['read', 'surveyed', 'showed', 'changed', 'told', 'worked', 'edited', 'committed', 'pushed', 'looked', 'unshown', 'missed'] as const;
+/** The fact the server counts itself, from the run's story, rather than take from the hook. */
+export const MISSED = 'missed';
 export type ReplyFacts = Partial<Record<(typeof REPLY_FACTS)[number], number>>;
 
 /** A reply rule's setting: what the owner turns it off by. */
@@ -62,6 +65,7 @@ export function replyFacts(said: unknown): ReplyFacts | undefined {
   if (!said || typeof said !== 'object') return undefined;
   const facts: ReplyFacts = {};
   for (const fact of REPLY_FACTS) {
+    if (fact === MISSED) continue;
     const n = (said as Record<string, unknown>)[fact];
     if (Number.isInteger(n) && (n as number) >= 0) facts[fact] = n as number;
   }

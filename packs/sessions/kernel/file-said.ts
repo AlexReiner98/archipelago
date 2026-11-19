@@ -16,8 +16,10 @@ export async function fileSaid(ctx: KernelContext, input: { session_id?: string;
   const before = new Set(Array.isArray(input.said) ? input.said.map(String) : []);
   const run = input.session_id ? await resolveRun(ctx, input.session_id, true) : undefined;
   const place = run ? await placeOf(ctx, run.id) : undefined;
-  const all = (await ctx.reads({ instructions: { where: `${FILE}${input.path}`, ...(place && { about: place }) } })) as { id: string; title: string; text: string }[];
+  const all = (await ctx.reads({ instructions: { where: `${FILE}${input.path}`, ...(place && { about: place }) } })) as { id: string; title: string; text: string; preset?: string }[];
   const told = all.filter((one) => !before.has(one.id));
+  // What is new to the session is kept as said to it there (the reflex_said pack's record); what it was told before is not said again.
+  if (told.length && run) await ctx.reads({ said_here: { ids: told.map((one) => one.preset ?? one.id), run: run.id, where: `${FILE}${input.path}` } }).catch(() => undefined);
   if (!told.length) return undefined;
   return { text: [`Archipelago, on ${input.path}:`, ...told.map((one) => `- ${one.title}. ${one.text}`)].join('\n'), ids: told.map((one) => one.id) };
 }
