@@ -179,7 +179,8 @@
             "misses": "reflex_view.misses",
             "rules": "reflex_view.rules",
             "legend": "reflex_view.legend",
-            "add": "reflex_view.add_node"
+            "add": "reflex_view.add_node",
+            "schema": "reflex_view.schema"
           },
           "colors": {
             "reflex_write": "#e8912d",
@@ -187,7 +188,8 @@
             "reflex_fail": "#d9534f",
             "reflex_fire": "#3fb27f",
             "reflex_owner": "#c58af9",
-            "reflex_learned": "#e8b04a"
+            "reflex_learned": "#e8b04a",
+            "reflex_schema": "#8c9bb0"
           },
           "sizes": {
             "reflex_ring": 60,
@@ -266,7 +268,8 @@
             "reflex_tier_owner": 1,
             "reflex_tier_learned": 0.8,
             "reflex_retired_ink": 0.35,
-            "reflex_gap_ink": 0.75
+            "reflex_gap_ink": 0.75,
+            "reflex_tier_schema": 1.6
           },
           "hues": [
             "#5aa9e6",

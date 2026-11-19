@@ -46,7 +46,7 @@ const firstPlace = (where) => (Array.isArray(where) ? where.find((w) => typeof w
 export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0, presets = []) {
   // The presets the story names (core's and the packs', no item of the map) stand with the rest, under their places.
   // A rule is one of them, under the place it guards (`where`); it is marked a rule.
-  const extra = presets.filter((p) => p && typeof p.id === 'string' && !(answer.items ?? []).some((i) => i.id === p.id)).map((p) => ({ id: p.id, type: 'instruction', title: p.title ?? p.id, preset: true, rule: p.kind === 'rule', fields: { for: p.for } }));
+  const extra = presets.filter((p) => p && typeof p.id === 'string' && !(answer.items ?? []).some((i) => i.id === p.id)).map((p) => ({ id: p.id, type: 'instruction', title: p.title ?? p.id, preset: true, rule: p.kind === 'rule', kind: p.kind ?? 'instruction', fields: { for: p.for } }));
   const items = [...(Array.isArray(answer.items) ? answer.items.filter((i) => !i.pending) : []), ...extra];
   const byId = new Map(items.map((i) => [i.id, i]));
   const up = new Map();
@@ -54,7 +54,7 @@ export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0
   const from = answer.lens?.from && byId.has(answer.lens.from) ? answer.lens.from : undefined;
   const nodes = new Map();
   const make = (id, item, title) => {
-    const node = { id, item: item?.preset ? undefined : item, preset: Boolean(item?.preset), rule: Boolean(item?.rule), title, parent: null, kids: [], depth: 0, born: item?.preset ? -Infinity : item ? Date.parse(item.created_at) : Infinity };
+    const node = { id, item: item?.preset ? undefined : item, preset: Boolean(item?.preset), rule: Boolean(item?.rule), kind: item?.kind ?? 'instruction', title, parent: null, kids: [], depth: 0, born: item?.preset ? -Infinity : item ? Date.parse(item.created_at) : Infinity };
     if (Number.isNaN(node.born)) node.born = Infinity;
     nodes.set(id, node);
     return node;

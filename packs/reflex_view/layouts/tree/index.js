@@ -10,7 +10,7 @@
 
 import { placeOfBough, treeOf } from './tree.js';
 import { radial } from './radial.js';
-import { rulesOf, storyOf, toldFrom, weekTo } from './story.js';
+import { rulesOf, schemaOf, storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { marksOf, tipOf } from './draw.js';
 import { barOf, cssOf, packHues } from './look.js';
@@ -99,7 +99,8 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again) {
   const first = treeOf(answer);
   if (!first) return { scene: { message: 'This view holds no instruction or reflex node yet.' } };
   const ids = first.written.map((node) => node.id);
-  const [records, story0, misses, ruled] = await Promise.all([recordsOf(ids, style, tools, n), recordsOf(ids, style, tools, n, 'story'), missesOf(style, tools, n), missesOf(style, tools, n, 'rules')]);
+  const [records, story0, misses, ruled, schemed] = await Promise.all([recordsOf(ids, style, tools, n), recordsOf(ids, style, tools, n, 'story'), missesOf(style, tools, n), missesOf(style, tools, n, 'rules'), missesOf(style, tools, n, 'schema')]);
+  const schema = schemaOf(schemed);
   const rules = rulesOf(ruled);
   // The pack's own story where the view sends one; else made from its counts and misses where both came, each
   // node's sayings with their days; else schematic.
@@ -110,19 +111,23 @@ async function drawn1({ answer, style, reduced, width, height }, tools, again) {
   const story = storyOf(answer, told, records ? counts : null, n, now, tiers);
   const placeOf = new Map([...(records ?? []).filter((r) => r && r.for !== undefined).map((r) => [r.id, r.for]), ...[...story.nodes].filter(([, x]) => x.for !== undefined).map(([id, x]) => [id, x.for])]);
   if (!story.rules?.length) story.rules = rules;
+  // The schema (types and the checks they imply) stands with the rest, its own tier, under the place each guards.
+  story.schema = schema;
+  for (const x of schema) if (!story.nodes.has(x.id)) story.nodes.set(x.id, { tier: 'schema', status: 'current', pack: x.pack, for: x.for });
   // Core's and the packs' presets stand with the rest; each rule under the place it guards, where saying and enforcing meet.
   const presets = [
     ...[...story.nodes].filter(([, x]) => x.tier === 'core' || x.tier === 'pack').map(([id, x]) => ({ id, ...x })),
     ...story.rules.map((r) => ({ id: r.id, title: r.title, for: [r.where], kind: 'rule' })),
+    ...schema.map((x) => ({ id: x.id, title: x.title, for: x.for, kind: x.kind })),
   ];
   // The legend filters (./legend.js): what its entries turn off leaves the tree, which fits itself again; a bough with
   // nothing left under it goes with it. Every node the view holds is counted, filter or no.
   const hidden = hiddenOf(style);
-  const infoOf = (id, rule) => {
+  const infoOf = (id, rule, kind = rule ? 'rule' : 'instruction') => {
     const r = rule ? story.rules.find((x) => x.id === id) : null, x = story.nodes.get(id);
-    return { id, rule: Boolean(rule), pack: r ? r.pack : x?.pack ?? x?.tier ?? 'owner', tier: r ? (r.pack === 'core' ? 'core' : 'pack') : x?.tier ?? 'owner', status: r ? 'current' : x?.status ?? 'current' };
+    return { id, rule: Boolean(rule), kind, pack: r ? r.pack : x?.pack ?? x?.tier ?? 'owner', tier: r ? (r.pack === 'core' ? 'core' : 'pack') : x?.tier ?? 'owner', status: r ? 'current' : x?.status ?? 'current' };
   };
-  const everyNode = [...first.written.map((node) => infoOf(node.id, false)), ...presets.map((p) => infoOf(p.id, p.kind === 'rule'))];
+  const everyNode = [...first.written.map((node) => infoOf(node.id, false)), ...presets.map((p) => infoOf(p.id, p.kind === 'rule', p.kind ?? 'instruction'))];
   const keep = new Set(everyNode.filter(shownBy(hidden)).map((x) => x.id)), counted = new Set(everyNode.map((x) => x.id));
   const shownAnswer = { ...answer, items: (answer.items ?? []).filter((i) => !counted.has(i.id) || keep.has(i.id)) };
   const tree = treeOf(shownAnswer, (item) => item.fields?.for ?? placeOf.get(item.id), n, presets.filter((p) => keep.has(p.id)));

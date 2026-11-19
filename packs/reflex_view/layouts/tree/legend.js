@@ -9,12 +9,12 @@
 import { m } from './marks.js';
 import { packClass } from './story.js';
 
-const TIERS = ['core', 'pack', 'owner', 'learned'];
+const TIERS = ['schema', 'core', 'pack', 'owner', 'learned'];
 const STANDINGS = ['trial', 'current', 'retired'];
 const EVENTS = ['miss', 'held', 'failed', 'fired'];
 
 /** The entries a node falls under: its kind, pack, tier and standing. */
-export const entriesOf = ({ rule, pack, tier, status }) => [`kind:${rule ? 'rule' : 'instruction'}`, `pack:${pack}`, `tier:${tier}`, `status:${status}`];
+export const entriesOf = ({ rule, kind, pack, tier, status }) => [`kind:${kind ?? (rule ? 'rule' : 'instruction')}`, `pack:${pack}`, `tier:${tier}`, `status:${status}`];
 
 /** Whether a node stands in the tree: none of its entries is turned off. */
 export const shownBy = (hidden) => (node) => !entriesOf(node).some((e) => hidden.has(e));
@@ -33,6 +33,7 @@ export function legendOf({ nodes, events, hidden, hues, toggles, schematic }) {
     m('div', { key: `lg:${entry}`, class: `rt-lg-row${hidden.has(entry) ? ' rt-off' : ''}${toggles ? ' toggles' : ''}`, ...(toggles && { on: ['click'], role: 'button' }), title: `${title}${toggles ? (hidden.has(entry) ? ' (off: click to show)' : ' (click to hide)') : ''}` },
       m('span', { class: 'rt-lg-mark' }, glyph), m('span', { class: 'rt-lg-name' }, label), m('span', { class: 'rt-lg-n' }, n.toLocaleString('en-US')));
   const dot = (cls) => m('svg', { viewBox: '0 0 2 2', class: 'rt-lg-glyph' }, m('circle', { cx: 1, cy: 1, r: 0.8, class: cls }));
+  const diamond = (cls) => m('svg', { viewBox: '0 0 2 2', class: 'rt-lg-glyph' }, m('path', { d: 'M1 0.1 L1.9 1 L1 1.9 L0.1 1 Z', class: cls }));
   const square = (cls) => m('svg', { viewBox: '0 0 2 2', class: 'rt-lg-glyph' }, m('rect', { x: 0.2, y: 0.2, width: 1.6, height: 1.6, class: cls }));
   const group = (title, rows) => rows.length > 0 && m('div', { class: 'rt-lg-group' }, m('div', { class: 'rt-lg-title' }, title), rows);
   const packs = [...hues.keys()];
@@ -40,11 +41,13 @@ export function legendOf({ nodes, events, hidden, hues, toggles, schematic }) {
     'div',
     { key: 'rt-legend', class: 'rt-legend' },
     group('Kind', [
-      row('kind:rule', square('rt-k-node'), 'Rules', count((x) => x.rule), 'A rule guards a write'),
-      row('kind:instruction', dot('rt-k-node'), 'Instructions', count((x) => !x.rule), 'An instruction is said to an agent'),
+      row('kind:rule', square('rt-k-node'), 'Rules', count((x) => x.kind === 'rule'), 'A rule guards a write'),
+      row('kind:instruction', dot('rt-k-node'), 'Instructions', count((x) => x.kind === 'instruction'), 'An instruction is said to an agent'),
+      ...(count((x) => x.kind === 'type') || hidden.has('kind:type') ? [row('kind:type', diamond('rt-k-schema'), 'Types', count((x) => x.kind === 'type'), 'A type: what an item may be')] : []),
+      ...(count((x) => x.kind === 'check') || hidden.has('kind:check') ? [row('kind:check', square('rt-k-check'), 'Checks', count((x) => x.kind === 'check'), 'A check a type implies: a write that breaks it is refused')] : []),
     ]),
     group('Pack', packs.map((p) => row(`pack:${p}`, dot(`rt-k-${packClass(p)}`), p === 'core' ? 'Core' : p === 'owner' ? 'Your own' : p === 'learned' ? 'Learned' : p, count((x) => x.pack === p), `From ${p}`))),
-    group('Tier', TIERS.map((t) => row(`tier:${t}`, dot('rt-k-node'), t === 'core' ? 'Core, the trunk' : t === 'pack' ? 'Other packs' : t === 'owner' ? 'The owner’s' : 'Learned', count((x) => x.tier === t), `Whose: ${t}`)).filter((r, i) => count((x) => x.tier === TIERS[i]) > 0 || hidden.has(`tier:${TIERS[i]}`))),
+    group('Tier', TIERS.map((t) => row(`tier:${t}`, dot('rt-k-node'), t === 'schema' ? 'Schema: types and checks' : t === 'core' ? 'Core, the trunk' : t === 'pack' ? 'Other packs' : t === 'owner' ? 'The owner’s' : 'Learned', count((x) => x.tier === t), `Whose: ${t}`)).filter((r, i) => count((x) => x.tier === TIERS[i]) > 0 || hidden.has(`tier:${TIERS[i]}`))),
     group('Standing', STANDINGS.map((s) => row(`status:${s}`, dot(`rt-k-node rt-k-${s}`), s === 'trial' ? 'On trial' : s === 'current' ? 'Current' : 'Retired', count((x) => x.status === s), `Standing: ${s}`)).filter((r, i) => count((x) => x.status === STANDINGS[i]) > 0 || hidden.has(`status:${STANDINGS[i]}`))),
     group(schematic ? 'What happened (schematic)' : 'What happened', [
       row('event:miss', dot('rt-k-write'), 'Misses', events.miss ?? 0, 'A miss no node covered'),
@@ -69,6 +72,7 @@ export const legendCss = `
 .rt-lg-glyph { width: var(--ln-reflex-key-glyph); height: var(--ln-reflex-key-glyph); flex: 0 0 auto; }
 .rt-k-trial { fill: none; stroke: var(--ln-text); stroke-width: var(--ln-reflex-legend-line); }
 .rt-k-retired { opacity: var(--ln-reflex-retired-ink); }
+.rt-k-check { fill: none; stroke: var(--ln-text); stroke-width: var(--ln-reflex-legend-line); }
 `;
 
 export { EVENTS };

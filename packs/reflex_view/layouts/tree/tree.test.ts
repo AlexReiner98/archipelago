@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { placeOfBough, treeOf } from './tree.js';
 import { radial } from './radial.js';
-import { rulesOf, storyOf, toldFrom, weekTo } from './story.js';
+import { rulesOf, schemaOf, storyOf, toldFrom, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { picture } from './index.js';
 import { namesShown, overlap } from './names.js';
@@ -279,4 +279,25 @@ test('a legend entry turned, the tree is drawn again in place from the changed v
   const all = patches.find((p) => p.key === 'rt-all');
   assert.ok(all && !JSON.stringify(all.mark).includes('n:core.guard'), 'the rule leaves the tree once the view has changed');
   assert.ok(patches.some((p) => p.key === 'rt-legend' && JSON.stringify(p.mark).includes('rt-off')), 'and the legend says it is off');
+});
+
+test('types and their checks stand as their own tier: a diamond, a hollow square, each check’s refusals a firing', async () => {
+  const a = { ...answer(2, []), lens: { find: ['schema'] } };
+  const schema = [
+    { id: 'type:task', kind: 'type', pack: 'core', tier: 'schema', for: ['tool:change:task'], title: 'Task', words: 'A piece of work' },
+    { id: 'check:task:status', kind: 'check', pack: 'core', tier: 'schema', for: ['tool:change:task:status'], title: 'Task status', guards: 'status', fired: ['2026-11-18T09:00:00Z'] },
+  ];
+  const act = async (name: string, params: any) => (name === 'schema' ? { answer: schema } : params?.ids ? { answer: params.ids.map((one: string) => ({ id: one, said: 0 })) } : { answer: [] });
+  const drawn = await picture({ answer: a, style: { ...style, sends: { ...style.sends, schema: 'schema' } }, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
+  const svg = JSON.stringify(drawn.scene.svg), legend = JSON.stringify(drawn.scene.aside);
+  assert.ok(svg.includes('"path",{"class":"rt-dot rt-type"'), 'a type is a diamond');
+  assert.ok(svg.includes('"rect",{"class":"rt-dot rt-check"'), 'a check is a small hollow square');
+  assert.ok(svg.includes('rt-t-schema'), 'their branches are the schema tier');
+  assert.ok(svg.includes('Task status · check, status · core'), 'a check says what it guards');
+  assert.ok(legend.includes('lg:kind:type') && legend.includes('lg:kind:check') && legend.includes('lg:tier:schema'));
+  const off = await picture({ answer: { ...a, lens: { find: ['schema-off'] } }, style: { ...style, sends: { ...style.sends, schema: 'schema' }, hidden: ['tier:schema'] }, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
+  assert.ok(!JSON.stringify(off.scene.svg).includes('type:task'), 'the schema turned off leaves the tree');
+  const tree = treeOf(a, (item: any) => item.fields?.for, n, schema.map((x) => ({ id: x.id, title: x.title, for: x.for, kind: x.kind })))!;
+  const film = filmOf(tree, { ...storyOf(a, null, null, n), schema: schemaOf(schema) }, n);
+  assert.equal(film.events.filter((e: any) => e.kind === 'fired').length, 1, 'a check’s refusal fires');
 });
