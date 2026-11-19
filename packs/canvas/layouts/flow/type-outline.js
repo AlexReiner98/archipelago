@@ -52,7 +52,7 @@ export function outlineOf(shape, l, t, r, b, k, { span, tension } = {}) {
   if (shape === 'forward') return forward(l, t, r, b, k);
   if (shape === 'roundstart') return roundStart(l, t, r, b, k);
   if (shape === 'tallarrow') return arrow(l, t, r, b, k);
-  if (shape === 'swallow') return swallow(l, t, r, b, k);
+  if (shape === 'swallow' || shape === 'pennant') return swallow(l, t, r, b, k);
   if (shape === 'roundend') return roundEnd(l, t, r, b, k);
   if (shape === 'plank') return plank(l, t, r, b);
   if (shape === 'roofed') return roofed(l, t, r, b, k);

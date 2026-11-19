@@ -51,7 +51,7 @@ function acrossTo(n, cx, cy, y, side) {
   // A forward board's notch on the left, a round start's curve on the left.
   if (n.shape === 'forward' && side < 0) return cx - hw + b * (1 - dy / hh);
   if (n.shape === 'roundstart' && side < 0) return cx + side * (hw - b + b * Math.sqrt(Math.max(0, 1 - (dy / hh) ** 2)));
-  if (n.shape === 'swallow' && side > 0) return cx + hw - b * (1 - dy / hh);
+  if ((n.shape === 'swallow' || n.shape === 'pennant') && side > 0) return cx + hw - b * (1 - dy / hh);
   if (n.shape === 'roundend' && side > 0) return cx + hw - b + b * Math.sqrt(Math.max(0, 1 - (dy / hh) ** 2));
   // A chamfer's and a fold's cut corners, on the right or on both sides, from the top down by the cut.
   if (n.shape === 'chamfer' && y < cy - hh + b) return cx + side * (hw - (b - (y - (cy - hh))));

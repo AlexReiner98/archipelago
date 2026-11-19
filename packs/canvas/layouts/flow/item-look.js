@@ -27,7 +27,7 @@ const cutOf = (style) => ((runs, status) => ((runs || Object.keys(status).length
 const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'];
 
 /** The ends a fingerpost board may have (./type-outline.js). */
-const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow'];
+const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow', 'pennant'];
 
 /** The fingerpost board a style asks for (pass 9): painted whole in its status colour (`board_fills`: per status, light and dark, a fill and the name's ink on it); the outline is the only type signal. */
 const boardOf = (style) => ((fills) => (Object.keys(fills).length ? { fills, who: style.who_strip === true } : null))(record(style.board_fills));
@@ -106,7 +106,7 @@ export function itemRules(style) {
       rules.push(`.lf-step.boarded.bs-${k} .lf-who { fill: color-mix(in srgb, ${ld(f, 'fill')} 82%, black); } .lf-step.boarded.bs-${k} .lf-who-mark, .lf-step.boarded.bs-${k}:is(.lf-step) .lf-who-text { fill: ${ld(f, 'text')}; }`);
       rules.push(`.lf-step.boarded.bs-${k}:is(.lf-step) text { fill: ${ld(f, 'text')}; } .lf-sw.bs-${k} .lf-shape { fill: ${ld(f, 'fill')}; stroke: color-mix(in srgb, ${ld(f, 'fill')} 65%, var(--ln-text)); stroke-width: var(--ln-rule); }`);
     }
-    rules.push('.lf-step .lf-who { stroke: none; pointer-events: none; } .lf-step .lf-who-text { font-size: var(--ln-flow-who-text); font-family: var(--ln-font); dominant-baseline: middle; pointer-events: none; } .lf-step .lf-who-you { font-weight: 700; } .lf-step .lf-who-mark { stroke: none; pointer-events: none; }');
+    rules.push('.lf-step .lf-who-hanger { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-rule); pointer-events: none; } .lf-step .lf-who { stroke: none; pointer-events: none; } .lf-step .lf-who-text { font-size: var(--ln-flow-who-text); font-family: var(--ln-font); dominant-baseline: middle; pointer-events: none; } .lf-step.boarded .lf-who-text.lf-who-you { fill: var(--ln-you); font-weight: 700; } .lf-step .lf-who-mark { stroke: none; pointer-events: none; }');
     if (g.board.fills.trouble) rules.push(`.lf-step .lf-cross { fill: none; stroke: ${ld(g.board.fills.trouble, 'text')}; stroke-width: var(--ln-flow-stroke-lit); stroke-linecap: round; pointer-events: none; }`);
     // An ended board has no fill, a faded outline and a muted name; the key's types are outlines only.
     rules.push('.lf-step.boarded.bs-ended .lf-shape { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-rule); } .lf-step.boarded.bs-ended:is(.lf-step) text { fill: var(--ln-muted); } .lf-step.boardkey .lf-shape { fill: none; stroke: var(--ln-muted); stroke-width: var(--ln-flow-stroke); }');
@@ -178,15 +178,19 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
   if (g.board && BOARDS.includes(n.shape)) {
     // No plate: the outline says the type, the fill the status. Blocked has a small cross at the board's left, never colour alone.
     const size = z('sign');
-    // The strip along the board's bottom, inside its outline: who is at work on it, or who it waits on.
+    // The who is a small plate hung under the board's left part, as one hangs under a fingerpost: as wide as its text, on two short
+    // hangers, only where someone holds the item. The board keeps its height; the plate adds below it, never across a wire's landing.
     const word = statusOf(item, phase), holders = g.board.who ? holdersOf(item, word, viewer) : [];
     if (holders.length) {
-      const left = /^(hexagon|roundstart)$/.test(n.shape) ? n.bevel : 0, right = /^(hexagon|forward|flag|tallarrow|roundend)$/.test(n.shape) ? n.bevel : 0, hs = z('who'), pad = z('who_pad'), mk = z('who_mark'), b0 = Y + n.h / 2, x0 = l + left;
-      out.over.push(m('g', {}, m('title', {}, holders.map((h) => h.full).join(', ')), m('rect', { class: 'lf-who', x: x0 + 0.7, y: b0 - hs, width: r - right - x0 - 1.4, height: hs - 0.7 }),
-        holders[0].kind === 'session' ? m('rect', { class: 'lf-who-mark', x: x0 + pad, y: b0 - hs / 2 - mk / 2, width: mk, height: mk }) : m('circle', { class: 'lf-who-mark', cx: x0 + pad + mk / 2, cy: b0 - hs / 2, r: mk / 2 }),
-        m('text', { class: `lf-who-text${holders[0].you ? ' lf-who-you' : ''}`, x: x0 + 2 * pad + mk, y: b0 - hs / 2 }, whoText(holders, z('who_most')))));
+      const left = /^(hexagon|roundstart)$/.test(n.shape) ? n.bevel : 0, hs = z('who'), pad = z('who_pad'), mk = z('who_mark'), top = Y + n.h / 2 + z('who_gap'), x0 = l + left + z('who_inset');
+      const said = `${word === 'waiting' ? 'waits on ' : ''}${whoText(holders, z('who_most'))}`, wide = Math.min(2 * pad + mk + pad + said.length * z('who_char'), n.w - left - 2 * z('who_inset'));
+      out.over.push(m('g', {}, m('title', {}, `${word === 'waiting' ? 'Waits on ' : ''}${holders.map((h) => h.full).join(', ')}`),
+        m('path', { class: 'lf-who-hanger', d: `M${x0 + pad} ${top - z('who_gap')}V${top}M${x0 + wide - pad} ${top - z('who_gap')}V${top}` }),
+        m('rect', { class: 'lf-who', x: x0, y: top, width: wide, height: hs, rx: 2 }),
+        holders[0].kind === 'session' ? m('rect', { class: 'lf-who-mark', x: x0 + pad, y: top + hs / 2 - mk / 2, width: mk, height: mk }) : m('circle', { class: 'lf-who-mark', cx: x0 + pad + mk / 2, cy: top + hs / 2, r: mk / 2 }),
+        m('text', { class: `lf-who-text${holders[0].you ? ' lf-who-you' : ''}`, x: x0 + 2 * pad + mk, y: top + hs / 2 }, said)));
     }
-    if (word === 'trouble') out.over.push(m('path', { class: 'lf-cross', d: crossPath(l + (/^(hexagon|forward|roundstart)$/.test(n.shape) ? n.bevel : 0) + z('sign_margin'), Y - size / 2 - (g.board.who ? z('who') / 2 : 0), size) }));
+    if (word === 'trouble') out.over.push(m('path', { class: 'lf-cross', d: crossPath(l + (/^(hexagon|forward|roundstart)$/.test(n.shape) ? n.bevel : 0) + z('sign_margin'), Y - size / 2, size) }));
   } else if (g.cut && CARVED.includes(n.shape)) {
     const lineage = lineageOf(item), list = listOf(g.cut, item, lineage), scale = g.cut.scale * (g.cut.grow ? GROWN[phase] ?? 1 : 1), rules = [];
     const draw = (cls, k, side = 0) => {

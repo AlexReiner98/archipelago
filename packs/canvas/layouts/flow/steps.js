@@ -10,7 +10,7 @@ const need = (set, name) => {
 };
 
 /** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
-export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge', 'carved', 'chamfer', 'fold', 'summit', 'hut', 'swallow', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow'];
+export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge', 'carved', 'chamfer', 'fold', 'summit', 'hut', 'swallow', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow', 'pennant'];
 /** The outlines by type an item is drawn by: the view's, under those its island's packs give (`shapes.islands`, by island id; decision e_gqmavsb7). */
 export const shapesFor = (i, shapes = {}) => ({ ...shapes.type, ...(shapes.islands?.[i.island] ?? {}) });
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
@@ -21,8 +21,8 @@ export const shapeIn = (i, shapes = {}) => (SHAPES.includes(shapes.ids?.[i.id]) 
 const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'];
 /** How far each outline cuts into its box, by the size the style names for it: none for a box, diamond, pill or sheet. */
 /** The ends a fingerpost board may have. */
-const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow'];
-const BEVEL = { chamfer: 'flow_chamfer', fold: 'flow_fold', summit: 'flow_summit', hut: 'flow_hut', swallow: 'flow_end_depth', roundend: 'flow_end_depth', roofed: 'flow_roof', forward: 'flow_end_depth', roundstart: 'flow_end_depth', tallarrow: 'flow_end_depth', cut: 'flow_cut', hexagon: 'flow_point', lozenge: 'flow_lozenge', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
+const BOARDS = ['flag', 'swallow', 'hexagon', 'roundend', 'plank', 'roofed', 'forward', 'roundstart', 'tallarrow', 'pennant'];
+const BEVEL = { chamfer: 'flow_chamfer', fold: 'flow_fold', summit: 'flow_summit', hut: 'flow_hut', swallow: 'flow_end_depth', roundend: 'flow_end_depth', roofed: 'flow_roof', pennant: 'flow_pennant', forward: 'flow_end_depth', roundstart: 'flow_end_depth', tallarrow: 'flow_end_depth', cut: 'flow_cut', hexagon: 'flow_point', lozenge: 'flow_lozenge', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
 
 /**
  * Each item a step with its size, as the flow sizes them; a choice nothing follows yet is a step of its own. Its outline
@@ -72,7 +72,7 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
     if (n.shape === 'summit') n.span = need(sizes, 'flow_summit_span');
-    if (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'flag' || n.shape === 'ticket' || n.shape === 'swallow' || n.shape === 'roundend' || n.shape === 'forward' || n.shape === 'roundstart' || n.shape === 'tallarrow') n.w += n.bevel * (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' || n.shape === 'forward' ? 2 : 1);
+    if (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'flag' || n.shape === 'ticket' || n.shape === 'swallow' || n.shape === 'roundend' || n.shape === 'forward' || n.shape === 'roundstart' || n.shape === 'tallarrow' || n.shape === 'pennant') n.w += n.bevel * (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' || n.shape === 'forward' ? 2 : 1);
     // A focus the style draws bigger (./focus.js): its box, not its words.
     if (!n.stub && shapes.scales?.[n.id] > 0) (n.w *= shapes.scales[n.id]), (n.h *= shapes.scales[n.id]);
   }

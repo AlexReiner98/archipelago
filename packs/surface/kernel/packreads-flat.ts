@@ -16,6 +16,7 @@ import { islandStands } from '../../loader/kernel/island-cap.ts';
 import { islandStyles, styleSources } from '../../loader/kernel/island-style.ts';
 import { headPos } from '../../log/kernel/tail.ts';
 import { blockGraph } from './blocking.ts';
+import { holdersOf } from './holders.ts';
 import { proposals } from './map-reads.ts';
 import { rankSql, searchIds, slipsOf } from './search.ts';
 
@@ -389,6 +390,8 @@ export async function flatSeeds(l: Archipelago, asked: NonNullable<FlatRead['fla
     found: Object.fromEntries(foundBy), terms: Object.fromEntries(termsBy), step: Object.fromEntries(stepOf),
     on_islands: l.registry.onIslands, islands: islandIds.map((id) => ({ id, ...isles.find((r) => r.id === id), ...(decls.has(id) && { decl: decls.get(id) }), ...(looks.has(id) && { look: looks.get(id) }), ...(styled.has(id) && { style: styled.get(id) }), ...(caps.has(id) && { cap: caps.get(id) }) })),
     ...(waiting.size && { waiting: Object.fromEntries(waiting) }),
+    // Who holds each item sent (./holders.ts): the people at work on it, who it waits on, its owner, named.
+    ...(((held) => Object.keys(held).length > 0 && { holders: held })(await holdersOf(l, items.map((e) => e.id)))),
     ...(parts.length && { parts_islands: parts }),
     ...(cut && { cut: true }), ...(matched !== undefined && { matched }),
   };

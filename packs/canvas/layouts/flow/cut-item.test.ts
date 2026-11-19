@@ -208,8 +208,8 @@ test('pass 9: a board painted whole in its status colour, the outline the only t
   assert.deepEqual(Object.keys(p.board_fills), ['not_started', 'under_way', 'waiting', 'finished', 'trouble']);
   // Seven outlines, all different, each end 9 deep.
   const shapes = p.type_shapes;
-  assert.deepEqual([shapes.task, shapes.work, shapes.question, shapes.occurrence, shapes.record, shapes.place, shapes.aim], ['flag', 'forward', 'hexagon', 'roundend', 'plank', 'roundstart', 'swallow']);
-  const paths = ['flag', 'forward', 'hexagon', 'roundend', 'plank', 'roundstart', 'swallow'].map((w) => outlineOf(w, 0, 0, 100, 30, 9) ?? w);
+  assert.deepEqual([shapes.task, shapes.work, shapes.question, shapes.occurrence, shapes.record, shapes.place, shapes.aim], ['flag', 'forward', 'hexagon', 'roundend', 'plank', 'roundstart', 'pennant']);
+  const paths = ['flag', 'forward', 'hexagon', 'roundend', 'plank', 'roundstart', 'pennant'].map((w) => outlineOf(w, 0, 0, 100, 30, 9) ?? w);
   assert.equal(new Set(paths.slice(1, 2).concat(paths.slice(3, 6))).size, 4);
   assert.equal(forward(0, 0, 100, 30, 9), 'M0 0H91L100 15L91 30H0L9 15Z');
   assert.equal(roundStart(0, 0, 100, 30, 9), 'M9 0H100V30H9A9 15 0 0 1 9 0Z');
@@ -232,7 +232,9 @@ test('pass 10: a strip says who holds the item', async () => {
   const { contrast, holdersOf, whoText } = await import('./waymark.js');
   const p = preset('canvas.waymark').props;
   assert.equal(p.who_strip, true);
-  assert.ok(p.sizes.flow_board_height >= 36);
+  assert.equal(p.sizes.flow_board_height, undefined, 'one uniform board height: the plate hangs below');
+  assert.ok(p.sizes.flow_pennant >= 14 && p.sizes.flow_pennant <= 16);
+  assert.ok(p.sizes.flow_end_depth <= 10 && house.sizes.flow_who_text >= 11);
   assert.ok('flow_who' in house.sizes && 'flow_who_text' in house.sizes && 'flow_who_most' in house.sizes);
   const item = { id: 'e_x', owner: 'e_sam', sessions: [{ title: 'Round 6 lane' }, { title: 'Spec check' }], holders: [{ how: 'works', id: 'e_alex', name: 'alex@aperture.tools' }] };
   const list = holdersOf(item, 'under_way', 'e_alex');

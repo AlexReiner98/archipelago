@@ -305,3 +305,26 @@ test('the sessions running on what a view finds come with it by default: open on
   assert.deepEqual(titles(await read({ filter: { find: [`in ${made.p}`], not: ['kind system'] } })), ['Flat lens', 'Tags'], 'a Not said is kept to');
   await assert.rejects(read({ sessions: 'yes' }), /sessions must be true or false/);
 });
+
+test('the answer says who holds each item, named: the people at work on it, who it waits on, its owner', async () => {
+  const l = await fresh();
+  const made = await make(l, [
+    { op: 'create', ref: 'sam', type: 'person', title: 'sam@example.test' },
+    { op: 'create', ref: 'bo', type: 'person', title: 'Bo Lindqvist' },
+    { op: 'create', ref: 'run', type: 'run', title: 'Round 6 lane' },
+    { op: 'create', ref: 'doing', type: 'task', title: 'Doing', status: 'doing' },
+    { op: 'create', ref: 'waiting', type: 'task', title: 'Waiting', status: 'waiting' },
+    { op: 'create', ref: 'owned', type: 'work', title: 'Owned' },
+    { op: 'create', ref: 'idle', type: 'task', title: 'Idle' },
+    { op: 'link', type: 'works_on', from: 'sam', to: 'doing' },
+    { op: 'link', type: 'works_on', from: 'run', to: 'doing' },
+    { op: 'link', type: 'waits_on', from: 'waiting', to: 'bo' },
+    { op: 'link', type: 'owned_by', from: 'owned', to: 'bo' },
+  ] as Op[]);
+  const answer = (await queryFlatPack.flatRead(kernelContext(l, 'query'), { filter: { find: [`id ${made.doing}`, `id ${made.waiting}`, `id ${made.owned}`, `id ${made.idle}`] } })) as { items: { id: string; holders?: { how: string; id: string; name: string }[] }[] };
+  const held = (id: string) => answer.items.find((i) => i.id === id)?.holders;
+  assert.deepEqual(held(made.doing), [{ how: 'works', id: made.sam, name: 'sam' }], 'a person with works_on is named by the part of an email before the @, and a run is not repeated (it is the item\'s sessions)');
+  assert.deepEqual(held(made.waiting), [{ how: 'waits', id: made.bo, name: 'Bo Lindqvist' }]);
+  assert.deepEqual(held(made.owned), [{ how: 'works', id: made.bo, name: 'Bo Lindqvist' }], 'the owner holds it');
+  assert.equal(held(made.idle), undefined, 'nobody holds it: no holders');
+});

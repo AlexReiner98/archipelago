@@ -337,7 +337,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   const stepLayer = steps.map((n) => {
     const X = g.x.get(n.id), Y = snap(g.y.get(n.id)), i = n.item;
     // A hexagon's name starts past its left point; a flag's and a hexagon's room ends before the point on the right.
-    const point = /^(hexagon|lozenge|ticket|forward|roundstart)$/.test(n.shape) ? n.bevel : 0, ends = /^(hexagon|lozenge|ticket|forward)$/.test(n.shape) ? 2 * n.bevel : /^(flag|tallarrow|swallow|roundend|roundstart)$/.test(n.shape) ? n.bevel : 0;
+    const point = /^(hexagon|lozenge|ticket|forward|roundstart)$/.test(n.shape) ? n.bevel : 0, ends = /^(hexagon|lozenge|ticket|forward)$/.test(n.shape) ? 2 * n.bevel : /^(flag|tallarrow|swallow|pennant|roundend|roundstart)$/.test(n.shape) ? n.bevel : 0;
     // No dot before the name (the style says its state on the shape): the room it had is shared, the name set in the middle.
     const bare = !look.dot && !look.tick && !n.stub, glyph = !n.stub && glyphOf(look, i) ? z('glyph_room') : 0;
     const ridged = n.shape === 'ridge' && look.ridge && !n.stub;
@@ -350,7 +350,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
     const CARVE = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'], RISES = ['summit'];
-    const nameY = (s, y) => (look.board?.who && /^(flag|swallow|hexagon|roundend|plank|roofed|forward|roundstart|tallarrow)$/.test(s.shape) ? y - z('who') / 2 : CARVE.includes(s.shape) && look.cut ? (Object.keys(look.cut.status).length ? y + ((s.h - (RISES.includes(s.shape) ? 2 * s.bevel : 0)) * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
+    const nameY = (s, y) => (CARVE.includes(s.shape) && look.cut ? (Object.keys(look.cut.status).length ? y + ((s.h - (RISES.includes(s.shape) ? 2 * s.bevel : 0)) * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
     const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n), viewer: answer.viewer });
     for (const rule of extra.rules ?? []) colourRules.add(rule);
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [
