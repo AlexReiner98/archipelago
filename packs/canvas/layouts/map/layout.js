@@ -40,7 +40,7 @@ function plainly(args, m, islandOf, heads, wides = new Map(), follows = new Map(
     cx += b.w + SEA;
     shelf = Math.max(shelf, b.h);
   }
-  return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
+  return { m, nodes: m.nodes, x, y, ...straight(m, x, y, sizes), islands, ports: [] };
 }
 
 /**

@@ -49,6 +49,16 @@ export const css = `
 /* Lit, a link keeps its colour, brightened toward the text's (flow_lit_mix). */
 .lf-wire.lit[class*=lf-k-], .lf-tie.lit[class*=lf-k-] { stroke: color-mix(in srgb, var(--lf-link), var(--ln-text) var(--ln-flow-lit-mix)); }
 .lf-head.lit[class*=lf-k-] { fill: color-mix(in srgb, var(--lf-link), var(--ln-text) var(--ln-flow-lit-mix)); }
+
+
+
+
+
+/* KIND: a wire reads its kind by weight and dash (round 5, theme e_zhcpy8bf): the order heaviest and solid, what a step is part of next, other headed ties lighter, a tie with no head dashed. */
+.lf-wire { stroke-width: var(--ln-flow-stroke-order); }
+.lf-tie { stroke-width: var(--ln-flow-stroke-tie); }
+.lf-tie.near:not(.lit) { stroke-width: var(--ln-flow-stroke-near); }
+/* END KIND */
 /* A wait on the person looking, in the colour of what waits on you, whatever its link type's colour. */
 .lf-tie.you { stroke: var(--ln-you); } .lf-head.you { fill: var(--ln-you); }
 /* A change held for the owner, where it would land: a new step faint, an edit marked on its step, a link dashed in the

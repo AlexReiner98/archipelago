@@ -36,11 +36,11 @@ test('each item stands at its cell, each island at its corner', () => {
   assert.ok(g.x.get('e_dddddddd') > bx, 'the second island stands at its corner, to the right');
 });
 
-test('a wire runs straight between the two boxes', () => {
+test('a wire runs square between the two boxes, at right angles to each', () => {
   const g = draw(placed);
   const wire = [...g.chains, ...g.ties].find((w: any) => [w.a, w.b].includes('e_aaaaaaaa'));
   assert.ok(wire, 'the link is drawn');
-  assert.equal(wire.points.length, 2);
+  assert.ok(wire.points.length >= 2 && wire.points.every((p: number[], i: number) => !i || p[0] === wire.points[i - 1][0] || p[1] === wire.points[i - 1][1]), 'no stretch slants');
 });
 
 test('the same picture twice is the same', () => {

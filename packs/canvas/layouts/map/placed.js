@@ -7,6 +7,7 @@
 // Wires are straight, from box edge to box edge. Layer: metrics. Pure: the layout's args in, the model out.
 
 import { frameOut, framed, lookOut, paints } from './looks.js';
+import { squareLines } from './square.js';
 
 /** A place [column, row] of whole cells, or nothing. */
 const cellOf = (v) => (Array.isArray(v) && v.length === 2 && v.every((n) => Number.isInteger(n) && n >= 0) ? v : null);
@@ -82,7 +83,7 @@ export function placedOut(args, m, islandOf, heads, wides = new Map()) {
   }
   ({ right, bottom } = shelve(loose, { x, y, from: [islands.length > loose.length ? right + sizes.flow_island_sea : M, M + RISE], gap: sizes.flow_island_sea, rise: RISE, aspect: args.aspect, across: args.across, right, bottom }));
   (groups.get(null) ?? []).forEach((n, k) => (x.set(n.id, M + k * cw + n.w / 2), y.set(n.id, bottom + GAP + n.h / 2)));
-  return { m, nodes: m.nodes, x, y, ...straight(m, x, y), islands, ports: [] };
+  return { m, nodes: m.nodes, x, y, ...straight(m, x, y, sizes), islands, ports: [] };
 }
 
 /**
@@ -168,12 +169,19 @@ export function shelve(loose, { x, y, from: [x0, y0], gap, rise = 0, aspect, acr
 /** How many columns `n` boxes of cells `cw` by `ch` take to stand in a block of `aspect` (width over height): one with no aspect. */
 export const columns = (n, aspect, cw, ch) => (aspect > 0 ? Math.max(1, Math.min(n, Math.round(Math.sqrt((n * aspect * ch) / cw)))) : 1);
 
-/** The kit's graph `m` wired straight, from box edge to box edge, its boxes standing at `x`, `y`: its chains and ties. */
-export function straight(m, x, y) {
+/**
+ * The kit's graph `m` wired from box to box, its boxes standing at `x`, `y`: its chains and ties. Run square, in the
+ * gutters (./square.js), where the style's `sizes` are given; else, and for a wire that found no way, straight from edge to edge.
+ */
+export function straight(m, x, y, sizes) {
   const line = (w) => {
     const a = m.nodes.get(w.a), b = m.nodes.get(w.b), pa = [x.get(w.a), y.get(w.a)], pb = [x.get(w.b), y.get(w.b)];
     return { ...w, points: [edge(pa, a, pb), edge(pb, b, pa)] };
   };
   const drawn = (w) => m.nodes.has(w.a) && m.nodes.has(w.b) && w.a !== w.b;
-  return { chains: m.chains.filter(drawn).map(line), ties: m.ties.filter(drawn).map(line) };
+  const [chains, ties] = [m.chains.filter(drawn), m.ties.filter(drawn)];
+  if (!sizes?.flow_square_clear) return { chains: chains.map(line), ties: ties.map(line) };
+  const runs = squareLines({ wires: [...chains, ...ties], nodes: m.nodes, x, y, sizes });
+  const lay = (w, k) => (runs[k] ? { ...w, points: runs[k] } : line(w));
+  return { chains: chains.map((w, k) => lay(w, k)), ties: ties.map((w, k) => lay(w, chains.length + k)) };
 }

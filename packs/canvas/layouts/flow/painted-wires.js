@@ -4,6 +4,8 @@
 // wire from another island on its item there. This checks what a look hands and says what those wires become: each
 // re-routed to the item's edge, from the other end's box. Layer: metrics. Pure: what was handed in, patches out.
 
+import { tidy } from './polyline.js';
+
 /** A finite number. */
 const num = (v) => typeof v === 'number' && Number.isFinite(v);
 
@@ -29,17 +31,20 @@ export function shoreOnly(g, islandOf, painted) {
   return { ...g, chains: g.chains.filter((w) => !own(w)), ties: g.ties.filter((w) => !own(w)) };
 }
 
-/** Where the line from `c` toward `p` leaves an end: a circle of radius `r`, or a box { w, h } about it. */
-function exit([cx, cy], end, [px, py]) {
-  const dx = px - cx, dy = py - cy, l = Math.hypot(dx, dy);
-  if (!l) return [cx, cy];
-  if (end.r !== undefined) return [cx + (dx / l) * end.r, cy + (dy / l) * end.r];
-  const t = Math.min(dx ? end.w / 2 / Math.abs(dx) : Infinity, dy ? end.h / 2 / Math.abs(dy) : Infinity);
-  return [cx + dx * t, cy + dy * t];
-}
+/** How far an end reaches from its middle toward a side: a circle's radius, or half a box's width (`across`) or height. */
+const reach = (end, across) => (end.r !== undefined ? end.r : (across ? end.w : end.h) / 2);
 
-/** The straight line of a wire between ends `a` and `b` ({ at: [x, y], r } a placed item, { at, w, h } a box), edge to edge. */
-export const lineOf = (a, b) => [exit(a.at, a, b.at), exit(b.at, b, a.at)];
+/**
+ * The wire between ends `a` and `b` ({ at: [x, y], r } a placed item, { at, w, h } a box), run square: out of the sides that face
+ * one another, across in the middle between them, in at right angles (a straight line where the two stand level).
+ */
+export function lineOf(a, b) {
+  const [[ax, ay], [bx, by]] = [a.at, b.at], sideways = Math.abs(bx - ax) >= Math.abs(by - ay);
+  const [i, j] = sideways ? [0, 1] : [1, 0], dir = Math.sign(b.at[i] - a.at[i]) || 1;
+  const from = a.at[i] + dir * reach(a, sideways), to = b.at[i] - dir * reach(b, sideways), mid = (from + to) / 2;
+  const at = (u, v) => (sideways ? [u, v] : [v, u]);
+  return tidy([at(from, a.at[j]), at(mid, a.at[j]), at(mid, b.at[j]), at(to, b.at[j])]);
+}
 
 /**
  * The patches that put every wire touching what was just placed where it now ends. `wires` [{ key, head, w, type }]: each
