@@ -258,5 +258,52 @@
         }
       }
     }
+  ],
+  "actions": [
+    {
+      "id": "reflex_view.legend",
+      "title": "Hide or show on the tree",
+      "description": "A toggle of the tree's legend, sent by its drawing as the person looking: hides one entry (on false) or shows it again (on true) by the view's style, its hidden list. On a view a pack ships, the first toggle makes the owner's version of it, with the style and query drawn.",
+      "verb": "revise",
+      "input": {
+        "type": "object",
+        "properties": {
+          "view": {
+            "type": "string",
+            "description": "The view the legend is on: a lens's id, or the id of the view a pack ships."
+          },
+          "entry": {
+            "type": "string",
+            "description": "kind:rule|instruction, pack:<id>, tier:core|pack|owner|learned, status:trial|current|retired or event:miss|held|failed|fired."
+          },
+          "on": {
+            "type": "boolean",
+            "description": "true shows it, false hides it."
+          },
+          "style": {
+            "type": "object",
+            "description": "The style the tree is drawn with: kept in a new version of a shipped view."
+          },
+          "filter": {
+            "type": "object",
+            "description": "The view's filter, for a new version."
+          },
+          "walk": {
+            "type": "object",
+            "description": "The view's walk, for a new version."
+          },
+          "limit": {
+            "type": "integer",
+            "description": "The view's limit, for a new version."
+          }
+        },
+        "required": [
+          "view",
+          "entry",
+          "on"
+        ],
+        "additionalProperties": false
+      }
+    }
   ]
 }
