@@ -8,6 +8,7 @@
 /** Make `el` (a details drawn from a menu mark) answer the keys and the narrowing of its steps. Once, when it is made. */
 export function menuSteps(el) {
   el.addEventListener('toggle', () => {
+    stepped(el.parentElement);
     // Shut, it forgets its steps: the next time it opens at its first.
     if (!el.open) for (const step of el.querySelectorAll('details.pm-menu[open]')) step.open = false;
     // Opened, its field that finds takes the keys, as the page's every list does.
@@ -34,6 +35,16 @@ export function menuSteps(el) {
     const field = finding(ev.target, el);
     if (field) narrow(field.closest('.menu-items'), field.value);
   });
+}
+
+/**
+ * A step opened is all its menu shows (part-marks.css, `.pm-stepped`): said by a class on the menu's items, not asked
+ * of the page by `:has()`. A rule `.menu-items:has(> details[open]) > :not(...)` could match any element put anywhere,
+ * so Chrome worked out the style of the whole page again on every element added to it: on the canvas, each frame of a zoom.
+ */
+function stepped(items) {
+  if (!items?.classList.contains('menu-items')) return;
+  items.classList.toggle('pm-stepped', [...items.children].some((c) => c.matches('details.pm-menu[open]')));
 }
 
 /** Whether `el` is a step of another menu. */

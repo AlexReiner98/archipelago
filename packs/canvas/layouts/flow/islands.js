@@ -68,7 +68,7 @@ export function islandMarks({ g, legends, islands = [], style, z, m, titled, isH
   const [PAD, CORNER, ROW, KEY_W, KEY_H, MARK_GAP] = ['island_pad', 'island_corner', 'island_legend_row', 'key_width', 'key_height', 'island_legend_mark_gap'].map(z);
   const tips = new Map();
   // What scales about the point [x, y] by a class's transform (its origin the point: a group moved there, and back inside it).
-  const grownFrom = ([x, y], cls, ...inner) => m('g', { transform: `translate(${x} ${y})` }, m('g', { class: cls }, m('g', { transform: `translate(${-x} ${-y})` }, ...inner)));
+  const grownFrom = ([x, y], cls, ...inner) => m('g', { transform: `translate(${x} ${y})` }, m('g', { class: `${cls} ln-plane` }, m('g', { transform: `translate(${-x} ${-y})` }, ...inner)));
   const rectOf = (r) => ({ x: r.l, y: r.t, width: r.r - r.l, height: r.b - r.t, rx: CORNER });
   const layer = g.islands.map((isle) => {
     const rects = isle.land.map(rectOf);
@@ -171,8 +171,8 @@ export const css = `
 .lf-island-name { pointer-events: auto; cursor: pointer; }
 /* Its name in the plain face, near the text's colour: the region's small-caps serif read as a whisper at this size (study e_unru8ftt). */
 .lf-island-name text { fill: color-mix(in srgb, var(--lf-island, var(--ln-muted)), var(--ln-text) var(--ln-flow-island-name-mix)); font-size: var(--ln-flow-island-text); font-family: var(--type-name-family, var(--ln-font)); font-weight: var(--type-name-weight, bold); dominant-baseline: central; }
-/* Its header kept at its size on screen: 1 over the camera's scale (--ln-plane-scale, set on the frame), within the style's least and most. */
-.lf-region { --lf-head: clamp(var(--ln-flow-island-head-least), calc(1 / var(--ln-plane-scale)), var(--ln-flow-island-head-most)); }
+/* Its header kept at its size on screen: 1 over the camera's scale (--ln-plane-scale, which the plane gives what has the class ln-plane), within the style's least and most. */
+.lf-head-scale, .lf-crown-scale { --lf-head: clamp(var(--ln-flow-island-head-least), calc(1 / var(--ln-plane-scale)), var(--ln-flow-island-head-most)); }
 .lf-head-scale, .lf-crown-scale { transform-box: view-box; transform-origin: 0 0; }
 .lf-head-scale { transform: scale(var(--lf-head)); }
 /* The crown: the land and shore above a header's foot, as tall as the header is drawn; its line as wide on screen as

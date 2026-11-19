@@ -40,7 +40,7 @@ export function sessionRings({ item, shape, x, y, w, h, corner, bevel, z, outlin
     const top = tags && y - h / 2 - gap * on.length - tags.lift;
     return m('g', { class: `lf-sr ${hueClass(s.hue)}${s.dormant ? ' dormant' : ''}`, ...(faint !== undefined && { opacity: faint }) },
       outline(shape, x, y, w + 2 * out, h + 2 * out, corner + out, bevel),
-      tags && m('text', { class: 'lf-sr-tag', x: x - w / 2, y: top, ...(k && { dy: `${-k * tags.leading}em` }) }, tagOf(s, item, style, tags.letters)));
+      tags && m('text', { class: 'lf-sr-tag ln-plane', x: x - w / 2, y: top, ...(k && { dy: `${-k * tags.leading}em` }) }, tagOf(s, item, style, tags.letters)));
   }));
 }
 
@@ -53,7 +53,7 @@ export function paintedTag({ s, item, k, rings, gap, style, m }) {
   const tags = tagSizes(style);
   if (!tags) return null;
   return m('g', { key: `tag:${item.id}:${k}`, transform: `translate(0 ${-gap * rings})` },
-    m('text', { class: 'lf-sr-tag mid', x: 0, y: -tags.lift, ...(k && { dy: `${-k * tags.leading}em` }) }, tagOf(s, item, style, tags.letters)));
+    m('text', { class: 'lf-sr-tag mid ln-plane', x: 0, y: -tags.lift, ...(k && { dy: `${-k * tags.leading}em` }) }, tagOf(s, item, style, tags.letters)));
 }
 
 /** The tag's sizes, where the style names them: its text, its lift over the rings, its leading (in its em), and the most letters it says. */
