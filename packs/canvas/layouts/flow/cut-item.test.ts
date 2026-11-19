@@ -149,28 +149,48 @@ test('pass 4: one colour per item by status, a small cut, and every box the same
 
 test('pass 6: markers by outline, one band of paint each, the same size for every type', async () => {
   // @ts-ignore a page module, untyped
-  const { areaOf, bandPoints, chamfer, fold, hut, outlineOf, summit } = await import('./type-outline.js');
+  const { areaOf, bandPoints, chamfer, fold, hut, outlineOf } = await import('./type-outline.js');
   // @ts-ignore a page module, untyped
   const { landOn } = await import('./shapes.js');
   assert.match(chamfer(0, 0, 100, 40, 9), /^M9 0H91L100 9V40H0V9Z$/);
   assert.match(fold(0, 0, 100, 40, 13), /^M0 0H87L100 13V40H0ZM87 0V13H100$/);
   assert.match(hut({ l: 0, t: 0, r: 100, b: 50, rise: 8 }).outline, /^M0 8L50 0L100 8V50H0Z$/);
-  const s = summit({ l: 0, t: 0, r: 100, b: 54, rise: 9, span: 0.3 });
-  assert.match(s.outline, /^M0 9H35L50 0L65 9H100V54H0Z$/);
+  assert.equal(outlineOf('summit', 0, 0, 100, 54, 9), 'M0 9H100V45H0Z');
   assert.equal(outlineOf('box', 0, 0, 1, 1, 3), null);
   const shapes = preset('canvas.status_field').props.type_shapes;
   assert.deepEqual([shapes.task, shapes.work, shapes.question, shapes.aim, shapes.occurrence, shapes.record, shapes.place], ['carved', 'flag', 'hexagon', 'summit', 'pill', 'fold', 'hut']);
   // The same painted area for every type at equal width (within 15 percent).
   const sizes = preset('canvas.status_field').props.sizes, h = 41, d = 0.2 * h, w = 150;
-  const areas = Object.entries({ carved: { k: 0, rx: 6 }, flag: { k: sizes.flow_point }, hexagon: { k: sizes.flow_point }, pill: { k: 0 }, fold: { k: 13 }, hut: { k: sizes.flow_hut }, summit: { k: sizes.flow_summit } }).map(([shape, o]: any) => [shape, areaOf(bandPoints(shape, { l: 0, t: 0, r: w, b: h, d, ...o }))]);
+  const areas = Object.entries({ carved: { k: 0, rx: 6 }, flag: { k: sizes.flow_point }, hexagon: { k: sizes.flow_point }, pill: { k: 0 }, fold: { k: 13 }, hut: { k: sizes.flow_hut } }).map(([shape, o]: any) => [shape, areaOf(bandPoints(shape, { l: 0, t: 0, r: w, b: h, d, ...o }))]);
   const mean = areas.reduce((sum, [, a]: any) => sum + a, 0) / areas.length;
   for (const [shape, a] of areas as any) assert.ok(Math.abs(a - mean) / mean <= 0.15, `${shape} paints ${a} against ${mean}`);
   // Wires land on the real outline: a chamfer's corner, a fold's, down a roof, down a summit's slope and beside it.
   assert.equal(landOn({ shape: 'fold', w: 100, h: 40, bevel: 10 }, 50, 20, [98, 0], [98, -9])[1], 8);
   assert.equal(landOn({ shape: 'hut', w: 100, h: 50, bevel: 8 }, 50, 25, [50, 0], [50, -9])[1], 0);
   assert.equal(landOn({ shape: 'hut', w: 100, h: 50, bevel: 8 }, 50, 25, [0, 0], [0, -9])[1], 8);
-  assert.equal(landOn({ shape: 'summit', w: 100, h: 54, bevel: 9, span: 0.3 }, 50, 27, [10, 0], [10, -9])[1], 9);
-  assert.ok(landOn({ shape: 'summit', w: 100, h: 54, bevel: 9, span: 0.3 }, 50, 27, [60, 0], [60, -9])[1] > 0);
-  assert.equal(sizes.flow_summit, 9);
+  // The aim: beside its range a wire lands on the box top, over the range on the range's top, below it on the box's own foot.
+  const aim = { shape: 'summit', w: 100, h: 72, bevel: 18, span: 0.7 };
+  assert.equal(landOn(aim, 50, 36, [5, 0], [5, -9])[1], 18);
+  assert.equal(landOn(aim, 50, 36, [60, 0], [60, -9])[1], 0);
+  assert.equal(landOn(aim, 50, 36, [60, 72], [60, 90])[1], 54);
+  assert.equal(sizes.flow_summit, 22);
   assert.equal(preset('canvas.status_field').props.item_state, 'none');
+});
+
+test('pass 7: the aim is a seeded range of layers, the front its status colour', async () => {
+  // @ts-ignore a page module, untyped
+  const { rangeLayers, rangeMarks } = await import('./aim-range.js');
+  const form = house.ridge_forms[house.type_forms.aim], m = (tag: string, attrs: any = {}, ...kids: any[]) => [tag, attrs, ...kids];
+  const a = rangeLayers('e_aaaaaaaa', form, 22), b = rangeLayers('e_bbbbbbbb', form, 22);
+  assert.deepEqual(a, rangeLayers('e_aaaaaaaa', form, 22));
+  assert.notDeepEqual(a, b);
+  assert.equal(a.length, 3);
+  const marks = rangeMarks({ id: 'e_aaaaaaaa', form, x0: 10, x1: 90, base: 20, rise: 18, word: 'under_way', m, cols: 22 });
+  assert.equal(marks.length, 6);
+  assert.match(marks[4][1].class, /lf-cut-s-under_way/);
+  assert.match(marks[0][1].class, /lf-range-1/);
+  assert.ok(marks.every((k: any) => !/NaN/.test(k[1].d ?? '')));
+  const top = Math.min(...marks.flatMap((k: any) => (k[1].d.match(/ (-?\d+(?:\.\d+)?)/g) ?? []).map(Number)));
+  assert.ok(top >= 20 - 18 - 4, `rises ${20 - top}`);
+  assert.ok(rangeMarks({ id: 'e_x', form, x0: 0, x1: 80, base: 20, rise: 18, word: 'ended', m, cols: 22 }).every((k: any) => /bare|ink/.test(k[1].class)));
 });

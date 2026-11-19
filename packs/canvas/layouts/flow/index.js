@@ -25,6 +25,7 @@ import { css } from './look.js';
 import { landMarks, landRules, landShades } from './land-look.js';
 import { boxHeight, listOf, ROLES, STATUS_WORDS } from './cut-item.js';
 import { outlineOf } from './type-outline.js';
+import { rangeKeyPath } from './aim-range.js';
 import { glyphOf, grammar, itemMarks, itemRules, swatchRows } from './item-look.js';
 import { css as islandCss, islandHue, islandMarks, nameOf, saidOf } from './islands.js';
 import { css as packCss, packMarks, packRules, packsWidth, partInKey, partsIslandMarks } from './pack-marks.js'; import { isParts, openParts, partsIslands, partsRoom, withPartsIslands } from './parts-islands.js'; import { ghostSize } from './ghost-parts.js';
@@ -242,15 +243,17 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
 
   // The key: what each mark this picture uses means, one to a row (./compose-key.js). A row's mark is drawn in a box of
   // its own: G is where its middle is, how wide and tall a step is in it, and a dot's size.
-  const G = { x: z('key_width') / 2, y: z('key_height') / 2, w: z('key_width') - 2, h: z('key_height') - 3, r: 4 };
-  const { keyRows, packRows } = keyOf({ z, G, corner: CORNER, story, steps: answer.steps, shapes, sessions, shownAs, model: () => g, stateOf, sessionOf, marked, markOf, heldUp, yours, kind, onYou, placeClass, headless, endsOf, dot, outline });
+  const G = { x: z('key_width') / 2, y: z('key_height') / 2, w: z('key_width') - 2 * z('key_margin'), h: z('key_height') - 2 * z('key_margin'), r: 4 };
+  // The key draws the aim whole, its range over its box, in the swatch's own box.
+  const keyOutline = (shape, x, y, w, hgt, rx, cut) => (shape === 'summit' && look.cut ? m('g', {}, outline('box', x, y + hgt * 0.2, w, hgt * 0.6, rx), m('path', { class: 'lf-range-ink', d: rangeKeyPath(x - w / 2, x + w / 2, y + hgt * 0.5 - hgt * 0.8, y - hgt * 0.3, z('ridge_cols')) })) : outline(shape, x, y, w, hgt, rx, cut));
+  const { keyRows, packRows } = keyOf({ z, G, corner: CORNER, story, steps: answer.steps, shapes, sessions, shownAs, model: () => g, stateOf, sessionOf, marked, markOf, heldUp, yours, kind, onYou, placeClass, headless, endsOf, dot, outline: keyOutline });
   const packOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.pack, capOf = (id) => (answer.islands ?? []).find((i) => i.id === id)?.cap;
   // An island's findings are items, drawn as any item is where its query holds them; its shore lists none (the owner, 10 Nov 2026).
   const [KW, KH] = ['key_width', 'key_height'].map(z);
   // Its last row, where the session may add to it: a button that adds an item on it (./islands.js).
   const addRow = (id) => (gestures.on(`i:${id}`).includes('add') ? [{ glyph: m('svg', { width: KW, height: KH, viewBox: `0 0 ${KW} ${KH}` }, m('path', { d: `M${KW / 2 - KH / 3} ${KH / 2}H${KW / 2 + KH / 3}M${KW / 2} ${KH / 6}V${KH * 5 / 6}`, class: 'lf-add-mark' })), label: 'Add', tip: 'Add an item on this island', add: id, group: 'add' }] : []);
   // A cut's palette, whole: each run of it a row of swatches in every island's key, labelled with the role it plays.
-  const swatches = look.cut ? swatchRows(look.cut, { m, w: KW, h: KH, roles: ROLES, words: STATUS_WORDS }) : { rows: [], rules: [] };
+  const swatches = look.cut ? swatchRows(look.cut, { m, w: KW, h: KH, roles: ROLES, words: STATUS_WORDS, sw: z('key_swatch') }) : { rows: [], rules: [] };
   for (const rule of swatches.rules) colourRules.add(rule);
   const legends = new Map((parts?.groups ?? []).filter((p) => p.id !== null && !isParts(p.id)).map((p) => [p.id, [...(looks.has(p.id) ? [] : packOf(p.id) ? packRows(packOf(p.id), p) : keyRows({ st: p.model.all.filter((n) => !n.dummy), model: p.model, chains: p.model.chains, ties: p.model.ties, breaks: p.model.breaks.length > 0, local: true })), ...swatches.rows, ...addRow(p.id)]]));
   const entryWidth = (row) => z('key_width') + z('island_legend_mark_gap') + measure(row.label, z('island_legend_text'));
@@ -340,7 +343,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
     const ring = !n.stub && !story && sessionRings({ item: i, shape: n.shape, x: X, y: Y, w: n.w, h: n.h, corner: CORNER, bevel: n.bevel, z, outline, m, style });
     // A ridge's name stands under its mountain, on the land; a sheet's lifts off its wave.
     const CARVE = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'], RISES = ['summit'];
-    const nameY = (s, y) => (CARVE.includes(s.shape) && look.cut ? (Object.keys(look.cut.status).length ? y + (RISES.includes(s.shape) ? s.bevel / 2 : 0) + ((s.h - (RISES.includes(s.shape) ? s.bevel : 0)) * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
+    const nameY = (s, y) => (CARVE.includes(s.shape) && look.cut ? (Object.keys(look.cut.status).length ? y + ((s.h - (RISES.includes(s.shape) ? 2 * s.bevel : 0)) * look.cut.most) / 2 : y + s.h / 2 - z('cut_pad') / 2 - (s.lines.length * s.line) / 2) : s.shape === 'ridge' && look.ridge ? y + z('ridge_name_gap') + (s.lines.length * s.line) / 2 : y - (s.shape === 'sheet' ? z('sheet_lift') : 0));
     const extra = n.stub || inPainted.has(n.id) || drawnBy.get(n.id)?.length ? { under: [], over: [] } : itemMarks({ g: look, n, at: [X, Y], phase: stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase, item: i, z, outline, m, corner: CORNER, dotAt: dotPlace(n) });
     for (const rule of extra.rules ?? []) colourRules.add(rule);
     const body = inPainted.has(n.id) ? [paintedBody({ item: i, x: X, y: Y, gap: z('session_gap'), style, m })] : drawnBy.get(n.id)?.length ? [ring, m('g', { class: 'lf-look-item', transform: `translate(${X} ${Y})` }, ...drawnBy.get(n.id))] : [

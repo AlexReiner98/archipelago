@@ -64,7 +64,7 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     else if (n.shape === 'ridge') [n.w, n.h] = [text + BOX_PAD, need(sizes, 'flow_ridge_height') + more];
     else [n.w, n.h] = [text + BOX_PAD, (n.shape === 'sheet' ? SHEET_H : BOX_H) + more];
     // Where the style carves its boxes every type is the same height, whatever its outline; a summit rises above that.
-    if (shapes.carve && CARVED.includes(n.shape)) n.h = shapes.carve(n.item, n.lines.length * LINE) + (n.shape === 'summit' ? need(sizes, BEVEL.summit) : 0);
+    if (shapes.carve && CARVED.includes(n.shape)) n.h = shapes.carve(n.item, n.lines.length * LINE) + (n.shape === 'summit' ? 2 * need(sizes, BEVEL.summit) : 0);
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
     if (n.shape === 'summit') n.span = need(sizes, 'flow_summit_span');

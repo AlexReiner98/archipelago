@@ -9,6 +9,7 @@ import { colourWays, ridgeMarks } from './ridge-item.js';
 import { bandsFor, cuts as cutsOf, GROWN, inset, listOf, runsOf, slotOf } from './cut-item.js';
 import { seedOf } from './ridge-item.js';
 import { bandPath } from './type-outline.js';
+import { rangeMarks } from './aim-range.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
 const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -19,7 +20,7 @@ const PLAIN = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.wai
 const ridgeOf = (style) => (['bands', 'emerge'].includes(style.ridge_state) ? { mode: style.ridge_state, ways: colourWays(record(style.ridge_palettes)[style.ridge_palette] ?? Object.values(record(style.ridge_palettes))[0]), island: !record(style.ridge_palettes)[style.ridge_palette], types: record(style.type_forms), forms: record(style.ridge_forms) } : null);
 
 /** The cut a style asks for: the accent of each phase, the cut of each type, and the dials (depth, softness, room above the name, whether it grows with progress). */
-const cutOf = (style) => ((runs, status) => ((runs || Object.keys(status).length) && Object.keys(record(style.cut_forms)).length ? { runs, status, types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, most: Number(style.cut_most) || 0.92, tension: Number(style.cut_tension), caps: record(style.type_caps), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink', bands: Math.max(1, Math.round(Number(style.cut_bands) || 1)), inset: Number(style.cut_inset) || 0 } : null))(runsOf(record(style.ridge_palettes)[style.cut_palette]), record(style.status_colours));
+const cutOf = (style) => ((runs, status) => ((runs || Object.keys(status).length) && Object.keys(record(style.cut_forms)).length ? { runs, status, types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, most: Number(style.cut_most) || 0.92, tension: Number(style.cut_tension), caps: record(style.type_caps), landforms: record(style.ridge_forms), typeForms: record(style.type_forms), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink', bands: Math.max(1, Math.round(Number(style.cut_bands) || 1)), inset: Number(style.cut_inset) || 0 } : null))(runsOf(record(style.ridge_palettes)[style.cut_palette]), record(style.status_colours));
 
 /** The outlines a carving style gives one height, and a status colour (./type-outline.js). */
 const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'];
@@ -93,6 +94,7 @@ export function itemRules(style) {
     // An ended item has no fill and a muted name; a done one keeps its name's ink.
     rules.push('.lf-step.ph-ended .lf-shape { fill: none; } .lf-step.ph-ended text { fill: var(--ln-muted); } .lf-step.closed:not(.ph-ended):not(.dim) text { fill: var(--ln-text); }');
   }
+  if (g.cut) rules.push('.lf-step .lf-range { stroke: none; pointer-events: none; } .lf-step .lf-range-1 { fill: color-mix(in srgb, var(--ln-text) 14%, var(--ln-land)); } .lf-step .lf-range-2 { fill: color-mix(in srgb, var(--ln-text) 28%, var(--ln-land)); } .lf-step .lf-range-bare { fill: none; } .lf-step .lf-range-ink { fill: none; stroke: var(--lf-ink, var(--ln-text)); stroke-width: var(--ln-flow-ridge-ink); stroke-linejoin: round; pointer-events: none; }');
   if (g.cut) rules.push(`.lf-step .lf-cut { stroke: ${g.cut.edge ? 'var(--lf-ink, var(--ln-text))' : 'none'}; stroke-width: var(--ln-rule); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-cut-none { fill: var(--ln-muted); } .lf-step .lf-cut-trouble { fill: var(--ln-blocked); } .lf-step.you .lf-cut { fill: var(--ln-you); } .lf-step .lf-shape.lf-edge { fill: none !important; }`);
   if (g.ridge) {
     rules.push('.lf-step .lf-ridge { stroke: none; pointer-events: none; } .lf-step .lf-ridge-ink { fill: none; stroke: var(--lf-ink, var(--ln-text)); stroke-width: var(--ln-flow-ridge-ink); stroke-linejoin: round; pointer-events: none; } .lf-step .lf-rc-island { fill: var(--lf-island, var(--ln-text)); }');
@@ -159,7 +161,11 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
     if (Object.keys(g.cut.status).length) {
       // One colour for the item, its status's: waiting is the status a task has; an ended item has no fill, its outline and a muted name.
       const word = statusOf(item, phase), cls = `lf-cut-s-${word}`, piece = (d) => out.over.push(m('path', { d, class: `lf-cut ${cls}` }));
-      if (word !== 'ended') {
+      if (n.shape === 'summit') {
+        // The aim alone is a landform: a range over its box, the front layer its status colour; the box is centred in its node.
+        const rise = n.bevel, form = g.cut.landforms[lineage.map((x) => g.cut.typeForms[x]).find(Boolean)] ?? Object.values(g.cut.landforms)[0] ?? {};
+        out.over.push(...rangeMarks({ id: item.id, form, x0: l + (n.w * (1 - n.span)) / 2, x1: r - (n.w * (1 - n.span)) / 2, base: t + rise, rise, word, m, cols: z('ridge_cols') }));
+      } else if (word !== 'ended') {
         // One band of paint along the top of every marker, the same depth for all; the fold, the roof and the summit are outline only.
         const rise = n.shape === 'summit' || n.shape === 'hut' ? n.bevel : 0, box = rise && n.shape === 'summit' ? t + rise : t, deep = g.cut.scale * (b - box) * 0.5;
         piece(bandPath(n.shape, { l, t: n.shape === 'summit' ? t : t, r, b, k: n.bevel ?? 0, d: deep, rx: n.shape === 'carved' ? Math.min(corner, n.h / 5) : 0 }));
@@ -201,10 +207,10 @@ function skyline(n, X, Y, round) {
 export const statusOf = (item, phase) => (item.status === 'waiting' && !/^(finished|ended|trouble)$/.test(phase) ? 'waiting' : phase === 'standing' ? 'under_way' : /^(not_started|under_way|finished|ended|trouble)$/.test(phase) ? phase : 'not_started');
 
 /** The key's rows for a cut's palette: each run as a row of swatches, labelled with the role it plays (the phase). Colour rules for them too. */
-export function swatchRows(cut, { m, w, h, roles, words = {} }) {
+export function swatchRows(cut, { m, w, h, roles, words = {}, sw = Math.min(w, h) }) {
   if (Object.keys(cut.status).length) {
     // Just the statuses, one swatch each, with their words.
-    const rows = Object.keys(words).filter((k) => cut.status[k]).map((k) => ({ glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('rect', { class: `lf-sw lf-cut-s-${k}`, x: 0, y: 0, width: w, height: h })), label: words[k], tip: `${words[k]}: the colour of an item with that status` }));
+    const rows = Object.keys(words).filter((k) => cut.status[k]).map((k) => ({ glyph: m('svg', { width: w, height: h, viewBox: `0 0 ${w} ${h}` }, m('rect', { class: `lf-sw lf-cut-s-${k}`, x: (w - sw) / 2, y: (h - sw) / 2, width: sw, height: sw })), label: words[k], tip: `${words[k]}: the colour of an item with that status` }));
     return { rows, rules: [] };
   }
   return swatchRunRows(cut, { m, w, h, roles });

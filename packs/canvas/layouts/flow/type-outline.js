@@ -39,7 +39,8 @@ export function outlineOf(shape, l, t, r, b, k, { span, tension } = {}) {
   if (shape === 'chamfer') return chamfer(l, t, r, b, k);
   if (shape === 'fold') return fold(l, t, r, b, k);
   if (shape === 'hut') return hut({ l, t, r, b, rise: k }).outline;
-  if (shape === 'summit') return summit({ l, t, r, b, rise: k, span: span ?? 0.4 }).outline;
+  // The aim's box alone, centred in its node: the range above it is drawn as layers (./aim-range.js), and as much room is left below.
+  if (shape === 'summit') return `M${l} ${t + k}H${r}V${b - k}H${l}Z`;
   return null;
 }
 
