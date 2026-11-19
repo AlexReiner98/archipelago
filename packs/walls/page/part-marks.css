@@ -124,7 +124,7 @@ details.pm-menu details.pm-menu > summary { padding: var(--space-4) var(--space-
 details.pm-menu details.pm-menu:not([open]) > summary::after { content: " ›"; color: var(--muted); }
 details.pm-menu details.pm-menu[open] > summary::before { content: "‹ "; color: var(--muted); }
 details.pm-menu details.pm-menu[open] > summary { color: var(--muted); background: none; }
-.menu-items:has(> details.pm-menu[open]) > :not(details.pm-menu[open]) { display: none; }
+.menu-items.pm-stepped > :not(details.pm-menu[open]) { display: none; }
 
 /* A tab a part draws: a button or a box selected, ringing once, in its session's hue. */
 .pm-button-tab { border: var(--border-1) solid transparent; border-radius: var(--radius-2) var(--radius-2) 0 0; background: none; color: var(--muted); }
