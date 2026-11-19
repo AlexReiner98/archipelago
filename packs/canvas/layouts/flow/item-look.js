@@ -8,7 +8,7 @@ import { lineageOf } from './graph.js';
 import { colourWays, ridgeMarks } from './ridge-item.js';
 import { bandsFor, cuts as cutsOf, GROWN, inset, listOf, runsOf, slotOf } from './cut-item.js';
 import { seedOf } from './ridge-item.js';
-import { flap, summit as summitOf, tabStrip } from './type-outline.js';
+import { cap, flap, hut as hutOf, summit as summitOf, tabStrip } from './type-outline.js';
 
 const words = (v) => String(v ?? '').split(/\s+/).filter(Boolean);
 const record = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
@@ -19,10 +19,10 @@ const PLAIN = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.wai
 const ridgeOf = (style) => (['bands', 'emerge'].includes(style.ridge_state) ? { mode: style.ridge_state, ways: colourWays(record(style.ridge_palettes)[style.ridge_palette] ?? Object.values(record(style.ridge_palettes))[0]), island: !record(style.ridge_palettes)[style.ridge_palette], types: record(style.type_forms), forms: record(style.ridge_forms) } : null);
 
 /** The cut a style asks for: the accent of each phase, the cut of each type, and the dials (depth, softness, room above the name, whether it grows with progress). */
-const cutOf = (style) => ((runs, status) => ((runs || Object.keys(status).length) && Object.keys(record(style.cut_forms)).length ? { runs, status, types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, most: Number(style.cut_most) || 0.92, tension: Number(style.cut_tension), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink', bands: Math.max(1, Math.round(Number(style.cut_bands) || 1)), inset: Number(style.cut_inset) || 0 } : null))(runsOf(record(style.ridge_palettes)[style.cut_palette]), record(style.status_colours));
+const cutOf = (style) => ((runs, status) => ((runs || Object.keys(status).length) && Object.keys(record(style.cut_forms)).length ? { runs, status, types: record(style.type_cuts), forms: record(style.cut_forms), scale: Number(style.cut_depth) || 1, most: Number(style.cut_most) || 0.92, tension: Number(style.cut_tension), caps: record(style.type_caps), clear: Number(style.cut_clear) || 0, grow: style.cut_grow === true, edge: style.cut_edge === 'ink', bands: Math.max(1, Math.round(Number(style.cut_bands) || 1)), inset: Number(style.cut_inset) || 0 } : null))(runsOf(record(style.ridge_palettes)[style.cut_palette]), record(style.status_colours));
 
 /** The outlines a carving style gives one height, and a status colour (./type-outline.js). */
-const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hexagon', 'pill', 'tab'];
+const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'];
 
 /** What a style says of the six slots (the outline is `type_shapes`, read by ./steps.js). */
 export function grammar(style) {
@@ -163,8 +163,13 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
         // The status colour is a piece of the outline: the fold, the tab, the summit; else the cap under a skyline, between the straight ends of the top.
         if (n.shape === 'fold') piece(flap(r, t, n.bevel));
         else if (n.shape === 'tab') piece(tabStrip(l, t, n.w, n.bevel));
+        else if (n.shape === 'hut') piece(hutOf({ l, t, r, b, rise: n.bevel }).fill);
         else if (n.shape === 'summit') piece(summitOf({ l, t, r, b, rise: n.bevel, span: z('summit_span'), tension: g.cut.tension }).fill);
-        else draw(cls, 0, n.shape === 'pill' ? n.h / 2 : n.shape === 'hexagon' || n.shape === 'chamfer' ? n.bevel : 0);
+        else {
+          // A plain cap, not a skyline: a flat band, a trapezoid, a point or a round arc, by type (`type_caps`), between the straight ends of the top.
+          const end = n.shape === 'pill' ? n.h / 2 : n.shape === 'hexagon' || n.shape === 'chamfer' || n.shape === 'flag' ? n.bevel : 0, start = n.shape === 'flag' ? 0 : end, kind = lineage.map((x) => g.cut.caps[x]).find(Boolean);
+          piece(cap(kind, l + start, r - end, t, g.cut.scale * n.h * 0.5, start || end ? 0 : Math.min(corner, n.h / 5)));
+        }
       }
     } else {
       // What the cuts take off is banded in the palette: the run of the phase, the colour in it the type's.

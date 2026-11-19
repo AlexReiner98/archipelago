@@ -149,7 +149,7 @@ test('pass 4: one colour per item by status, a small cut, and every box the same
 
 test('pass 5: a type by its outline, the status colour only in a piece of it', async () => {
   // @ts-ignore a page module, untyped
-  const { chamfer, flap, fold, outlineOf, summit, tabStrip } = await import('./type-outline.js');
+  const { cap, chamfer, flap, fold, hut, outlineOf, summit, tabStrip } = await import('./type-outline.js');
   // @ts-ignore a page module, untyped
   const { landOn } = await import('./shapes.js');
   assert.match(chamfer(0, 0, 100, 40, 9), /^M9 0H91L100 9V40H0V9Z$/);
@@ -162,9 +162,14 @@ test('pass 5: a type by its outline, the status colour only in a piece of it', a
   assert.ok(s.cubics.every((c: number[][]) => c[0][1] === c[1][1] || c[2][1] === c[3][1]));
   assert.ok(s.outline.endsWith('V54H0Z') && s.fill.endsWith('Z'));
   assert.equal(outlineOf('box', 0, 0, 1, 1, 3), null);
+  assert.match(hut({ l: 0, t: 0, r: 100, b: 50, rise: 8 }).outline, /^M0 8L50 0L100 8V50H0Z$/);
+  assert.match(cap('band', 0, 100, 0, 8), /^M0 0H100V8H0Z$/);
+  assert.doesNotMatch(cap('arc', 0, 100, 0, 8), /C/);
+  assert.equal(landOn({ shape: 'hut', w: 100, h: 58, bevel: 8 }, 50, 29, [10, 0], [10, -9])[1], 8);
+  assert.equal(preset('canvas.status_field').props.sizes.flow_point, 7);
   // The same height whatever the outline: carved, chamfer, hexagon... each type of the preset has one of the shapes.
   const shapes = preset('canvas.status_field').props.type_shapes;
-  assert.deepEqual([shapes.task, shapes.work, shapes.question, shapes.aim, shapes.occurrence, shapes.record, shapes.place], ['carved', 'chamfer', 'hexagon', 'summit', 'pill', 'fold', 'tab']);
+  assert.deepEqual([shapes.task, shapes.work, shapes.question, shapes.aim, shapes.occurrence, shapes.record, shapes.place], ['carved', 'flag', 'hexagon', 'summit', 'pill', 'fold', 'hut']);
   // Wires land on the real outline: on a chamfer's cut corner, a fold's, and below a summit's rise.
   const box = { shape: 'chamfer', w: 100, h: 40, bevel: 10 };
   assert.equal(landOn(box, 50, 20, [0 + 52, 0], [52, -9])[1], 0);

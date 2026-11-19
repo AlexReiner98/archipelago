@@ -10,7 +10,7 @@ const need = (set, name) => {
 };
 
 /** The outlines a step may have: in the house style, one for each of core's starter types (decision e_u8aytubm). */
-export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge', 'carved', 'chamfer', 'fold', 'summit'];
+export const SHAPES = ['box', 'diamond', 'pill', 'sheet', 'cut', 'hexagon', 'flag', 'tab', 'ticket', 'lozenge', 'ridge', 'carved', 'chamfer', 'fold', 'summit', 'hut'];
 /** The outlines by type an item is drawn by: the view's, under those its island's packs give (`shapes.islands`, by island id; decision e_gqmavsb7). */
 export const shapesFor = (i, shapes = {}) => ({ ...shapes.type, ...(shapes.islands?.[i.island] ?? {}) });
 /** The type in an item's lineage nearest it that the style gives an outline (`shapes.type`), if any. */
@@ -18,9 +18,9 @@ export const shapedBy = (i, shapes = {}) => ((own) => lineageOf(i).find((t) => S
 /** The outline an item is drawn in: its type's, else the nearest flavour's that has one, else a box. */
 export const shapeIn = (i, shapes = {}) => (SHAPES.includes(shapes.ids?.[i.id]) ? shapes.ids[i.id] : shapesFor(i, shapes)[shapedBy(i, shapes)] ?? 'box');
 /** The outlines a carving style gives one height (hexagon and pill among them). */
-const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hexagon', 'pill', 'tab'];
+const CARVED = ['carved', 'chamfer', 'fold', 'summit', 'hut', 'hexagon', 'flag', 'pill', 'tab'];
 /** How far each outline cuts into its box, by the size the style names for it: none for a box, diamond, pill or sheet. */
-const BEVEL = { chamfer: 'flow_chamfer', fold: 'flow_fold', summit: 'flow_summit', cut: 'flow_cut', hexagon: 'flow_point', lozenge: 'flow_lozenge', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
+const BEVEL = { chamfer: 'flow_chamfer', fold: 'flow_fold', summit: 'flow_summit', hut: 'flow_hut', cut: 'flow_cut', hexagon: 'flow_point', lozenge: 'flow_lozenge', flag: 'flow_point', tab: 'flow_tab', ticket: 'flow_notch' };
 
 /**
  * Each item a step with its size, as the flow sizes them; a choice nothing follows yet is a step of its own. Its outline
@@ -64,7 +64,7 @@ export function stepsOf({ items, links, measure, sizes, shapes = {} }) {
     else if (n.shape === 'ridge') [n.w, n.h] = [text + BOX_PAD, need(sizes, 'flow_ridge_height') + more];
     else [n.w, n.h] = [text + BOX_PAD, (n.shape === 'sheet' ? SHEET_H : BOX_H) + more];
     // Where the style carves its boxes every type is the same height, whatever its outline; a summit rises above that.
-    if (shapes.carve && CARVED.includes(n.shape)) n.h = shapes.carve(n.item, n.lines.length * LINE) + (n.shape === 'summit' ? need(sizes, 'flow_summit') : 0);
+    if (shapes.carve && CARVED.includes(n.shape)) n.h = shapes.carve(n.item, n.lines.length * LINE) + (n.shape === 'summit' || n.shape === 'hut' ? need(sizes, BEVEL[n.shape]) : 0);
     // A pointed end takes room beside the name: one for a flag, both for a hexagon.
     if (BEVEL[n.shape]) n.bevel = need(sizes, BEVEL[n.shape]);
     if (n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'flag' || n.shape === 'ticket') n.w += n.bevel * (n.shape === 'flag' ? 1 : 2);

@@ -24,7 +24,7 @@ function downTo(n, cx, cy, x, side) {
   // A chamfer's cut top corners, a fold's turned one, a summit's rise above its box: the real outline, not its bounds.
   if (n.shape === 'chamfer' && side < 0) return cy - hh + Math.max(0, (n.bevel ?? 0) - Math.min(x - (cx - hw), cx + hw - x));
   if (n.shape === 'fold' && side < 0) return cy - hh + Math.max(0, x - (cx + hw - (n.bevel ?? 0)));
-  if (n.shape === 'summit' && side < 0) return cy - hh + (n.bevel ?? 0);
+  if ((n.shape === 'summit' || n.shape === 'hut') && side < 0) return cy - hh + (n.bevel ?? 0);
   const b = n.bevel ?? 0, over = Math.max(0, dx - (hw - b));
   if (n.shape === 'cut') return cy + side * (hh - over);
   if (n.shape === 'hexagon' || n.shape === 'lozenge' || (n.shape === 'flag' && x > cx)) return cy + side * hh * (1 - over / b);
