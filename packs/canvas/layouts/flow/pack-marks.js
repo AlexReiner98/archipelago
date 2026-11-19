@@ -175,8 +175,10 @@ export function packMarks({ island, pack, off = [], partsOff = [], open = null, 
   const tips = new Map(), marks = [], opened = openSet(open);
   const tip = (key, lines) => tips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, lines[0]), ...lines.slice(1).map((l) => m('span', { class: 'lf-tip-row' }, l))));
   const ring = (cx, r, glyph) => [m('circle', { cx, cy: y, r }), m('text', { x: cx, y }, glyph)];
+  // The name beside it is centred on the line; its baseline lies this far (in its size) below, and the pack's words stand on it.
+  const BASELINE = 0.35;
   // A pack is named in words, not a letter in a ring: its title, quiet, in its state's colour (study e_unru8ftt, round 4).
-  const word = (p, cx) => [m('rect', { x: cx - GAP / 2, y: y - D / 2, width: measure(nameOf(p), z('island_pack_text')) + GAP, height: D, class: 'lf-hit' }), m('text', { x: cx, y, class: 'lf-pack-name' }, nameOf(p))];
+  const word = (p, cx) => [m('rect', { x: cx - GAP / 2, y: y - D / 2, width: measure(nameOf(p), z('island_pack_text')) + GAP, height: D, class: 'lf-hit' }), m('text', { x: cx, y: y + z('island_text') * BASELINE, class: 'lf-pack-name' }, nameOf(p))];
   let cx = x;
   for (const p of packsOf(pack)) {
     const key = `pk:${island}:${p.id}`, opens = partsOf(p).length > 0, isOpen = opens && opened.has(p.id);
@@ -227,7 +229,7 @@ export const css = ghostCss + `
 .lf-pack text, .lf-part text { fill: var(--lf-pack, var(--ln-muted)); font-size: var(--ln-flow-island-pack-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: central; }
 /* A pack's name: plain words, set left, quiet; a required pack fainter than the island's own, off crossed out, open lit. */
 .lf-pack .lf-hit { fill: transparent; stroke: none; }
-.lf-pack text.lf-pack-name { text-anchor: start; }
+.lf-pack text.lf-pack-name { text-anchor: start; dominant-baseline: alphabetic; }
 .lf-pack text.lf-pack-name { fill: var(--ln-muted); }
 .lf-pack:not(.own) text { opacity: var(--ln-flow-waiting); }
 .lf-pack.st-off text { text-decoration: line-through; }
