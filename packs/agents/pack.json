@@ -50,15 +50,6 @@
         },
         "run": "query-answers.ts#told"
       },
-      "answer.rules_file": {
-        "in": {
-          "run?": "string"
-        },
-        "out": {
-          "text": "string"
-        },
-        "run": "query-answers.ts#rulesFile"
-      },
       "answer.schema_brief": {
         "in": {},
         "out": {
