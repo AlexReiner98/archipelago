@@ -5,6 +5,7 @@
 // the island's own (`--lf-island`); rows and ink are the colour roles the page has: no new colour. Every count and
 // width is the style's (sizes, read as --ln-flow-*). Layer: marks. Pure: a style and the islands' places in, marks out.
 
+import { colourKey } from './colour.js';
 import { islandHue } from './islands.js';
 
 const one = (v, from, none) => (from.includes(String(v)) ? String(v) : none);
@@ -56,11 +57,11 @@ const steps = (l, t, r, b, n, s) => {
  * The land's marks: `sea` (rows over the whole picture, drawn first), `land` (what each island has over its ground, by
  * its id), `classOf` (the class that gives a thing on an island its hue, by island id). `size` is the picture's.
  */
-export function landMarks({ style, g, islands, size, z, m, isHex }) {
+export function landMarks({ style, g, islands, size, z, m, isHex, info = [] }) {
   const land = landGrammar(style), classes = new Map();
   (islands ?? []).forEach((isle, k) => {
-    const hex = islandHue(style, isHex, k);
-    classes.set(isle.id, hex ? `lf-island lf-i-${hex.slice(1).toLowerCase()}` : 'lf-island');
+    const hex = islandHue(style, isHex, k, info.find((i) => i.id === isle.id));
+    classes.set(isle.id, hex ? `lf-island lf-i-${colourKey(hex)}` : 'lf-island');
   });
   const sea = land.sea === 'rows' && land.row ? [m('path', { class: 'lf-sea-rows', d: rowsPath(0, size.width, 0, size.height, land.row) })] : [];
   if (!landOwn(land)) return { sea, land: [], classOf: (id) => classes.get(id) ?? '', grammar: land };

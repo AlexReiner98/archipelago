@@ -1,7 +1,7 @@
 // What the page hands a drawing beside its answer and style (./layout.js): the words of the types and links it
 // holds, and the colours it is drawn in, as this page has them. A drawing has no registry and no page of its own.
 
-import { STYLE_COLORS } from './query-base.js';
+import { colourRoles } from './query-base.js';
 import { relations, types as registry } from './words.js';
 
 /** What a drawing is told of the types and links an answer holds, as this page knows them: the values each type's
@@ -18,6 +18,6 @@ export function colours(host, style) {
   const css = getComputedStyle(host), read = (name) => css.getPropertyValue(name).trim();
   return {
     page: Object.fromEntries(Object.keys(style.theme?.light ?? {}).map((name) => [name, read(`--${name.replaceAll('_', '-')}`)])),
-    lens: Object.fromEntries(STYLE_COLORS.map((name) => [name, read(`--ln-${name}`)])),
+    lens: Object.fromEntries(colourRoles(style).map((name) => [name, read(`--ln-${name}`)])),
   };
 }

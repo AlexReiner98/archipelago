@@ -22,7 +22,7 @@
 // the page and scrolls with it, so the land moves with the words exactly, and only a new frame moves it on the page.
 
 import { frameSandbox, h } from './base.js';
-import { STYLE_COLORS } from './query-base.js';
+import { colourRoles } from './query-base.js';
 import { pageWords } from './style-code.js';
 
 const n = (v) => (Number.isFinite(v) ? Math.round(v) : 0);
@@ -74,7 +74,7 @@ export function wear(look, root = document.documentElement) {
 export function runBackdrop({ code, answer, style, dressed, under, replace = true, held = false, drew = () => {}, failed = () => {} }) {
   if (replace) document.querySelector('body > iframe.page-backdrop')?.remove();
   const frame = h('iframe', { class: 'page-backdrop', sandbox: frameSandbox(), src: '/draw.html', title: 'The page’s backdrop', 'aria-hidden': 'true', tabindex: '-1' });
-  const colours = Object.fromEntries(STYLE_COLORS.map((name) => [name, getComputedStyle(dressed).getPropertyValue(`--ln-${name}`).trim()]));
+  const colours = Object.fromEntries(colourRoles(style).map((name) => [name, getComputedStyle(dressed).getPropertyValue(`--ln-${name}`).trim()]));
   const theme = { ...colours, dark: matchMedia('(prefers-color-scheme: dark)').matches };
   const motion = matchMedia('(prefers-reduced-motion: reduce)');
   let pending = 0, done = false, scrolls = false, refit = false, words = null, worn = '{}', leaving = false, kept_ = null;

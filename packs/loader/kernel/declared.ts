@@ -225,8 +225,8 @@ export interface StyleDef {
   body?: string;
   on?: string[];
   /** "workspace": on nothing, it lies over the workspace's own style kept about nothing, and under every nearer one. */
-  /** "chosen": used only once the owner keeps a version of it (a theme), over the presets on nothing. */
-  over?: 'workspace' | 'chosen';
+  /** "chosen": used only once the owner keeps a version of it (a theme), over the presets on nothing. "palette": the same, but chosen alone among palettes and lying over the chosen theme, so a palette changes the colours of any look. */
+  over?: 'workspace' | 'chosen' | 'palette';
   props: Record<string, unknown>;
 }
 

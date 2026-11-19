@@ -27,8 +27,8 @@ export function use(presetId: unknown, on: boolean, presets: Preset[], versions:
     return { ops: [{ op: 'update', id: mine.id, status: 'retired' }], reason: `${preset.title} retired`, answer: { preset: preset.id, item: mine.id, looks: true } };
   }
   // A theme is chosen alone: any other kept is retired in the same change.
-  const theme = preset.over === 'chosen';
-  const others = theme ? versions.filter((v) => v.is_open && v !== mine && presets.some((p) => p.over === 'chosen' && p.id === v.props.preset)) : [];
+  const theme = preset.over === 'chosen' || preset.over === 'palette';
+  const others = theme ? versions.filter((v) => v.is_open && v !== mine && presets.some((p) => p.over === preset.over && p.id === v.props.preset)) : [];
   const retire = others.map((v) => ({ op: 'update', id: v.id, status: 'retired' }));
   const { preset: _p, on: _o, ...fields } = preset.props ?? {};
   const mineOp = mine
@@ -36,7 +36,7 @@ export function use(presetId: unknown, on: boolean, presets: Preset[], versions:
     : { op: 'create', ref: 'mine', type: 'style', title: preset.title.slice(0, 60), status: 'current', props: { ...fields, ...(preset.on?.length && { on: preset.on }), preset: preset.id } };
   return {
     ops: [...retire, ...(mineOp ? [mineOp] : [])],
-    reason: theme ? `${preset.title} chosen as the workspace's theme` : mine ? `${preset.title} used again` : `${preset.title}: the owner's version of the preset`,
+    reason: theme ? `${preset.title} chosen as the workspace's ${preset.over === 'palette' ? 'palette' : 'theme'}` : mine ? `${preset.title} used again` : `${preset.title}: the owner's version of the preset`,
     answer: { preset: preset.id, item: mine?.id ?? '{mine}', looks: true },
   };
 }
