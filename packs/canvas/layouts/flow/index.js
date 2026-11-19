@@ -157,7 +157,7 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   // house style does not, since the order's wire already says it and red is kept for trouble (the owner, 3 Nov 2026).
   const heldUp = (i) => style.held_up === 'trouble' && Boolean(stateOf(i).blocked);
   /** A step's dot: its phase's mark, in the trouble colour when it is in trouble or, as the style says, held up. */
-  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''}`;
+  const dotClass = (i, phase = stateOf(i).phase) => `ph-${phase} ${markOf(phase, i.island)}${phase === 'trouble' || heldUp(i) ? ' trouble' : ''} bs-${boardWord(i)}`;
   /** The dot itself, as its mark says: a ring, a ring half filled, a disc, or nothing. */
   /** The status a board is painted in: blocked is trouble unless nothing is left to block (./item-look.js statusOf). */
   const boardWord = (i) => statusOf(i, stateOf(i).blocked && !/^(finished|ended)$/.test(stateOf(i).phase) ? 'trouble' : stateOf(i).phase);
@@ -311,6 +311,8 @@ export function draw({ answer: given, style, reduced, width, height }, tools) {
   /** A step's dot where it is drawn: of its own phase, or of the phase a story's step gives it then. */
   const dotPlace = (n) => {
     const [X, Y] = local(n.item?.island, [g.x.get(n.id), g.y.get(n.id)]), point = n.shape === 'hexagon' || n.shape === 'lozenge' || n.shape === 'ticket' ? n.bevel : 0;
+    // On a board the mark stands in the room the board keeps at its left, before the name.
+    if (look.board) return [X - n.w / 2 + point + (z('sign') + z('sign_gap') + z('sign_margin')) / 2, Y];
     const left = n.shape === 'diamond' ? X - n.w / 2 + z('diamond_pad') / 2 : X - n.w / 2 + point + z('text_x');
     return [left - z('dot_gap'), Y];
   };
