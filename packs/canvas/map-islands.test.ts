@@ -8,6 +8,7 @@ import { copyFileSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
+import { unmoved } from './marks-moved.ts';
 import { pathToFileURL } from 'node:url';
 
 const pack = JSON.parse(readFileSync(join(import.meta.dirname, 'pack.json'), 'utf8'));
@@ -33,7 +34,8 @@ const answer = {
     { type: 'waits_on', from: 'e_sendzzzz', to: 'e_alexzzzz' },
   ],
 };
-const draw = (a: any, style: any = house) => picture({ answer: a, style, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene;
+// Read where the marks stand on the picture: each island is drawn about its own corner, in a group moved there.
+const draw = (a: any, style: any = house) => ((scene) => ({ ...scene, ...(scene.svg && { svg: unmoved(scene.svg) }) }))(picture({ answer: a, style, reduced: true }, { measure, patch: () => {}, frame: () => Promise.resolve(0), open: () => {} }).scene);
 
 /** Every mark under `mark` that `test` holds of, depth first. */
 const marks = (mark: any, hold: (m: any) => boolean): any[] => {

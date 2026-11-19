@@ -89,7 +89,7 @@ test('unless with holds.link: every task on the feature is in a lane, and the re
     { op: 'link', type: 'part_of', from: 't2', to: 'f' },
     { op: 'link', type: 'forms.in_lane', from: 't1', to: 'ln' },
   ] as Op[]);
-  assert.equal(await refusal(send(l, [{ op: 'update', id: f, status: 'approved' }] as Op[], human)), `Change rejected:\n- Every task of "Feature" is in a lane first: "Task two"`);
+  assert.equal(await refusal(send(l, [{ op: 'update', id: f, status: 'approved' }] as Op[], human)), `Change rejected:\n- Every task of "Feature" is in a lane first: "Task two" (todo)`);
   assert.equal((await send(l, [{ op: 'link', type: 'forms.in_lane', from: t2, to: ln }, { op: 'update', id: f, status: 'approved' }] as Op[])).status, 'applied', 'a link in the same change counts');
   assert.ok(t1);
 });
@@ -107,8 +107,8 @@ test('{missing} names what fails an unless with every and with none', async () =
     { op: 'link', type: 'part_of', from: 'a', to: 'f' },
     { op: 'link', type: 'part_of', from: 'b', to: 'f' },
   ] as Op[]);
-  assert.match(await refusal(send(l, [{ op: 'update', id: f, status: 'merged' }] as Op[])), /Not merged: "Lane B"$/);
-  assert.match(await refusal(send(l, [{ op: 'update', id: f, status: 'approved' }] as Op[])), /Still working: "Lane B"$/);
+  assert.match(await refusal(send(l, [{ op: 'update', id: f, status: 'merged' }] as Op[])), /Not merged: "Lane B" \(working\)$/);
+  assert.match(await refusal(send(l, [{ op: 'update', id: f, status: 'approved' }] as Op[])), /Still working: "Lane B" \(working\)$/);
 });
 
 test('must_link on a pack’s islands holds on the islands of a pack that extends it, and not on one that does not', async () => {

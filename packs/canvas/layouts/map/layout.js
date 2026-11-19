@@ -15,7 +15,7 @@ export { stages } from './stage.js';
  * shelves toward the picture's shape, and every link a straight wire, as a placed view draws it.
  */
 function plainly(args, m, islandOf, heads, wides = new Map(), follows = new Map()) {
-  const { sizes } = args, GAP = sizes.flow_node_gap, PAD = sizes.flow_island_pad, SEA = sizes.flow_island_sea, M = sizes.flow_margin;
+  const { sizes } = args, GAP = sizes.flow_node_gap, PAD = sizes.flow_island_pad, SEA = sizes.flow_island_sea, M = sizes.flow_margin, RISE = args.rise ?? 0;
   const groups = new Map();
   for (const [id, n] of m.nodes) (groups.get(islandOf(id) ?? null) ?? groups.set(islandOf(id) ?? null, []).get(islandOf(id) ?? null)).push(n);
   const made = [...groups].map(([island, list]) => {
@@ -29,9 +29,9 @@ function plainly(args, m, islandOf, heads, wides = new Map(), follows = new Map(
   // Shelves as wide as the whole would be at the picture's shape.
   const area = blocks.reduce((s, b) => s + (b.w + SEA) * (b.h + SEA), 0), wide = Math.max(...blocks.map((b) => b.w), Math.sqrt(area * (args.aspect ?? 1.6)));
   const x = new Map(), y = new Map(), islands = [];
-  let cx = M, cy = M, shelf = 0;
+  let cx = M, cy = M + RISE, shelf = 0;
   for (const b of blocks) {
-    if (cx > M && cx + b.w > M + wide) (cx = M), (cy += shelf + SEA), (shelf = 0);
+    if (cx > M && cx + b.w > M + wide) (cx = M), (cy += shelf + SEA + RISE), (shelf = 0);
     b.list.forEach((n, k) => {
       x.set(n.id, cx + b.pad + (k % b.columns) * b.cw + n.w / 2);
       y.set(n.id, cy + b.top + Math.floor(k / b.columns) * b.ch + n.h / 2);
@@ -57,6 +57,7 @@ export function laidOut(args, { islandOf = () => null, heads = new Map(), wides 
 
 /** The model the flow's scene draws: the whole picture with no islands, or the kit's plain graph when only that is asked. */
 export function layout(args) {
+  if (args.extras?.args) return { args };
   if (args.extras?.plain) {
     const m = model(args);
     return { all: [...m.nodes.values()], chains: m.chains, ties: m.ties, potential: m.potential, breaks: [], args };

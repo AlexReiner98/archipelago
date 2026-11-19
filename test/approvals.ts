@@ -32,11 +32,11 @@ export const SETTINGS: Record<string, Record<string, unknown>> = {
   hold: { agent_changes: 'hold' },
   code: { agent_code: true },
   'apply+code': { agent_changes: 'apply', agent_code: true },
-  // Holds off (the owner, 3 Nov 2026, e_66mwta3w): whatever a rule holds applies; asked and propose-only still wait.
+  // Holds off (the owner, 3 Nov 2026, e_66mwta3w): whatever a rule holds applies, asked too since 18 Nov 2026; propose-only still waits.
   off: { holds_off: true },
   'hold+off': { agent_changes: 'hold', holds_off: true },
   // What a new workspace begins with since 15 Nov 2026 (beginApplying: "completely remove all approvals for now"):
-  // every change applies as made, its answer naming the stakes; only a wait the agent or its token asked for holds.
+  // every change applies as made, its answer naming the stakes; only a token that may only propose holds.
   begun: { agent_changes: 'apply', holds_off: true },
 };
 

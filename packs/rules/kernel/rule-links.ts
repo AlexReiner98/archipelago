@@ -83,5 +83,5 @@ export async function linksHeld(q: Q, reg: Registry, item: string, spec: LinkSpe
   return ends.size;
 }
 
-/** How a refusal names what failed it ({missing}): each title quoted, five at most and how many more. */
-export const named = (titles: string[]) => (titles.length > 5 ? [...titles.slice(0, 5).map((t) => `"${t}"`), `${titles.length - 5} more`] : titles.map((t) => `"${t}"`)).join(', ');
+/** How a refusal names what failed it ({missing}): each title quoted, with its status where given, five at most and how many more. */
+export const named = (titles: string[], statuses: string[] = []) => { const one = (t: string, i: number) => `"${t}"${statuses[i] ? ` (${statuses[i]})` : ''}`; return (titles.length > 5 ? [...titles.slice(0, 5).map(one), `${titles.length - 5} more`] : titles.map(one)).join(', '); };

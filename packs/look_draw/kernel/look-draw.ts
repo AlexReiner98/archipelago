@@ -24,8 +24,9 @@ const DRAW_MS = 15_000;
 const AT_ONCE = 3;
 /** The longest a look waits for its turn. */
 const WAIT_MS = 60_000;
-/** The longest one drawing takes, from its turn to its picture. */
+/** The longest one drawing takes, from its turn to its picture (`late`, which a test shortens to force a stall). */
 const LATE_MS = 45_000;
+export const limits = { late: LATE_MS };
 /** Past this a PNG is sent as a JPEG instead: a picture is for reading, not for keeping. */
 const PNG_MOST = 400_000;
 /** The longest a press is given to settle: the page unchanged for QUIET_MS, else taken as it stands. */
@@ -52,6 +53,8 @@ export interface Drawn {
   fell_back?: { asked: string; drawn: string }[];
   /** What the page's parts drew with, one for each island it drew parts on (packs/loader/kernel/pack-versions.ts, Drew). */
   drew?: unknown[];
+  /** The tries the page drew with, of those it was given (packs/surface/page/preview.js, lookTried). */
+  tried_with?: { item: string; field: string }[];
   /** A dry run's: what its drawings said went wrong, each once, the first first. */
   errors?: string[];
   /** A pressed look's: the keys found and pressed, in order, and those no mark had (or none could be reached). */
@@ -175,6 +178,15 @@ export function errorsOf(state: Drawn['state'], why: string | undefined, shown: 
   return [...new Set(out.map((e) => e.slice(0, 300)))];
 }
 
+/** What a look is doing, as a late one says where it was stuck. */
+export type Stage = 'opening the page' | 'waiting for the page to say it had drawn' | 'pressing its marks' | 'taking its picture' | 'reading its marks' | 'reading its faces' | 'reading its checks' | 'reading what it drew with';
+
+/** Why a look was closed past its limit: the step it was stuck on, and what the page last said of its drawing. */
+export function lateWhy(ms: number, stage: Stage, said: { state?: string; why?: string }): string {
+  const last = said.state ? `; the page last said it was ${said.state}${said.why ? ` (${said.why.slice(0, 120)})` : ''}` : stage === 'opening the page' ? '' : '; the page had said nothing of its drawing';
+  return `The view had not drawn within ${ms / 1000} s: it was stuck ${stage}${last}, and its page stopped answering, so it was closed.`;
+}
+
 /** Wait until the page has gone QUIET_MS without a change (packs/walls/page/look-press.js counts them), at most PRESS_MS. */
 async function settle(tab: Tab) {
   const count = () => tab.evaluate<number>('window.lookChanges ? window.lookChanges() : 0').catch(() => 0);
@@ -216,10 +228,12 @@ export async function pressAll(tab: Tab, keys: string[]): Promise<{ pressed: str
 
 async function drawNow(address: string, pass: string, width: number, height: number, scheme: 'dark' | 'light', marks: boolean, tries?: Try[], press?: string[]): Promise<Drawn> {
   clearTimeout(idle);
-  const began = Date.now();
+  const began = Date.now(), most = limits.late;
   const tab = await (await getBrowser()).tab();
-  // Past LATE_MS the tab is closed, which ends whatever command was waiting on it.
-  const late = setTimeout(() => void tab.close(), LATE_MS);
+  // Past its limit the tab is closed, and the step it was on then is kept to say why: a command already sent to the
+  // page is not ended by the close (it runs to SEND_MS in ./chrome.ts), so the look may be on a later step by the time it fails.
+  let stage: Stage = 'opening the page', stuck: Stage | undefined, said: { state?: string; why?: string } = {};
+  const late = setTimeout(() => ((stuck = stage), void tab.close()), most);
   try {
     await tab.send('Page.enable');
     await tab.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
@@ -230,16 +244,18 @@ async function drawNow(address: string, pass: string, width: number, height: num
     // A dry run's code, where the page's tries are read (packs/surface/page/preview.js) before its first drawing: data, never run here.
     if (tries?.length) await tab.send('Page.addScriptToEvaluateOnNewDocument', { source: `globalThis.lookTries = ${JSON.stringify(tries)};` });
     await tab.send('Page.navigate', { url: address });
-    let said: { state?: string; why?: string } = {};
+    stage = 'waiting for the page to say it had drawn';
     for (const until = Date.now() + DRAW_MS; Date.now() < until; await wait(150)) {
-      // Asked again until it answers: while the page loads there is nothing yet to ask.
-      said = (await tab.evaluate<{ state?: string; why?: string }>(`({ state: document.documentElement.dataset.look, why: document.documentElement.dataset.look_why })`).catch(() => ({}))) ?? {};
+      // Asked again until it answers: while the page loads there is nothing yet to ask. What it last said is kept.
+      said = (await tab.evaluate<{ state?: string; why?: string }>(`({ state: document.documentElement.dataset.look, why: document.documentElement.dataset.look_why })`).catch(() => null)) ?? said;
       if (said.state && said.state !== 'drawing') break;
     }
     const state = (['drawn', 'empty', 'error'].includes(String(said.state)) ? said.state : 'late') as Drawn['state'];
     // Pressed first, once it has drawn: a view that never drew has no marks to press.
+    stage = 'pressing its marks';
     const presses = press?.length ? (state === 'drawn' ? await pressAll(tab, press) : { pressed: [], missing: [...press] }) : undefined;
     const shot = async (format: 'png' | 'jpeg') => Buffer.from((await tab.send('Page.captureScreenshot', { format, ...(format === 'jpeg' && { quality: 80 }) })).data, 'base64');
+    stage = 'taking its picture';
     // Settled: the same picture twice, a moment apart; a drawing that moves is taken as it stands on the third.
     let last = await shot('png'), settled = false;
     for (let n = 0; n < 3 && !settled; n++) {
@@ -249,16 +265,21 @@ async function drawNow(address: string, pass: string, width: number, height: num
       last = now;
     }
     const jpeg = last.length > PNG_MOST;
+    stage = 'reading its marks';
     const made = marks && state === 'drawn' ? await tab.evaluate<Marks | null>('window.lookMarks()').catch(logged(`look ${address}: its marks could not be read`, null)) : null;
+    stage = 'reading its faces';
     const fell_back = await facesOf(tab).catch(logged(`look ${address}: its faces could not be read`));
     // Read off the page as it was taken: a probe that fails is said, and the look answers with no checks.
+    stage = 'reading its checks';
     const checks = checksOf(await tab.evaluate<Probe>(PROBE).catch(logged(`look ${address}: its checks could not be read`, null)));
+    stage = 'reading what it drew with';
     const drew = await tab.evaluate<unknown[] | null>('window.lookDrew ? window.lookDrew() : null').catch(logged(`look ${address}: what it drew with could not be read`, null));
     const why = state === 'late' ? `The view did not say it had drawn within ${DRAW_MS / 1000} s: this is how it stood.` : said.why;
+    const tried_with = tries?.length ? ((await tab.evaluate<{ item: string; field: string }[] | null>('window.lookTried ? window.lookTried() : null').catch(logged(`look ${address}: the tries it drew with could not be read`, null))) ?? []) : undefined;
     const errors = tries?.length ? errorsOf(state, why, (await tab.evaluate<string[]>(SHOWN_ERRORS).catch(logged(`look ${address}: its errors could not be read`, []))) ?? []) : undefined;
-    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, checks, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(errors && { errors }), ...presses };
+    return { data: jpeg ? await shot('jpeg') : last, content_type: jpeg ? 'image/jpeg' : 'image/png', width, height, state, ...(why && { why: why.slice(0, 300) }), settled, checks, ms: Date.now() - began, ...(made && JSON.stringify(made).length <= MARKS_MOST && { marks: made }), ...(fell_back && { fell_back }), ...(drew?.length && { drew }), ...(tried_with && { tried_with }), ...(errors && { errors }), ...presses };
   } catch (err) {
-    throw Date.now() - began >= LATE_MS ? new Error(`The view had not drawn within ${LATE_MS / 1000} s, and its page stopped answering: it was closed.`) : err;
+    throw stuck || Date.now() - began >= most ? new Error(lateWhy(most, stuck ?? stage, said)) : err;
   } finally {
     clearTimeout(late);
     await tab.close();

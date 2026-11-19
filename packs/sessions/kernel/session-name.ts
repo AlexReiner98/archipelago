@@ -26,26 +26,36 @@ export const cutTitle = (title: string) => (title.length > TITLE_MOST ? `${title
 const PLACED = 'Session in ';
 /** What a session is called before its chat has a title: what it works on, else where it runs. */
 export const sessionTitle = (fallback: { task?: string; place?: string }) => cutTitle(fallback.task ?? `${PLACED}${fallback.place ?? 'an unknown folder'}`);
-/** A first prompt's opening words, as a name: its first line, cut at a word to a name's length. */
+/** A block a client puts round what it adds to a prompt (`<system-reminder>…</system-reminder>`), and any tag left alone. */
+const ADDED_BLOCK = /<([a-z][\w-]*)(?:\s[^>]*)?>[\s\S]*?<\/\1\s*>/gi;
+const TAG = /<\/?[a-z][\w-]*(?:\s[^>]*)?\/?>/gi;
+/**
+ * What a person said, without what their client added to it (the study e_unru8ftt: a session was named
+ * "<system-reminder>", the first line its client put before the prompt): each tagged block, then each tag left.
+ */
+export const ownWords = (text: string) => text.replace(ADDED_BLOCK, '\n').replace(TAG, ' ');
+/** A title that is only what a client added: a tag, or nothing once the tags are gone. */
+const added = (title: string) => !ownWords(title).trim();
+/** A first prompt's opening words, as a name: its first line of the person's own words, cut at a word to a name's length. */
 export const promptTitle = (prompt: unknown): string => {
-  const line = typeof prompt === 'string' ? (prompt.split('\n').find((l) => l.trim()) ?? '').trim().replace(/\s+/g, ' ') : '';
+  const line = typeof prompt === 'string' ? (ownWords(prompt).split('\n').find((l) => l.trim()) ?? '').trim().replace(/\s+/g, ' ') : '';
   if (line.length <= TITLE_MOST) return line;
   const cut = line.slice(0, TITLE_MOST - 1);
   return `${cut.slice(0, cut.lastIndexOf(' ') > 20 ? cut.lastIndexOf(' ') : cut.length).trimEnd()}…`;
 };
 
 /**
- * A session still named after its folder, prompted: named by what was asked, until its client gives it a title (which
+ * A session still named after its folder, or after what its client added to a prompt, prompted: named by what was asked, until its client gives it a title (which
  * then replaces this, as its label). One named after its task, or titled, keeps its name.
  */
 export async function sessionPromptNamed(ctx: KernelContext, run: Pick<Item, 'id' | 'title' | 'props'>, prompt: unknown, actor = 'agent:claude-code'): Promise<boolean> {
   const title = promptTitle(prompt);
-  if (!title || run.props.label || !run.title.startsWith(PLACED)) return false;
+  if (!title || run.props.label || !(run.title.startsWith(PLACED) || added(run.title))) return false;
   await bookkeep(ctx, actor, { ops: [{ op: 'update', id: run.id, title }], reason: 'Session named by its first prompt' });
   return true;
 }
 /** A title as a client said it: its words, trimmed, or nothing. */
-export const saidTitle = (label: unknown) => (typeof label === 'string' ? label.trim().replace(/\s+/g, ' ').slice(0, 200) : '');
+export const saidTitle = (label: unknown) => (typeof label === 'string' ? ownWords(label).trim().replace(/\s+/g, ' ').slice(0, 200) : '');
 
 /** What the session's client calls it now: kept as its label, and its title. Only a new one is written: true when it was, for every page open to hear it at once (its tab is named anew: ui/pane-route.js reads the title off the step). */
 export async function sessionLabelled(ctx: KernelContext, run: Pick<Item, 'id' | 'title' | 'props'>, label: unknown, actor = 'agent:claude-code'): Promise<boolean> {

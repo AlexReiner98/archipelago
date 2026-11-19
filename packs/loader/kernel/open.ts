@@ -18,6 +18,7 @@ import { hostFor } from './packtools.ts';
 import { ISLANDS } from './islands.ts';
 import { takeTypeItems } from './type-items.ts';
 import { syncTypes } from './typetable.ts';
+import { judgeExamples } from './rule-check.ts';
 import type { Archipelago } from '../../write/kernel/pelago.ts';
 
 
@@ -27,6 +28,9 @@ export const OPEN: RootOpen = {
       const { dataDir, packsDir, packDirs, packs, workspacePacks, rootDir } = o.config;
       if (dataDir !== null) await importLocalPack(o.db, o.isDefault ? join(packsDir, LOCAL_PACK, 'pack.json') : join(rootDir, o.id, 'local-pack', 'pack.json'));
       o.registry = new Registry(packDirs ?? packsDir, packsFor(packs, workspacePacks, o.id), await localTypes<TypeDef>(o.db));
+      // A pack.json's rules come with their examples, each judged as it loads (packs/rules/kernel/examples.ts).
+      const off = (await Promise.all(o.registry.packs.map(async (p) => (await judgeExamples(o.registry!, p.id)).map((x) => `Pack "${p.id}": ${x}`)))).flat();
+      if (off.length) throw new Error(off.join('; '));
       const db = o.db;
       o.registry.keepLocal = (def) => addLocalType(db, def);
     },

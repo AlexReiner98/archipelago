@@ -160,27 +160,37 @@ export async function missingLinks(q: Q, reg: Registry, rules: RuleDef[], ops: F
   return [...new Set(out)];
 }
 
+/** The items a change makes, by ref, as the rules read them before it is written: a made-up item in a rule's example is one. */
+export function madeIn(reg: Pick<Registry, 'types'>, ops: FormOp[]): Map<string, Row> {
+  return new Map(ops.flatMap((o) => (o.op === 'create' && o.ref && o.type ? [[o.ref, { id: o.ref, type: o.type, title: String(o.title ?? o.type), status: o.status ?? reg.types.get(o.type)?.statuses.open[0] ?? '', props: o.props ?? {} }] as const] : [])));
+}
+
 /**
- * Whether what a walk from `start` reaches holds as the rule's unless says, the change's own updates and links laid over
- * what is stored; and where it does not, what fails it ({missing} in the rule's say): with every, the items that do not
- * hold; with none, those that do.
+ * Whether what a walk from `start` reaches holds as the rule's unless says, the change's own items, links, cuts and
+ * updates laid over what is stored; and where it does not, what fails it ({missing} in the rule's say), each by its
+ * title and status, so a verdict titled as its screen is told from it: with every, the items that do not hold; with
+ * none, those that do.
  */
 export async function holdsUnless(q: Q, reg: Registry, u: Unless, start: string | undefined, ops: FormOp[]): Promise<{ holds: boolean; missing: string }> {
   const count = u.count ?? 'every';
   const [, link, way] = WALK.exec(u.walk)!;
   const family = reg.relationFamily(link);
+  const gone = new Set(ops.filter((o) => o.op === 'unlink' && o.relation).map((o) => o.relation!));
+  const given = ops.filter((o) => o.op === 'link' && o.type && o.from && o.to && family.includes(reg.canonical(o.type)));
   const seen = new Set<string>(start ? [start] : []);
   let front = start ? [start] : [];
   for (let step = 0; step < (u.steps ?? 1) && front.length; step++) {
-    const { rows } = await q.query<{ id: string }>(
-      way === '<' ? `select from_id as id from relation where to_id = any($1::text[]) and type = any($2::text[]) and valid_to is null limit 500` : `select to_id as id from relation where from_id = any($1::text[]) and type = any($2::text[]) and valid_to is null limit 500`,
+    const { rows } = await q.query<{ rel: string; id: string }>(
+      way === '<' ? `select id as rel, from_id as id from relation where to_id = any($1::text[]) and type = any($2::text[]) and valid_to is null limit 500` : `select id as rel, to_id as id from relation where from_id = any($1::text[]) and type = any($2::text[]) and valid_to is null limit 500`,
       [front, family],
     );
-    front = [...new Set(rows.map((r) => r.id))].filter((id) => !seen.has(id));
+    const added = given.filter((o) => front.includes(way === '<' ? o.to! : o.from!)).map((o) => (way === '<' ? o.from! : o.to!));
+    front = [...new Set([...rows.filter((r) => !gone.has(r.rel)).map((r) => r.id), ...added])].filter((id) => !seen.has(id));
     for (const id of front) seen.add(id);
   }
   if (start) seen.delete(start);
-  const reached = [...(await itemsOf(q, [...seen])).values()]
+  const made = madeIn(reg, ops);
+  const reached = [...(await itemsOf(q, [...seen].filter((id) => !made.has(id)))).values(), ...[...seen].flatMap((id) => made.get(id) ?? [])]
     .filter((r) => !r.archived_at && !ops.some((o) => o.op === 'archive' && o.id === r.id))
     .map((r) => ops.filter((o) => o.op === 'update' && o.id === r.id).reduce((x, o) => ({ ...x, status: o.status ?? x.status, props: { ...x.props, ...o.props } }), r))
     .filter((r) => !u.type || reg.isA(r.type, u.type));
@@ -195,5 +205,5 @@ export async function holdsUnless(q: Q, reg: Registry, u: Unless, start: string 
   }
   const failing = reached.filter((r) => (count === 'none' ? fit.get(r.id) : !fit.get(r.id)));
   const holds = count === 'some' ? reached.some((r) => fit.get(r.id)) : !failing.length;
-  return { holds, missing: holds || count === 'some' ? '' : named(failing.map((r) => r.title)) };
+  return { holds, missing: holds || count === 'some' ? '' : named(failing.map((r) => r.title), failing.map((r) => r.status)) };
 }

@@ -9,15 +9,12 @@
 import type { Q } from '../../database/kernel/db.ts';
 import type { Registry } from '../../loader/kernel/packs.ts';
 import type { Keep } from '../../log/kernel/retention.ts';
-import { outsideLayout, outsideReach } from './reach-check.ts';
-export { outsideLayout, outsideReach } from './reach-check.ts';
+import { outsideLayout, outsideReach } from './reach-check.ts'; export { outsideLayout, outsideReach } from './reach-check.ts';
 // What checks a pack's rules as it loads is the loader's; the words it checks by are read here too.
-import { COMPARE, fillForms, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
-import { checkForms, checkUnless, holdsUnless, missingLinks, overMost, type AtMost, type FormOp, type MustLink, type Unless } from './rule-forms.ts';
-import { apartRefused, type Apart } from './apart.ts';
-export { checkRules } from '../../loader/kernel/rule-check.ts';
-import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts';
-import { opFacts } from '../../loader/kernel/part-trial.ts';
+import { COMPARE, fillExamples, fillForms, fillLifts, regex } from '../../loader/kernel/rule-check.ts';
+import { checkForms, checkUnless, holdsUnless, madeIn, missingLinks, overMost, type AtMost, type FormOp, type MustLink, type Unless } from './rule-forms.ts';
+import { apartRefused, type Apart } from './apart.ts'; import { exampleProblems, type Example } from './examples.ts'; export { checkRules } from '../../loader/kernel/rule-check.ts';
+import { KERNEL_PACKS } from '../../loader/kernel/packorder.ts'; import { opFacts } from '../../loader/kernel/part-trial.ts';
 
 type OneOrMany = string | string[];
 
@@ -94,6 +91,8 @@ export interface RuleDef {
   then?: 'hold' | 'refuse' | 'ask' | 'spare' | { require: string[] } | { carry: Carry };
   /** For spare: the rules it lets the op through, by id, each of its own pack. Left out, every rule (bookkeeping). */
   spares?: string[];
+  /** Small changes on made-up items (refs only) and what each must come to, judged as its pack's manifest is written (./examples.ts). */
+  examples?: Example[];
   /** Fields whose values together may belong to one item of the type only. */
   unique?: string[];
   /** For unique, at_most and must_link: the type it holds within (of), flavours included. */
@@ -177,6 +176,8 @@ export interface Who {
   may?: string;
   /** The change asks to wait. */
   asked?: boolean;
+  /** Holds are off here (decide sets it): a wait the change asked for counts for nothing. */
+  holdsOff?: boolean;
   /** The change says on whose authority it is made. */
   said?: boolean;
   /** It says it is made on the owner's word (authority of human, with a basis). */
@@ -192,13 +193,14 @@ export interface Who {
 /** The settings an owner lifts a rule by: each one an agent's token may read (packs/database/kernel/schema.ts, AGENT_CODE_READ). On is true, or "apply". */
 export const LIFTS = ['agent_changes', 'agent_code', 'agent_publish', 'agent_backups'];
 // The loader's slot loader.lifts: a pack's rule is checked against these as it loads (packs/loader/kernel/rule-check.ts).
-fillLifts(LIFTS); fillForms({ checkForms, checkUnless }); // and loader.rule_forms: the forms that read links, checked as a pack loads
+fillLifts(LIFTS); fillForms({ checkForms, checkUnless }); fillExamples((reg, pack) => exampleProblems(reg, pack, decide)); // and loader.rule_forms: the forms that read links, checked as a pack loads
 const list = (x: OneOrMany | undefined) => (x === undefined ? undefined : Array.isArray(x) ? x : [x]);
 /** The lift by which agents' changes apply as they are made; a new workspace begins with it (beginApplying). */
 export const AGENT_CHANGES = 'agent_changes';
 /**
  * The setting by which the owner turns holds off: every change applies as it is made, whatever rule would hold it,
- * forget included (the owner, 3 Nov 2026, decision e_66mwta3w). A wait the change or its token asked for still holds.
+ * forget included (the owner, 3 Nov 2026, decision e_66mwta3w), and a change that asked to wait (asked: the owner, 18 Nov
+ * 2026, "pull the gate out so this is impossible"). Only a token that may do nothing but propose (may) still holds.
  * Off unless set. An agent's token reads it (packs/database/kernel/schema.ts, HOLDS_OFF_READ).
  */
 export const HOLDS_OFF = 'holds_off';
@@ -297,6 +299,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   const ruled = (rule: Rule): Ruled => ({ rule: rule.id ?? '', pack: rule.pack, say: said(rule, `${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`), ...(rule.stake && { stake: said({ ...rule, say: rule.stake }, rule.stake) }) });
   // What is checked only of an op that takes effect at once comes after what holds it.
   const order = [...rules.filter((r) => r.when?.held === undefined), ...rules.filter((r) => r.when?.held !== undefined)];
+  let holding = 0; // what holds it, but for its asking where holds are off: held: false is checked as if it never asked
   // A pack's bookkeeping its own rule lets through is spared every other rule, each named as spared by it, it first.
   const sparing = order.filter((r) => r.then === 'spare' && applies(r, reg, who, w, targets, false, facts));
   const lets = sparing.find((r) => !r.spares), letBy = lets && `${lets.pack}.${lets.id ?? ''}`;
@@ -304,7 +307,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
   // A rule that names what it spares lets the op through those of its own pack's rules alone.
   const named = new Map(sparing.filter((r) => r.spares).flatMap((r) => r.spares!.map((id) => [`${r.pack}.${id}`, `${r.pack}.${r.id ?? ''}`] as const)));
   for (const rule of order) {
-    if (rule.unique || rule.at_most || rule.must_link || (rule.unless && facts.unless?.has(keyOf(rule))) || rule.stream || rule.on !== undefined || rule.then === 'spare' || carryOf(rule) || !applies(rule, reg, who, w, targets, held.length > 0, facts)) continue;
+    if (rule.unique || rule.at_most || rule.must_link || (rule.unless && facts.unless?.has(keyOf(rule))) || rule.stream || rule.on !== undefined || rule.then === 'spare' || carryOf(rule) || !applies(rule, reg, who, w, targets, holding > 0, facts)) continue;
     if (letBy) { spared.push({ ...ruled(rule), lifted_by: letBy }); continue; }
     const spare = named.get(`${rule.pack}.${rule.id ?? ''}`);
     if (spare) { spared.push({ ...ruled(rule), lifted_by: spare }); continue; }
@@ -315,7 +318,7 @@ export function judge(rules: Rule[], reg: Registry, who: Who, w: Written, target
     }
     if (rule.then === 'hold') {
       // A person's own change waits for nobody; one a drawing asked for waits for that person.
-      if (!who.human || (who.drawing && rule.when?.drawing)) held.push(ruled(rule));
+      if (!who.human || (who.drawing && rule.when?.drawing)) held.push(ruled(rule)), (holding += who.holdsOff && rule.when?.asked !== undefined ? 0 : 1);
     } else if (rule.then === 'refuse') refusers.push(ruled(rule)), refused.push(said(rule, `"${title}": refused by ${rule.pack}'s rule${rule.id ? ` ${rule.id}` : ''}`));
     else if (typeof rule.then === 'object' && 'require' in rule.then) {
       // A field the item's head holds (its body) is read from the op too.
@@ -442,6 +445,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
   const ops = given as (Written & { id?: string; keep?: string; drop?: string })[];
   const on = (op: (typeof ops)[number]) => (op.op === 'merge' ? [op.keep!, op.drop!] : op.id ? [op.id] : []);
   const found = new Map((await q.query<Target>(`select id, type, title, status, props from entity where id = any($1::text[])`, [ops.flatMap(on)])).rows.map((e) => [e.id, e]));
+  for (const [ref, made] of madeIn(reg, ops as FormOp[])) if (!found.has(ref)) found.set(ref, made); // an op on an item the change makes, as a rule's example writes one
   // What is read of each op beside it: a part's trial version, a version spread to another island (packs/loader/kernel/part-trial.ts).
   const facts = await opFacts(q, reg, ops, found);
   // A rule that holds or refuses unless what a walk from the item reaches holds is spared where it does (./rule-forms.ts).
@@ -451,9 +455,9 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
     for (const r of unlessing) if (applies(r, reg, who, op, targets, false, facts[i])) { const u = await holdsUnless(q, reg, r.unless!, targets[0]?.id, ops as FormOp[]); if (u.holds) met.add(keyOf(r)); else missing.set(keyOf(r), u.missing); }
     facts[i] = { ...facts[i], unless: met, missing };
   }));
-  // With holds off, what a rule holds applies as made; a wait the change or its token asked for (asked, may) still holds.
+  // With holds off, what a rule holds applies as made, asked included; only a token that may only propose (may) holds.
   const off = who.human && !who.drawing ? false : await holdsOff(q);
-  const askedFor = (r: Ruled) => { const when = every.get(keyOf(r))?.when; return when?.asked !== undefined || when?.may !== undefined; };
+  const askedFor = (r: Ruled) => every.get(keyOf(r))?.when?.may !== undefined;
   const once = <T>(xs: T[], key: (x: T) => string) => [...new Map(xs.map((x) => [key(x), x])).values()];
   const judged = await Promise.all(ops.map(async (op, i) => {
     const targets = on(op).flatMap((id) => found.get(id) ?? []);
@@ -461,7 +465,7 @@ export async function decide(q: Q, reg: Registry, who: Who, given: { op: string 
       const { rules: these, registry } = under(run);
       // A rule of a version names it: the held change says which version of the pack held it.
       const mark = (r: Ruled) => (run?.version && r.pack === run.version.of && !KERNEL_PACKS.includes(r.pack) ? { ...r, version: run.version!.item } : r);
-      const one = judge(these, registry, who, op, targets, lifted, facts[i]);
+      const one = judge(these, registry, { ...who, holdsOff: off }, op, targets, lifted, facts[i]);
       return { held: one.held.map(mark), spared: one.spared.map(mark), refusers: one.refusers.map(mark), refused: [...one.refused, ...(one.letBy ? [] : await clashes(q, registry, op, targets[0]))] };
     }));
     const held = once(each.flatMap((e) => e.held), keyOf);

@@ -89,6 +89,9 @@ export async function tryOf(l: Archipelago, input: { item: string; field: string
   return { item: input.item, field: input.field, value, title: it.title, ...(drawing && { drawing }), at: Date.now() };
 }
 
+/** The tries the one asking has live, as their own open page draws them: what a look of theirs draws too (./tool-reads.ts). */
+export const livePreviews = async (l: Archipelago): Promise<Preview[]> => (await keptOf(l)).previews;
+
 export const PREVIEW_TOOLS: Record<string, Tool> = {
   preview: {
     description:

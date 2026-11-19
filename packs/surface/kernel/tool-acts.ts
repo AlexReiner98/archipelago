@@ -11,6 +11,7 @@ import { actorId } from '../../write/kernel/pelago.ts';
 import { befell, importAudit, recordRun, recordUsage, sessionEnd, sessionStart, sessionUpdate, tell } from './session-calls.ts';
 import { point, sessionOpened, sessionTookUp, whose } from './tool-change.ts';
 import { putShownOn } from './show-islands.ts';
+import { livePreviews } from './tool-preview.ts';
 import { slotted } from './surface-slots.ts';
 import { rechecked } from './recheck.ts';
 import { backupNow, restartNow } from './tool-config.ts';
@@ -86,7 +87,9 @@ export const ACT_TOOLS: Record<string, Tool> = {
       const putOn = input.url ? [] : await putShownOn(l, actor, hash, island, input.run);
       // Whether the owner is looking at it (the presence pack's answer.sight); nothing brings it into sight.
       const { pages, sight } = await callAs<{ pages: unknown; sight: unknown }>(l, 'answer.sight', { whose: whose(l), actor: actor.name, run: input.run, focus: false });
-      const size = { width: input.width, height: input.height, scheme: input.scheme, fresh: input.fresh };
+      // Drawn as the asker's own open page draws it: with their live tries (./tool-preview.ts).
+      const previews = input.look ? await livePreviews(l) : [];
+      const size = { width: input.width, height: input.height, scheme: input.scheme, fresh: input.fresh, ...(previews.length && { previews }) };
       return { ...at, pages, sight, ...(putOn.length && { put_on: putOn }), ...(input.look && (await callAs<Record<string, unknown>>(l, 'answer.look', { whose: whose(l), actor: actor.name, hash, size }))) };
     },
   },

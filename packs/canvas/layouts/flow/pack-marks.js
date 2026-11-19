@@ -21,6 +21,9 @@ const NAMED = /^[a-z]+$/;
 /** A pack or part id as the page takes one on a mark (packs/walls/page/marks.js, which also holds it to 64 characters): a part with another is drawn, never a switch. */
 const SWITCHABLE = /^[a-z][a-z\d_.-]*$/;
 
+/** A pack as the header names it: its title, else its id. */
+export const nameOf = (p) => String(p?.title || p?.id || '?');
+
 /** A pack's glyph: the one its preset gives, a few characters at most, else its title's initial. */
 export const glyphOf = (p) => {
   const g = typeof p?.glyph === 'string' ? [...p.glyph.trim()].slice(0, 2).join('') : '';
@@ -62,6 +65,9 @@ const takes = (p) => list(p.consumes).filter((c) => typeof c?.name === 'string')
 /** The rows a tip adds for names: what it gives, takes and lacks, each one row, none where it has none. */
 const nameRows = (gives, took, lacks) => [gives.length && `Gives ${gives.join(', ')}`, took.length && `Takes ${took.join(', ')}`, lacks.length && `Lacks ${lacks.join(', ')}`].filter(Boolean);
 
+/** What a pack holds besides its types and links, in words ("21/22 rules · 1 instruction"): a row of its tip, where the header once counted it. */
+const countsOf = (p) => ((kinds) => kinds.map(([kind, parts]) => `${countText(parts)} ${PART_KINDS[kind].toLowerCase()}${parts.length === 1 ? '' : 's'}`).join(' · '))(kindsOf(p).filter(([kind]) => kind !== 'type' && kind !== 'link'));
+
 /** A pack's tip: its name, its state on this island and why, what it gives, takes and lacks, and what a click does. */
 export function tipOf(p, writes, { opens = false, open = false } = {}) {
   const state = stateOf(p), n = Number.isInteger(p.off_would_wait) ? p.off_would_wait : 0;
@@ -70,6 +76,7 @@ export function tipOf(p, writes, { opens = false, open = false } = {}) {
     `${p.title ?? p.id}${p.own ? '' : ' (required)'}`,
     p.kernel === true ? "Always on: the kernel's own" : `${PACK_STATES[state]}${p.why ? `: ${p.why}` : ''}`,
     ...nameRows(words(p.provides), takes(p), state === 'waiting' ? words(p.lacks) : []),
+    countsOf(p),
     opens && (open ? 'Click to close its parts' : 'Click to open its parts'),
     writes && (opens ? (state === 'off' ? 'Turn it on here from its first part' : `Turn it off here from its first part${would}`) : state === 'off' ? 'Click to turn it on here' : `Click to turn it off here${would}`),
   ].filter(Boolean);
@@ -139,15 +146,16 @@ export function partInKey({ island, pack, id, partsOff = [], on = () => [] }) {
   return null;
 }
 
-/** The key's rows for what of each pack is not a type or link: one row a pack, its kinds' glyphs and counts ("Build: § 21/22 · ¶ 1"). */
+/** The key's rows for what of each pack is not a type or link: one row a pack, its kinds counted in words ("21/22 rules · 1 instruction"). */
 export function countRows({ pack, style, m, z }) {
   const [W, H] = ['key_width', 'key_height'].map(z);
   return packsOf(pack).flatMap((p) => {
     const kinds = kindsOf(p).filter(([kind]) => kind !== 'type' && kind !== 'link');
     if (!kinds.length) return [];
-    const said = kinds.map(([kind, parts]) => `${kindGlyph(style, kind)} ${countText(parts)}`).join(' · ');
+    // Each kind in words, its count first ("10 rules · 1 view"): a glyph per kind read as soup (study e_unru8ftt).
+    const said = kinds.map(([kind, parts]) => `${countText(parts)} ${PART_KINDS[kind].toLowerCase()}${parts.length === 1 ? '' : 's'}`).join(' · ');
     // The row's mark is the pack's own glyph, so its words are the counts alone; the pack's name is in its tip.
-    return [{ glyph: m('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, m('text', { x: W / 2, y: H / 2, class: `lf-key-count st-${kinds.some(([, ps]) => ps.some((r) => stateOf(r) !== 'active')) ? 'some' : 'active'}` }, glyphOf(p))), label: said, tip: `${p.title ?? p.id}: ${kinds.map(([kind, parts]) => ((l) => (l[1] ? `${l[0]} (${l[1]})` : l[0]))(kindTipOf(kind, parts))).join(', ')}` }];
+    return [{ group: 'count', glyph: m('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}` }, m('text', { x: W / 2, y: H / 2, class: `lf-key-count st-${kinds.some(([, ps]) => ps.some((r) => stateOf(r) !== 'active')) ? 'some' : 'active'}` }, glyphOf(p))), label: said, tip: `${p.title ?? p.id}: ${kinds.map(([kind, parts]) => ((l) => (l[1] ? `${l[0]} (${l[1]})` : l[0]))(kindTipOf(kind, parts))).join(', ')}` }];
   });
 }
 
@@ -166,7 +174,11 @@ export function packMarks({ island, pack, off = [], partsOff = [], open = null, 
   const tips = new Map(), marks = [], opened = openSet(open);
   const tip = (key, lines) => tips.set(key, m('div', { class: 'lf-tip' }, m('b', {}, lines[0]), ...lines.slice(1).map((l) => m('span', { class: 'lf-tip-row' }, l))));
   const ring = (cx, r, glyph) => [m('circle', { cx, cy: y, r }), m('text', { x: cx, y }, glyph)];
-  let cx = x + D / 2;
+  // The name beside it is centred on the line; its baseline lies this far (in its size) below, and the pack's words stand on it.
+  const BASELINE = 0.35;
+  // A pack is named in words, not a letter in a ring: its title, quiet, in its state's colour (study e_unru8ftt, round 4).
+  const word = (p, cx) => [m('rect', { x: cx - GAP / 2, y: y - D / 2, width: measure(nameOf(p), z('island_pack_text')) + GAP, height: D, class: 'lf-hit' }), m('text', { x: cx, y: y + z('island_text') * BASELINE, class: 'lf-pack-name' }, nameOf(p))];
+  let cx = x;
   for (const p of packsOf(pack)) {
     const key = `pk:${island}:${p.id}`, opens = partsOf(p).length > 0, isOpen = opens && opened.has(p.id);
     const sw = `pw:${island}:${p.id}`, switches = togglesHere(p, off) && on(opens ? sw : key).includes('toggle');
@@ -174,14 +186,14 @@ export function packMarks({ island, pack, off = [], partsOff = [], open = null, 
     tip(key, lines);
     const cls = `lf-pack st-${stateOf(p)}${p.own ? ' own' : ''}${!opens && switches ? ' toggles' : ''}${opens ? ' opens' : ''}${isOpen ? ' open' : ''}`;
     const events = ['enter', 'leave', ...(opens ? ['find'] : switches ? ['toggle'] : [])];
-    marks.push(titled(m('g', { key, on: events, ...(opens && { find: `parts ${p.id} ${island}`, ...(!isOpen && { shows: `gh:${island}:${p.id}` }) }), ...(!opens && switches && { item: island, pack: p.id }), class: cls }, ...ring(cx, D / 2, glyphOf(p))), lines.join('\n')));
+    marks.push(titled(m('g', { key, on: events, ...(opens && { find: `parts ${p.id} ${island}`, ...(!isOpen && { shows: `gh:${island}:${p.id}` }) }), ...(!opens && switches && { item: island, pack: p.id }), class: cls }, ...word(p, cx)), lines.join('\n')));
     // Open, the switch for the whole pack stands after its mark; its parts are an island of their own.
     if (isOpen) {
       const swLines = switchTipOf(p, switches);
       tip(sw, swLines);
-      marks.push(titled(m('g', { key: sw, on: ['enter', 'leave', ...(switches ? ['toggle'] : [])], ...(switches && { item: island, pack: p.id }), class: `lf-part whole st-${stateOf(p)}${switches ? ' toggles' : ''}` }, ...ring(cx + D / 2 + GAP + d / 2, d / 2, kindGlyph(style, 'pack'))), swLines.join('\n')));
+      marks.push(titled(m('g', { key: sw, on: ['enter', 'leave', ...(switches ? ['toggle'] : [])], ...(switches && { item: island, pack: p.id }), class: `lf-part whole st-${stateOf(p)}${switches ? ' toggles' : ''}` }, ...ring(cx + measure(nameOf(p), z('island_pack_text')) + GAP + d / 2, d / 2, kindGlyph(style, 'pack'))), swLines.join('\n')));
     }
-    cx += D + GAP + (isOpen ? rowWidth(p, z) : 0);
+    cx += measure(nameOf(p), z('island_pack_text')) + GAP + (isOpen ? rowWidth(p, z) : 0);
   }
   // Over its cap, how many it holds against how many its look reads well at, after its packs.
   const over = capText(cap), edge = x + packsWidth(pack, z, null, measure, open);
@@ -190,7 +202,7 @@ export function packMarks({ island, pack, off = [], partsOff = [], open = null, 
 }
 
 /** How wide an island's packs stand after its name: each mark with its gap, an open one's switch, then what over its cap says. */
-export const packsWidth = (pack, z, cap, measure = () => 0, open = null) => packsOf(pack).reduce((w, p) => w + z('island_pack_mark') + z('island_pack_gap') + (openSet(open).has(p.id) ? rowWidth(p, z) : 0), 0) + ((t) => (t ? measure(t, z('island_pack_text')) + z('island_pack_gap') : 0))(capText(cap));
+export const packsWidth = (pack, z, cap, measure = () => 0, open = null) => packsOf(pack).reduce((w, p) => w + measure(nameOf(p), z('island_pack_text')) + z('island_pack_gap') + (openSet(open).has(p.id) ? rowWidth(p, z) : 0), 0) + ((t) => (t ? measure(t, z('island_pack_text')) + z('island_pack_gap') : 0))(capText(cap));
 
 /**
  * A parts island's marks (./parts-islands.js): its pack's parts drawn by ./ghost-parts.js from its land's top left,
@@ -214,6 +226,14 @@ export const css = ghostCss + `
 .lf-pack circle, .lf-part circle { fill: var(--ln-land); stroke: var(--lf-pack, var(--ln-muted)); stroke-width: var(--ln-flow-island-pack-stroke); }
 .lf-pack.st-off circle, .lf-part.st-off circle { stroke-dasharray: var(--ln-flow-dash-held); }
 .lf-pack text, .lf-part text { fill: var(--lf-pack, var(--ln-muted)); font-size: var(--ln-flow-island-pack-text); font-family: var(--ln-font); text-anchor: middle; dominant-baseline: central; }
+/* A pack's name: plain words, set left, quiet; a required pack fainter than the island's own, off crossed out, open lit. */
+.lf-pack .lf-hit { fill: transparent; stroke: none; }
+.lf-pack text.lf-pack-name { text-anchor: start; dominant-baseline: alphabetic; }
+.lf-pack text.lf-pack-name { fill: var(--ln-muted); }
+.lf-pack:not(.own) text { opacity: var(--ln-flow-waiting); }
+.lf-pack.st-off text { text-decoration: line-through; }
+.lf-pack.open text { fill: var(--ln-text); }
+.lf-pack:is(.toggles, .opens):is(:hover, :focus-visible) text { text-decoration: underline; }
 /* A part: smaller; waiting, faded and dashed, as a waiting step is. */
 .lf-part text { font-size: var(--ln-flow-island-part-text); }
 .lf-part.st-waiting { opacity: var(--ln-flow-waiting); }

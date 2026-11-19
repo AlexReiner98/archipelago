@@ -43,3 +43,10 @@ test('with no least, all of it is fitted however small', () => {
   assert.equal(v.s, v.whole);
   assert.ok(v.s < 0.2);
 });
+
+test('high: a box that fits down the room stands at its top, still centred across', () => {
+  const v = framed([0, 0, 4000, 500], [0, 48, 1000, 600], 16, 0, true);
+  const [l, t] = onFrame(v, [0, 0]), [r] = onFrame(v, [4000, 500]);
+  assert.ok(Math.abs(t - 56) < 1e-9, 'its top half the pad under the room’s');
+  assert.ok(Math.abs(l + r - 1000) < 1e-9, 'centred across');
+});
