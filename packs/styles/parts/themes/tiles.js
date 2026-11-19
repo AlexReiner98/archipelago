@@ -3,8 +3,8 @@
 // the one picked, with Try here (on this screen alone, nothing kept), Keep and Stop, or for the house, Use the house
 // colours.
 
-/** A preset is a theme when it is used only once chosen. */
-export const isTheme = (s) => s?.over === 'chosen';
+/** A preset is a theme when it is used only once chosen (a look's, or a palette, which lies over any look). */
+export const isTheme = (s) => s?.over === 'chosen' || s?.over === 'palette';
 
 /** The theme the workspace keeps, if any. */
 export const keptOf = (styles) => styles.find((s) => isTheme(s) && s.item && !s.retired);

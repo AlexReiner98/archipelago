@@ -8,8 +8,8 @@ export const typeTitle = (words, t) => words?.types?.[t]?.title ?? t;
 /** What a preset is for: the whole workspace, or the types it is on. */
 export const where = (s, words) => (s.on?.length ? `on ${s.on.map((t) => typeTitle(words, t)).join(', ')}` : 'the whole workspace');
 
-/** A preset is a theme when it is used only once chosen. */
-export const isTheme = (s) => s?.over === 'chosen';
+/** A preset is a theme when it is used only once chosen (a look's, or a palette, which lies over any look). */
+export const isTheme = (s) => s?.over === 'chosen' || s?.over === 'palette';
 
 /** One preset's row; `busy` is the id of the one whose change is going out. */
 export function presetRow(s, words, busy) {

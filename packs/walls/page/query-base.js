@@ -2,6 +2,7 @@
 // colours and sizes a style may set. The drawings (flow, list, a layout's code) import this; query.js picks one.
 
 import { h } from './base.js';
+import { colourRoles } from './colour-roles.js';
 import { typeVars } from './theme.js';
 
 export const LIT = [
@@ -10,8 +11,7 @@ export const LIT = [
   ['blocked', 'Blocked', 'Only what is blocked stays lit'],
 ];
 
-/** A style's colours, by the name the stylesheet knows each by. */
-export const STYLE_COLORS = ['sea', 'land', 'inner', 'line', 'text', 'muted', 'accent', 'blocked', 'you', 'session', 'done', 'warn'];
+export { colourRoles } from './colour-roles.js';
 /** The sizes a style names at its top, and the stylesheet's name for each. */
 const TOP_SIZES = ['text', 'radius', 'gap', 'column'];
 /** A length as a style may give it: a number of pixels, or a number with one of these units. */
@@ -25,7 +25,9 @@ const asLength = (v) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ?
  */
 export function dress(host, style) {
   const set = new Map();
-  for (const name of STYLE_COLORS) if (typeof style.colors?.[name] === 'string' && /^#[0-9a-f]{3,8}$/i.test(style.colors[name])) set.set(`--ln-${name}`, style.colors[name]);
+  // A role is the theme colour its pack names for it, which follows the theme; a hex a style gives for it is its own.
+  for (const [name, to] of Object.entries(style.roles ?? {})) if (NAME.test(name) && typeof to === 'string') set.set(`--ln-${name}`, /^#[0-9a-f]{3,8}$/i.test(to) ? to : NAME.test(to) ? `var(--${to.replaceAll('_', '-')})` : '');
+  for (const name of colourRoles(style)) if (typeof style.colors?.[name] === 'string' && /^#[0-9a-f]{3,8}$/i.test(style.colors[name])) set.set(`--ln-${name}`, style.colors[name]);
   for (const name of TOP_SIZES) if (asLength(style[name])) set.set(`--ln-${name}-size`, asLength(style[name]));
   for (const [name, value] of Object.entries(style.sizes ?? {})) if (NAME.test(name) && asLength(value)) set.set(`--ln-${name.replaceAll('_', '-')}`, asLength(value));
   for (const [name, value] of Object.entries(style.numbers ?? {})) if (NAME.test(name) && Number.isFinite(value)) set.set(`--ln-${name.replaceAll('_', '-')}`, String(value));
@@ -34,7 +36,7 @@ export function dress(host, style) {
   // to the roles the page's does.
   if (style.faces || style.type) for (const [name, value] of typeVars(style.type, style.faces)) set.set(name, value);
   for (const name of [...host.style].filter((n) => /^--(ln|face|type)-/.test(n) && !set.has(n))) host.style.removeProperty(name);
-  for (const [name, value] of set) host.style.setProperty(name, value);
+  for (const [name, value] of set) value && host.style.setProperty(name, value);
 }
 const named = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 /**

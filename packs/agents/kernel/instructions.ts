@@ -23,7 +23,7 @@ export interface StyleDef {
   title: string;
   body?: string;
   on?: string[];
-  over?: 'workspace' | 'chosen';
+  over?: 'workspace' | 'chosen' | 'palette';
   props: Record<string, unknown>;
 }
 
