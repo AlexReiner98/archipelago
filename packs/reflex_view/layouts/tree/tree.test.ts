@@ -219,3 +219,40 @@ test('played from the start, the trunk comes in too: a rule there from the first
   played.end();
   assert.ok(on.has('n:core.guard'));
 });
+
+/** A page as the frame is one: a scene is mounted once its picture answers; asked for before that, a surface is none. */
+const page = () => {
+  let mounted = false, shown = 0;
+  const patches: any[] = [];
+  const tools = {
+    frame: () => new Promise((r) => setTimeout(r, 1)),
+    patch: (p: any[]) => patches.push(...p),
+    open() {},
+    // A surface's canvas has no image to show until a context is taken on it, as an OffscreenCanvas does.
+    surface: async () => {
+      if (!mounted) return null;
+      let context = false;
+      return { canvas: { getContext: () => (context = true) }, show: () => { if (!context) throw new Error('no context'); shown++; } };
+    },
+  };
+  return { tools, patches, mount: () => (mounted = true), shown: () => shown };
+};
+
+test('drawn again (the map changed), the new tree shows its surface, so the one it replaces leaves, and it keeps playing', async () => {
+  const first = page();
+  const a = await picture({ answer: { ...answer(), lens: { find: ['held-over'] } }, style, reduced: false }, first.tools);
+  first.mount();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(first.shown(), 1, 'the first tree shows its surface once it is mounted');
+  // The map changes: the page draws the view again and ends the picture it replaces.
+  const second = page();
+  const b = await picture({ answer: { ...answer(), lens: { find: ['held-over'] } }, style, reduced: false }, second.tools);
+  a.end();
+  second.mount();
+  const before = first.patches.length;
+  await new Promise((r) => setTimeout(r, 30));
+  assert.equal(second.shown(), 1, 'the new tree shows its surface, so the page takes the old picture away');
+  assert.equal(first.patches.length, before, 'the tree replaced draws nothing more');
+  assert.ok(second.patches.some((p) => p.key === 'cam'), 'the new tree keeps playing');
+  b.end();
+});

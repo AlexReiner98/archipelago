@@ -110,11 +110,17 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
   const play = player({ tree, placed, film, story, z, n, pools: { sparks, lights }, from, fresh, speed });
   const start = grown ? story.to : story.from;
   const bar = barOf({ ...weekTo(story, start), day: new Date(start).toISOString().split('T')[0], schematic: story.schematic, speed: speed.now, speeds: reduced ? [] : SPEEDS });
-  let alive = !reduced, last = null;
+  let alive = !reduced, last = null, frames = 0;
   const loop = async () => {
     while (alive) {
       await tools.frame();
       if (!alive) return;
+      // A scene with a surface is drawn afresh each time, never mounted from a picture kept still: a played tree must
+      // run. Its surface is asked for once the page has drawn a frame of this scene (the second): asked sooner, the
+      // page has no surface for it yet and answers none, the worker keeps that answer, and the picture this one
+      // replaces stays laid over it, still, until a first frame is shown that never comes. Its canvas takes a context
+      // first: one with none has no image to show.
+      if (++frames === 2) tools.surface?.().then((s) => s && (s.canvas.getContext('2d'), s.show())).catch(() => {});
       const now = performance.now(), dt = last === null ? 0 : Math.min(n('reflex_frame_most'), (now - last) / 1000);
       last = now;
       const out = play.step(dt);
@@ -122,9 +128,6 @@ export async function picture({ answer, style, reduced, width, height }, tools) 
     }
   };
   if (alive) loop().catch(() => (alive = false));
-  // A scene with a surface is drawn afresh each time, never mounted from a picture kept still: a played tree must
-  // run. Its first frame is shown at once (nothing on it yet), so the page knows the picture has drawn.
-  if (!reduced) tools.surface?.().then((s) => s?.show()).catch(() => {});
   const byKey = (key) => tree.nodes.get(key.slice(2));
   return {
     scene: { svg, css, key: keyOf(z, story.schematic, hues), before: bar, size: { width: placed.width, height: placed.height }, ...(!reduced && { surface: { key: 'rt-surface' } }) },
