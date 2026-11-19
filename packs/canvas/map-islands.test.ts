@@ -80,7 +80,7 @@ test('each island carries its own legend and the corner has none', () => {
   const scene = draw(answer);
   assert.deepEqual(scene.key, [], 'no key in the corner');
   assert.ok(legendOf(scene, 'e_grantsis').includes('Task') && legendOf(scene, 'e_grantsis').includes('Leads to'), legendOf(scene, 'e_grantsis').join(', '));
-  assert.ok(legendOf(scene, 'e_lablabis').includes('Record'), 'Lab’s says what a record is');
+  assert.ok(legendOf(scene, 'e_lablabis').includes('Task'), 'Lab’s says what its item is');
   assert.ok(!legendOf(scene, 'e_grantsis').includes('Record'), 'Grants’ says only what it draws');
 });
 
