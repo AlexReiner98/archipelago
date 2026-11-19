@@ -141,7 +141,7 @@ export function drawPicker() {
   const auto = h('button', { type: 'button', class: 'isl-auto', 'aria-pressed': 'false', onclick: () => toggleAuto() }, 'Auto');
   // Two rows that fold (Alex, 19 Nov 2026, e_spqgn9td): Islands, the bar as it was, and Custom views (./views-side.js),
   // whose press puts a drawing up in place of the islands. A press on Islands while a drawing is up brings them back.
-  const views = h('div', { class: 'isl-views', role: 'list', 'aria-label': 'Custom views' });
+  const views = h('div', { class: 'isl-views', 'aria-label': 'Custom views' });
   const islandsHead = foldHead('islands', 'Islands', () => viewUp() && ((location.hash = '#/'), true));
   const viewsHead = foldHead('views', 'Custom views');
   const side = h('aside', { id: 'islands', 'aria-label': 'Islands' },

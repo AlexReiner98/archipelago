@@ -120,9 +120,8 @@ body[data-panes="1"]:has(#query:not([hidden])) #islands { top: calc(var(--band) 
 /* Islands takes the room the views leave; the views, a few rows, scroll on their own where they are many. */
 #islands .isl-fold-body[data-fold="islands"] { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
 #islands .isl-fold-body[data-fold="views"] { flex: none; max-height: 40%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; padding: var(--space-3) 0 var(--space-5); }
-/* A view's row: on, its name in full colour; one offered (a pack's, the view up not kept) muted, Keep at its right. */
+/* A view's row: on, its name in full colour; Pin or Unpin at its right while it is pointed at, × on the one up. */
 #islands .isl-view.on .isl-name { color: var(--text); }
-#islands .isl-view .isl-unkeep { visibility: hidden; }
-#islands .isl-view:is(:hover, :focus-within) .isl-unkeep { visibility: visible; }
-#islands .isl-keep { flex: none; border: 0; background: none; padding: 0 var(--space-3); font: inherit; font-size: var(--text-2); color: var(--muted); cursor: pointer; }
-#islands .isl-keep:hover { color: var(--accent); }
+#islands .isl-pin { flex: none; visibility: hidden; border: 0; background: none; padding: 0 var(--space-3); font: inherit; font-size: var(--text-2); color: var(--muted); cursor: pointer; }
+#islands .isl-view:is(:hover, :focus-within) .isl-pin { visibility: visible; }
+#islands .isl-pin:hover { color: var(--accent); }
