@@ -11,7 +11,7 @@ import { packClass } from './story.js';
 /** The two colours, each checked as a hex colour; the page's accent and warn where the style names none. */
 export const coloursOf = (style) => {
   const hex = (name, or) => (typeof style.colors?.[name] === 'string' && HEX.test(style.colors[name]) ? style.colors[name] : or);
-  return { write: hex('reflex_write', 'var(--warn, var(--accent))'), say: hex('reflex_say', 'var(--accent)'), fail: hex('reflex_fail', 'var(--bad, var(--warn))'), fire: hex('reflex_fire', 'var(--ok, var(--accent))') };
+  return { write: hex('reflex_write', 'var(--warn, var(--accent))'), say: hex('reflex_say', 'var(--accent)'), fail: hex('reflex_fail', 'var(--bad, var(--warn))'), fire: hex('reflex_fire', 'var(--ok, var(--accent))'), schema: hex('reflex_schema', 'var(--ln-muted)') };
 };
 
 /**
@@ -26,14 +26,16 @@ export const packHues = (style, packs) => {
 };
 
 export function cssOf(style, z, n, hues = new Map()) {
-  const { write, say, fail, fire } = coloursOf(style);
+  const { write, say, fail, fire, schema } = coloursOf(style);
   const byPack = [...hues].map(([pack, hue]) => `.${packClass(pack)} .rt-dot { fill: ${hue}; }\n.rt-trial.${packClass(pack)} .rt-dot { fill: none; stroke: ${hue}; }\n.rt-k-${packClass(pack)} { fill: ${hue}; }`);
   const levels = n('reflex_branch_levels');
   // A branch's weight by its level, times its tier's (reflex_tier_core, _pack, _owner, _learned): core's the trunk.
+  // A tier the view's style names no weight for (one kept before that tier was drawn) weighs as one.
+  const tierWeight = (tier) => (Number.isFinite(style.numbers?.[`reflex_tier_${tier}`]) ? style.numbers[`reflex_tier_${tier}`] : 1);
   const width = (d) => Math.max(z('reflex_branch_least'), z('reflex_branch') - d * z('reflex_branch_step'));
   const level = Array.from({ length: levels + 1 }, (_, d) => [
     `.rt-b${d} { stroke-width: ${width(d)}; stroke-opacity: ${Math.max(n('reflex_branch_faint'), n('reflex_branch_ink') - d * n('reflex_branch_fade'))}; }`,
-    ...['core', 'pack', 'owner', 'learned'].map((tier) => `.rt-b${d}.rt-t-${tier} { stroke-width: ${Math.round(width(d) * n(`reflex_tier_${tier}`) * 100) / 100}; }`),
+    ...['schema', 'core', 'pack', 'owner', 'learned'].map((tier) => `.rt-b${d}.rt-t-${tier} { stroke-width: ${Math.round(width(d) * tierWeight(tier) * 100) / 100}; }`),
   ]).flat();
   return `
 .rt { overflow: visible; }
@@ -51,6 +53,12 @@ ${level.join('\n')}
 .rt-gap .rt-dot { stroke: ${write}; stroke-width: ${z('reflex_gap_ring')}; stroke-opacity: ${n('reflex_gap_ink')}; }
 ${byPack.join('\n')}
 .rt-rule .rt-dot { fill-opacity: 1; }
+.rt-branch.rt-t-schema { stroke: ${schema}; }
+.rt-dot.rt-check { fill: none; stroke: var(--ln-text); stroke-width: ${z('reflex_trial_ring')}; }
+.rt-k-schema { fill: ${schema}; }
+.rt-adds { cursor: copy; }
+.rt-adds:is(:hover, :focus-visible) .rt-dot { fill-opacity: 1; stroke: var(--accent); stroke-width: ${z('reflex_trial_ring')}; }
+.rt-adds:is(:hover, :focus-visible) .rt-name { text-decoration: underline; }
 .rt-light.rt-fired circle { fill: ${fire}; }
 .rt-trail.rt-fired { stroke: ${fire}; }
 .rt-head.rt-fired { fill: ${fire}; }

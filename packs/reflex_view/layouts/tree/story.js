@@ -89,3 +89,12 @@ export const packOf = (node, story) => {
 };
 /** The class a pack's hue is drawn by. */
 export const packClass = (pack) => `rt-p-${String(pack).toLowerCase().replace(/[^a-z0-9_-]/g, '-')}`;
+
+/**
+ * The schema the pack answered (its view schema, sent as `schema`): every type and the checks it implies, each
+ * { id, kind (type or check), pack, tier (schema), for, title, words, guards, fired (a check's refusals, as times) }.
+ */
+export const schemaOf = (nodes) =>
+  (Array.isArray(nodes) ? nodes : [])
+    .filter((x) => x && typeof x.id === 'string' && (x.kind === 'type' || x.kind === 'check'))
+    .map((x) => ({ id: x.id, kind: x.kind, pack: x.pack ?? 'core', title: x.title ?? x.id, for: Array.isArray(x.for) ? x.for : [x.for].filter(Boolean), guards: x.guards, words: x.words, fired: (x.fired ?? []).map((at) => Date.parse(at)).filter(Number.isFinite) }));

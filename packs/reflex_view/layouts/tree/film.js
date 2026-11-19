@@ -25,7 +25,7 @@ export function filmOf(tree, story, n) {
   };
   const events = [
     ...story.misses.map((m) => ({ kind: 'miss', t: time(m.at), node: (m.grew && tree.nodes.get(m.grew)) || placeOf(m.where), grew: Boolean(m.grew && tree.nodes.get(m.grew)) })),
-    ...(story.rules ?? []).flatMap((r) => (tree.nodes.has(r.id) ? r.fired.map((at) => ({ kind: 'fired', t: time(at), node: tree.nodes.get(r.id) })) : [])),
+    ...[...(story.rules ?? []), ...(story.schema ?? [])].flatMap((r) => (tree.nodes.has(r.id) ? (r.fired ?? []).map((at) => ({ kind: 'fired', t: time(at), node: tree.nodes.get(r.id) })) : [])),
     ...story.said.filter((s) => tree.nodes.has(s.id)).map((s) => ({ kind: s.verdict === 'failed' || s.verdict === 'came_back' ? 'failed' : 'held', t: time(s.at), node: tree.nodes.get(s.id) })),
   ].sort((a, b) => a.t - b.t);
   // A miss that grew a node is that node's birth.
