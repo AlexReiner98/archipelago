@@ -47,16 +47,21 @@ export function surfaceOf(picture, port, colours) {
     const w = Number(picture.getAttribute?.('width')) || box.width, t = Number(picture.getAttribute?.('height')) || box.height;
     return w > 0 && t > 0 ? { x: 0, y: 0, width: w, height: t } : null;
   };
+  // Under the picture, wherever the stage puts it now: its corner is read again each time the camera moves, never kept,
+  // so a bar that comes or goes above the picture cannot leave the paint standing off the marks.
+  let stage = null;
   const follow = () => {
+    const at = layer.parentElement;
+    if (at && at !== stage) (stage = at), watch.observe(at);
+    const b = picture.getBoundingClientRect(), s = at?.getBoundingClientRect();
+    box = { width: b.width, height: b.height };
+    if (s) Object.assign(layer.style, { left: `${b.left - s.left}px`, top: `${b.top - s.top}px` });
     layer.style.transform = cameraOf(camera(), box.width, box.height);
   };
-  // Under the picture, wherever the stage puts it: its corner, from the stage's.
   const place = () => {
-    const b = picture.getBoundingClientRect(), stage = layer.parentElement?.getBoundingClientRect();
-    box = { width: b.width, height: b.height };
-    if (stage) Object.assign(layer.style, { left: `${b.left - stage.left}px`, top: `${b.top - stage.top}px` });
+    const was = `${box.width} ${box.height}`;
     follow();
-    if (given) port.postMessage({ type: 'surface-size', size: sizeNow() });
+    if (given && `${box.width} ${box.height}` !== was) port.postMessage({ type: 'surface-size', size: sizeNow() });
   };
   const watch = new ResizeObserver(place);
   watch.observe(picture);

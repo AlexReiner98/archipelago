@@ -1,21 +1,15 @@
 // Where a painted island's look paints (packs/canvas/layouts/flow/painted-tiles.js; task e_cr98zz2g, one scene, one
 // renderer): a tile of the map's own world, laid by the page's camera with the marks. A pan never changes it; a zoom
-// only once the density is far enough off the screen's; an island too big to paint whole is painted for what is in view.
+// paints it again at the screen's density, so words keep their size; an island too big to paint whole is painted for
+// what is in view.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 // @ts-ignore: a pack's drawing code, plain JavaScript
-import { camOf, sizeOf, stepOf, tileFor } from '../packs/canvas/layouts/flow/painted-tiles.js';
+import { camOf, sizeOf, tileFor } from '../packs/canvas/layouts/flow/painted-tiles.js';
 
 const isle = { at: [100, 50], size: [400, 250] };
 const room = { most: 4_194_304, side: 4096, margin: 0.5 };
 const view = (x: number, y: number, scale: number, w = 1200, h = 800) => ({ x, y, width: w / scale, height: h / scale, scale });
-
-test('densities come in steps of √2, never softer than the screen', () => {
-  assert.equal(stepOf(1), 1);
-  assert.equal(stepOf(2), 2);
-  assert.ok(Math.abs(stepOf(1.2) - Math.SQRT2) < 1e-9);
-  for (const s of [0.13, 0.7, 1.01, 3.3]) assert.ok(stepOf(s) >= s && stepOf(s) <= s * Math.SQRT2 + 1e-9, `${s} → ${stepOf(s)}`);
-});
 
 test('an island that fits is painted whole, and a pan keeps the very same tile', () => {
   const t = tileFor(isle, view(0, 0, 1), 2, null, room);
@@ -23,9 +17,9 @@ test('an island that fits is painted whole, and a pan keeps the very same tile',
   assert.equal(t.k, 1);
   assert.equal(t.whole, true);
   assert.equal(tileFor(isle, view(-300, 120, 1), 2, t, room), t, 'panned, nothing to paint again');
-  assert.equal(tileFor(isle, view(0, 0, 0.8), 2, t, room), t, 'zoomed out a little, the density it has is kept');
-  assert.notEqual(tileFor(isle, view(0, 0, 1.1), 2, t, room), t, 'zoomed in past it, a sharper one');
-  assert.notEqual(tileFor(isle, view(0, 0, 0.4), 2, t, room), t, 'zoomed out to under half, a lighter one');
+  const zoomed = tileFor(isle, view(0, 0, 1.1), 2, t, room);
+  assert.equal(zoomed.k, 1.1, 'zoomed, it is painted at the density of the screen, so words keep their size');
+  assert.equal(tileFor(isle, view(40, 0, 1.1), 2, zoomed, room), zoomed, 'and a pan after keeps that');
 });
 
 test('an island out of sight has no tile', () => {
