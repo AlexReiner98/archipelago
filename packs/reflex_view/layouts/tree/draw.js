@@ -14,18 +14,23 @@ export const HIDDEN = 1.5;
 const glow = (key, kind) => m('g', { key, class: `rt-glow rt-${kind}`, opacity: 0 }, m('circle', { class: 'rt-g1', r: 1 }), m('circle', { class: 'rt-g2', r: 0.6 }), m('circle', { class: 'rt-g3', r: 0.3 }));
 
 /** The scene's svg, and how many sparks and lights its pools hold. */
-export function marksOf(tree, placed, z, n, shown, named) {
+export function marksOf(tree, placed, z, n, shown, named, story, gapped = new Set()) {
+  // A node's tier (core, pack, owner, learned) weighs its branch; its standing (trial, current, retired) marks its dot.
+  // A bough takes the tier nearest the trunk of what grows from it.
+  const RANK = ['core', 'pack', 'owner', 'learned'];
+  const tierOf = (node) => (node.item || node.preset ? story.nodes.get(node.id)?.tier ?? 'owner' : RANK[Math.min(...node.kids.map((k) => RANK.indexOf(tierOf(k))))] ?? 'owner');
+  const standing = (node) => story.nodes.get(node.id)?.status ?? 'current';
   const { place, branch, width, height, centre } = placed;
   const branches = tree.order.filter((node) => node.parent).map((node) => {
     const on = shown(node);
-    return m('path', { key: `b:${node.id}`, class: `rt-branch rt-b${Math.min(node.depth, n('reflex_branch_levels'))}`, d: branch.get(node.id), pathLength: 1, 'stroke-dasharray': '1 2', 'stroke-dashoffset': on ? 0 : HIDDEN });
+    return m('path', { key: `b:${node.id}`, class: `rt-branch rt-b${Math.min(node.depth, n('reflex_branch_levels'))} rt-t-${tierOf(node)}`, d: branch.get(node.id), pathLength: 1, 'stroke-dasharray': '1 2', 'stroke-dashoffset': on ? 0 : HIDDEN });
   });
   const nodes = tree.order.filter((node) => node.parent).map((node) => {
     const p = place.get(node.id), label = placed.labels.get(node.id), spot = label && nameAt(label);
     const r = node.kids.length ? z('reflex_node') : z('reflex_leaf');
     return m(
       'g',
-      { key: `n:${node.id}`, class: `rt-node${shown(node) ? ' on' : ''}${node.item ? '' : ' rt-bough'}`, ...(node.item && { item: node.item.id, on: ['click', 'enter', 'leave'], role: 'link' }) },
+      { key: `n:${node.id}`, class: `rt-node rt-${standing(node)}${shown(node) ? ' on' : ''}${node.item || node.preset ? '' : ' rt-bough'}${gapped.has(node.id) ? ' rt-gap' : ''}`, ...(node.item && { item: node.item.id, on: ['click', 'enter', 'leave'], role: 'link' }) },
       // Its whole name is its tooltip, whether its name shows or gives way.
       m('title', {}, node.title),
       m('circle', { class: 'rt-hit', cx: at(p.x), cy: at(p.y), r: z('reflex_hit') }),

@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { treeOf } from './tree.js';
 import { radial } from './radial.js';
-import { sayingsOf } from './said.js';
+import { storyOf, weekTo } from './story.js';
 import { filmOf } from './film.js';
 import { picture } from './index.js';
 import { namesShown, overlap } from './names.js';
@@ -56,17 +56,44 @@ test('it is placed the same each time, each child within its parent’s share of
   assert.equal(a.along.get(id(6))!.length, n('reflex_curve_steps') + 1);
 });
 
-test('the film grows to the whole, and the counts end on what was said', () => {
-  const tree = treeOf(answer())!, said = sayingsOf(tree, n), film = filmOf(tree, said, n);
-  assert.equal(said.schematic, true);
-  const times = tree.born.map((one) => film.born.get(one.id)!);
-  assert.deepEqual([...times].sort((x, y) => x - y), times);
-  assert.ok(times.every((t) => t > 0 && t <= film.end));
-  assert.equal(film.writtenAt(film.end), 12);
-  assert.equal(film.saidAt(film.end), said.total);
-  assert.ok(film.saidAt(film.end / 2) < said.total);
-  const counted = sayingsOf(treeOf({ ...answer(2, []), items: [node(0, { fields: { said: 7 } }), node(1)] })!, n);
-  assert.deepEqual([counted.schematic, counted.total], [false, 7]);
+/** A story as the pack tells it: a core preset, a trial grown from a miss, a gap, and sayings of every verdict. */
+const told = (items: any[]) => {
+  const day = (k: number) => new Date(Date.UTC(2026, 10, 1) + k * 864e5).toISOString();
+  return {
+    from: day(0), to: day(28),
+    nodes: [{ id: 'core.say_authority', tier: 'core', status: 'current', for: ['tool:change'], title: 'Say on whose authority' }, ...items.map((i, k) => ({ id: i.id, tier: k === 0 ? 'learned' : 'owner', status: k === 0 ? 'trial' : 'current' }))],
+    misses: [{ at: day(10), where: 'tool:change', grew: items[0].id }, { at: day(20), where: 'tool:change' }],
+    said: [{ id: items[1].id, at: day(12), verdict: 'held' }, { id: items[2].id, at: day(14), verdict: 'came_back' }, { id: items[3].id, at: day(15), verdict: 'quiet' }, { id: 'core.say_authority', at: day(16), verdict: 'held' }],
+  };
+};
+
+test('over real dates: the trunk stands, a miss sparks where it happened or grows its trial, sayings light by verdict', () => {
+  const a = answer(6, []);
+  const came = told(a.items), story = storyOf(a, came, null, n);
+  assert.equal(story.schematic, false);
+  const tree = treeOf(a, (item: any) => item.fields?.for ?? story.nodes.get(item.id)?.for, n, [...story.nodes].filter(([, x]) => x.tier === 'core').map(([id, x]) => ({ id, ...x })))!;
+  assert.ok(tree.nodes.get('core.say_authority')!.preset, 'core\u2019s preset stands in the tree');
+  const film = filmOf(tree, story, n);
+  assert.equal(film.born.get('core.say_authority'), 0, 'the trunk is there from the start');
+  const kinds = film.events.map((e: any) => e.kind);
+  assert.deepEqual(kinds, ['miss', 'held', 'failed', 'held', 'miss'], 'a quiet saying runs no light');
+  const [grew, , , , gap] = film.events;
+  assert.equal(grew.node.id, a.items[0].id);
+  assert.equal(film.born.get(a.items[0].id), grew.t, 'the trial is born of its miss');
+  assert.equal(gap.grew, false);
+  assert.equal(gap.node.id, '~for:tool:change', 'a miss that grew nothing sparks on the bough of its place');
+  assert.deepEqual(weekTo(story, Date.parse(came.to)), { misses: 0, held: 0 }, "the gap is eight days before the end: out of that week");
+  assert.deepEqual(weekTo(story, Date.parse(came.from) + 21 * 864e5), { misses: 1, held: 1 });
+  assert.deepEqual(weekTo(story, Date.parse(came.from) + 16 * 864e5), { misses: 1, held: 2 });
+});
+
+test('until the pack tells the story, it is made from the map and its counts, and says so', () => {
+  const a = answer(4, []);
+  const story = storyOf(a, null, new Map([[a.items[1].id, 3]]), n, Date.UTC(2026, 10, 19));
+  assert.equal(story.schematic, true);
+  assert.equal(story.said.length, 3);
+  assert.ok(story.said.every((one: any) => one.verdict === 'held' && one.at >= story.from && one.at <= story.to));
+  assert.equal(story.misses.length, 0, 'no miss is made up');
 });
 
 test('played, it patches the tree in as it grows; under reduced motion it stands whole and still', async () => {
@@ -82,33 +109,24 @@ test('played, it patches the tree in as it grows; under reduced motion it stands
   played.end();
   const still = await picture({ answer: { ...answer(), lens: { find: ['still'] } }, style, reduced: true }, tools);
   assert.equal(still.scene.surface, undefined);
-  assert.equal(JSON.stringify(still.scene.svg).match(/rt-node on/g)?.length, 12);
+  assert.equal(JSON.stringify(still.scene.svg).match(/rt-node rt-\w+ on/g)?.length, 12);
   assert.ok((await picture({ answer: answer(), style: { shape: 'reflex_tree' }, reduced: true }, tools)).scene.message);
 });
 
-test('the counts the pack answers through the view’s sends stand in for the schematic ones', async () => {
-  const patches: any[] = [], asked: any[] = [];
-  const act = async (name: string, params: any) => (asked.push([name, params]), { answer: params.ids.map((one: string, i: number) => ({ id: one, said: i })) });
-  const tools = { frame: () => new Promise(() => {}), patch: (p: any[]) => patches.push(...p), open() {}, act };
-  const act2 = async (name: string, params: any) => ((await act(name, params)) as any);
-  const counted = await picture({ answer: { ...answer(), lens: { find: ['counted'] } }, style, reduced: true }, { ...tools, act: async (name: string, params: any) => { const got = await act2(name, params); got.answer.forEach((r: any, i: number) => (r.for = i < 3 ? ['tool:change'] : undefined)); return got; } });
-  assert.equal(asked[0][0], style.sends.said);
-  assert.equal(asked[0][1].ids.length, 12);
-  const svg = JSON.stringify(counted.scene.svg);
-  assert.ok(svg.includes('66 said') || JSON.stringify(counted.scene.before).includes('66'), 'the counts it answered are the ones shown');
-  assert.ok(!JSON.stringify(counted.scene.before).includes('schematic'));
-  assert.ok(svg.includes('n:~for:tool:change'), 'a node part of nothing hangs from the boughs of where it is said');
+test('the story the pack answers draws the tiers, the standing and the gaps', async () => {
+  const a = { ...answer(6, []), lens: { find: ['story'] } };
+  const asked: string[] = [];
+  const act = async (name: string, params: any) => (asked.push(name), name === 'story' ? { answer: told(a.items) } : { answer: params.ids.map((one: string) => ({ id: one, said: 1, for: ['tool:change'] })) });
+  const drawn = await picture({ answer: a, style: { ...style, sends: { ...style.sends, story: 'story' } }, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
+  assert.ok(asked.includes('story') && asked.includes(style.sends.said));
+  const svg = JSON.stringify(drawn.scene.svg), bar = JSON.stringify(drawn.scene.before);
+  assert.ok(svg.includes('rt-t-core') && svg.includes('rt-t-learned'), 'each branch carries its tier');
+  assert.ok(svg.includes('rt-trial'), 'a trial node is drawn hollow');
+  assert.ok(svg.includes('rt-gap'), 'grown, the place a miss grew nothing from keeps its gap');
+  assert.ok(!bar.includes('schematic'));
+  assert.ok(bar.includes('misses') && bar.includes('held'), 'the counter is misses against held');
 });
 
-test('counted, a node never said is never lit', () => {
-  const tree = treeOf(answer())!, said = sayingsOf(tree, n);
-  for (const id of said.counts.keys()) said.counts.set(id, id === tree.written[0].id ? 3 : 0);
-  said.schematic = false;
-  const film = filmOf(tree, said, n), rnd = () => 0.9;
-  assert.equal(film.pick(film.end, rnd)!.id, tree.written[0].id);
-  said.counts.set(tree.written[0].id, 0);
-  assert.equal(film.pick(film.end, rnd), null);
-});
 
 test('grown, no two shown names overlap or cross a wire, and every node is named or a dot with its name as tooltip', async () => {
   const places = ['tool:change', 'tool:query', 'file:packs/canvas/layouts/*.js', 'file:packs/*/page/*.js', 'file:ui/*', 'session_start', 'working_rules', 'guide:style_code'];

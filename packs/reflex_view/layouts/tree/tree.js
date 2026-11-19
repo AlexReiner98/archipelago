@@ -43,16 +43,18 @@ const firstPlace = (where) => (Array.isArray(where) ? where.find((w) => typeof w
  * The tree in the answer, or null when it holds no node. `placeOf(item)` is where it is said (its `for`), from the
  * answer's fields or from what the pack answered of it; `n` the style's numbers.
  */
-export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0) {
-  const items = Array.isArray(answer.items) ? answer.items.filter((i) => !i.pending) : [];
+export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0, presets = []) {
+  // The presets the story names (core's and the packs', no item of the map) stand with the rest, under their places.
+  const extra = presets.filter((p) => p && typeof p.id === 'string' && !(answer.items ?? []).some((i) => i.id === p.id)).map((p) => ({ id: p.id, type: 'instruction', title: p.title ?? p.id, preset: true, fields: { for: p.for } }));
+  const items = [...(Array.isArray(answer.items) ? answer.items.filter((i) => !i.pending) : []), ...extra];
   const byId = new Map(items.map((i) => [i.id, i]));
   const up = new Map();
   for (const l of answer.links ?? []) if (isPartOf(l) && !l.pending && byId.has(l.from) && byId.has(l.to) && l.from !== l.to && !up.has(l.from)) up.set(l.from, l.to);
   const from = answer.lens?.from && byId.has(answer.lens.from) ? answer.lens.from : undefined;
   const nodes = new Map();
   const make = (id, item, title) => {
-    const node = { id, item, title, parent: null, kids: [], depth: 0, born: item ? Date.parse(item.created_at) : Infinity };
-    if (!Number.isFinite(node.born)) node.born = Infinity;
+    const node = { id, item: item?.preset ? undefined : item, preset: Boolean(item?.preset), title, parent: null, kids: [], depth: 0, born: item?.preset ? -Infinity : item ? Date.parse(item.created_at) : Infinity };
+    if (Number.isNaN(node.born)) node.born = Infinity;
     nodes.set(id, node);
     return node;
   };
@@ -63,7 +65,7 @@ export function treeOf(answer, placeOf = (item) => item.fields?.for, n = () => 0
     if (nodes.has(item.id)) return nodes.get(item.id);
     visiting.add(item.id);
     const node = make(item.id, item, item.title);
-    const parentId = up.get(item.id);
+    const parentId = item.preset ? undefined : up.get(item.id);
     let parent = parentId === root.id ? root : parentId !== undefined && !visiting.has(parentId) ? place(byId.get(parentId)) : undefined;
     if (!parent) {
       parent = root;

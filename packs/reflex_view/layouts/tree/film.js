@@ -1,44 +1,37 @@
-// Layer: shape. When each thing happens as the tree is played. The tree grows from the root alone (reflex_film_lead
-// seconds) to the whole over reflex_film seconds, its nodes in the order they were made, the rate of new ones rising,
-// peaking and falling, as new things are many at first and fewer as the tree covers more. The lights run more often
-// the more of the tree is written: in proportion to the square of what is written so far (a tree that covers more of
-// what happens answers more of it), from reflex_lights_least to reflex_lights_most a second; once grown, at
-// reflex_lights_live. Each runs to a node made a while before (reflex_light_after), chosen by how often it was said.
+// Layer: shape. When each thing happens as the tree is played: over real dates. The story's window (./story.js) runs
+// over reflex_film seconds after the root stands alone (reflex_film_lead). Core's and the packs' presets, and what was
+// made before the window, stand from the start: the trunk. Each node made in the window comes in on its day. Each miss
+// sparks on its day, where it happened (the trial node written from it, else the bough of its place, else the root);
+// each saying runs a light to its node on its day, held or came back; a quiet one runs none.
 
-/** A number generator from a seed, the same run each time: each call a number from 0 to 1. */
-export const seeded = (seed) => {
-  let s = Math.max(1, Math.floor(seed * 2147483646));
-  return () => ((s = (s * 16807) % 2147483647) - 1) / 2147483646;
-};
+import { boughsOf } from './tree.js';
 
-/** The film of a tree: when each node is born, how much is written and said by a time, and where the next light goes. */
-export function filmOf(tree, said, n) {
-  const lead = n('reflex_film_lead'), length = n('reflex_film');
-  const born = new Map([[tree.root.id, 0]]);
-  const k = tree.born.length;
-  tree.born.forEach((node, i) => born.set(node.id, lead + (length * Math.acos(1 - (2 * (i + 1)) / k)) / Math.PI));
+/** The film of a tree and its story: when each node is born, the events in order, and the date at a time. */
+export function filmOf(tree, story, n) {
+  const lead = n('reflex_film_lead'), length = n('reflex_film'), span = Math.max(1, story.to - story.from);
+  const time = (at) => lead + Math.max(0, Math.min(1, (at - story.from) / span)) * length;
   const end = lead + length;
-  const written = tree.written.map((node) => born.get(node.id));
-  const writtenAt = (t) => written.filter((b) => b <= t).length;
-  // How much of what the tree said is said by a time: the lights' rate summed, so the count runs as they do.
-  const steps = Math.max(1, Math.ceil(end * n('reflex_count_steps')));
-  const sum = [0];
-  for (let i = 1; i <= steps; i++) sum.push(sum[i - 1] + writtenAt((i * end) / steps) ** 2);
-  const saidAt = (t) => (t >= end || sum[steps] === 0 ? said.total : Math.round((said.total * sum[Math.max(0, Math.floor((t / end) * steps))]) / sum[steps]));
-  const all = Math.max(1, tree.written.length);
-  const rate = (t) => (t >= end ? n('reflex_lights_live') : Math.min(n('reflex_lights_most'), n('reflex_lights_least') + (n('reflex_lights_most') * writtenAt(t) ** 2) / all ** 2));
-  const after = n('reflex_light_after');
-  /** The node the next light runs to at `t`, weighed by how often each was said; null while none is old enough. */
-  const pick = (t, rnd) => {
-    const ready = tree.written.filter((node) => born.get(node.id) <= t - after);
-    if (!ready.length) return null;
-    // Schematic, every node may light; counted, only one that was said, as often as it was.
-    const weigh = (node) => said.counts.get(node.id) + (said.schematic ? 1 : 0);
-    const sum = ready.reduce((s, node) => s + weigh(node), 0);
-    if (sum <= 0) return null;
-    let at = rnd() * sum;
-    for (const node of ready) if (weigh(node) > 0 && (at -= weigh(node)) <= 0) return node;
-    return ready[ready.length - 1];
+  // A node stands from the start if it is core's or a pack's, or was made before the window.
+  const born = new Map([[tree.root.id, 0]]);
+  for (const node of tree.born) {
+    const tier = story.nodes.get(node.id)?.tier;
+    born.set(node.id, tier === 'core' || tier === 'pack' || !(node.born > story.from) ? 0 : time(node.born));
+  }
+  // Where a miss happened: the deepest bough of its place the tree has.
+  const placeOf = (where) => {
+    let at = tree.root;
+    for (const b of boughsOf(where, n('reflex_file_depth'), n('reflex_place_depth'))) at = tree.nodes.get(`~for:${b.key}`) ?? at;
+    return at;
   };
-  return { born, end, writtenAt, saidAt, rate, pick };
+  const events = [
+    ...story.misses.map((m) => ({ kind: 'miss', t: time(m.at), node: (m.grew && tree.nodes.get(m.grew)) || placeOf(m.where), grew: Boolean(m.grew && tree.nodes.get(m.grew)) })),
+    ...story.said.filter((s) => s.verdict !== 'quiet' && tree.nodes.has(s.id)).map((s) => ({ kind: s.verdict === 'came_back' ? 'failed' : 'held', t: time(s.at), node: tree.nodes.get(s.id) })),
+  ].sort((a, b) => a.t - b.t);
+  // A miss that grew a node is that node's birth.
+  for (const e of events) if (e.kind === 'miss' && e.grew) born.set(e.node.id, e.t);
+  // A bough stands when its first node does.
+  const first = (node) => (node.kids.length ? Math.min(born.get(node.id), ...node.kids.map(first)) : born.get(node.id));
+  for (const node of tree.order) if (node.parent && !node.item && !node.preset) born.set(node.id, first(node));
+  const dateAt = (t) => story.from + (Math.max(0, Math.min(length, t - lead)) / length) * span;
+  return { born, end, events, dateAt };
 }

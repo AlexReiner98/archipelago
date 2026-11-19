@@ -1,33 +1,36 @@
-// Layer: marks. The tree played, a frame at a time, as patches to the marks ./draw.js made. Each node comes in at its
-// birth, its branch drawn out of its parent, with an amber spark where it is born that swells and fades
-// (reflex_spark, reflex_spark_grow over reflex_spark_life seconds). The lights run from the root along the branches
-// to the node said (reflex_pulse seconds), a trail behind them, and flash there (to reflex_flash over
-// reflex_flash_time). The camera starts close on the root and pulls back as the tree spreads (at most reflex_zoom_most,
-// easing by reflex_zoom_ease). Once grown, the lights go on at the live rate and a node new since the picture was
-// last drawn is born again where it stands. Nothing here runs under reduced motion: the tree stands whole.
+// Layer: marks. The tree played over real dates (./film.js), a frame at a time, as patches to the marks ./draw.js
+// made. Each node comes in on its day, its branch drawn out of its parent. A miss sparks amber where it happened,
+// swelling and fading (reflex_spark, reflex_spark_grow over reflex_spark_life seconds): on the trial node written
+// from it, else on the bough of its place, which then keeps a quiet ring, a gap (rt-gap). A saying that held runs a
+// blue light from the root along the branches to its node (reflex_pulse seconds), a trail behind it, and flashes
+// there (to reflex_flash over reflex_flash_time); one whose miss came back runs the same in the failure colour. The
+// camera starts close on the root and pulls back as the tree spreads (at most reflex_zoom_most, easing by
+// reflex_zoom_ease). The counts over the picture are the week to the film's day: misses against held. Nothing here
+// runs under reduced motion: the tree stands whole.
 
-import { seeded } from './film.js';
 import { at } from './marks.js';
-import { hash } from './tree.js';
 import { HIDDEN } from './draw.js';
+import { weekTo } from './story.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 /** A player for the tree: `step(dt)` answers the patches for dt seconds more; `replay()` starts it from the root. */
-export function player({ tree, placed, film, said, z, n, pools, from, fresh, speed }) {
+export function player({ tree, placed, film, story, z, n, pools, from, fresh, speed }) {
   const { place, polar, along, centre, reach } = placed;
   const life = n('reflex_spark_life'), pulse = n('reflex_pulse'), flashFor = n('reflex_flash_time');
   const ring = z('reflex_ring');
-  const rnd = seeded(hash(tree.root.id));
   const sparks = Array(pools.sparks).fill(null), lights = Array(pools.lights).fill(null);
-  let t, shown, zoom, owed, counts, nextSpark;
+  let t, shown, zoom, next, counts, nextSpark, gaps;
   const reset = (start) => {
     t = start;
     shown = new Set();
     zoom = 0;
-    owed = 0;
-    counts = { said: -1, written: -1 };
+    // The next event to play: those before the start are past.
+    next = film.events.findIndex((e) => e.t > start);
+    if (next < 0) next = film.events.length;
+    counts = { misses: -1, held: -1, day: '' };
     nextSpark = 0;
+    gaps = new Set();
   };
   reset(from);
   // A node new since this view was last drawn is born now, once the film is past.
@@ -61,7 +64,6 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
       if (at0 > t) continue;
       shown.add(node.id);
       out.push({ key: `n:${node.id}`, toggle: { on: true } }, { key: `b:${node.id}`, set: { 'stroke-dashoffset': 0 } });
-      if (node.item && t - at0 < life) sparkAt(node, at0, out);
     }
     // The camera: close on what is grown, out to the whole.
     const extent = Math.max(0, ...[...shown].map((id) => polar.get(id).r));
@@ -76,11 +78,18 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
       const p = xy(s.node.id), r = (z('reflex_spark') + z('reflex_spark_grow') * Math.sqrt(age)) * scale;
       out.push({ key: `sp:${i}`, set: { transform: `translate(${at(p.x)} ${at(p.y)}) scale(${at(r)})`, opacity: (1 - age / life).toFixed(2) } });
     });
-    // Lights: as many as the rate says, each to a node chosen by how often it is said.
-    owed += film.rate(t) * dt * speed.now;
-    for (; owed >= 1; owed -= 1) {
-      const free = lights.indexOf(null), node = free >= 0 && film.pick(t, rnd);
-      if (node) lights[free] = { node, start: t, route: route(node) };
+    // What happened by now: a miss sparks, a saying runs a light; a miss that grew nothing leaves a gap.
+    for (; next < film.events.length && film.events[next].t <= t; next++) {
+      const e = film.events[next];
+      if (e.kind === 'miss') {
+        sparkAt(e.node, e.t, out);
+        if (!e.grew && !gaps.has(e.node.id)) gaps.add(e.node.id), out.push({ key: `n:${e.node.id}`, toggle: { 'rt-gap': true } });
+        continue;
+      }
+      const free = lights.indexOf(null);
+      if (free < 0 || !e.node.parent) continue;
+      lights[free] = { node: e.node, start: e.t, route: route(e.node), failed: e.kind === 'failed' };
+      out.push({ key: `lg:${free}`, toggle: { 'rt-failed': e.kind === 'failed' } }, { key: `lt:${free}`, toggle: { 'rt-failed': e.kind === 'failed' } }, { key: `lh:${free}`, toggle: { 'rt-failed': e.kind === 'failed' } });
     }
     lights.forEach((l, i) => {
       if (!l) return;
@@ -99,11 +108,12 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
       );
     });
     for (const [id, until] of litUntil) if (t > until) litUntil.delete(id), out.push({ key: `n:${id}`, toggle: { 'rt-lit': false } });
-    // The counts: written by the model, said by the tree.
-    const written = film.writtenAt(t), saidNow = film.saidAt(t);
-    if (written !== counts.written) out.push({ key: 'rt-written-n', text: written.toLocaleString('en-US') });
-    if (saidNow !== counts.said) out.push({ key: 'rt-said-n', text: saidNow.toLocaleString('en-US') });
-    counts = { said: saidNow, written };
+    // The counts: the week to the film's day, misses against held.
+    const date = film.dateAt(t), week = weekTo(story, date), day = new Date(date).toISOString().split('T')[0];
+    if (week.misses !== counts.misses) out.push({ key: 'rt-miss-n', text: week.misses.toLocaleString('en-US') });
+    if (week.held !== counts.held) out.push({ key: 'rt-held-n', text: week.held.toLocaleString('en-US') });
+    if (day !== counts.day) out.push({ key: 'rt-day', text: day });
+    counts = { ...week, day };
     return out;
   };
   const hide = () => {
@@ -113,6 +123,7 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
     lights.fill(null);
     for (const id of litUntil.keys()) out.push({ key: `n:${id}`, toggle: { 'rt-lit': false } });
     litUntil.clear();
+    for (const id of gaps) out.push({ key: `n:${id}`, toggle: { 'rt-gap': false } });
     for (let i = 0; i < pools.sparks; i++) out.push({ key: `sp:${i}`, set: { opacity: 0 } });
     for (let i = 0; i < pools.lights; i++) out.push({ key: `lt:${i}`, set: { opacity: 0 } }, { key: `lg:${i}`, set: { opacity: 0 } }, { key: `lh:${i}`, set: { opacity: 0 } });
     return out;
@@ -120,5 +131,5 @@ export function player({ tree, placed, film, said, z, n, pools, from, fresh, spe
   // What is new since last drawn is born a moment after the picture opens.
   for (const node of fresh) reborn.set(node.id, from + n('reflex_film_lead'));
   for (const node of tree.born) if (!reborn.has(node.id) && film.born.get(node.id) <= from) shown.add(node.id);
-  return { step, replay: () => (reborn.clear(), reset(0), hide()), said };
+  return { step, replay: () => { const out = hide(); reborn.clear(); reset(0); return out; } };
 }
