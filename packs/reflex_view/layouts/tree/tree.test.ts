@@ -262,6 +262,7 @@ test('a branch whose place can be said takes a new trial node there, through the
   const add = asked.find((x) => x[0] === 'add');
   assert.deepEqual(add[1], { for: 'tool:change' });
   assert.equal(add[2].asks[0].field, 'title', 'the page asks for its words first');
-  const none = await picture({ answer: { ...a, lens: { find: ['no-add'] } }, style, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
+  const { add: _add, ...noAdd } = style.sends;
+  const none = await picture({ answer: { ...a, lens: { find: ['no-add'] } }, style: { ...style, sends: noAdd }, reduced: true }, { frame: () => new Promise(() => {}), patch() {}, open() {}, act });
   assert.ok(!JSON.stringify(none.scene.svg).includes('rt-adds'), 'where the view sends no add, a branch takes nothing');
 });
