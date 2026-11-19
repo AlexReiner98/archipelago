@@ -74,3 +74,39 @@ test('the house style says every size the grammar reads', () => {
   const s = pack.styles.find((x: any) => x.id === 'core.house').props.sizes;
   for (const k of ['flow_slab', 'flow_double_gap', 'flow_foot', 'flow_notch_size', 'flow_glyph_text', 'flow_glyph_inset', 'flow_glyph_drop', 'flow_glyph_room', 'flow_item_lift', 'flow_stroke_ink']) assert.ok(k in s, k);
 });
+
+// ---- the land, round 6 (screen e_3sf9hbu9) ----
+// @ts-ignore a page module, untyped
+import { landGrammar, landMarks, landRules } from './land-look.js';
+
+test('the land says nothing by default and reads its words when it does', () => {
+  assert.deepEqual(landGrammar({}), { sea: 'flat', ground: 'tint', edge: 'rule', row: 0, snap: false });
+  assert.equal(landGrammar({ sea: 'rows', row: 7, row_snap: true }).snap, true);
+  assert.equal(landRules({}), '');
+  assert.match(landRules({ sea: 'rows', row: 7 }), /lf-sea-rows/);
+});
+
+test('rows run over the sea and an island has its edge', () => {
+  const islands = [{ id: 'e_aaaaaaaa', land: [{ l: 10, t: 10, r: 110, b: 60 }] }];
+  const draw = (style: any) => landMarks({ style, g: {}, islands, size: { width: 200, height: 100 }, z, m, isHex: () => true });
+  assert.equal(draw({ sea: 'rows', row: 10 }).sea.length, 1);
+  assert.equal(draw({}).land.length, 0);
+  assert.ok(draw({ land_edge: 'shallows' }).land[0].length > 3);
+  assert.match(JSON.stringify(draw({ land_edge: 'skyline' }).land), /lf-skyline-edge/);
+});
+
+test('a terrace has as many steps as the phase, and a skyline its top inked', () => {
+  const steps = (phase: string) => marks({ item_fill: 'terrace' }, phase).under.length;
+  assert.deepEqual([steps('not_started'), steps('under_way'), steps('finished')], [1, 2, 3]);
+  assert.match(JSON.stringify(marks({ item_ink: 'skyline' }, 'under_way').over), /lf-skyline/);
+  assert.equal(grammar({ item_fill: 'terrace' }).dot, false);
+});
+
+test('the four ridge presets are chosen ones, and use no colour of their own', () => {
+  for (const id of ['canvas.ridge_rows', 'canvas.ridge_terraces', 'canvas.ridge_hatched', 'canvas.ridge_skyline']) {
+    const p = preset(id);
+    assert.equal(p.over, 'chosen', id);
+    assert.doesNotMatch(JSON.stringify(p.props), /#[0-9a-f]{3,8}/i, id);
+    assert.ok(landRules(p.props).length > 0 && itemRules(p.props).length > 0, id);
+  }
+});

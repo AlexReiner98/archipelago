@@ -15,12 +15,12 @@ const PLAIN = ':not(.you):not(.here):not(.focus):not(.ghost):not(.held):not(.wai
 export function grammar(style) {
   const state = new Set(words(style.item_state)), text = record(style.item_text);
   // Round 5 gave the fill words to the state: still read, where `item_fill` says nothing.
-  const fill = one(style.item_fill, ['card', 'lift', 'stratum', 'none'], state.has('lift') ? 'lift' : state.has('land') ? 'none' : null);
+  const fill = one(style.item_fill, ['card', 'lift', 'stratum', 'none', 'clear', 'terrace'], state.has('lift') ? 'lift' : state.has('land') ? 'none' : null);
   return {
-    ink: one(style.item_ink, ['line', 'ink'], 'line'), fill, state,
+    ink: one(style.item_ink, ['line', 'ink', 'skyline'], 'line'), fill, state,
     marks: record(style.item_marks), text: { face: one(text.face, ['body', 'display'], 'body'), weight: one(text.weight, ['phase', 'even'], null) },
     // The state is said once, on the shape: the dot before the title stays only where the style asks for no other say.
-    dot: !['double', 'foot', 'notch'].some((w) => state.has(w)),
+    dot: fill !== 'terrace' && !['double', 'foot', 'notch'].some((w) => state.has(w)),
     // A check where there is no notch for it keeps the dot's room before the name, empty until the item is finished.
     tick: state.has('check') && (state.has('foot') || state.has('double')) && !state.has('notch'),
   };
@@ -36,10 +36,16 @@ export function itemRules(style) {
   if (g.ink === 'ink') {
     rules.push('.lf-step { --lf-ink: light-dark(var(--ln-text), var(--ln-sea)); }');
     shape(`${PLAIN}:not(.closed)`, 'stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-ink, var(--ln-flow-stroke-lit));');
+  } else if (g.ink === 'skyline') {
+    // The item's top is inked and its sides a hairline: the top edge is a mark of its own (itemMarks).
+    rules.push('.lf-step { --lf-ink: var(--ln-text); }', '.lf-skyline { fill: none; stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke-ink); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }');
+    shape(`${PLAIN}:not(.closed)`, 'stroke-width: var(--ln-rule);');
   } else rules.push('.lf-step { --lf-ink: var(--ln-text); }');
   if (g.fill) {
-    const fills = { card: 'var(--ln-land)', none: 'none', lift: 'color-mix(in srgb, var(--ln-text) var(--ln-flow-item-lift), var(--ln-land))', stratum: 'color-mix(in srgb, var(--ln-text) var(--ln-flow-item-lift), var(--ln-land))' };
+    // clear: the item knocks out the rows under it, as the wordmark's plate does; terrace: on steps in its island's hue.
+    const fills = { card: 'var(--ln-land)', none: 'none', clear: 'var(--ln-sea)', terrace: 'var(--ln-land)', lift: 'color-mix(in srgb, var(--ln-text) var(--ln-flow-item-lift), var(--ln-land))', stratum: 'color-mix(in srgb, var(--ln-text) var(--ln-flow-item-lift), var(--ln-land))' };
     shape(PLAIN, `fill: ${fills[g.fill]};`);
+    if (g.fill === 'terrace') rules.push('.lf-tstep { stroke: none; pointer-events: none; } .lf-tstep-1 { fill: color-mix(in srgb, var(--lf-island, var(--ln-text)) var(--ln-flow-terrace-mix-1), var(--ln-sea)); } .lf-tstep-2 { fill: color-mix(in srgb, var(--lf-island, var(--ln-text)) var(--ln-flow-terrace-mix-2), var(--ln-sea)); } .lf-tstep-3 { fill: color-mix(in srgb, var(--lf-island, var(--ln-text)) var(--ln-flow-terrace-mix-3), var(--ln-sea)); }');
     // A stratum is a slab lifted off its land, its edge the ink; what is finished sinks to the land, outline only.
     if (g.fill === 'stratum') {
       rules.push('.lf-step .lf-slab { fill: var(--lf-ink); stroke: var(--lf-ink); stroke-width: var(--ln-flow-stroke); pointer-events: none; }');
@@ -102,6 +108,12 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
       ? m('path', { d: tickPath(x0 + s * 0.5, y0 + s * 0.55, s * 0.75), class: 'lf-tick' })
       : m('path', { d: `M${x0} ${y0}H${x0 + s}L${x0} ${y0 + s}Z`, class: `lf-notch ph-${phase}` }));
   } else if (g.tick && ended) out.over.push(m('path', { d: tickPath(dotAt[0], dotAt[1], z('dot')), class: 'lf-tick' }));
+  if (g.fill === 'terrace') {
+    // One step under it not started, two under way, three finished: the steps are its phase, each narrower than the one above.
+    const levels = ['not_started', 'under_way', 'finished'], k = ended ? levels.length : Math.max(1, levels.indexOf(phase) + 1), hs = z('terrace_item'), inset = z('terrace_item_in');
+    for (let j = 0; j < k; j++) out.under.push(m('rect', { class: `lf-tstep lf-tstep-${levels.length - j}`, x: l + (j + 1) * inset, y: b + j * hs - 1, width: Math.max(0, n.w - 2 * (j + 1) * inset), height: hs }));
+  }
+  if (g.ink === 'skyline') out.over.push(m('path', { class: 'lf-skyline', d: skyline(n, X, Y, round) }));
   const glyph = glyphOf(g, item);
   if (glyph) out.over.push(m('text', { x: r - z('glyph_inset') - round / 2, y: t + z('glyph_drop'), class: 'lf-glyph' }, glyph));
   return out;
@@ -111,4 +123,14 @@ export function itemMarks({ g, n, at: [X, Y], phase, item, z, outline, m, corner
 function addClass(mark, cls) {
   if (mark?.[1]) mark[1].class = `${mark[1].class ?? ''} ${cls}`.trim();
   return mark;
+}
+
+/** The top of an outline as a line, shaped by its kind: flat for a box, rising to a point for a diamond, round for a pill, shouldered for a lozenge, a tab for a place. */
+function skyline(n, X, Y, round) {
+  const l = X - n.w / 2, r = X + n.w / 2, t = Y - n.h / 2, hh = n.h / 2;
+  if (n.shape === 'diamond') return `M${l} ${Y}L${X} ${t}L${r} ${Y}`;
+  if (n.shape === 'pill') return `M${l + round} ${t}H${r - round}`;
+  if (n.shape === 'hexagon' || n.shape === 'lozenge') return `M${l} ${Y}L${l + round} ${t}H${r - round}L${r} ${Y}`;
+  if (n.shape === 'tab') return `M${l} ${t}H${l + n.w / 3}L${l + n.w / 3 + (n.bevel ?? 0)} ${t + (n.bevel ?? 0)}H${r}`;
+  return `M${l} ${t}H${r}`;
 }
