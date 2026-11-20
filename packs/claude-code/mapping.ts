@@ -14,6 +14,14 @@
  * | SessionEnd       | end                                                    | nothing                      |
  * | SubagentStart    | begin the subagent's run (parent: the session's), reach session_start | additionalContext |
  * | SubagentStop     | as Stop, on the subagent's run and transcript, then end it | block (keeps it going)   |
+ * | PreCompact       | reach compact (what is said after is a re-saying)       | nothing                      |
+ * | PermissionRequest | note the ask; the person's answer becomes a `decision` act | nothing (the dialog shows) |
+ * | Notification     | act `notice` at prompt: the run waits on the person     | nothing                      |
+ *
+ * A PermissionRequest names no tool use id, so an ask is matched to its call
+ * by place and input. The person's answer shows in what follows: the call's
+ * PostToolUse (allow), or its result in the transcript, read at the next
+ * prompt or stop (deny when Claude Code wrote that the person rejected it).
  *
  * A hook from inside a subagent carries its `agent_id`, and belongs to the
  * subagent's own run, `<session>:<agent>` (runIdOf).
@@ -38,8 +46,8 @@ import type { Actor, Json, Time } from "../../spec/common.ts";
 
 export const HARNESS = "claude-code";
 
-/** The places this adapter reaches: every term of edition 1, and edition 2's skill: and memory:. */
-export const REACHES = ["session_start", "prompt", "tool:<name>", "file:<path>", "tool_result:<name>", "reply_end", "skill:<name>", "memory:<scope>/<path>"];
+/** The places this adapter reaches: every term of edition 1, edition 2's skill: and memory:, and edition 3's compact. */
+export const REACHES = ["session_start", "prompt", "tool:<name>", "file:<path>", "tool_result:<name>", "reply_end", "skill:<name>", "memory:<scope>/<path>", "compact"];
 
 /** What every Claude Code hook is sent on stdin (or as the body of an http hook). */
 export interface HookInput {
@@ -62,6 +70,11 @@ export interface HookInput {
   agent_type?: string;
   /** SubagentStop: the subagent's own transcript. */
   agent_transcript_path?: string;
+  /** PreCompact: `manual` or `auto`. */
+  trigger?: string;
+  /** Notification: what kind (`permission_prompt`, `idle_prompt`, …) and its text. */
+  notification_type?: string;
+  message?: string;
   [key: string]: unknown;
 }
 
@@ -136,6 +149,10 @@ export interface RunPort {
   seen?: Set<string>;
   /** How far the transcript was read for loads, and the Skill calls seen so far. Absent: not read yet. */
   loads?: { offset: number; skills: Map<string, string> };
+  /** Tool calls the harness asked the person about (PermissionRequest) and that no answer has settled yet, by callKey. */
+  asks?: Map<string, number>;
+  /** When the oldest pending ask was made: only results after it can answer one. */
+  askedAt?: Time;
 }
 
 export interface Options {
@@ -319,7 +336,27 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
   // A subagent's loads are in its own transcript, which its hooks don't name until it stops.
   if (run === input.session_id) await reachLoads(input, port, options, reach);
 
+  // The person's answer to a permission ask shows only in what follows: settle what the transcript says now.
+  if (event === "UserPromptSubmit" || event === "Stop" || event === "SubagentStop") await settleAsks(input, port, options, act);
+
   switch (event) {
+    case "PreCompact": {
+      await reach(["compact"], { trigger: input.trigger ?? "auto" });
+      return {};
+    }
+    case "PermissionRequest": {
+      // The harness is about to ask the person. Their answer is recorded when it shows (settleAsks, PostToolUse).
+      const asks = (port.asks ??= new Map());
+      if (!asks.size) port.askedAt = now();
+      const key = callKey(`tool:${input.tool_name ?? "unknown"}`, trim(input.tool_input) ?? null);
+      asks.set(key, (asks.get(key) ?? 0) + 1);
+      return {};
+    }
+    case "Notification": {
+      const type = typeof input.notification_type === "string" ? input.notification_type : "notice";
+      await act({ place: "prompt", kind: "notice", by: "agent", input: { type, ...(typeof input.message === "string" ? { message: trim(input.message) as string } : {}) }, ok: true });
+      return {};
+    }
     case "SessionStart": {
       const answer = await reach(["session_start"], input.source ? { source: input.source } : undefined);
       return context("SessionStart", answer);
@@ -379,6 +416,13 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
       const failed = event === "PostToolUseFailure";
       if (input.tool_use_id) port.seen?.add(input.tool_use_id);
       const output = failed ? (input.error ?? null) : trim(input.tool_response);
+      const asked = takeAsk(port, `tool:${tool}`, trim(input.tool_input) ?? null);
+      if (asked) {
+        const denied = failed && REJECTED.test(String(input.error ?? ""));
+        await act({ place: `tool:${tool}`, kind: "decision", by: "person", input: trim(input.tool_input) ?? null, output: denied ? "deny" : "allow", ok: !denied });
+        // A denied call never ran: the person's decision is the act.
+        if (denied) return context(event, await reach([`tool_result:${tool}`], output ?? undefined));
+      }
       await act({ place: `tool:${tool}`, kind: "tool", by: "agent", input: trim(input.tool_input) ?? null, output: output ?? null, ok: !failed && !isError(input.tool_response) });
       const answer = await reach([`tool_result:${tool}`], output ?? undefined);
       return context(event, answer);
@@ -398,6 +442,64 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     }
     default:
       return {};
+  }
+}
+
+/** What Claude Code tells the model when the person denied a tool call. */
+export const REJECTED = /user doesn't want to proceed|tool use was rejected|user rejected/i;
+
+/** Takes one pending ask for this call, if the harness asked the person about it. */
+function takeAsk(port: RunPort, place: Place, input: Json): boolean {
+  const key = callKey(place, input);
+  const n = port.asks?.get(key) ?? 0;
+  if (!n) return false;
+  if (n > 1) port.asks!.set(key, n - 1);
+  else port.asks!.delete(key);
+  return true;
+}
+
+/**
+ * The person's answers that show in the transcript: for each pending ask,
+ * the turn's call with its input whose result is there. A rejection (the
+ * result Claude Code writes when the person says no) is `deny`; any other
+ * result is `allow`, for a call whose PostToolUse never came. An ask with
+ * no result yet stays pending.
+ */
+export function answersIn(transcript: string, asks: Map<string, number>, since?: Time): { key: string; place: Place; input: Json; allowed: boolean }[] {
+  const entries = entriesOf(transcript);
+  const uses = new Map<string, { key: string; place: Place; input: Json }>();
+  const left = new Map(asks);
+  const out: { key: string; place: Place; input: Json; allowed: boolean }[] = [];
+  for (const e of entries) {
+    for (const b of blocks(e)) {
+      if (e.type === "assistant" && b?.type === "tool_use" && typeof b.id === "string") {
+        const place = `tool:${String(b.name)}`;
+        const input = trim(b.input) ?? null;
+        uses.set(b.id, { key: callKey(place, input), place, input });
+      }
+      if (e.type === "user" && b?.type === "tool_result" && typeof b.tool_use_id === "string") {
+        const use = uses.get(b.tool_use_id);
+        if (!use || !left.get(use.key)) continue;
+        if (since && typeof e.timestamp === "string" && e.timestamp < since) continue;
+        left.set(use.key, left.get(use.key)! - 1);
+        const c = b.content;
+        const text = typeof c === "string" ? c : Array.isArray(c) ? c.filter((x: any) => x?.type === "text").map((x: any) => x.text).join("\n") : "";
+        out.push({ ...use, allowed: !(b.is_error === true && REJECTED.test(text)) });
+      }
+    }
+  }
+  return out;
+}
+
+/** Records the person's answers to pending asks that the transcript shows, as `decision` acts. */
+async function settleAsks(input: HookInput, port: RunPort, options: Options, act: (a: Omit<Act, "run" | "time">) => Promise<void>): Promise<void> {
+  if (!port.asks?.size || !options.transcript) return;
+  const own = typeof input.agent_transcript_path === "string" ? { ...input, transcript_path: input.agent_transcript_path } : input;
+  const text = await options.transcript(own);
+  if (!text) return;
+  for (const a of answersIn(text, port.asks, port.askedAt)) {
+    if (!takeAsk(port, a.place, a.input)) continue;
+    await act({ place: a.place, kind: "decision", by: "person", input: a.input, output: a.allowed ? "allow" : "deny", ok: a.allowed });
   }
 }
 

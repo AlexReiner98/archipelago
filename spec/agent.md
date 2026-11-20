@@ -20,6 +20,14 @@ Types: [agent.ts](agent.ts).
 | **refuse** | map → agent | A node stops what is happening at a place: a tool call, a prompt, the end of a reply |
 | **act** | agent → map | The agent did something: a tool call and its result, a reply. A person's prompt is recorded the same way, `by: person` |
 
+An act's `kind` (`ACT_KINDS`): `tool`, `reply` and `prompt` since edition 1.
+Edition 3 adds the person's side of a run:
+
+| Kind | By | Place | What |
+|---|---|---|---|
+| `decision` | person | `tool:<name>` | The person allowed or denied a tool call the harness asked them about: output `allow` or `deny`, and a denial is `ok: false`, a miss like a failed call |
+| `notice` | agent | `prompt` | The harness asked the person for something (a permission, input) and the run waits on them: input `{type, message}` |
+
 ## Places
 
 A place is a moment in a run where the map can speak. The spec owns the
@@ -46,9 +54,21 @@ input. Nothing can be refused there: the text is already loaded.
 | `skill:<name>` | the harness loads a skill's text (`skill:<plugin>:<name>` for a plugin's) | no | the transcript, read at the next hook |
 | `memory:<scope>/<path>` | the harness loads a memory file; scope `project`, `local`, `user`, `auto` or `managed`, the path with `/` and `~` for home | no | the transcript's `instructions` attachment |
 
+Edition 3 (Alex, 20 Nov 2026: every way an agent and the map meet is
+modelled) adds one place:
+
+| Place | Reached when | Can refuse | Claude Code |
+|---|---|---|---|
+| `compact` | the harness is about to compact the run's context (input `{trigger}`) | no | PreCompact |
+
+What was said before a compaction is gone from the agent's context, so a
+node said again after it in the run is a **re-saying**: the agent pack
+records that say with `detail.resaid: true`.
+
 Left out on purpose: a session's end (nothing can be said to the agent
-there; it's the run's `end` event), subagents (`tool:Agent`), and compaction
-(`session_start` fires after it).
+there; it's the run's `end` event). A subagent needs no place of its own:
+it is a run whose `parent` is the run that started it, reaching
+`session_start` as it starts and `reply_end` as it stops.
 
 A reached place is concrete; a node's `at` may use `*` in the argument
 (`tool:*`, `file:packs/*/page/*.js`). The adapter decides which places it can

@@ -20,6 +20,19 @@ exchange.
 | SessionEnd | `end` (and of any subagent run still open) | nothing |
 | SubagentStart | `begin` the subagent's run, reach `session_start` (input `{source: "subagent", agent_type}`) | what was said, as context |
 | SubagentStop | as Stop, on the subagent's run and its own transcript, then `end` it | block on a refusal: the subagent keeps going |
+| PreCompact | reach `compact` (input `{trigger}`): the agent pack records it, and marks what is said again after it as re-said | nothing |
+| PermissionRequest | note the ask; the person's answer becomes a `decision` act at `tool:<name>` | nothing: the dialog shows |
+| Notification | act `notice` at `prompt` (input `{type, message}`): the run waits on the person | nothing |
+
+## The person's decisions
+
+A PermissionRequest names no tool use id, so an ask is matched to its call
+by place and input. The answer shows in what follows: the call's
+PostToolUse means allowed, and its result in the transcript, read at the
+next prompt or stop, says whether the person rejected it (Claude Code's
+"The user doesn't want to proceed…"). Either way it is a `decision` act by
+the person, before the call's own act; a denial is `ok: false`, a miss the
+verdicts and grow see, and a denied call has no tool act, since it never ran.
 
 ## Subagents
 
@@ -117,8 +130,9 @@ terminal, keeps its runs across restarts, and isn't touched by edits here.
 
 In `~/.claude/settings.json`, beside whatever hooks are there, add one group
 per event (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse,
-PostToolUseFailure, Stop, SessionEnd, SubagentStart, SubagentStop;
-`"matcher": "*"` on the tool events),
+PostToolUseFailure, Stop, SessionEnd, SubagentStart, SubagentStop,
+PreCompact, PermissionRequest, Notification; `"matcher": "*"` on the tool
+events and PermissionRequest),
 each with:
 
 ```json

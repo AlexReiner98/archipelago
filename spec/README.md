@@ -22,6 +22,8 @@ every capability's key and type in one map for a runtime to declare.
 Decided with Alex: panels are Preact, the graph is one WebGL2 scene
 surface, and the spec owns the six places of edition 1 and edition 2's
 `skill:` and `memory:`, where the map speaks through the files it writes.
+Edition 3 adds the place `compact` and the person's acts, `decision` and
+`notice` ([agent](agent.md)).
 
 ## Packs ask for capabilities
 

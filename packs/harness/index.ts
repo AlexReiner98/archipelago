@@ -133,6 +133,8 @@ function actLine(e: ExchangeEvent, cwd?: string): string {
   const i = (a.input ?? {}) as Record<string, Json>;
   if (a.kind === "prompt") return short(typeof a.input === "string" ? a.input : (i.prompt ?? a.input));
   if (a.kind === "reply") return short(a.input ?? a.output);
+  if (a.kind === "notice") return `waits on the person (${String(i.type ?? "notice")}): ${short(i.message ?? "")}`;
+  if (a.kind === "decision") return `the person ${a.output === "deny" ? "denied" : "allowed"}: ${short(i.command ?? i.file_path ?? i.pattern ?? a.input)}`;
   const path = i.file_path ?? i.path ?? i.notebook_path;
   if (typeof path === "string") {
     const rel = cwd && path.toLowerCase().startsWith(cwd.toLowerCase()) ? path.slice(cwd.length).replace(/^[\\/]/, "") : path;
@@ -409,8 +411,10 @@ const harness: Pack = {
                 : e.kind === "act" ? html`<span class=${`hv-m ${e.act?.ok === false ? "m-failed" : "m-quiet"}`}>${e.act?.ok === false ? "✕" : "●"}</span>`
                 : e.kind === "begin" ? html`<span class="hv-m m-quiet">▶</span>`
                 : e.kind === "end" ? html`<span class="hv-m m-quiet">■</span>`
+                : e.kind === "compact" ? html`<span class="hv-m m-quiet">⇣</span>`
                 : html`<span class="hv-m m-failed">!</span>`;
-              const what = e.kind === "act" ? actLine(e, info?.cwd) : e.node ? `${titles.get(e.node) ?? e.node}: ${short(e.text)}` : e.kind === "begin" ? beginLine(e) : e.kind === "end" ? "run ended" : short(e.text);
+              const resaid = (e.detail as { resaid?: boolean } | undefined)?.resaid ? "re-said after compaction · " : "";
+              const what = e.kind === "act" ? actLine(e, info?.cwd) : e.node ? `${resaid}${titles.get(e.node) ?? e.node}: ${short(e.text)}` : e.kind === "begin" ? beginLine(e) : e.kind === "end" ? "run ended" : e.kind === "compact" ? `context compacted (${String((e.detail as { trigger?: string } | undefined)?.trigger ?? "auto")}): what follows is said again` : short(e.text);
               const cell = html`<div title=${`#${e.seq} ${e.kind}${e.place ? ` @${e.place}` : ""}${e.node ? ` ${e.node}` : ""}\n${e.text ?? actLine(e)}`}>
                 <span class="s">${e.seq}</span>${mark}${e.place && html`<span class="p">${e.place}</span>`}<span class="x">${what}</span>
               </div>`;

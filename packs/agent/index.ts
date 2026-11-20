@@ -72,6 +72,11 @@ const agent: Pack = {
     const nodes = new Map<string, Registered>();
     const treeWatchers = new Set<() => void>();
     const runs = new Map<RunId, RunInfo>();
+    /**
+     * Per run, the nodes said since its last `compact`, and those said
+     * before it: a node of the second set said again is a re-saying.
+     */
+    const sayings = new Map<RunId, { now: Set<string>; before: Set<string> }>();
     let seq = 0;
 
     const ordered = () => [...nodes.values()].sort((a, b) => byPosition(a.caller, b.caller) || a.seq - b.seq);
@@ -145,6 +150,14 @@ const agent: Pack = {
 
       async reach(moment: Moment): Promise<Answer> {
         const run = await runOf(moment.run, caller, moment.time);
+        const said = sayings.get(moment.run) ?? { now: new Set<string>(), before: new Set<string>() };
+        sayings.set(moment.run, said);
+        if (moment.places.includes("compact")) {
+          // The context is about to go: everything said so far must be said again.
+          for (const n of said.now) said.before.add(n);
+          said.now.clear();
+          await record({ run: moment.run, time: moment.time, place: "compact", direction: "from_agent", kind: "compact", ...(moment.input !== undefined ? { detail: moment.input } : {}) });
+        }
         const asked = ordered()
           .map((r) => ({ r, place: moment.places.find((p) => r.def.at.some((a) => placeMatches(a, p))) }))
           .filter((x): x is { r: Registered; place: Place } => x.place !== undefined);
@@ -164,7 +177,9 @@ const agent: Pack = {
           if (!u) continue;
           if ("say" in u) {
             answer.said.push({ node: r.info.id, text: u.say });
-            await record({ ...base, direction: "to_agent", kind: "say", text: u.say });
+            const resaid = said.before.has(r.info.id) && !said.now.has(r.info.id);
+            said.now.add(r.info.id);
+            await record({ ...base, direction: "to_agent", kind: "say", text: u.say, ...(resaid ? { detail: { resaid: true } } : {}) });
           } else if (refusable(place)) {
             if (!answer.refused) answer.refused = { node: r.info.id, text: u.refuse, ...(u.code ? { code: u.code } : {}) };
             await record({ ...base, direction: "to_agent", kind: "refuse", text: u.refuse, ...(u.code ? { detail: { code: u.code } } : {}) });
@@ -191,6 +206,7 @@ const agent: Pack = {
         info.ended = time;
         await record({ run, time, direction: "from_agent", kind: "end" });
         runs.delete(run);
+        sayings.delete(run);
       },
     }));
   },

@@ -171,6 +171,75 @@ test("a subagent is a run of its own, whose parent is the session's run", async 
   assert.deepEqual(calls.map((c) => c[0]), ["begin", "reach", "reach", "reach", "act", "reach", "act", "end"]);
 });
 
+test("PreCompact reaches compact with what started it", async () => {
+  const { calls, go } = fake();
+  assert.deepEqual(await go({ hook_event_name: "PreCompact", trigger: "manual" }), {});
+  const m = calls[1]![1] as Moment;
+  assert.deepEqual([m.places, m.input], [["compact"], { trigger: "manual" }]);
+});
+
+test("a notice: the harness asked the person, and the run waits on them", async () => {
+  const { calls, go } = fake();
+  await go({ hook_event_name: "Notification", notification_type: "idle_prompt", message: "Claude is waiting for your input" });
+  const a = calls[1]![1] as Act;
+  assert.deepEqual([a.place, a.kind, a.by, a.input, a.ok], ["prompt", "notice", "agent", { type: "idle_prompt", message: "Claude is waiting for your input" }, true]);
+});
+
+test("a person allowing a call they were asked about is their decision, before the call's act", async () => {
+  const { calls, go } = fake();
+  const call = { tool_name: "Bash", tool_input: { command: "rm -rf build" } };
+  assert.deepEqual(await go({ hook_event_name: "PermissionRequest", ...call }), {});
+  await go({ hook_event_name: "PostToolUse", tool_use_id: "t1", tool_response: { stdout: "" }, ...call });
+  // The same call again, not asked about: no decision.
+  await go({ hook_event_name: "PostToolUse", tool_use_id: "t2", tool_response: { stdout: "" }, ...call });
+  const acts = calls.filter((c) => c[0] === "act").map((c) => c[1] as Act);
+  assert.deepEqual(acts.map((a) => [a.place, a.kind, a.by, a.output, a.ok]), [
+    ["tool:Bash", "decision", "person", "allow", true],
+    ["tool:Bash", "tool", "agent", { stdout: "" }, true],
+    ["tool:Bash", "tool", "agent", { stdout: "" }, true],
+  ]);
+});
+
+test("a person denying a call shows in the transcript, read at the next prompt: a decision that didn't work", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "cc-ask-"));
+  try {
+    const path = join(dir, "t.jsonl");
+    const call = { tool_name: "Edit", tool_input: { file_path: "a.ts", old_string: "x", new_string: "y" } };
+    const lines = [
+      { type: "user", timestamp: "2026-11-20T14:59:00.000Z", message: { content: "fix it" } },
+      { type: "assistant", timestamp: "2026-11-20T14:59:01.000Z", message: { content: [{ type: "tool_use", id: "t1", name: "Edit", input: call.tool_input }] } },
+      { type: "user", timestamp: "2026-11-20T15:00:01.000Z", message: { content: [{ type: "tool_result", tool_use_id: "t1", is_error: true, content: "The user doesn't want to proceed with this tool use. The tool use was rejected." }] } },
+    ];
+    await writeFile(path, lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+    const calls: [string, unknown][] = [];
+    const agentRun: AgentRun = {
+      async begin(s) {
+        return { ...s, started: T };
+      },
+      async reach(m) {
+        calls.push(["reach", m]);
+        return { said: [] };
+      },
+      async act(a) {
+        calls.push(["act", a]);
+      },
+      async end() {},
+    };
+    const port: RunPort = { agent: agentRun, begun: false, seen: new Set() };
+    const { readFile } = await import("node:fs/promises");
+    const opts = { actor, now: () => T, transcript: async () => readFile(path, "utf8") };
+    const go = (i: Partial<HookInput> & { hook_event_name: string }) => handle({ session_id: "s1", transcript_path: path, ...i }, port, opts);
+    await go({ hook_event_name: "PermissionRequest", ...call });
+    await go({ hook_event_name: "UserPromptSubmit", prompt: "no, do it differently" });
+    await go({ hook_event_name: "UserPromptSubmit", prompt: "again" });
+    const decisions = calls.filter((c) => c[0] === "act" && (c[1] as Act).kind === "decision").map((c) => c[1] as Act);
+    assert.deepEqual(decisions.map((a) => [a.place, a.by, a.output, a.ok]), [["tool:Edit", "person", "deny", false]]);
+    assert.deepEqual(port.asks?.size, 0);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("a SubagentStop for a subagent that never started is not a run", async () => {
   const { calls, go } = fake();
   assert.deepEqual(await go({ hook_event_name: "SubagentStop", agent_id: "agent-x", agent_type: "", last_assistant_message: "suggestion" }), {});

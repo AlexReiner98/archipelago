@@ -142,6 +142,26 @@ test("reach asks the nodes at the places, in config-tree order, and records each
   assert.deepEqual(errors, []);
 });
 
+test("after a compact, a node said again is a re-saying; the first saying and a new node aren't", async () => {
+  const { loader, errors, as } = setup();
+  await loader.apply(tree({ id: "a", nodes: [say("brief", ["session_start"], "Read the brief."), say("bash", ["tool:Bash"], "Careful.")] }));
+  const { run, read } = as();
+  await run.begin(start);
+  await run.reach(moment(["session_start"]));
+  await run.reach(moment(["compact"]));
+  await run.reach(moment(["session_start"]));
+  await run.reach(moment(["session_start"]));
+  await run.reach(moment(["tool:Bash"]));
+  const says = (await read.events("r1")).items.filter((e) => e.kind === "say");
+  assert.deepEqual(says.map((e) => [e.node, (e.detail as { resaid?: boolean } | undefined)?.resaid ?? false]), [
+    ["nodes/brief", false],
+    ["nodes/brief", true],
+    ["nodes/brief", false],
+    ["nodes/bash", false],
+  ]);
+  assert.deepEqual(errors, []);
+});
+
 test("a refusal stops a refusable place; elsewhere it is recorded as a miss", async () => {
   const { loader, as } = setup();
   await loader.apply(

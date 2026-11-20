@@ -4,7 +4,8 @@
  * The spec owns the place vocabulary. Edition 1 has six places (Alex,
  * 20 Nov 2026): the ones an adapter can both reach and speak at. Edition 2
  * adds `skill:` and `memory:` (Alex, 20 Nov 2026), where the map speaks
- * through the files it writes.
+ * through the files it writes. Edition 3 (Alex, 20 Nov 2026) adds `compact`
+ * and the person's acts, `decision` and `notice`.
  */
 import type { Actor, Capability, Dispose, Id, Json, PackId, Term, Time } from "./common.ts";
 
@@ -32,6 +33,20 @@ export const PLACES: (Term & { refusable: boolean })[] = [
   // so the map speaks there through the files the harness loads.
   { term: "skill:<name>", since: 2, refusable: false, doc: "The harness loads a skill's text, which the map wrote; what it loaded is the moment's input." },
   { term: "memory:<scope>/<path>", since: 2, refusable: false, doc: "The harness loads a memory file (scope: project, local, user, auto, managed; `~` for home), which the map wrote; what it loaded is the moment's input." },
+  // Edition 3 (Alex, 20 Nov 2026): every way an agent and the map meet is modelled.
+  { term: "compact", since: 3, refusable: false, doc: "The harness is about to compact the run's context: what was said before is gone from it, so a node said again after is a re-saying. The moment's input says what started it (`trigger`)." },
+];
+
+/**
+ * What an act is (`Act.kind`). Edition 3 adds `decision` and `notice`, the
+ * person's side of a run.
+ */
+export const ACT_KINDS: Term[] = [
+  { term: "tool", since: 1, doc: "A tool call and its result, by the agent." },
+  { term: "reply", since: 1, doc: "The agent's reply." },
+  { term: "prompt", since: 1, doc: "A person's message to the agent." },
+  { term: "decision", since: 3, doc: "A person answered the harness about a tool call, at its `tool:` place: output `allow` or `deny`; a denial is `ok: false`." },
+  { term: "notice", since: 3, doc: "The harness asked the person for something (a permission, input) and the run waits on them, at `prompt`: input `{type, message}`." },
 ];
 
 /** What a node is. Open vocabulary, like places. */
@@ -124,8 +139,12 @@ export interface Act {
   run: RunId;
   place: Place;
   time: Time;
-  /** `tool`: a tool call and its result. `reply`: the agent's reply. `prompt`: a person's message to it. */
-  kind: "tool" | "reply" | "prompt";
+  /**
+   * `tool`: a tool call and its result. `reply`: the agent's reply. `prompt`:
+   * a person's message to it. Edition 3: `decision`, a person allowed or
+   * denied a tool call; `notice`, the harness asked the person for something.
+   */
+  kind: "tool" | "reply" | "prompt" | "decision" | "notice";
   by: "agent" | "person";
   input?: Json;
   output?: Json;
