@@ -7,10 +7,12 @@ import type { Act, AgentNode, AgentRun, Answer, Moment, RunStart } from "../spec
 import type { ExchangeRead } from "../spec/exchange.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
+import action from "../packs/action/index.ts";
 import agent from "../packs/agent/index.ts";
+import graph from "../packs/graph/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import claudeCode from "../packs/claude-code/index.ts";
-import { handle, lastAssistantText, relativePath, toolPlaces, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
+import { handle, lastAssistantText, relativePath, toolPlaces, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
 import { knownPlace, rpc } from "../packs/claude-code/mcp.ts";
 
 const T = "2026-11-20T15:00:00.000Z";
@@ -131,9 +133,9 @@ test("Stop reaches reply_end with the reply; a refusal keeps the agent going", a
   assert.deepEqual(await go({ hook_event_name: "Stop", last_assistant_message: "All done." }), {});
   assert.deepEqual(await go({ hook_event_name: "Stop", last_assistant_message: "done?" }), { decision: "block", reason: "Not yet: run the tests." });
   const acts = calls.filter((c) => c[0] === "act").map((c) => c[1] as Act);
-  assert.deepEqual(acts.map((a) => [a.place, a.kind, a.output, a.ok]), [
-    ["reply_end", "reply", "All done.", true],
-    ["reply_end", "reply", "done?", false],
+  assert.deepEqual(acts.map((a) => [a.place, a.kind, a.input, a.output, a.ok]), [
+    ["reply_end", "reply", undefined, "All done.", true],
+    ["reply_end", "reply", "done?", { refused: "n/more", text: "Not yet: run the tests." }, false],
   ]);
 });
 
@@ -164,7 +166,7 @@ test("the MCP server's hear answers only what the nodes say at the place", async
   assert.equal(init.result.protocolVersion, "2025-03-26");
   assert.equal(await rpc({ jsonrpc: "2.0", method: "notifications/initialized" }, ports), undefined);
   const list = (await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, ports)) as any;
-  assert.deepEqual(list.result.tools.map((t: any) => t.name), ["hear"]);
+  assert.deepEqual(list.result.tools.map((t: any) => t.name), ["hear", "act"]);
   const heard = (await rpc({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "hear", arguments: { place: "file:a.ts" } } }, ports)) as any;
   assert.deepEqual(heard.result, { content: [{ type: "text", text: "About a.ts." }] });
   const refused = (await rpc({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "hear", arguments: { place: "file:.env" } } }, ports)) as any;
@@ -194,9 +196,11 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   let port = 0;
-  const modules: Record<string, Pack> = { "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe };
+  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply([
+    { id: "graph", pack: "graph.ts" },
+    { id: "action", pack: "action.ts" },
     { id: "exchange", pack: "exchange.ts" },
     { id: "agent", pack: "agent.ts" },
     { id: "nodes", pack: "nodes.ts" },
@@ -252,7 +256,7 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
     assert.deepEqual(errors, []);
 
     // Unloading the pack closes its server.
-    await loader.apply([{ id: "exchange", pack: "exchange.ts" }, { id: "agent", pack: "agent.ts" }]);
+    await loader.apply([{ id: "graph", pack: "graph.ts" }, { id: "action", pack: "action.ts" }, { id: "exchange", pack: "exchange.ts" }, { id: "agent", pack: "agent.ts" }]);
     await assert.rejects(fetch(`http://127.0.0.1:${port}/health`));
   } finally {
     await loader.apply([]);
@@ -284,4 +288,31 @@ test("the command forwarder prints the adapter's answer, and nothing when it is 
     await new Promise((ok) => server.close(ok));
   }
   assert.deepEqual(await forward(`http://127.0.0.1:${port}/hook`), { code: 0, out: "" });
+});
+
+test("at Stop, the turn's failed tool calls no hook saw are read from the transcript and recorded as failed acts", async () => {
+  const line = (o: object) => JSON.stringify(o);
+  const transcript = [
+    line({ type: "user", message: { content: "earlier prompt" } }),
+    line({ type: "assistant", message: { content: [{ type: "tool_use", id: "old", name: "Edit", input: { file_path: "a" } }] } }),
+    line({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "old", is_error: true, content: "old error" }] } }),
+    line({ type: "user", message: { content: "fix settings" } }),
+    line({ type: "assistant", message: { content: [{ type: "tool_use", id: "e1", name: "Edit", input: { file_path: "C:\work\repo\s.txt", old_string: "x" } }, { type: "tool_use", id: "e2", name: "Bash", input: { command: "false" } }] } }),
+    line({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "e1", is_error: true, content: "<tool_use_error>String to replace not found in file.</tool_use_error>" }, { type: "tool_result", tool_use_id: "e2", is_error: true, content: "exit 1" }] } }),
+  ].join("\n");
+  assert.deepEqual(unseenFailures(transcript, new Set(["e2"])), [
+    { id: "e1", tool: "Edit", input: { file_path: "C:\work\repo\s.txt", old_string: "x" }, error: "String to replace not found in file." },
+  ]);
+  const { calls, port } = fake();
+  port.seen = new Set(["e2"]);
+  const go = (input: Partial<HookInput> & { hook_event_name: string }) =>
+    handle({ session_id: "s1", cwd: "C:\work\repo", ...input }, port, { actor, now: () => T, transcript: async () => transcript });
+  await go({ hook_event_name: "Stop", last_assistant_message: "Done." });
+  await go({ hook_event_name: "Stop", last_assistant_message: "Done." });
+  const acts = calls.filter((c) => c[0] === "act").map((c) => c[1] as Act);
+  assert.deepEqual(acts.map((a) => [a.place, a.output, a.ok]), [
+    ["tool:Edit", "String to replace not found in file.", false],
+    ["reply_end", "Done.", true],
+    ["reply_end", "Done.", true],
+  ]);
 });

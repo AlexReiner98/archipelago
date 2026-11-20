@@ -1,5 +1,5 @@
 /**
- * Runs the adapter: exchange, agent and claude-code in one Node process,
+ * Runs the adapter: graph, action, exchange, agent and claude-code in one Node process,
  * hot-reloaded, with a live tail of the exchange on the console.
  *
  *   node packs/claude-code/host.ts [--port 5181] [--demo] [--journal file]
@@ -26,6 +26,8 @@ const { values } = parseArgs({
 mkdirSync(dirname(values.journal), { recursive: true });
 
 const tree: Entry[] = [
+  { id: "graph", pack: "packs/graph/index.ts", config: { file: join(dirname(values.journal), "graph.json") } },
+  { id: "action", pack: "packs/action/index.ts" },
   { id: "exchange", pack: "packs/exchange/index.ts", config: { journal: values.journal } },
   { id: "agent", pack: "packs/agent/index.ts" },
   ...(values.demo ? [{ id: "demo-nodes", pack: "packs/claude-code/dev/demo.ts" }] : []),

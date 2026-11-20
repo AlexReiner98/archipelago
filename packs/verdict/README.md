@@ -23,7 +23,9 @@ run's `cwd` (from its `begin`), with `/` for separators, since Claude Code
 gives them absolute. A node's own refusals are its saying, and so is the
 denied call a refusal causes (an act whose output names the node as
 `refused`): a refusal is the node working. An exchange `miss` (a node threw) is the exchange's fault, not the
-agent's, and judges nothing. A node no longer in the tree is judged at the
+agent's, and judges nothing. Nor does a refusal with the code `ask`, nor
+the act it denies: it holds the agent back to ask it something (the grow
+pack's question at `reply_end`), not because anything went wrong. A node no longer in the tree is judged at the
 places it was said.
 
 Only runs where a node was said judge it.

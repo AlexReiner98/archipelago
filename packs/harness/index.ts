@@ -8,6 +8,8 @@
  * - Run: one run live, map → agent beside agent → map.
  * - Node: its words, places, pack and record. Words made from a map item
  *   are edited through the `words.set` action, and the next say uses them.
+ *   A trial node (its item's `status` is `trial`) is marked in the tree, and
+ *   its pane says what miss it came from and can retire it (`words.retire`).
  *
  * A click on a node sets `here.node`, and the run lights its firings; a
  * click on an event sets `here.event` and `here.node`, and the tree lights
@@ -59,6 +61,8 @@ interface VerdictRead {
 
 /** The action that changes a node's words, when a pack provides it. */
 const EDIT = "words.set";
+/** The action that retires a node made from a map item. */
+const RETIRE = "words.retire";
 
 const MARK: Record<Verdict | "none", string> = { held: "✓", failed: "✕", quiet: "○", none: "·" };
 
@@ -99,6 +103,9 @@ const STYLE = `
 .hv-words .ro { white-space:pre-wrap; padding:4px 6px; border:1px dashed var(--line); border-radius:3px; }
 .hv-words .bar { display:flex; gap:8px; align-items:center; margin-top:4px; color:var(--dim); white-space:nowrap; }
 .hv-empty { padding:10px; color:var(--dim); }
+.hv-trial .x { font-style:italic; }
+.hv-tag { flex:none; font-size:10px; padding:0 4px; border-radius:3px; border:1px dashed var(--pick); color:var(--pick); }
+.hv-miss { margin:2px 10px 6px; padding:4px 6px; border-left:3px solid var(--failed); white-space:pre-wrap; color:var(--dim); }
 `;
 
 const short = (v: unknown, n = 120): string => {
@@ -113,7 +120,7 @@ function actLine(e: ExchangeEvent, cwd?: string): string {
   if (!a) return "";
   const i = (a.input ?? {}) as Record<string, Json>;
   if (a.kind === "prompt") return short(typeof a.input === "string" ? a.input : (i.prompt ?? a.input));
-  if (a.kind === "reply") return short(a.output ?? a.input);
+  if (a.kind === "reply") return short(a.input ?? a.output);
   const path = i.file_path ?? i.path ?? i.notebook_path;
   if (typeof path === "string") {
     const rel = cwd && path.toLowerCase().startsWith(cwd.toLowerCase()) ? path.slice(cwd.length).replace(/^[\\/]/, "") : path;
@@ -256,11 +263,46 @@ const harness: Pack = {
       return item;
     };
 
+    /** Each node item's status (`trial`, `retired`), by item id, kept live. */
+    const useStatuses = (): Map<string, string> => {
+      const [st, setSt] = useState<Map<string, string>>(new Map());
+      useEffect(() => {
+        let gone = false;
+        const load = async () => {
+          const m = new Map<string, string>();
+          for (let p = await graph.of("node", { limit: 500 }); ; p = await graph.of("node", { limit: 500, after: p.next })) {
+            for (const i of p.items) if (typeof i.fields.status === "string") m.set(i.id, i.fields.status);
+            if (!p.next) break;
+          }
+          if (!gone) setSt(m);
+        };
+        void load();
+        const stop = graphLive.watch({ types: ["node"] }, () => void load());
+        return () => {
+          gone = true;
+          void stop();
+        };
+      }, []);
+      return st;
+    };
+    const statusOf = (n: NodeInfo | undefined, st: Map<string, string>) => (n?.source ? st.get(n.source) : undefined);
+
+    const useHas = (name: string): boolean => {
+      const has = () => actions.list().some((a) => a.name === name);
+      const [v, setV] = useState(has());
+      useEffect(() => {
+        const stop = actions.watch(() => setV(has()));
+        setV(has());
+        return stop as () => void;
+      }, [name]);
+      return v;
+    };
+
     // ---------- the panes ----------
 
     const Mark = ({ v }: { v?: Verdict }) => html`<span class=${`hv-m m-${v ?? "none"}`} title=${v ?? "not said"}>${MARK[v ?? "none"]}</span>`;
 
-    const TreePane = ({ nodes, byNode, counts }: { nodes: NodeInfo[]; byNode: Map<string, RunVerdict>; counts: Map<string, number> }) => {
+    const TreePane = ({ nodes, byNode, counts, statuses }: { nodes: NodeInfo[]; byNode: Map<string, RunVerdict>; counts: Map<string, number>; statuses: Map<string, string> }) => {
       const [by, setBy] = useState<"place" | "pack">("place");
       const picked = useHere<string>(KEYS.node);
       const groups = useMemo(() => {
@@ -287,12 +329,13 @@ const harness: Pack = {
                 <div class="hv-group" title=${group}>${group}</div>
                 ${list.map(
                   (n) => html`
-                    <div class=${`hv-row ${picked === n.id ? "hv-lit hv-pick" : ""}`} title=${`${n.id} · ${n.kind}`} onClick=${() => {
+                    <div class=${`hv-row ${picked === n.id ? "hv-lit hv-pick" : ""} ${statusOf(n, statuses) === "trial" ? "hv-trial" : ""}`} title=${`${n.id} · ${n.kind}${statusOf(n, statuses) === "trial" ? " · trial" : ""}`} onClick=${() => {
                       set.set(KEYS.node, n.id);
                       set.set(KEYS.event, undefined);
                     }}>
                       <${Mark} v=${byNode.get(n.id)?.verdict} />
                       <span class="x">${n.title}</span>
+                      ${statusOf(n, statuses) === "trial" && html`<span class="hv-tag">trial</span>`}
                       <span class="n">${counts.get(n.id) ?? ""}</span>
                     </div>
                   `,
@@ -418,6 +461,35 @@ const harness: Pack = {
       `;
     };
 
+    const Trial = ({ info }: { info: NodeInfo }) => {
+      const item = useItem(info.source);
+      const canRetire = useHas(RETIRE);
+      const [status, setStatus] = useState("");
+      useEffect(() => setStatus(""), [info.id]);
+      if (item?.fields.status !== "trial") return null;
+      const from = typeof item.fields.from_run === "string" ? item.fields.from_run : undefined;
+      const seq = item.fields.from_seq;
+      const retire = async () => {
+        setStatus("retiring…");
+        const out = await invoke.invoke({
+          action: RETIRE,
+          input: { node: info.source! },
+          authority: { of: "human", basis: "retired in the harness view" },
+          reason: `Retired the trial node ${info.title}`,
+        });
+        setStatus(out.ok ? "retired: it is no longer said" : `refused: ${out.refused.message}`);
+      };
+      return html`
+        <div class="hv-group">trial: written after this miss</div>
+        <div class="hv-miss">${typeof item.fields.misses === "string" ? item.fields.misses : "—"}</div>
+        ${from && html`<div class="hv-row" onClick=${() => set.set(KEYS.run, from)} title="show that run"><span class="x">from ${from.slice(0, 8)}${seq !== undefined ? ` #${seq}` : ""}</span></div>`}
+        <div class="hv-words"><div class="bar">
+          ${canRetire && html`<button class="hv-btn" onClick=${retire}>Retire</button>`}
+          <span>${status || "Said only at its place, marked as a trial."}</span>
+        </div></div>
+      `;
+    };
+
     const NodePane = ({ nodes, editable }: { nodes: NodeInfo[]; editable: boolean }) => {
       const id = useHere<string>(KEYS.node);
       const info = nodes.find((n) => n.id === id);
@@ -431,6 +503,7 @@ const harness: Pack = {
           <div class="hv-body">
             ${!info && html`<div class="hv-empty">Not loaded now: its record stays.</div>`}
             ${info && html`<${Words} info=${info} editable=${editable} />`}
+            ${info?.source && html`<${Trial} info=${info} />`}
             ${info && html`
               <div class="hv-kv"><span class="k">places</span><span class="v" title=${info.at.join(", ")}>${info.at.join(", ")}</span></div>
               <div class="hv-kv"><span class="k">pack</span><span class="v">${info.pack}</span></div>
@@ -465,12 +538,13 @@ const harness: Pack = {
       const verdictsOfRun = useVerdictData(() => (run ? verdicts.run(run) : Promise.resolve([])), [run], run) ?? [];
       const records = useVerdictData(() => verdicts.records({ limit: 500 }).then((p) => p.items), []) ?? [];
       const editable = useEditable();
+      const statuses = useStatuses();
       const byNode = useMemo(() => new Map(verdictsOfRun.map((v) => [v.node, v])), [verdictsOfRun]);
       const counts = useMemo(() => new Map(records.map((r) => [r.node, r.said])), [records]);
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
       return html`
         <div class="hv">
-          <${TreePane} nodes=${nodes} byNode=${byNode} counts=${counts} />
+          <${TreePane} nodes=${nodes} byNode=${byNode} counts=${counts} statuses=${statuses} />
           <${RunPane} runs=${runs} run=${run} events=${events} verdictsOfRun=${verdictsOfRun} titles=${titles} />
           <${NodePane} nodes=${nodes} editable=${editable} />
         </div>

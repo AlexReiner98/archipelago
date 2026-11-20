@@ -4,7 +4,8 @@ The Claude Code adapter. Claude Code's hooks and an MCP server are mere
 callers of `agent.run` ([spec](../../spec/agent.md)): what a hook or tool
 tells the model is what the nodes say or refuse at a place, and what the
 agent does comes in as an act. Nothing past this pack knows which harness
-runs. Injects `agent.run`, so it waits for an agent pack.
+runs. Injects `agent.run`, `action.invoke` and `action.list`, so it waits
+for an agent pack and an action pack.
 
 ## Hooks to places
 
@@ -14,8 +15,13 @@ runs. Injects `agent.run`, so it waits for an agent pack.
 | UserPromptSubmit | reach `prompt`, then act `prompt` by the person | context, or block on a refusal |
 | PreToolUse | reach `tool:<name>` and `file:<path>` (from `file_path`, `notebook_path`, relative to the run's folder) | context, or deny on a refusal; a denied call is its own act, `ok: false` |
 | PostToolUse / PostToolUseFailure | act `tool`, then reach `tool_result:<name>` with the result | context |
-| Stop | reach `reply_end` with the reply, then act `reply` | block on a refusal: the agent keeps going |
+| Stop | reach `reply_end` with the reply, then act `reply` (on a refusal, a denied act: the reply as input, the refusal as output) | block on a refusal: the agent keeps going |
 | SessionEnd | `end` | nothing |
+
+Claude Code rejects some tool calls before any hook runs (an Edit whose
+`old_string` isn't in the file): the model sees the error, the hooks don't.
+So at Stop, the turn's errored tool results that no hook saw are read from
+the transcript and recorded as failed tool acts, ahead of `reply_end`.
 
 The run is the session id; each run has its own context, intercepted with
 the agent as actor and the run, and its hooks are handled one at a time in
@@ -25,11 +31,14 @@ hook, or from the transcript's last assistant text.
 
 ## The MCP server
 
-One tool, `hear`: what the nodes say at a place the agent names
+Two tools. `hear`: what the nodes say at a place the agent names
 (`file:spec/agent.ts`, `tool:Bash`). Its answer is only what `reach`
-answers; a refusal comes back as an error result. A tool call doesn't name
-its session, so the run is found from the tool use id the PreToolUse hook
-saw for it.
+answers; a refusal comes back as an error result. `act`: the agent invokes
+a declared action (`action`, `input`, `reason`) as itself, in its run, on
+its own authority; its description lists the actions declared now, and a
+refusal comes back as an error saying why. This is how an agent writes a
+trial node (`grow.trial`). A tool call doesn't name its session, so the run
+is found from the tool use id the PreToolUse hook saw for it.
 
 ## Running it
 

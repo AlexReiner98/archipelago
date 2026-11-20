@@ -1,12 +1,17 @@
 /**
  * The adapter's MCP server: JSON-RPC over streamable HTTP, answered with
- * JSON. Its one tool, `hear`, is a caller of `agent.run` like the hooks:
- * what it tells the model is only what the nodes say at the place asked.
+ * JSON. Two tools, each a caller like the hooks:
+ * - `hear`, of `agent.run`: what it tells the model is only what the nodes
+ *   say at the place asked;
+ * - `act`, of `action.invoke`: the agent invokes a declared action, as
+ *   itself and in its run. Every change goes through an action, whether a
+ *   person or an agent makes it.
  *
  * A tool call doesn't name its session, so the adapter finds the run from
  * the tool use id its PreToolUse hook saw (`_meta["claudecode/toolUseId"]`),
  * else the last run that was about to call it.
  */
+import type { ActionInfo, ActionInvoke } from "../../spec/action.ts";
 import type { AgentRun, Answer, Place } from "../../spec/agent.ts";
 import { PLACES } from "../../spec/agent.ts";
 import type { Json, Time } from "../../spec/common.ts";
@@ -14,6 +19,9 @@ import type { Json, Time } from "../../spec/common.ts";
 export const SERVER = { name: "archipelago", version: "0.1.0" };
 export const PROTOCOL = "2025-06-18";
 export const HEAR = "hear";
+export const ACT = "act";
+/** The tools whose calls the PreToolUse hook ties to their run. */
+export const TOOL_NAMES = [HEAR, ACT];
 
 export const TOOLS = [
   {
@@ -27,7 +35,29 @@ export const TOOLS = [
       required: ["place"],
     },
   },
+  {
+    name: ACT,
+    description:
+      "Invoke a declared action of the map, as yourself in this run: the one way to change it. " +
+      "The input must match the action's schema; a refusal comes back as an error saying why.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", description: "The action's name, such as grow.trial." },
+        input: { type: "object", description: "The action's input." },
+        reason: { type: "string", description: "Why, in one line: it is recorded with the change." },
+      },
+      required: ["action", "input", "reason"],
+    },
+  },
 ];
+
+/** The tools, with `act`'s description naming the actions declared now. */
+export function toolsWith(actions: ActionInfo[]): typeof TOOLS {
+  if (!actions.length) return TOOLS;
+  const names = actions.map((a) => `${a.name} (${a.title})`).join("; ");
+  return TOOLS.map((t) => (t.name === ACT ? { ...t, description: `${t.description} Declared now: ${names}.` } : t));
+}
 
 const FAMILIES = PLACES.map((p) => p.term.replace(/<.*>$/, ""));
 
@@ -44,8 +74,13 @@ export interface JsonRpc {
 }
 
 export interface McpPorts {
-  /** The run a tool call belongs to: `agent.run` from its context, or nothing if no run is known. */
-  runFor(toolUseId: string | undefined): { run: string; agent: AgentRun } | undefined;
+  /**
+   * The run a tool call belongs to: `agent.run` and `action.invoke` from its
+   * context, or nothing if no run is known.
+   */
+  runFor(toolUseId: string | undefined): { run: string; agent: AgentRun; invoke?: ActionInvoke } | undefined;
+  /** The actions declared now, for `act`'s description. */
+  actions?: () => ActionInfo[];
   now?: () => Time;
 }
 
@@ -73,9 +108,10 @@ export async function rpc(msg: JsonRpc, ports: McpPorts): Promise<object | undef
     case "ping":
       return result(msg.id, {});
     case "tools/list":
-      return result(msg.id, { tools: TOOLS as unknown as Json });
+      return result(msg.id, { tools: toolsWith(ports.actions?.() ?? []) as unknown as Json });
     case "tools/call": {
       const name = msg.params?.name;
+      if (name === ACT) return result(msg.id, await act(msg.params?.arguments, ports.runFor(msg.params?._meta?.["claudecode/toolUseId"])));
       if (name !== HEAR) return failure(msg.id, -32602, `No tool ${String(name)}.`);
       const place = msg.params?.arguments?.place;
       if (typeof place !== "string" || !knownPlace(place)) {
@@ -90,4 +126,20 @@ export async function rpc(msg: JsonRpc, ports: McpPorts): Promise<object | undef
     default:
       return failure(msg.id, -32601, `No method ${String(msg.method)}.`);
   }
+}
+
+/** Runs `act`: the action, as the run's agent, on its own authority. */
+async function act(args: any, port: ReturnType<McpPorts["runFor"]>): Promise<Json> {
+  if (!port) return text("No run is known here yet: hooks haven't reached the adapter.", true);
+  if (!port.invoke) return text("Nothing here invokes actions.", true);
+  if (typeof args?.action !== "string" || !args.action) return text("Say which action, as `action`.", true);
+  const input = args.input && typeof args.input === "object" && !Array.isArray(args.input) ? (args.input as Json) : {};
+  const out = await port.invoke.invoke({
+    action: args.action,
+    input,
+    authority: { of: "agent", basis: `asked for in run ${port.run}` },
+    reason: typeof args.reason === "string" && args.reason ? args.reason : `${args.action}, by the agent`,
+  });
+  if (!out.ok) return text(`Refused (${out.refused.code}): ${out.refused.message}`, true);
+  return text(JSON.stringify({ output: out.output, ...(out.change ? { change: out.change } : {}) }));
 }

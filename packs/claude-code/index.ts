@@ -7,19 +7,20 @@
  * One HTTP server, the pack's effect (it closes when the pack unloads):
  * - `POST /hook`: Claude Code's http hooks post their input here and print
  *   the answer (see mapping.ts).
- * - `POST /mcp`: a streamable-HTTP MCP server (see mcp.ts).
+ * - `POST /mcp`: a streamable-HTTP MCP server (see mcp.ts): `hear` and `act`.
  *
  * Each run (a Claude Code session) gets its own context, intercepted with the
  * agent as actor and the session id as run, so every call is the run's.
  */
 import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import type { ActionInvoke, ActionList } from "../../spec/action.ts";
 import type { AgentRun } from "../../spec/agent.ts";
 import type { Actor } from "../../spec/common.ts";
 import { META } from "../../spec/common.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { handle, lastAssistantText, type HookInput, type HookOutput, type RunPort } from "./mapping.ts";
-import { HEAR, rpc, type JsonRpc } from "./mcp.ts";
+import { TOOL_NAMES, rpc, type JsonRpc } from "./mcp.ts";
 
 export interface ClaudeCodeConfig {
   /** The port to listen on, on 127.0.0.1. 0 picks a free one. Default 5181. */
@@ -57,24 +58,32 @@ function send(res: ServerResponse, status: number, value?: unknown): void {
 }
 
 interface RunState extends RunPort {
+  /** `action.invoke` from the run's context: the agent's `act` calls. */
+  invoke: ActionInvoke;
   /** Hooks of one run are handled one at a time, in the order they came. */
   queue: Promise<unknown>;
 }
 
-async function lastReply(input: HookInput): Promise<string | undefined> {
+async function transcript(input: HookInput): Promise<string | undefined> {
   if (!input.transcript_path) return undefined;
   try {
-    return lastAssistantText(await readFile(input.transcript_path, "utf8"));
+    return await readFile(input.transcript_path, "utf8");
   } catch {
     return undefined;
   }
 }
 
+async function lastReply(input: HookInput): Promise<string | undefined> {
+  const text = await transcript(input);
+  return text === undefined ? undefined : lastAssistantText(text);
+}
+
 const claudeCode: Pack<ClaudeCodeConfig> = {
   id: "claude-code",
-  inject: ["agent.run"],
+  inject: ["agent.run", "action.invoke", "action.list"],
   async apply(ctx: Context, config: ClaudeCodeConfig = {}) {
     const actor: Actor = config.agent ?? { id: "claude-code", kind: "agent" };
+    const actions = ctx.get<ActionList>("action.list");
     const runs = new Map<string, RunState>();
     /** MCP calls of `hear`, by tool use id, to the run that was about to make them. */
     const hearing = new Map<string, string>();
@@ -84,7 +93,7 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
       let state = runs.get(session);
       if (!state) {
         const runCtx = ctx.intercept({ [META.actor]: actor, [META.run]: session });
-        state = { agent: runCtx.get<AgentRun>("agent.run"), begun: false, queue: Promise.resolve() };
+        state = { agent: runCtx.get<AgentRun>("agent.run"), invoke: runCtx.get<ActionInvoke>("action.invoke"), begun: false, seen: new Set(), queue: Promise.resolve() };
         runs.set(session, state);
       }
       return state;
@@ -92,11 +101,11 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
 
     const hook = (input: HookInput): Promise<HookOutput> => {
       const state = runOf(input.session_id);
-      if (input.hook_event_name === "PreToolUse" && input.tool_name?.endsWith(`__${HEAR}`)) {
+      if (input.hook_event_name === "PreToolUse" && input.tool_name?.startsWith("mcp__") && TOOL_NAMES.some((n) => input.tool_name!.endsWith(`__${n}`))) {
         if (input.tool_use_id) hearing.set(input.tool_use_id, input.session_id);
         lastHearing = input.session_id;
       }
-      const next = state.queue.then(() => handle(input, state, { actor, lastReply }));
+      const next = state.queue.then(() => handle(input, state, { actor, lastReply, transcript }));
       state.queue = next.catch(() => {});
       if (input.hook_event_name === "SessionEnd") void next.finally(() => runs.delete(input.session_id));
       return next;
@@ -108,8 +117,10 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
           const session = (toolUseId && hearing.get(toolUseId)) || lastHearing;
           if (toolUseId) hearing.delete(toolUseId);
           if (!session) return undefined;
-          return { run: session, agent: runOf(session).agent };
+          const state = runOf(session);
+          return { run: session, agent: state.agent, invoke: state.invoke };
         },
+        actions: () => actions.list(),
       });
 
     const server: Server = createServer(async (req, res) => {

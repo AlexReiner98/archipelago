@@ -6,8 +6,10 @@
  *
  * An item `node` has: `title`, `kind` (instruction, reflex, rule, …), `at`
  * (a list of places), `words`, and `refuse` (true: the words are a
- * refusal). Injects graph.read and graph.watch to follow them, agent.node
- * to register them, and action.register and action.invoke for its actions.
+ * refusal), and `status`: absent for a kept node, `trial` for one on trial
+ * (its words are said marked as a trial), `retired` for one no longer said.
+ * Injects graph.read and graph.watch to follow them, agent.node to register
+ * them, and action.register and action.invoke for its actions.
  */
 import type { ActionContext, ActionInvoke, ActionRegister } from "../../spec/action.ts";
 import type { AgentNode } from "../../spec/agent.ts";
@@ -19,6 +21,9 @@ import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
 export const TYPE = "node";
+
+/** What a trial node's words are said after, so the agent knows it is one. */
+export const TRIAL_MARK = "(Trial node, written after a miss: it may be wrong.)";
 
 export interface NodeSeed {
   title: string;
@@ -33,7 +38,7 @@ export interface WordsConfig {
   seed?: NodeSeed[];
 }
 
-const shape = (i: Item) => JSON.stringify([i.fields.title, i.fields.kind, i.fields.at]);
+const shape = (i: Item) => JSON.stringify([i.fields.title, i.fields.kind, i.fields.at, i.fields.status === "retired"]);
 
 const words: Pack<WordsConfig> = {
   id: "words",
@@ -51,7 +56,7 @@ const words: Pack<WordsConfig> = {
         void had.dispose();
         registered.delete(id);
       }
-      if (!item || item.type !== TYPE) return;
+      if (!item || item.type !== TYPE || item.fields.status === "retired") return;
       const at = Array.isArray(item.fields.at) ? (item.fields.at as string[]) : [];
       const dispose = agent.node({
         name: id,
@@ -63,7 +68,8 @@ const words: Pack<WordsConfig> = {
           const [now] = await graph.get([id]);
           const text = typeof now?.fields.words === "string" ? now.fields.words.trim() : "";
           if (!text) return null;
-          return now!.fields.refuse === true ? { refuse: text, code: "words.refuse" } : { say: text };
+          const said = now!.fields.status === "trial" ? `${TRIAL_MARK} ${text}` : text;
+          return now!.fields.refuse === true ? { refuse: said, code: "words.refuse" } : { say: said };
         },
       });
       registered.set(id, { dispose, shape: shape(item) });
@@ -85,6 +91,28 @@ const words: Pack<WordsConfig> = {
         const facts: Fact[] = [];
         if (item.fields.words !== undefined) facts.push(["-", input.node, "words", item.fields.words]);
         facts.push(["+", input.node, "words", input.words]);
+        call.write(facts);
+        return { node: input.node };
+      },
+    });
+
+    register.register({
+      name: "words.retire",
+      title: "Retire a node: it is no longer said",
+      input: {
+        type: "object",
+        properties: { node: { type: "string", description: "The node's item id" } },
+        required: ["node"],
+      },
+      async run(input: { node: Id }, call: ActionContext) {
+        const [item] = await graph.get([input.node]);
+        if (!item || item.type !== TYPE) {
+          throw new Refused({ code: "words.not_a_node", message: `${input.node} is not a node on the map.`, by: { pack: "words" } });
+        }
+        if (item.fields.status === "retired") return { node: input.node };
+        const facts: Fact[] = [];
+        if (item.fields.status !== undefined) facts.push(["-", input.node, "status", item.fields.status]);
+        facts.push(["+", input.node, "status", "retired"]);
         call.write(facts);
         return { node: input.node };
       },

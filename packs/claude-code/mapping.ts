@@ -10,8 +10,13 @@
  * | PreToolUse       | reach tool:<name> + file:<path>; act ok:false if refused | additionalContext, or deny |
  * | PostToolUse      | act tool, reach tool_result:<name>                     | additionalContext            |
  * | PostToolUseFailure | act tool ok:false, reach tool_result:<name>          | additionalContext            |
- * | Stop             | reach reply_end, act reply                             | block (keeps it going)       |
+ * | Stop             | act each unseen failed tool, reach reply_end, act reply (denied if refused) | block (keeps it going) |
  * | SessionEnd       | end                                                    | nothing                      |
+ *
+ * Claude Code rejects some tool calls before any hook runs (an Edit whose
+ * old_string isn't in the file): the model sees the error, the hooks never
+ * do. At Stop, the turn's errored tool results that no hook saw are read
+ * from the transcript and recorded as failed acts, so a miss is never lost.
  */
 import type { Act, AgentRun, Answer, Moment, Place, RunStart } from "../../spec/agent.ts";
 import type { Actor, Json, Time } from "../../spec/common.ts";
@@ -107,6 +112,8 @@ export interface RunPort {
   agent: AgentRun;
   /** Whether `begin` has been called for it here. */
   begun: boolean;
+  /** The tool use ids a hook saw in this run, so the transcript adds only the rest. */
+  seen?: Set<string>;
 }
 
 export interface Options {
@@ -114,6 +121,8 @@ export interface Options {
   now?: () => Time;
   /** The reply's text when the hook doesn't carry it (read from the transcript). */
   lastReply?: (input: HookInput) => Promise<string | undefined>;
+  /** The transcript, to find the turn's failed tool calls no hook saw. */
+  transcript?: (input: HookInput) => Promise<string | undefined>;
 }
 
 export function runStart(input: HookInput, actor: Actor): RunStart {
@@ -162,6 +171,7 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     }
     case "PreToolUse": {
       const tool = input.tool_name ?? "unknown";
+      if (input.tool_use_id) port.seen?.add(input.tool_use_id);
       const answer = await reach(toolPlaces(tool, input.tool_input, input.cwd), trim(input.tool_input));
       if (answer.refused) {
         // The tool won't run, so no PostToolUse: the refused call is the act.
@@ -170,7 +180,7 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
           kind: "tool",
           by: "agent",
           input: trim(input.tool_input) ?? null,
-          output: { refused: answer.refused.node, text: answer.refused.text },
+          output: { refused: answer.refused.node, text: answer.refused.text, ...(answer.refused.code ? { code: answer.refused.code } : {}) },
           ok: false,
         });
         return {
@@ -187,16 +197,29 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     case "PostToolUseFailure": {
       const tool = input.tool_name ?? "unknown";
       const failed = event === "PostToolUseFailure";
+      if (input.tool_use_id) port.seen?.add(input.tool_use_id);
       const output = failed ? (input.error ?? null) : trim(input.tool_response);
       await act({ place: `tool:${tool}`, kind: "tool", by: "agent", input: trim(input.tool_input) ?? null, output: output ?? null, ok: !failed && !isError(input.tool_response) });
       const answer = await reach([`tool_result:${tool}`], output ?? undefined);
       return context(event, answer);
     }
     case "Stop": {
+      if (port.seen && options.transcript) {
+        const text = await options.transcript(input);
+        for (const f of text ? unseenFailures(text, port.seen) : []) {
+          port.seen.add(f.id);
+          await act({ place: `tool:${f.tool}`, kind: "tool", by: "agent", input: trim(f.input) ?? null, output: trim(f.error) ?? null, ok: false });
+        }
+      }
       const reply = input.last_assistant_message ?? (await options.lastReply?.(input));
       const answer = await reach(["reply_end"], reply === undefined ? undefined : trim(reply));
-      await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { output: trim(reply) } : {}), ok: !answer.refused });
-      if (answer.refused) return { decision: "block", reason: refusalText(answer) };
+      if (answer.refused) {
+        // The reply was held back: it is the input of a denied act, like a denied tool call.
+        const { node, text, code } = answer.refused;
+        await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { input: trim(reply) } : {}), output: { refused: node, text, ...(code ? { code } : {}) }, ok: false });
+        return { decision: "block", reason: refusalText(answer) };
+      }
+      await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { output: trim(reply) } : {}), ok: true });
       return {};
     }
     default:
@@ -233,4 +256,46 @@ export function lastAssistantText(transcript: string): string | undefined {
     if (text) return text;
   }
   return undefined;
+}
+
+/** A tool call of the turn that failed, from the transcript. */
+export interface TranscriptFailure {
+  id: string;
+  tool: string;
+  input?: Json;
+  error: string;
+}
+
+/**
+ * The current turn's tool calls whose result is an error and whose id isn't
+ * in `seen`: from the last prompt (a user entry that isn't a tool result) on.
+ */
+export function unseenFailures(transcript: string, seen: Set<string>): TranscriptFailure[] {
+  const entries: any[] = [];
+  for (const line of transcript.split("\n")) {
+    if (!line.trim()) continue;
+    try {
+      entries.push(JSON.parse(line));
+    } catch {}
+  }
+  const blocks = (e: any): any[] => (Array.isArray(e?.message?.content) ? e.message.content : []);
+  let start = 0;
+  entries.forEach((e, i) => {
+    if (e?.type === "user" && !e.isMeta && !blocks(e).some((b) => b?.type === "tool_result")) start = i;
+  });
+  const uses = new Map<string, { tool: string; input?: Json }>();
+  const out: TranscriptFailure[] = [];
+  for (const e of entries.slice(start)) {
+    for (const b of blocks(e)) {
+      if (e.type === "assistant" && b?.type === "tool_use" && typeof b.id === "string") uses.set(b.id, { tool: String(b.name), input: b.input });
+      if (e.type === "user" && b?.type === "tool_result" && b.is_error === true && typeof b.tool_use_id === "string" && !seen.has(b.tool_use_id)) {
+        const use = uses.get(b.tool_use_id);
+        if (!use) continue;
+        const c = b.content;
+        const error = typeof c === "string" ? c : Array.isArray(c) ? c.filter((x: any) => x?.type === "text").map((x: any) => x.text).join("\n") : "";
+        out.push({ id: b.tool_use_id, tool: use.tool, ...(use.input !== undefined ? { input: use.input } : {}), error: error.replace(/<\/?tool_use_error>/g, "").trim() });
+      }
+    }
+  }
+  return out;
 }

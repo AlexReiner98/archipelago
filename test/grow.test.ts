@@ -1,0 +1,145 @@
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import type { ActionInvoke } from "../spec/action.ts";
+import type { AgentNode, AgentTree } from "../spec/agent.ts";
+import type { ExchangeEvent } from "../spec/exchange.ts";
+import type { GraphRead } from "../spec/graph.ts";
+import { Runtime, type Pack } from "../runtime/core.ts";
+import { Loader } from "../runtime/loader.ts";
+import action from "../packs/action/index.ts";
+import agent from "../packs/agent/index.ts";
+import claudeCode from "../packs/claude-code/index.ts";
+import exchange from "../packs/exchange/index.ts";
+import graph from "../packs/graph/index.ts";
+import grow, { ASKER, askText } from "../packs/grow/index.ts";
+import { askedIn, covered, missesOf } from "../packs/grow/miss.ts";
+import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
+import words, { TRIAL_MARK } from "../packs/words/index.ts";
+
+const T = "2026-11-20T15:00:00.000Z";
+const ev = (seq: number, e: Partial<ExchangeEvent>): ExchangeEvent => ({ id: `e${seq}`, run: "r", seq, time: T, direction: "from_agent", kind: "act", ...e });
+
+test("misses: failed acts and refusals, at their place and files; an asking refusal and the reply it holds are none", () => {
+  const events = [
+    ev(1, { kind: "begin", detail: { cwd: "C:\\repo" } }),
+    ev(2, { place: "tool:Edit", act: { kind: "tool", by: "agent", input: { file_path: "C:\\repo\\a\\b.ts" }, output: "String not found", ok: false } }),
+    ev(3, { place: "tool:Read", act: { kind: "tool", by: "agent", input: { file_path: "C:\\repo\\c.ts" }, ok: true } }),
+    ev(4, { kind: "refuse", direction: "to_agent", place: "file:.env", node: "w/env", text: "Not .env." }),
+    ev(5, { kind: "refuse", direction: "to_agent", place: "reply_end", node: ASKER, text: "Before you finish: a miss (#2).", detail: { code: "ask" } }),
+    ev(6, { place: "reply_end", act: { kind: "reply", by: "agent", input: "done", output: { refused: ASKER, text: "…", code: "ask" }, ok: false } }),
+  ];
+  const misses = missesOf(events, "C:\\repo");
+  assert.deepEqual(misses.map((m) => [m.seq, m.places, m.words]), [
+    [2, ["tool:Edit", "file:a/b.ts"], "String not found"],
+    [4, ["file:.env"], "Not .env."],
+  ]);
+  assert.equal(covered(misses[0]!, [{ id: "w/x", at: ["file:a/*.ts"] }]), true);
+  assert.equal(covered(misses[0]!, [{ id: "w/x", at: ["file:a/c.ts"] }, { id: ASKER, at: ["tool:*"] }], ASKER), false);
+  assert.deepEqual([...askedIn(events, ASKER)], [2]);
+  assert.match(askText(misses), /^Before you finish: 2 misses .*\(#2, #4\)/);
+});
+
+/** The real packs, through the loader, with the adapter over HTTP: a miss to an ask to a node to its saying. */
+test("a miss nothing covers is asked about once; the agent writes a trial node through act; the next run hears it at its place", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "grow-"));
+  const nodes: Pack = {
+    id: "nodes",
+    inject: ["agent.node"],
+    apply(ctx) {
+      const n = ctx.get<AgentNode>("agent.node");
+      n.node({ name: "bash", kind: "reflex", title: "bash", at: ["tool:Bash"], speak: () => ({ say: "Prefer Read." }) });
+      n.node({ name: "check", kind: "reflex", title: "check", at: ["reply_end"], speak: () => ({ say: "Did you check?" }) });
+    },
+  };
+  const probe: Pack = { id: "probe", inject: ["action.invoke", "agent.tree", "graph.read", "verdict.read"], apply() {} };
+  const rt = new Runtime();
+  const errors: unknown[] = [];
+  rt.onError = (_f, e) => errors.push(e);
+  let port = 0;
+  const modules: Record<string, Pack> = {
+    "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "verdict.ts": verdict,
+    "words.ts": words, "grow.ts": grow, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe,
+  };
+  const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
+  await loader.apply([
+    { id: "graph", pack: "graph.ts" },
+    { id: "action", pack: "action.ts" },
+    { id: "exchange", pack: "exchange.ts" },
+    { id: "agent", pack: "agent.ts" },
+    { id: "verdict", pack: "verdict.ts" },
+    { id: "words", pack: "words.ts" },
+    { id: "nodes", pack: "nodes.ts" },
+    { id: "grow", pack: "grow.ts" },
+    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "probe", pack: "probe.ts" },
+  ]);
+  try {
+    const post = async (path: string, body: unknown) => {
+      const r = await fetch(`http://127.0.0.1:${port}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      return r.status === 202 ? undefined : ((await r.json()) as any);
+    };
+    const hook = (session: string, event: string, more: object = {}) => post("/hook", { hook_event_name: event, session_id: session, cwd: dir, ...more });
+    const file = join(dir, "packs", "x.ts");
+
+    // Run 1: an Edit fails where nothing listens; a Bash failure is covered by the bash node.
+    await hook("s1", "SessionStart", { source: "startup" });
+    await hook("s1", "PreToolUse", { tool_name: "Edit", tool_input: { file_path: file, old_string: "a" }, tool_use_id: "t1" });
+    await hook("s1", "PostToolUseFailure", { tool_name: "Edit", tool_input: { file_path: file, old_string: "a" }, error: "String to replace not found in file.", tool_use_id: "t1" });
+    await hook("s1", "PostToolUseFailure", { tool_name: "Bash", tool_input: { command: "false" }, error: "exit 1", tool_use_id: "t2" });
+    const ask = await hook("s1", "Stop", { last_assistant_message: "Done." });
+    assert.equal(ask.decision, "block", "the ask keeps the agent going");
+    const seq = Number(/#(\d+)/.exec(ask.reason)![1]);
+    assert.match(ask.reason, /at tool:Edit, file:packs\/x\.ts: String to replace not found/);
+    assert.doesNotMatch(ask.reason, /tool:Bash/, "a covered miss isn't asked about");
+
+    // Asked once: the next stop goes through.
+    assert.deepEqual(await hook("s1", "Stop", { last_assistant_message: "Done, again." }), {});
+
+    // The agent writes the node through the MCP tool act.
+    const call = async (id: string, args: object) => {
+      await hook("s1", "PreToolUse", { tool_name: "mcp__archipelago__act", tool_input: args, tool_use_id: id });
+      return (await post("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "act", arguments: args, _meta: { "claudecode/toolUseId": id } } })).result;
+    };
+    const tools = (await post("/mcp", { jsonrpc: "2.0", id: 9, method: "tools/list" })).result.tools;
+    assert.match(tools.find((t: any) => t.name === "act").description, /grow\.trial/);
+    const wild = await call("t3", { action: "grow.trial", reason: "r", input: { seq, place: "file:packs/*.ts", misses: "m", words: "w" } });
+    assert.equal(wild.isError, true, "only an exact place");
+    const elsewhere = await call("t4", { action: "grow.trial", reason: "r", input: { seq, place: "tool:Bash", misses: "m", words: "w" } });
+    assert.match(elsewhere.content[0].text, /happened at tool:Edit, file:packs\/x\.ts/);
+    const wrote = await call("t5", {
+      action: "grow.trial",
+      reason: "the Edit missed",
+      input: { seq, place: "file:packs/x.ts", misses: "String to replace not found in file.", words: "Read packs/x.ts again before you edit it: it changes under you." },
+    });
+    assert.ok(!wrote.isError, wrote.content[0].text);
+    const node = JSON.parse(wrote.content[0].text).output.node as string;
+
+    const p = loader.fiber("probe")!.ctx;
+    const [item] = await p.get<GraphRead>("graph.read").get([node]);
+    assert.deepEqual([item!.fields.status, item!.fields.at, item!.fields.misses, item!.fields.from_run, item!.fields.from_seq], ["trial", ["file:packs/x.ts"], "String to replace not found in file.", "s1", seq]);
+    assert.ok(p.get<AgentTree>("agent.tree").nodes().some((n) => n.source === node && n.at.length === 1));
+
+    // The ask isn't a miss: the reply_end node isn't failed by it.
+    const v = await p.get<VerdictRead>("verdict.read").run("s1");
+    assert.notEqual(v.find((x) => x.node === "nodes/check")?.verdict, "failed");
+
+    // Run 2: the trial node is said at its exact place, marked, and nowhere else.
+    await hook("s2", "SessionStart", { source: "startup" });
+    const at = await hook("s2", "PreToolUse", { tool_name: "Edit", tool_input: { file_path: file }, tool_use_id: "u1" });
+    assert.equal(at.hookSpecificOutput.additionalContext, `${TRIAL_MARK} Read packs/x.ts again before you edit it: it changes under you.`);
+    const near = await hook("s2", "PreToolUse", { tool_name: "Edit", tool_input: { file_path: join(dir, "packs", "y.ts") }, tool_use_id: "u2" });
+    assert.deepEqual(near, {});
+
+    // Retired by a person, it is no longer said.
+    const out = await p.get<ActionInvoke>("action.invoke").invoke({ action: "words.retire", input: { node }, authority: { of: "human", basis: "test" }, reason: "retire" });
+    assert.ok(out.ok);
+    assert.deepEqual(await hook("s2", "PreToolUse", { tool_name: "Edit", tool_input: { file_path: file }, tool_use_id: "u3" }), {});
+    assert.deepEqual(errors, []);
+  } finally {
+    await loader.apply([]);
+    await rm(dir, { recursive: true, force: true });
+  }
+});

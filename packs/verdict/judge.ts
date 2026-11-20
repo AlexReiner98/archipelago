@@ -19,7 +19,9 @@
  * The node's own refusals are its saying, not its miss, and neither is the
  * denied call a refusal causes (an act whose output names it as `refused`).
  * An exchange `miss` (a node threw) is a fault of the exchange, not the
- * agent's, and judges nothing.
+ * agent's, and judges nothing. Nor does a refusal with the code `ask` (ASK):
+ * it holds the agent back to ask it something, not because anything went
+ * wrong, and neither does the act it denies.
  *
  * Place matching follows spec/agent.md: the family must be the same, and in
  * the argument `*` stays within a path segment and `**` doesn't. It is
@@ -118,8 +120,22 @@ function filePlaces(input: Json | undefined, cwd?: string): Place[] {
   return out;
 }
 
+/** The refusal code of a node that asks the agent something: not a miss. */
+export const ASK = "ask";
+
+/** Whether the event is an asking refusal, or the act one denied. */
+export function isAsk(e: ExchangeEvent): boolean {
+  if (e.kind === "refuse") {
+    const d = e.detail;
+    return !!d && typeof d === "object" && !Array.isArray(d) && d.code === ASK;
+  }
+  const out = e.kind === "act" ? e.act?.output : undefined;
+  return !!out && typeof out === "object" && !Array.isArray(out) && typeof out.refused === "string" && out.code === ASK;
+}
+
 /** Where a miss stands, or undefined when the event isn't one. `cwd` is the run's. */
 export function missPlaces(e: ExchangeEvent, cwd?: string): Place[] | undefined {
+  if (isAsk(e)) return undefined;
   if (e.kind === "refuse" && e.place) return [e.place];
   if (e.kind === "act" && e.act?.ok === false) return [...(e.place ? [e.place] : []), ...filePlaces(e.act.input, cwd)];
   return undefined;
