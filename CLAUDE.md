@@ -19,6 +19,13 @@ and its decisions before starting. Don't keep a second plan in files.
   undo applies its inverse. The graph is the truth: nothing is rebuilt from
   the journal.
 - No pack owns a part of the data. A grouping is a link or a query.
+- This repo is public and MIT. Everything one person needs on their own
+  machine belongs here, a basic map UI included. What it takes to run it for
+  others goes in a separate private repo of packs: sign-in, multiple users,
+  hosted sync, a graph at scale, domain packs, connectors, sharing.
+- Nothing private is ever committed here: no tokens, no local paths, and no
+  owner content such as skills, memory or map data. Data stays in the ignored
+  `.data/` folder.
 
 ## The first build
 
