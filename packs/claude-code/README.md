@@ -85,6 +85,16 @@ each with:
 { "type": "command", "command": "node \"<repo>/packs/claude-code/hook.ts\"", "timeout": 5 }
 ```
 
+And the MCP server, at user level, so any session can `hear` and `act`
+(how an agent writes the trial node the grow pack asks for):
+
+```
+claude mcp add --scope user --transport http archipelago http://127.0.0.1:5181/mcp
+```
+
+When the server is down, the session shows the MCP server as failed and
+carries on.
+
 Command hooks, not http: an http hook to a server that is down shows as a
 hook error in the session ("Stop hook error occurred", a PreToolUse
 warning). [hook.ts](hook.ts) prints nothing and exits 0 when the server is
