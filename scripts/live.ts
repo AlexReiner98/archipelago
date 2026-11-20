@@ -39,7 +39,12 @@ const short = (sha: string) => sha.slice(0, 7);
 
 /** Runs a command in the console, its output shown; true when it exits 0. */
 function run(cwd: string, cmd: string, args: string[]): boolean {
-  return spawnSync(cmd, args, { cwd, stdio: "inherit", shell: process.platform === "win32" }).status === 0;
+  return spawnSync(cmd, args, { cwd, stdio: "inherit" }).status === 0;
+}
+
+/** Runs npm (a .cmd on Windows, so through the shell; the arguments are this script's own). */
+function npm(cwd: string, ...args: string[]): boolean {
+  return spawnSync(["npm", ...args].join(" "), { cwd, stdio: "inherit", shell: true }).status === 0;
 }
 
 /** The live server, through scripts/server.ts: no hot reload, default ports. */
@@ -77,7 +82,7 @@ function install(dir: string): boolean {
   const lock = join(dir, "package-lock.json");
   const stamp = join(dir, "node_modules", ".installed-lock");
   if (existsSync(stamp) && readFileSync(stamp, "utf8") === readFileSync(lock, "utf8")) return true;
-  if (!run(dir, "npm", ["ci", "--no-audit", "--no-fund"])) return false;
+  if (!npm(dir, "ci", "--no-audit", "--no-fund")) return false;
   copyFileSync(lock, stamp);
   return true;
 }
@@ -93,7 +98,7 @@ function test(sha: string): boolean {
   try {
     symlinkSync(join(here, "node_modules"), join(dir, "node_modules"), "junction");
     console.log(`testing ${short(sha)} in ${dir}`);
-    return run(dir, "npm", ["test"]) && run(dir, "npm", ["run", "check"]);
+    return npm(dir, "test") && npm(dir, "run", "check");
   } finally {
     // The junction alone, never what it points to.
     try {

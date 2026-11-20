@@ -10,13 +10,13 @@
     "dev:start": "node scripts/server.ts start --port 5280 --no-write",
     "dev:stop": "node scripts/server.ts stop --port 5280 --no-write",
     "dev:status": "node scripts/server.ts status --port 5280 --no-write",
-    "dev:copy": "node scripts/live.ts copy",
-    "live:setup": "node scripts/live.ts setup",
-    "live:start": "node scripts/live.ts start",
-    "live:stop": "node scripts/live.ts stop",
-    "live:status": "node scripts/live.ts status",
-    "promote": "node scripts/live.ts promote",
-    "rollback": "node scripts/live.ts rollback"
+    "dev:copy": "node --disable-warning=ExperimentalWarning scripts/live.ts copy",
+    "live:setup": "node --disable-warning=ExperimentalWarning scripts/live.ts setup",
+    "live:start": "node --disable-warning=ExperimentalWarning scripts/live.ts start",
+    "live:stop": "node --disable-warning=ExperimentalWarning scripts/live.ts stop",
+    "live:status": "node --disable-warning=ExperimentalWarning scripts/live.ts status",
+    "promote": "node --disable-warning=ExperimentalWarning scripts/live.ts promote",
+    "rollback": "node --disable-warning=ExperimentalWarning scripts/live.ts rollback"
   },
   "devDependencies": {
     "@types/node": "24.19.1",
