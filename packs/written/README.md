@@ -59,3 +59,13 @@ As each change commits, the file is written with the node's words; undoing
 the change writes the words it restores. When the pack unloads, every file
 it wrote goes back to `was`, unless it changed since. Loading again writes
 the map's words.
+
+## Placing
+
+`written.place` (a pack-own key, [place.ts](place.ts)) lets another pack
+say where a node's file goes instead: `placer({ name, files(node) })`,
+asked in config-tree order, the first answer deciding; `changed()` places
+every node again. A copy is written only where nothing is or over what this
+pack wrote; the node's own file is taken away only while it holds the map's
+words, and put back when no placer says otherwise or the pack unloads. The
+[placed](../placed/README.md) pack is one placer.

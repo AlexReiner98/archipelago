@@ -30,7 +30,7 @@
  * the verdicts judge it and `words.set` rewords it.
  */
 import type { ActionContext, ActionInvoke, ActionList, ActionRegister } from "../../spec/action.ts";
-import type { Place, RunInfo } from "../../spec/agent.ts";
+import type { Facts, Place, RunInfo } from "../../spec/agent.ts";
 import { PLACES } from "../../spec/agent.ts";
 import type { Committed } from "../../spec/changeset.ts";
 import type { Authority, Dispose, Id, Json } from "../../spec/common.ts";
@@ -532,6 +532,8 @@ const mcp: Pack<McpConfig> = {
             title: { type: "string", description: "What the chat is called." },
             task: { type: "string", description: "The id of the item this run took on." },
             parent: { type: "string", description: "The run that started this one." },
+            profiles: { type: "array", items: { type: "string" }, description: "Ids of profiles this run is in, beyond what its facts give." },
+            drop: { type: "array", items: { type: "string" }, description: "Ids of profiles this run is not in, whatever its facts give." },
             end: { type: "boolean", description: "The run is over." },
           },
         },
@@ -551,9 +553,13 @@ const mcp: Pack<McpConfig> = {
             info = p.items.find((r) => r.run === run.run);
             if (!p.next) break;
           }
-          const { started: _s, ended: _e, ...was } = info ?? { run: run.run, agent: run.actor, harness: host.harness, reaches: [] };
+          // Facts are made again at begin; only what this call says is given (edition 5).
+          const { started: _s, ended: _e, facts: _f, ...was } = info ?? { run: run.run, agent: run.actor, harness: host.harness, reaches: [] };
           const said = Object.fromEntries((["title", "task", "parent"] as const).filter((k) => typeof args[k] === "string" && args[k]).map((k) => [k, args[k] as string]));
-          const begun = await run.agent.begin({ ...was, ...said });
+          const facts: Facts = {};
+          if (ids(args.profiles).length) facts.profiles = ids(args.profiles);
+          if (ids(args.drop).length) facts.profiles_drop = ids(args.drop);
+          const begun = await run.agent.begin({ ...was, ...said, ...(Object.keys(facts).length ? { facts } : {}) });
           return ok({ run: begun.run, ...(begun.title ? { title: begun.title } : {}), ...(begun.task ? { task: begun.task } : {}), ...(begun.parent ? { parent: begun.parent } : {}) });
         },
       },

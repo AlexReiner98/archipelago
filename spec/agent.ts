@@ -7,7 +7,9 @@
  * through the files it writes. Edition 3 (Alex, 20 Nov 2026) adds `compact`
  * and the person's acts, `decision` and `notice`. Edition 4 (Alex, 20 Nov
  * 2026) adds a node's `repeat` and a moment's `again`: the same words are
- * said once per context.
+ * said once per context. Edition 5 (Alex, 20 Nov 2026) adds a run's
+ * `facts`, which any pack can add to (`agent.facts`), and a gate where a
+ * pack says "not this node for this run" (`agent.gate`).
  */
 import type { Actor, Capability, Dispose, Id, Json, PackId, Term, Time } from "./common.ts";
 
@@ -127,11 +129,85 @@ export interface RunStart {
   parent?: RunId;
   /** The task it took on, if it says. */
   task?: Id;
+  /** Edition 5: facts the adapter knows (a subagent's `agent_type`). */
+  facts?: Facts;
 }
 
 export interface RunInfo extends RunStart {
   started: Time;
   ended?: Time;
+  /**
+   * Edition 5: every fact about the run, made again at each `begin`: the
+   * fields above that it has (`harness`, `cwd`, `parent`, `task`), then the
+   * start's own facts, then each fact source's (`agent.facts`) in
+   * config-tree order. A key already set is kept.
+   */
+  facts?: Facts;
+}
+
+/**
+ * Edition 5: what is so about a run, by name. Open-ended: any pack can add
+ * a fact (a git pack reads `remote` from `cwd`), and whatever reads them
+ * matches on names, never on fixed fields. A value is text or a list of it.
+ */
+export type Facts = Record<string, string | string[]>;
+
+/** The facts the spec's own packs name. Open vocabulary, like places. */
+export const FACTS: Term[] = [
+  { term: "harness", since: 5, doc: "Which harness: `claude-code`." },
+  { term: "cwd", since: 5, doc: "The folder the run works in, as the harness gives it." },
+  { term: "parent", since: 5, doc: "The run that started this one." },
+  { term: "task", since: 5, doc: "The item the run took on." },
+  { term: "hub", since: 5, doc: "The items the task is part of, at any depth." },
+  { term: "remote", since: 5, doc: "The git remote of `cwd`, as `host/owner/name`: steadier than the folder, which worktrees and machines change." },
+  { term: "branch", since: 5, doc: "The git branch checked out in `cwd`." },
+  { term: "repo", since: 5, doc: "The map's item for the remote." },
+  { term: "profiles", since: 5, doc: "Profiles the run says it is in (the `run` tool's `profiles`)." },
+  { term: "profiles_drop", since: 5, doc: "Profiles the run says it is not in (the `run` tool's `drop`)." },
+  { term: "agent_type", since: 5, doc: "A subagent's type, as the harness names it." },
+];
+
+/**
+ * Edition 5: a pack's way to add facts to a run. Registering one is a
+ * revertible effect. Asked at each `begin`; nothing (or a throw, recorded
+ * as a miss) adds nothing.
+ */
+export interface FactSource {
+  /** Unique within the pack. */
+  name: string;
+  facts(run: RunInfo): Facts | null | Promise<Facts | null>;
+}
+
+/** `agent.facts`: add a fact source, as the calling pack's. */
+export interface AgentFacts {
+  source(def: FactSource): Dispose;
+}
+
+/**
+ * Edition 5: a gate says "not this node for this run" before the node is
+ * asked. Registering one is a revertible effect, like a node. At each
+ * `reach`, every gate is asked about every node listening there, in
+ * config-tree order; the first that answers holds the node back, and the
+ * node isn't asked. The gate doesn't choose which packs are loaded.
+ */
+export interface GateDef {
+  /** Unique within the pack. */
+  name: string;
+  title: string;
+  /** Why the node is held back from this run, or nothing: it may speak. */
+  hold(node: NodeInfo, run: RunInfo, moment: Moment): Hold | null | Promise<Hold | null>;
+}
+
+/**
+ * A gate's answer: why the node is held back. A `trial` hold is only
+ * recorded: the node is still asked, so a gate can be watched before it
+ * holds anything.
+ */
+export type Hold = string | { why: string; trial?: boolean };
+
+/** `agent.gate`: add a gate, as the calling pack's. */
+export interface AgentGate {
+  gate(def: GateDef): Dispose;
 }
 
 /** What the map says back at a moment. */
@@ -194,10 +270,14 @@ export interface Capabilities {
   "agent.node": AgentNode;
   "agent.tree": AgentTree;
   "agent.run": AgentRun;
+  "agent.facts": AgentFacts;
+  "agent.gate": AgentGate;
 }
 
 export const capabilities: Capability[] = [
   { key: "agent.node", since: 1, doc: "Adds a node that may say or refuse at places." },
   { key: "agent.tree", since: 1, doc: "Every node loaded now, without its code." },
   { key: "agent.run", since: 1, doc: "Begin, reach places, act, end: the adapter's way in. Everything is recorded on the exchange." },
+  { key: "agent.facts", since: 5, doc: "Adds a fact source: facts about a run, asked at each begin." },
+  { key: "agent.gate", since: 5, doc: "Adds a gate that may hold a node back from a run before it is asked." },
 ];

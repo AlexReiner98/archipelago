@@ -306,6 +306,8 @@ export function runStart(input: HookInput, actor: Actor): RunStart {
     reaches: REACHES,
     ...(input.cwd ? { cwd: input.cwd } : {}),
     ...(sub ? { parent: input.session_id, title: input.agent_type ? `${input.agent_type} subagent` : "subagent" } : {}),
+    // Edition 5: a subagent's type is a fact about its run.
+    ...(sub && typeof input.agent_type === "string" && input.agent_type ? { facts: { agent_type: input.agent_type } } : {}),
   };
 }
 

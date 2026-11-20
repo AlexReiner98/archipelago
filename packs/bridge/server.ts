@@ -34,6 +34,7 @@ export const KEYS = [
   "graph.read",
   "graph.watch",
   "types.read",
+  "profile.read",
 ] as const;
 
 /** Reads a client keeps a copy of, refreshed when the key's `watch` fires. */

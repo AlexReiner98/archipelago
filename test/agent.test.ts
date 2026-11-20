@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import type { AgentNode, AgentRun, AgentTree, Moment, NodeDef } from "../spec/agent.ts";
+import type { AgentFacts, AgentGate, AgentNode, AgentRun, AgentTree, Moment, NodeDef } from "../spec/agent.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../spec/exchange.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
@@ -295,4 +295,100 @@ test("the journal keeps the record across a restart", async () => {
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+/** A pack that adds the facts and gates it is configured with: data, like the nodes. */
+const extras: Pack<{ name?: string; facts?: Record<string, string>; hold?: { node: string; why: string; trial?: boolean }[]; throws?: boolean }> = {
+  id: "extras",
+  inject: ["agent.facts", "agent.gate"],
+  apply(ctx, config) {
+    if (config.facts || config.throws) {
+      ctx.get<AgentFacts>("agent.facts").source({
+        name: config.name ?? "f",
+        facts: (run) => {
+          if (config.throws) throw new Error("no git here");
+          return { ...config.facts!, seen_cwd: String(run.facts?.cwd ?? "") };
+        },
+      });
+    }
+    if (config.hold) {
+      ctx.get<AgentGate>("agent.gate").gate({
+        name: "g",
+        title: "Test gate",
+        hold: (node) => {
+          const h = config.hold!.find((x) => x.node === node.id);
+          return h ? (h.trial ? { why: h.why, trial: true } : h.why) : null;
+        },
+      });
+    }
+  },
+};
+
+test("facts: the start's, then each source's in config-tree order; a key already set is kept; a later begin adds", async () => {
+  const { loader, errors, as } = setup({ "extras.ts": extras });
+  await loader.apply([
+    { id: "exchange", pack: "exchange.ts" },
+    { id: "agent", pack: "agent.ts" },
+    { id: "one", pack: "extras.ts", config: { facts: { remote: "github.com/a/b", harness: "not this" } } },
+    { id: "two", pack: "extras.ts", config: { name: "f2", facts: { remote: "later loses", branch: "main" } } },
+    { id: "probe", pack: "probe.ts" },
+  ]);
+  const { run, read } = as();
+  const info = await run.begin({ ...start, cwd: "~/x", facts: { agent_type: "Explore" } });
+  assert.deepEqual(info.facts, { harness: "test", cwd: "~/x", agent_type: "Explore", remote: "github.com/a/b", seen_cwd: "~/x", branch: "main" });
+  const again = await run.begin({ ...start, cwd: "~/x", task: "i_1" });
+  assert.equal(again.facts?.task, "i_1");
+  assert.equal(again.facts?.agent_type, "Explore", "what an earlier start gave stays");
+  const begins = (await read.events("r1")).items.filter((e) => e.kind === "begin");
+  assert.deepEqual((begins[1]!.detail as { facts: Record<string, string> }).facts.task, "i_1");
+  assert.deepEqual(errors, []);
+});
+
+test("a fact source that throws is a miss; the run still begins", async () => {
+  const { loader, as } = setup({ "extras.ts": extras });
+  await loader.apply([
+    { id: "exchange", pack: "exchange.ts" },
+    { id: "agent", pack: "agent.ts" },
+    { id: "bad", pack: "extras.ts", config: { throws: true } },
+    { id: "probe", pack: "probe.ts" },
+  ]);
+  const { run, read } = as();
+  const info = await run.begin(start);
+  assert.deepEqual(info.facts, { harness: "test" });
+  const misses = (await read.events("r1")).items.filter((e) => e.kind === "miss");
+  assert.match(misses[0]!.text!, /no git here/);
+});
+
+test("a gate holds a node back before it is asked, recorded once per run; a trial hold only records", async () => {
+  const { loader, errors, as } = setup({ "extras.ts": extras });
+  await loader.apply([
+    { id: "exchange", pack: "exchange.ts" },
+    { id: "agent", pack: "agent.ts" },
+    { id: "gate", pack: "extras.ts", config: { hold: [{ node: "nodes/aperture", why: "For Aperture runs." }, { node: "nodes/watched", why: "Would hold.", trial: true }] } },
+    { id: "a", pack: "nodes.ts", config: { nodes: [say("aperture", ["tool:Bash"], "Rhino."), say("watched", ["tool:Bash"], "Watched."), say("plain", ["tool:Bash"], "Plain.")] } },
+    { id: "probe", pack: "probe.ts" },
+  ]);
+  const { run, read } = as();
+  await run.begin(start);
+  const first = await run.reach(moment(["tool:Bash"]));
+  assert.deepEqual(first.said.map((s) => s.node), ["nodes/watched", "nodes/plain"]);
+  await run.reach({ ...moment(["tool:Bash"]), again: true });
+  const gated = (await read.events("r1")).items.filter((e) => e.kind === "gated");
+  assert.deepEqual(
+    gated.map((e) => [e.node, e.text, e.detail]),
+    [
+      ["nodes/aperture", "For Aperture runs.", { gate: "extras/g" }],
+      ["nodes/watched", "Would hold.", { gate: "extras/g", trial: true }],
+    ],
+  );
+  // Unloading the gate's pack takes the gate: the node speaks again.
+  await loader.apply([
+    { id: "exchange", pack: "exchange.ts" },
+    { id: "agent", pack: "agent.ts" },
+    { id: "a", pack: "nodes.ts", config: { nodes: [say("aperture", ["tool:Bash"], "Rhino.")] } },
+    { id: "probe", pack: "probe.ts" },
+  ]);
+  const after = await as().run.reach({ ...moment(["tool:Bash"]), again: true });
+  assert.deepEqual(after.said.map((s) => s.node), ["nodes/aperture"]);
+  assert.deepEqual(errors, []);
 });

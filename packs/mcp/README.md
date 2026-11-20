@@ -15,7 +15,7 @@ Injects `mcp.host`, `graph.read`, `graph.watch`, `types.read`,
 | `get` | `ids` (≤ 50), `links?`, `map?` | Items whole, with their base and their links, each with the item at its other end (≤ 50 an item) |
 | `query` | `find`, `walk?`, `limit?`, `map?` | The find line of the map ([query.ts](../find/query.ts)): words in titles, `is:open`, `is:closed`, `type:` (a type or a base), `status:`, `in:<id>`, `near:<id>`, `id:<id>`. `walk` (`over`, `dir`, `steps` ≤ 5) follows links from what is found. Items as id, type, title and status, the links among them, and how many more (`limit` 30, at most 200) |
 | `tell` | `said`, `about?`, `replaces?` | What the agent concluded: the action `mcp.tell`, a record (kind `said`) with `about` links, in one change set; `replaces` supersedes an earlier one |
-| `run` | `title?`, `task?`, `parent?`, `end?` | What the run is, on the exchange: `agent.run`'s `begin` again, which keeps when it began; `end` ends it. A harness without hooks begins its run this way |
+| `run` | `title?`, `task?`, `parent?`, `profiles?`, `drop?`, `end?` | What the run is, on the exchange: `agent.run`'s `begin` again, which keeps when it began; `end` ends it. `profiles` and `drop` are facts (`profiles`, `profiles_drop`): profiles the run says it is in, or not. A harness without hooks begins its run this way |
 
 `map` names another map to read instead of the living one: an old map kept
 read only ([archive](../archive/README.md)). A pack adds such a map through

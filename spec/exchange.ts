@@ -16,6 +16,7 @@ export const EVENT_KINDS: Term[] = [
   { term: "act", since: 1, doc: "The agent, or the person at its prompt, did something (from_agent)." },
   { term: "miss", since: 1, doc: "The exchange itself went wrong: a node threw, or refused where it couldn't." },
   { term: "compact", since: 3, doc: "The run's context is being compacted (from_agent, at `compact`, detail the moment's input): a node said again after it is re-said (its say's `detail.resaid`)." },
+  { term: "gated", since: 5, doc: "A gate held a node back from the run (to_agent, at the place it listened at, `node` the node, text why, detail `{gate}`), once per run and node: it wasn't quiet, it wasn't asked. With `detail.trial` the hold was only recorded, and the node was asked." },
 ];
 
 export interface ExchangeEvent {

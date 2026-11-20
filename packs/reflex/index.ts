@@ -15,6 +15,9 @@
  *   and its way from the root lights. Drag to move, wheel to zoom,
  *   double-click to fit.
  *
+ * - A profile picked in the bar shows only the nodes it holds
+ *   (`profile.read`); "all" shows every node.
+ *
  * It only shows: it invokes no action. Its styles go when it unloads.
  */
 import { h } from "preact";
@@ -25,9 +28,11 @@ import type { Json } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
+import type { ProfileRead } from "../../spec/profile.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
+import { profileHooks } from "./profiles.ts";
 import { branchAt, lightOf, packHues, pointAt, radial, route, STYLE, treeOf, type Grouping, type Placed, type Tree } from "./layout.ts";
 
 
@@ -58,6 +63,8 @@ const SHEET = `
 .rx-bar button { font:inherit; background:none; border:1px solid var(--line); color:var(--dim); padding:0 6px; border-radius:3px; cursor:pointer; }
 .rx-bar button.on { color:var(--fg); border-color:var(--dim); }
 .rx-n { font-variant-numeric:tabular-nums; }
+.rx-sel { font:inherit; background:var(--panel); color:var(--dim); border:1px solid var(--line); border-radius:3px; padding:0 4px; max-width:180px; }
+.rx-sel option { background:var(--panel); color:var(--fg); }
 .rx-say { color:${C.say}; } .rx-fail { color:${C.fail}; } .rx-write { color:${C.write}; }
 .rx-canvas { position:relative; overflow:hidden; cursor:grab; user-select:none; min-height:0; }
 .rx-canvas.panning { cursor:grabbing; }
@@ -95,7 +102,7 @@ const clock = (t?: string) => (t ? new Date(t).toLocaleTimeString([], { hour: "2
 
 const reflex: Pack = {
   id: "reflex",
-  inject: ["slot.fill", "here.read", "here.set", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "graph.read", "graph.watch"],
+  inject: ["slot.fill", "here.read", "here.set", "agent.tree", "exchange.read", "exchange.watch", "verdict.read", "graph.read", "graph.watch", "profile.read"],
   apply(ctx: Context) {
     const here = ctx.get<HereRead>("here.read");
     const set = ctx.get<HereSet>("here.set");
@@ -105,6 +112,9 @@ const reflex: Pack = {
     const verdicts = ctx.get<VerdictRead>("verdict.read");
     const graph = ctx.get<GraphRead>("graph.read");
     const graphLive = ctx.get<GraphWatch>("graph.watch");
+    const profiles = ctx.get<ProfileRead>("profile.read");
+
+    const { useProfileList, useProfileNodes } = profileHooks(graph, graphLive, profiles);
 
     // ---------- hooks over the capabilities ----------
 
@@ -454,7 +464,11 @@ const reflex: Pack = {
       const nodes = useNodes();
       const [by, setBy] = useState<Grouping>("place");
       const [unsaid, setUnsaid] = useState(false);
-      const tree = useMemo(() => treeOf(nodes, { by, unsaid }), [nodes, by, unsaid]);
+      const [profile, setProfile] = useState("");
+      const profileList = useProfileList();
+      const held = useProfileNodes(profile, nodes);
+      const shownNodes = useMemo(() => (held ? nodes.filter((n) => held.has(n.id)) : nodes), [nodes, held]);
+      const tree = useMemo(() => treeOf(shownNodes, { by, unsaid }), [shownNodes, by, unsaid]);
       const placed = useMemo(() => radial(tree), [tree]);
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
       const statuses = useStatuses();
@@ -502,6 +516,10 @@ const reflex: Pack = {
             <span class="dim rx-n">${shown} node${shown === 1 ? "" : "s"}</span>
             <button class=${by === "place" ? "on" : ""} onClick=${() => setBy("place")}>by place</button>
             <button class=${by === "pack" ? "on" : ""} onClick=${() => setBy("pack")}>by pack</button>
+            ${profileList.length ? html`<select class="rx-sel" value=${profile} onChange=${(e: Event) => setProfile((e.target as HTMLSelectElement).value)} title="Show one profile's nodes">
+              <option value="">all</option>
+              ${profileList.map((p) => html`<option value=${p.id}>${p.title}</option>`)}
+            </select>` : null}
             ${by === "place" && (tree.hidden || unsaid) ? html`<button class=${unsaid ? "on" : ""} onClick=${() => setUnsaid(!unsaid)} title="Nodes whose places are empty: kept, but never said">${unsaid ? "hide" : "show"} ${unsaid ? "" : tree.hidden} never said</button>` : null}
             <span class="sp"></span>
             ${run

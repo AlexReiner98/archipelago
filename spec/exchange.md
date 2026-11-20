@@ -20,7 +20,7 @@ by. Types: [exchange.ts](exchange.ts).
 | `time` | when |
 | `place` | where in the run (see [agent](agent.md)); absent for `begin`, `end`, and a miss about the run itself |
 | `direction` | `to_agent` (the map spoke) or `from_agent` (the agent did) |
-| `kind` | `begin`, `end`, `say`, `refuse`, `act`, `miss` |
+| `kind` | `begin`, `end`, `say`, `refuse`, `act`, `miss`; `compact` (edition 3); `gated` (edition 5, a gate held the node back) |
 | `node` | the node that spoke |
 | `pack` | the pack the node or action belongs to |
 | `text` | what was said, the refusal's words, or the error |

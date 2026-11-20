@@ -5,7 +5,9 @@
  *
  * - Tree: every node that can be said, by place or by pack, each with its
  *   verdict in the run looked at.
- * - Run: one run live, map → agent beside agent → map.
+ * - Run: one run live, map → agent beside agent → map. Its profiles
+ *   (`profile.read`) on one row under the head: ● holds, ◌ shadow, a part
+ *   dimmed; a node a gate held back is a ⊝ line (◌ when only a shadow would).
  * - Node: its words, places, pack and record. Words made from a map item
  *   are edited through the `words.set` action, and the next say uses them.
  *   A trial node (its item's `status` is `trial`) is marked in the tree, and
@@ -26,6 +28,8 @@ import type { Json } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
 import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
+import type { ProfileRead } from "../../spec/profile.ts";
+import { profileHook } from "./profiles.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
@@ -109,6 +113,10 @@ const STYLE = `
 .hv-empty { padding:10px; color:var(--dim); }
 .hv-trial .x { font-style:italic; }
 .hv-tag { flex:none; font-size:10px; padding:0 4px; border-radius:3px; border:1px dashed var(--pick); color:var(--pick); }
+.hv-prof { display:flex; gap:10px; padding:2px 10px; border-bottom:1px solid var(--line); white-space:nowrap; overflow:hidden; }
+.hv-prof .k { color:var(--dim); }
+.hv-prof .part { color:var(--dim); }
+.hv-prof .sp { flex:1; }
 .hv-miss { margin:2px 10px 6px; padding:4px 6px; border-left:3px solid var(--failed); white-space:pre-wrap; color:var(--dim); }
 `;
 
@@ -159,6 +167,7 @@ const harness: Pack = {
     "action.invoke",
     "graph.read",
     "graph.watch",
+    "profile.read",
   ],
   apply(ctx: Context) {
     const here = ctx.get<HereRead>("here.read");
@@ -171,6 +180,7 @@ const harness: Pack = {
     const invoke = ctx.get<ActionInvoke>("action.invoke");
     const graph = ctx.get<GraphRead>("graph.read");
     const graphLive = ctx.get<GraphWatch>("graph.watch");
+    const profiles = ctx.get<ProfileRead>("profile.read");
 
     // ---------- hooks over the capabilities ----------
 
@@ -248,6 +258,8 @@ const harness: Pack = {
       }, deps);
       return v;
     };
+
+    const useProfiles = profileHook(profiles);
 
     const useEditable = (): boolean => {
       const has = () => actions.list().some((a) => a.name === EDIT);
@@ -380,6 +392,8 @@ const harness: Pack = {
         body.current?.querySelector(`[data-ev="${CSS.escape(event)}"]`)?.scrollIntoView({ block: "nearest" });
       }, [event]);
       const info = runs.find((r) => r.run === run);
+      const inProfiles = useProfiles(info);
+      const facts = info?.facts ?? {};
       return html`
         <div class="hv-pane">
           <div class="hv-head">
@@ -395,6 +409,12 @@ const harness: Pack = {
             <span class="sp"></span>
             <span><span class="m-held">${MARK.held} ${sum.held}</span> <span class="m-failed">${MARK.failed} ${sum.failed}</span> <span class="m-quiet">${MARK.quiet} ${sum.quiet}</span></span>
           </div>
+          ${info && html`<div class="hv-prof" title=${Object.entries(facts).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join("\n")}>
+            <span class="k">profiles</span>
+            ${inProfiles && !inProfiles.length && html`<span class="part" title="In no profile: it hears every node.">none</span>`}
+            ${(inProfiles ?? []).map((p) => html`<span class=${p.by === "part" ? "part" : ""} title=${`${p.holding ? "holds" : "shadow: only records"}${p.by === "part" ? ", as a part" : ""}`}>${p.holding ? "●" : "◌"} ${p.title}</span>`)}
+            ${facts.remote && html`<span class="sp"></span><span class="part">${String(facts.remote).split("/").slice(-1)[0]}${facts.branch ? ` · ${facts.branch}` : ""}</span>`}
+          </div>`}
           <div class="hv-cols"><div>map → agent</div><div>agent → map</div></div>
           <div class="hv-body" ref=${body} onScroll=${(e: Event) => {
             const el = e.target as HTMLElement;
@@ -412,6 +432,7 @@ const harness: Pack = {
                 : e.kind === "begin" ? html`<span class="hv-m m-quiet">▶</span>`
                 : e.kind === "end" ? html`<span class="hv-m m-quiet">■</span>`
                 : e.kind === "compact" ? html`<span class="hv-m m-quiet">⇣</span>`
+                : e.kind === "gated" ? html`<span class="hv-m m-quiet">${(e.detail as { trial?: boolean } | undefined)?.trial ? "◌" : "⊝"}</span>`
                 : html`<span class="hv-m m-failed">!</span>`;
               const resaid = (e.detail as { resaid?: boolean } | undefined)?.resaid ? "re-said after compaction · " : "";
               const what = e.kind === "act" ? actLine(e, info?.cwd) : e.node ? `${resaid}${titles.get(e.node) ?? e.node}: ${short(e.text)}` : e.kind === "begin" ? beginLine(e) : e.kind === "end" ? "run ended" : e.kind === "compact" ? `context compacted (${String((e.detail as { trigger?: string } | undefined)?.trigger ?? "auto")}): what follows is said again` : short(e.text);

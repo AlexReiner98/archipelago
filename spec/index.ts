@@ -8,6 +8,7 @@ import * as agent from "./agent.ts";
 import * as exchange from "./exchange.ts";
 import * as graph from "./graph.ts";
 import * as here from "./here.ts";
+import * as profile from "./profile.ts";
 import * as scene from "./scene.ts";
 import * as slot from "./slot.ts";
 import * as types from "./types.ts";
@@ -18,6 +19,7 @@ export interface Capabilities
     exchange.Capabilities,
     graph.Capabilities,
     here.Capabilities,
+    profile.Capabilities,
     scene.Capabilities,
     slot.Capabilities,
     types.Capabilities {}
@@ -33,4 +35,5 @@ export const capabilities: Capability[] = [
   ...scene.capabilities,
   ...here.capabilities,
   ...types.capabilities,
+  ...profile.capabilities,
 ];

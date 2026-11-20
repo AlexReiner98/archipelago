@@ -25,8 +25,14 @@
  *   Writing is an effect: when the pack unloads, each file it wrote goes
  *   back to `was`, unless it changed since.
  *
+ * - Placing (place.ts): a placer registered on `written.place` may say a
+ *   node's file goes elsewhere (copies, and its own file taken away); the
+ *   pack writes there instead, and undoes it when the placer stops saying
+ *   so or the pack unloads.
+ *
  * Injects graph.read and graph.watch to follow the nodes, action.register
- * for its actions. Server only: it reads and writes files.
+ * for its actions; provides `written.place`. Server only: it reads and
+ * writes files.
  */
 import { readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
@@ -38,6 +44,7 @@ import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { OLD_MARK, discover, placeOf, type Scan } from "./files.ts";
+import { Copies, KEY, type WrittenPlace, placers as makePlacers } from "./place.ts";
 
 export const NODE = "node";
 export const LOADED = "loaded";
@@ -100,6 +107,10 @@ const written: Pack<WrittenConfig> = {
     const mine = new Map<Id, { file: string; last?: string; was?: string; restores?: boolean }>();
     let queue: Promise<unknown> = Promise.resolve();
     const later = (work: () => Promise<void>) => (queue = queue.then(work, work).catch((e) => ctx.runtime.report(ctx.fiber, e)));
+    const report = (e: unknown) => ctx.runtime.report(ctx.fiber, e);
+    const placers = makePlacers();
+    const copies = new Copies(report);
+    ctx.effect(() => () => later(() => copies.undoAll()));
 
     const write = async (id: Id, file: string, text: string, was: string | undefined) => {
       const known = mine.get(id)!;
@@ -120,8 +131,23 @@ const written: Pack<WrittenConfig> = {
       }
     };
 
-    /** Brings one node's file to its words, if the file is the map's to write. */
+    /** Brings one node's files to its words: where a placer says, else its own file. */
     const ensure = async (item: Item) => {
+      const words = String(item.fields.words);
+      const own = String(item.fields.file);
+      const files = placers.size ? await placers.ask(item, report) : null;
+      const keepsOwn = files === null || files.some((f) => fold(f) === fold(own));
+      await copies.place(item.id, (files ?? []).filter((f) => fold(f) !== fold(own)), words);
+      if (keepsOwn) {
+        await copies.putBack(item.id);
+        await ensureOwn(item);
+      } else {
+        await copies.takeAway(item.id, own, words, mine.get(item.id)?.last);
+      }
+    };
+
+    /** Brings one node's own file to its words, if the file is the map's to write. */
+    const ensureOwn = async (item: Item) => {
       const id = item.id;
       const file = String(item.fields.file);
       const words = String(item.fields.words);
@@ -153,6 +179,21 @@ const written: Pack<WrittenConfig> = {
     later(async () => {
       for (const item of await all(graph, NODE)) if (writes(item)) await ensure(item);
     });
+
+    const everything = () => later(async () => {
+      for (const item of await all(graph, NODE)) if (writes(item)) await ensure(item);
+    });
+    ctx.provide<WrittenPlace>(KEY, (caller, from) => ({
+      placer: (def) => from.effect(() => {
+        const dispose = placers.add(def, caller);
+        everything();
+        return () => {
+          dispose();
+          everything();
+        };
+      }),
+      changed: everything,
+    }));
 
     const register = ctx.get<ActionRegister>("action.register");
 

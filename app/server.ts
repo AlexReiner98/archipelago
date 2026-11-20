@@ -4,7 +4,9 @@
  * - a Node runtime with the server's packs, hot-reloaded: graph, action,
  *   types and the bases (work, question, record, actor, links, items) with
  *   the trial flavour branch, interchange (a moved map's change sets),
- *   exchange, agent, verdict, words, loaded, written, grow, since ("since
+ *   exchange, agent, git and hub (a run's repository and hub as facts),
+ *   verdict, words, loaded, profile (which runs a node is for), written,
+ *   placed (a profile's skills written where its runs are), grow, since ("since
  *   you last heard", at each prompt), the Claude Code adapter (5181), the
  *   map's agent tools on its MCP server (mcp), the old maps kept read only
  *   (archive, from <data>/archives), and

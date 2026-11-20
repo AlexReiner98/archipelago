@@ -130,3 +130,47 @@ the places the run reached.
 
 A refusal from a node at a place that can't refuse isn't applied; it's
 recorded as a `miss` so whoever wrote the node sees it.
+
+## Facts
+
+Edition 5 (Alex, 20 Nov 2026). A run carries **facts**: what is so about
+it, by name (`RunInfo.facts`). They are open-ended, so whatever reads them
+(a profile's match) matches on names, never on fixed fields.
+
+| Capability | Gives |
+|---|---|
+| `agent.facts` | Add a fact source |
+
+At each `begin` the agent pack makes the facts again: the start's fields
+it has (`harness`, `cwd`, `parent`, `task`), then the start's own `facts`
+(a subagent's `agent_type`), then each source's, in config-tree order. A
+key already set is kept. A source is registered like a node, as a
+revertible effect. The vocabulary is open (`FACTS` lists the ones the
+spec's packs name):
+
+| Fact | What |
+|---|---|
+| `harness`, `cwd`, `parent`, `task` | From the start |
+| `agent_type` | A subagent's type |
+| `remote`, `branch` | The git remote and branch of `cwd`. The remote is steadier than the folder, which worktrees and machines change |
+| `hub` | The items the task is part of |
+
+The `begin` event's detail is the run with its facts.
+
+## Gates
+
+Edition 5. A **gate** says "not this node for this run" before the node is
+asked.
+
+| Capability | Gives |
+|---|---|
+| `agent.gate` | Add a gate |
+
+At each `reach`, every gate is asked about each node listening there, in
+config-tree order. The first that gives a reason holds the node back: it
+isn't asked, and the exchange records a `gated` event, once per run and
+node, so the node is told apart from a quiet one. A **trial** hold is
+only recorded (`detail.trial`): the node is still asked, so a gate can be
+watched before it holds anything. Gates compose: profiles
+are one ([profile](profile.md)), an experiment on what a subagent hears is
+another. A gate holds nodes back; it doesn't choose which packs are loaded.
