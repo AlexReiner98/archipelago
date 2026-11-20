@@ -8,7 +8,13 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "lib": [
+      "ES2022",
+      "DOM"
+    ]
   },
-  "include": ["spec/**/*.ts"]
+  "include": [
+    "spec/**/*.ts"
+  ]
 }

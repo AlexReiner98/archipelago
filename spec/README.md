@@ -11,14 +11,15 @@ short doc. This is **edition 1, in draft**, while Alex shapes it.
 | [agent](agent.md) | `agent.node` `agent.tree` `agent.run` | Say, refuse, act. Places, nodes, runs |
 | [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event per say, refusal and act |
 | [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | UI composition: places in the UI that packs fill |
+| [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | Large graphs: one WebGL2 surface, filled with layers |
 | [here](here.md) | `here.declare` `here.read` `here.set` | Shared ephemeral state: what is being looked at |
 | [changeset](changeset.md) | (a format) | A change in full: header and facts `[op, id, field, value]` |
 
 [common.ts](common.ts) holds the shared words; [index.ts](index.ts) puts
 every capability's key and type in one map for a runtime to declare.
 
-Two choices are open on the map, not decided here: the renderer behind
-`slot`, and the place vocabulary in `agent`.
+Decided with Alex: panels are Preact, the graph is one WebGL2 scene
+surface, and the spec owns the six places of edition 1.
 
 ## Packs ask for capabilities
 

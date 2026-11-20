@@ -1,18 +1,21 @@
 /**
  * slot: UI composition. See slot.md.
  *
- * DRAFT: the renderer (what `View` is) is an open question to Alex on the map.
+ * Panels are Preact function components (Alex, 20 Nov 2026). The graph is
+ * not drawn with components: it is one scene surface that packs fill with
+ * layers (scene.ts).
  */
 import type { JsonSchema } from "./action.ts";
+import type { FunctionComponent } from "preact";
 import type { Capability, Dispose, PackId } from "./common.ts";
 
 /**
- * A component: what a pack puts in a slot. Pinned by the renderer choice;
- * until then, a function of props whose result only the renderer reads.
- * Whatever is chosen must unmount fully (no global registration), so a
- * pack's UI goes when the pack does.
+ * A component: what a pack puts in a slot. A Preact function component,
+ * written with htm so no build step is needed. Every pack's components run
+ * on the one copy of Preact the renderer pack provides. Unmounting is
+ * complete, and hook cleanups are where a component's disposers go.
  */
-export type View<P = Record<string, unknown>> = (props: P) => unknown;
+export type View<P = Record<string, unknown>> = FunctionComponent<P>;
 
 /**
  * - `many`: every fill shows, in config-tree order of the filling packs

@@ -1,4 +1,4 @@
-# slot (draft)
+# slot
 
 How the UI is put together out of packs. A pack declares a slot (a hole in
 its UI) and other packs fill it. The whole UI is one slot, `root`, filled
@@ -28,21 +28,24 @@ by whichever shell pack is loaded. Types: [slot.ts](slot.ts).
 - Both return disposers. When a pack unloads, its slots and fills go, and
   so does everything mounted in them.
 
-## The renderer: open
+## The renderer
 
-One renderer draws every pack's components, so `View` has one meaning.
-**Open as a question to Alex.** Web Components are out, because a
-`customElements.define` can't be undone. What the choice has to give:
+Decided by Alex: **panels are Preact** function components, written with
+htm so there's no build step. The renderer pack provides the one copy
+every pack uses, and fills `root` with nothing but a mount point for the
+shell. Web Components are out, because a `customElements.define` can't be
+undone.
 
-- A component unmounts completely, with nothing left registered.
-- A component can render another slot inside itself (`<Slot name=… />`),
-  which is how the shell leaves holes for packs.
-- Reading `here` and watching the graph re-render it, and its
-  subscriptions are disposed when it unmounts.
-- A pack's module can be swapped (HMR) without reloading the page.
+- A component unmounts completely; its hook cleanups are its disposers.
+- A component renders another slot inside itself (`<Slot name=… />`), which
+  is how the shell leaves holes for packs.
+- Reading `here` or watching the graph re-renders it, and its
+  subscriptions go when it unmounts.
 
-The candidates are on the question. Until it's settled, `View` is typed as
-a function of props whose result only the renderer reads.
+**The graph is not drawn with components.** DOM stalls at a few thousand
+nodes. The graph is one [scene](scene.md) surface: a WebGL2 canvas owned by
+the scene pack, filled by packs with layers, and placed on the page as an
+ordinary panel.
 
 ## What it isn't
 

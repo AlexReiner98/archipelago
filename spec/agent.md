@@ -1,4 +1,4 @@
-# agent (draft)
+# agent
 
 Everything the map says to an agent and everything the agent does passes
 through one service. Its registry of nodes is the harness view's tree.
@@ -23,19 +23,23 @@ Types: [agent.ts](agent.ts).
 ## Places
 
 A place is a moment in a run where the map can speak. The spec owns the
-vocabulary (decided by Alex); which places edition 1 holds is still being
-settled:
+vocabulary (decided by Alex). Edition 1 has the six places an adapter can
+both reach and speak at, which is what the harness view and verdicts need:
 
-| Place | Reached when | Can refuse |
-|---|---|---|
-| `session_start` | the run begins | no |
-| `prompt` | a person's message reaches the agent | yes |
-| `tool:<name>` | the agent is about to call a tool | yes |
-| `tool_result:<name>` | a tool has returned (its result is the input) | no |
-| `file:<path>` | a tool is about to touch that file (with its `tool:`) | yes |
-| `skill:<name>` | a skill is loaded | no |
-| `memory:<scope>` | memory of that scope is loaded (`project`, `user`, …) | no |
-| `reply_end` | the agent is about to finish its reply | yes (it keeps going) |
+| Place | Reached when | Can refuse | Claude Code hook |
+|---|---|---|---|
+| `session_start` | the run begins, and again after a compaction | no | SessionStart |
+| `prompt` | a person's message reaches the agent | yes | UserPromptSubmit |
+| `tool:<name>` | the agent is about to call a tool | yes | PreToolUse |
+| `file:<path>` | a tool is about to touch that file (with its `tool:`) | yes | PreToolUse, from the input |
+| `tool_result:<name>` | a tool has returned (its result is the input) | no | PostToolUse |
+| `reply_end` | the agent is about to finish its reply | yes (it keeps going) | Stop |
+
+Left out on purpose: a session's end (nothing can be said to the agent
+there; it's the run's `end` event), subagents (`tool:Agent`), skills
+(`tool:Skill`), memory loads (no moment to speak at; memory and skill text
+are nodes said at `session_start`), and compaction (`session_start` fires
+after it).
 
 A reached place is concrete; a node's `at` may use `*` in the argument
 (`tool:*`, `file:packs/*/page/*.js`). The adapter decides which places it can
