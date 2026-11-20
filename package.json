@@ -6,7 +6,10 @@
   "scripts": {
     "check": "tsc -p .",
     "test": "node --test --test-timeout=20000 test/*.test.ts",
-    "serve": "node app/server.ts"
+    "serve": "node app/server.ts",
+    "server:start": "node scripts/server.ts start",
+    "server:stop": "node scripts/server.ts stop",
+    "server:status": "node scripts/server.ts status"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

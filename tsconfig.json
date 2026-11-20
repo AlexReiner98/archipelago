@@ -10,7 +10,9 @@
     "erasableSyntaxOnly": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "lib": [
       "ES2022",
       "DOM"
@@ -21,6 +23,7 @@
     "runtime/**/*.ts",
     "packs/**/*.ts",
     "test/**/*.ts",
-    "app/**/*.ts"
+    "app/**/*.ts",
+    "scripts/**/*.ts"
   ]
 }

@@ -53,3 +53,30 @@ The hooks are Claude Code's `http` hooks, posting to `POST /hook`, except
 SessionStart, which Claude Code runs only as a command:
 [hook.ts](hook.ts) forwards it. If the adapter isn't running, every hook
 says nothing and the agent carries on.
+
+## Every session
+
+To have every Claude Code session, in any repo, report here: run the app
+server on its own, and add the hooks at user level.
+
+```
+npm run server:start      # also server:stop, server:status
+```
+
+starts `app/server.ts` detached ([scripts/server.ts](../../scripts/server.ts)),
+with its data, log and pid in `app/.data`, so it outlives the terminal and
+keeps its runs across restarts.
+
+In `~/.claude/settings.json`, beside whatever hooks are there, add one group
+per event (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse,
+PostToolUseFailure, Stop, SessionEnd; `"matcher": "*"` on the tool events),
+each with:
+
+```json
+{ "type": "command", "command": "node \"<repo>/packs/claude-code/hook.ts\"", "timeout": 5 }
+```
+
+Command hooks, not http: an http hook to a server that is down shows as a
+hook error in the session ("Stop hook error occurred", a PreToolUse
+warning). [hook.ts](hook.ts) prints nothing and exits 0 when the server is
+down or slow (3 s, `ARCHIPELAGO_HOOK_TIMEOUT_MS`), at about 0.2 s a hook.
