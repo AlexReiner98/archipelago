@@ -21,6 +21,13 @@
  * is none, so the harness view shows it, the verdicts judge it and
  * `words.set` refines it. The list says its words now; without the words
  * pack, the defaults here.
+ *
+ * Each kind of refusal an action gives through `act` or `tell` (its code)
+ * is a node too: `schema_check` for the schema's, `rule` for the rest, at
+ * the tools' results (`tool_result:mcp__archipelago__*`) with `when`
+ * `Refused (<code>)`, made the first time the code is seen. The adapter
+ * reaches the result with the refusal in it, so the node is said there,
+ * the verdicts judge it and `words.set` rewords it.
  */
 import type { ActionContext, ActionInvoke, ActionList, ActionRegister } from "../../spec/action.ts";
 import type { Place, RunInfo } from "../../spec/agent.ts";
@@ -52,6 +59,19 @@ export const DESCRIPTIONS: Record<string, string> = {
   tell: "Say what you concluded, in one short line, about the items it concerns. It is kept as a record; replaces supersedes an earlier one.",
   run: "Say what this run is: its title, the task it took on, the run that started it; end: true when it is over.",
 };
+
+/** A refusal's node kind: the schema's are `schema_check`, every other action's a `rule`. */
+export const refusalKind = (code: string) => (code.startsWith("schema.") ? "schema_check" : "rule");
+
+/** What a refusal's node says the first time, beside the refusal's own message; `words.set` rewords it. */
+export function refusalWords(code: string): string {
+  if (code.startsWith("schema.")) {
+    return `The schema held that change (${code}): something in it doesn't fit its type, and its problems are in the refusal. Fix the fields it names and act again; schema.check tries a change without writing it.`;
+  }
+  if (code === "action.input") return "That action needs fields it wasn't given; the refusal lists its shape. Send them all in one act.";
+  if (code === "action.unknown") return "That action isn't declared now. The act tool's description lists those that are.";
+  return `The map refused that act (${code}). Its reason is in the refusal: change what it names and act again, or tell what stopped you.`;
+}
 
 export const GET_MAX = 50;
 /** What `map` says, on get and query. */
@@ -247,6 +267,45 @@ const mcp: Pack<McpConfig> = {
     };
     actions.watch(() => void makeNodes());
     await makeNodes();
+    // ---- Each kind of refusal an action gives, a node: said at the tool's result when the
+    // result holds it, so it is judged and reworded like any instruction (refusalNode).
+    const refusalAt = `tool_result:${placeOf("*").slice("tool:".length)}`;
+    const refusals = new Map<string, Id>();
+    const refusalOf = (item: Item): string | undefined => {
+      const when = item.fields.when;
+      if (item.fields.status === "retired" || typeof when !== "string" || !Array.isArray(item.fields.at) || !(item.fields.at as Json[]).includes(refusalAt)) return undefined;
+      return /^Refused \((.+)\)$/.exec(when)?.[1];
+    };
+    const learnRefusal = (item: Item | null, id: Id) => {
+      for (const [code, n] of refusals) if (n === id && (!item || refusalOf(item) !== code)) refusals.delete(code);
+      const code = item && refusalOf(item);
+      if (code && !refusals.has(code)) refusals.set(code, item!.id);
+    };
+    live.watch({ types: ["node"] }, async (c) => {
+      const touched = [...new Set(c.facts.map((f) => f[1]))];
+      const now = await graph.get(touched);
+      touched.forEach((id, i) => learnRefusal(now[i] ?? null, id));
+    });
+    for (let p = await graph.of("node", { limit: LIMIT_MAX }); ; p = await graph.of("node", { limit: LIMIT_MAX, after: p.next })) {
+      for (const item of p.items) learnRefusal(item, item.id);
+      if (!p.next) break;
+    }
+    /** Makes sure a node says this kind of refusal; the first time a code is seen, through `words.add`. */
+    const refusalNode = (code: string) => {
+      making = making.then(async () => {
+        if (refusals.has(code) || !actions.list().some((a) => a.name === "words.add")) return;
+        const out = await invoke.invoke<{ node: Id }>({
+          action: "words.add",
+          input: { title: `Refused: ${code}`, kind: refusalKind(code), at: [refusalAt], when: `Refused (${code})`, words: refusalWords(code) },
+          authority: { of: "agent", basis: "the mcp pack: each kind of refusal is a node" },
+          reason: `Say the ${code} refusal as a node`,
+        });
+        if (out.ok) refusals.set(code, out.output.node);
+        else ctx.runtime.report(ctx.fiber, new Error(out.refused.message));
+      });
+      return making;
+    };
+
     const describe = async (tool: string): Promise<string> => {
       const id = nodeOf.get(tool);
       const [item] = id ? await graph.get([id]) : [null];
@@ -341,6 +400,7 @@ const mcp: Pack<McpConfig> = {
             reason: typeof args.reason === "string" && args.reason ? args.reason : `${name}, by the agent`,
           });
           if (!out.ok) {
+            await refusalNode(out.refused.code);
             // An input that doesn't fit the action's shape: say the shape.
             const shape = out.refused.code === "action.input" ? ` It takes: ${JSON.stringify(declared.input.properties ?? declared.input)}` : "";
             return no(`Refused (${out.refused.code}): ${out.refused.message}${shape}`);
@@ -456,7 +516,10 @@ const mcp: Pack<McpConfig> = {
           if (about.length) input.about = about;
           if (typeof args.replaces === "string") input.replaces = args.replaces;
           const out = await run.invoke.invoke<{ id: Id }>({ action: "mcp.tell", input, authority: asAgent(run), reason: `Told: ${String(input.said).slice(0, 120)}` });
-          if (!out.ok) return no(`Refused (${out.refused.code}): ${out.refused.message}`);
+          if (!out.ok) {
+            await refusalNode(out.refused.code);
+            return no(`Refused (${out.refused.code}): ${out.refused.message}`);
+          }
           return ok({ id: out.output.id, ...(out.change ? { change: out.change } : {}) });
         },
       },

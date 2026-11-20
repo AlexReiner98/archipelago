@@ -27,7 +27,7 @@ import { META } from "../../spec/common.ts";
 import type { ExchangeRead } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { handle, lastAssistantText, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
+import { handle, lastAssistantText, runIdOf, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
 import { rpc, type JsonRpc } from "./mcp.ts";
 
 export interface ClaudeCodeConfig {
@@ -160,10 +160,11 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
     };
 
     const hook = (input: HookInput): Promise<HookOutput> => {
-      const state = runOf(input.session_id);
+      const key = runIdOf(input);
+      const state = runOf(key);
       if (input.hook_event_name === "PreToolUse" && input.tool_name?.startsWith(prefix)) {
-        if (input.tool_use_id) hearing.set(input.tool_use_id, input.session_id);
-        lastHearing = input.session_id;
+        if (input.tool_use_id) hearing.set(input.tool_use_id, key);
+        lastHearing = key;
       }
       const next = state.queue.then(() => handle(input, state, {
         actor,
@@ -185,7 +186,18 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
         },
       }));
       state.queue = next.catch(() => {});
-      if (input.hook_event_name === "SessionEnd") void next.finally(() => runs.delete(input.session_id));
+      if (input.hook_event_name === "SubagentStop") void next.finally(() => !state.begun && runs.delete(key));
+      if (input.hook_event_name === "SessionEnd") {
+        void next.finally(() => runs.delete(key));
+        // A subagent still open when its session ends ends with it.
+        for (const [k, child] of runs) {
+          if (!k.startsWith(`${input.session_id}:`)) continue;
+          runs.delete(k);
+          child.queue = child.queue.then(async () => {
+            if (child.begun) await child.agent.end(k, new Date().toISOString());
+          }).catch(() => {});
+        }
+      }
       return next;
     };
 

@@ -6,7 +6,8 @@
  *
  * An item `node` has: `title`, `kind` (instruction, reflex, rule, …), `at`
  * (a list of places), `words`, and `refuse` (true: the words are a
- * refusal), and `status`: absent for a kept node, `trial` for one on trial
+ * refusal), `when` (said only when the moment's input holds that text: a
+ * reflex's condition), and `status`: absent for a kept node, `trial` for one on trial
  * (its words are said marked as a trial), `retired` for one no longer said.
  * `held` (a reason): held as written, so `words.set` and `words.retire`
  * refuse, saying why (the written pack's rule, packs/written).
@@ -33,6 +34,8 @@ export interface NodeSeed {
   at: string[];
   words: string;
   refuse?: boolean;
+  /** Said only when the moment's input holds this text. */
+  when?: string;
 }
 
 export interface WordsConfig {
@@ -49,6 +52,13 @@ function heldCheck(item: Item) {
     message: `${String(item.fields.title ?? item.id)} is held as written: ${typeof held === "string" ? held : "its rule holds it."} Its rule must open it before its words change inside the map.`,
     by: { pack: "words" },
   });
+}
+
+/** A node's `when`: absent, it always speaks; else only when the moment's input holds that text. */
+export function holds(when: Json | undefined, input: Json | undefined): boolean {
+  if (typeof when !== "string" || !when) return true;
+  if (input === undefined || input === null) return false;
+  return (typeof input === "string" ? input : JSON.stringify(input)).includes(when);
 }
 
 const shape = (i: Item) => JSON.stringify([i.fields.title, i.fields.kind, i.fields.at, i.fields.status === "retired"]);
@@ -77,10 +87,11 @@ const words: Pack<WordsConfig> = {
         title: String(item.fields.title ?? id),
         at,
         source: id,
-        async speak() {
+        async speak(moment) {
           const [now] = await graph.get([id]);
           const text = typeof now?.fields.words === "string" ? now.fields.words.trim() : "";
           if (!text) return null;
+          if (!holds(now!.fields.when, moment.input)) return null;
           const said = now!.fields.status === "trial" ? `${TRIAL_MARK} ${text}` : text;
           return now!.fields.refuse === true ? { refuse: said, code: "words.refuse" } : { say: said };
         },
@@ -144,6 +155,7 @@ const words: Pack<WordsConfig> = {
           at: { type: "array", items: { type: "string" } },
           words: { type: "string" },
           refuse: { type: "boolean" },
+          when: { type: "string", description: "Said only when the moment's input holds this text." },
         },
         required: ["title", "at", "words"],
       },
@@ -157,6 +169,7 @@ const words: Pack<WordsConfig> = {
           ["+", id, "words", input.words],
         ];
         if (input.refuse) facts.push(["+", id, "refuse", true]);
+        if (input.when) facts.push(["+", id, "when", input.when]);
         call.write(facts);
         return { node: id };
       },

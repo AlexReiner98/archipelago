@@ -89,6 +89,7 @@ async function setup() {
     exchange: () => p.get<ExchangeRead>("exchange.read"),
     tree: () => p.get<AgentTree>("agent.tree"),
     node: () => p.get<AgentNode>("agent.node"),
+    agent: () => toolRun().agent,
     invoke: () => p.intercept({ actor: { id: "person:alex", kind: "person" } }).get<ActionInvoke>("action.invoke"),
     async close() {
       await loader.apply([]);
@@ -148,6 +149,42 @@ test("act writes through declared actions, shows what one takes, and undo takes 
     assert.ok(!undone.isError, undone.text);
     assert.deepEqual(await s.graph().get([id]), [null]);
     assert.match((await s.call("act", { action: "nope.nothing" })).text, /No action nope\.nothing/);
+  } finally {
+    await s.close();
+  }
+});
+
+test("each kind of refusal is a node, said at the tool's result when the result holds it, and reworded like any other", async () => {
+  const s = await setup();
+  try {
+    const made = await s.call("act", { action: "items.create", input: { type: "work", title: "A task" }, reason: "test" });
+    const id = made.json.output.id;
+    const wrong = await s.call("act", { action: "items.set", input: { id, fields: { status: "built" } } });
+    const flat = await s.call("act", { action: "items.set", input: { id, status: "doing" } });
+    await s.call("act", { action: "items.set", input: { id, status: "done" } });
+    const codeOf = (text: string) => /^Refused \((.+?)\)/.exec(text)![1]!;
+    const codes = [codeOf(wrong.text), codeOf(flat.text)];
+    assert.equal(codes[1], "action.input");
+    await new Promise((r) => setTimeout(r, 20));
+    const nodes = s.tree().nodes().filter((n) => n.title.startsWith("Refused: "));
+    assert.deepEqual(nodes.map((n) => n.title).sort(), [...new Set(codes)].map((c) => `Refused: ${c}`).sort(), "one node per code, the same code twice makes none");
+    for (const n of nodes) {
+      assert.deepEqual(n.at, ["tool_result:mcp__archipelago__*"]);
+      assert.equal(n.kind, n.title.includes("schema.") ? "schema_check" : "rule");
+    }
+
+    // Said only where a result holds its refusal.
+    const at = (input: string) => s.agent().reach({ run: RUN, places: ["tool_result:mcp__archipelago__act"], time: new Date().toISOString(), input });
+    const said = await at(flat.text);
+    assert.deepEqual(said.said.map((x) => x.node), [nodes.find((n) => n.title === "Refused: action.input")!.id]);
+    assert.match(said.said[0]!.text, /needs fields it wasn't given/);
+    assert.deepEqual((await at('{"output":{"id":"x"}}')).said, []);
+
+    const input = nodes.find((n) => n.title === "Refused: action.input")!;
+    const set = await s.invoke().invoke({ action: "words.set", input: { node: input.source!, words: "Give every field the action takes." }, authority: { of: "human", basis: "test" }, reason: "reword" });
+    assert.ok(set.ok);
+    assert.equal((await at(flat.text)).said[0]!.text, "Give every field the action takes.");
+    assert.deepEqual(s.errors, []);
   } finally {
     await s.close();
   }

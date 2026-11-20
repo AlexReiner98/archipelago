@@ -4,7 +4,8 @@
  * - a Node runtime with the server's packs, hot-reloaded: graph, action,
  *   types and the bases (work, question, record, actor, links, items) with
  *   the trial flavour branch, interchange (a moved map's change sets),
- *   exchange, agent, verdict, words, loaded, written, grow, the Claude Code adapter (5181), the
+ *   exchange, agent, verdict, words, loaded, written, grow, since ("since
+ *   you last heard", at each prompt), the Claude Code adapter (5181), the
  *   map's agent tools on its MCP server (mcp), the old maps kept read only
  *   (archive, from <data>/archives), and
  *   the bridge (5182) the page reaches them through.
@@ -103,6 +104,7 @@ const tree: Entry[] = [
   { id: "loaded", pack: "packs/loaded/index.ts" },
   { id: "written", pack: "packs/written/index.ts", disabled: !values.write },
   { id: "grow", pack: "packs/grow/index.ts" },
+  { id: "since", pack: "packs/since/index.ts" },
   {
     id: "claude-code",
     pack: "packs/claude-code/index.ts",

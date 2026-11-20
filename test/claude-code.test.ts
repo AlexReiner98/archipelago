@@ -150,6 +150,33 @@ test("SessionEnd ends the run; the next hook begins it again", async () => {
   assert.deepEqual(calls.map((c) => c[0]), ["begin", "reach", "end"]);
 });
 
+test("a subagent is a run of its own, whose parent is the session's run", async () => {
+  const { calls, port, go } = fake((m) =>
+    m.places[0] === "session_start" ? { said: [{ node: "n/start", text: "Hello, helper." }] } : m.input === "half done" ? { said: [], refused: { node: "n/more", text: "Finish it." } } : { said: [] },
+  );
+  // Each run has its own port in the adapter; here one port stands for the subagent's.
+  const sub = { agent_id: "agent-7", agent_type: "Explore" };
+  assert.deepEqual(await go({ hook_event_name: "SubagentStart", ...sub }), {
+    hookSpecificOutput: { hookEventName: "SubagentStart", additionalContext: "Hello, helper." },
+  });
+  await go({ hook_event_name: "PreToolUse", tool_name: "Grep", tool_input: { pattern: "x" }, ...sub });
+  assert.deepEqual(await go({ hook_event_name: "SubagentStop", last_assistant_message: "half done", ...sub }), { decision: "block", reason: "Finish it." });
+  assert.equal(port.begun, true);
+  assert.deepEqual(await go({ hook_event_name: "SubagentStop", last_assistant_message: "Found it.", ...sub }), {});
+  assert.equal(port.begun, false);
+  const begin = calls[0]![1] as RunStart;
+  assert.deepEqual([begin.run, begin.parent, begin.title], ["s1:agent-7", "s1", "Explore subagent"]);
+  assert.ok(calls.slice(1).every((c) => c[0] === "end" ? c[1] === "s1:agent-7" : (c[1] as Moment | Act).run === "s1:agent-7"));
+  assert.deepEqual((calls[1]![1] as Moment).input, { source: "subagent", agent_type: "Explore" });
+  assert.deepEqual(calls.map((c) => c[0]), ["begin", "reach", "reach", "reach", "act", "reach", "act", "end"]);
+});
+
+test("a SubagentStop for a subagent that never started is not a run", async () => {
+  const { calls, go } = fake();
+  assert.deepEqual(await go({ hook_event_name: "SubagentStop", agent_id: "agent-x", agent_type: "", last_assistant_message: "suggestion" }), {});
+  assert.deepEqual(calls, []);
+});
+
 test("the reply is read from the transcript when the hook doesn't carry it", () => {
   const transcript = [
     JSON.stringify({ type: "user", message: { content: "hi" } }),

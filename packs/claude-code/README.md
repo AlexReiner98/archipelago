@@ -17,7 +17,19 @@ exchange.
 | PreToolUse | reach `tool:<name>` and `file:<path>` (from `file_path`, `notebook_path`, relative to the run's folder) | context, or deny on a refusal; a denied call is its own act, `ok: false` |
 | PostToolUse / PostToolUseFailure | act `tool`, then reach `tool_result:<name>` with the result | context |
 | Stop | reach `reply_end` with the reply, then act `reply` (on a refusal, a denied act: the reply as input, the refusal as output) | block on a refusal: the agent keeps going |
-| SessionEnd | `end` | nothing |
+| SessionEnd | `end` (and of any subagent run still open) | nothing |
+| SubagentStart | `begin` the subagent's run, reach `session_start` (input `{source: "subagent", agent_type}`) | what was said, as context |
+| SubagentStop | as Stop, on the subagent's run and its own transcript, then `end` it | block on a refusal: the subagent keeps going |
+
+## Subagents
+
+A subagent is a run of its own, `<session>:<agent_id>`, whose `parent` is the
+session's run and whose title is its type ("Explore subagent"). Every hook
+from inside it carries its `agent_id`, so its tool calls are its own acts,
+judged in its own run. A SubagentStop for a subagent that never started
+(Claude Code's own helpers, such as prompt suggestions) is not a run.
+What a subagent loads isn't read yet: its transcript is its own file, which
+its hooks name only when it stops.
 
 Claude Code rejects some tool calls before any hook runs (an Edit whose
 `old_string` isn't in the file): the model sees the error, the hooks don't.
@@ -105,7 +117,8 @@ terminal, keeps its runs across restarts, and isn't touched by edits here.
 
 In `~/.claude/settings.json`, beside whatever hooks are there, add one group
 per event (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse,
-PostToolUseFailure, Stop, SessionEnd; `"matcher": "*"` on the tool events),
+PostToolUseFailure, Stop, SessionEnd, SubagentStart, SubagentStop;
+`"matcher": "*"` on the tool events),
 each with:
 
 ```json

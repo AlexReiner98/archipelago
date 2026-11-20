@@ -12,6 +12,11 @@
  * | PostToolUseFailure | act tool ok:false, reach tool_result:<name>          | additionalContext            |
  * | Stop             | act each unseen failed tool, reach reply_end, act reply (denied if refused) | block (keeps it going) |
  * | SessionEnd       | end                                                    | nothing                      |
+ * | SubagentStart    | begin the subagent's run (parent: the session's), reach session_start | additionalContext |
+ * | SubagentStop     | as Stop, on the subagent's run and transcript, then end it | block (keeps it going)   |
+ *
+ * A hook from inside a subagent carries its `agent_id`, and belongs to the
+ * subagent's own run, `<session>:<agent>` (runIdOf).
  *
  * Every hook but SessionEnd first reads what Claude Code loaded since the
  * last hook from the transcript: a skill's text (`skill:<name>`), and the
@@ -52,6 +57,11 @@ export interface HookInput {
   stop_hook_active?: boolean;
   last_assistant_message?: string;
   reason?: string;
+  /** Set on every hook from inside a subagent, and on SubagentStart/SubagentStop. */
+  agent_id?: string;
+  agent_type?: string;
+  /** SubagentStop: the subagent's own transcript. */
+  agent_transcript_path?: string;
   [key: string]: unknown;
 }
 
@@ -261,20 +271,31 @@ export interface RecordedCall {
   input?: Json;
 }
 
+/**
+ * The run a hook belongs to. A subagent's hooks carry its `agent_id`: it is
+ * a run of its own, `<session>:<agent>`, whose parent is the session's run,
+ * so its tool calls are its own.
+ */
+export function runIdOf(input: Pick<HookInput, "session_id" | "agent_id">): string {
+  return typeof input.agent_id === "string" && input.agent_id ? `${input.session_id}:${input.agent_id}` : input.session_id;
+}
+
 export function runStart(input: HookInput, actor: Actor): RunStart {
+  const sub = typeof input.agent_id === "string" && input.agent_id;
   return {
-    run: input.session_id,
+    run: runIdOf(input),
     agent: actor,
     harness: HARNESS,
     reaches: REACHES,
     ...(input.cwd ? { cwd: input.cwd } : {}),
+    ...(sub ? { parent: input.session_id, title: input.agent_type ? `${input.agent_type} subagent` : "subagent" } : {}),
   };
 }
 
 /** Handles one hook: calls `agent.run` and answers what the hook prints. */
 export async function handle(input: HookInput, port: RunPort, options: Options): Promise<HookOutput> {
   const now = options.now ?? (() => new Date().toISOString());
-  const run = input.session_id;
+  const run = runIdOf(input);
   const agent = port.agent;
   const event = input.hook_event_name;
 
@@ -283,6 +304,8 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     port.begun = false;
     return {};
   }
+  // Claude Code's own helpers (prompt suggestions, /btw) stop as subagents that never started: not runs.
+  if (event === "SubagentStop" && !port.begun) return {};
   if (!port.begun) {
     await agent.begin(runStart(input, options.actor));
     port.begun = true;
@@ -293,12 +316,32 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     return agent.reach(m);
   };
   const act = (a: Omit<Act, "run" | "time">) => agent.act({ run, time: now(), ...a });
-  await reachLoads(input, port, options, reach);
+  // A subagent's loads are in its own transcript, which its hooks don't name until it stops.
+  if (run === input.session_id) await reachLoads(input, port, options, reach);
 
   switch (event) {
     case "SessionStart": {
       const answer = await reach(["session_start"], input.source ? { source: input.source } : undefined);
       return context("SessionStart", answer);
+    }
+    case "SubagentStart": {
+      const answer = await reach(["session_start"], { source: "subagent", ...(input.agent_type ? { agent_type: input.agent_type } : {}) });
+      return context("SubagentStart", answer);
+    }
+    case "SubagentStop": {
+      const own: HookInput = { ...input, ...(typeof input.agent_transcript_path === "string" ? { transcript_path: input.agent_transcript_path } : {}) };
+      await replayFailures(own, run, port, options, act);
+      const reply = input.last_assistant_message ?? (await options.lastReply?.(own));
+      const answer = await reach(["reply_end"], reply === undefined ? undefined : trim(reply));
+      if (answer.refused) {
+        const { node, text, code } = answer.refused;
+        await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { input: trim(reply) } : {}), output: { refused: node, text, ...(code ? { code } : {}) }, ok: false });
+        return { decision: "block", reason: refusalText(answer) };
+      }
+      await act({ place: "reply_end", kind: "reply", by: "agent", ...(reply !== undefined ? { output: trim(reply) } : {}), ok: true });
+      await agent.end(run, now());
+      port.begun = false;
+      return {};
     }
     case "UserPromptSubmit": {
       const answer = await reach(["prompt"], input.prompt ?? "");
@@ -341,15 +384,7 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
       return context(event, answer);
     }
     case "Stop": {
-      if (port.seen && options.transcript) {
-        const text = await options.transcript(input);
-        const since = text ? turnStart(text) : undefined;
-        const recorded = text && options.recorded ? await options.recorded(run, since) : undefined;
-        for (const f of text ? unseenFailures(text, port.seen, recorded) : []) {
-          port.seen.add(f.id);
-          await act({ place: `tool:${f.tool}`, kind: "tool", by: "agent", input: trim(f.input) ?? null, output: trim(f.error) ?? null, ok: false });
-        }
-      }
+      await replayFailures(input, run, port, options, act);
       const reply = input.last_assistant_message ?? (await options.lastReply?.(input));
       const answer = await reach(["reply_end"], reply === undefined ? undefined : trim(reply));
       if (answer.refused) {
@@ -363,6 +398,18 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     }
     default:
       return {};
+  }
+}
+
+/** At a stop, the turn's failed tool calls no hook saw, from the transcript, as failed acts. */
+async function replayFailures(input: HookInput, run: string, port: RunPort, options: Options, act: (a: Omit<Act, "run" | "time">) => Promise<void>): Promise<void> {
+  if (!port.seen || !options.transcript) return;
+  const text = await options.transcript(input);
+  if (!text) return;
+  const recorded = options.recorded ? await options.recorded(run, turnStart(text)) : undefined;
+  for (const f of unseenFailures(text, port.seen, recorded)) {
+    port.seen.add(f.id);
+    await act({ place: `tool:${f.tool}`, kind: "tool", by: "agent", input: trim(f.input) ?? null, output: trim(f.error) ?? null, ok: false });
   }
 }
 
