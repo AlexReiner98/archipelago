@@ -59,6 +59,16 @@ export function normalRemote(url: string): string | undefined {
   return path ? `${host.toLowerCase()}/${path}` : undefined;
 }
 
+/** A remote a run's start gave: a url, or already `host/owner/name`. Anything else isn't one. */
+export function givenRemote(value: unknown): string | undefined {
+  const v = Array.isArray(value) ? value[0] : value;
+  if (typeof v !== "string" || !v.trim()) return undefined;
+  const n = normalRemote(v);
+  if (n) return n;
+  const s = v.trim().replace(/\.git$/i, "");
+  return /^[\w.-]+(\/[\w.-]+){2,}$/.test(s) ? s.replace(/^[^/]+/, (h) => h.toLowerCase()) : undefined;
+}
+
 export interface GitConfig {
   /** Runs git in a folder; replaced in tests. */
   git?: (cwd: string, args: string[]) => Promise<string | undefined>;
@@ -143,11 +153,14 @@ const git: Pack<GitConfig> = {
     ctx.get<AgentFacts>("agent.facts").source({
       name: "repo",
       async facts(info) {
+        // A remote the run's start gave (the hook read it where the session runs): used as it is, so a
+        // server that can't see the folder still finds the repo item. Else git reads the folder here.
+        const given = givenRemote(info.facts?.remote);
         const cwd = typeof info.facts?.cwd === "string" ? info.facts.cwd : info.cwd;
-        if (!cwd) return null;
-        const [url, branch] = await Promise.all([run(cwd, ["remote", "get-url", "origin"]), run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"])]);
+        if (!cwd && !given) return null;
+        const [url, branch] = cwd ? await Promise.all([given ? undefined : run(cwd, ["remote", "get-url", "origin"]), run(cwd, ["rev-parse", "--abbrev-ref", "HEAD"])]) : [undefined, undefined];
         const out: Facts = {};
-        const remote = url ? normalRemote(url) : undefined;
+        const remote = given ?? (url ? normalRemote(url) : undefined);
         if (remote) {
           out.remote = remote;
           const repo = await repoFor(remote);

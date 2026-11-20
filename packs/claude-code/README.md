@@ -122,6 +122,11 @@ SessionStart, which Claude Code runs only as a command:
 [hook.ts](hook.ts) forwards it. If the adapter isn't running, every hook
 says nothing and the agent carries on.
 
+hook.ts adds `git_remote`: origin of the session's folder as
+`host/owner/name`, read where the session runs (no credentials leave). The
+run begins with it as its `remote` fact, so a server that can't see the
+folder still knows the repository ([git](../git/README.md)).
+
 ## Every session
 
 To have every Claude Code session, in any repo, report here: run the live

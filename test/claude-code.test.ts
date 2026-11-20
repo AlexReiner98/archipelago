@@ -14,6 +14,7 @@ import exchange from "../packs/exchange/index.ts";
 import claudeCode from "../packs/claude-code/index.ts";
 import { handle, lastAssistantText, relativePath, toolPlaces, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
 import { rpc } from "../packs/claude-code/mcp.ts";
+import { withRemote } from "../packs/claude-code/hook.ts";
 import mcpPack from "../packs/mcp/index.ts";
 import types from "../packs/types/index.ts";
 import type { ToolDef } from "../packs/mcp/host.ts";
@@ -423,25 +424,54 @@ test("the command forwarder prints the adapter's answer, and nothing when it is 
   const server = createServer((req, res) => {
     let b = "";
     req.on("data", (c) => (b += c));
-    req.on("end", () => res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ echoed: JSON.parse(b).hook_event_name })));
+    req.on("end", () => {
+      const got = JSON.parse(b);
+      res.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ echoed: got.hook_event_name, ...(got.git_remote ? { remote: got.git_remote } : {}) }));
+    });
   });
   await new Promise<void>((ok) => server.listen(0, "127.0.0.1", ok));
   const port = (server.address() as { port: number }).port;
-  const forward = async (url: string) => {
-    const { spawn } = await import("node:child_process");
+  // A folder whose origin carries credentials: only host/owner/name may leave.
+  const repo = await mkdtemp(join(tmpdir(), "hook-repo-"));
+  const { execFileSync, spawn } = await import("node:child_process");
+  execFileSync("git", ["init", "-q", repo]);
+  execFileSync("git", ["-C", repo, "remote", "add", "origin", "https://user:secret@GitHub.com/a/b.git"]);
+  const forward = async (url: string, cwd?: string) => {
     const child = spawn(process.execPath, ["packs/claude-code/hook.ts", url]);
     let out = "";
     child.stdout.on("data", (c) => (out += c));
-    child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart", session_id: "s" }));
+    child.stdin.end(JSON.stringify({ hook_event_name: "SessionStart", session_id: "s", ...(cwd ? { cwd } : {}) }));
     const code = await new Promise((ok) => child.on("close", ok));
     return { code, out };
   };
   try {
     assert.deepEqual(await forward(`http://127.0.0.1:${port}/hook`), { code: 0, out: '{"echoed":"SessionStart"}' });
+    assert.deepEqual(await forward(`http://127.0.0.1:${port}/hook`, repo), { code: 0, out: '{"echoed":"SessionStart","remote":"github.com/a/b"}' });
   } finally {
     await new Promise((ok) => server.close(ok));
+    await rm(repo, { recursive: true, force: true });
   }
   assert.deepEqual(await forward(`http://127.0.0.1:${port}/hook`), { code: 0, out: "" });
+});
+
+test("the forwarder adds the folder's remote; a folder with no origin, or bad input, goes as it came", () => {
+  const body = (o: object) => JSON.stringify(o);
+  assert.equal(JSON.parse(withRemote(body({ cwd: "C:/r" }), () => "git@github.com:a/b.git\n")).git_remote, "github.com/a/b");
+  assert.equal(withRemote(body({ cwd: "C:/r" }), () => { throw new Error("not a repo"); }), body({ cwd: "C:/r" }));
+  assert.equal(withRemote(body({}), () => "https://github.com/a/b"), body({}));
+  assert.equal(withRemote("not json", () => "https://github.com/a/b"), "not json");
+});
+
+test("the hook's remote is a fact of the run it begins", async () => {
+  const { calls, go } = fake();
+  await go({ hook_event_name: "SessionStart", git_remote: "github.com/a/b" });
+  assert.deepEqual((calls[0]![1] as RunStart).facts, { remote: "github.com/a/b" });
+  const sub = fake();
+  await sub.go({ hook_event_name: "SubagentStart", agent_id: "x", agent_type: "Explore", git_remote: "github.com/a/b" });
+  assert.deepEqual((sub.calls[0]![1] as RunStart).facts, { agent_type: "Explore", remote: "github.com/a/b" });
+  const none = fake();
+  await none.go({ hook_event_name: "SessionStart" });
+  assert.equal((none.calls[0]![1] as RunStart).facts, undefined);
 });
 
 test("at Stop, the turn's failed tool calls no hook saw are read from the transcript and recorded as failed acts", async () => {

@@ -10,7 +10,7 @@ import exchange from "../packs/exchange/index.ts";
 import graph from "../packs/graph/index.ts";
 import types from "../packs/types/index.ts";
 import record from "../packs/record/index.ts";
-import git, { normalRemote } from "../packs/git/index.ts";
+import git, { givenRemote, normalRemote } from "../packs/git/index.ts";
 
 const BASE = "mem:/packs/";
 
@@ -46,6 +46,35 @@ async function setup(folders: Record<string, { url?: string; branch?: string }>)
 }
 
 const start = (run: string, cwd: string) => ({ run, agent: { id: "e_agent", kind: "agent" as const }, harness: "claude-code", reaches: [], cwd });
+
+test("a remote the start gave is used where git can't see the folder (a hosted server)", async () => {
+  const { errors, run, read, loader } = await setup({ "C:/here": { url: "https://github.com/a/other.git", branch: "main" } });
+  // The folder is on another machine: git finds nothing, the hook's remote is the repository.
+  const a = await run.begin({ ...start("r1", "C:/elsewhere"), facts: { remote: "github.com/AlexReiner98/archipelago-next" } });
+  assert.equal(a.facts?.remote, "github.com/AlexReiner98/archipelago-next");
+  const [item] = await read.get([String(a.facts?.repo)]);
+  assert.equal(item?.fields.remote, "github.com/AlexReiner98/archipelago-next");
+  // Given wins over the folder's own origin, and a url is read as a remote.
+  const b = await run.begin({ ...start("r2", "C:/here"), facts: { remote: "git@GitHub.com:AlexReiner98/archipelago-next.git" } });
+  assert.equal(b.facts?.repo, a.facts?.repo);
+  assert.equal(b.facts?.branch, "main");
+  // Not a remote: git reads the folder as before.
+  const c = await run.begin({ ...start("r3", "C:/here"), facts: { remote: "nonsense" } });
+  assert.notEqual(c.facts?.repo, a.facts?.repo);
+  assert.equal((await read.of("repo")).items.length, 2);
+  assert.deepEqual(errors, []);
+  await loader.apply([]);
+});
+
+test("given remotes: urls and host/owner/name; nothing else", () => {
+  assert.equal(givenRemote("github.com/a/b"), "github.com/a/b");
+  assert.equal(givenRemote("GitHub.com/A/b.git"), "github.com/A/b");
+  assert.equal(givenRemote("https://u:t@github.com/a/b.git"), "github.com/a/b");
+  assert.equal(givenRemote(["github.com/a/b"]), "github.com/a/b");
+  assert.equal(givenRemote("nonsense"), undefined);
+  assert.equal(givenRemote("a/b"), undefined);
+  assert.equal(givenRemote(3), undefined);
+});
 
 test("remotes read alike from https, ssh and scp forms", () => {
   assert.equal(normalRemote("https://github.com/AlexReiner98/archipelago-next.git"), "github.com/AlexReiner98/archipelago-next");

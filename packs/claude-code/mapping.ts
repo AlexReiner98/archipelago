@@ -72,6 +72,8 @@ export interface HookInput {
   agent_transcript_path?: string;
   /** PreCompact: `manual` or `auto`. */
   trigger?: string;
+  /** Added by the command hook, not Claude Code: origin of the session's folder as host/owner/name. */
+  git_remote?: string;
   /** Notification: what kind (`permission_prompt`, `idle_prompt`, …) and its text. */
   notification_type?: string;
   message?: string;
@@ -306,9 +308,20 @@ export function runStart(input: HookInput, actor: Actor): RunStart {
     reaches: REACHES,
     ...(input.cwd ? { cwd: input.cwd } : {}),
     ...(sub ? { parent: input.session_id, title: input.agent_type ? `${input.agent_type} subagent` : "subagent" } : {}),
-    // Edition 5: a subagent's type is a fact about its run.
-    ...(sub && typeof input.agent_type === "string" && input.agent_type ? { facts: { agent_type: input.agent_type } } : {}),
+    ...(Object.keys(startFacts(input, !!sub)).length ? { facts: startFacts(input, !!sub) } : {}),
   };
+}
+
+/**
+ * Edition 5 facts the hook input carries: a subagent's type, and the remote
+ * the hook read where the session runs (`git_remote`, as host/owner/name), so
+ * a server that can't see the folder still knows the repository.
+ */
+function startFacts(input: HookInput, sub: boolean): Record<string, string> {
+  const facts: Record<string, string> = {};
+  if (sub && typeof input.agent_type === "string" && input.agent_type) facts.agent_type = input.agent_type;
+  if (typeof input.git_remote === "string" && input.git_remote) facts.remote = input.git_remote;
+  return facts;
 }
 
 /** Handles one hook: calls `agent.run` and answers what the hook prints. */
