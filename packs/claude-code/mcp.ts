@@ -7,9 +7,14 @@
  * A tool call doesn't name its session, so the adapter finds the run from
  * the tool use id its PreToolUse hook saw (`_meta["claudecode/toolUseId"]`),
  * else the last run that was about to call one of this server's tools.
+ *
+ * A client without hooks (anything but Claude Code: claude.ai, a desktop
+ * chat) gets an MCP session on `initialize`, and each session is a run of
+ * its own: the adapter hands its calls to `ports.call`, which reaches the
+ * tool's places and records the call, as the hooks would.
  */
 import type { Json } from "../../spec/common.ts";
-import type { ToolDef, ToolRun } from "../mcp/host.ts";
+import type { ToolDef, ToolResult, ToolRun } from "../mcp/host.ts";
 
 export const SERVER = { name: "archipelago", version: "0.2.0" };
 export const PROTOCOL = "2025-06-18";
@@ -26,6 +31,8 @@ export interface McpPorts {
   tools(): ToolDef[];
   /** The run a tool call belongs to, or nothing if no run is known. */
   runFor(toolUseId: string | undefined): ToolRun | undefined;
+  /** Makes the call itself, when the adapter records it (a client without hooks); absent, `tool.call`. */
+  call?(tool: ToolDef, args: { [key: string]: Json }, run: ToolRun | undefined): Promise<ToolResult>;
 }
 
 const result = (id: JsonRpc["id"], value: Json) => ({ jsonrpc: "2.0", id: id ?? null, result: value });
@@ -57,7 +64,8 @@ export async function rpc(msg: JsonRpc, ports: McpPorts): Promise<object | undef
       const raw = msg.params?.arguments;
       const args = raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as { [key: string]: Json }) : {};
       try {
-        const out = await tool.call(args, ports.runFor(msg.params?._meta?.["claudecode/toolUseId"]));
+        const run = ports.runFor(msg.params?._meta?.["claudecode/toolUseId"]);
+        const out = ports.call ? await ports.call(tool, args, run) : await tool.call(args, run);
         return result(msg.id, text(out.text, out.isError));
       } catch (err) {
         return result(msg.id, text(`${tool.name} failed: ${(err as Error)?.message ?? String(err)}`, true));

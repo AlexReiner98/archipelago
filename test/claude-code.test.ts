@@ -543,3 +543,72 @@ test("a restart mid-turn records each call once: Stop reads back what is on the 
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+/** A client without hooks (claude.ai, a desktop chat): its MCP session is a run of its own. */
+test("an MCP client without hooks gets a session, and the session is its own recorded run", async () => {
+  const nodes: Pack = {
+    id: "nodes",
+    inject: ["agent.node"],
+    apply(ctx) {
+      const n = ctx.get<AgentNode>("agent.node");
+      n.node({ name: "hello", kind: "instruction", title: "hello", at: ["session_start"], speak: () => ({ say: "Hello from the map." }) });
+      n.node({ name: "heard", kind: "reflex", title: "heard", at: ["tool_result:mcp__archipelago__hear"], speak: () => ({ say: "Heard it." }) });
+    },
+  };
+  const probe: Pack = { id: "probe", inject: ["exchange.read"], apply() {} };
+  const rt = new Runtime();
+  let port = 0;
+  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe, "types.ts": types, "mcp.ts": mcpPack };
+  const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
+  await loader.apply([
+    { id: "graph", pack: "graph.ts" },
+    { id: "action", pack: "action.ts" },
+    { id: "exchange", pack: "exchange.ts" },
+    { id: "agent", pack: "agent.ts" },
+    { id: "nodes", pack: "nodes.ts" },
+    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "types", pack: "types.ts" },
+    { id: "mcp", pack: "mcp.ts" },
+    { id: "probe", pack: "probe.ts" },
+  ]);
+  try {
+    const post = async (body: unknown, session?: string) => {
+      const r = await fetch(`http://127.0.0.1:${port}/mcp`, { method: "POST", headers: { "content-type": "application/json", ...(session ? { "mcp-session-id": session } : {}) }, body: JSON.stringify(body) });
+      return { status: r.status, session: r.headers.get("mcp-session-id"), json: r.status === 202 ? undefined : await r.json() };
+    };
+    // Claude Code opens no session: its calls are found through its hooks.
+    const cc = await post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", clientInfo: { name: "claude-code" } } });
+    assert.equal(cc.session, null);
+
+    const init = await post({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18", clientInfo: { name: "Claude AI" } } });
+    const session = init.session!;
+    assert.ok(session, "a client without hooks gets a session");
+    assert.equal((await post({ jsonrpc: "2.0", method: "notifications/initialized" }, session)).status, 202);
+    const call = await post({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "hear", arguments: { place: "file:x.ts" } } }, session);
+    const text: string = call.json.result.content[0].text;
+    assert.match(text, /Hello from the map\./, "what is said at session_start comes with the first result");
+    assert.match(text, /Heard it\./, "what is said at the tool's result comes with it");
+
+    assert.equal((await post({ jsonrpc: "2.0", id: 3, method: "tools/list" }, "not-a-session")).status, 404, "an unknown session starts again");
+    const del = await fetch(`http://127.0.0.1:${port}/mcp`, { method: "DELETE", headers: { "mcp-session-id": session } });
+    assert.equal(del.status, 204);
+
+    const read = loader.fiber("probe")!.ctx.get<ExchangeRead>("exchange.read");
+    const runs = (await read.runs()).items;
+    const own = runs.find((r) => r.run === `mcp-${session}`)!;
+    assert.deepEqual([own.harness, own.agent], ["claude-ai", { id: "claude-ai", kind: "agent" }]);
+    const events = (await read.events(own.run)).items;
+    assert.deepEqual(
+      events.map((e) => [e.kind, e.place ?? "-", e.node ?? e.act?.kind ?? "-"]),
+      [
+        ["begin", "-", "-"],
+        ["say", "session_start", "nodes/hello"],
+        ["act", "tool:mcp__archipelago__hear", "tool"],
+        ["say", "tool_result:mcp__archipelago__hear", "nodes/heard"],
+        ["end", "-", "-"],
+      ],
+    );
+  } finally {
+    await loader.apply([]);
+  }
+});

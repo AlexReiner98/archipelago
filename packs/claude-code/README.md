@@ -89,6 +89,15 @@ tool call doesn't name its session, so the run is found from the tool use
 id the PreToolUse hook saw for it, else the last run about to call one of
 this server's tools. Without the mcp pack the server answers with no tools.
 
+A client without hooks (claude.ai, a desktop chat: any client but Claude
+Code) gets an `Mcp-Session-Id` at `initialize`, and its session is a run of
+its own, `mcp-<id>`, with the client as agent and harness. The adapter does
+what the hooks would: it begins the run, reaches `session_start`, reaches
+each call's `tool:` place before it and `tool_result:` after it, records the
+call as an act, and hands back what was said with the result. `DELETE /mcp`
+ends the run; a session the server doesn't know (it restarted) is a 404, and
+the client starts a new one.
+
 ## Running it
 
 ```

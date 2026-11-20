@@ -8,27 +8,40 @@
  * - `POST /hook`: Claude Code's http hooks post their input here and print
  *   the answer (see mapping.ts).
  * - `POST /mcp`: a streamable-HTTP MCP server (see mcp.ts), serving the
- *   tools packs add through `mcp.host`, which this pack provides.
+ *   tools packs add through `mcp.host`, which this pack provides. A client
+ *   without hooks gets an `Mcp-Session-Id` on `initialize`, and its session
+ *   is a run of its own (`mcp-<id>`, the client as agent); `DELETE /mcp`
+ *   ends it.
  *
  * Each run (a Claude Code session) gets its own context, intercepted with the
  * agent as actor and the session id as run, so every call is the run's.
  */
+import { randomUUID } from "node:crypto";
 import { open, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
 import type { Dispose } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
-import type { McpHost, ToolDef } from "../mcp/host.ts";
+import type { McpHost, ToolDef, ToolResult, ToolRun } from "../mcp/host.ts";
 import { HOST } from "../mcp/host.ts";
 import type { AgentRun, Place } from "../../spec/agent.ts";
-import type { Actor, Time } from "../../spec/common.ts";
+import type { Actor, Json, Time } from "../../spec/common.ts";
 import { META } from "../../spec/common.ts";
 import type { ExchangeRead } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { handle, lastAssistantText, runIdOf, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
+import { handle, lastAssistantText, refusalText, runIdOf, spoken, trim, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
 import { rpc, type JsonRpc } from "./mcp.ts";
+
+/** The places a run without hooks reaches: its start, and each tool call and result. */
+export const MCP_REACHES = ["session_start", "tool:<name>", "tool_result:<name>"];
+
+/** The agent an MCP client is, from the name it gives at `initialize`. */
+export function clientActor(name: unknown): Actor {
+  const id = String(typeof name === "string" && name ? name : "mcp-client").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").slice(0, 60);
+  return { id, kind: "agent" };
+}
 
 export interface ClaudeCodeConfig {
   /** The port to listen on, on 127.0.0.1. 0 picks a free one. Default 5181. */
@@ -65,6 +78,14 @@ function send(res: ServerResponse, status: number, value?: unknown): void {
     return;
   }
   res.writeHead(status, { "content-type": "application/json" }).end(JSON.stringify(value));
+}
+
+/** An MCP session of a client without hooks: a run of its own. */
+interface Session {
+  run: string;
+  actor: Actor;
+  client: string;
+  state: RunState;
 }
 
 interface RunState extends RunPort {
@@ -201,6 +222,70 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
       return next;
     };
 
+    const sessions = new Map<string, Session>();
+    const now = () => new Date().toISOString();
+    /** A call from a session's client: the adapter reaches and records what the hooks would. */
+    const sessionCall = (s: Session, tool: ToolDef, args: { [key: string]: Json }, run: ToolRun): Promise<ToolResult> => {
+      const st = s.state;
+      const next = st.queue.then(async (): Promise<ToolResult> => {
+        const said: (string | undefined)[] = [];
+        if (!st.begun) {
+          await st.agent.begin({ run: s.run, agent: s.actor, harness: s.client, reaches: MCP_REACHES, title: s.client });
+          st.begun = true;
+          said.push(spoken(await st.agent.reach({ run: s.run, places: ["session_start"], time: now() })));
+        }
+        const place = `tool:${prefix}${tool.name}`;
+        const input = trim(args) ?? null;
+        const before = await st.agent.reach({ run: s.run, places: [place], time: now(), input });
+        if (before.refused) {
+          const { node, text, code } = before.refused;
+          await st.agent.act({ run: s.run, place, time: now(), kind: "tool", by: "agent", input, output: { refused: node, text, ...(code ? { code } : {}) }, ok: false });
+          return { text: [refusalText(before), ...said].filter(Boolean).join("\n\n"), isError: true };
+        }
+        said.push(spoken(before));
+        let out: ToolResult;
+        try {
+          out = await tool.call(args, run);
+        } catch (err) {
+          out = { text: `${tool.name} failed: ${(err as Error)?.message ?? String(err)}`, isError: true };
+        }
+        await st.agent.act({ run: s.run, place, time: now(), kind: "tool", by: "agent", input, output: trim(out.text) ?? null, ok: !out.isError });
+        said.push(spoken(await st.agent.reach({ run: s.run, places: [`tool_result:${prefix}${tool.name}`], time: now(), input: trim(out.text) ?? null })));
+        const words = said.filter(Boolean);
+        return words.length ? { ...out, text: `${out.text}\n\n${words.join("\n\n")}` } : out;
+      });
+      st.queue = next.catch(() => {});
+      return next;
+    };
+    /** A client without hooks opens a session at `initialize`; Claude Code's calls are found through its hooks. */
+    const sessionOf = (msg: JsonRpc): string | undefined => {
+      if (msg.method !== "initialize") return undefined;
+      const client = msg.params?.clientInfo?.name;
+      if (client === "claude-code") return undefined;
+      const id = randomUUID();
+      const agent = clientActor(client);
+      const run = `mcp-${id}`;
+      const runCtx = ctx.intercept({ [META.actor]: agent, [META.run]: run });
+      const state: RunState = { agent: runCtx.get<AgentRun>("agent.run"), invoke: runCtx.get<ActionInvoke>("action.invoke"), begun: false, seen: new Set(), queue: Promise.resolve() };
+      sessions.set(id, { run, actor: agent, client: agent.id, state });
+      return id;
+    };
+    const endSession = async (id: string) => {
+      const s = sessions.get(id);
+      sessions.delete(id);
+      if (!s) return;
+      s.state.queue = s.state.queue.then(async () => {
+        if (s.state.begun) await s.state.agent.end(s.run, now());
+      }).catch(() => {});
+      await s.state.queue;
+    };
+    ctx.effect(() => () => void sessions.clear());
+
+    const sessionMcp = (msg: JsonRpc, s: Session) => {
+      const run: ToolRun = { run: s.run, actor: s.actor, agent: s.state.agent, invoke: s.state.invoke };
+      return rpc(msg, { runFor: () => run, tools: () => [...tools.values()], call: (tool, args, r) => sessionCall(s, tool, args, r ?? run) });
+    };
+
     const mcp = (msg: JsonRpc) =>
       rpc(msg, {
         runFor(toolUseId) {
@@ -238,13 +323,25 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
           return send(res, 200, await hook(input));
         }
         if (path === "/mcp") {
+          const header = req.headers["mcp-session-id"];
+          const id = typeof header === "string" ? header : undefined;
+          const session = id ? sessions.get(id) : undefined;
+          // A session this server doesn't know (it restarted): the client starts a new one.
+          if (id && !session) return send(res, 404, { jsonrpc: "2.0", id: null, error: { code: -32001, message: "Session not found" } });
+          if (req.method === "DELETE" && id) {
+            await endSession(id);
+            return send(res, 204);
+          }
           if (req.method !== "POST") return send(res, 405);
           const parsed = JSON.parse(await body(req)) as JsonRpc | JsonRpc[];
+          const answer = (m: JsonRpc) => (session ? sessionMcp(m, session) : mcp(m));
           if (Array.isArray(parsed)) {
-            const out = (await Promise.all(parsed.map(mcp))).filter(Boolean);
+            const out = (await Promise.all(parsed.map(answer))).filter(Boolean);
             return out.length ? send(res, 200, out) : send(res, 202);
           }
-          const out = await mcp(parsed);
+          const opened = session ? undefined : sessionOf(parsed);
+          if (opened) res.setHeader("mcp-session-id", opened);
+          const out = await answer(parsed);
           return out ? send(res, 200, out) : send(res, 202);
         }
         if (req.method === "GET" && path === "/health") return send(res, 200, { ok: true, runs: runs.size });

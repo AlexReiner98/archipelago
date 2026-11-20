@@ -29,7 +29,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
-import type { Entry } from "../runtime/loader.ts";
+import { serverTree } from "./tree.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { values } = parseArgs({
@@ -43,86 +43,7 @@ const { values } = parseArgs({
 });
 const PAGE = Number(values.port);
 
-export const SEED = [
-  {
-    title: "Says the run is recorded",
-    kind: "instruction",
-    at: ["session_start"],
-    words: "This run is recorded on the exchange: every say, refusal and act shows live in the harness view.",
-  },
-  {
-    title: "The spec is Alex's",
-    kind: "reflex",
-    at: ["file:spec/**"],
-    words: "spec/ holds the contracts. Don't change one silently: ask Alex first.",
-  },
-  {
-    title: "Packs, not kernel",
-    kind: "reflex",
-    at: ["file:runtime/**"],
-    words: "runtime/ is the kernel. Keep it small: a new idea becomes a pack.",
-  },
-  {
-    title: "Read files with Read",
-    kind: "reflex",
-    at: ["tool:Bash"],
-    words: "To read or search files, prefer Read, Grep and Glob over Bash.",
-  },
-  {
-    title: "No secrets",
-    kind: "rule",
-    at: ["file:.env", "file:**/.env"],
-    words: "The map refuses .env files: they hold secrets.",
-    refuse: true,
-  },
-  {
-    title: "Check before you stop",
-    kind: "reflex",
-    at: ["reply_end"],
-    words: "Before you finish: did every change you made pass npm run check?",
-  },
-];
-
-const tree: Entry[] = [
-  { id: "graph", pack: "packs/graph/index.ts", config: { db: join(values.data, "graph.sqlite") } },
-  { id: "action", pack: "packs/action/index.ts" },
-  { id: "types", pack: "packs/types/index.ts" },
-  { id: "work", pack: "packs/work/index.ts" },
-  { id: "question", pack: "packs/question/index.ts" },
-  { id: "record", pack: "packs/record/index.ts" },
-  { id: "actor", pack: "packs/actor/index.ts" },
-  { id: "links", pack: "packs/links/index.ts" },
-  { id: "branch", pack: "packs/branch/index.ts" },
-  { id: "items", pack: "packs/items/index.ts" },
-  { id: "schema", pack: "packs/schema/index.ts", config: { db: join(values.data, "schema.sqlite") } },
-  { id: "history", pack: "packs/history/index.ts", config: { db: join(values.data, "history.sqlite") } },
-  { id: "interchange", pack: "packs/interchange/index.ts" },
-  { id: "exchange", pack: "packs/exchange/index.ts", config: { journal: join(values.data, "exchange.jsonl") } },
-  { id: "agent", pack: "packs/agent/index.ts" },
-  { id: "verdict", pack: "packs/verdict/index.ts" },
-  { id: "words", pack: "packs/words/index.ts", config: { seed: SEED } },
-  { id: "loaded", pack: "packs/loaded/index.ts" },
-  { id: "written", pack: "packs/written/index.ts", disabled: !values.write },
-  { id: "grow", pack: "packs/grow/index.ts" },
-  { id: "since", pack: "packs/since/index.ts" },
-  {
-    id: "claude-code",
-    pack: "packs/claude-code/index.ts",
-    config: { port: PAGE + 1, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
-  },
-  { id: "mcp", pack: "packs/mcp/index.ts" },
-  { id: "archive", pack: "packs/archive/index.ts", config: { dir: join(values.data, "archives") } },
-  {
-    id: "bridge",
-    pack: "packs/bridge/server.ts",
-    config: {
-      port: PAGE + 2,
-      actor: { id: "person:owner", kind: "person" },
-      origins: [`http://127.0.0.1:${PAGE}`, `http://localhost:${PAGE}`],
-      onListen: (p: number) => console.log(`bridge on http://127.0.0.1:${p}`),
-    },
-  },
-];
+const tree = serverTree({ data: values.data, port: PAGE, write: values.write });
 
 const host = new NodeHost({
   tree,

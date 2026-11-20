@@ -134,7 +134,7 @@ function context(event: string, answer: Answer): HookOutput {
 }
 
 /** The refusal's words, with what else was said after them. */
-function refusalText(answer: Answer): string {
+export function refusalText(answer: Answer): string {
   const rest = spoken(answer);
   return rest ? `${answer.refused!.text}\n\n${rest}` : answer.refused!.text;
 }
