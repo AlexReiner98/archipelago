@@ -5,10 +5,19 @@
  *   exchange, agent, verdict, words, loaded, written, grow, the Claude Code adapter (5181) and
  *   the bridge (5182) the page reaches them through.
  *
+ * --port moves all three (page, page + 1, page + 2); --no-watch turns hot
+ * reload off, for the page and the packs. ARCHIPELAGO_PORT and
+ * ARCHIPELAGO_WATCH=0 set the same, so scripts/live.ts can start any commit:
+ * an older one ignores them and runs on the default ports.
+ *
+ * --no-write (ARCHIPELAGO_WRITE=0) leaves the written pack off, so the
+ * server writes no skill or memory file. The dev server runs so: those files
+ * are what real sessions load, and only live writes them.
+ *
  * Point Claude Code at the adapter (packs/claude-code/README.md) and open
  * http://127.0.0.1:5180/app/.
  *
- *   node app/server.ts [--data dir]
+ *   node app/server.ts [--data dir] [--port 5180] [--no-watch] [--no-write]
  */
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -18,8 +27,16 @@ import { serve } from "../runtime/serve.ts";
 import type { Entry } from "../runtime/loader.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const { values } = parseArgs({ options: { data: { type: "string", default: join(root, "app", ".data") } } });
-const PAGE = 5180;
+const { values } = parseArgs({
+  allowNegative: true,
+  options: {
+    data: { type: "string", default: join(root, "app", ".data") },
+    port: { type: "string", default: process.env.ARCHIPELAGO_PORT ?? "5180" },
+    watch: { type: "boolean", default: process.env.ARCHIPELAGO_WATCH !== "0" },
+    write: { type: "boolean", default: process.env.ARCHIPELAGO_WRITE !== "0" },
+  },
+});
+const PAGE = Number(values.port);
 
 export const SEED = [
   {
@@ -69,18 +86,18 @@ const tree: Entry[] = [
   { id: "verdict", pack: "packs/verdict/index.ts" },
   { id: "words", pack: "packs/words/index.ts", config: { seed: SEED } },
   { id: "loaded", pack: "packs/loaded/index.ts" },
-  { id: "written", pack: "packs/written/index.ts" },
+  { id: "written", pack: "packs/written/index.ts", disabled: !values.write },
   { id: "grow", pack: "packs/grow/index.ts" },
   {
     id: "claude-code",
     pack: "packs/claude-code/index.ts",
-    config: { port: 5181, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
+    config: { port: PAGE + 1, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
   },
   {
     id: "bridge",
     pack: "packs/bridge/server.ts",
     config: {
-      port: 5182,
+      port: PAGE + 2,
       actor: { id: "person:owner", kind: "person" },
       origins: [`http://127.0.0.1:${PAGE}`, `http://localhost:${PAGE}`],
       onListen: (p: number) => console.log(`bridge on http://127.0.0.1:${p}`),
@@ -91,7 +108,7 @@ const tree: Entry[] = [
 const host = new NodeHost({
   tree,
   base: pathToFileURL(root + "/").href,
-  watch: join(root, "packs"),
+  watch: values.watch ? join(root, "packs") : undefined,
   onReload: (r) => r.reloaded.length && console.log(`reloaded ${r.reloaded.join(", ")}`),
 });
 host.runtime.onError = (fiber, error) => console.error(`[${fiber.pack.id}]`, error);
@@ -100,8 +117,8 @@ await host.runtime.settle();
 for (const s of host.loader.status()) {
   if (s.state !== "active") console.log(`${s.id}: ${s.state}${s.missing ? ` (waiting for ${s.missing.join(", ")})` : ""}${s.error ? ` ${s.error}` : ""}`);
 }
-const page = await serve({ port: PAGE, root });
-console.log(`harness view on ${page.url}app/`);
+const page = await serve({ port: PAGE, root, watch: values.watch });
+console.log(`harness view on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
 
 const stop = async () => {
   await page.close();

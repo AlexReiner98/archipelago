@@ -2,7 +2,7 @@
  * Runs the adapter: graph, action, exchange, agent and claude-code in one Node process,
  * hot-reloaded, with a live tail of the exchange on the console.
  *
- *   node packs/claude-code/host.ts [--port 5181] [--demo] [--journal file]
+ *   node packs/claude-code/host.ts [--port 5281] [--demo] [--journal file]
  *
  * Point Claude Code at it with the hooks and MCP server in settings.json
  * (see README.md).
@@ -18,7 +18,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "../..");
 const { values } = parseArgs({
   options: {
-    port: { type: "string", default: "5181" },
+    port: { type: "string", default: "5281" },
     demo: { type: "boolean", default: false },
     journal: { type: "string", default: join(here, ".data", "exchange.jsonl") },
   },

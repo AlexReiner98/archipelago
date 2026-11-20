@@ -42,7 +42,7 @@ export interface DevServer {
   close(): Promise<void>;
 }
 
-export async function serve(options: { port?: number; root?: string } = {}): Promise<DevServer> {
+export async function serve(options: { port?: number; root?: string; watch?: boolean } = {}): Promise<DevServer> {
   const root = resolve(options.root ?? join(fileURLToPath(import.meta.url), "../.."));
   const graph = new ModuleGraph();
   const clients = new Set<ServerResponse>();
@@ -95,7 +95,7 @@ export async function serve(options: { port?: number; root?: string } = {}): Pro
 
   let pending = new Set<string>();
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const watcher = watch(root, { recursive: true }, (_e, name) => {
+  const watcher = options.watch === false ? undefined : watch(root, { recursive: true }, (_e, name) => {
     if (!name || name.includes("node_modules") || name.startsWith(".git")) return;
     pending.add("/" + name.replaceAll("\\", "/"));
     clearTimeout(timer);
@@ -118,7 +118,7 @@ export async function serve(options: { port?: number; root?: string } = {}): Pro
     url: `http://127.0.0.1:${port}/`,
     graph,
     close: async () => {
-      watcher.close();
+      watcher?.close();
       for (const c of clients) c.end();
       await new Promise<void>((ok) => server.close(() => ok()));
     },

@@ -4,8 +4,13 @@
     {
       "name": "harness",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["app/server.ts"],
-      "port": 5180
+      "runtimeArgs": [
+        "app/server.ts",
+        "--port",
+        "5280",
+        "--no-write"
+      ],
+      "port": 5280
     }
   ]
 }

@@ -6,10 +6,17 @@
   "scripts": {
     "check": "tsc -p .",
     "test": "node --test --test-timeout=20000 test/*.test.ts",
-    "serve": "node app/server.ts",
-    "server:start": "node scripts/server.ts start",
-    "server:stop": "node scripts/server.ts stop",
-    "server:status": "node scripts/server.ts status"
+    "serve": "node app/server.ts --port 5280 --no-write",
+    "dev:start": "node scripts/server.ts start --port 5280 --no-write",
+    "dev:stop": "node scripts/server.ts stop --port 5280 --no-write",
+    "dev:status": "node scripts/server.ts status --port 5280 --no-write",
+    "dev:copy": "node scripts/live.ts copy",
+    "live:setup": "node scripts/live.ts setup",
+    "live:start": "node scripts/live.ts start",
+    "live:stop": "node scripts/live.ts stop",
+    "live:status": "node scripts/live.ts status",
+    "promote": "node scripts/live.ts promote",
+    "rollback": "node scripts/live.ts rollback"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

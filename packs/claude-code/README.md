@@ -66,7 +66,7 @@ is found from the tool use id the PreToolUse hook saw for it.
 ## Running it
 
 ```
-node packs/claude-code/host.ts [--port 5181] [--demo] [--journal file]
+node packs/claude-code/host.ts [--port 5281] [--demo] [--journal file]
 ```
 
 starts exchange, agent and this pack in one hot-reloaded process, with a
@@ -75,7 +75,8 @@ live tail of the exchange on the console. `--demo` adds a few nodes
 defaults to `packs/claude-code/.data/exchange.jsonl`.
 
 Point Claude Code at it with [settings.json](settings.json) (the hooks) and
-[mcp.json](mcp.json) (the MCP server):
+[mcp.json](mcp.json) (the MCP server). Both name 5281, the dev port, so
+they reach this host or the dev app server (`npm run serve`), never live:
 
 ```
 claude --settings packs/claude-code/settings.json --mcp-config packs/claude-code/mcp.json
@@ -88,16 +89,19 @@ says nothing and the agent carries on.
 
 ## Every session
 
-To have every Claude Code session, in any repo, report here: run the app
-server on its own, and add the hooks at user level.
+To have every Claude Code session, in any repo, report here: run the live
+server, and add the hooks at user level.
 
 ```
-npm run server:start      # also server:stop, server:status
+npm run live:setup        # once: the live worktree, beside this checkout
+npm run live:start        # also live:stop, live:status
 ```
 
-starts `app/server.ts` detached ([scripts/server.ts](../../scripts/server.ts)),
-with its data, log and pid in `app/.data`, so it outlives the terminal and
-keeps its runs across restarts.
+starts `app/server.ts` detached from the live worktree, at a fixed commit
+with hot reload off ([scripts/live.ts](../../scripts/live.ts)), with its
+data, log and pid in the worktree's `app/.data`, so it outlives the
+terminal, keeps its runs across restarts, and isn't touched by edits here.
+`npm run promote` moves it to new code (the main README, "Live").
 
 In `~/.claude/settings.json`, beside whatever hooks are there, add one group
 per event (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse,
@@ -105,7 +109,7 @@ PostToolUseFailure, Stop, SessionEnd; `"matcher": "*"` on the tool events),
 each with:
 
 ```json
-{ "type": "command", "command": "node \"<repo>/packs/claude-code/hook.ts\"", "timeout": 5 }
+{ "type": "command", "command": "node \"<live worktree>/packs/claude-code/hook.ts\"", "timeout": 5 }
 ```
 
 And the MCP server, at user level, so any session can `hear` and `act`
