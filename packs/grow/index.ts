@@ -13,7 +13,7 @@
  *   the miss it should prevent, and the run and seq it came from. The words
  *   pack says a trial node marked as one.
  *
- * Promoting or retiring a trial by its record is the next step, not here.
+ * Promoting or retiring a trial by its record is the keep pack's.
  * Coverage is the verdict pack's: a node covers a miss when it listens
  * there as narrowly as the miss allows, or its `misses` (read from the map
  * item it came from) name the miss's words (miss.ts).
@@ -189,7 +189,9 @@ const grow: Pack = {
             throw refuse("grow.place", `Miss #${input.seq} happened at ${miss.places.join(", ")}: say the node at one of those.`);
           }
         }
-        const title = (input.title ?? words.split(/(?<=[.!?:])\s/)[0] ?? words).trim().slice(0, 80);
+        // A title names the advice, not the "What fixed it:" it leads with.
+        const lead = words.replace(/^what fixed it:\s*/i, "");
+        const title = (input.title ?? lead.split(/(?<=[.!?:])\s/)[0] ?? lead).trim().slice(0, 80);
         const added = await call.call<{ node: string }>("words.add", { title, kind: "reflex", at: [place], words });
         const id = added.node;
         facts.push(["+", id, "status", "trial"], ["+", id, "misses", misses]);

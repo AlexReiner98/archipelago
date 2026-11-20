@@ -12,8 +12,14 @@ Per run, a node is judged from the first time it was said (or refused) there:
 | Verdict | When |
 |---|---|
 | **failed** | one of its misses came after |
-| **held** | a miss came before, and none after; or it refused, and nothing went wrong after |
-| **quiet** | no miss and no refusal in the run: nothing to judge |
+| **held** | a miss came before, and none after; or it refused, and nothing went wrong after; or a near miss came after, and no miss |
+| **quiet** | no miss, no refusal and no near miss in the run: nothing to judge |
+
+A **near miss** is the miss's situation coming up again and going right: a
+call at the node's place that worked, whose answer holds one of the phrases
+of its `misses` (16 characters or more, word for word). Its input doesn't
+count, since a search for the error names it. Neither do a few words in
+common, since any JSON output has "json" in it. `near` counts them.
 
 A node's **miss** is something going wrong that it covers: a refusal by
 another node, or an act with `ok: false`. An act stands at its place and at
@@ -46,8 +52,8 @@ Only runs where a node was said judge it.
 ## The record
 
 Per node: `said`, `runs`, `held`, `failed`, `quiet`, `last`, and `places`
-(how often it was said at each). The reflex record without its growth loop:
-promoting and retiring nodes comes later.
+(how often it was said at each). The [keep](../keep/README.md) pack promotes
+and retires trial nodes by it.
 
 ## `verdict.read`
 

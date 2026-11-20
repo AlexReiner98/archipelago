@@ -10,6 +10,8 @@ reflex's condition) speaks only when the moment's input holds that text.
 |---|---|
 | `words.set` `{ node, words }` | Changes what a node says |
 | `words.add` `{ title, kind, at, words, refuse?, when? }` | Adds a node |
+| `words.retire` `{ node }` | Retires a node: `status: retired`, no longer said |
+| `words.promote` `{ node }` | Keeps a trial or retired node: its `status` goes, and it is said as kept |
 | `words.voice` `{ voice, title, kind?, at, words }` | The wording item of a code-made node (`voice`: its id, such as `grow/ask`): made the first time, found after. This pack doesn't say it; that node does, with `{name}` filled in, and `words.set` rewords it |
 
 A node item with `repeat: "every"` is said each time its place is reached;

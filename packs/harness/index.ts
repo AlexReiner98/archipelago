@@ -12,6 +12,10 @@
  *   are edited through the `words.set` action, and the next say uses them.
  *   A trial node (its item's `status` is `trial`) is marked in the tree, and
  *   its pane says what miss it came from and can retire it (`words.retire`).
+ *   With the keep pack (keep.ts): each trial node's standing by its record
+ *   in the tree (trial, promote, retire, held back), the nodes kept or
+ *   retired in the tree's last group, and the record against the
+ *   thresholds, the gate's checks, Keep and Retire in the node pane.
  *   A node the map writes a file from shows the file and its rule, held as
  *   written or open to refinement, and can flip it (`written.rule`).
  *
@@ -30,6 +34,7 @@ import type { GraphRead, GraphWatch, Item } from "../../spec/graph.ts";
 import type { HereRead, HereSet } from "../../spec/here.ts";
 import type { ProfileRead } from "../../spec/profile.ts";
 import { profileHook } from "./profiles.ts";
+import { KEEP_STYLE, keepParts, type Review } from "./keep.ts";
 import { KEYS } from "../../spec/here.ts";
 import type { SlotFill } from "../../spec/slot.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
@@ -118,7 +123,7 @@ const STYLE = `
 .hv-prof .part { color:var(--dim); }
 .hv-prof .sp { flex:1; }
 .hv-miss { margin:2px 10px 6px; padding:4px 6px; border-left:3px solid var(--failed); white-space:pre-wrap; color:var(--dim); }
-`;
+${KEEP_STYLE}`;
 
 const short = (v: unknown, n = 120): string => {
   const s = typeof v === "string" ? v : v === undefined ? "" : JSON.stringify(v);
@@ -261,6 +266,17 @@ const harness: Pack = {
 
     const useProfiles = profileHook(profiles);
 
+    const kp = keepParts({
+      actions,
+      invoke,
+      graphLive,
+      onVerdicts: (on) => verdicts.watch(() => on()),
+      pick: (node) => {
+        set.set(KEYS.node, node);
+        set.set(KEYS.event, undefined);
+      },
+    });
+
     const useEditable = (): boolean => {
       const has = () => actions.list().some((a) => a.name === EDIT);
       const [v, setV] = useState(has());
@@ -328,7 +344,8 @@ const harness: Pack = {
 
     const Mark = ({ v }: { v?: Verdict }) => html`<span class=${`hv-m m-${v ?? "none"}`} title=${v ?? "not said"}>${MARK[v ?? "none"]}</span>`;
 
-    const TreePane = ({ nodes, byNode, counts, statuses }: { nodes: NodeInfo[]; byNode: Map<string, RunVerdict>; counts: Map<string, number>; statuses: Map<string, string> }) => {
+    const TreePane = ({ nodes, byNode, counts, statuses, review }: { nodes: NodeInfo[]; byNode: Map<string, RunVerdict>; counts: Map<string, number>; statuses: Map<string, string>; review?: Review }) => {
+      const reviewed = useMemo(() => new Map((review?.nodes ?? []).map((r) => [r.item, r])), [review]);
       const [by, setBy] = useState<"place" | "pack">("place");
       const picked = useHere<string>(KEYS.node);
       const groups = useMemo(() => {
@@ -361,13 +378,14 @@ const harness: Pack = {
                     }}>
                       <${Mark} v=${byNode.get(n.id)?.verdict} />
                       <span class="x">${n.title}</span>
-                      ${statusOf(n, statuses) === "trial" && html`<span class="hv-tag">trial</span>`}
+                      ${review && n.source && reviewed.has(n.source) ? html`<${kp.Tag} r=${reviewed.get(n.source)} />` : statusOf(n, statuses) === "trial" && html`<span class="hv-tag">trial</span>`}
                       <span class="n">${counts.get(n.id) ?? ""}</span>
                     </div>
                   `,
                 )}
               `,
             )}
+            <${kp.Decided} review=${review} picked=${picked} />
           </div>
         </div>
       `;
@@ -500,7 +518,7 @@ const harness: Pack = {
 
     const Trial = ({ info }: { info: NodeInfo }) => {
       const item = useItem(info.source);
-      const canRetire = useHas(RETIRE);
+      const canRetire = useHas(RETIRE) && !useHas("keep.apply");
       const [status, setStatus] = useState("");
       useEffect(() => setStatus(""), [info.id]);
       if (item?.fields.status !== "trial") return null;
@@ -520,10 +538,10 @@ const harness: Pack = {
         <div class="hv-group">trial: written after this miss</div>
         <div class="hv-miss">${typeof item.fields.misses === "string" ? item.fields.misses : "—"}</div>
         ${from && html`<div class="hv-row" onClick=${() => set.set(KEYS.run, from)} title="show that run"><span class="x">from ${from.slice(0, 8)}${seq !== undefined ? ` #${seq}` : ""}</span></div>`}
-        <div class="hv-words"><div class="bar">
-          ${canRetire && html`<button class="hv-btn" onClick=${retire}>Retire</button>`}
+        ${canRetire && html`<div class="hv-words"><div class="bar">
+          <button class="hv-btn" onClick=${retire}>Retire</button>
           <span>${status || "Said only at its place, marked as a trial."}</span>
-        </div></div>
+        </div></div>`}
       `;
     };
 
@@ -556,7 +574,7 @@ const harness: Pack = {
       `;
     };
 
-    const NodePane = ({ nodes, editable }: { nodes: NodeInfo[]; editable: boolean }) => {
+    const NodePane = ({ nodes, editable, review }: { nodes: NodeInfo[]; editable: boolean; review?: Review }) => {
       const id = useHere<string>(KEYS.node);
       const info = nodes.find((n) => n.id === id);
       const record = useVerdictData(() => (id ? verdicts.record(id) : Promise.resolve(undefined)), [id]);
@@ -570,6 +588,7 @@ const harness: Pack = {
             ${!info && html`<div class="hv-empty">Not loaded now: its record stays.</div>`}
             ${info && html`<${Words} info=${info} editable=${editable} />`}
             ${info?.source && html`<${Trial} info=${info} />`}
+            <${kp.Standing} review=${review} id=${id} source=${info?.source} />
             ${info?.source && html`<${Written} info=${info} />`}
             ${info && html`
               <div class="hv-kv"><span class="k">places</span><span class="v" title=${info.at.join(", ")}>${info.at.join(", ")}</span></div>
@@ -606,14 +625,15 @@ const harness: Pack = {
       const records = useVerdictData(() => verdicts.records({ limit: 500 }).then((p) => p.items), []) ?? [];
       const editable = useEditable();
       const statuses = useStatuses();
+      const review = kp.useReview();
       const byNode = useMemo(() => new Map(verdictsOfRun.map((v) => [v.node, v])), [verdictsOfRun]);
       const counts = useMemo(() => new Map(records.map((r) => [r.node, r.said])), [records]);
       const titles = useMemo(() => new Map(nodes.map((n) => [n.id, n.title])), [nodes]);
       return html`
         <div class="hv">
-          <${TreePane} nodes=${nodes} byNode=${byNode} counts=${counts} statuses=${statuses} />
+          <${TreePane} nodes=${nodes} byNode=${byNode} counts=${counts} statuses=${statuses} review=${review} />
           <${RunPane} runs=${runs} run=${run} events=${events} verdictsOfRun=${verdictsOfRun} titles=${titles} />
-          <${NodePane} nodes=${nodes} editable=${editable} />
+          <${NodePane} nodes=${nodes} editable=${editable} review=${review} />
         </div>
       `;
     };

@@ -9,7 +9,7 @@
  * refusal), `when` (said only when the moment's input holds that text: a
  * reflex's condition), `repeat` (`every`: said each time, not once per
  * context), `voice` (the wording of a code-made node, which says it: this
- * pack registers nothing for it; `words.voice` makes it), and `status`: absent for a kept node, `trial` for one on trial
+ * pack registers nothing for it; `words.voice` makes it), and `status`: absent for a kept node (`words.promote` keeps one), `trial` for one on trial
  * (its words are said marked as a trial), `retired` for one no longer said.
  * `held` (a reason): held as written, so `words.set` and `words.retire`
  * refuse, saying why (the written pack's rule, packs/written).
@@ -150,6 +150,25 @@ const words: Pack<WordsConfig> = {
         if (item.fields.status !== undefined) facts.push(["-", input.node, "status", item.fields.status]);
         facts.push(["+", input.node, "status", "retired"]);
         call.write(facts);
+        return { node: input.node };
+      },
+    });
+
+    register.register({
+      name: "words.promote",
+      title: "Keep a node: a trial or retired one is said as kept from now on",
+      input: {
+        type: "object",
+        properties: { node: { type: "string", description: "The node's item id" } },
+        required: ["node"],
+      },
+      async run(input: { node: Id }, call: ActionContext) {
+        const [item] = await graph.get([input.node]);
+        if (!item || item.type !== TYPE) {
+          throw new Refused({ code: "words.not_a_node", message: `${input.node} is not a node on the map.`, by: { pack: "words" } });
+        }
+        heldCheck(item);
+        if (item.fields.status !== undefined) call.write([["-", input.node, "status", item.fields.status]]);
         return { node: input.node };
       },
     });

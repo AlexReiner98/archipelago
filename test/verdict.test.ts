@@ -56,6 +56,16 @@ test("quiet: said, and nothing went wrong where it listens", () => {
   assert.equal(v[0]!.verdict, "quiet");
 });
 
+test("held: its miss's situation came up again after it was said, and worked (a near miss)", () => {
+  const near = listeningOf([{ id: "w/retry", at: ["tool:Bash"], misses: "server answered 429 empty body" }]);
+  const ok = (seq: number, output: string) => ev("r", seq, { kind: "act", place: "tool:Bash", act: { kind: "tool", by: "agent", input: { command: "curl" }, output, ok: true } });
+  const v = judgeRun("r", [said("r", 1, "w/retry", "tool:Bash"), ok(2, "Server answered 429 empty body; waited and retried: 200")], near);
+  assert.deepEqual(v.map((x) => [x.verdict, x.near]), [["held", 1]]);
+  assert.equal(judgeRun("r", [said("r", 1, "w/retry", "tool:Bash"), ok(2, "429 from the server, empty body")], near)[0]!.verdict, "quiet", "a few words in common aren't the miss");
+  const short = listeningOf([{ id: "w/retry", at: ["tool:Bash"], misses: "Unexpected end of JSON input,JSON.parse" }]);
+  assert.equal(judgeRun("r", [said("r", 1, "w/retry", "tool:Bash"), ok(2, '{"input": "x", "parse": true, "end": 1}')], short)[0]!.verdict, "quiet");
+});
+
 test("a node not said in a run isn't judged there", () => {
   assert.deepEqual(judgeRun("r", [failedAct("r", 1, "tool:change")], listening), []);
 });

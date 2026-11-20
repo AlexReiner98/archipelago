@@ -7,8 +7,9 @@
  * reflex record's meanings, 19 Nov 2026):
  * - failed: one of its misses came after;
  * - held: a miss came before and none after, or it refused something and
- *   nothing went wrong after (a refusal is the node working);
- * - quiet: no miss and no refusal, nothing to judge.
+ *   nothing went wrong after (a refusal is the node working), or its miss's
+ *   situation came up again after it was said and worked (`near`);
+ * - quiet: no miss, no refusal and no near miss, nothing to judge.
  *
  * A node's miss is something going wrong that it covers: a refusal by
  * another node, or an act that didn't work (`ok: false`), at a place that
@@ -131,6 +132,12 @@ export interface RunVerdict {
   after: number;
   /** The seqs of the misses after: what failed it. */
   failed_by: number[];
+  /**
+   * Near misses after it was said: an act at its place that worked, whose
+   * answer holds one of its miss's phrases word for word (`missPhrases`).
+   * The situation came up again, and this time nothing went wrong.
+   */
+  near: number;
 }
 
 /** A node's record across runs. */
@@ -235,6 +242,30 @@ function isMissOf(e: ExchangeEvent, node: string, listener: Listener, cwd?: stri
   return covers(listener, places, missWords(e));
 }
 
+/** The phrases of a node's `misses` long enough to stand for that miss alone: its comma- or line-separated parts of 16 characters or more. */
+export function missPhrases(misses: string | undefined): string[] {
+  return (misses ?? "")
+    .split(/[,;\n]/)
+    .map((p) => p.trim().toLowerCase())
+    .filter((p) => p.length >= 16);
+}
+
+/**
+ * Whether an act that worked stands where the node listens and answered
+ * with one of its miss's phrases, word for word: the situation came up
+ * again and went right. Its input doesn't count (a search for the error
+ * names it), nor a few words in common (any JSON output has "json").
+ */
+function isNearOf(e: ExchangeEvent, node: string, listener: Listener, cwd?: string): boolean {
+  if (e.kind !== "act" || !e.act || e.act.ok === false || deniedBy(e) === node) return false;
+  const phrases = missPhrases(listener.misses);
+  if (!phrases.length) return false;
+  const places = [...(e.place ? [e.place] : []), ...filePlaces(e.act.input, cwd)];
+  if (!places.some((p) => listener.at.some((a) => placeMatches(a, p)))) return false;
+  const out = text(e.act.output).toLowerCase();
+  return phrases.some((p) => out.includes(p));
+}
+
 /** One run's verdicts, one per node said in it, in the order each was first said. */
 export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listening): RunVerdict[] {
   const sorted = [...events].filter((e) => e.run === run).sort((a, b) => a.seq - b.seq);
@@ -255,16 +286,18 @@ export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listeni
     const before = misses.filter((m) => m.seq < first.seq).length;
     const afterList = misses.filter((m) => m.seq > first.seq);
     const after = afterList.length;
+    const near = sorted.filter((e) => e.seq > first.seq && isNearOf(e, node, listener, cwd)).length;
     out.push({
       run,
       node,
-      verdict: after ? "failed" : before || refused ? "held" : "quiet",
+      verdict: after ? "failed" : before || refused || near ? "held" : "quiet",
       said: said.length,
       first: first.seq,
       said_at: first.time,
       before,
       after,
       failed_by: afterList.map((m) => m.seq),
+      near,
     });
   }
   return out;
