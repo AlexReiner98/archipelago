@@ -1,18 +1,18 @@
 /**
  * Marks for states, from bases and status sides, never a type's name. A
  * base's shape is its place among the bases defined; its fill is where its
- * status sits: the first open hollow, a later open half, the first closed
- * full, a later closed struck through. Shared by the canvas and the item
- * page, through the `map.marks` export.
+ * status sits: the first open hollow, a later open half (blue), the first
+ * closed full (green), a later closed full and grey, its title struck. The
+ * item page draws by the same rule.
  */
 import type { Json } from "../../spec/common.ts";
 import type { TypeInfo } from "../../spec/types.ts";
 
 const SHAPES = [
-  ["□", "◧", "■", "⊠"],
-  ["◇", "◈", "◆", "⟡"],
-  ["○", "◐", "●", "⊘"],
-  ["△", "◭", "▲", "⊿"],
+  ["□", "◧", "■", "■"],
+  ["◇", "◈", "◆", "◆"],
+  ["○", "◐", "●", "●"],
+  ["△", "◭", "▲", "▲"],
 ];
 
 export type Side = "fresh" | "moving" | "done" | "gone";

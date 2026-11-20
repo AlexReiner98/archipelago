@@ -141,7 +141,7 @@ test("marks come from the base and the status's side, never the type's name", ()
   const w = TYPES.get("work")!;
   const bug = TYPES.get("bug")!;
   assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => side(w, s)), ["fresh", "moving", "done", "gone"]);
-  assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => mark(bases, w, s)), ["□", "◧", "■", "⊠"]);
+  assert.deepEqual(["todo", "doing", "done", "dropped"].map((s) => mark(bases, w, s)), ["□", "◧", "■", "■"]);
   assert.equal(mark(bases, bug, "done"), mark(bases, w, "done"), "a flavour is marked as its base");
   assert.equal(mark(bases, TYPES.get("question")!, "open"), "◇");
 });

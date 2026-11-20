@@ -11,8 +11,13 @@ plane; the query (`find.query`) is the whole surface.
   spans columns takes a thin row of its own in each column it passes, each
   card side spreads its wire ends, and each wire turns on its own lane.
 - Marks (marks.ts) come from the base and the status's side, never the
-  type's name: shape by base, hollow for the first open status, half for a
-  later open one, full for the first closed, struck for a later closed.
+  type's name: shape by base, hollow for the first open status, half and
+  blue for a later open one, full and green for the first closed, full and
+  grey (its title struck) for a later closed. The legend shows every mark:
+  each base with each of its statuses, and each kind of link.
+- Hovering or opening an item lights it: a blue outline, its links blue
+  over the rest, the items linked to it yellow. The legend's "lit" line
+  says so.
 - A click sets `here.item`. Drag the plane to move it, wheel to zoom,
   double-click to fit.
 - It only shows: nobody adds or links items by hand. Agents change the

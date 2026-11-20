@@ -45,7 +45,7 @@ const STYLE = `
 .ip-x { font:inherit; background:none; border:0; color:var(--dim); cursor:pointer; padding:0 4px; }
 .ip-x:hover { color:var(--fg); }
 .ip-mk { width:1.1em; text-align:center; flex:none; color:var(--dim); }
-.ip-mk.s-moving { color:var(--pick); } .ip-mk.s-done { color:var(--held); }
+.ip-mk.s-moving { color:var(--pick); } .ip-mk.s-done { color:var(--held); } .ip-mk.s-gone { color:var(--quiet); }
 .ip-row { display:flex; gap:8px; align-items:baseline; padding:1px 10px; white-space:nowrap; min-height:20px; }
 .ip-row .k { color:var(--dim); width:8.5em; flex:none; overflow:hidden; text-overflow:ellipsis; }
 .ip-row .v { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
@@ -59,7 +59,7 @@ const STYLE = `
 `;
 
 /** Marks, by base and status side (the same rule the canvas draws by). */
-const SHAPES = [["□", "◧", "■", "⊠"], ["◇", "◈", "◆", "⟡"], ["○", "◐", "●", "⊘"], ["△", "◭", "▲", "⊿"]];
+const SHAPES = [["□", "◧", "■", "■"], ["◇", "◈", "◆", "◆"], ["○", "◐", "●", "●"], ["△", "◭", "▲", "▲"]];
 const sideOf = (t: TypeInfo | undefined, s: Json | undefined) => {
   if (!t || typeof s !== "string") return 0;
   const o = t.statuses.open.indexOf(s);

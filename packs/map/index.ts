@@ -5,6 +5,9 @@
  * state, links as right-angled wires (layout.ts).
  *
  * - A click on an item sets `here.item`; its wires and neighbours light.
+ *   Hovering an item lights its wires and neighbours too, over the rest.
+ * - The legend holds every mark: each base with each of its statuses (read
+ *   from the types), and each kind of link.
  * - The plane pans by dragging, zooms by the wheel, and fits again on a
  *   double-click.
  * - It only shows: nobody adds or links items by hand here. Agents change
@@ -70,6 +73,7 @@ const STYLE = `
 .mp-card .mk { fill:var(--dim); font-size:13px; }
 .mp-card.s-moving .mk { fill:var(--pick); }
 .mp-card.s-done .mk { fill:var(--held); }
+.mp-card.s-gone .mk { fill:var(--quiet); }
 .mp-card.s-done text.t, .mp-card.s-gone text.t { fill:var(--dim); }
 .mp-card.s-gone text.t { text-decoration:line-through; }
 .mp-card.pick rect { stroke:var(--pick); stroke-width:2; }
@@ -77,11 +81,21 @@ const STYLE = `
 .mp-wire { fill:none; stroke:var(--dim); stroke-width:1.2; }
 .mp-wire.part_of { stroke-dasharray:5 3; }
 .mp-wire.bears_on { stroke-dasharray:1 3; stroke-linecap:round; stroke-width:1.6; }
-.mp-wire.waits_on { stroke:var(--pick); }
+.mp-wire.waits_on { stroke-dasharray:7 3 1.5 3; }
 .mp-wire.about { stroke:var(--line); }
-.mp-wire.lit { stroke:var(--fg); stroke-width:2; }
-.mp-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:11px; display:flex; gap:10px; background:color-mix(in srgb, var(--bg) 85%, transparent); padding:1px 6px; border-radius:3px; }
+.mp-wire.lit { stroke:var(--pick); stroke-width:2.2; }
+.mp-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:11px; background:color-mix(in srgb, var(--bg) 88%, transparent); padding:3px 8px; border-radius:3px; border:1px solid var(--line); display:grid; grid-template-columns:auto 1fr; column-gap:10px; row-gap:1px; pointer-events:none; }
+.mp-key .b { color:var(--fg); }
+.mp-key .row { display:flex; gap:10px; white-space:nowrap; align-items:center; }
+.mp-key .row > span { display:inline-flex; align-items:center; gap:3px; }
+.mp-key .m { display:inline-block; width:1.1em; text-align:center; }
+.mp-key .m.s-moving { color:var(--pick); } .mp-key .m.s-done { color:var(--held); } .mp-key .m.s-gone { color:var(--quiet); }
 .mp-key svg { width:22px; height:8px; vertical-align:middle; }
+.mp-key .sw { display:inline-block; width:16px; height:9px; border-radius:2px; border:1px solid var(--line); background:var(--panel); }
+.mp-key .sw.pick { border:2px solid var(--pick); width:14px; height:7px; }
+.mp-key .sw.near { background:var(--lit); }
+.mp-card.hover rect { stroke:var(--pick); }
+.mp-wire.hot { stroke:var(--pick); stroke-width:2.2; }
 .mp-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); }
 `;
 
@@ -119,13 +133,38 @@ const map: Pack = {
       return html`${slots.fills(name).map((f) => html`<${f.view} key=${`${f.pack}/${f.name}`} />`)}`;
     };
 
-    const Key = () => html`
-      <div class="mp-key">
-        ${["depends_on", "part_of", "waits_on", "bears_on", "about"].map(
-          (k) => html`<span><svg viewBox="0 0 22 8"><path class=${`mp-wire ${k}`} d="M0 4H22" /></svg> ${k}</span>`,
-        )}
-      </div>
-    `;
+    /** Every mark the canvas draws: each base with each of its statuses, then each kind of link. */
+    const Key = () => {
+      const all = index.types();
+      const bases = all.filter((t) => t.base === t.name);
+      const names = bases.map((t) => t.name);
+      const known = new Set(["depends_on", "part_of", "waits_on", "bears_on", "about"]);
+      const kinds = index.links().map((l) => l.name);
+      return html`
+        <div class="mp-key">
+          ${bases.map(
+            (t) => html`
+              <span class="b">${t.name}</span>
+              <span class="row">
+                ${[...t.statuses.open, ...t.statuses.closed].map(
+                  (st) => html`<span><span class=${`m s-${side(t, st)}`}>${mark(names, t, st)}</span>${st}</span>`,
+                )}
+              </span>
+            `,
+          )}
+          <span class="b">lit</span>
+          <span class="row">
+            <span><span class="sw pick"></span> hovered or open</span>
+            <span><span class="sw near"></span> linked to it</span>
+            <span><svg viewBox="0 0 22 8"><path class="mp-wire lit" d="M0 4H22" /></svg> its links</span>
+          </span>
+          <span class="b">links</span>
+          <span class="row">
+            ${kinds.map((k) => html`<span><svg viewBox="0 0 22 8"><path class=${`mp-wire ${known.has(k) ? k : ""}`} d="M0 4H22" /></svg> ${k}</span>`)}
+          </span>
+        </div>
+      `;
+    };
 
     const Canvas = ({ result, drawn }: { result: Result; drawn: Out }) => {
       const picked = useHere<string>(KEYS.item);
@@ -133,6 +172,7 @@ const map: Pack = {
       const [view, setView] = useState({ x: -20, y: -20, k: 1 });
       const [panning, setPanning] = useState(false);
       const [fits, refit] = useState(0);
+      const [hover, setHover] = useState<Id | undefined>();
       const bases = useMemo(() => index.types().filter((t) => t.base === t.name).map((t) => t.name), [result]);
 
       // Fit the drawing when what is drawn changes shape, not when the pane beside it opens.
@@ -184,26 +224,31 @@ const map: Pack = {
         box.current!.addEventListener("pointercancel", up);
       };
 
-      const near = useMemo(() => {
+      const neighbours = (id: Id | undefined) => {
         const s = new Set<Id>();
-        if (picked) for (const l of result.links) if (l.from === picked) s.add(l.to);
-        else if (l.to === picked) s.add(l.from);
+        if (id) for (const l of result.links) if (l.from === id) s.add(l.to);
+        else if (l.to === id) s.add(l.from);
         return s;
-      }, [picked, result]);
+      };
+      const near = useMemo(() => neighbours(picked), [picked, result]);
+      const hoverNear = useMemo(() => neighbours(hover), [hover, result]);
+      const touches = (p: { from: Id; to: Id }, id: Id | undefined) => !!id && (p.from === id || p.to === id);
+      // Lit wires are drawn last, so they lie over the others.
+      const wires = [...drawn.paths].sort((a, b) => Number(touches(a, hover) || touches(a, picked)) - Number(touches(b, hover) || touches(b, picked)));
       const titleLen = Math.floor((SIZE.w - 30) / 6.4);
       return html`
         <div class=${`mp-canvas${panning ? " panning" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${(e: MouseEvent) => !at(toWorld(e)) && refit((n) => n + 1)} title="Click an item to open it; drag to move the plane; double-click to fit">
           <svg><g transform=${`scale(${view.k}) translate(${-view.x} ${-view.y})`}>
-            ${drawn.paths.map(
-              (p) => html`<path key=${p.id} class=${`mp-wire ${p.type}${picked && (p.from === picked || p.to === picked) ? " lit" : ""}`} d=${`M${p.points.map((q) => q.join(" ")).join("L")}`}><title>${p.type}</title></path>`,
+            ${wires.map(
+              (p) => html`<path key=${p.id} class=${`mp-wire ${p.type}${touches(p, hover) ? " hot" : touches(p, picked) ? " lit" : ""}`} d=${`M${p.points.map((q) => q.join(" ")).join("L")}`}><title>${p.type}</title></path>`,
             )}
             ${result.items.map((r) => {
               const b = drawn.boxes.get(r.id)!;
               const t = index.type(r.type);
               const title = String(r.fields.title ?? r.id);
-              const cls = `mp-card s-${side(t, r.fields.status)}${r.id === picked ? " pick" : ""}${near.has(r.id) ? " near" : ""}`;
+              const cls = `mp-card s-${side(t, r.fields.status)}${r.id === picked ? " pick" : ""}${near.has(r.id) || hoverNear.has(r.id) ? " near" : ""}${r.id === hover ? " hover" : ""}`;
               return html`
-                <g key=${r.id} class=${cls} transform=${`translate(${b.x} ${b.y})`}>
+                <g key=${r.id} class=${cls} transform=${`translate(${b.x} ${b.y})`} onPointerEnter=${() => setHover(r.id)} onPointerLeave=${() => setHover((h) => (h === r.id ? undefined : h))}>
                   <title>${title} · ${r.type} · ${String(r.fields.status ?? "")}</title>
                   <rect width=${SIZE.w} height=${SIZE.h} rx="3" />
                   <text class="mk" x="9" y=${SIZE.h / 2}>${mark(bases, t, r.fields.status)}</text>
