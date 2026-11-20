@@ -1,7 +1,16 @@
-# graph 0.1.0
+# graph
 
 The graph pack stores items and links and is the truth. This is what every
 other pack sees of it. Types: [graph.ts](graph.ts).
+
+## Capabilities
+
+| Key | Gives |
+|---|---|
+| `graph.read` | Bounded reads |
+| `graph.watch` | Live watch |
+| `graph.stage` | Add a stage to the write chain |
+| `graph.commit` | Enter the write chain (the action pack only) |
 
 ## Items and links
 
@@ -55,10 +64,10 @@ The store applies the set atomically: all facts or none. A retraction whose
 value isn't the field's current value fails the whole set with
 `graph.conflict`.
 
-## Why `commit` is on the service
+## Who may commit
 
-The write end has to be reachable for the action service, which is a pack
-like any other. The contract says only the action service calls it; the
-graph doesn't enforce that, since there is no sandbox. A pack that writes
-around actions breaks the contract the same way one that ignores its types
-does.
+`graph.commit` is a capability like the others, so who holds it is the
+orchestrator's choice, not a convention: it is given to the action pack
+alone, and every other change reaches the graph through `action.invoke`.
+There is no sandbox, so a pack that reached past its context could still
+write; that breaks the contract the same way ignoring its types would.

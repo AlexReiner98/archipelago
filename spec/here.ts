@@ -1,10 +1,8 @@
 /**
- * here 0.1.0: shared ephemeral state. See here.md.
+ * here: shared ephemeral state. See here.md.
  */
 import type { JsonSchema } from "./action.ts";
-import type { Actor, ContractVersion, Dispose, Json, PackId } from "./common.ts";
-
-export const contract: ContractVersion<"here"> = { name: "here", version: "0.1.0" };
+import type { Actor, Capability, Dispose, Json, PackId } from "./common.ts";
 
 /**
  * - `page`: one open page. Two tabs can look at different things.
@@ -40,13 +38,33 @@ export interface Change {
   by: Actor | { pack: PackId };
 }
 
-/** The service, provided as `here@0`. */
-export interface Here {
+/** `here.declare`. */
+export interface HereDeclare {
   /** Declares a key beyond the spec's. A taken key is refused. */
   declare(def: KeyDef): Dispose;
+}
+
+/** `here.read`. */
+export interface HereRead {
   get<T extends Json>(key: string): T | undefined;
-  /** Sets or (with `undefined`) clears a key. Not an action: see here.md. */
-  set(key: string, value: Json | undefined, by: Change["by"]): void;
   /** Calls `on` with each change to the key, starting with its value now. */
   watch(key: string, on: (change: Change) => void): Dispose;
 }
+
+/** `here.set`. */
+export interface HereSet {
+  /** Sets or (with `undefined`) clears a key. Not an action: see here.md. */
+  set(key: string, value: Json | undefined, by: Change["by"]): void;
+}
+
+export interface Capabilities {
+  "here.declare": HereDeclare;
+  "here.read": HereRead;
+  "here.set": HereSet;
+}
+
+export const capabilities: Capability[] = [
+  { key: "here.declare", since: 1, doc: "Declares a key of shared ephemeral state, with its scope." },
+  { key: "here.read", since: 1, doc: "A key's value now, and each change to it." },
+  { key: "here.set", since: 1, doc: "Sets or clears a key." },
+];

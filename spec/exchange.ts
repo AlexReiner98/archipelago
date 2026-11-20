@@ -1,22 +1,21 @@
 /**
- * exchange 0.1.0: one event per say, refusal and act. See exchange.md.
+ * exchange: one event per say, refusal and act. See exchange.md.
  */
 import type { Act, Place, RunId, RunInfo } from "./agent.ts";
-import type { ContractVersion, Dispose, Json, Page, PageRequest, PackId, Time } from "./common.ts";
-
-export const contract: ContractVersion<"exchange"> = { name: "exchange", version: "0.1.0" };
+import type { Capability, Dispose, Json, Page, PageRequest, PackId, Term, Time } from "./common.ts";
 
 /** `to_agent`: the map spoke. `from_agent`: the agent (or the person at its prompt) did. */
 export type ExchangeDirection = "to_agent" | "from_agent";
 
-/**
- * - `begin`, `end`: the run's edges.
- * - `say`, `refuse`: a node spoke at a place (to_agent).
- * - `act`: the agent did something (from_agent).
- * - `miss`: something in the exchange itself went wrong: a node threw, or
- *   refused where refusing can't stop anything. Not the agent's fault.
- */
-export type ExchangeKind = "begin" | "end" | "say" | "refuse" | "act" | "miss";
+/** Open vocabulary: a consumer skips events of a kind it doesn't know. */
+export const EVENT_KINDS: Term[] = [
+  { term: "begin", since: 1, doc: "The run started." },
+  { term: "end", since: 1, doc: "The run ended." },
+  { term: "say", since: 1, doc: "A node gave words at a place (to_agent)." },
+  { term: "refuse", since: 1, doc: "A node stopped what was happening at a place (to_agent)." },
+  { term: "act", since: 1, doc: "The agent, or the person at its prompt, did something (from_agent)." },
+  { term: "miss", since: 1, doc: "The exchange itself went wrong: a node threw, or refused where it couldn't." },
+];
 
 export interface ExchangeEvent {
   id: string;
@@ -26,7 +25,7 @@ export interface ExchangeEvent {
   time: Time;
   place: Place;
   direction: ExchangeDirection;
-  kind: ExchangeKind;
+  kind: string;
   /** The node that spoke (say, refuse, miss). */
   node?: string;
   /** The pack the node or the act's action belongs to. */
@@ -42,22 +41,39 @@ export interface ExchangeFilter {
   run?: RunId;
   node?: string;
   pack?: PackId;
-  kinds?: ExchangeKind[];
+  kinds?: string[];
 }
 
-/** The service, provided as `exchange@0`. */
-export interface Exchange {
-  /**
-   * Records an event and gives it its id and seq. The agent service calls
-   * this for everything that passes through it; nothing else should.
-   */
+/** `exchange.append`: only the provider of `agent.run` should be given it. */
+export interface ExchangeAppend {
+  /** Records an event and gives it its id and seq. */
   append(event: Omit<ExchangeEvent, "id" | "seq">): Promise<ExchangeEvent>;
+}
+
+/** `exchange.read`. */
+export interface ExchangeRead {
   /** Runs, newest first. */
   runs(page?: PageRequest): Promise<Page<RunInfo>>;
   /** One run's events in seq order. */
   events(run: RunId, page?: PageRequest): Promise<Page<ExchangeEvent>>;
   /** A node's events across runs, newest first: what the node page shows. */
   said(node: string, page?: PageRequest): Promise<Page<ExchangeEvent>>;
+}
+
+/** `exchange.watch`. */
+export interface ExchangeWatch {
   /** Live: each event as it is appended. */
   watch(filter: ExchangeFilter, on: (event: ExchangeEvent) => void): Dispose;
 }
+
+export interface Capabilities {
+  "exchange.append": ExchangeAppend;
+  "exchange.read": ExchangeRead;
+  "exchange.watch": ExchangeWatch;
+}
+
+export const capabilities: Capability[] = [
+  { key: "exchange.append", since: 1, doc: "Records an exchange event, numbering it within its run." },
+  { key: "exchange.read", since: 1, doc: "Runs, a run's events, a node's events: bounded pages." },
+  { key: "exchange.watch", since: 1, doc: "Each event as it is appended, by run, node, pack or kind." },
+];

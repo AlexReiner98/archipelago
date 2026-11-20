@@ -1,9 +1,11 @@
 /**
- * changeset 0.1.0: a change written in full. See changeset.md.
+ * changeset: a change written in full. See changeset.md.
+ *
+ * A format, not a capability: it is what `graph.commit`, `graph.read` and
+ * `graph.watch` carry, and it is fixed with them. A format that had to
+ * change would come with new capabilities that carry it.
  */
-import type { Actor, Authority, ContractVersion, Id, Json, PackRef, Time } from "./common.ts";
-
-export const contract: ContractVersion<"changeset"> = { name: "changeset", version: "0.1.0" };
+import type { Actor, Authority, Id, Json, PackId, Time } from "./common.ts";
 
 /** `+` asserts a value, `-` retracts it. */
 export type Op = "+" | "-";
@@ -25,12 +27,12 @@ export interface Header {
   /** On whose say-so. */
   authority: Authority;
   /**
-   * The pack whose code wrote it. For a change a person or agent made
-   * through an action, the pack that provides the action.
+   * The pack whose code wrote it, and the code's hash, for provenance: which
+   * code did this. Nothing depends on it; it is a record.
    */
-  pack: PackRef;
-  /** The action it was made through, with the version of it. */
-  action: { name: string; version: string };
+  pack: { id: PackId; hash?: string };
+  /** The action it was made through. */
+  action: string;
   /** Why, in a sentence, as the actor gave it. */
   reason: string;
   /** When it was proposed. */
@@ -59,7 +61,7 @@ export interface Committed extends Proposed {
 /**
  * The inverse of a change set's facts: reversed, each op flipped. Exact
  * because every retraction carries the value it removed. A pure function,
- * so it lives in the contract.
+ * so it lives in the spec.
  */
 export function inverse(facts: readonly Fact[]): Fact[] {
   const out: Fact[] = [];

@@ -1,7 +1,6 @@
 /**
- * Words every contract shares. Not a contract of its own: it is versioned
- * with the spec as a whole, and a change here is a change to every contract
- * that imports it.
+ * Words every contract shares. Not a capability: these are the
+ * types the capabilities are written in, fixed with the edition.
  */
 
 /** Any value that survives JSON. Facts, inputs and events carry only these. */
@@ -91,11 +90,41 @@ export class Refused extends Error {
 }
 
 /**
- * How every contract states its version. `name` is the service the runtime
- * provides it under; `version` is semver. See spec/README.md for what each
- * part of the number promises.
+ * An edition of the spec: 1, 2, 3… The spec as a whole is versioned, not
+ * the packs that use it. An edition adds capabilities or vocabulary, or
+ * retires capabilities; it never changes what one means.
  */
-export interface ContractVersion<N extends string = string> {
-  name: N;
-  version: `${number}.${number}.${number}`;
+export type Edition = number;
+
+/** The edition these files are. */
+export const EDITION: Edition = 1;
+
+/**
+ * A capability: one key in the Cordis context, and what it means. A pack
+ * asks for capabilities (its `inject`), never for a version of a pack, and
+ * whichever pack provides the key now satisfies it. Once an edition is
+ * accepted, a capability's meaning is fixed for good. A change that old
+ * users couldn't ignore is a new capability with a new key, and the old one
+ * is retired, not altered. See spec/README.md.
+ */
+export interface Capability {
+  /** The context key: `graph.read`. */
+  key: string;
+  /** What providing it promises, in a sentence. The types say the rest. */
+  doc: string;
+  /** The edition it arrived in. */
+  since: Edition;
+  /** The edition it was retired in, and what replaces it. */
+  retired?: { in: Edition; by?: string };
+}
+
+/**
+ * A vocabulary entry (a place, a node kind, an event kind). Vocabularies
+ * are open: an edition can add entries, and every consumer ignores entries
+ * it doesn't know rather than failing on them.
+ */
+export interface Term {
+  term: string;
+  doc: string;
+  since: Edition;
 }

@@ -1,8 +1,16 @@
-# agent 0.1.0 (draft)
+# agent (draft)
 
 Everything the map says to an agent and everything the agent does passes
 through one service. Its registry of nodes is the harness view's tree.
 Types: [agent.ts](agent.ts).
+
+## Capabilities
+
+| Key | Gives |
+|---|---|
+| `agent.node` | Add a node |
+| `agent.tree` | The registry of nodes |
+| `agent.run` | The adapter's side: begin, reach, act, end |
 
 ## Three verbs
 
@@ -31,7 +39,11 @@ A reached place is concrete; a node's `at` may use `*` in the argument
 (`tool:*`, `file:packs/*/page/*.js`). The adapter decides which places it can
 reach (the Claude Code adapter maps them to its hooks); the vocabulary says
 what each one means, so a node written for one adapter works under another.
-A new place is a minor version.
+The vocabulary is open: an edition can add a place, and a node may listen at
+a place no adapter reaches yet. It stays quiet, and the tree shows it as not
+reachable from the run's adapter (`RunStart.reaches`). A node that reads the
+map has its pack inject `graph.read`; `speak` is handed nothing but the
+moment and the run.
 
 ## Nodes
 

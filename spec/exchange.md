@@ -1,8 +1,16 @@
-# exchange 0.1.0
+# exchange
 
 One event for each thing that passes between the map and an agent. It's
 what the harness view streams live and what the verdict pack judges a run
 by. Types: [exchange.ts](exchange.ts).
+
+## Capabilities
+
+| Key | Gives |
+|---|---|
+| `exchange.append` | Record an event (the provider of `agent.run` only) |
+| `exchange.read` | Runs and events, bounded |
+| `exchange.watch` | Events live |
 
 ## The event
 

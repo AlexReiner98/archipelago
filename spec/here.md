@@ -1,8 +1,16 @@
-# here 0.1.0
+# here
 
 What is being looked at, now. It's how the harness view's three panes stay
 linked: picking a node in the tree sets `here.node`, and the node pane and
 the live run both follow. Types: [here.ts](here.ts).
+
+## Capabilities
+
+| Key | Gives |
+|---|---|
+| `here.declare` | Declare a key |
+| `here.read` | Read and watch a key |
+| `here.set` | Set or clear one |
 
 ## Keys
 

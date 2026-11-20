@@ -1,42 +1,43 @@
 /**
- * agent 0.1.0: say, refuse, act. See agent.md.
+ * agent: say, refuse, act. See agent.md.
  *
  * DRAFT: the place vocabulary is an open question to Alex on the map.
  */
-import type { Actor, ContractVersion, Dispose, Id, Json, PackId, Time } from "./common.ts";
-import type { GraphRead } from "./graph.ts";
-
-export const contract: ContractVersion<"agent"> = { name: "agent", version: "0.1.0" };
+import type { Actor, Capability, Dispose, Id, Json, PackId, Term, Time } from "./common.ts";
 
 /** One agent session, from its start to its end. */
 export type RunId = string;
 
 /**
- * A place: a moment in a run where the map can speak. Draft vocabulary.
- * A reached place is concrete (`tool:Bash`, `file:spec/agent.ts`); a node's
- * `at` may put `*` in the argument (`tool:*`, `file:packs/* /page/*.js`).
+ * A place: a moment in a run where the map can speak. A reached place is
+ * concrete (`tool:Bash`, `file:spec/agent.ts`); a node's `at` may put `*`
+ * in the argument (`tool:*`). The vocabulary is open (see PLACES): a node
+ * may listen at a place no adapter reaches yet, and stays quiet until one
+ * does.
  */
-export type Place =
-  | "session_start"
-  | "prompt"
-  | "reply_end"
-  | `tool:${string}`
-  | `skill:${string}`
-  | `memory:${string}`
-  | `file:${string}`;
+export type Place = string;
 
-/** Places where a refusal stops what is happening. Elsewhere only `say` counts. */
-export const REFUSABLE = ["prompt", "reply_end", "tool:", "file:"] as const;
+/** Draft vocabulary. `refusable`: a refusal there stops what is happening. */
+export const PLACES: (Term & { refusable: boolean })[] = [
+  { term: "session_start", since: 1, refusable: false, doc: "The run begins." },
+  { term: "prompt", since: 1, refusable: true, doc: "A person's message reaches the agent." },
+  { term: "tool:<name>", since: 1, refusable: true, doc: "The agent is about to call a tool." },
+  { term: "file:<path>", since: 1, refusable: true, doc: "A tool is about to touch that file; reached with its tool:." },
+  { term: "skill:<name>", since: 1, refusable: false, doc: "A skill is loaded." },
+  { term: "memory:<scope>", since: 1, refusable: false, doc: "Memory of that scope is loaded." },
+  { term: "reply_end", since: 1, refusable: true, doc: "The agent is about to finish its reply; refusing keeps it going." },
+];
 
-/** What a node is. Draft vocabulary, grown by minor versions. */
-export type NodeKind =
-  | "instruction"
-  | "reflex"
-  | "rule"
-  | "schema_check"
-  | "skill"
-  | "memory"
-  | "tool_text";
+/** What a node is. Open vocabulary, like places. */
+export const NODE_KINDS: Term[] = [
+  { term: "instruction", since: 1, doc: "Standing words for every run." },
+  { term: "reflex", since: 1, doc: "Words said when a condition holds at a place." },
+  { term: "rule", since: 1, doc: "A check that can refuse." },
+  { term: "schema_check", since: 1, doc: "The schema's refusal, said to the agent." },
+  { term: "skill", since: 1, doc: "A skill's text." },
+  { term: "memory", since: 1, doc: "Remembered words." },
+  { term: "tool_text", since: 1, doc: "A tool's description or result text." },
+];
 
 /** What the adapter knows when it reaches places. */
 export interface Moment {
@@ -49,30 +50,26 @@ export interface Moment {
 }
 
 /** What a node answers at a moment. Nothing: it stays quiet. */
-export type Utterance =
-  | { say: string }
-  | { refuse: string; code?: string };
+export type Utterance = { say: string } | { refuse: string; code?: string };
 
-export interface NodeContext {
-  graph: GraphRead;
-  run: RunInfo;
-}
-
-/** Anything said at a place. Registering one is a revertible effect. */
+/**
+ * Anything said at a place. Registering one is a revertible effect. A node
+ * that reads the map has its pack inject `graph.read`; it is handed nothing.
+ */
 export interface NodeDef {
   /** `pack/name`, stable across reloads, so a run's record keeps pointing at it. */
   id: string;
   pack: PackId;
-  kind: NodeKind;
+  kind: string;
   title: string;
   /** The places it listens at. */
   at: Place[];
   /** The map item it was made from, when it was made from one. */
   source?: Id;
-  speak(moment: Moment, ctx: NodeContext): Utterance | null | Promise<Utterance | null>;
+  speak(moment: Moment, run: RunInfo): Utterance | null | Promise<Utterance | null>;
 }
 
-/** What the registry shows: a node without its code. The harness view's tree is these. */
+/** A node without its code. The harness view's tree is these. */
 export type NodeInfo = Omit<NodeDef, "speak">;
 
 export interface RunStart {
@@ -80,6 +77,8 @@ export interface RunStart {
   agent: Actor;
   /** Which harness: `claude-code`. */
   harness: string;
+  /** The places this adapter can reach, as terms of PLACES. */
+  reaches: string[];
   title?: string;
   cwd?: string;
   /** The run that started this one. */
@@ -115,16 +114,23 @@ export interface Act {
   ok?: boolean;
 }
 
-/**
- * The service, provided as `agent@0`. Every say, refusal and act passes
- * through it, and it hands each one to the exchange as an event.
- */
-export interface Agent {
-  /** Adds a node to the registry. */
+/** `agent.node`: add a node. */
+export interface AgentNode {
   node(def: NodeDef): Dispose;
-  /** The registry: every node now loaded. */
-  nodes(): NodeInfo[];
+}
 
+/** `agent.tree`: the registry, every node loaded now. */
+export interface AgentTree {
+  nodes(): NodeInfo[];
+  /** Calls `on` when nodes come or go. */
+  watch(on: () => void): Dispose;
+}
+
+/**
+ * `agent.run`: the adapter's side. Every say, refusal and act passes
+ * through here, and the provider hands each one to `exchange.append`.
+ */
+export interface AgentRun {
   /** A run starts. Reaching `session_start` follows. */
   begin(run: RunStart): Promise<RunInfo>;
   /** The adapter reached places: asks every node listening there, in order. */
@@ -134,3 +140,15 @@ export interface Agent {
   /** A run ends. */
   end(run: RunId, time: Time): Promise<void>;
 }
+
+export interface Capabilities {
+  "agent.node": AgentNode;
+  "agent.tree": AgentTree;
+  "agent.run": AgentRun;
+}
+
+export const capabilities: Capability[] = [
+  { key: "agent.node", since: 1, doc: "Adds a node that may say or refuse at places." },
+  { key: "agent.tree", since: 1, doc: "Every node loaded now, without its code." },
+  { key: "agent.run", since: 1, doc: "Begin, reach places, act, end: the adapter's way in. Everything is recorded on the exchange." },
+];

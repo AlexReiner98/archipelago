@@ -1,67 +1,77 @@
 # The spec
 
 The interfaces packs talk through. Any pack can be replaced; these can't
-be changed silently. Each one is a TypeScript module (the types) and a short
-doc. Both are versioned together.
+be changed silently. Each contract is a TypeScript module (the types) and a
+short doc. This is **edition 1, in draft**, while Alex shapes it.
 
-| Contract | Version | What it is |
+| Contract | Capabilities | What it is |
 |---|---|---|
-| [agent](agent.md) | 0.1.0 | Say, refuse, act. Places, nodes, runs |
-| [exchange](exchange.md) | 0.1.0 | The event for each say, refusal and act, and the stream of them |
-| [changeset](changeset.md) | 0.1.0 | A change in full: header and facts `[op, id, field, value]` |
-| [graph](graph.md) | 0.1.0 | Bounded reads, live watch, the write chain |
-| [action](action.md) | 0.1.0 | The one way anyone changes anything |
-| [slot](slot.md) | 0.1.0 | UI composition: places in the UI that packs fill |
-| [here](here.md) | 0.1.0 | Shared ephemeral state: what is being looked at, now |
+| [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` | Bounded reads, live watch, the write chain |
+| [action](action.md) | `action.register` `action.list` `action.invoke` | The one way anyone changes anything |
+| [agent](agent.md) | `agent.node` `agent.tree` `agent.run` | Say, refuse, act. Places, nodes, runs |
+| [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event per say, refusal and act |
+| [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | UI composition: places in the UI that packs fill |
+| [here](here.md) | `here.declare` `here.read` `here.set` | Shared ephemeral state: what is being looked at |
+| [changeset](changeset.md) | (a format) | A change in full: header and facts `[op, id, field, value]` |
 
-[common.ts](common.ts) holds the words they share (ids, actors, authority,
-pages, refusals, `Dispose`).
+[common.ts](common.ts) holds the shared words; [index.ts](index.ts) puts
+every capability's key and type in one map for a runtime to declare.
 
-Every version is 0.x: these are drafts while Alex shapes them. Two choices
-are open on the map, not decided here: the renderer behind `slot`, and the
-place vocabulary in `agent`.
+Two choices are open on the map, not decided here: the renderer behind
+`slot`, and the place vocabulary in `agent`.
 
-## How they sit on the runtime
+## Packs ask for capabilities
 
-The kernel is the Cordis runtime and its loader. A contract is a **service**
-in Cordis's sense: an interface behind a key in the context. A pack that
-implements it provides the key; a pack that uses it lists the key in its
-`inject`. When the provider leaves, its consumers go inactive and come back
-when a provider returns. Nothing here assumes which pack provides what.
+The kernel is the Cordis runtime and its loader. A capability is one key
+in the Cordis context and what it means. A pack lists the capabilities it
+uses in its `inject`, and whichever pack provides each key right now
+satisfies it. A pack never names another pack, or a version of one. That
+is what lets packs come, go and be swapped while the system runs: a
+consumer doesn't know or care which provider it got.
 
-Every call that adds something to the system (a node, an action, a watcher,
-a write stage, a slot fill, a `here` key) returns a `Dispose`. The runtime
-makes each one a Cordis effect of the calling pack, so unloading the pack
-takes back everything it registered. That is the rule "a pack's effects are
-revertible", made concrete.
+- A capability the pack didn't ask for, it doesn't get. Nothing in these
+  contracts hands one out as a side door; an action or a node that reads
+  the graph has its pack inject `graph.read`.
+- When nothing provides a capability, the packs that need it stay inactive
+  until something does. That's the only failure mode, and it isn't an error.
+- Capabilities are fine-grained so a pack's `inject` says what it does,
+  and so the orchestrator can narrow one per pack through Cordis
+  interception without reloading anything. `graph.commit` should be given
+  only to the action pack, and `exchange.append` only to the provider of
+  `agent.run`.
 
-Services that many packs contribute to (the agent's nodes, the actions, the
-write chain, the slots) are **brokers** (Cordis §6.2): contributors register
-through the broker and consumers never reload when one comes or goes.
+Every call that adds something (a node, an action, a watcher, a stage, a
+slot fill, a `here` key) returns a `Dispose`, and the runtime makes it an
+effect of the calling pack, so unloading the pack takes back everything it
+added. Capabilities many packs contribute to (nodes, actions, stages,
+slots) are brokers in Cordis's sense (§6.2): contributors come and go
+without consumers reloading.
 
 Calls that may cross a process are async.
 
-## Versions
+## The spec is versioned, packs aren't
 
-Cordis matches services by key name only and leaves versioning open
-(§6.6). The spec adds it, as follows.
+The spec has editions: 1, 2, 3… Packs don't declare versions of anything.
 
-- Each contract has a semver version, exported as `contract` from its
-  module.
-- **Patch**: the doc changed, the types didn't.
-- **Minor**: something was added that old consumers can ignore: an optional
-  field, a new place, a new event kind, a new optional method. Old
-  providers still satisfy new consumers that don't use the addition.
-- **Major**: anything else. Renaming, removing, narrowing, or changing what
-  a field means.
-- A provider registers under `name@major` (for example `graph@1`), and says
-  its exact version. Two majors can be provided side by side, so a pack can
-  move across a break at its own pace.
-- A consumer declares a range (`graph: ^1.2`). The loader checks it when the
-  consumer loads. A consumer whose range isn't met **stays inactive**, as it
-  would with a missing dependency, and the loader says why. It never runs
-  against a version it didn't ask for.
-- While a contract is 0.x, each minor counts as a major (`^0.1` means
-  `0.1.x`), as in npm.
-- Changing a contract is a commit to this folder that changes the version.
-  A change to the types without a version change is a bug.
+- Once an edition is accepted, a capability's meaning is fixed for good.
+  Nothing about it changes, so nothing can change silently under a pack.
+- A change old users couldn't ignore is a **new capability with a new
+  key**. The old one is retired in that edition, and may still be provided
+  alongside the new one for as long as packs use it.
+- An addition is also a new capability, not a widening of an old one. A
+  pack that wants the addition asks for it, and a pack that doesn't is
+  unaffected.
+- Vocabularies (places, node kinds, event kinds) are open: an edition may
+  add terms, each marked with the edition it came in, and every consumer
+  ignores a term it doesn't know.
+- Each capability says the edition it arrived in (`since`) and, if
+  retired, the edition and what replaces it. The list is the spec's
+  history.
+- Until edition 1 is accepted, its capabilities can still be edited:
+  nothing has been built on them yet.
+
+Cordis links by key alone and leaves versioning open (§6.6). It names two
+problems: drift (a key's interface changing under a consumer) and
+collision (two meanings for one key). Fixed meanings answer drift. The spec
+owning every key in its namespaces answers collision; a pack's own keys
+start with its id.

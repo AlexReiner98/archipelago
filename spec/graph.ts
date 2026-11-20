@@ -1,10 +1,8 @@
 /**
- * graph 0.1.0: bounded reads, live watch, the write chain. See graph.md.
+ * graph: bounded reads, live watch, the write chain. See graph.md.
  */
 import type { Committed, Proposed } from "./changeset.ts";
-import type { ContractVersion, Cursor, Dispose, Id, Json, Page, PageRequest, PackId } from "./common.ts";
-
-export const contract: ContractVersion<"graph"> = { name: "graph", version: "0.1.0" };
+import type { Capability, Cursor, Dispose, Id, Json, Page, PageRequest, PackId } from "./common.ts";
 
 /** No read returns more than this many items, whatever it asks for. */
 export const LIMIT_MAX = 500;
@@ -24,7 +22,7 @@ export interface Link extends Item {
 
 export type Direction = "out" | "in" | "both";
 
-/** The read side. Every read is bounded: by ids given, or by a page. */
+/** `graph.read`. Every read is bounded: by ids given, or by a page. */
 export interface GraphRead {
   /** At most LIMIT_MAX ids. A missing id gives `null` in its place. */
   get(ids: Id[]): Promise<(Item | null)[]>;
@@ -47,6 +45,7 @@ export interface WatchFilter {
   after?: Cursor;
 }
 
+/** `graph.watch`. */
 export interface GraphWatch {
   /**
    * Calls `on` with each committed change set that touches the filter, in
@@ -57,21 +56,19 @@ export interface GraphWatch {
 }
 
 /**
- * The write chain. A change set travels action → schema → history → graph
- * and each stage is a stage registered here. A stage sees the proposed set
- * and calls `next` to pass it on; it may refuse by throwing `Refused`, or
- * act after `next` returns (as history does, journalling only what was
- * applied). Stages may not change the facts: a stage that wants a different
- * change refuses and says what would pass.
+ * One stage of the write chain. It sees the proposed set and calls `next`
+ * to pass it on; it may refuse by throwing `Refused`, or act after `next`
+ * returns (as history does, journalling only what was applied). It may not
+ * change the facts: a stage that wants a different change refuses and says
+ * what would pass.
  */
 export type Stage = (change: Proposed, next: (change: Proposed) => Promise<Committed>) => Promise<Committed>;
 
 /**
- * Where a stage runs. The order is fixed by the contract; within one phase,
+ * Where a stage runs. The order is fixed by the spec; within one phase,
  * stages run in the order of `rank` (low first), then pack id.
  * - `check`: may refuse. The schema pack is here.
  * - `record`: sees what was applied. The history pack is here.
- * The action service is the chain's entry; the graph's store is its end.
  */
 export type Phase = "check" | "record";
 
@@ -82,15 +79,29 @@ export interface StageDef {
   run: Stage;
 }
 
-export interface GraphWrite {
+/** `graph.stage`. */
+export interface GraphStage {
   /** Adds a stage to the chain. */
   stage(def: StageDef): Dispose;
-  /**
-   * Sends a change set down the chain. Only the action service calls this
-   * (see action.md); anything else writing here breaks the contract.
-   */
+}
+
+/** `graph.commit`: the chain's entry. Only the action pack should be given it. */
+export interface GraphCommit {
+  /** Sends a change set down the chain to the store. */
   commit(change: Proposed): Promise<Committed>;
 }
 
-/** The whole service, provided as `graph@0`. */
-export interface Graph extends GraphRead, GraphWatch, GraphWrite {}
+/** The context keys this file defines, and what each one is. */
+export interface Capabilities {
+  "graph.read": GraphRead;
+  "graph.watch": GraphWatch;
+  "graph.stage": GraphStage;
+  "graph.commit": GraphCommit;
+}
+
+export const capabilities: Capability[] = [
+  { key: "graph.read", since: 1, doc: "Bounded reads of items, links and committed change sets." },
+  { key: "graph.watch", since: 1, doc: "Each committed change set touching a filter, in order, resumable from a cursor." },
+  { key: "graph.stage", since: 1, doc: "Adds a check or record stage to the write chain." },
+  { key: "graph.commit", since: 1, doc: "Sends a change set (changeset format, edition 1) down the write chain; all or nothing." },
+];

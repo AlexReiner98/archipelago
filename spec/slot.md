@@ -1,8 +1,16 @@
-# slot 0.1.0 (draft)
+# slot (draft)
 
 How the UI is put together out of packs. A pack declares a slot (a hole in
 its UI) and other packs fill it. The whole UI is one slot, `root`, filled
 by whichever shell pack is loaded. Types: [slot.ts](slot.ts).
+
+## Capabilities
+
+| Key | Gives |
+|---|---|
+| `slot.declare` | Declare a slot |
+| `slot.fill` | Fill one |
+| `slot.read` | What fills each slot, for the renderer |
 
 ## Slots and fills
 

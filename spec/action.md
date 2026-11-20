@@ -1,28 +1,40 @@
-# action 0.1.0
+# action
 
 Every change goes through a declared action, whether a person or an agent
 makes it. A UI never writes directly; a tool an agent calls is an action;
 a pack changing data does it through an action too. Types:
 [action.ts](action.ts).
 
+## Capabilities
+
+| Key | Gives |
+|---|---|
+| `action.register` | Declare an action |
+| `action.list` | The declared actions and their schemas |
+| `action.invoke` | Run one |
+
 ## Declaring one
 
 ```ts
-actions.register({
+// the verdict pack injects action.register and exchange.read
+ctx["action.register"].register({
   name: "verdict.judge",
-  version: "1.0.0",
   title: "Record whether each node held in a run",
   input: { type: "object", properties: { run: { type: "string" } }, required: ["run"] },
-  async run({ run }, ctx) {
-    const said = await ctx.graph.of("said", { limit: 200 });
-    ctx.write([["+", "e_v1", "type", "verdict"], ["+", "e_v1", "run", run]]);
-    return { judged: said.items.length };
+  async run({ run }, call) {
+    const events = await ctx["exchange.read"].events(run, { limit: 500 });
+    call.write([["+", "e_v1", "type", "verdict"], ["+", "e_v1", "run", run]]);
+    return { judged: events.items.length };
   },
 });
 ```
 
 - `name` starts with the pack's id. A second registration of a taken name
-  is refused, never silently replaced.
+  is refused, never silently replaced. Actions have no versions: one whose
+  input or output must change incompatibly gets a new name, and the old one
+  is retired.
+- The call context grants nothing. What the action reads, its pack
+  injected.
 - `input` and `output` are JSON Schema, so the same declaration gives a
   UI its form and an agent its tool.
 - `register` returns a disposer; the action goes when its pack unloads.

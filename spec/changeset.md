@@ -1,4 +1,4 @@
-# changeset 0.1.0
+# changeset
 
 A change, written in full. The journal keeps them, undo inverts them, and
 they are what moves between two places (an export, a sync, a pack's seed
