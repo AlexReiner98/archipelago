@@ -8,6 +8,8 @@ The one way anyone changes anything. Provides `action.register`,
 - Who called is the calling context's: the actor and run interception set,
   else `pack:<id>` as the actor. The header's pack is the one that
   registered the outermost action.
+- When the reserved `history.undo` ran in the call, the header's `undoes`
+  is the `change` it was given.
 - What an action and the actions it `call`s write is one change set,
   committed when the outermost returns, or nothing. A refusal anywhere comes
   back as `{ ok: false, refused }`.

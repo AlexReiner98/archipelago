@@ -81,6 +81,7 @@ export const SEED = [
 const tree: Entry[] = [
   { id: "graph", pack: "packs/graph/index.ts", config: { db: join(values.data, "graph.sqlite") } },
   { id: "action", pack: "packs/action/index.ts" },
+  { id: "history", pack: "packs/history/index.ts", config: { db: join(values.data, "history.sqlite") } },
   { id: "exchange", pack: "packs/exchange/index.ts", config: { journal: join(values.data, "exchange.jsonl") } },
   { id: "agent", pack: "packs/agent/index.ts" },
   { id: "verdict", pack: "packs/verdict/index.ts" },

@@ -12,6 +12,7 @@ import type { ActionContext, ActionDef, ActionInfo, ActionInvoke, ActionList, Ac
 import type { Fact } from "../../spec/changeset.ts";
 import type { Actor, Caller, Dispose, Json, Refusal } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
+import { UNDO } from "../../spec/action.ts";
 import type { GraphCommit } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 
@@ -96,6 +97,8 @@ const action: Pack = {
           return { ok: false, refused: { code: "action.unknown", message: `No action ${call.action} is registered now.`, by: { pack: "action" } } };
         }
         const facts: Fact[] = [];
+        /** The set the reserved undo action undid in this call, for the header's `undoes`. */
+        let undoes: string | undefined;
         const run = async (name: string, input: Json): Promise<Json> => {
           const r = actions.get(name);
           if (!r) throw new Refused({ code: "action.unknown", message: `No action ${name} is registered now.`, by: { pack: "action" } });
@@ -109,7 +112,9 @@ const action: Pack = {
             written: () => facts,
             call: (n, i) => run(n, i) as Promise<any>,
           };
-          return r.def.run(input, actx);
+          const out = await r.def.run(input, actx);
+          if (name === UNDO && undoes === undefined) undoes = String((input as { change?: Json }).change);
+          return out;
         };
         try {
           const output = (await run(call.action, call.input)) as O;
@@ -123,6 +128,7 @@ const action: Pack = {
               action: call.action,
               reason: call.reason,
               time: new Date().toISOString(),
+              ...(undoes !== undefined ? { undoes } : {}),
               ...(caller.run ? { run: caller.run } : {}),
             },
             facts,

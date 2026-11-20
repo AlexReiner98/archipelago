@@ -1,0 +1,189 @@
+import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { test } from "node:test";
+import type { ActionContext, ActionInvoke, ActionRegister, Outcome } from "../spec/action.ts";
+import type { Fact } from "../spec/changeset.ts";
+import type { Json, Page } from "../spec/common.ts";
+import type { GraphRead } from "../spec/graph.ts";
+import { Runtime, type Pack } from "../runtime/core.ts";
+import { Loader, type Entry as TreeEntry } from "../runtime/loader.ts";
+import action from "../packs/action/index.ts";
+import graph from "../packs/graph/index.ts";
+import history, { netFacts } from "../packs/history/index.ts";
+import type { Entry, Snapshot } from "../packs/history/journal.ts";
+
+const BASE = "mem:/packs/";
+
+/** A pack with one action that writes whatever facts it is given. */
+const probe: Pack = {
+  id: "probe",
+  inject: ["action.invoke", "action.register", "graph.read"],
+  apply(ctx) {
+    ctx.get<ActionRegister>("action.register").register({
+      name: "probe.write",
+      title: "Write facts",
+      input: { type: "object", required: ["facts"] },
+      async run(input: { facts: Fact[] }, call: ActionContext) {
+        call.write(input.facts);
+        return null;
+      },
+    });
+  },
+};
+
+async function setup(opts: { db?: string; keep?: number; fold?: number } = {}) {
+  const rt = new Runtime();
+  const errors: unknown[] = [];
+  rt.onError = (_f, e) => errors.push(e);
+  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "history.ts": history, "probe.ts": probe };
+  const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
+  const tree: TreeEntry[] = [
+    { id: "graph", pack: "graph.ts" },
+    { id: "action", pack: "action.ts" },
+    { id: "history", pack: "history.ts", config: { db: opts.db, keep: opts.keep, fold: opts.fold } },
+    { id: "probe", pack: "probe.ts" },
+  ];
+  await loader.apply(tree);
+  const ctx = loader.fiber("probe")!.ctx.intercept({ actor: { id: "agent:test", kind: "agent" }, run: "r1" });
+  const invoke = ctx.get<ActionInvoke>("action.invoke");
+  const read = ctx.get<GraphRead>("graph.read");
+  const call = <O extends Json = Json>(name: string, input: Json, reason = "a test"): Promise<Outcome<O>> =>
+    invoke.invoke<O>({ action: name, input, authority: { of: "agent", basis: "test" }, reason });
+  const write = (...facts: Fact[]) => call("probe.write", { facts } as unknown as Json);
+  const ok = async <O extends Json>(p: Promise<Outcome<O>>) => {
+    const o = await p;
+    if (!o.ok) assert.fail(`refused: ${o.refused.code} ${o.refused.message}`);
+    return o;
+  };
+  return { loader, errors, call, write, ok, read, stop: () => loader.apply([]) };
+}
+
+test("each committed set is journalled in full, with its inverse; a refused one is not", async () => {
+  const h = await setup();
+  try {
+    const a = await h.ok(h.write(["+", "e1", "type", "task"], ["+", "e1", "status", "todo"]));
+    const b = await h.ok(h.write(["-", "e1", "status", "todo"], ["+", "e1", "status", "doing"]));
+    const refused = await h.write(["-", "e1", "status", "todo"]);
+    assert.equal(refused.ok, false);
+    const got = (await h.ok(h.call<Json>("history.get", { change: b.change! }))).output as unknown as Entry;
+    assert.equal(got.header.actor.id, "agent:test");
+    assert.deepEqual(got.header.authority, { of: "agent", basis: "test" });
+    assert.equal(got.header.pack.id, "probe");
+    assert.equal(got.header.action, "probe.write");
+    assert.equal(got.header.reason, "a test");
+    assert.equal(got.header.run, "r1");
+    assert.deepEqual(got.facts, [["-", "e1", "status", "todo"], ["+", "e1", "status", "doing"]]);
+    assert.deepEqual(got.inverse, [["-", "e1", "status", "doing"], ["+", "e1", "status", "todo"]]);
+    const list = (await h.ok(h.call<Json>("history.list", {}))).output as unknown as Page<Entry>;
+    assert.deepEqual(list.items.map((e) => e.id), [b.change, a.change]);
+    const byRun = (await h.ok(h.call<Json>("history.list", { run: "nope" }))).output as unknown as Page<Entry>;
+    assert.equal(byRun.items.length, 0);
+    assert.deepEqual(h.errors, []);
+  } finally {
+    await h.stop();
+  }
+});
+
+test("undo applies the inverse as a new set marked undoes; undoing the undo redoes", async () => {
+  const h = await setup();
+  try {
+    await h.ok(h.write(["+", "e1", "type", "task"], ["+", "e1", "status", "todo"]));
+    const b = await h.ok(h.write(["-", "e1", "status", "todo"], ["+", "e1", "status", "doing"]));
+    const u = await h.ok(h.call("history.undo", { change: b.change! }, "wrong status"));
+    assert.equal(u.committed!.header.undoes, b.change);
+    assert.equal(u.committed!.header.action, "history.undo");
+    assert.equal(u.committed!.header.pack.id, "history");
+    assert.equal(u.committed!.header.reason, "wrong status");
+    assert.equal((await h.read.get(["e1"]))[0]!.fields.status, "todo");
+
+    const twice = await h.call("history.undo", { change: b.change! });
+    assert.equal(twice.ok, false);
+    assert.equal(!twice.ok && twice.refused.code, "history.undone");
+
+    const redo = await h.ok(h.call("history.undo", { change: u.change! }, "it was right"));
+    assert.equal((await h.read.get(["e1"]))[0]!.fields.status, "doing");
+    const original = (await h.ok(h.call<Json>("history.get", { change: b.change! }))).output as unknown as Entry;
+    assert.equal(original.undoneBy, undefined, "redone: the original stands again");
+    const undo = (await h.ok(h.call<Json>("history.get", { change: u.change! }))).output as unknown as Entry;
+    assert.equal(undo.undoneBy, redo.change);
+  } finally {
+    await h.stop();
+  }
+});
+
+test("an undo whose field has moved since is refused by the graph, and changes nothing", async () => {
+  const h = await setup();
+  try {
+    const a = await h.ok(h.write(["+", "e1", "type", "task"], ["+", "e1", "status", "todo"]));
+    await h.ok(h.write(["-", "e1", "status", "todo"], ["+", "e1", "status", "done"]));
+    const out = await h.call("history.undo", { change: a.change! });
+    assert.equal(out.ok, false);
+    assert.equal(!out.ok && out.refused.code, "graph.conflict");
+    assert.deepEqual((await h.read.get(["e1"]))[0], { id: "e1", type: "task", fields: { status: "done" } });
+    const unknown = await h.call("history.undo", { change: "c999" });
+    assert.equal(!unknown.ok && unknown.refused.code, "history.unknown");
+  } finally {
+    await h.stop();
+  }
+});
+
+test("old entries fold into snapshots of their net change; the graph is untouched", async () => {
+  const h = await setup({ keep: 3, fold: 2 });
+  try {
+    const sets: string[] = [];
+    sets.push((await h.ok(h.write(["+", "e1", "type", "task"], ["+", "e1", "status", "todo"]))).change!);
+    sets.push((await h.ok(h.write(["-", "e1", "status", "todo"], ["+", "e1", "status", "doing"]))).change!);
+    sets.push((await h.ok(h.write(["+", "e2", "type", "task"]))).change!);
+    sets.push((await h.ok(h.write(["-", "e1", "status", "doing"], ["+", "e1", "status", "done"]))).change!);
+    sets.push((await h.ok(h.write(["+", "e3", "type", "note"]))).change!);
+    sets.push((await h.ok(h.write(["-", "e3", "type", "note"]))).change!);
+    // Six sets, keep 3 + fold 2: the oldest two folded once.
+    const list = (await h.ok(h.call<Json>("history.list", {}))).output as unknown as Page<Entry>;
+    assert.deepEqual(list.items.map((e) => e.id), sets.slice(2).reverse());
+    const snaps = (await h.ok(h.call<Json>("history.snapshots", {}))).output as unknown as Page<Snapshot>;
+    assert.equal(snaps.items.length, 1);
+    const s = snaps.items[0]!;
+    assert.equal(s.count, 2);
+    assert.deepEqual([s.first, s.last], [1, 2]);
+    assert.deepEqual(s.actors, ["agent:test"]);
+    assert.deepEqual(s.facts, [["+", "e1", "type", "task"], ["+", "e1", "status", "doing"]]);
+    const gone = await h.call("history.undo", { change: sets[0]! });
+    assert.equal(!gone.ok && gone.refused.code, "history.compacted");
+    assert.deepEqual((await h.read.get(["e1"]))[0], { id: "e1", type: "task", fields: { status: "done" } });
+  } finally {
+    await h.stop();
+  }
+});
+
+test("net facts: a field's value before a run and after it, nothing for what came and went", () => {
+  assert.deepEqual(
+    netFacts([
+      [["+", "a", "type", "task"], ["+", "b", "x", 1]],
+      [["-", "b", "x", 1], ["+", "b", "x", 2], ["-", "c", "y", "old"]],
+      [["-", "a", "type", "task"], ["+", "c", "y", "new"]],
+    ]),
+    [["-", "c", "y", "old"], ["+", "b", "x", 2], ["+", "c", "y", "new"]],
+  );
+});
+
+test("the journal is kept on disk; unloading the pack takes its stage and actions", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "history-"));
+  try {
+    const db = join(dir, "history.sqlite");
+    let h = await setup({ db });
+    const a = await h.ok(h.write(["+", "e1", "type", "task"]));
+    await h.stop();
+    h = await setup({ db });
+    const got = (await h.ok(h.call<Json>("history.get", { change: a.change! }))).output as unknown as Entry;
+    assert.deepEqual(got.facts, [["+", "e1", "type", "task"]]);
+    await h.loader.edit((t) => t.filter((e) => e.id !== "history"));
+    const out = await h.call("history.undo", { change: a.change! });
+    assert.equal(!out.ok && out.refused.code, "action.unknown");
+    await h.ok(h.write(["+", "e2", "type", "task"]));
+    await h.stop();
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});

@@ -19,5 +19,5 @@ built-in `node:sqlite`, no dependency), or in memory without one. Provides
   facts) and reads them back in: the way a graph moves between stores.
   `node scripts/graph.ts` runs it by hand (export, import, from-json for the
   old JSON file, counts).
-- No schema, no history yet: those are their own packs, joining the chain
-  as stages.
+- No schema and no history here: those are their own packs, joining the
+  chain as stages ([history](../history/README.md)).
