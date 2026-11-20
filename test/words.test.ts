@@ -50,7 +50,7 @@ function setup() {
 }
 
 const tree = (file?: string, seed = [{ title: "Spec", kind: "reflex", at: ["file:spec/**"], words: "Ask Alex first." }]): Entry[] => [
-  { id: "graph", pack: "graph.ts", config: { file } },
+  { id: "graph", pack: "graph.ts", config: { db: file } },
   { id: "action", pack: "action.ts" },
   { id: "exchange", pack: "exchange.ts" },
   { id: "agent", pack: "agent.ts" },
@@ -142,7 +142,7 @@ test("the graph refuses a retraction of a value it doesn't hold, whole", async (
 
 test("the graph is kept on disk and read back; watchers hear each change set", async () => {
   const dir = await mkdtemp(join(tmpdir(), "graph-"));
-  const file = join(dir, "graph.json");
+  const file = join(dir, "graph.sqlite");
   try {
     const one = setup();
     await one.loader.apply(tree(file));

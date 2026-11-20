@@ -65,7 +65,7 @@ function setup(home: string, graphFile: string) {
   const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "words.ts": words, "loaded.ts": loaded, "written.ts": written, "probe.ts": probe };
   const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
   const tree: Entry[] = [
-    { id: "graph", pack: "graph.ts", config: { file: graphFile } },
+    { id: "graph", pack: "graph.ts", config: { db: graphFile } },
     { id: "action", pack: "action.ts" },
     { id: "exchange", pack: "exchange.ts" },
     { id: "agent", pack: "agent.ts" },
@@ -134,7 +134,7 @@ test("the files the map may write, and the place each is said at: the adapter's 
 
 test("adopt imports skills and memory as nodes at their places, through an action; the old map's file stays its own", async () => {
   const { root, home, project, f } = await layout();
-  const { loader, errors, tree, as, call } = setup(home, join(root, "graph.json"));
+  const { loader, errors, tree, as, call } = setup(home, join(root, "graph.sqlite"));
   await loader.apply(tree);
   try {
     const alex = as();
@@ -183,7 +183,7 @@ test("adopt imports skills and memory as nodes at their places, through an actio
 
 test("a held node refuses refinement and says why; opened, words.set writes the file the next session loads, round trip intact", async () => {
   const { root, home, project, f } = await layout();
-  const graphFile = join(root, "graph.json");
+  const graphFile = join(root, "graph.sqlite");
   let { loader, errors, tree, as, call } = setup(home, graphFile);
   await loader.apply(tree);
   const ORIGINAL = await readFile(f.project, "utf8");

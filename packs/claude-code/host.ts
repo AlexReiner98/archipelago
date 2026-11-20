@@ -26,7 +26,7 @@ const { values } = parseArgs({
 mkdirSync(dirname(values.journal), { recursive: true });
 
 const tree: Entry[] = [
-  { id: "graph", pack: "packs/graph/index.ts", config: { file: join(dirname(values.journal), "graph.json") } },
+  { id: "graph", pack: "packs/graph/index.ts", config: { db: join(dirname(values.journal), "graph.sqlite") } },
   { id: "action", pack: "packs/action/index.ts" },
   { id: "exchange", pack: "packs/exchange/index.ts", config: { journal: values.journal } },
   { id: "agent", pack: "packs/agent/index.ts" },

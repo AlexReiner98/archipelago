@@ -73,7 +73,7 @@ test("what Claude Code loads is said at skill: and memory: places by a node per 
   };
   let port = 0;
   const tree = [
-    { id: "graph", pack: "graph.ts", config: { file: join(dir, "graph.json") } },
+    { id: "graph", pack: "graph.ts", config: { db: join(dir, "graph.sqlite") } },
     { id: "action", pack: "action.ts" },
     { id: "exchange", pack: "exchange.ts", config: { journal: join(dir, "exchange.jsonl") } },
     { id: "agent", pack: "agent.ts" },

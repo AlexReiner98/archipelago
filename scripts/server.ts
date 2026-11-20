@@ -6,7 +6,7 @@
  *   node scripts/server.ts stop                 stop it
  *   node scripts/server.ts status               say whether it runs, and where
  *
- * The data (graph.json, exchange.jsonl) lives in --data, default app/.data,
+ * The data (graph.sqlite, exchange.jsonl) lives in --data, default app/.data,
  * so it persists across restarts. The server's output goes to server.log
  * there, its pid to server.pid.
  */
@@ -61,7 +61,7 @@ switch (positionals[0] ?? "status") {
     }
     mkdirSync(data, { recursive: true });
     const log = openSync(logFile, "a");
-    const child = spawn(process.execPath, [join(root, "app", "server.ts"), "--data", data], {
+    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", join(root, "app", "server.ts"), "--data", data], {
       cwd: root,
       detached: true,
       windowsHide: true,
