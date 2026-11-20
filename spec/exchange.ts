@@ -23,7 +23,8 @@ export interface ExchangeEvent {
   /** Per run, from 1, no gaps: the order things happened in. */
   seq: number;
   time: Time;
-  place: Place;
+  /** Where in the run. Absent for `begin`, `end`, and a miss about the run itself. */
+  place?: Place;
   direction: ExchangeDirection;
   kind: string;
   /** The node that spoke (say, refuse, miss). */

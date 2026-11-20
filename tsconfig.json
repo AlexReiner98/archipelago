@@ -19,6 +19,7 @@
   "include": [
     "spec/**/*.ts",
     "runtime/**/*.ts",
+    "packs/**/*.ts",
     "test/**/*.ts"
   ]
 }

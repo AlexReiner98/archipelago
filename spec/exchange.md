@@ -18,7 +18,7 @@ by. Types: [exchange.ts](exchange.ts).
 |---|---|
 | `run`, `seq` | which run, and its order in that run (from 1, no gaps) |
 | `time` | when |
-| `place` | where in the run (see [agent](agent.md)) |
+| `place` | where in the run (see [agent](agent.md)); absent for `begin`, `end`, and a miss about the run itself |
 | `direction` | `to_agent` (the map spoke) or `from_agent` (the agent did) |
 | `kind` | `begin`, `end`, `say`, `refuse`, `act`, `miss` |
 | `node` | the node that spoke |
