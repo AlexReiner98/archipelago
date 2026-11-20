@@ -90,6 +90,8 @@ const atLoad = (at: Place[]) => at.length > 0 && at.every((a) => LOAD_FAMILIES.s
 export interface Listener {
   at: Place[];
   misses?: string;
+  /** Said only when the moment's input holds this (a refusal's node, at a tool's result). */
+  when?: string;
 }
 
 /**
@@ -103,6 +105,8 @@ export interface Listener {
  * alone decide, wherever the miss stands.
  */
 export function covers(node: Listener, places: Place[], words: string): boolean {
+  // A node said at a tool's result when the result holds its `when` (a refusal's node) is that miss's.
+  if (node.when && words.includes(node.when) && places.some((p) => p.startsWith("tool:") && node.at.some((a) => placeMatches(a, `tool_result:${p.slice(5)}`)))) return true;
   // Nothing goes wrong at a load itself: a skill or memory node's misses alone say which misses are its.
   if (atLoad(node.at)) return namesMiss(node.misses, words);
   if (!places.some((p) => node.at.some((a) => placeMatches(a, p)))) return false;

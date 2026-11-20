@@ -193,3 +193,16 @@ test("grow and verdict decide coverage the same way", () => {
   });
   assert.deepEqual(got, [false, true, false, true, true, false, false, true, false, true, true, false]);
 });
+
+test("a refusal's node, said at the tool's result, covers that refusal at the tool, and no other", () => {
+  const node = { at: ["tool_result:mcp__archipelago__*"], when: "Refused (action.input)" };
+  const cases: [string[], string, boolean][] = [
+    [["tool:mcp__archipelago__act"], "Refused (action.input): items.set needs fields.", true],
+    [["tool:mcp__archipelago__act"], "Refused (schema.quarantined): status built is not one of todo.", false],
+    [["tool:Bash"], "Refused (action.input): echoed", false],
+  ];
+  for (const [places, words, want] of cases) {
+    assert.equal(growCovers(node, places, words), want, words);
+    assert.equal(verdictCovers(node, places, words), want, words);
+  }
+});

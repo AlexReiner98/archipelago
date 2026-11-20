@@ -240,6 +240,44 @@ test("a person denying a call shows in the transcript, read at the next prompt: 
   }
 });
 
+test("what a subagent loaded is read from its own transcript when it stops, in its run", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "cc-sub-"));
+  try {
+    const own = join(dir, "agent.jsonl");
+    const line = { type: "attachment", attachment: { type: "instructions", files: [{ path: "/r/CLAUDE.md", type: "Project", content: "# Rules" }] } };
+    await writeFile(own, JSON.stringify(line) + "\n");
+    const { readFile } = await import("node:fs/promises");
+    const reached: Moment[] = [];
+    const agentRun: AgentRun = {
+      async begin(s) {
+        return { ...s, started: T };
+      },
+      async reach(m) {
+        reached.push(m);
+        return { said: [] };
+      },
+      async act() {},
+      async end() {},
+    };
+    const port: RunPort = { agent: agentRun, begun: true, seen: new Set() };
+    const transcriptFrom = async (i: HookInput, offset: number) => {
+      const text = (await readFile(i.transcript_path!, "utf8")).slice(offset);
+      return { text, end: offset + text.length };
+    };
+    await handle(
+      { hook_event_name: "SubagentStop", session_id: "s1", agent_id: "a1", agent_type: "Explore", transcript_path: join(dir, "main.jsonl"), agent_transcript_path: own, last_assistant_message: "Done." },
+      port,
+      { actor, now: () => T, transcriptFrom },
+    );
+    assert.deepEqual(reached.map((m) => [m.run, m.places[0]]), [
+      ["s1:a1", "memory:project//r/CLAUDE.md"],
+      ["s1:a1", "reply_end"],
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("a SubagentStop for a subagent that never started is not a run", async () => {
   const { calls, go } = fake();
   assert.deepEqual(await go({ hook_event_name: "SubagentStop", agent_id: "agent-x", agent_type: "", last_assistant_message: "suggestion" }), {});

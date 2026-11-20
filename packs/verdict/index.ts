@@ -43,15 +43,19 @@ export interface VerdictRead {
  * Each node with the words of the miss it should prevent: the `misses`
  * field of the map item it was made from (its `source`), when it has one.
  */
-async function withMisses(graph: GraphRead, nodes: NodeInfo[]): Promise<(NodeInfo & { misses?: string })[]> {
+async function withMisses(graph: GraphRead, nodes: NodeInfo[]): Promise<(NodeInfo & { misses?: string; when?: string })[]> {
   const sources = [...new Set(nodes.flatMap((n) => (n.source ? [n.source] : [])))];
-  const misses = new Map<string, string>();
+  const found = new Map<string, { misses?: string; when?: string }>();
   for (let i = 0; i < sources.length; i += LIMIT_MAX) {
     for (const item of await graph.get(sources.slice(i, i + LIMIT_MAX))) {
-      if (item && typeof item.fields.misses === "string" && item.fields.misses.trim()) misses.set(item.id, item.fields.misses);
+      if (!item) continue;
+      const f: { misses?: string; when?: string } = {};
+      if (typeof item.fields.misses === "string" && item.fields.misses.trim()) f.misses = item.fields.misses;
+      if (typeof item.fields.when === "string" && item.fields.when) f.when = item.fields.when;
+      if (f.misses || f.when) found.set(item.id, f);
     }
   }
-  return nodes.map((n) => (n.source && misses.has(n.source) ? { ...n, misses: misses.get(n.source)! } : n));
+  return nodes.map((n) => (n.source && found.has(n.source) ? { ...n, ...found.get(n.source)! } : n));
 }
 
 function pageOf<T>(list: T[], page?: PageRequest): Page<T> {

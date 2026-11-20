@@ -41,8 +41,9 @@ session's run and whose title is its type ("Explore subagent"). Every hook
 from inside it carries its `agent_id`, so its tool calls are its own acts,
 judged in its own run. A SubagentStop for a subagent that never started
 (Claude Code's own helpers, such as prompt suggestions) is not a run.
-What a subagent loads isn't read yet: its transcript is its own file, which
-its hooks name only when it stops.
+What a subagent loads is in its own transcript, which its hooks name only
+when it stops: at SubagentStop its skills and memory files are reached in
+its run, ahead of `reply_end`.
 
 Claude Code rejects some tool calls before any hook runs (an Edit whose
 `old_string` isn't in the file): the model sees the error, the hooks don't.

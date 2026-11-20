@@ -367,6 +367,8 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     }
     case "SubagentStop": {
       const own: HookInput = { ...input, ...(typeof input.agent_transcript_path === "string" ? { transcript_path: input.agent_transcript_path } : {}) };
+      // What the subagent loaded is in its own transcript, named only now.
+      if (own.transcript_path !== input.transcript_path) await reachLoads(own, port, options, reach);
       await replayFailures(own, run, port, options, act);
       const reply = input.last_assistant_message ?? (await options.lastReply?.(own));
       const answer = await reach(["reply_end"], reply === undefined ? undefined : trim(reply));
