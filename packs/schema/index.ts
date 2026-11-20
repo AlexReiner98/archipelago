@@ -61,15 +61,23 @@ const schema: Pack<SchemaConfig> = {
       const named = new Set<Id>();
       for (const [op, , , value] of facts) if (op === "+" && typeof value === "string" && !known.has(value) && value.length <= 200) named.add(value);
       await read([...named]);
-      return check(now, facts, {
+      const problems = check(now, facts, {
         type: (name) => types.get(name),
         typeOf: (id) => known.get(id) ?? null,
         strict: config.strict ?? false,
       });
+      return { problems, now };
+    };
+
+    /** The type each id has once the facts apply: the last type asserted, else what it had. */
+    const typeAfter = (facts: readonly Fact[], now: Map<Id, Fields>, id: Id): string | undefined => {
+      let t = typeof now.get(id)?.type === "string" ? (now.get(id)!.type as string) : undefined;
+      for (const [op, fid, field, value] of facts) if (fid === id && field === "type") t = op === "+" ? String(value) : undefined;
+      return t;
     };
 
     ctx.get<GraphStage>("graph.stage").stage(async (change, next) => {
-      const problems = await problemsOf(change.facts);
+      const { problems, now } = await problemsOf(change.facts);
       const key = change.header.action === RELEASE ? JSON.stringify(change.facts) : undefined;
       const releases = key !== undefined ? releasing.get(key) : undefined;
       if (releases) releasing.delete(key!);
@@ -79,6 +87,7 @@ const schema: Pack<SchemaConfig> = {
           throw new Refused({ code: "schema.misfit", message: `${releases} still doesn't fit, so it stays held: ${list}`, by, detail: problems as unknown as Json });
         }
         const held = quarantine.hold(change, problems);
+        quarantine.missed(problems.map((p) => typeAfter(change.facts, now, p.id)).filter((t): t is string => !!t), held.at);
         throw new Refused({
           code: "schema.quarantined",
           message: `This change doesn't fit the types defined now, so it is held as ${held.id}, not applied: ${list} Send a change that fits, or schema.release ${held.id} once its types allow it.`,
@@ -88,6 +97,13 @@ const schema: Pack<SchemaConfig> = {
       }
       const committed = await next(change);
       if (releases) quarantine.released(releases, committed.id);
+      // What each type is made of: an item new to the graph, or given a new type.
+      const made = change.facts.filter(([op, id, field, value]) => op === "+" && field === "type" && now.get(id)?.type !== value).map((f) => String(f[3]));
+      try {
+        quarantine.made(made, committed.committed);
+      } catch (err) {
+        ctx.runtime.report(ctx.fiber, err);
+      }
       return committed;
     });
 
@@ -142,12 +158,32 @@ const schema: Pack<SchemaConfig> = {
     });
 
     register.register({
+      name: "schema.record",
+      title: "Each type's record: what is made of it, and the misses it causes",
+      doc: "Per type, defined or not: items made (new, or given the type), sets held because an item of it didn't fit, and when each last happened, with whether the type is a trial flavour. What the learning loop keeps or makes dormant a type by. Writes nothing.",
+      input: { type: "object", properties: { type: { type: "string" } } },
+      async run(input: { type?: string }) {
+        const defined = types.all().types;
+        const rows = new Map(quarantine.record().map((r) => [r.type, r]));
+        for (const t of defined) if (!rows.has(t.name)) rows.set(t.name, { type: t.name, made: 0, misses: 0 });
+        const out = [...rows.values()]
+          .filter((r) => !input.type || r.type === input.type)
+          .map((r) => {
+            const t = types.get(r.type);
+            const info = t && "statuses" in t ? { base: t.base, trial: t.trial } : t ? { link: true } : { defined: false };
+            return { ...r, ...info };
+          });
+        return out as unknown as Json;
+      },
+    });
+
+    register.register({
       name: "schema.check",
       title: "Would these facts fit?",
       doc: "Checks facts against the types defined now, without writing or holding anything.",
       input: { type: "object", properties: { facts: { type: "array" } }, required: ["facts"] },
       async run(input: { facts: Fact[] }) {
-        const problems = await problemsOf(input.facts);
+        const { problems } = await problemsOf(input.facts);
         return { fits: problems.length === 0, problems } as unknown as Json;
       },
     });

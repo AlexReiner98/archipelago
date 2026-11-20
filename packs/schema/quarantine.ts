@@ -31,7 +31,23 @@ CREATE TABLE IF NOT EXISTS quarantine (
   body TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS quarantine_state ON quarantine (state, n);
+CREATE TABLE IF NOT EXISTS record (
+  type TEXT PRIMARY KEY,
+  made INTEGER NOT NULL DEFAULT 0,
+  misses INTEGER NOT NULL DEFAULT 0,
+  last_made TEXT,
+  last_miss TEXT
+);
 `;
+
+/** A type's record: how many items were made of it, how many held sets it caused, and when last. */
+export interface TypeRecord {
+  type: string;
+  made: number;
+  misses: number;
+  lastMade?: string;
+  lastMiss?: string;
+}
 
 const LAYOUT = "1";
 
@@ -53,7 +69,32 @@ export class Quarantine {
       one: p("SELECT n, body FROM quarantine WHERE n = ?"),
       set: p("UPDATE quarantine SET state = ?, body = ? WHERE n = ?"),
       list: p("SELECT n, body FROM quarantine WHERE (? IS NULL OR state = ?) AND n < ? ORDER BY n DESC LIMIT ?"),
+      made: p("INSERT INTO record (type, made, last_made) VALUES (?, ?, ?) ON CONFLICT (type) DO UPDATE SET made = made + excluded.made, last_made = excluded.last_made"),
+      missed: p("INSERT INTO record (type, misses, last_miss) VALUES (?, 1, ?) ON CONFLICT (type) DO UPDATE SET misses = misses + 1, last_miss = excluded.last_miss"),
+      record: p("SELECT type, made, misses, last_made, last_miss FROM record ORDER BY type"),
     };
+  }
+
+  /** Counts items made, by type, as of `at`. */
+  made(types: string[], at: string): void {
+    const counts = new Map<string, number>();
+    for (const t of types) counts.set(t, (counts.get(t) ?? 0) + 1);
+    for (const [t, n] of counts) this.q.made!.run(t, n, at);
+  }
+
+  /** Counts one held set against each type it had a misfitting item of. */
+  missed(types: string[], at: string): void {
+    for (const t of new Set(types)) this.q.missed!.run(t, at);
+  }
+
+  record(): TypeRecord[] {
+    return (this.q.record!.all() as { type: string; made: number; misses: number; last_made: string | null; last_miss: string | null }[]).map((r) => ({
+      type: r.type,
+      made: r.made,
+      misses: r.misses,
+      ...(r.last_made ? { lastMade: r.last_made } : {}),
+      ...(r.last_miss ? { lastMiss: r.last_miss } : {}),
+    }));
   }
 
   close(): void {

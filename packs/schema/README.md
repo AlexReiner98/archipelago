@@ -13,6 +13,15 @@ on its own.
 | `schema.release` `{ quarantine }` | Sends a held set again as the releaser's change; marked released once applied |
 | `schema.drop` `{ quarantine }` | Stops holding it, with the call's reason; the record stays |
 | `schema.check` `{ facts }` | Would these facts fit? Writes and holds nothing |
+| `schema.record` `{ type? }` | Each type's record: items made of it, held sets it caused, when last, and whether it is a trial flavour; writes nothing |
+
+The record is what the learning loop keeps a trial flavour by, or makes it
+dormant by (decision "How do types grow without creeping?"). A type counts
+as made when an item is new or given that type. A held set counts once
+against each type it had a misfitting item of. Refusals made inside an
+action before it writes (such as `items.*` checks) never reach the chain,
+so they aren't counted. The pack names no type: statuses and fields come
+from the base, through `types.read`.
 
 What it checks (check.ts):
 

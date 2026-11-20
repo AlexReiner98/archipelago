@@ -220,6 +220,28 @@ test("drop stops holding a set and keeps the record; check says whether facts fi
   }
 });
 
+test("each type's record: what is made of it and the misses it causes, trial flavours marked", async () => {
+  const s = await setup();
+  try {
+    await s.ok(s.write(...task("a"), ...task("b")));
+    await s.ok(s.write(["+", "c", "type", "bug"], ["+", "c", "severity", "low"]));
+    await s.ok(s.write(["-", "a", "status", "todo"], ["+", "a", "status", "done"]));
+    await s.refused(s.write(["+", "d", "type", "bug"], ["+", "d", "severity", "mild"], ["+", "e", "type", "bug"], ["+", "e", "colour", "red"]));
+    await s.ok(s.write(["+", "u", "type", "event"]));
+    const rec = (await s.ok(s.call<Json>("schema.record", {}))).output as unknown as { type: string; made: number; misses: number; trial?: boolean; base?: string; defined?: boolean; lastMiss?: string }[];
+    const of = (t: string) => rec.find((r) => r.type === t)!;
+    assert.deepEqual([of("work").made, of("work").misses, of("work").trial], [2, 0, false]);
+    assert.deepEqual([of("bug").made, of("bug").misses, of("bug").trial, of("bug").base], [1, 1, true, "work"], "one held set is one miss");
+    assert.ok(of("bug").lastMiss);
+    assert.deepEqual([of("question").made, of("question").misses], [0, 0], "a defined type with nothing made shows, at zero");
+    assert.deepEqual([of("event").made, of("event").defined], [1, false]);
+    const one = (await s.ok(s.call<Json>("schema.record", { type: "bug" }))).output as unknown as unknown[];
+    assert.equal(one.length, 1);
+  } finally {
+    await s.stop();
+  }
+});
+
 test("unloading the schema pack takes its stage: writes are no longer checked", async () => {
   const s = await setup();
   try {
