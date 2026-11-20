@@ -16,10 +16,12 @@ import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
 import type { AgentRun } from "../../spec/agent.ts";
-import type { Actor } from "../../spec/common.ts";
+import type { Actor, Time } from "../../spec/common.ts";
 import { META } from "../../spec/common.ts";
+import type { ExchangeRead } from "../../spec/exchange.ts";
+import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { handle, lastAssistantText, type HookInput, type HookOutput, type RunPort } from "./mapping.ts";
+import { handle, lastAssistantText, type HookInput, type HookOutput, type RecordedCall, type RunPort } from "./mapping.ts";
 import { TOOL_NAMES, rpc, type JsonRpc } from "./mcp.ts";
 
 export interface ClaudeCodeConfig {
@@ -80,10 +82,22 @@ async function lastReply(input: HookInput): Promise<string | undefined> {
 
 const claudeCode: Pack<ClaudeCodeConfig> = {
   id: "claude-code",
-  inject: ["agent.run", "action.invoke", "action.list"],
+  inject: ["agent.run", "action.invoke", "action.list", "exchange.read"],
   async apply(ctx: Context, config: ClaudeCodeConfig = {}) {
     const actor: Actor = config.agent ?? { id: "claude-code", kind: "agent" };
     const actions = ctx.get<ActionList>("action.list");
+    const read = ctx.get<ExchangeRead>("exchange.read");
+    /** The run's tool acts on the record, from `since` on. */
+    const recorded = async (run: string, since?: Time): Promise<RecordedCall[]> => {
+      const out: RecordedCall[] = [];
+      for (let p = await read.events(run, { limit: LIMIT_MAX }); ; p = await read.events(run, { limit: LIMIT_MAX, after: p.next })) {
+        for (const e of p.items) {
+          if (e.kind !== "act" || e.act?.kind !== "tool" || !e.place || (since && e.time < since)) continue;
+          out.push({ place: e.place, ...(e.act.input !== undefined ? { input: e.act.input } : {}) });
+        }
+        if (!p.next) return out;
+      }
+    };
     const runs = new Map<string, RunState>();
     /** MCP calls of `hear`, by tool use id, to the run that was about to make them. */
     const hearing = new Map<string, string>();
@@ -105,7 +119,7 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
         if (input.tool_use_id) hearing.set(input.tool_use_id, input.session_id);
         lastHearing = input.session_id;
       }
-      const next = state.queue.then(() => handle(input, state, { actor, lastReply, transcript }));
+      const next = state.queue.then(() => handle(input, state, { actor, lastReply, transcript, recorded }));
       state.queue = next.catch(() => {});
       if (input.hook_event_name === "SessionEnd") void next.finally(() => runs.delete(input.session_id));
       return next;

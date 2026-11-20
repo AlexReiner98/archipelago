@@ -316,3 +316,76 @@ test("at Stop, the turn's failed tool calls no hook saw are read from the transc
     ["reply_end", "Done.", true],
   ]);
 });
+
+test("a restart mid-turn records each call once: Stop reads back what is on the record", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "cc-restart-"));
+  const journal = join(dir, "exchange.jsonl");
+  const transcriptPath = join(dir, "t.jsonl");
+  const begun = new Date(Date.now() - 1000).toISOString();
+  const line = (o: object) => JSON.stringify(o);
+  const use = (id: string, name: string, input: object) => line({ type: "assistant", message: { content: [{ type: "tool_use", id, name, input }] } });
+  const result = (id: string, content: string, is_error = true) => line({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, is_error, content }] } });
+  await writeFile(
+    transcriptPath,
+    [
+      line({ type: "user", timestamp: begun, message: { content: "build it" } }),
+      use("t1", "Bash", { command: "false" }),
+      result("t1", "exit 1"),
+      use("t2", "Bash", { command: "false" }),
+      result("t2", "exit 1"),
+      use("t3", "Edit", { file_path: join(dir, "a.ts"), old_string: "x", new_string: "y" }),
+      result("t3", "<tool_use_error>String to replace not found in file.</tool_use_error>"),
+      line({ type: "assistant", message: { content: [{ type: "text", text: "Done." }] } }),
+    ].join("\n") + "\n",
+  );
+  const probe: Pack = { id: "probe", inject: ["exchange.read"], apply() {} };
+  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "cc.ts": claudeCode, "probe.ts": probe };
+  let port = 0;
+  const tree = [
+    { id: "graph", pack: "graph.ts" },
+    { id: "action", pack: "action.ts" },
+    { id: "exchange", pack: "exchange.ts", config: { journal } },
+    { id: "agent", pack: "agent.ts" },
+    { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "probe", pack: "probe.ts" },
+  ];
+  const start = async () => {
+    const rt = new Runtime();
+    const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
+    await loader.apply(tree);
+    return loader;
+  };
+  const hook = (event: string, more: object = {}) =>
+    fetch(`http://127.0.0.1:${port}/hook`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ hook_event_name: event, session_id: "sess-r", cwd: dir, transcript_path: transcriptPath, ...more }),
+    }).then((r) => r.json());
+  let loader = await start();
+  try {
+    await hook("SessionStart", { source: "startup" });
+    await hook("UserPromptSubmit", { prompt: "build it" });
+    // The first failed Bash call is seen by its hooks; then the server restarts.
+    await hook("PreToolUse", { tool_name: "Bash", tool_input: { command: "false" }, tool_use_id: "t1" });
+    await hook("PostToolUseFailure", { tool_name: "Bash", tool_input: { command: "false" }, error: "exit 1", tool_use_id: "t1" });
+    await loader.apply([]);
+    loader = await start();
+    // The same command fails again with no hook (the server was down), and an Edit is rejected before any hook.
+    await hook("Stop", { stop_hook_active: false });
+    await hook("Stop", { stop_hook_active: true });
+    const read = loader.fiber("probe")!.ctx.get<ExchangeRead>("exchange.read");
+    const acts = (await read.events("sess-r")).items.filter((e) => e.kind === "act" && e.act?.kind === "tool");
+    assert.deepEqual(
+      acts.map((e) => [e.place, e.act!.output, e.act!.ok]),
+      [
+        ["tool:Bash", "exit 1", false],
+        ["tool:Bash", "exit 1", false],
+        ["tool:Edit", "String to replace not found in file.", false],
+      ],
+      "t1 once from its hook, t2 and t3 once from the transcript, after a restart and two Stops",
+    );
+  } finally {
+    await loader.apply([]);
+    await rm(dir, { recursive: true, force: true });
+  }
+});

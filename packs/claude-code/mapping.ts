@@ -17,6 +17,8 @@
  * old_string isn't in the file): the model sees the error, the hooks never
  * do. At Stop, the turn's errored tool results that no hook saw are read
  * from the transcript and recorded as failed acts, so a miss is never lost.
+ * What is already on the record is read back from the exchange, not only
+ * remembered, so a restart mid-turn never records a call twice.
  */
 import type { Act, AgentRun, Answer, Moment, Place, RunStart } from "../../spec/agent.ts";
 import type { Actor, Json, Time } from "../../spec/common.ts";
@@ -123,6 +125,18 @@ export interface Options {
   lastReply?: (input: HookInput) => Promise<string | undefined>;
   /** The transcript, to find the turn's failed tool calls no hook saw. */
   transcript?: (input: HookInput) => Promise<string | undefined>;
+  /**
+   * The run's tool calls already on the record, from `since` on: read back
+   * from the exchange, so a call is recorded once even when the adapter
+   * restarted mid-turn and forgot what its hooks saw.
+   */
+  recorded?: (run: string, since?: Time) => Promise<RecordedCall[]>;
+}
+
+/** A tool call as the record holds it: its place and its (cut) input. */
+export interface RecordedCall {
+  place: Place;
+  input?: Json;
 }
 
 export function runStart(input: HookInput, actor: Actor): RunStart {
@@ -206,7 +220,9 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     case "Stop": {
       if (port.seen && options.transcript) {
         const text = await options.transcript(input);
-        for (const f of text ? unseenFailures(text, port.seen) : []) {
+        const since = text ? turnStart(text) : undefined;
+        const recorded = text && options.recorded ? await options.recorded(run, since) : undefined;
+        for (const f of text ? unseenFailures(text, port.seen, recorded) : []) {
           port.seen.add(f.id);
           await act({ place: `tool:${f.tool}`, kind: "tool", by: "agent", input: trim(f.input) ?? null, output: trim(f.error) ?? null, ok: false });
         }
@@ -266,11 +282,7 @@ export interface TranscriptFailure {
   error: string;
 }
 
-/**
- * The current turn's tool calls whose result is an error and whose id isn't
- * in `seen`: from the last prompt (a user entry that isn't a tool result) on.
- */
-export function unseenFailures(transcript: string, seen: Set<string>): TranscriptFailure[] {
+function entriesOf(transcript: string): any[] {
   const entries: any[] = [];
   for (const line of transcript.split("\n")) {
     if (!line.trim()) continue;
@@ -278,19 +290,60 @@ export function unseenFailures(transcript: string, seen: Set<string>): Transcrip
       entries.push(JSON.parse(line));
     } catch {}
   }
-  const blocks = (e: any): any[] => (Array.isArray(e?.message?.content) ? e.message.content : []);
+  return entries;
+}
+
+const blocks = (e: any): any[] => (Array.isArray(e?.message?.content) ? e.message.content : []);
+
+/** Where the current turn starts: the last prompt (a user entry that isn't a tool result). */
+function turnIndex(entries: any[]): number {
   let start = 0;
   entries.forEach((e, i) => {
     if (e?.type === "user" && !e.isMeta && !blocks(e).some((b) => b?.type === "tool_result")) start = i;
   });
-  const uses = new Map<string, { tool: string; input?: Json }>();
+  return start;
+}
+
+/** When the current turn's prompt was written, if the transcript says. */
+export function turnStart(transcript: string): Time | undefined {
+  const entries = entriesOf(transcript);
+  const t = entries[turnIndex(entries)]?.timestamp;
+  return typeof t === "string" && t ? t : undefined;
+}
+
+/** What makes two records of a tool call the same call: its place and its cut input. */
+const callKey = (place: Place, input: Json | undefined) => `${place} ${JSON.stringify(input ?? null)}`;
+
+/**
+ * The current turn's tool calls whose result is an error and that aren't on
+ * the record yet, in order. A call is on the record when a hook saw its id
+ * (`seen`), or when `recorded` (the turn's tool acts read back from the
+ * exchange) holds a call at its place with its input: each recorded call
+ * accounts for one transcript call, so the same command failing twice is
+ * two calls. With `recorded`, nothing is recorded twice, whatever restarted.
+ */
+export function unseenFailures(transcript: string, seen: Set<string>, recorded?: RecordedCall[]): TranscriptFailure[] {
+  const entries = entriesOf(transcript);
+  const left = new Map<string, number>();
+  for (const r of recorded ?? []) {
+    const k = callKey(r.place, r.input);
+    left.set(k, (left.get(k) ?? 0) + 1);
+  }
+  const uses = new Map<string, { tool: string; input?: Json; onRecord: boolean }>();
   const out: TranscriptFailure[] = [];
-  for (const e of entries.slice(start)) {
+  for (const e of entries.slice(turnIndex(entries))) {
     for (const b of blocks(e)) {
-      if (e.type === "assistant" && b?.type === "tool_use" && typeof b.id === "string") uses.set(b.id, { tool: String(b.name), input: b.input });
-      if (e.type === "user" && b?.type === "tool_result" && b.is_error === true && typeof b.tool_use_id === "string" && !seen.has(b.tool_use_id)) {
+      if (e.type === "assistant" && b?.type === "tool_use" && typeof b.id === "string") {
+        const tool = String(b.name);
+        const k = callKey(`tool:${tool}`, trim(b.input) ?? null);
+        const n = left.get(k) ?? 0;
+        if (n) left.set(k, n - 1);
+        uses.set(b.id, { tool, input: b.input, onRecord: n > 0 || seen.has(b.id) });
+      }
+      if (e.type === "user" && b?.type === "tool_result" && b.is_error === true && typeof b.tool_use_id === "string") {
         const use = uses.get(b.tool_use_id);
-        if (!use) continue;
+        if (!use || use.onRecord) continue;
+        use.onRecord = true;
         const c = b.content;
         const error = typeof c === "string" ? c : Array.isArray(c) ? c.filter((x: any) => x?.type === "text").map((x: any) => x.text).join("\n") : "";
         out.push({ id: b.tool_use_id, tool: use.tool, ...(use.input !== undefined ? { input: use.input } : {}), error: error.replace(/<\/?tool_use_error>/g, "").trim() });

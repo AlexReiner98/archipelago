@@ -4,8 +4,9 @@ The Claude Code adapter. Claude Code's hooks and an MCP server are mere
 callers of `agent.run` ([spec](../../spec/agent.md)): what a hook or tool
 tells the model is what the nodes say or refuse at a place, and what the
 agent does comes in as an act. Nothing past this pack knows which harness
-runs. Injects `agent.run`, `action.invoke` and `action.list`, so it waits
-for an agent pack and an action pack.
+runs. Injects `agent.run`, `action.invoke`, `action.list` and
+`exchange.read`, so it waits for an agent pack, an action pack and an
+exchange.
 
 ## Hooks to places
 
@@ -22,6 +23,11 @@ Claude Code rejects some tool calls before any hook runs (an Edit whose
 `old_string` isn't in the file): the model sees the error, the hooks don't.
 So at Stop, the turn's errored tool results that no hook saw are read from
 the transcript and recorded as failed tool acts, ahead of `reply_end`.
+What is already on the record is read back from the exchange (the turn's
+tool acts, from the prompt's time on), not only remembered: each recorded
+call at a place with the same input accounts for one transcript call. So a
+call is recorded once even when the server restarted mid-turn and forgot
+what its hooks saw, and a second Stop adds nothing.
 
 The run is the session id; each run has its own context, intercepted with
 the agent as actor and the run, and its hooks are handled one at a time in
