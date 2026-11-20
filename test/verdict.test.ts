@@ -70,7 +70,7 @@ test("a failed edit of a file the node is said for is its miss", () => {
 
 test("another node's refusal is a miss; the node's own refusals are its saying", () => {
   const own = judgeRun("r", [refusedBy("r", 1, "a/rule", "tool:Bash"), refusedBy("r", 2, "a/rule", "tool:Bash")], listening);
-  assert.deepEqual(own.map((x) => [x.verdict, x.said]), [["quiet", 2]]);
+  assert.deepEqual(own.map((x) => [x.verdict, x.said]), [["held", 2]]);
   const other = judgeRun("r", [said("r", 1, "a/schema", "tool:change"), refusedBy("r", 2, "b/check", "tool:change")], listening);
   assert.equal(other.find((x) => x.node === "a/schema")!.verdict, "failed");
 });
@@ -96,6 +96,70 @@ test("records add up runs, sayings and verdicts, with the last time said", () =>
     { said: 4, runs: 3, held: 1, failed: 1, quiet: 1, last: T(3), places: { "tool:change": 4 } },
   );
   assert.equal(recs.find((r) => r.node === "a/rule")!.quiet, 1);
+});
+
+// A Claude Code run as the adapter records it: `begin` carries the RunInfo,
+// and a PreToolUse refusal is followed by the denied call as its own act.
+const CWD = "C:\\Users\\me\\Documents\\Github\\archipelago-next";
+const begin = (run: string, seq: number, cwd = CWD) =>
+  ev(run, seq, { kind: "begin", direction: "from_agent", detail: { run, agent: "agent:claude", harness: "claude-code", reaches: [], cwd, started: T(seq) } });
+const refusedHere = (run: string, seq: number, node: string, place: string) =>
+  ev(run, seq, { kind: "refuse", node, pack: "rules", place, text: "Use the change tool, not Bash, for the map.", detail: { code: "use-change" } });
+const deniedAct = (run: string, seq: number, node: string, tool: string, input: Record<string, string>) =>
+  ev(run, seq, {
+    kind: "act",
+    direction: "from_agent",
+    place: `tool:${tool}`,
+    act: { kind: "tool", by: "agent", input, output: { refused: node, text: "Use the change tool, not Bash, for the map." }, ok: false },
+  });
+
+test("a blocked call is held: the denied act it caused is not its miss", () => {
+  const v = judgeRun(
+    "s",
+    [
+      begin("s", 1),
+      refusedHere("s", 2, "a/rule", "tool:Bash"),
+      deniedAct("s", 3, "a/rule", "Bash", { command: "curl -X POST https://example.test/map" }),
+      okAct("s", 4, "tool:Bash"),
+    ],
+    listening,
+  );
+  assert.deepEqual(v.map((x) => [x.node, x.verdict, x.after, x.failed_by]), [["a/rule", "held", 0, []]]);
+  // A call that fails at its place later, not the one it denied, still fails it.
+  const again = judgeRun(
+    "s",
+    [begin("s", 1), refusedHere("s", 2, "a/rule", "tool:Bash"), deniedAct("s", 3, "a/rule", "Bash", { command: "x" }), failedAct("s", 4, "tool:Bash")],
+    listening,
+  );
+  assert.deepEqual(again.map((x) => [x.verdict, x.failed_by]), [["failed", [4]]]);
+  // Another node listening there still counts the refusal as its miss.
+  const other = judgeRun(
+    "s",
+    [begin("s", 1), said("s", 2, "b/hint", "tool:Bash"), refusedHere("s", 3, "a/rule", "tool:Bash"), deniedAct("s", 4, "a/rule", "Bash", { command: "x" })],
+    listeningOf([{ id: "b/hint", at: ["tool:Bash"] }, { id: "a/rule", at: ["tool:Bash"] }]),
+  );
+  assert.equal(other.find((x) => x.node === "b/hint")!.verdict, "failed");
+});
+
+test("absolute paths from Claude Code match file: places, relative to the run's cwd", () => {
+  const spec = listeningOf([{ id: "a/spec", at: ["file:spec/**"] }]);
+  const read = (seq: number, file_path: string) => failedAct("w", seq, "tool:Read", { file_path });
+  // Windows: backslashes, and a drive letter cased differently from the cwd.
+  const win = judgeRun("w", [begin("w", 1), said("w", 2, "a/spec", "file:spec/agent.ts"), read(3, "c:\\Users\\me\\Documents\\Github\\archipelago-next\\spec\\agent.md")], spec);
+  assert.deepEqual(win.map((x) => [x.verdict, x.failed_by]), [["failed", [3]]]);
+  // POSIX.
+  const posix = judgeRun(
+    "w",
+    [begin("w", 1, "/home/me/archipelago-next/"), said("w", 2, "a/spec", "file:spec/agent.ts"), read(3, "/home/me/archipelago-next/spec/exchange.ts")],
+    spec,
+  );
+  assert.equal(posix[0]!.verdict, "failed");
+  // A file outside the cwd stays absolute and doesn't match.
+  const outside = judgeRun("w", [begin("w", 1), said("w", 2, "a/spec", "file:spec/agent.ts"), read(3, "C:\\Users\\me\\other\\spec\\agent.md")], spec);
+  assert.equal(outside[0]!.verdict, "quiet");
+  // A sibling folder that shares the cwd's prefix is outside it.
+  const sibling = judgeRun("w", [begin("w", 1), said("w", 2, "a/spec", "file:spec/agent.ts"), read(3, `${CWD}-old\\spec\\agent.md`)], spec);
+  assert.equal(sibling[0]!.verdict, "quiet");
 });
 
 // ---------- the pack, live on the runtime with agent and exchange ----------

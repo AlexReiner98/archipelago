@@ -11,15 +11,18 @@ Per run, a node is judged from the first time it was said (or refused) there:
 | Verdict | When |
 |---|---|
 | **failed** | one of its misses came after |
-| **held** | a miss came before, and none after |
-| **quiet** | no miss in the run: nothing to judge |
+| **held** | a miss came before, and none after; or it refused, and nothing went wrong after |
+| **quiet** | no miss and no refusal in the run: nothing to judge |
 
 A node's **miss** is something going wrong where it listens: a refusal by
 another node, or an act with `ok: false`, at a place matching one of the
 node's `at`. An act also stands at the files its input names (`file_path`,
 `path`, `notebook_path`), so a node said at `file:packs/*/page/*.js` is
-failed by a failed edit of such a file. A node's own refusals are its
-saying. An exchange `miss` (a node threw) is the exchange's fault, not the
+failed by a failed edit of such a file. Paths are made relative to the
+run's `cwd` (from its `begin`), with `/` for separators, since Claude Code
+gives them absolute. A node's own refusals are its saying, and so is the
+denied call a refusal causes (an act whose output names the node as
+`refused`): a refusal is the node working. An exchange `miss` (a node threw) is the exchange's fault, not the
 agent's, and judges nothing. A node no longer in the tree is judged at the
 places it was said.
 

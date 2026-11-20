@@ -6,14 +6,18 @@
  * Per run, a node is judged from the first time it was said there (the
  * reflex record's meanings, 19 Nov 2026):
  * - failed: one of its misses came after;
- * - held: a miss came before and none after;
- * - quiet: no miss at all, nothing to judge.
+ * - held: a miss came before and none after, or it refused something and
+ *   nothing went wrong after (a refusal is the node working);
+ * - quiet: no miss and no refusal, nothing to judge.
  *
  * A node's miss is something going wrong where it listens: a refusal by
  * another node, or an act that didn't work (`ok: false`), at a place that
  * matches one of the node's `at`. An act also stands at the files its input
  * names (`file:<path>`), so a node said for a file is judged by a failed
- * edit of that file. The node's own refusals are its saying, not its miss.
+ * edit of that file. Claude Code names files by absolute path, so a path is
+ * made relative to the run's cwd (from its `begin`) before it is a place.
+ * The node's own refusals are its saying, not its miss, and neither is the
+ * denied call a refusal causes (an act whose output names it as `refused`).
  * An exchange `miss` (a node threw) is a fault of the exchange, not the
  * agent's, and judges nothing.
  *
@@ -90,30 +94,57 @@ export function listeningOf(nodes: Pick<NodeInfo, "id" | "at">[]): Listening {
 
 const PATH_KEYS = ["file_path", "path", "notebook_path"];
 
+/**
+ * A path as a place argument: `/` for separators, and relative to `cwd` when
+ * it lies inside it. A drive letter's case is folded, as Windows does.
+ */
+export function relativePath(path: string, cwd?: string): string {
+  const norm = (p: string) => p.replace(/\\/g, "/");
+  const p = norm(path);
+  if (!cwd) return p;
+  const base = norm(cwd).replace(/\/+$/, "") + "/";
+  const fold = (s: string) => (/^[a-z]:\//i.test(s) ? s.toLowerCase() : s);
+  return fold(p).startsWith(fold(base)) ? p.slice(base.length) : p;
+}
+
 /** The files an act's input names, as places. */
-function filePlaces(input: Json | undefined): Place[] {
+function filePlaces(input: Json | undefined, cwd?: string): Place[] {
   if (!input || typeof input !== "object" || Array.isArray(input)) return [];
   const out: Place[] = [];
   for (const k of PATH_KEYS) {
     const v = input[k];
-    if (typeof v === "string" && v) out.push(`file:${v.replace(/\\/g, "/")}`);
+    if (typeof v === "string" && v) out.push(`file:${relativePath(v, cwd)}`);
   }
   return out;
 }
 
-/** Where a miss stands, or undefined when the event isn't one. */
-export function missPlaces(e: ExchangeEvent): Place[] | undefined {
+/** Where a miss stands, or undefined when the event isn't one. `cwd` is the run's. */
+export function missPlaces(e: ExchangeEvent, cwd?: string): Place[] | undefined {
   if (e.kind === "refuse" && e.place) return [e.place];
-  if (e.kind === "act" && e.act?.ok === false) return [...(e.place ? [e.place] : []), ...filePlaces(e.act.input)];
+  if (e.kind === "act" && e.act?.ok === false) return [...(e.place ? [e.place] : []), ...filePlaces(e.act.input, cwd)];
   return undefined;
+}
+
+/** The node whose refusal denied this act, when it was a denied call. */
+function deniedBy(e: ExchangeEvent): string | undefined {
+  const out = e.kind === "act" ? e.act?.output : undefined;
+  if (!out || typeof out !== "object" || Array.isArray(out)) return undefined;
+  return typeof out.refused === "string" ? out.refused : undefined;
+}
+
+/** The run's folder, as its `begin` says. */
+export function cwdOf(events: ExchangeEvent[]): string | undefined {
+  const d = events.find((e) => e.kind === "begin")?.detail;
+  if (!d || typeof d !== "object" || Array.isArray(d)) return undefined;
+  return typeof d.cwd === "string" && d.cwd ? d.cwd : undefined;
 }
 
 const isSaying = (e: ExchangeEvent) => (e.kind === "say" || e.kind === "refuse") && !!e.node;
 
 /** Whether a miss event is one of this node's: at a place it listens at, and not its own. */
-function isMissOf(e: ExchangeEvent, node: string, at: Place[]): boolean {
-  if (e.node === node) return false;
-  const places = missPlaces(e);
+function isMissOf(e: ExchangeEvent, node: string, at: Place[], cwd?: string): boolean {
+  if (e.node === node || deniedBy(e) === node) return false;
+  const places = missPlaces(e, cwd);
   if (!places) return false;
   return places.some((p) => at.some((a) => placeMatches(a, p)));
 }
@@ -121,6 +152,7 @@ function isMissOf(e: ExchangeEvent, node: string, at: Place[]): boolean {
 /** One run's verdicts, one per node said in it, in the order each was first said. */
 export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listening): RunVerdict[] {
   const sorted = [...events].filter((e) => e.run === run).sort((a, b) => a.seq - b.seq);
+  const cwd = cwdOf(sorted);
   const sayings = new Map<string, ExchangeEvent[]>();
   for (const e of sorted) {
     if (!isSaying(e)) continue;
@@ -132,14 +164,15 @@ export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listeni
   for (const [node, said] of sayings) {
     const first = said[0]!;
     const at = listening.get(node) ?? [...new Set(said.map((s) => s.place).filter((p): p is Place => !!p))];
-    const misses = sorted.filter((e) => isMissOf(e, node, at));
+    const misses = sorted.filter((e) => isMissOf(e, node, at, cwd));
+    const refused = said.some((s) => s.kind === "refuse");
     const before = misses.filter((m) => m.seq < first.seq).length;
     const afterList = misses.filter((m) => m.seq > first.seq);
     const after = afterList.length;
     out.push({
       run,
       node,
-      verdict: after ? "failed" : before ? "held" : "quiet",
+      verdict: after ? "failed" : before || refused ? "held" : "quiet",
       said: said.length,
       first: first.seq,
       said_at: first.time,
