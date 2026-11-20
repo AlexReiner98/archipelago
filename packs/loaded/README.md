@@ -11,11 +11,10 @@ like any node, and shown in the harness view's tree. Injects `graph.read`,
 | `skill:<name>` | a skill's text loads (`skill:anthropic-skills:docs` for a plugin's) |
 | `memory:<scope>/<path>` | a memory file loads; scope `project`, `local`, `user`, `auto` or `managed`, the path with `/` and `~` for home |
 
-These are open-vocabulary places ([spec/agent.ts](../../spec/agent.ts)):
-not in edition 1's `PLACES`, so an adapter reaches them without listing
-them in `reaches`. Whether they join `PLACES` is a question to Alex on the
-map ("skill: and memory: places in the spec?"). They record; the map can't
-speak to the agent there, since the harness has already loaded the text.
+These are edition 2 places in `PLACES` ([spec/agent.ts](../../spec/agent.ts)),
+and the Claude Code adapter lists them in `reaches`. This pack records a
+load the map hasn't adopted yet; once the map writes the file
+([packs/written](../written/README.md)), the map's node says it instead.
 
 - **Nodes.** Each graph item of type `loaded` (`title`, `kind`: skill or
   memory, `place`, `path`) is a node at its one place that says what was
@@ -25,6 +24,9 @@ speak to the agent there, since the harness has already loaded the text.
   first time its place is seen, and changes nothing after. The adapter
   calls it before reaching the place; the pack follows the graph as each
   change commits, so the node is there by the time the action returns.
+- **Adopted.** An item whose `adopted` names a node (set by
+  `written.adopt`) registers nothing: that node says it, and `loaded.note`
+  answers with it.
 - **Judging.** Nothing goes wrong at a load itself, so a loaded node is
   failed only by misses its `misses` (a field on its item) name, wherever
   in the run they stand (`covers` in the verdict and grow packs). Without

@@ -1,8 +1,10 @@
 /**
  * agent: say, refuse, act. See agent.md.
  *
- * The spec owns the place vocabulary, and edition 1 has six places (Alex,
- * 20 Nov 2026): the ones an adapter can both reach and speak at.
+ * The spec owns the place vocabulary. Edition 1 has six places (Alex,
+ * 20 Nov 2026): the ones an adapter can both reach and speak at. Edition 2
+ * adds `skill:` and `memory:` (Alex, 20 Nov 2026), where the map speaks
+ * through the files it writes.
  */
 import type { Actor, Capability, Dispose, Id, Json, PackId, Term, Time } from "./common.ts";
 
@@ -18,7 +20,7 @@ export type RunId = string;
  */
 export type Place = string;
 
-/** Edition 1's places. `refusable`: a refusal there stops what is happening. */
+/** The places, each with the edition it came in. `refusable`: a refusal there stops what is happening. */
 export const PLACES: (Term & { refusable: boolean })[] = [
   { term: "session_start", since: 1, refusable: false, doc: "The run begins." },
   { term: "prompt", since: 1, refusable: true, doc: "A person's message reaches the agent." },
@@ -26,6 +28,10 @@ export const PLACES: (Term & { refusable: boolean })[] = [
   { term: "tool_result:<name>", since: 1, refusable: false, doc: "A tool has returned; what it returned is the moment's input." },
   { term: "file:<path>", since: 1, refusable: true, doc: "A tool is about to touch that file; reached with its tool:." },
   { term: "reply_end", since: 1, refusable: true, doc: "The agent is about to finish its reply; refusing keeps it going." },
+  // Edition 2 (Alex, 20 Nov 2026): skills and memory are written by the map,
+  // so the map speaks there through the files the harness loads.
+  { term: "skill:<name>", since: 2, refusable: false, doc: "The harness loads a skill's text, which the map wrote; what it loaded is the moment's input." },
+  { term: "memory:<scope>/<path>", since: 2, refusable: false, doc: "The harness loads a memory file (scope: project, local, user, auto, managed; `~` for home), which the map wrote; what it loaded is the moment's input." },
 ];
 
 /** What a node is. Open vocabulary, like places. */

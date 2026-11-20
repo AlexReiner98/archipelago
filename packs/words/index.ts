@@ -8,6 +8,8 @@
  * (a list of places), `words`, and `refuse` (true: the words are a
  * refusal), and `status`: absent for a kept node, `trial` for one on trial
  * (its words are said marked as a trial), `retired` for one no longer said.
+ * `held` (a reason): held as written, so `words.set` and `words.retire`
+ * refuse, saying why (the written pack's rule, packs/written).
  * Injects graph.read and graph.watch to follow them, agent.node to register
  * them, and action.register and action.invoke for its actions.
  */
@@ -36,6 +38,17 @@ export interface NodeSeed {
 export interface WordsConfig {
   /** Nodes made through `words.add` when the graph has none yet. */
   seed?: NodeSeed[];
+}
+
+/** A node held as written (its `held` says why) is not changed or retired inside the map. */
+function heldCheck(item: Item) {
+  const held = item.fields.held;
+  if (held === undefined || held === null || held === false) return;
+  throw new Refused({
+    code: "words.held",
+    message: `${String(item.fields.title ?? item.id)} is held as written: ${typeof held === "string" ? held : "its rule holds it."} Its rule must open it before its words change inside the map.`,
+    by: { pack: "words" },
+  });
 }
 
 const shape = (i: Item) => JSON.stringify([i.fields.title, i.fields.kind, i.fields.at, i.fields.status === "retired"]);
@@ -88,6 +101,7 @@ const words: Pack<WordsConfig> = {
         if (!item || item.type !== TYPE) {
           throw new Refused({ code: "words.not_a_node", message: `${input.node} is not a node on the map.`, by: { pack: "words" } });
         }
+        heldCheck(item);
         const facts: Fact[] = [];
         if (item.fields.words !== undefined) facts.push(["-", input.node, "words", item.fields.words]);
         facts.push(["+", input.node, "words", input.words]);
@@ -109,6 +123,7 @@ const words: Pack<WordsConfig> = {
         if (!item || item.type !== TYPE) {
           throw new Refused({ code: "words.not_a_node", message: `${input.node} is not a node on the map.`, by: { pack: "words" } });
         }
+        heldCheck(item);
         if (item.fields.status === "retired") return { node: input.node };
         const facts: Fact[] = [];
         if (item.fields.status !== undefined) facts.push(["-", input.node, "status", item.fields.status]);

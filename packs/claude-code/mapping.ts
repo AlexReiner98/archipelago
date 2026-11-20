@@ -33,8 +33,8 @@ import type { Actor, Json, Time } from "../../spec/common.ts";
 
 export const HARNESS = "claude-code";
 
-/** The places this adapter reaches: every term of edition 1. */
-export const REACHES = ["session_start", "prompt", "tool:<name>", "file:<path>", "tool_result:<name>", "reply_end"];
+/** The places this adapter reaches: every term of edition 1, and edition 2's skill: and memory:. */
+export const REACHES = ["session_start", "prompt", "tool:<name>", "file:<path>", "tool_result:<name>", "reply_end", "skill:<name>", "memory:<scope>/<path>"];
 
 /** What every Claude Code hook is sent on stdin (or as the body of an http hook). */
 export interface HookInput {

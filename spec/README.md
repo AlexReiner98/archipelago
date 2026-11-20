@@ -19,7 +19,8 @@ short doc. This is **edition 1, in draft**, while Alex shapes it.
 every capability's key and type in one map for a runtime to declare.
 
 Decided with Alex: panels are Preact, the graph is one WebGL2 scene
-surface, and the spec owns the six places of edition 1.
+surface, and the spec owns the six places of edition 1 and edition 2's
+`skill:` and `memory:`, where the map speaks through the files it writes.
 
 ## Packs ask for capabilities
 

@@ -2,7 +2,7 @@
  * The app, server side: `npm run serve`. One process runs
  * - the dev server for the page (runtime/serve.ts, port 5180), and
  * - a Node runtime with the server's packs, hot-reloaded: graph, action,
- *   exchange, agent, verdict, words, loaded, grow, the Claude Code adapter (5181) and
+ *   exchange, agent, verdict, words, loaded, written, grow, the Claude Code adapter (5181) and
  *   the bridge (5182) the page reaches them through.
  *
  * Point Claude Code at the adapter (packs/claude-code/README.md) and open
@@ -69,6 +69,7 @@ const tree: Entry[] = [
   { id: "verdict", pack: "packs/verdict/index.ts" },
   { id: "words", pack: "packs/words/index.ts", config: { seed: SEED } },
   { id: "loaded", pack: "packs/loaded/index.ts" },
+  { id: "written", pack: "packs/written/index.ts" },
   { id: "grow", pack: "packs/grow/index.ts" },
   {
     id: "claude-code",

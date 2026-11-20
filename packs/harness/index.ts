@@ -10,6 +10,8 @@
  *   are edited through the `words.set` action, and the next say uses them.
  *   A trial node (its item's `status` is `trial`) is marked in the tree, and
  *   its pane says what miss it came from and can retire it (`words.retire`).
+ *   A node the map writes a file from shows the file and its rule, held as
+ *   written or open to refinement, and can flip it (`written.rule`).
  *
  * A click on a node sets `here.node`, and the run lights its firings; a
  * click on an event sets `here.event` and `here.node`, and the tree lights
@@ -63,6 +65,8 @@ interface VerdictRead {
 const EDIT = "words.set";
 /** The action that retires a node made from a map item. */
 const RETIRE = "words.retire";
+/** The action that opens a written node to refinement or holds it (packs/written). */
+const RULE = "written.rule";
 
 const MARK: Record<Verdict | "none", string> = { held: "✓", failed: "✕", quiet: "○", none: "·" };
 
@@ -490,6 +494,35 @@ const harness: Pack = {
       `;
     };
 
+    /** A node the map writes a file from (packs/written): the file, and whether it may be refined here. */
+    const Written = ({ info }: { info: NodeInfo }) => {
+      const item = useItem(info.source);
+      const canRule = useHas(RULE);
+      const [status, setStatus] = useState("");
+      useEffect(() => setStatus(""), [info.id]);
+      if (typeof item?.fields.file !== "string") return null;
+      const held = typeof item.fields.held === "string" ? item.fields.held : undefined;
+      const flip = async () => {
+        setStatus("…");
+        const out = await invoke.invoke({
+          action: RULE,
+          input: held ? { node: info.source!, refine: "open" } : { node: info.source!, refine: "held", why: "Held as written in the harness view." },
+          authority: { of: "human", basis: "set in the harness view" },
+          reason: held ? `Opened ${info.title} to refinement inside the map` : `Held ${info.title} as written`,
+        });
+        setStatus(out.ok ? "" : `refused: ${out.refused.message}`);
+      };
+      return html`
+        <div class="hv-group">written: the map writes this file</div>
+        <div class="hv-kv"><span class="k">file</span><span class="v" title=${item.fields.file}>${item.fields.file}</span></div>
+        <div class="hv-kv"><span class="k">rule</span><span class="v" title=${held ?? ""}>${held ? `held: ${held}` : "open: the loop or an agent may refine it"}</span></div>
+        ${canRule && html`<div class="hv-words"><div class="bar">
+          <button class="hv-btn" onClick=${flip}>${held ? "Open to refinement" : "Hold as written"}</button>
+          <span style="overflow:hidden;text-overflow:ellipsis">${status}</span>
+        </div></div>`}
+      `;
+    };
+
     const NodePane = ({ nodes, editable }: { nodes: NodeInfo[]; editable: boolean }) => {
       const id = useHere<string>(KEYS.node);
       const info = nodes.find((n) => n.id === id);
@@ -504,6 +537,7 @@ const harness: Pack = {
             ${!info && html`<div class="hv-empty">Not loaded now: its record stays.</div>`}
             ${info && html`<${Words} info=${info} editable=${editable} />`}
             ${info?.source && html`<${Trial} info=${info} />`}
+            ${info?.source && html`<${Written} info=${info} />`}
             ${info && html`
               <div class="hv-kv"><span class="k">places</span><span class="v" title=${info.at.join(", ")}>${info.at.join(", ")}</span></div>
               <div class="hv-kv"><span class="k">pack</span><span class="v">${info.pack}</span></div>

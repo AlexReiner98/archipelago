@@ -23,8 +23,9 @@ Types: [agent.ts](agent.ts).
 ## Places
 
 A place is a moment in a run where the map can speak. The spec owns the
-vocabulary (decided by Alex). Edition 1 has the six places an adapter can
-both reach and speak at, which is what the harness view and verdicts need:
+vocabulary (decided by Alex), and each place says the edition it came in.
+Edition 1 has the six places an adapter can both reach and speak at, which
+is what the harness view and verdicts need:
 
 | Place | Reached when | Can refuse | Claude Code hook |
 |---|---|---|---|
@@ -35,11 +36,19 @@ both reach and speak at, which is what the harness view and verdicts need:
 | `tool_result:<name>` | a tool has returned (its result is the input) | no | PostToolUse |
 | `reply_end` | the agent is about to finish its reply | yes (it keeps going) | Stop |
 
+Edition 2 adds two places (Alex, 20 Nov 2026: skills and memory are
+something the map writes). The map speaks there through the files the
+harness loads, once it writes them; what the harness loaded is the moment's
+input. Nothing can be refused there: the text is already loaded.
+
+| Place | Reached when | Can refuse | Claude Code |
+|---|---|---|---|
+| `skill:<name>` | the harness loads a skill's text (`skill:<plugin>:<name>` for a plugin's) | no | the transcript, read at the next hook |
+| `memory:<scope>/<path>` | the harness loads a memory file; scope `project`, `local`, `user`, `auto` or `managed`, the path with `/` and `~` for home | no | the transcript's `instructions` attachment |
+
 Left out on purpose: a session's end (nothing can be said to the agent
-there; it's the run's `end` event), subagents (`tool:Agent`), skills
-(`tool:Skill`), memory loads (no moment to speak at; memory and skill text
-are nodes said at `session_start`), and compaction (`session_start` fires
-after it).
+there; it's the run's `end` event), subagents (`tool:Agent`), and compaction
+(`session_start` fires after it).
 
 A reached place is concrete; a node's `at` may use `*` in the argument
 (`tool:*`, `file:packs/*/page/*.js`). The adapter decides which places it can

@@ -39,7 +39,10 @@ its folder), and skills an `invoked_skills` attachment loads again after a
 compaction. Each is noted with the action `loaded.note`, when a pack
 declares it ([loaded](../loaded/README.md)), and reached with what was
 loaded as the input, ahead of the hook's own places: a memory file is said
-before the turn's first tool call. What is said there isn't handed back.
+before the turn's first tool call. What is said there isn't handed back:
+the map speaks there through the file itself, which it writes once the
+file is adopted ([written](../written/README.md)). Both places are edition 2
+terms, listed in the adapter's `reaches`.
 After a restart the transcript is read from its start, and the loads the
 exchange already holds are skipped.
 

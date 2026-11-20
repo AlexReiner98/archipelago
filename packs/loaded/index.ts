@@ -15,6 +15,9 @@
  * - The action `loaded.note` ({ place, kind, title, path? }) makes the item
  *   the first time a place is seen, and changes nothing after. The adapter
  *   calls it before it reaches the place, so the node is there to say it.
+ * - Adopted: once the map writes the file (packs/written), the item's
+ *   `adopted` names the map's node, which says it instead; this pack then
+ *   registers nothing there.
  *
  * Injects graph.read and graph.watch to follow the items, agent.node to
  * register them, action.register for `loaded.note`.
@@ -69,14 +72,16 @@ const loaded: Pack = {
     const sync = (id: Id) => {
       const f = fields.get(id);
       const place = placeOf(f);
-      const shape = JSON.stringify([place, f?.title, f?.kind]);
+      // Adopted (packs/written): the map's own node says it, not this record.
+      const adopted = typeof f?.adopted === "string" ? f.adopted : undefined;
+      const shape = JSON.stringify([place, f?.title, f?.kind, adopted]);
       const had = registered.get(id);
       if (had?.shape === shape) return;
       if (had) {
         void had.dispose();
         registered.delete(id);
       }
-      if (!place) return;
+      if (!place || adopted) return;
       const title = String(f!.title ?? place);
       const dispose = agent.node({
         name: id,
@@ -135,7 +140,10 @@ const loaded: Pack = {
           throw refuse("loaded.place", `A ${input.kind} is said at one exact ${familyOf(input.kind)}<…> place, not ${JSON.stringify(input.place)}.`);
         }
         const known = byPlace(place);
-        if (known) return { node: known };
+        if (known) {
+          const adopted = fields.get(known)?.adopted;
+          return { node: typeof adopted === "string" ? adopted : known };
+        }
         const id = `l_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
         const facts: Fact[] = [
           ["+", id, "type", TYPE],
