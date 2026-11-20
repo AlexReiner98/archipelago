@@ -159,6 +159,12 @@ claude mcp add --scope user --transport http archipelago http://127.0.0.1:5181/m
 When the server is down, the session shows the MCP server as failed and
 carries on.
 
+The adapter answers only `127.0.0.1:<port>` and `localhost:<port>` as its
+Host, and refuses a request carrying an Origin that is not the page's or one
+in `config.origins` ([runtime/guard.ts](../../runtime/guard.ts)), so a web
+page in the owner's browser can't post to `/hook` or `/mcp`. Hooks and MCP
+clients send no Origin.
+
 Command hooks, not http: an http hook to a server that is down shows as a
 hook error in the session ("Stop hook error occurred", a PreToolUse
 warning). [hook.ts](hook.ts) prints nothing and exits 0 when the server is

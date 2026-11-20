@@ -5,6 +5,7 @@
  */
 import { join } from "node:path";
 import type { Entry } from "../runtime/loader.ts";
+import { localOrigins } from "../runtime/guard.ts";
 
 export const SEED = [
   {
@@ -54,15 +55,24 @@ export interface TreeOptions {
   port: number;
   /** Whether the written pack writes skill and memory files. */
   write: boolean;
-  /** More origins the bridge answers, besides the page's own (a host in front of it). */
+  /** More origins the page, the adapter and the bridge answer, besides the page's own (a host in front of them). */
   origins?: string[];
+  /** More Host values they answer (a proxy in front that keeps its own). */
+  hosts?: string[];
+}
+
+/** What the page server is given, so that it answers the same as the adapter and the bridge. */
+export function pageAccess({ port: PAGE, origins = [], hosts = [] }: Pick<TreeOptions, "port" | "origins" | "hosts">) {
+  return { origins: [...localOrigins(PAGE), ...origins], hosts };
 }
 
 /**
  * The server's config tree. A host that runs the server its own way (more
  * packs, another front) starts from this tree and adds to it.
  */
-export function serverTree({ data, port: PAGE, write, origins = [] }: TreeOptions): Entry[] {
+export function serverTree({ data, port: PAGE, write, origins = [], hosts = [] }: TreeOptions): Entry[] {
+  // The app's own origin is the page's: the adapter and the bridge answer it, and a host's in front.
+  const access = pageAccess({ port: PAGE, origins, hosts });
   return [
     { id: "graph", pack: "packs/graph/index.ts", config: { db: join(data, "graph.sqlite") } },
     { id: "action", pack: "packs/action/index.ts" },
@@ -88,7 +98,7 @@ export function serverTree({ data, port: PAGE, write, origins = [] }: TreeOption
     {
       id: "claude-code",
       pack: "packs/claude-code/index.ts",
-      config: { port: PAGE + 1, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
+      config: { port: PAGE + 1, ...access, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
     },
     { id: "mcp", pack: "packs/mcp/index.ts" },
     { id: "archive", pack: "packs/archive/index.ts", config: { dir: join(data, "archives") } },
@@ -98,7 +108,7 @@ export function serverTree({ data, port: PAGE, write, origins = [] }: TreeOption
       config: {
         port: PAGE + 2,
         actor: { id: "person:owner", kind: "person" },
-        origins: [`http://127.0.0.1:${PAGE}`, `http://localhost:${PAGE}`, ...origins],
+        ...access,
         onListen: (p: number) => console.log(`bridge on http://127.0.0.1:${p}`),
       },
     },

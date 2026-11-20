@@ -31,6 +31,7 @@ import { META } from "../../spec/common.ts";
 import type { ExchangeRead } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
+import { refuse, type LocalAccess } from "../../runtime/guard.ts";
 import { handle, lastAssistantText, refusalText, runIdOf, spoken, trim, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
 import { rpc, type JsonRpc } from "./mcp.ts";
 
@@ -43,7 +44,12 @@ export function clientActor(name: unknown): Actor {
   return { id, kind: "agent" };
 }
 
-export interface ClaudeCodeConfig {
+/**
+ * `hosts` and `origins` add to what the runtime's guard answers: a request
+ * with another Host, or with an Origin that is not the adapter's own or one
+ * of these, is refused 403. Hooks and MCP clients send no Origin.
+ */
+export interface ClaudeCodeConfig extends LocalAccess {
   /** The port to listen on, on 127.0.0.1. 0 picks a free one. Default 5181. */
   port?: number;
   /** Who the agent is. Default `{ id: "claude-code", kind: "agent" }`. */
@@ -313,6 +319,7 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
     }));
 
     const server: Server = createServer(async (req, res) => {
+      if (refuse(req, res, config)) return;
       const path = (req.url ?? "/").split("?")[0];
       try {
         if (req.method === "POST" && path === "/hook") {

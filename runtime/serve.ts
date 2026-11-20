@@ -18,6 +18,7 @@ import { createServer, type ServerResponse } from "node:http";
 import { stripTypeScriptTypes } from "node:module";
 import { extname, join, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { refuse, type LocalAccess } from "./guard.ts";
 import { ModuleGraph } from "./hmr.ts";
 
 const TYPES: Record<string, string> = {
@@ -42,7 +43,8 @@ export interface DevServer {
   close(): Promise<void>;
 }
 
-export async function serve(options: { port?: number; root?: string; watch?: boolean } = {}): Promise<DevServer> {
+/** `hosts` and `origins` add to what the guard answers (guard.ts). */
+export async function serve(options: { port?: number; root?: string; watch?: boolean } & LocalAccess = {}): Promise<DevServer> {
   const root = resolve(options.root ?? join(fileURLToPath(import.meta.url), "../.."));
   const graph = new ModuleGraph();
   const clients = new Set<ServerResponse>();
@@ -59,7 +61,9 @@ export async function serve(options: { port?: number; root?: string; watch?: boo
     return out;
   };
 
+  const access: LocalAccess = { hosts: options.hosts, origins: options.origins };
   const server = createServer(async (req, res) => {
+    if (refuse(req, res, access)) return;
     const url = new URL(req.url ?? "/", "http://x");
     if (url.pathname === "/@hmr") {
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });

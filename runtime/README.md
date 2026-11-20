@@ -11,6 +11,7 @@ stripping) and in the browser (the dev server strips types).
 | [hmr.ts](hmr.ts) | The module graph HMR walks | §5.2.2 |
 | [node.ts](node.ts) | Node host: resolve hook, watcher, HMR | |
 | [serve.ts](serve.ts) | Dev server for the browser: types stripped, HMR pushed | |
+| [guard.ts](guard.ts) | What every local server checks first: its own Host, and no foreign Origin | |
 | [browser.ts](browser.ts) | Browser host | |
 
 ## A pack

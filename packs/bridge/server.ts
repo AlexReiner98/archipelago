@@ -14,13 +14,14 @@
  *
  * Every call is made from this pack's context, intercepted with
  * `config.actor`: whoever is at the page acts as that person. There is no
- * sign-in yet; the server listens on 127.0.0.1 and answers only the
- * origins in `config.origins`.
+ * sign-in yet; the server listens on 127.0.0.1 and the runtime's guard
+ * refuses another Host, and an Origin not in `config.origins`.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { Actor, Dispose } from "../../spec/common.ts";
 import { META } from "../../spec/common.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
+import { refuse } from "../../runtime/guard.ts";
 
 /** The keys served. Each is injected, so the bridge waits for all of them. */
 export const KEYS = [
@@ -42,8 +43,10 @@ export interface BridgeConfig {
   port?: number;
   /** Who calls through the bridge. */
   actor?: Actor;
-  /** Origins allowed to call (CORS). */
+  /** Origins allowed to call (CORS), besides the bridge's own. */
   origins?: string[];
+  /** More Host values answered (runtime/guard.ts). */
+  hosts?: string[];
   onListen?: (port: number) => void;
 }
 
@@ -68,7 +71,6 @@ const bridge: Pack<BridgeConfig> = {
   async apply(ctx: Context, config: BridgeConfig = {}) {
     const as = config.actor ? ctx.intercept({ [META.actor]: config.actor }) : ctx;
     const streams = new Map<string, { res: ServerResponse; watches: Map<number, Dispose> }>();
-    const origins = new Set(config.origins ?? []);
 
     const method = (key: string, name: string): ((...a: unknown[]) => unknown) => {
       if (!(KEYS as readonly string[]).includes(key)) throw new Error(`${key} is not served`);
@@ -88,12 +90,11 @@ const bridge: Pack<BridgeConfig> = {
     };
 
     const server = createServer(async (req, res) => {
+      if (refuse(req, res, config)) return;
       const origin = req.headers.origin;
-      if (origin && origins.has(origin)) {
+      if (origin) {
         res.setHeader("access-control-allow-origin", origin);
         res.setHeader("access-control-allow-headers", "content-type");
-      } else if (origin) {
-        return send(res, 403, { error: `origin ${origin} is not allowed` });
       }
       if (req.method === "OPTIONS") return res.writeHead(204).end();
       const path = (req.url ?? "/").split("?")[0];

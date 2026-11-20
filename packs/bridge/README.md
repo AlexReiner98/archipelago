@@ -8,7 +8,9 @@ by calling it. Packs in the page inject them as if they ran there.
 
 - Calls are made from the server pack's context intercepted with
   `config.actor`: whoever is at the page acts as that person. There is no
-  sign-in yet; it listens on 127.0.0.1 and answers only `config.origins`.
+  sign-in yet; it listens on 127.0.0.1, and the runtime's guard
+  ([runtime/guard.ts](../../runtime/guard.ts)) refuses another Host and an
+  Origin not in `config.origins` (`config.hosts` adds Host values).
 - A watch takes its callback last; its calls come down the stream. The
   synchronous reads (`agent.tree.nodes`, `action.list.list`) are copies
   the client keeps fresh by the key's own watch.

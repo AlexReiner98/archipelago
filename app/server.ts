@@ -29,7 +29,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { NodeHost } from "../runtime/node.ts";
 import { serve } from "../runtime/serve.ts";
-import { serverTree } from "./tree.ts";
+import { pageAccess, serverTree } from "./tree.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const { values } = parseArgs({
@@ -57,7 +57,7 @@ await host.runtime.settle();
 for (const s of host.loader.status()) {
   if (s.state !== "active") console.log(`${s.id}: ${s.state}${s.missing ? ` (waiting for ${s.missing.join(", ")})` : ""}${s.error ? ` ${s.error}` : ""}`);
 }
-const page = await serve({ port: PAGE, root, watch: values.watch });
+const page = await serve({ port: PAGE, root, watch: values.watch, ...pageAccess({ port: PAGE }) });
 console.log(`harness view on ${page.url}app/${values.watch ? "" : " (hot reload off)"}`);
 
 const stop = async () => {
