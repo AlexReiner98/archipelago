@@ -13,6 +13,14 @@
  * | Stop             | act each unseen failed tool, reach reply_end, act reply (denied if refused) | block (keeps it going) |
  * | SessionEnd       | end                                                    | nothing                      |
  *
+ * Every hook but SessionEnd first reads what Claude Code loaded since the
+ * last hook from the transcript: a skill's text (`skill:<name>`), and the
+ * memory files of an `instructions` attachment (`memory:<scope>/<path>`).
+ * Each is noted (`loaded.note`, so a node is there to say it) and reached
+ * with what was loaded as the input, ahead of the hook's own places, so a
+ * memory file is said before the turn's first tool call. What is said there
+ * isn't handed back: Claude Code already loaded it.
+ *
  * Claude Code rejects some tool calls before any hook runs (an Edit whose
  * old_string isn't in the file): the model sees the error, the hooks never
  * do. At Stop, the turn's errored tool results that no hook saw are read
@@ -116,6 +124,8 @@ export interface RunPort {
   begun: boolean;
   /** The tool use ids a hook saw in this run, so the transcript adds only the rest. */
   seen?: Set<string>;
+  /** How far the transcript was read for loads, and the Skill calls seen so far. Absent: not read yet. */
+  loads?: { offset: number; skills: Map<string, string> };
 }
 
 export interface Options {
@@ -131,6 +141,118 @@ export interface Options {
    * restarted mid-turn and forgot what its hooks saw.
    */
   recorded?: (run: string, since?: Time) => Promise<RecordedCall[]>;
+  /** The transcript from a byte offset, up to its last whole line, and where that ends. */
+  transcriptFrom?: (input: HookInput, offset: number) => Promise<{ text: string; end: number } | undefined>;
+  /** How many times each skill:/memory: place was reached in the run, from the record: a restart reads loads again from the start. */
+  loadedSaid?: (run: string) => Promise<Map<Place, number>>;
+  /** Makes sure a node is there to say a load (the action `loaded.note`). */
+  note?: (load: Load) => Promise<void>;
+  /** The home folder, written `~` in a memory file's place. */
+  home?: string;
+}
+
+/** Something Claude Code loaded into the run: a skill's text or a memory file. */
+export interface Load {
+  place: Place;
+  kind: "skill" | "memory";
+  title: string;
+  path?: string;
+  text: string;
+}
+
+/** Claude Code's memory types, as the scopes of `memory:` places. */
+const SCOPES: Record<string, string> = { Project: "project", Local: "local", User: "user", AutoMem: "auto", Managed: "managed" };
+
+/** A path with `/`, and `~` for the home folder. */
+export function homePath(path: string, home?: string): string {
+  const p = path.replaceAll("\\", "/");
+  if (!home) return p;
+  const h = home.replaceAll("\\", "/").replace(/\/+$/, "");
+  const fold = (s: string) => (/^[a-z]:\//i.test(s) ? s.toLowerCase() : s);
+  return fold(p).startsWith(fold(h) + "/") ? `~${p.slice(h.length)}` : p;
+}
+
+const SKILL_TEXT = /^Base directory for this skill:\s*(.+)$/m;
+const textOf = (content: unknown): string =>
+  typeof content === "string" ? content : Array.isArray(content) ? content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("\n") : "";
+const baseName = (dir: string) => dir.trim().replaceAll("\\", "/").replace(/\/+$/, "").split("/").pop() ?? dir;
+
+/**
+ * What the transcript's lines say Claude Code loaded, in order: memory files
+ * from `instructions` attachments, a skill's text from the meta entry that
+ * follows its loading (named by its Skill call, else its folder), and the
+ * skills an `invoked_skills` attachment loads again after a compaction.
+ * `skills` carries the Skill calls' names across reads.
+ */
+export function loadsIn(transcript: string, skills: Map<string, string> = new Map(), home?: string): Load[] {
+  const out: Load[] = [];
+  for (const line of transcript.split("\n")) {
+    if (!line.trim()) continue;
+    let e: any;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (e?.isSidechain) continue;
+    const a = e?.attachment;
+    if (e?.type === "attachment" && a?.type === "instructions" && Array.isArray(a.files)) {
+      for (const f of a.files) {
+        if (typeof f?.path !== "string" || typeof f.content !== "string") continue;
+        const scope = SCOPES[f.type] ?? String(f.type ?? "memory").toLowerCase();
+        const path = homePath(f.path, home);
+        out.push({ place: `memory:${scope}/${path}`, kind: "memory", title: `${scope} memory ${path}`, path: f.path, text: f.content });
+      }
+      continue;
+    }
+    if (e?.type === "attachment" && a?.type === "invoked_skills" && Array.isArray(a.skills)) {
+      for (const k of a.skills) {
+        if (typeof k?.name !== "string" || typeof k.content !== "string") continue;
+        out.push({ place: `skill:${k.name}`, kind: "skill", title: `skill ${k.name}`, ...(typeof k.path === "string" ? { path: k.path } : {}), text: k.content });
+      }
+      continue;
+    }
+    const content = e?.message?.content;
+    if (e?.type === "assistant" && Array.isArray(content)) {
+      for (const b of content) if (b?.type === "tool_use" && b.name === "Skill" && typeof b.input?.skill === "string") skills.set(b.id, b.input.skill);
+      continue;
+    }
+    if (e?.type === "user" && e.isMeta) {
+      const text = textOf(content);
+      const dir = SKILL_TEXT.exec(text)?.[1];
+      if (!dir) continue;
+      const name = (e.sourceToolUseID && skills.get(e.sourceToolUseID)) || baseName(dir);
+      out.push({ place: `skill:${name}`, kind: "skill", title: `skill ${name}`, path: dir.trim(), text });
+    }
+  }
+  return out;
+}
+
+/**
+ * Reads what was loaded since the last hook and reaches each load's place.
+ * After a restart the transcript is read from its start, and the loads the
+ * record already holds (`loadedSaid`) are skipped, so none is said twice.
+ */
+async function reachLoads(input: HookInput, port: RunPort, options: Options, reach: (places: Place[], value?: Json) => Promise<Answer>): Promise<void> {
+  if (!options.transcriptFrom || !input.transcript_path) return;
+  const fresh = !port.loads;
+  const state = (port.loads ??= { offset: 0, skills: new Map() });
+  const got = await options.transcriptFrom(input, state.offset);
+  if (!got) return;
+  state.offset = got.end;
+  let loads = loadsIn(got.text, state.skills, options.home);
+  if (fresh && loads.length && options.loadedSaid) {
+    const said = await options.loadedSaid(input.session_id);
+    loads = loads.filter((l) => {
+      const n = said.get(l.place) ?? 0;
+      if (n) said.set(l.place, n - 1);
+      return !n;
+    });
+  }
+  for (const l of loads) {
+    await options.note?.(l);
+    await reach([l.place], { kind: l.kind, ...(l.path ? { path: l.path } : {}), text: trim(l.text) as string });
+  }
 }
 
 /** A tool call as the record holds it: its place and its (cut) input. */
@@ -171,6 +293,7 @@ export async function handle(input: HookInput, port: RunPort, options: Options):
     return agent.reach(m);
   };
   const act = (a: Omit<Act, "run" | "time">) => agent.act({ run, time: now(), ...a });
+  await reachLoads(input, port, options, reach);
 
   switch (event) {
     case "SessionStart": {

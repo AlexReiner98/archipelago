@@ -177,6 +177,9 @@ test("grow and verdict decide coverage the same way", () => {
     [["tool:Edit"], "string to replace not found", ["tool:Edit", "file:packs/a.ts"], "String to replace not found in file."],
     [["reply_end"], "stopped before checking", ["reply_end"], "Run npm run check before you stop."],
     [["file:.env"], undefined, ["file:.env"], "Not .env."],
+    // Said where a skill or memory file loads: its misses alone decide, wherever the miss stands.
+    [["memory:project/~/p/CLAUDE.md"], "npm test failing", ["tool:Bash"], "npm test: 2 failing"],
+    [["skill:review"], undefined, ["tool:Bash"], "npm test: 2 failing"],
   ];
   const got = cases.map(([at, misses, places, words]) => {
     const node = { at, ...(misses ? { misses } : {}) };
@@ -184,5 +187,5 @@ test("grow and verdict decide coverage the same way", () => {
     assert.equal(g, verdictCovers(node, places, words), JSON.stringify([at, misses, places, words]));
     return g;
   });
-  assert.deepEqual(got, [false, true, false, true, true, false, false, true, false, true]);
+  assert.deepEqual(got, [false, true, false, true, true, false, false, true, false, true, true, false]);
 });

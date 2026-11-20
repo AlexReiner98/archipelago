@@ -12,16 +12,17 @@
  * Each run (a Claude Code session) gets its own context, intercepted with the
  * agent as actor and the session id as run, so every call is the run's.
  */
-import { readFile } from "node:fs/promises";
+import { open, readFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
-import type { AgentRun } from "../../spec/agent.ts";
+import type { AgentRun, Place } from "../../spec/agent.ts";
 import type { Actor, Time } from "../../spec/common.ts";
 import { META } from "../../spec/common.ts";
 import type { ExchangeRead } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
-import { handle, lastAssistantText, type HookInput, type HookOutput, type RecordedCall, type RunPort } from "./mapping.ts";
+import { handle, lastAssistantText, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
 import { TOOL_NAMES, rpc, type JsonRpc } from "./mcp.ts";
 
 export interface ClaudeCodeConfig {
@@ -75,6 +76,27 @@ async function transcript(input: HookInput): Promise<string | undefined> {
   }
 }
 
+/** The transcript from a byte offset, up to its last whole line. */
+async function transcriptFrom(input: HookInput, offset: number): Promise<{ text: string; end: number } | undefined> {
+  if (!input.transcript_path) return undefined;
+  let file;
+  try {
+    file = await open(input.transcript_path, "r");
+  } catch {
+    return undefined;
+  }
+  try {
+    const size = (await file.stat()).size;
+    if (size <= offset) return { text: "", end: size < offset ? 0 : offset };
+    const buf = Buffer.alloc(size - offset);
+    const { bytesRead } = await file.read(buf, 0, buf.length, offset);
+    const whole = buf.subarray(0, bytesRead).lastIndexOf(10) + 1;
+    return { text: buf.subarray(0, whole).toString("utf8"), end: offset + whole };
+  } finally {
+    await file.close();
+  }
+}
+
 async function lastReply(input: HookInput): Promise<string | undefined> {
   const text = await transcript(input);
   return text === undefined ? undefined : lastAssistantText(text);
@@ -98,6 +120,20 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
         if (!p.next) return out;
       }
     };
+    /** How many times each skill:/memory: place was reached in the run: one count per moment said there. */
+    const loadedSaid = async (run: string): Promise<Map<Place, number>> => {
+      const moments = new Map<Place, Set<string>>();
+      for (let p = await read.events(run, { limit: LIMIT_MAX }); ; p = await read.events(run, { limit: LIMIT_MAX, after: p.next })) {
+        for (const e of p.items) {
+          if (e.kind !== "say" || !e.place || !/^(skill|memory):/.test(e.place)) continue;
+          const set = moments.get(e.place) ?? new Set();
+          set.add(e.time);
+          moments.set(e.place, set);
+        }
+        if (!p.next) return new Map([...moments].map(([place, s]) => [place, s.size]));
+      }
+    };
+    const home = homedir();
     const runs = new Map<string, RunState>();
     /** MCP calls of `hear`, by tool use id, to the run that was about to make them. */
     const hearing = new Map<string, string>();
@@ -119,7 +155,25 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
         if (input.tool_use_id) hearing.set(input.tool_use_id, input.session_id);
         lastHearing = input.session_id;
       }
-      const next = state.queue.then(() => handle(input, state, { actor, lastReply, transcript, recorded }));
+      const next = state.queue.then(() => handle(input, state, {
+        actor,
+        lastReply,
+        transcript,
+        recorded,
+        transcriptFrom,
+        loadedSaid,
+        home,
+        // A node to say the load, when a pack declares `loaded.note`; nothing is lost when none does.
+        note: async (l: Load) => {
+          if (!actions.list().some((a) => a.name === "loaded.note")) return;
+          await state.invoke.invoke({
+            action: "loaded.note",
+            input: { place: l.place, kind: l.kind, title: l.title, ...(l.path ? { path: l.path } : {}) },
+            authority: { of: "agent", basis: "Claude Code loaded it into the run" },
+            reason: `Claude Code loaded ${l.title}`,
+          });
+        },
+      }));
       state.queue = next.catch(() => {});
       if (input.hook_event_name === "SessionEnd") void next.finally(() => runs.delete(input.session_id));
       return next;

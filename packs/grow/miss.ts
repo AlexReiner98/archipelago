@@ -68,6 +68,10 @@ export function namesMiss(misses: string | undefined, words: string): boolean {
 /** A file: pattern that names some files, not all of them (`file:**`, `file:*`). */
 const narrowFile = (pattern: Place) => pattern.startsWith("file:") && /[^*/]/.test(pattern.slice(5));
 
+/** The places a harness loads at (a skill, a memory file): what is said there speaks to the whole run. */
+const LOAD_FAMILIES = ["skill:", "memory:"];
+const atLoad = (at: Place[]) => at.length > 0 && at.every((a) => LOAD_FAMILIES.some((f) => a.startsWith(f)));
+
 /** Where a node listens, and the words of the miss it should prevent, if it says. */
 export interface Listener {
   at: Place[];
@@ -80,8 +84,13 @@ export interface Listener {
  * allows (a file: pattern matching the miss's file, not every file), or its
  * `misses` name the miss's words. A broad place alone (tool:Bash, said
  * before every Bash call) covers nothing: the words must say which miss.
+ * A node said where the harness loads something (skill:, memory:) speaks to
+ * the whole run, and nothing goes wrong at a load itself: its `misses`
+ * alone decide, wherever the miss stands.
  */
 export function covers(node: Listener, places: Place[], words: string): boolean {
+  // Nothing goes wrong at a load itself: a skill or memory node's misses alone say which misses are its.
+  if (atLoad(node.at)) return namesMiss(node.misses, words);
   if (!places.some((p) => node.at.some((a) => placeMatches(a, p)))) return false;
   if (node.at.some((a) => narrowFile(a) && places.some((p) => p.startsWith("file:") && placeMatches(a, p)))) return true;
   return namesMiss(node.misses, words);

@@ -29,6 +29,20 @@ call at a place with the same input accounts for one transcript call. So a
 call is recorded once even when the server restarted mid-turn and forgot
 what its hooks saw, and a second Stop adds nothing.
 
+## Skills and memory
+
+Every hook but SessionEnd first reads the transcript from where the last
+one stopped, for what Claude Code loaded: memory files from an
+`instructions` attachment (`memory:<scope>/<path>`), a skill's text from
+the meta entry after it loads (`skill:<name>`, named by its Skill call, else
+its folder), and skills an `invoked_skills` attachment loads again after a
+compaction. Each is noted with the action `loaded.note`, when a pack
+declares it ([loaded](../loaded/README.md)), and reached with what was
+loaded as the input, ahead of the hook's own places: a memory file is said
+before the turn's first tool call. What is said there isn't handed back.
+After a restart the transcript is read from its start, and the loads the
+exchange already holds are skipped.
+
 The run is the session id; each run has its own context, intercepted with
 the agent as actor and the run, and its hooks are handled one at a time in
 the order they came. Long tool inputs and results are cut at 4000
