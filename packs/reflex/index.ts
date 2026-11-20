@@ -15,8 +15,10 @@
  *   and its way from the root lights. Drag to move, wheel to zoom,
  *   double-click to fit.
  *
- * - A profile picked in the bar shows only the nodes it holds
- *   (`profile.read`); "all" shows every node.
+ * - A profile picked in the bar shows the nodes a run in it hears from
+ *   profiles: its own and those of every profile it is part of
+ *   (`profile.read`), and "by profile" groups them by where each comes
+ *   from; the card names them. "all" shows every node.
  *
  * It only shows: it invokes no action. Its styles go when it unloads.
  */
@@ -309,13 +311,14 @@ const reflex: Pack = {
       </div>
     `;
 
-    const Card = ({ info, verdict }: { info?: NodeInfo; verdict?: Verdict }) =>
+    const Card = ({ info, verdict, from }: { info?: NodeInfo; verdict?: Verdict; from?: string[] }) =>
       info
         ? html`
             <div class="rx-card">
               <div class="t">${info.title}</div>
               <div class="kv">${info.kind} · ${info.pack}${verdict ? ` · ${verdict} in this run` : ""}</div>
               <div class="kv" title=${info.at.join(", ")}>${info.at.length ? info.at.join(", ") : "said nowhere"}</div>
+              ${from?.length ? html`<div class="kv" title="The profiles it comes from, nearest first">from ${from.join(", ")}</div>` : null}
               <div class="kv"><a href="#harness">Open in the harness view</a></div>
             </div>
           `
@@ -468,7 +471,8 @@ const reflex: Pack = {
       const profileList = useProfileList();
       const held = useProfileNodes(profile, nodes);
       const shownNodes = useMemo(() => (held ? nodes.filter((n) => held.has(n.id)) : nodes), [nodes, held]);
-      const tree = useMemo(() => treeOf(shownNodes, { by, unsaid }), [shownNodes, by, unsaid]);
+      const grouping = by === "profile" && !held ? "place" : by;
+      const tree = useMemo(() => treeOf(shownNodes, { by: grouping, unsaid, ...(held ? { profiles: held } : {}) }), [shownNodes, grouping, unsaid, held]);
       const placed = useMemo(() => radial(tree), [tree]);
       const hues = useMemo(() => packHues(nodes.map((n) => n.pack)), [nodes]);
       const statuses = useStatuses();
@@ -516,6 +520,7 @@ const reflex: Pack = {
             <span class="dim rx-n">${shown} node${shown === 1 ? "" : "s"}</span>
             <button class=${by === "place" ? "on" : ""} onClick=${() => setBy("place")}>by place</button>
             <button class=${by === "pack" ? "on" : ""} onClick=${() => setBy("pack")}>by pack</button>
+            ${held ? html`<button class=${by === "profile" ? "on" : ""} onClick=${() => setBy("profile")} title="Group by the profile each node comes from">by profile</button>` : null}
             ${profileList.length ? html`<select class="rx-sel" value=${profile} onChange=${(e: Event) => setProfile((e.target as HTMLSelectElement).value)} title="Show one profile's nodes">
               <option value="">all</option>
               ${profileList.map((p) => html`<option value=${p.id}>${p.title}</option>`)}
@@ -530,7 +535,7 @@ const reflex: Pack = {
           </div>
           <div style="position:relative;min-height:0;display:grid">
             <${Canvas} tree=${tree} placed=${placed} hues=${hues} statuses=${statuses} byNode=${byNode} picked=${picked} fires=${fires} />
-            <${Card} info=${pickedInfo} verdict=${picked ? byNode.get(picked) : undefined} />
+            <${Card} info=${pickedInfo} verdict=${picked ? byNode.get(picked) : undefined} from=${picked ? held?.get(picked) : undefined} />
           </div>
         </div>
       `;

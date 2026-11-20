@@ -44,7 +44,7 @@ export interface Tree {
   hidden: number;
 }
 
-export type Grouping = "place" | "pack";
+export type Grouping = "place" | "pack" | "profile";
 
 export interface TreeOptions {
   by?: Grouping;
@@ -54,6 +54,8 @@ export interface TreeOptions {
   placeDepth?: number;
   /** Show nodes said nowhere, under "never said". */
   unsaid?: boolean;
+  /** By profile: the profiles each node comes from, nearest first; its first is its bough. */
+  profiles?: Map<string, string[]>;
 }
 
 export const ROOT = "~root";
@@ -89,13 +91,17 @@ export function boughsOf(place: Place | undefined, fileDepth = 2, most = 4): Bou
 /** The boughs a node hangs from. */
 function boughsFor(n: NodeInfo, o: Required<TreeOptions>): Bough[] | undefined {
   if (o.by === "pack") return [{ key: `pack:${n.pack}`, title: n.pack }, { key: `pack:${n.pack}:${n.kind}`, title: words(n.kind) }];
+  if (o.by === "profile") {
+    const from = o.profiles.get(n.id)?.[0] ?? "no profile";
+    return [{ key: `profile:${from}`, title: from }, { key: `profile:${from}:${n.kind}`, title: words(n.kind) }];
+  }
   if (!n.at.length) return o.unsaid ? [NEVER] : undefined;
   return boughsOf(n.at[0], o.fileDepth, o.placeDepth);
 }
 
 /** Every node under one root. The same nodes make the same tree, whatever order they come in. */
 export function treeOf(nodes: NodeInfo[], options: TreeOptions = {}): Tree {
-  const o: Required<TreeOptions> = { by: "place", fileDepth: 2, placeDepth: 4, unsaid: false, ...options };
+  const o: Required<TreeOptions> = { by: "place", fileDepth: 2, placeDepth: 4, unsaid: false, profiles: new Map(), ...options };
   const root: TreeNode = { id: ROOT, title: "agent", depth: 0, kids: [] };
   const byId = new Map<string, TreeNode>([[ROOT, root]]);
   let hidden = 0;

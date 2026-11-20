@@ -198,3 +198,19 @@ test("lightOf: a say lights its node, a refusal in red, an act sparks on its pla
   assert.equal(lightOf(t, { kind: "begin" })!.at, ROOT);
   assert.equal(lightOf(t, { kind: "unknown" }), undefined);
 });
+
+test("treeOf: by profile, each node under the nearest profile it comes from", () => {
+  const profiles = new Map([
+    ["words/start", ["Everyone"]],
+    ["words/packs", ["Archipelago", "Everyone"]],
+  ]);
+  const t = treeOf(NODES.filter((n) => profiles.has(n.id)), { by: "profile", profiles });
+  assert.deepEqual(t.root.kids.map((k) => k.title).sort(), ["Archipelago", "Everyone"]);
+  const up = (id: string) => {
+    const ids: string[] = [];
+    for (let n = t.byId.get(id)!.parent; n; n = n.parent) ids.push(n.id);
+    return ids;
+  };
+  assert.ok(up("words/packs").includes("~:profile:Archipelago"));
+  assert.ok(up("words/start").includes("~:profile:Everyone"));
+});
