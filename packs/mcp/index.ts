@@ -294,7 +294,11 @@ const mcp: Pack<McpConfig> = {
             authority: asAgent(run, args.authority),
             reason: typeof args.reason === "string" && args.reason ? args.reason : `${name}, by the agent`,
           });
-          if (!out.ok) return no(`Refused (${out.refused.code}): ${out.refused.message}`);
+          if (!out.ok) {
+            // An input that doesn't fit the action's shape: say the shape.
+            const shape = out.refused.code === "action.input" ? ` It takes: ${JSON.stringify(declared.input.properties ?? declared.input)}` : "";
+            return no(`Refused (${out.refused.code}): ${out.refused.message}${shape}`);
+          }
           return ok({ output: out.output, ...(out.change ? { change: out.change } : {}) });
         },
       },

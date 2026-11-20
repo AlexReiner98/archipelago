@@ -142,6 +142,8 @@ test("act writes through declared actions, shows what one takes, and undo takes 
     const refused = await s.call("act", { action: "items.set", input: { id, fields: { status: "built" } } });
     assert.equal(refused.isError, true);
     assert.match(refused.text, /todo, doing, done, dropped/);
+    const flat = await s.call("act", { action: "items.set", input: { id, status: "doing" } });
+    assert.match(flat.text, /needs fields\. It takes: \{"id":.*"fields":/, "a misshapen input is told the shape");
     const undone = await s.call("act", { action: "history.undo", input: { change: made.json.change }, reason: "test" });
     assert.ok(!undone.isError, undone.text);
     assert.deepEqual(await s.graph().get([id]), [null]);
