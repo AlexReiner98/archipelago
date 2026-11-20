@@ -54,14 +54,14 @@ hook, or from the transcript's last assistant text.
 
 ## The MCP server
 
-Two tools. `hear`: what the nodes say at a place the agent names
-(`file:spec/agent.ts`, `tool:Bash`). Its answer is only what `reach`
-answers; a refusal comes back as an error result. `act`: the agent invokes
-a declared action (`action`, `input`, `reason`) as itself, in its run, on
-its own authority; its description lists the actions declared now, and a
-refusal comes back as an error saying why. This is how an agent writes a
-trial node (`grow.trial`). A tool call doesn't name its session, so the run
-is found from the tool use id the PreToolUse hook saw for it.
+The adapter provides `mcp.host` ([host.ts](../mcp/host.ts)) and serves
+whatever tools packs add to it: the [mcp](../mcp/README.md) pack's `hear`,
+`act`, `get`, `query`, `tell` and `run`. It knows none of them. It lists
+them, says where each is called (`tool:mcp__archipelago__<tool>`, with the
+`name` config the server is added under), and hands each call its run: a
+tool call doesn't name its session, so the run is found from the tool use
+id the PreToolUse hook saw for it, else the last run about to call one of
+this server's tools. Without the mcp pack the server answers with no tools.
 
 ## Running it
 

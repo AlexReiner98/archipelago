@@ -19,6 +19,8 @@ import { askedIn, covered, covers as growCovers, missesOf } from "../packs/grow/
 import { covers as verdictCovers } from "../packs/verdict/judge.ts";
 import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
 import words, { TRIAL_MARK } from "../packs/words/index.ts";
+import mcp from "../packs/mcp/index.ts";
+import types from "../packs/types/index.ts";
 
 const T = "2026-11-20T15:00:00.000Z";
 const ev = (seq: number, e: Partial<ExchangeEvent>): ExchangeEvent => ({ id: `e${seq}`, run: "r", seq, time: T, direction: "from_agent", kind: "act", ...e });
@@ -62,7 +64,7 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
   let port = 0;
   const modules: Record<string, Pack> = {
     "graph.ts": graph, "action.ts": action, "exchange.ts": exchange, "agent.ts": agent, "verdict.ts": verdict,
-    "words.ts": words, "grow.ts": grow, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe,
+    "words.ts": words, "grow.ts": grow, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe, "types.ts": types, "mcp.ts": mcp,
   };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply([
@@ -75,6 +77,8 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
     { id: "nodes", pack: "nodes.ts" },
     { id: "grow", pack: "grow.ts" },
     { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "types", pack: "types.ts" },
+    { id: "mcp", pack: "mcp.ts" },
     { id: "probe", pack: "probe.ts" },
   ]);
   try {

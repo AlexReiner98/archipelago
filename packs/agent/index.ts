@@ -134,10 +134,12 @@ const agent: Pack = {
     }));
 
     ctx.provide<AgentRun>("agent.run", (caller) => ({
+      /** Again for a run that has begun: it says more about itself (a title, its task), and keeps when it started. */
       async begin(start) {
-        const info: RunInfo = { ...start, started: new Date().toISOString() };
+        const time = new Date().toISOString();
+        const info: RunInfo = { ...start, started: runs.get(start.run)?.started ?? time };
         runs.set(start.run, info);
-        await record({ run: start.run, time: info.started, direction: "from_agent", kind: "begin", detail: info as unknown as Json });
+        await record({ run: start.run, time, direction: "from_agent", kind: "begin", detail: info as unknown as Json });
         return info;
       },
 

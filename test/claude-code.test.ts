@@ -13,7 +13,10 @@ import graph from "../packs/graph/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import claudeCode from "../packs/claude-code/index.ts";
 import { handle, lastAssistantText, relativePath, toolPlaces, unseenFailures, type HookInput, type RunPort } from "../packs/claude-code/mapping.ts";
-import { knownPlace, rpc } from "../packs/claude-code/mcp.ts";
+import { rpc } from "../packs/claude-code/mcp.ts";
+import mcpPack from "../packs/mcp/index.ts";
+import types from "../packs/types/index.ts";
+import type { ToolDef } from "../packs/mcp/host.ts";
 
 const T = "2026-11-20T15:00:00.000Z";
 const actor = { id: "claude-code", kind: "agent" as const };
@@ -159,21 +162,33 @@ test("the reply is read from the transcript when the hook doesn't carry it", () 
   assert.equal(lastAssistantText(""), undefined);
 });
 
-test("the MCP server's hear answers only what the nodes say at the place", async () => {
-  const { port } = fake((m) => (m.places[0] === "file:.env" ? { said: [], refused: { node: "n/env", text: "Not .env." } } : { said: [{ node: "n/a", text: "About a.ts." }] }));
-  const ports = { runFor: () => ({ run: "s1", agent: port.agent }), now: () => T };
+test("the MCP server lists the tools packs added and hands each call its run", async () => {
+  const { port } = fake();
+  const seen: unknown[] = [];
+  const echo: ToolDef = {
+    name: "echo",
+    description: () => "Says it back.",
+    inputSchema: { type: "object" },
+    async call(args, run) {
+      seen.push(run?.run);
+      if (args.boom) throw new Error("boom");
+      return { text: String(args.say), isError: args.say === "no" };
+    },
+  };
+  const ports = { tools: () => [echo], runFor: (id?: string) => (id === "t1" ? { run: "s1", actor, agent: port.agent, invoke: {} as any } : undefined) };
   const init = (await rpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-03-26" } }, ports)) as any;
   assert.equal(init.result.protocolVersion, "2025-03-26");
   assert.equal(await rpc({ jsonrpc: "2.0", method: "notifications/initialized" }, ports), undefined);
   const list = (await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list" }, ports)) as any;
-  assert.deepEqual(list.result.tools.map((t: any) => t.name), ["hear", "act"]);
-  const heard = (await rpc({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "hear", arguments: { place: "file:a.ts" } } }, ports)) as any;
-  assert.deepEqual(heard.result, { content: [{ type: "text", text: "About a.ts." }] });
-  const refused = (await rpc({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "hear", arguments: { place: "file:.env" } } }, ports)) as any;
-  assert.deepEqual(refused.result, { content: [{ type: "text", text: "Not .env." }], isError: true });
-  const bad = (await rpc({ jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "hear", arguments: { place: "nowhere" } } }, ports)) as any;
-  assert.equal(bad.result.isError, true);
-  assert.ok(knownPlace("tool:Bash") && knownPlace("reply_end") && !knownPlace("tool:") && !knownPlace("file"));
+  assert.deepEqual(list.result.tools, [{ name: "echo", description: "Says it back.", inputSchema: { type: "object" } }]);
+  const call = (args: object, toolUseId?: string) =>
+    rpc({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "echo", arguments: args, ...(toolUseId ? { _meta: { "claudecode/toolUseId": toolUseId } } : {}) } }, ports) as Promise<any>;
+  assert.deepEqual((await call({ say: "hi" }, "t1")).result, { content: [{ type: "text", text: "hi" }] });
+  assert.deepEqual((await call({ say: "no" })).result, { content: [{ type: "text", text: "no" }], isError: true });
+  assert.deepEqual((await call({ boom: true })).result, { content: [{ type: "text", text: "echo failed: boom" }], isError: true });
+  assert.deepEqual(seen, ["s1", undefined, undefined]);
+  const none = (await rpc({ jsonrpc: "2.0", id: 4, method: "tools/call", params: { name: "nope" } }, ports)) as any;
+  assert.equal(none.error.code, -32602);
 });
 
 /** The real packs, through the loader, over HTTP. */
@@ -196,7 +211,7 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
   let port = 0;
-  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe };
+  const modules: Record<string, Pack> = { "graph.ts": graph, "action.ts": action, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "cc.ts": claudeCode, "probe.ts": probe, "types.ts": types, "mcp.ts": mcpPack };
   const loader = new Loader(rt, { base: "mem:/", import: async (url) => ({ default: modules[url.slice(5)]! }) });
   await loader.apply([
     { id: "graph", pack: "graph.ts" },
@@ -205,10 +220,13 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
     { id: "agent", pack: "agent.ts" },
     { id: "nodes", pack: "nodes.ts" },
     { id: "claude-code", pack: "cc.ts", config: { port: 0, onListen: (p: number) => (port = p) } },
+    { id: "types", pack: "types.ts" },
+    { id: "mcp", pack: "mcp.ts" },
     { id: "probe", pack: "probe.ts" },
   ]);
   try {
     assert.ok(port > 0, "the adapter listens");
+    assert.equal(loader.fiber("mcp")?.state, "active", "the mcp pack serves its tools on the adapter");
     const post = async (path: string, body: unknown) => {
       const r = await fetch(`http://127.0.0.1:${port}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       return { status: r.status, json: r.status === 202 ? undefined : await r.json() };
@@ -225,6 +243,8 @@ test("hooks and MCP over HTTP reach the agent pack and land on the exchange, bot
     assert.equal(denied.hookSpecificOutput.permissionDecision, "deny");
 
     await hook("PreToolUse", { tool_name: "mcp__archipelago__hear", tool_input: { place: "file:spec/x.ts" }, tool_use_id: "t3" });
+    const listed = await post("/mcp", { jsonrpc: "2.0", id: 9, method: "tools/list" });
+    assert.deepEqual(listed.json.result.tools.map((t: any) => t.name), ["hear", "act", "get", "query", "tell", "run"]);
     const mcp = await post("/mcp", { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "hear", arguments: { place: "file:spec/x.ts" }, _meta: { "claudecode/toolUseId": "t3" } } });
     assert.deepEqual(mcp.json.result.content, [{ type: "text", text: "The spec is versioned." }]);
     assert.equal((await post("/mcp", { jsonrpc: "2.0", method: "notifications/initialized" })).status, 202);

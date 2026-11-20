@@ -119,6 +119,14 @@ const short = (v: unknown, n = 120): string => {
 };
 
 /** One line for what an act was about. */
+/** The first begin starts the run; a later one is the run saying more about itself. */
+function beginLine(e: ExchangeEvent): string {
+  const d = (e.detail ?? {}) as { started?: string; title?: string; task?: string };
+  if (!d.started || d.started === e.time) return "run began";
+  const told = [d.title && `"${short(d.title, 60)}"`, d.task && `on ${d.task}`].filter(Boolean).join(" ");
+  return told ? `run is ${told}` : "run said what it is";
+}
+
 function actLine(e: ExchangeEvent, cwd?: string): string {
   const a = e.act;
   if (!a) return "";
@@ -402,7 +410,7 @@ const harness: Pack = {
                 : e.kind === "begin" ? html`<span class="hv-m m-quiet">▶</span>`
                 : e.kind === "end" ? html`<span class="hv-m m-quiet">■</span>`
                 : html`<span class="hv-m m-failed">!</span>`;
-              const what = e.kind === "act" ? actLine(e, info?.cwd) : e.node ? `${titles.get(e.node) ?? e.node}: ${short(e.text)}` : e.kind === "begin" ? "run began" : e.kind === "end" ? "run ended" : short(e.text);
+              const what = e.kind === "act" ? actLine(e, info?.cwd) : e.node ? `${titles.get(e.node) ?? e.node}: ${short(e.text)}` : e.kind === "begin" ? beginLine(e) : e.kind === "end" ? "run ended" : short(e.text);
               const cell = html`<div title=${`#${e.seq} ${e.kind}${e.place ? ` @${e.place}` : ""}${e.node ? ` ${e.node}` : ""}\n${e.text ?? actLine(e)}`}>
                 <span class="s">${e.seq}</span>${mark}${e.place && html`<span class="p">${e.place}</span>`}<span class="x">${what}</span>
               </div>`;

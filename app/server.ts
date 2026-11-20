@@ -3,7 +3,8 @@
  * - the dev server for the page (runtime/serve.ts, port 5180), and
  * - a Node runtime with the server's packs, hot-reloaded: graph, action,
  *   types and the bases (work, question, record, actor, links, items),
- *   exchange, agent, verdict, words, loaded, written, grow, the Claude Code adapter (5181) and
+ *   exchange, agent, verdict, words, loaded, written, grow, the Claude Code adapter (5181), the
+ *   map's agent tools on its MCP server (mcp), and
  *   the bridge (5182) the page reaches them through.
  *
  * --port moves all three (page, page + 1, page + 2); --no-watch turns hot
@@ -103,6 +104,7 @@ const tree: Entry[] = [
     pack: "packs/claude-code/index.ts",
     config: { port: PAGE + 1, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
   },
+  { id: "mcp", pack: "packs/mcp/index.ts" },
   {
     id: "bridge",
     pack: "packs/bridge/server.ts",

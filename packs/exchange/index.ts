@@ -71,13 +71,18 @@ export class Log {
     return event;
   }
 
-  /** A run as its `begin` event recorded it, with its end if it has one. */
+  /**
+   * A run as its `begin` events recorded it: a later one says more (a
+   * title, its task) and keeps when the first began. With its end if it has one.
+   */
   info(run: RunId): RunInfo | undefined {
     const list = this.runs.get(run) ?? [];
-    const begin = list.find((e) => e.kind === "begin");
-    if (!begin?.detail) return undefined;
+    const begins = list.filter((e) => e.kind === "begin" && e.detail);
+    if (!begins.length) return undefined;
+    const first = begins[0]!.detail as unknown as RunInfo;
+    const merged = Object.assign({}, ...begins.map((b) => b.detail)) as RunInfo;
     const end = list.find((e) => e.kind === "end");
-    return { ...(begin.detail as unknown as RunInfo), ...(end ? { ended: end.time } : {}) };
+    return { ...merged, started: first.started, ...(end ? { ended: end.time } : {}) };
   }
 }
 

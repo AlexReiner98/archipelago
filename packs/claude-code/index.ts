@@ -7,7 +7,8 @@
  * One HTTP server, the pack's effect (it closes when the pack unloads):
  * - `POST /hook`: Claude Code's http hooks post their input here and print
  *   the answer (see mapping.ts).
- * - `POST /mcp`: a streamable-HTTP MCP server (see mcp.ts): `hear` and `act`.
+ * - `POST /mcp`: a streamable-HTTP MCP server (see mcp.ts), serving the
+ *   tools packs add through `mcp.host`, which this pack provides.
  *
  * Each run (a Claude Code session) gets its own context, intercepted with the
  * agent as actor and the session id as run, so every call is the run's.
@@ -16,6 +17,10 @@ import { open, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { ActionInvoke, ActionList } from "../../spec/action.ts";
+import type { Dispose } from "../../spec/common.ts";
+import { Refused } from "../../spec/common.ts";
+import type { McpHost, ToolDef } from "../mcp/host.ts";
+import { HOST } from "../mcp/host.ts";
 import type { AgentRun, Place } from "../../spec/agent.ts";
 import type { Actor, Time } from "../../spec/common.ts";
 import { META } from "../../spec/common.ts";
@@ -23,13 +28,15 @@ import type { ExchangeRead } from "../../spec/exchange.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { handle, lastAssistantText, type HookInput, type HookOutput, type Load, type RecordedCall, type RunPort } from "./mapping.ts";
-import { TOOL_NAMES, rpc, type JsonRpc } from "./mcp.ts";
+import { rpc, type JsonRpc } from "./mcp.ts";
 
 export interface ClaudeCodeConfig {
   /** The port to listen on, on 127.0.0.1. 0 picks a free one. Default 5181. */
   port?: number;
   /** Who the agent is. Default `{ id: "claude-code", kind: "agent" }`. */
   agent?: Actor;
+  /** The name the MCP server is added to Claude Code under: its tools are `mcp__<name>__<tool>`. Default `archipelago`. */
+  name?: string;
   /** Told the port once listening (tests use port 0). */
   onListen?: (port: number) => void;
 }
@@ -134,8 +141,11 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
       }
     };
     const home = homedir();
+    const prefix = `mcp__${config.name ?? "archipelago"}__`;
+    /** The tools packs added through `mcp.host`, in the order they came. */
+    const tools = new Map<string, ToolDef>();
     const runs = new Map<string, RunState>();
-    /** MCP calls of `hear`, by tool use id, to the run that was about to make them. */
+    /** Calls of this server's tools, by tool use id, to the run that was about to make them. */
     const hearing = new Map<string, string>();
     let lastHearing: string | undefined;
 
@@ -151,7 +161,7 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
 
     const hook = (input: HookInput): Promise<HookOutput> => {
       const state = runOf(input.session_id);
-      if (input.hook_event_name === "PreToolUse" && input.tool_name?.startsWith("mcp__") && TOOL_NAMES.some((n) => input.tool_name!.endsWith(`__${n}`))) {
+      if (input.hook_event_name === "PreToolUse" && input.tool_name?.startsWith(prefix)) {
         if (input.tool_use_id) hearing.set(input.tool_use_id, input.session_id);
         lastHearing = input.session_id;
       }
@@ -186,10 +196,24 @@ const claudeCode: Pack<ClaudeCodeConfig> = {
           if (toolUseId) hearing.delete(toolUseId);
           if (!session) return undefined;
           const state = runOf(session);
-          return { run: session, agent: state.agent, invoke: state.invoke };
+          return { run: session, actor, agent: state.agent, invoke: state.invoke };
         },
-        actions: () => actions.list(),
+        tools: () => [...tools.values()],
       });
+
+    ctx.provide<McpHost>(HOST, (_caller, from) => ({
+      harness: "claude-code",
+      place: (tool) => `tool:${prefix}${tool}`,
+      add(def): Dispose {
+        if (tools.has(def.name)) {
+          throw new Refused({ code: "mcp.tool_taken", message: `A tool ${def.name} is already served.`, by: { pack: "claude-code" } });
+        }
+        return from.effect(() => {
+          tools.set(def.name, def);
+          return () => tools.delete(def.name);
+        });
+      },
+    }));
 
     const server: Server = createServer(async (req, res) => {
       const path = (req.url ?? "/").split("?")[0];
