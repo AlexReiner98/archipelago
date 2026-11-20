@@ -27,6 +27,21 @@ through the `agent` service and is recorded by `exchange`. A verdict per run
 says whether each node worked. The UI shows the tree, the live run and the
 node, linked to each other.
 
+## What does not apply here
+
+The map tells every session some of the owner's preferences at the start.
+These are about the old repository and do not apply here:
+
+- Start sessions from the main archipelago checkout
+- Iterate before full tests (the old `npm test` sets and the structure test)
+- Layouts judged by eye, and drawing controls in the panel (the old canvas)
+- Cross-island via a published finding, and nothing held in Archipelago
+- Live site edits without screenshots (archipelago.tools)
+
+The rest still holds: no PRs mid-work, plans as flows, diagrams not text,
+a feature ships with its UI, social prose is the owner's, and own runs for
+builders.
+
 ## Rules
 
 - Every change goes through a declared action, whether a person or an agent
