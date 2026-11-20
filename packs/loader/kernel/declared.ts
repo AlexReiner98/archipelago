@@ -45,6 +45,8 @@ export interface ActionDef {
   admin?: boolean;
   /** Only a person may call it, as the kernel's own humanOnly tools: left out of what agents are offered, and refused whole when an agent calls it. */
   humanOnly?: boolean;
+  /** Offered and run only on a dev server (npm run dev), as the kernel's devOnly tools: an action still tried on scratch copies of a map. */
+  devOnly?: boolean;
 }
 
 /** A service outside the map a pack may reach, and the name of the secret the kernel adds (the pack never sees it). */

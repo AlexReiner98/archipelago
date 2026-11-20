@@ -65,9 +65,11 @@ test('CI runs every file in exactly one shard, on each engine, and shard 1 alone
  * Seconds of a runner the heaviest shard may be expected to take on either engine (88 on 4 Nov 2026, with 8 shards),
  * but for a shard its heaviest file alone holds up: more shards do not shorten that one, so it is held to FILE_BUDGET.
  * 110 since 17 Nov 2026 (the owner, decision e_pfk6jq45): 10 shards an engine fill the 20 jobs the plan runs at once,
- * and an 11th would wait for a runner of its own run, so the budget follows the work rather than more shards.
+ * and an 11th would wait for a runner of its own run, so the budget follows the work rather than more shards. 115
+ * since 19 Nov 2026, when phase 1 of one tier (PR #487) brought six new files, each weighed at the middle until CI has
+ * measured them.
  */
-const BUDGET = 110;
+const BUDGET = 115;
 /** Seconds one file may take, as measured: past it, split the file, as no number of shards waits less than it. */
 const FILE_BUDGET = 60;
 
