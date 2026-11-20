@@ -85,6 +85,44 @@ test("the layout puts what an item needs to its left, parts before the whole, wi
   assert.equal(out.width, 3 * SIZE.w + 2 * SIZE.gapX, "three columns: a q c, then b, then hub");
 });
 
+test("wires never share a stretch of line and never run through a card", () => {
+  // A plan whose wires fan out of one card, span several columns, and meet in one card.
+  const items = ["hub", "a", "b", "c", "d", "e", "f", "q", "x"].map((id) => ({ id }));
+  const links = [
+    ["part_of", "a", "hub"], ["part_of", "b", "hub"], ["part_of", "c", "hub"], ["part_of", "d", "hub"], ["part_of", "e", "hub"], ["part_of", "f", "hub"],
+    ["depends_on", "b", "a"], ["depends_on", "c", "b"], ["depends_on", "d", "c"], ["depends_on", "e", "a"], ["depends_on", "f", "a"],
+    ["depends_on", "f", "q"], ["about", "x", "e"], ["bears_on", "q", "hub"],
+  ].map(([type, from, to], i) => ({ id: `l${i}`, type: type!, from: from!, to: to! }));
+  const out = layout({ items, links });
+  type S = { x0: number; y0: number; x1: number; y1: number; wire: string };
+  const segs: S[] = [];
+  for (const p of out.paths) {
+    for (let i = 1; i < p.points.length; i++) {
+      const [x0, y0] = p.points[i - 1]!;
+      const [x1, y1] = p.points[i]!;
+      assert.ok(x0 === x1 || y0 === y1, "right angles only");
+      segs.push({ x0: Math.min(x0, x1), y0: Math.min(y0, y1), x1: Math.max(x0, x1), y1: Math.max(y0, y1), wire: p.id });
+    }
+  }
+  const eps = 0.01;
+  for (let i = 0; i < segs.length; i++) {
+    for (let j = i + 1; j < segs.length; j++) {
+      const a = segs[i]!;
+      const b = segs[j]!;
+      if (a.wire === b.wire) continue;
+      const horiz = a.y0 === a.y1 && b.y0 === b.y1 && Math.abs(a.y0 - b.y0) < eps && Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0) > eps;
+      const vert = a.x0 === a.x1 && b.x0 === b.x1 && Math.abs(a.x0 - b.x0) < eps && Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0) > eps;
+      assert.ok(!horiz && !vert, `wires ${a.wire} and ${b.wire} share a stretch`);
+    }
+  }
+  for (const s of segs) {
+    for (const box of out.boxes.values()) {
+      const inside = s.x1 > box.x + eps && s.x0 < box.x + SIZE.w - eps && s.y1 > box.y + eps && s.y0 < box.y + SIZE.h - eps;
+      assert.ok(!inside, `wire ${s.wire} runs through ${box.id}`);
+    }
+  }
+});
+
 test("the layout survives a cycle and links outside the drawn items", () => {
   const out = layout({
     items: [{ id: "a" }, { id: "b" }],
