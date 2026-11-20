@@ -187,3 +187,43 @@ test("a quarantined node, or one whose words fail their check, never reaches a r
   assert.match(review.nodes[0]!.checks[0]!, /home folder/);
   assert.equal((await item(fine)).fields.status, undefined);
 });
+
+test("the pack loads and unloads cleanly, with a decision pending; its gate, stage and actions go with it", async () => {
+  const { loader, rt, errors, invoke, trial, runOnce, tree } = await setup({ fail: 1 });
+  const id = await trial("Retry the server call.", "server answered 429 empty body");
+  await runOnce("u1", "server answered 429 empty body", false);
+  // Without keep, then nothing: a watch may fire while it goes.
+  await loader.apply(["graph", "action", "exchange", "agent", "verdict", "words", "probe"].map((x) => ({ id: x, pack: x })));
+  await rt.settle();
+  assert.equal((await invoke("keep.review", {})).ok, false, "keep.review goes with the pack");
+  assert.ok((await invoke("words.set", { node: id, words: "Changed." }, "u1")).ok, "no self-edit stage once it is gone");
+  await new Promise((r) => setTimeout(r, 700));
+  await loader.apply([]);
+  await rt.settle();
+  assert.deepEqual(errors, []);
+  assert.equal(tree.nodes().length, 0);
+});
+
+test("a node written while the pack loads doesn't trip it", async () => {
+  const writer: Pack = {
+    id: "writer",
+    inject: ["action.invoke"],
+    async apply(ctx) {
+      await ctx.get<ActionInvoke>("action.invoke").invoke({ action: "words.add", input: { title: "w", at: ["tool:Bash"], words: "Written at load." }, authority: { of: "agent", basis: "test" }, reason: "test" });
+    },
+  };
+  const rt = new Runtime();
+  const errors: unknown[] = [];
+  rt.onError = (_f, e) => errors.push(e);
+  const modules: Record<string, Pack> = { graph, action, exchange, agent, verdict, words: words as Pack, keep: keep as Pack, writer };
+  const BASE = "mem:/packs/";
+  const loader = new Loader(rt, { base: BASE, import: async (url) => ({ default: modules[url.slice(BASE.length)] }) });
+  const ids = ["graph", "action", "exchange", "agent", "verdict", "words", "keep", "writer"];
+  await loader.apply(ids.map((id) => ({ id, pack: id })));
+  await rt.settle();
+  await loader.apply(ids.filter((x) => x !== "keep").map((id) => ({ id, pack: id })));
+  await rt.settle();
+  await loader.apply([]);
+  await rt.settle();
+  assert.deepEqual(errors, []);
+});

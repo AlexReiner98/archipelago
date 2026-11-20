@@ -117,6 +117,17 @@ const keep: Pack<KeepConfig> = {
     const invoke = ctx.get<ActionInvoke>("action.invoke");
     const has = (name: string) => actions.list().some((a) => a.name === name);
 
+    /** Per item, the runs its record had when this pack last decided it: an undo isn't redone until another run. */
+    const decidedAt = new Map<Id, number>();
+    // Declared before anything can call soon(): a watch may fire while the pack loads or unloads.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let busy = Promise.resolve();
+    let gone = false;
+    ctx.effect(() => () => {
+      gone = true;
+      clearTimeout(timer);
+    });
+
     /** Every node item, kept live: read page by page, then followed. */
     const items = new Map<Id, Item>();
     const loadNodes = async () => {
@@ -326,10 +337,6 @@ const keep: Pack<KeepConfig> = {
       },
     });
 
-    /** Per item, the runs its record had when this pack last decided it: an undo isn't redone until another run. */
-    const decidedAt = new Map<Id, number>();
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let busy = Promise.resolve();
     const decide = async () => {
       if (!applying || !has("words.promote") || !has("words.retire")) return;
       const all = peers();
@@ -352,11 +359,11 @@ const keep: Pack<KeepConfig> = {
     };
     function soon() {
       clearTimeout(timer);
+      if (gone) return;
       timer = setTimeout(() => {
-        busy = busy.then(decide).catch((err) => ctx.runtime.report(ctx.fiber, err));
+        busy = busy.then(() => (gone ? undefined : decide())).catch((err) => ctx.runtime.report(ctx.fiber, err));
       }, 500);
     }
-    ctx.effect(() => () => clearTimeout(timer));
     verdicts.watch(() => soon());
     soon();
   },
