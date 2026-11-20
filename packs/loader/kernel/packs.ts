@@ -11,7 +11,7 @@ import { actorsOf, islandsOff, packKind, sharedOf } from './islands.ts'; import 
 import { orderPacks, KERNEL_PACKS, ownsId, providersOf, type PackState } from './packorder.ts';
 import type { RuleDef } from '../../rules/kernel/rules.ts'; import { checkRules } from './rule-check.ts';
 import { isApp, isInternal, isRequired, kernelRefused, parts, withoutAbsent, type Manifest } from './manifest.ts'; import { openedTo, providedOf } from './services.ts';
-import { OWN_PACKS, readPackFolders } from './pack-folders.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts'; import { checkParts } from './ui-parts.ts';
+import { OWN_PACKS } from './pack-folders.ts'; import { packsOf, readSeed, type Seed } from './pack-source.ts'; import { madePacks, type ItemPack, type PackVersion } from './pack-items.ts'; import { versionWhere } from './pack-code.ts'; import { checkParts } from './ui-parts.ts';
 import { ownPack, withVersions, type TypeItem } from './type-overlay.ts'; import { checkPhases, phasesOf } from '../../../src/phases.ts'; import { keepVersionTypes } from './version-types.ts'; import { withoutParts, type PartState } from './island-parts.ts';
 
 export type FieldType = 'string' | 'number' | 'boolean' | 'date' | 'datetime' | 'url' | 'enum' | 'json';
@@ -112,7 +112,7 @@ export class Registry {
   /** Every folder packs are read from, in order: the server's own, then those `PELAGO_PACKS` names. */
   readonly dirs: string[];
   /** The folder each pack was found in. */
-  private where = new Map<string, string>();
+  private where = new Map<string, string>(); /** The pack files as this registry first read them (packs/loader/kernel/pack-source.ts): a rebuild reads none again. */ private seed?: Seed;
   readonly only: string[] | undefined;
   /** The types this workspace defined for itself (define_type), in order: its database keeps them (packs/identity/kernel/control.ts). */
   private local: TypeDef[]; /** The types and link types kept on the map (packs/loader/kernel/type-items.ts). */ items: TypeItem[] = [];
@@ -141,17 +141,17 @@ export class Registry {
   private kept: { types: ResolvedType[]; relations: ResolvedRelation[] } = { types: [], relations: [] };
 
   /** The manifests this registry was given in place of folders: the packs as the log said them at a past position (packs/loader/kernel/registry-at.ts). Their code is read from `where` (packs/loader/kernel/pack-code.ts), as the log kept it, and a handler they declare is taken as it was said. */ private given?: { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string>; answers?: string[] }; // answers: what the server's internal packs answer today, always there whatever the log said then
-  constructor(dirs: string | string[] | { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string>; answers?: string[] }, only?: string[], local: TypeDef[] = []) {
+  constructor(dirs: string | string[] | { found: Map<string, PackFile>; hashes: Map<string, string>; where?: Map<string, string>; answers?: string[] }, only?: string[], local: TypeDef[] = [], seed?: Seed) {
     if (typeof dirs === 'object' && !Array.isArray(dirs)) (this.given = dirs), (dirs = []);
     this.dirs = [dirs].flat(); this.dir = this.dirs[0] ?? '';
     this.only = only;
-    this.local = [...local];
-    this.reload();
+    this.local = [...local]; this.seed = seed; this.rebuild();
   }
-  reload(): void { const held = new Map<string, string>(); while (this.loadOnce(held)); } /** One load: true when it held back a pack whose declarations did not hold (it waits with why), to be loaded again without it. */
+  /** Read the pack files again (a new release, a test that changed one) and rebuild. */ reload(): void { this.seed = undefined; this.rebuild(); }
+  /** Build again from the seed and the items kept on the map, reading no file: what follows a change to a system item. */ rebuild(): void { const held = new Map<string, string>(); while (this.loadOnce(held)); } /** One load: true when it held back a pack whose declarations did not hold (it waits with why), to be loaded again without it. */
   private loadOnce(held: Map<string, string>): boolean {
     // A workspace's own types are in its database, never in a folder another server started from here would read.
-    let { found, hashes, where } = this.given ? { found: new Map(this.given.found), hashes: new Map(this.given.hashes), where: new Map(this.given.where) } : readPackFolders<PackFile>(this.dirs, LOCAL_PACK);
+    let { found, hashes, where } = this.given ? { found: new Map(this.given.found), hashes: new Map(this.given.hashes), where: new Map(this.given.where) } : packsOf((this.seed ??= readSeed(this.dirs, LOCAL_PACK)), this.items);
     this.where = where;
     const own = ownPack(this.localPack(), this.items, LOCAL_PACK); if (own) found.set(LOCAL_PACK, own);
     const made = madePacks(this.items, found, LOCAL_PACK); this.made = new Map(made.packs.map((p) => [p.manifest.id, p])); this.madeWrong = made.wrong;
@@ -322,7 +322,7 @@ export class Registry {
     const madeOn = new Set([...this.made.keys()].filter((p) => !next.includes(p))); const sameMade = madeOn.size === this.madeOn.size && [...madeOn].every((p) => this.madeOn.has(p));
     if (!newly.length && next.length === this.turnedOff.length && islands === this.islands && sameMade) return undefined;
     this.turnedOff = next; this.islands = islands; this.madeOn = madeOn;
-    this.reload();
+    this.rebuild();
     return newly;
   }
 
@@ -444,27 +444,27 @@ export class Registry {
   async defineLocal(def: TypeDef): Promise<void> {
     this.local = [...this.local, def];
     try {
-      this.reload();
+      this.rebuild();
     } catch (err) {
       this.local = this.local.slice(0, -1);
-      this.reload();
+      this.rebuild();
       throw err;
     }
     await this.keepLocal(def);
   }
 
   /** Take in the types and link types kept on the map; one that does not load leaves the registry as it was, and says why. */
-  takeItems(items: TypeItem[]): void { const was = this.items; this.items = items; try { this.reload(); } catch (err) { this.items = was; this.reload(); throw err; } }
+  takeItems(items: TypeItem[]): void { const was = this.items; this.items = items; try { this.rebuild(); } catch (err) { this.items = was; this.rebuild(); throw err; } }
   /** The folder a pack's files are in: where it was found, or the first folder for one not found. */
   folderOf(pack: string): string { return join(this.where.get(pack) ?? this.dir, pack); }
   /** A registry like this one with these type items in place of its own: what a change that makes or changes one is checked against; `off`, packs turned off there too (an island's, packs/loader/kernel/island-off.ts); `partsOff`, parts (island-parts.ts). */
-  trial(items: TypeItem[], on: string[] = [], swap?: PackVersion, off: string[] = [], partsOff: string[] = []): Registry { const r = new Registry(this.given ?? this.dirs, this.only, this.local); r.swap = swap; r.partsOff = [...new Set([...this.partsOff, ...partsOff])]; r.turnedOff = [...new Set([...this.turnedOff.filter((p) => !on.includes(p)), ...off.filter((p) => !KERNEL_PACKS.includes(p))])]; r.madeOn = new Set([...this.madeOn, ...on].filter((p) => !off.includes(p))); r.offHere = off.filter((p) => !this.turnedOff.includes(p)); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
+  trial(items: TypeItem[], on: string[] = [], swap?: PackVersion, off: string[] = [], partsOff: string[] = []): Registry { const r = new Registry(this.given ?? this.dirs, this.only, this.local, this.seed); r.swap = swap; r.partsOff = [...new Set([...this.partsOff, ...partsOff])]; r.turnedOff = [...new Set([...this.turnedOff.filter((p) => !on.includes(p)), ...off.filter((p) => !KERNEL_PACKS.includes(p))])]; r.madeOn = new Set([...this.madeOn, ...on].filter((p) => !off.includes(p))); r.offHere = off.filter((p) => !this.turnedOff.includes(p)); r.islands = this.islands; r.kept = this.kept; r.takeItems(items); return r; }
   /** Take up the types defined here by another server on the same database. Returns whether any were new. */
   followLocal(defs: TypeDef[]): boolean {
     const added = defs.filter((t) => !this.local.some((l) => l.id === t.id));
     if (!added.length) return false;
     this.local = [...this.local, ...added];
-    this.reload();
+    this.rebuild();
     return true;
   }
 

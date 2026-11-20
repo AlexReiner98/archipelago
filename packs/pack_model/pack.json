@@ -1,0 +1,53 @@
+{
+  "id": "pack_model",
+  "version": "0.1.0",
+  "title": "Packs on the map",
+  "description": "The pack model as the map's own words: a pack is an item, and everything it declares is an item part_of it (a type, a link type, a rule, a view, a screen, an instruction, a style, a lens, a layout, a part, an automation), each recording the shipped value it last came from (shipped) and naming the code it runs by path and hash (runs). The types are core's, since the kernel reads them; this pack keeps the ties between them: what a part requires, what a type is a flavour of, and what an owner's version stands over. packs/pack_model/README.md is the contract the registry, install and floor build on.",
+  "requires": ["type:pack", "type:type", "type:link_type", "type:rule", "type:view", "type:screen", "type:instruction", "type:style", "type:lens", "type:layout", "type:part", "type:automation"],
+  "links": [
+    {
+      "id": "requires",
+      "extends": "uses",
+      "title": "requires",
+      "inverse": "is required by",
+      "from": ["pack", "type", "link_type", "rule", "view", "screen", "instruction", "style", "lens", "layout", "part", "automation"],
+      "to": ["pack", "type", "link_type", "rule", "view", "screen", "instruction", "style", "lens", "layout", "part", "automation"],
+      "description": "A pack, or a part of one, cannot work without what the target provides: the name it requires is the link's props.name (type:task, has:when, field:due@task, service:answer.flat), the target the part that provides it now. Made by install from the pack file's requires and what each part names; a name nothing on the map provides has no link, and its pack waits."
+    },
+    {
+      "id": "flavour_of",
+      "extends": "about",
+      "title": "flavour of",
+      "inverse": "has the flavour",
+      "from": ["type", "link_type"],
+      "to": ["type", "link_type"],
+      "description": "A type is a flavour of its parent, a link type of the one it extends: drawn from spec.extends, which stays the truth the registry reads. Made by install beside the spec."
+    },
+    {
+      "id": "stands_over",
+      "extends": "about",
+      "title": "stands over",
+      "inverse": "is stood over by",
+      "from": ["type", "link_type", "rule", "view", "screen", "instruction", "style", "lens", "layout", "part"],
+      "to": ["type", "link_type", "rule", "view", "screen", "instruction", "style", "lens", "layout", "part"],
+      "description": "The owner's version of a shipped part stands over it: the source's fields are read over the target's, and an upgrade changes the target alone. Drawn from the source's preset, which names the target's declares; one part has one version at most. A rule's version may only tighten the floor's."
+    }
+  ],
+  "styles": [
+    {
+      "id": "pack_model.parts",
+      "type": "lens",
+      "title": "Its parts",
+      "on": ["pack"],
+      "props": {
+        "filter": {
+          "find": ["in {here}"]
+        },
+        "walk": {
+          "over": "all",
+          "steps": 1
+        }
+      }
+    }
+  ]
+}

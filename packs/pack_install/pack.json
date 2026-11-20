@@ -1,0 +1,59 @@
+{
+  "id": "pack_install",
+  "version": "0.1.0",
+  "title": "Pack install",
+  "description": "Install and upgrade as changes: a pack file's manifest becomes items on the map, the pack's item and one per part it declares, part of it, each carrying what was shipped. An upgrade merges each field against what was last shipped: what only the pack changed is applied, what only the owner changed is kept, and what both changed goes to the owner as a change of its own, held by this pack's rule both_changed and drawn as a ghost. A part the new version drops is retired, unless the owner changed it. Everything else is one change set, undone in one.",
+  "requires": [
+    "type:pack",
+    "type:rule",
+    "type:view"
+  ],
+  "rules": [
+    {
+      "id": "both_changed",
+      "when": {
+        "pack": true,
+        "op": [
+          "update"
+        ],
+        "matches": {
+          "pack_merge": "^both$"
+        }
+      },
+      "then": "hold",
+      "stake": "The pack's new value replaces yours on \"{title}\".",
+      "say": "You and the pack both changed \"{title}\" since it was last shipped: which value stays is yours to say."
+    }
+  ],
+  "actions": [
+    {
+      "id": "pack_install.install",
+      "title": "Install or upgrade a pack",
+      "description": "A pack file onto the map, as one change: installed, every part an item of its pack; upgraded, merged per field against what was last shipped, the owner's edits kept and what both changed held for the owner. Answers what it made, applied, kept, asked, retired and left.",
+      "verb": "capture",
+      "input": {
+        "type": "object",
+        "properties": {
+          "manifest": {
+            "type": "object",
+            "description": "The pack file (pack.json) as an object."
+          },
+          "folder": {
+            "type": "string",
+            "description": "The pack's folder from the repository's root (packs/<id> unless said)."
+          },
+          "files": {
+            "type": "object",
+            "description": "The hashes of the pack's code files by path within its folder ({ \"handler.js\": \"<hex>\" }), the hex sha256 of each file's bytes: what the pack and its layouts and parts run."
+          }
+        },
+        "required": [
+          "manifest"
+        ],
+        "additionalProperties": false
+      },
+      "limit_ms": 10000,
+      "devOnly": true
+    }
+  ]
+}
