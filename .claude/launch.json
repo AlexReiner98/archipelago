@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "runtime-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["runtime/serve.ts", "5180"],
+      "port": 5180
+    }
+  ]
+}

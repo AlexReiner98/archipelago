@@ -4,9 +4,12 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "check": "tsc -p ."
+    "check": "tsc -p .",
+    "test": "node --test --test-timeout=20000 test/*.test.ts",
+    "serve": "node runtime/serve.ts 5180"
   },
   "devDependencies": {
+    "@types/node": "24.19.1",
     "preact": "11.1.1",
     "typescript": "5.9.3"
   }

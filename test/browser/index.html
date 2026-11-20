@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cordis runtime</title>
+    <style>
+      body { font: 14px system-ui, sans-serif; margin: 16px; background: #fff; color: #111; }
+      table { border-collapse: collapse; }
+      td, th { padding: 2px 10px; text-align: left; border-bottom: 1px solid #ddd; }
+      button { margin-right: 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>Cordis runtime in the browser</h1>
+    <p>
+      <button id="toggle">Disable provider</button>
+      <button id="swap">Move consumer first</button>
+    </p>
+    <div id="out"></div>
+    <table><thead><tr><th>entry</th><th>state</th><th>position</th></tr></thead><tbody id="status"></tbody></table>
+    <p id="log"></p>
+    <script type="module" src="./boot.ts"></script>
+  </body>
+</html>

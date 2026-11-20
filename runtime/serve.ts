@@ -1,0 +1,131 @@
+/**
+ * The dev server for the browser runtime: serves the repository's files,
+ * TypeScript with its types stripped (the same source runs on Node and in
+ * the browser, no build), and pushes changes for HMR.
+ *
+ * Each module it serves has its relative imports rewritten to carry the
+ * target's version (`./word.ts?v=2`), and its imports recorded in the
+ * module graph. When a file changes, the change and every module that
+ * imports it get new versions (Algorithm 8), and `/@hmr` tells every page
+ * which modules were accepted, at what version. The page's loader then
+ * re-imports the entries built on them.
+ *
+ *   node runtime/serve.ts [port] [root]
+ */
+import { watch } from "node:fs";
+import { readFile, stat } from "node:fs/promises";
+import { createServer, type ServerResponse } from "node:http";
+import { stripTypeScriptTypes } from "node:module";
+import { extname, join, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { ModuleGraph } from "./hmr.ts";
+
+const TYPES: Record<string, string> = {
+  ".ts": "text/javascript",
+  ".js": "text/javascript",
+  ".html": "text/html",
+  ".css": "text/css",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+};
+
+/** Imports and re-exports with a relative or rooted specifier. */
+const IMPORT = /(\bfrom\s*|\bimport\s*\(\s*|\bimport\s+)(["'])(\.{1,2}\/[^"']+|\/[^"']+)\2/g;
+
+/** The runtime's own modules: a change to one needs a reload of the page. */
+const declined = (path: string) => path.startsWith("/runtime/");
+
+export interface DevServer {
+  url: string;
+  graph: ModuleGraph;
+  close(): Promise<void>;
+}
+
+export async function serve(options: { port?: number; root?: string } = {}): Promise<DevServer> {
+  const root = resolve(options.root ?? join(fileURLToPath(import.meta.url), "../.."));
+  const graph = new ModuleGraph();
+  const clients = new Set<ServerResponse>();
+
+  /** Rewrites a module's imports to their versions, recording them. */
+  const rewrite = (path: string, code: string) => {
+    const deps = new Set<string>();
+    const out = code.replace(IMPORT, (_m, lead: string, q: string, spec: string) => {
+      const target = new URL(spec, `http://x${path}`).pathname;
+      deps.add(target);
+      return `${lead}${q}${graph.versioned(target)}${q}`;
+    });
+    graph.setImports(path, deps);
+    return out;
+  };
+
+  const server = createServer(async (req, res) => {
+    const url = new URL(req.url ?? "/", "http://x");
+    if (url.pathname === "/@hmr") {
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
+      res.write(": hmr\n\n");
+      clients.add(res);
+      req.on("close", () => clients.delete(res));
+      return;
+    }
+    let path = decodeURIComponent(url.pathname);
+    let file = join(root, path);
+    if (!file.startsWith(root + sep) && file !== root) {
+      res.writeHead(403).end();
+      return;
+    }
+    try {
+      if ((await stat(file)).isDirectory()) {
+        path = path.replace(/\/?$/, "/index.html");
+        file = join(file, "index.html");
+      }
+      let body: string | Buffer = await readFile(file);
+      const ext = extname(file);
+      if (ext === ".ts" || ext === ".js") {
+        let code = body.toString("utf8");
+        if (ext === ".ts") code = stripTypeScriptTypes(code, { mode: "strip" });
+        body = rewrite(path, code);
+      }
+      res.writeHead(200, { "content-type": TYPES[ext] ?? "application/octet-stream", "cache-control": "no-store" });
+      res.end(body);
+    } catch {
+      res.writeHead(404).end(`not found: ${path}`);
+    }
+  });
+
+  let pending = new Set<string>();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const watcher = watch(root, { recursive: true }, (_e, name) => {
+    if (!name || name.includes("node_modules") || name.startsWith(".git")) return;
+    pending.add("/" + name.replaceAll("\\", "/"));
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const changed = [...pending].filter((p) => graph.has(p));
+      pending = new Set();
+      if (!changed.length) return;
+      const { accepted, declined: restart } = graph.classify(changed, declined);
+      graph.bump(accepted);
+      const versions = Object.fromEntries([...accepted].map((p) => [p, graph.version(p)]));
+      const data = JSON.stringify({ accepted: [...accepted], versions, restart: [...restart] });
+      for (const c of clients) c.write(`data: ${data}\n\n`);
+    }, 50);
+  });
+
+  await new Promise<void>((ok) => server.listen(options.port ?? 0, "127.0.0.1", ok));
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : options.port;
+  return {
+    url: `http://127.0.0.1:${port}/`,
+    graph,
+    close: async () => {
+      watcher.close();
+      for (const c of clients) c.end();
+      await new Promise<void>((ok) => server.close(() => ok()));
+    },
+  };
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const port = Number(process.argv[2] ?? 5180);
+  const s = await serve({ port, root: process.argv[3] });
+  console.log(`serving ${s.url}`);
+}

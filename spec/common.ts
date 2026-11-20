@@ -127,8 +127,10 @@ export interface Refusal {
 
 /** Thrown, or returned as `{ refused }`, by any contract that can refuse. */
 export class Refused extends Error {
-  constructor(readonly refusal: Refusal) {
+  readonly refusal: Refusal;
+  constructor(refusal: Refusal) {
     super(refusal.message);
+    this.refusal = refusal;
     this.name = "Refused";
   }
 }

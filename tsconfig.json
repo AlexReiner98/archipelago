@@ -7,14 +7,18 @@
     "noUncheckedIndexedAccess": true,
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "lib": [
       "ES2022",
       "DOM"
     ]
   },
   "include": [
-    "spec/**/*.ts"
+    "spec/**/*.ts",
+    "runtime/**/*.ts",
+    "test/**/*.ts"
   ]
 }
