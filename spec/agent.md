@@ -22,14 +22,16 @@ Types: [agent.ts](agent.ts).
 
 ## Places
 
-A place is a moment in a run where the map can speak. **Draft vocabulary,
-open as a question to Alex:**
+A place is a moment in a run where the map can speak. The spec owns the
+vocabulary (decided by Alex); which places edition 1 holds is still being
+settled:
 
 | Place | Reached when | Can refuse |
 |---|---|---|
 | `session_start` | the run begins | no |
 | `prompt` | a person's message reaches the agent | yes |
 | `tool:<name>` | the agent is about to call a tool | yes |
+| `tool_result:<name>` | a tool has returned (its result is the input) | no |
 | `file:<path>` | a tool is about to touch that file (with its `tool:`) | yes |
 | `skill:<name>` | a skill is loaded | no |
 | `memory:<scope>` | memory of that scope is loaded (`project`, `user`, …) | no |

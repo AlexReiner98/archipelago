@@ -1,7 +1,8 @@
 /**
  * agent: say, refuse, act. See agent.md.
  *
- * DRAFT: the place vocabulary is an open question to Alex on the map.
+ * The spec owns the place vocabulary (Alex, 20 Nov 2026); which places are
+ * in edition 1 is still being settled.
  */
 import type { Actor, Capability, Dispose, Id, Json, PackId, Term, Time } from "./common.ts";
 
@@ -22,6 +23,7 @@ export const PLACES: (Term & { refusable: boolean })[] = [
   { term: "session_start", since: 1, refusable: false, doc: "The run begins." },
   { term: "prompt", since: 1, refusable: true, doc: "A person's message reaches the agent." },
   { term: "tool:<name>", since: 1, refusable: true, doc: "The agent is about to call a tool." },
+  { term: "tool_result:<name>", since: 1, refusable: false, doc: "A tool has returned; what it returned is the moment's input." },
   { term: "file:<path>", since: 1, refusable: true, doc: "A tool is about to touch that file; reached with its tool:." },
   { term: "skill:<name>", since: 1, refusable: false, doc: "A skill is loaded." },
   { term: "memory:<scope>", since: 1, refusable: false, doc: "Memory of that scope is loaded." },
