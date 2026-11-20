@@ -2,9 +2,11 @@
  * The app, server side: `npm run serve`. One process runs
  * - the dev server for the page (runtime/serve.ts, port 5180), and
  * - a Node runtime with the server's packs, hot-reloaded: graph, action,
- *   types and the bases (work, question, record, actor, links, items),
+ *   types and the bases (work, question, record, actor, links, items) with
+ *   the trial flavour branch, interchange (a moved map's change sets),
  *   exchange, agent, verdict, words, loaded, written, grow, the Claude Code adapter (5181), the
- *   map's agent tools on its MCP server (mcp), and
+ *   map's agent tools on its MCP server (mcp), the old maps kept read only
+ *   (archive, from <data>/archives), and
  *   the bridge (5182) the page reaches them through.
  *
  * --port moves all three (page, page + 1, page + 2); --no-watch turns hot
@@ -89,9 +91,11 @@ const tree: Entry[] = [
   { id: "record", pack: "packs/record/index.ts" },
   { id: "actor", pack: "packs/actor/index.ts" },
   { id: "links", pack: "packs/links/index.ts" },
+  { id: "branch", pack: "packs/branch/index.ts" },
   { id: "items", pack: "packs/items/index.ts" },
   { id: "schema", pack: "packs/schema/index.ts", config: { db: join(values.data, "schema.sqlite") } },
   { id: "history", pack: "packs/history/index.ts", config: { db: join(values.data, "history.sqlite") } },
+  { id: "interchange", pack: "packs/interchange/index.ts" },
   { id: "exchange", pack: "packs/exchange/index.ts", config: { journal: join(values.data, "exchange.jsonl") } },
   { id: "agent", pack: "packs/agent/index.ts" },
   { id: "verdict", pack: "packs/verdict/index.ts" },
@@ -105,6 +109,7 @@ const tree: Entry[] = [
     config: { port: PAGE + 1, onListen: (p: number) => console.log(`claude-code adapter on http://127.0.0.1:${p}`) },
   },
   { id: "mcp", pack: "packs/mcp/index.ts" },
+  { id: "archive", pack: "packs/archive/index.ts", config: { dir: join(values.data, "archives") } },
   {
     id: "bridge",
     pack: "packs/bridge/server.ts",

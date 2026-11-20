@@ -12,6 +12,10 @@
  *   (the action `mcp.tell`).
  * - `run`: what the run is (title, task, parent), or that it is over.
  *
+ * `get` and `query` read another map when given its name (`map`): one a
+ * pack added through `mcp.maps` (maps.ts), such as an old map kept as a
+ * read-only archive. Nothing writes to those.
+ *
  * Each tool's description is a node: a `tool_text` node item at the tool's
  * place (`tool:mcp__archipelago__get`), made through `words.add` when there
  * is none, so the harness view shows it, the verdicts judge it and
@@ -32,6 +36,8 @@ import type { Context, Pack } from "../../runtime/core.ts";
 import { run as find, type Index, type Row, type Wire } from "../find/query.ts";
 import type { McpHost, ToolDef, ToolResult, ToolRun } from "./host.ts";
 import { HOST } from "./host.ts";
+import type { MapDef, MapRead, McpMaps } from "./maps.ts";
+import { MAPS } from "./maps.ts";
 
 /** What each tool says when its node has no words (or there is no words pack). */
 export const DESCRIPTIONS: Record<string, string> = {
@@ -48,6 +54,8 @@ export const DESCRIPTIONS: Record<string, string> = {
 };
 
 export const GET_MAX = 50;
+/** What `map` says, on get and query. */
+const MAP_DOC = "Another map by name: an old map kept read only. Absent, the living map. A name not known is answered with the names there are.";
 export const QUERY_LIMIT = 30;
 export const QUERY_MAX = 200;
 export const WALK_MAX = 5;
@@ -105,12 +113,50 @@ const mcp: Pack<McpConfig> = {
     const exchange = ctx.get<ExchangeRead>("exchange.read");
     const KIND = config.kind ?? "tool_text";
 
+    // ---- Other maps, by name, read only (maps.ts).
+    const maps = new Map<string, { def: MapDef; index?: Promise<Index> }>();
+    ctx.provide<McpMaps>(MAPS, (_caller, from) => ({
+      add(def): Dispose {
+        if (!def.name || maps.has(def.name)) {
+          throw new Refused({ code: "mcp.map_taken", message: `A map ${def.name} is already there.`, by: { pack: "mcp" } });
+        }
+        return from.effect(() => {
+          const entry = { def };
+          maps.set(def.name, entry);
+          return () => {
+            if (maps.get(def.name) === entry) maps.delete(def.name);
+          };
+        });
+      },
+    }));
+    /** The map a call names: absent or empty, the living one. */
+    const mapOf = (name: Json | undefined): { read: MapRead | null; entry?: { def: MapDef; index?: Promise<Index> } } | string => {
+      if (name === undefined || name === null || name === "") return { read: null };
+      const entry = typeof name === "string" ? maps.get(name) : undefined;
+      if (!entry) return `No map ${String(name)}. ${maps.size ? `The others are: ${[...maps.keys()].join(", ")}.` : "There is no other map."} Leave map out for the living one.`;
+      return { read: entry.def.read, entry };
+    };
+    /** A map's whole index, read once: nothing writes to it. */
+    const indexOf = (entry: { def: MapDef; index?: Promise<Index> }): Promise<Index> =>
+      (entry.index ??= (async () => {
+        const its: Index = { items: new Map(), links: new Map(), type: (n) => byType.get(n) };
+        for (let p = await entry.def.read.all({ limit: LIMIT_MAX }); ; p = await entry.def.read.all({ limit: LIMIT_MAX, after: p.next })) {
+          for (const it of p.items) {
+            const f = it.fields;
+            if (typeof f.from === "string" && typeof f.to === "string") its.links.set(it.id, { id: it.id, type: it.type, fields: f, from: f.from, to: f.to });
+            else its.items.set(it.id, { id: it.id, type: it.type, fields: f });
+          }
+          if (!p.next) break;
+        }
+        return its;
+      })());
+
     // ---- The map, held for query: every item and link of a type defined now.
     const items = new Map<Id, Row>();
     const links = new Map<Id, Wire>();
     let byType = new Map<string, TypeInfo>();
     let linkTypes: LinkInfo[] = [];
-    const index: Index = { items, links, type: (n) => byType.get(n) };
+    const current: Index = { items, links, type: (n) => byType.get(n) };
     const put = (id: Id, type: string, f: Record<string, Json>) => {
       if (typeof f.from === "string" && typeof f.to === "string") links.set(id, { id, type, fields: f, from: f.from, to: f.to });
       else items.set(id, { id, type, fields: f });
@@ -309,13 +355,17 @@ const mcp: Pack<McpConfig> = {
           properties: {
             ids: { type: "array", items: { type: "string" }, description: `At most ${GET_MAX}.` },
             links: { type: "boolean", description: "With their links (default true)." },
+            map: { type: "string", description: MAP_DOC },
           },
           required: ["ids"],
         },
         async call(args) {
           const want = [...new Set(ids(args.ids))].slice(0, GET_MAX);
           if (!want.length) return no("Give ids.");
-          const found = await graph.get(want);
+          const on = mapOf(args.map);
+          if (typeof on === "string") return no(on);
+          const read: Pick<MapRead, "get" | "links"> = on.read ?? graph;
+          const found = await read.get(want);
           const out: Json[] = [];
           const missing: Id[] = [];
           for (let i = 0; i < want.length; i++) {
@@ -330,8 +380,8 @@ const mcp: Pack<McpConfig> = {
               out.push({ id: item.id, type: item.type, ...base, ...item.fields });
               continue;
             }
-            const page = await graph.links(item.id, { dir: "both" }, { limit: GET_MAX });
-            const ends = await graph.get(page.items.map((l) => (l.from === item.id ? l.to : l.from)));
+            const page = await read.links(item.id, { dir: "both" }, { limit: GET_MAX });
+            const ends = await read.get(page.items.map((l) => (l.from === item.id ? l.to : l.from)));
             const ls = page.items.map((l, j) => {
               const { from: _f, to: _t, ...fields } = l.fields;
               const end = brief(ends[j]) ?? { id: l.from === item.id ? l.to : l.from };
@@ -339,7 +389,7 @@ const mcp: Pack<McpConfig> = {
             });
             out.push({ id: item.id, type: item.type, ...base, ...item.fields, links: ls, ...(page.next ? { more_links: true } : {}) } as Json);
           }
-          return ok({ items: out, ...(missing.length ? { missing } : {}) });
+          return ok({ ...(on.entry ? { map: on.entry.def.name } : {}), items: out, ...(missing.length ? { missing } : {}) });
         },
       },
       {
@@ -358,9 +408,14 @@ const mcp: Pack<McpConfig> = {
               },
             },
             limit: { type: "number", description: `Default ${QUERY_LIMIT}, at most ${QUERY_MAX}.` },
+            map: { type: "string", description: MAP_DOC },
           },
         },
         async call(args) {
+          const on = mapOf(args.map);
+          if (typeof on === "string") return no(on);
+          const index: Index = on.entry ? await indexOf(on.entry) : current;
+          const { items, links } = index;
           const limit = Math.max(1, Math.min(typeof args.limit === "number" ? Math.floor(args.limit) : QUERY_LIMIT, QUERY_MAX));
           const q = typeof args.find === "string" ? args.find : "";
           const found = find(index, q, QUERY_MAX * 10);
@@ -380,7 +435,7 @@ const mcp: Pack<McpConfig> = {
           rows = rows.slice(0, limit);
           const kept = new Set(rows.map((r) => r.id));
           const ls = [...links.values()].filter((l) => kept.has(l.from) && kept.has(l.to)).map((l) => ({ id: l.id, type: l.type, from: l.from, to: l.to }));
-          return ok({ items: rows.map(brief), links: ls, ...(more ? { more } : {}) });
+          return ok({ ...(on.entry ? { map: on.entry.def.name } : {}), items: rows.map(brief), links: ls, ...(more ? { more } : {}) });
         },
       },
       {

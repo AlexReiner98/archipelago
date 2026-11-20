@@ -103,24 +103,33 @@ type Row = { n: number; id: string; fields: string };
 
 export class Store {
   readonly db: DatabaseSync;
+  readonly readOnly: boolean;
   private seq: number;
   private readonly q: Record<string, StatementSync>;
 
-  /** `file` is the database; none, or `:memory:`, keeps it in memory. */
   private readonly keep: number;
 
-  constructor(file: string = ":memory:", keep = 1000) {
+  /**
+   * `file` is the database; none, or `:memory:`, keeps it in memory.
+   * `readOnly` opens an existing one that nothing may write: an archive.
+   */
+  constructor(file: string = ":memory:", keep = 1000, opts: { readOnly?: boolean } = {}) {
     this.keep = keep;
-    this.db = new DatabaseSync(file);
-    if (file !== ":memory:") this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+    this.readOnly = !!opts.readOnly;
+    this.db = new DatabaseSync(file, { readOnly: !!opts.readOnly });
     this.db.exec("PRAGMA busy_timeout = 5000;");
-    this.db.exec(SCHEMA);
+    if (!opts.readOnly) {
+      if (file !== ":memory:") this.db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+      this.db.exec(SCHEMA);
+    }
     const layout = this.db.prepare("SELECT value FROM meta WHERE key = 'layout'").get() as { value: string } | undefined;
-    if (!layout) this.db.prepare("INSERT INTO meta (key, value) VALUES ('layout', ?)").run(LAYOUT);
-    else if (layout.value !== LAYOUT) throw new Error(`graph store ${file} has layout ${layout.value}; this pack reads ${LAYOUT}`);
+    if (!layout && !opts.readOnly) this.db.prepare("INSERT INTO meta (key, value) VALUES ('layout', ?)").run(LAYOUT);
+    else if (layout?.value !== LAYOUT) throw new Error(`graph store ${file} has layout ${layout?.value ?? "none"}; this pack reads ${LAYOUT}`);
     const s = this.db.prepare("SELECT value FROM meta WHERE key = 'seq'").get() as { value: string } | undefined;
     this.seq = s ? Number(s.value) : 0;
     const p = (sql: string) => this.db.prepare(sql);
+    // A read-only database refuses to prepare writes: those are left out, and apply refuses.
+    const w = (sql: string) => (opts.readOnly ? (undefined as unknown as StatementSync) : p(sql));
     this.q = {
       one: p("SELECT n, id, fields FROM items WHERE id = ?"),
       many: p("SELECT id, fields FROM items WHERE id IN (SELECT value FROM json_each(?))"),
@@ -129,15 +138,15 @@ export class Store {
       in: p("SELECT n, id, fields FROM items WHERE dst = ? AND (? IS NULL OR type = ?) AND n > ? ORDER BY n LIMIT ?"),
       both: p("SELECT n, id, fields FROM items WHERE (src = ? OR dst = ?) AND (? IS NULL OR type = ?) AND n > ? ORDER BY n LIMIT ?"),
       all: p("SELECT n, id, fields FROM items WHERE n > ? ORDER BY n LIMIT ?"),
-      insert: p("INSERT INTO items (id, type, src, dst, fields) VALUES (?, ?, ?, ?, ?)"),
-      update: p("UPDATE items SET type = ?, src = ?, dst = ?, fields = ? WHERE id = ?"),
-      remove: p("DELETE FROM items WHERE id = ?"),
-      seen: p("INSERT INTO seen (id, type) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET type = excluded.type"),
+      insert: w("INSERT INTO items (id, type, src, dst, fields) VALUES (?, ?, ?, ?, ?)"),
+      update: w("UPDATE items SET type = ?, src = ?, dst = ?, fields = ? WHERE id = ?"),
+      remove: w("DELETE FROM items WHERE id = ?"),
+      seen: w("INSERT INTO seen (id, type) VALUES (?, ?) ON CONFLICT (id) DO UPDATE SET type = excluded.type"),
       typeOf: p("SELECT type FROM seen WHERE id = ?"),
-      log: p("INSERT INTO changes (seq, body) VALUES (?, ?)"),
-      prune: p("DELETE FROM changes WHERE seq <= ?"),
+      log: w("INSERT INTO changes (seq, body) VALUES (?, ?)"),
+      prune: w("DELETE FROM changes WHERE seq <= ?"),
       since: p("SELECT seq, body FROM changes WHERE seq > ? ORDER BY seq LIMIT ?"),
-      setSeq: p("INSERT INTO meta (key, value) VALUES ('seq', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value"),
+      setSeq: w("INSERT INTO meta (key, value) VALUES ('seq', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value"),
       count: p("SELECT count(*) AS n FROM items"),
       types: p("SELECT type, count(*) AS n FROM items GROUP BY type ORDER BY type"),
     };
@@ -149,6 +158,7 @@ export class Store {
 
   /** Applies a change set whole, or throws `Refused` and changes nothing. */
   apply(change: Proposed): Committed {
+    if (this.readOnly) throw new Refused({ code: "graph.read_only", message: "This store is read-only: nothing writes to it.", by: { pack: "graph" } });
     const ids = [...new Set(change.facts.map((f) => f[1]))];
     this.db.exec("BEGIN IMMEDIATE");
     try {
