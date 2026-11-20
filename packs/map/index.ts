@@ -1,0 +1,298 @@
+/**
+ * The map pack, page side: the canvas of a query, in the shell as the view
+ * "Map". One flat plane: the query is the whole surface (`find.query`,
+ * drawn through `find.index`), each item one line with the mark of its
+ * state, links as right-angled wires (layout.ts).
+ *
+ * - A click on an item sets `here.item`; its wires and neighbours light.
+ * - The plane pans by dragging, zooms by the wheel, and fits again on a
+ *   double-click.
+ * - Every gesture is a change, through an action: a drag from one item to
+ *   another links them (`items.link`, of the kind picked in the bar); "+"
+ *   makes an item (`items.create`), part of the one the query is `in:`.
+ * - Declares `map.bar` (many: the find line goes there) and `map.side`
+ *   (one: the item page goes there), so other packs fill them.
+ *
+ * Drawn as SVG components: the canvas holds a query's items, at most a few
+ * hundred. The scene surface (spec/scene.md) is for the graph at scale.
+ */
+import { h } from "preact";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import htm from "htm";
+import type { ActionInvoke } from "../../spec/action.ts";
+import type { Id, Json } from "../../spec/common.ts";
+import type { HereRead, HereSet } from "../../spec/here.ts";
+import { KEYS } from "../../spec/here.ts";
+import type { SlotDeclare, SlotFill, SlotRead } from "../../spec/slot.ts";
+import type { Context, Pack } from "../../runtime/core.ts";
+import type { LinkInfo, TypeInfo } from "../../spec/types.ts";
+import { layout, SIZE, type Out } from "./layout.ts";
+import { mark, side } from "./marks.ts";
+
+export { mark, side } from "./marks.ts";
+
+const html: (s: TemplateStringsArray, ...v: unknown[]) => any = (htm as unknown as { bind(f: typeof h): any }).bind(h);
+
+/** What `find.index` answers (the find pack's own key). */
+interface Row {
+  id: Id;
+  type: string;
+  fields: Record<string, Json>;
+}
+interface Result {
+  items: Row[];
+  links: (Row & { from: Id; to: Id })[];
+  more: number;
+}
+interface FindIndex {
+  ready(): boolean;
+  item(id: Id): Row | undefined;
+  types(): TypeInfo[];
+  links(): LinkInfo[];
+  type(name: string): TypeInfo | undefined;
+  run(query: string, limit?: number): Result;
+  watch(on: () => void): () => void;
+}
+
+const QUERY = "find.query";
+const AUTH = { of: "human" as const, basis: "a gesture on the map page" };
+
+const STYLE = `
+.mp { display:grid; grid-template-rows:auto 1fr; height:100%; min-height:0; }
+.mp-bar { display:flex; gap:8px; align-items:center; padding:5px 10px; border-bottom:1px solid var(--line); white-space:nowrap; min-width:0; }
+.mp-bar select, .mp-bar button { font:inherit; background:var(--panel); color:var(--fg); border:1px solid var(--line); border-radius:3px; padding:1px 4px; cursor:pointer; }
+.mp-bar .say { color:var(--failed); overflow:hidden; text-overflow:ellipsis; max-width:40%; }
+.mp-bar .dim { color:var(--dim); }
+.mp-body { display:flex; min-height:0; }
+.mp-canvas { flex:1; min-width:0; position:relative; overflow:hidden; cursor:grab; user-select:none; }
+.mp-canvas.panning { cursor:grabbing; }
+.mp-canvas svg { width:100%; height:100%; display:block; }
+.mp-side { width:min(380px, 40%); flex:none; border-left:1px solid var(--line); overflow:auto; }
+.mp-card rect { fill:var(--panel); stroke:var(--line); }
+.mp-card { cursor:pointer; }
+.mp-card text { font:12px ui-sans-serif, system-ui, sans-serif; fill:var(--fg); dominant-baseline:central; }
+.mp-card .mk { fill:var(--dim); font-size:13px; }
+.mp-card.s-moving .mk { fill:var(--pick); }
+.mp-card.s-done .mk { fill:var(--held); }
+.mp-card.s-done text.t, .mp-card.s-gone text.t { fill:var(--dim); }
+.mp-card.s-gone text.t { text-decoration:line-through; }
+.mp-card.pick rect { stroke:var(--pick); stroke-width:2; }
+.mp-card.near rect { fill:var(--lit); }
+.mp-card.target rect { stroke:var(--held); stroke-width:2; }
+.mp-wire { fill:none; stroke:var(--dim); stroke-width:1.2; }
+.mp-wire.part_of { stroke-dasharray:5 3; }
+.mp-wire.bears_on { stroke-dasharray:1 3; stroke-linecap:round; stroke-width:1.6; }
+.mp-wire.waits_on { stroke:var(--pick); }
+.mp-wire.about { stroke:var(--line); }
+.mp-wire.lit { stroke:var(--fg); stroke-width:2; }
+.mp-wire.drag { stroke:var(--held); stroke-dasharray:4 3; }
+.mp-key { position:absolute; left:8px; bottom:6px; color:var(--dim); font-size:11px; display:flex; gap:10px; background:color-mix(in srgb, var(--bg) 85%, transparent); padding:1px 6px; border-radius:3px; }
+.mp-key svg { width:22px; height:8px; vertical-align:middle; }
+.mp-empty { position:absolute; inset:0; display:grid; place-items:center; color:var(--dim); }
+`;
+
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+const map: Pack = {
+  id: "map",
+  inject: ["find.index", "here.read", "here.set", "action.invoke", "slot.declare", "slot.fill", "slot.read"],
+  apply(ctx: Context) {
+    const index = ctx.get<FindIndex>("find.index");
+    const here = ctx.get<HereRead>("here.read");
+    const set = ctx.get<HereSet>("here.set");
+    const invoke = ctx.get<ActionInvoke>("action.invoke");
+    const slots = ctx.get<SlotRead>("slot.read");
+    const declare = ctx.get<SlotDeclare>("slot.declare");
+    declare.declare({ name: "map.bar", merge: "many", doc: "The map's top line: find goes here." });
+    declare.declare({ name: "map.side", merge: "one", doc: "Beside the canvas: the item page goes here." });
+
+    const useHere = <T extends Json>(key: string): T | undefined => {
+      const [v, setV] = useState<T | undefined>(here.get<T>(key));
+      useEffect(() => here.watch(key, (c) => setV(c.value as T | undefined)) as () => void, [key]);
+      return v;
+    };
+    const useIndex = () => {
+      const [, tick] = useState(0);
+      useEffect(() => index.watch(() => tick((x) => x + 1)) as () => void, []);
+      return index;
+    };
+    const Slot = ({ name }: { name: string }) => {
+      const [, tick] = useState(0);
+      useEffect(() => {
+        const stop = slots.watch(name, () => tick((x) => x + 1));
+        tick((x) => x + 1);
+        return stop as () => void;
+      }, [name]);
+      return html`${slots.fills(name).map((f) => html`<${f.view} key=${`${f.pack}/${f.name}`} />`)}`;
+    };
+
+    const Key = () => html`
+      <div class="mp-key">
+        ${["depends_on", "part_of", "waits_on", "bears_on", "about"].map(
+          (k) => html`<span><svg viewBox="0 0 22 8"><path class=${`mp-wire ${k}`} d="M0 4H22" /></svg> ${k}</span>`,
+        )}
+      </div>
+    `;
+
+    const Canvas = ({ result, drawn, kind, say }: { result: Result; drawn: Out; kind: string; say: (s: string) => void }) => {
+      const picked = useHere<string>(KEYS.item);
+      const box = useRef<HTMLDivElement>(null);
+      const [view, setView] = useState({ x: -20, y: -20, k: 1 });
+      const [drag, setDrag] = useState<{ from: Id; x: number; y: number; over?: Id } | undefined>();
+      const [panning, setPanning] = useState(false);
+      const [fits, refit] = useState(0);
+      const bases = useMemo(() => index.types().filter((t) => t.base === t.name).map((t) => t.name), [result]);
+
+      // Fit the drawing when what is drawn changes shape, not when the pane beside it opens.
+      const shape = `${drawn.width}x${drawn.height}:${result.items.length}`;
+      useEffect(() => {
+        const W = box.current?.clientWidth || 800;
+        const H = box.current?.clientHeight || 600;
+        const k = Math.min(1.1, Math.max(0.6, Math.min((W - 40) / Math.max(drawn.width, 1), (H - 60) / Math.max(drawn.height, 1))));
+        setView({ x: -20 / k, y: -20 / k, k });
+      }, [shape, fits]);
+
+      const toWorld = (e: { clientX: number; clientY: number }) => {
+        const r = box.current!.getBoundingClientRect();
+        return { x: view.x + (e.clientX - r.left) / view.k, y: view.y + (e.clientY - r.top) / view.k };
+      };
+      const at = (p: { x: number; y: number }) => {
+        for (const b of drawn.boxes.values()) if (p.x >= b.x && p.x <= b.x + SIZE.w && p.y >= b.y && p.y <= b.y + SIZE.h) return b.id;
+        return undefined;
+      };
+      const onWheel = (e: WheelEvent) => {
+        e.preventDefault();
+        const p = toWorld(e);
+        const k = Math.min(3, Math.max(0.15, view.k * Math.exp(-e.deltaY * 0.0015)));
+        const r = box.current!.getBoundingClientRect();
+        setView({ k, x: p.x - (e.clientX - r.left) / k, y: p.y - (e.clientY - r.top) / k });
+      };
+      const onDown = (e: PointerEvent) => {
+        if (e.button !== 0) return;
+        const p = toWorld(e);
+        const hit = at(p);
+        const start = { cx: e.clientX, cy: e.clientY, view };
+        let moved = false;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        const move = (m: PointerEvent) => {
+          if (!moved && Math.hypot(m.clientX - start.cx, m.clientY - start.cy) < 4) return;
+          moved = true;
+          if (hit) {
+            const q = toWorld(m);
+            setDrag({ from: hit, x: q.x, y: q.y, over: at(q) });
+          } else {
+            setPanning(true);
+            setView({ ...start.view, x: start.view.x - (m.clientX - start.cx) / start.view.k, y: start.view.y - (m.clientY - start.cy) / start.view.k });
+          }
+        };
+        const up = async (u: PointerEvent) => {
+          box.current?.removeEventListener("pointermove", move);
+          box.current?.removeEventListener("pointerup", up);
+          setPanning(false);
+          setDrag(undefined);
+          if (!moved) return set.set(KEYS.item, hit);
+          const to = hit ? at(toWorld(u)) : undefined;
+          if (!hit || !to || to === hit) return;
+          const out = await invoke.invoke({ action: "items.link", input: { type: kind, from: hit, to }, authority: AUTH, reason: `Linked ${kind} on the canvas` });
+          say(out.ok ? "" : out.refused.message);
+        };
+        box.current!.addEventListener("pointermove", move);
+        box.current!.addEventListener("pointerup", up);
+      };
+
+      const near = useMemo(() => {
+        const s = new Set<Id>();
+        if (picked) for (const l of result.links) if (l.from === picked) s.add(l.to);
+        else if (l.to === picked) s.add(l.from);
+        return s;
+      }, [picked, result]);
+      const titleLen = Math.floor((SIZE.w - 30) / 6.4);
+      const from = drag && drawn.boxes.get(drag.from);
+      return html`
+        <div class=${`mp-canvas${panning ? " panning" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${(e: MouseEvent) => !at(toWorld(e)) && refit((n) => n + 1)} title="Drag an item onto another to link them; drag the plane to move it; double-click it to fit">
+          <svg><g transform=${`scale(${view.k}) translate(${-view.x} ${-view.y})`}>
+            ${drawn.paths.map(
+              (p) => html`<path key=${p.id} class=${`mp-wire ${p.type}${picked && (p.from === picked || p.to === picked) ? " lit" : ""}`} d=${`M${p.points.map((q) => q.join(" ")).join("L")}`}><title>${p.type}</title></path>`,
+            )}
+            ${result.items.map((r) => {
+              const b = drawn.boxes.get(r.id)!;
+              const t = index.type(r.type);
+              const title = String(r.fields.title ?? r.id);
+              const cls = `mp-card s-${side(t, r.fields.status)}${r.id === picked ? " pick" : ""}${near.has(r.id) ? " near" : ""}${drag?.over === r.id && drag.over !== drag.from ? " target" : ""}`;
+              return html`
+                <g key=${r.id} class=${cls} transform=${`translate(${b.x} ${b.y})`}>
+                  <title>${title} · ${r.type} · ${String(r.fields.status ?? "")}</title>
+                  <rect width=${SIZE.w} height=${SIZE.h} rx="3" />
+                  <text class="mk" x="9" y=${SIZE.h / 2}>${mark(bases, t, r.fields.status)}</text>
+                  <text class="t" x="24" y=${SIZE.h / 2}>${clip(title, titleLen)}</text>
+                </g>
+              `;
+            })}
+            ${from && html`<path class="mp-wire drag" d=${`M${from.x + SIZE.w} ${from.y + SIZE.h / 2}L${drag!.x} ${drag!.y}`} />`}
+          </g></svg>
+          ${!result.items.length && html`<div class="mp-empty">${index.ready() ? "Nothing matches." : "Reading the map…"}</div>`}
+          <${Key} />
+        </div>
+      `;
+    };
+
+    const View = () => {
+      const idx = useIndex();
+      const q = useHere<string>(QUERY) ?? "";
+      const picked = useHere<string>(KEYS.item);
+      const [kind, setKind] = useState("depends_on");
+      const [base, setBase] = useState("work");
+      const [said, say] = useState("");
+      const result = idx.run(q);
+      const drawn = useMemo(() => layout(result), [JSON.stringify([result.items.map((r) => r.id), result.links.map((l) => [l.id, l.from, l.to])])]);
+      const bases = idx.types().filter((t) => t.base === t.name);
+      const inside = /(?:^|\s)in:(\S+)/.exec(q)?.[1];
+      const make = async () => {
+        const out = await invoke.invoke({
+          action: "items.create",
+          input: { type: base, title: `New ${base}`, ...(inside && idx.item(inside) ? { part_of: inside } : {}) },
+          authority: AUTH,
+          reason: "Made on the map",
+        });
+        if (!out.ok) return say(out.refused.message);
+        say("");
+        set.set(KEYS.item, (out.output as { id: string }).id);
+      };
+      useEffect(() => {
+        const esc = (e: KeyboardEvent) => e.key === "Escape" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) && set.set(KEYS.item, undefined);
+        addEventListener("keydown", esc);
+        return () => removeEventListener("keydown", esc);
+      }, []);
+      return html`
+        <div class="mp">
+          <div class="mp-bar">
+            <${Slot} name="map.bar" />
+            ${said && html`<span class="say" title=${said}>${said}</span>`}
+            <span class="dim">drag links</span>
+            <select value=${kind} onChange=${(e: Event) => setKind((e.target as HTMLSelectElement).value)} title="The kind of link a drag makes">
+              ${idx.links().map((l) => html`<option value=${l.name}>${l.name}</option>`)}
+            </select>
+            <select value=${base} onChange=${(e: Event) => setBase((e.target as HTMLSelectElement).value)} title="What + makes">
+              ${bases.map((t) => html`<option value=${t.name}>${t.name}</option>`)}
+            </select>
+            <button onClick=${make} title=${inside ? "Make an item part of the one this query is in" : "Make an item"}>+</button>
+          </div>
+          <div class="mp-body">
+            <${Canvas} result=${result} drawn=${drawn} kind=${kind} say=${say} />
+            ${picked && html`<div class="mp-side"><${Slot} name="map.side" /></div>`}
+          </div>
+        </div>
+      `;
+    };
+
+    ctx.effect(() => {
+      const style = document.createElement("style");
+      style.textContent = STYLE;
+      document.head.append(style);
+      return () => style.remove();
+    });
+    ctx.get<SlotFill>("slot.fill").fill({ slot: "shell.main", name: "map", title: "Map", view: View });
+  },
+};
+
+export default map;

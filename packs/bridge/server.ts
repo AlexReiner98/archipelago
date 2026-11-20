@@ -32,10 +32,11 @@ export const KEYS = [
   "action.invoke",
   "graph.read",
   "graph.watch",
+  "types.read",
 ] as const;
 
 /** Reads a client keeps a copy of, refreshed when the key's `watch` fires. */
-export const SYNC: Record<string, string> = { "agent.tree": "nodes", "action.list": "list" };
+export const SYNC: Record<string, string> = { "agent.tree": "nodes", "action.list": "list", "types.read": "all" };
 
 export interface BridgeConfig {
   port?: number;

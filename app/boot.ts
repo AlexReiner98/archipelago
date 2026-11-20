@@ -1,7 +1,7 @@
 /**
  * The app, page side: the browser runtime and its config tree. The bridge
- * provides the server's capabilities here; the renderer, here, shell and
- * harness packs make the page. The bridge is two ports above the page
+ * provides the server's capabilities here; the renderer, here, shell,
+ * harness, find, map and item packs make the page. The bridge is two ports above the page
  * (5180 serves the page and 5182 the bridge, 5280 and 5282 for dev). `host` is on window, so a pack can be turned
  * off from the console: `host.loader.edit(t => (t.find(e => e.id === "harness").disabled = true, t))`.
  */
@@ -15,6 +15,9 @@ const host = await startBrowser({
     { id: "renderer", pack: "packs/renderer/index.ts", config: { mount: "#app" } },
     { id: "shell", pack: "packs/shell/index.ts" },
     { id: "harness", pack: "packs/harness/index.ts" },
+    { id: "find", pack: "packs/find/index.ts" },
+    { id: "map", pack: "packs/map/index.ts" },
+    { id: "item", pack: "packs/item/index.ts" },
   ],
 });
 host.runtime.onError = (fiber, error) => console.error(`[${fiber.pack.id}]`, error);
