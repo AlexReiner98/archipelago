@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "runtime-dev",
+      "name": "harness",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["runtime/serve.ts", "5180"],
+      "runtimeArgs": ["app/server.ts"],
       "port": 5180
     }
   ]

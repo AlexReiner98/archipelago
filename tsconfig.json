@@ -20,6 +20,7 @@
     "spec/**/*.ts",
     "runtime/**/*.ts",
     "packs/**/*.ts",
-    "test/**/*.ts"
+    "test/**/*.ts",
+    "app/**/*.ts"
   ]
 }

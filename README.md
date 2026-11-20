@@ -23,6 +23,25 @@ Early. The first build is a live **harness view** for Claude Code sessions. It
 shows what is said to the agent, where it was said, by which pack, and whether
 it worked.
 
+## Running it
+
+```
+npm install
+npm run serve
+```
+
+starts one process ([app/server.ts](app/server.ts)): the server's packs
+(graph, action, exchange, agent, verdict, words, the Claude Code adapter on
+5181, the bridge on 5182) and the page's dev server. Open
+http://127.0.0.1:5180/app/ and start Claude Code through the adapter:
+
+```
+claude --settings packs/claude-code/settings.json --mcp-config packs/claude-code/mcp.json
+```
+
+The page's own packs (bridge client, here, renderer, shell, harness) are in
+[app/boot.ts](app/boot.ts). Data is kept in `app/.data/`.
+
 ## Licence
 
 MIT

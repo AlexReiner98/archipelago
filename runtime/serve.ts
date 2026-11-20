@@ -23,6 +23,7 @@ import { ModuleGraph } from "./hmr.ts";
 const TYPES: Record<string, string> = {
   ".ts": "text/javascript",
   ".js": "text/javascript",
+  ".mjs": "text/javascript",
   ".html": "text/html",
   ".css": "text/css",
   ".json": "application/json",
