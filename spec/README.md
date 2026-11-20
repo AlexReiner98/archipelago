@@ -49,6 +49,27 @@ without consumers reloading.
 
 Calls that may cross a process are async.
 
+## What the spec asks of the runtime
+
+Three things, all of them plain Cordis:
+
+1. **Registrations are the caller's effects.** Whatever a pack adds
+   through a capability goes when the pack unloads.
+2. **Providers know their caller from its context.** A provider reads the
+   calling pack, and the actor and run where interception set them
+   (`Caller` in common.ts). No call takes "who I am" as an argument, so no
+   pack can claim to be another or speak for a person. Sign-in intercepts
+   a person's page with them as actor; the harness adapter makes one child
+   context per run with the agent and the run.
+3. **The config tree orders everything.** Where contributions need an order
+   (write stages, nodes' words, slot fills), it is the contributing packs'
+   order in the config tree (`byPosition`), then the order each pack
+   registered in. There are no ranks or priorities: reordering is moving
+   an entry, and a `one` slot shows the first fill.
+
+`here` is the one place the spec leaves the Cordis way on purpose: see
+[here](here.md).
+
 ## The spec is versioned, packs aren't
 
 The spec has editions: 1, 2, 3… Packs don't declare versions of anything.

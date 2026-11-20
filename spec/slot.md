@@ -16,10 +16,12 @@ by whichever shell pack is loaded. Types: [slot.ts](slot.ts).
 
 - `declare({ name, merge, props })`: a slot, named under the declaring
   pack (`harness.node`), with the props every fill gets.
-- `fill({ slot, id, view, rank })`: a component in a slot.
-- `many` shows every fill, by rank then pack id. `one` shows the fill the
-  config tree names for the slot, else the highest rank. There is no
-  conflict to settle: a choice is config, and config can be changed back.
+- `fill({ slot, name, view })`: a component in a slot, as the calling
+  pack's.
+- Fills are in the config-tree order of their packs. `many` shows them
+  all in that order; `one` shows the first. To show another, move its
+  pack's entry or disable the one in front. There are no ranks and no
+  conflicts to settle: order is config, and config can be changed back.
 - A fill for an undeclared slot waits, shown nowhere, until a pack
   declares it. That's the same as a Cordis consumer waiting for its
   provider, and it means load order never matters.

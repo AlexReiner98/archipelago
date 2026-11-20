@@ -2,7 +2,7 @@
  * action: the one way anyone changes anything. See action.md.
  */
 import type { ChangeSetId, Committed, Fact } from "./changeset.ts";
-import type { Actor, Authority, Capability, Dispose, Json, PackId, Refusal } from "./common.ts";
+import type { Authority, Caller, Capability, Dispose, Json, PackId, Refusal } from "./common.ts";
 
 /** A JSON Schema (2020-12) object. Kept loose here; the schema pack checks it. */
 export type JsonSchema = { [key: string]: Json };
@@ -12,10 +12,10 @@ export type JsonSchema = { [key: string]: Json };
  * an action that reads the graph has its pack inject `graph.read`.
  */
 export interface ActionContext {
-  actor: Actor;
+  /** Who called, from the calling context. */
+  caller: Caller;
   authority: Authority;
   reason: string;
-  run?: string;
   /**
    * Adds facts to this call's change set. Nothing is applied until the
    * outermost action returns; then all of it is, as one change set, or none.
@@ -28,7 +28,10 @@ export interface ActionContext {
 }
 
 export interface ActionDef<I extends Json = Json, O extends Json = Json> {
-  /** Dotted, starting with the pack's id: `graph.create`, `verdict.judge`. */
+  /**
+   * Dotted, starting with the registering pack's id (`verdict.judge`); the
+   * provider refuses a name outside the caller's own.
+   */
   name: string;
   /** One line for a person or an agent choosing it. */
   title: string;
@@ -39,14 +42,17 @@ export interface ActionDef<I extends Json = Json, O extends Json = Json> {
   run(input: I, ctx: ActionContext): Promise<O>;
 }
 
-/** A call, from a person through a UI, an agent through a tool, or a pack. */
+/**
+ * A call, from a person through a UI, an agent through a tool, or a pack.
+ * Who is calling isn't part of it: the action pack reads the actor, the run
+ * and the pack from the calling context (`Caller` in common.ts).
+ */
 export interface Invocation {
   action: string;
   input: Json;
-  actor: Actor;
+  /** On whose say-so: varies call by call, so it is said here. */
   authority: Authority;
   reason: string;
-  run?: string;
 }
 
 export type Outcome<O extends Json = Json> =
@@ -60,13 +66,14 @@ export interface ActionInfo {
   doc?: string;
   input: JsonSchema;
   output?: JsonSchema;
+  /** The pack that registered it, from its context. */
   pack: PackId;
 }
 
 /** `action.register`. */
 export interface ActionRegister {
   /**
-   * Declares an action. A second action of the same name is refused. An
+   * Declares an action, as the calling pack's. A taken name is refused. An
    * action whose input or output must change incompatibly gets a new name;
    * the old one is retired, not altered.
    */

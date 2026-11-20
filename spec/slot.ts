@@ -15,16 +15,19 @@ import type { Capability, Dispose, PackId } from "./common.ts";
 export type View<P = Record<string, unknown>> = (props: P) => unknown;
 
 /**
- * - `many`: every fill shows, ordered by rank then pack id.
- * - `one`: one fill shows: the one the config tree names for this slot,
- *   else the highest rank, then the lowest pack id.
+ * - `many`: every fill shows, in config-tree order of the filling packs
+ *   (`byPosition` in common.ts), then the order each pack filled in.
+ * - `one`: the first of those shows. To show another, move its pack's
+ *   entry in the config tree, or disable the one in front.
  */
 export type Merge = "many" | "one";
 
 export interface SlotDef {
-  /** Dotted, starting with the declaring pack's id: `harness.node`. `root` is reserved. */
+  /**
+   * Dotted, starting with the declaring pack's id (`harness.node`); the
+   * provider refuses a name outside the caller's own. `root` is reserved.
+   */
   name: string;
-  pack: PackId;
   merge: Merge;
   /** The props every fill receives. */
   props?: JsonSchema;
@@ -33,37 +36,38 @@ export interface SlotDef {
 
 export interface FillDef<P = Record<string, unknown>> {
   slot: string;
-  /** `pack/name`, stable across reloads. */
-  id: string;
-  pack: PackId;
-  rank?: number;
+  /** Unique within the pack, stable across reloads. */
+  name: string;
   title?: string;
   view: View<P>;
 }
 
-export type FillInfo = Omit<FillDef, "view">;
+export interface FillInfo extends Omit<FillDef, "view"> {
+  /** The pack that filled it, from its context. */
+  pack: PackId;
+}
 
 /** The one slot the spec declares: the renderer mounts the fill of `root`. */
 export const ROOT = "root";
 
 /** `slot.declare`. */
 export interface SlotDeclare {
-  /** Declares a slot. A taken name is refused. */
+  /** Declares a slot, as the calling pack's. A taken name is refused. */
   declare(def: SlotDef): Dispose;
 }
 
 /** `slot.fill`. */
 export interface SlotFill {
-  /** Fills a slot. A fill for a slot nobody has declared waits, shown nowhere, until one is. */
+  /** Fills a slot, as the calling pack's. A fill for a slot nobody has declared waits, shown nowhere, until one is. */
   fill<P>(def: FillDef<P>): Dispose;
 }
 
 /** `slot.read`: what the renderer reads, and a view of the UI's own structure. */
 export interface SlotRead {
   /** What shows in a slot now, in order (one entry for `one`). */
-  fills(slot: string): FillDef[];
-  /** Every slot declared now. */
-  slots(): SlotDef[];
+  fills(slot: string): (FillDef & FillInfo)[];
+  /** Every slot declared now, with the pack that declared it. */
+  slots(): (SlotDef & { pack: PackId })[];
   /** Calls `on` when a slot's fills change. */
   watch(slot: string, on: () => void): Dispose;
 }

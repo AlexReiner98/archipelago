@@ -2,7 +2,7 @@
  * graph: bounded reads, live watch, the write chain. See graph.md.
  */
 import type { Committed, Proposed } from "./changeset.ts";
-import type { Capability, Cursor, Dispose, Id, Json, Page, PageRequest, PackId } from "./common.ts";
+import type { Capability, Cursor, Dispose, Id, Json, Page, PageRequest } from "./common.ts";
 
 /** No read returns more than this many items, whatever it asks for. */
 export const LIMIT_MAX = 500;
@@ -57,37 +57,30 @@ export interface GraphWatch {
 
 /**
  * One stage of the write chain. It sees the proposed set and calls `next`
- * to pass it on; it may refuse by throwing `Refused`, or act after `next`
- * returns (as history does, journalling only what was applied). It may not
- * change the facts: a stage that wants a different change refuses and says
- * what would pass.
+ * to pass it on. A check refuses by throwing `Refused` before calling
+ * `next` (the schema pack). A record acts after `next` returns, so it only
+ * sees what was applied (the history pack). No stage changes the facts: a
+ * stage that wants a different change refuses and says what would pass.
  */
 export type Stage = (change: Proposed, next: (change: Proposed) => Promise<Committed>) => Promise<Committed>;
 
 /**
- * Where a stage runs. The order is fixed by the spec; within one phase,
- * stages run in the order of `rank` (low first), then pack id.
- * - `check`: may refuse. The schema pack is here.
- * - `record`: sees what was applied. The history pack is here.
+ * `graph.stage`. Stages chain in config-tree order of their packs
+ * (`byPosition` in common.ts): the first is outermost, the store is last.
  */
-export type Phase = "check" | "record";
-
-export interface StageDef {
-  pack: PackId;
-  phase: Phase;
-  rank?: number;
-  run: Stage;
-}
-
-/** `graph.stage`. */
 export interface GraphStage {
-  /** Adds a stage to the chain. */
-  stage(def: StageDef): Dispose;
+  /** Adds a stage, as the calling pack's. */
+  stage(run: Stage): Dispose;
 }
 
 /** `graph.commit`: the chain's entry. Only the action pack should be given it. */
 export interface GraphCommit {
-  /** Sends a change set down the chain to the store. */
+  /**
+   * Sends a change set down the chain to the store. The action pack fills
+   * the header from contexts, not from what callers say: `actor` and `run`
+   * from the invoking context, `pack` from the context that registered the
+   * outermost action.
+   */
   commit(change: Proposed): Promise<Committed>;
 }
 

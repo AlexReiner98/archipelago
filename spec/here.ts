@@ -12,9 +12,8 @@ import type { Actor, Capability, Dispose, Json, PackId } from "./common.ts";
 export type Scope = "page" | "person";
 
 export interface KeyDef {
-  /** Dotted, starting with the declaring pack's id, or one of the spec's keys. */
+  /** Dotted, starting with the declaring pack's id; the provider refuses a key outside it. */
   key: string;
-  pack: PackId;
   scope: Scope;
   value?: JsonSchema;
   doc?: string;
@@ -35,12 +34,13 @@ export const KEYS = {
 export interface Change {
   key: string;
   value: Json | undefined;
-  by: Actor | { pack: PackId };
+  /** Who set it: the pack, and the actor if its context carries one. */
+  by: { pack: PackId; actor?: Actor };
 }
 
 /** `here.declare`. */
 export interface HereDeclare {
-  /** Declares a key beyond the spec's. A taken key is refused. */
+  /** Declares a key beyond the spec's, as the calling pack's. A taken key is refused. */
   declare(def: KeyDef): Dispose;
 }
 
@@ -54,7 +54,7 @@ export interface HereRead {
 /** `here.set`. */
 export interface HereSet {
   /** Sets or (with `undefined`) clears a key. Not an action: see here.md. */
-  set(key: string, value: Json | undefined, by: Change["by"]): void;
+  set(key: string, value: Json | undefined): void;
 }
 
 export interface Capabilities {

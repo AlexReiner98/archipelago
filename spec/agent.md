@@ -60,6 +60,10 @@ nothing.
 
 ## A run
 
+The adapter makes one child context per run, intercepted with the agent as
+actor and the run's id, and calls `agent.run` from it. Every call in that
+context belongs to the run without saying so.
+
 ```
 begin(run) → reach({places: ["session_start"]}) → …
   reach({places: ["tool:Edit", "file:spec/agent.ts"], input}) → Answer
@@ -68,7 +72,7 @@ begin(run) → reach({places: ["session_start"]}) → …
 ```
 
 At `reach`, every node listening at any of the places is asked. The answer
-lists what was said in a stable order (pack id, then node id) and the first
+lists what was said in the config-tree order of the nodes' packs, and the first
 refusal, if any. The adapter hands the words to the agent and, on a
 refusal, stops the step and gives the agent the refusal's words.
 

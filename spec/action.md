@@ -42,14 +42,15 @@ ctx["action.register"].register({
 ## Calling one
 
 ```ts
-actions.invoke({ action, input, actor, authority, reason, run? })
+ctx["action.invoke"].invoke({ action, input, authority, reason })
   → { ok: true, output, change? } | { ok: false, refused }
 ```
 
 - Everything an action writes with `ctx.write`, including through actions
   it `call`s, becomes **one** change set, applied when the outermost action
-  returns, all or nothing. Its header names the actor, authority, reason,
-  the outermost action and the pack that provides it.
+  returns, all or nothing. Its header names the actor and run (from the
+  calling context), the authority and reason (from the call), the
+  outermost action, and the pack that registered it (from its context).
 - The set goes down the graph's write chain (schema, history, store). A
   refusal anywhere comes back as `{ ok: false, refused }`, saying what
   would pass.
@@ -65,7 +66,11 @@ change set with `undoes` set. See [changeset](changeset.md).
 
 ## Who is calling
 
-`actor` and `authority` are what the caller says. Without a sandbox, the
-service can't prove them; the adapter that brings a person or agent in
-(sign-in, the Claude Code adapter) is where they're set, and the record is
-what makes misuse visible.
+A caller never says who it is. The action pack reads it from the calling
+context (`Caller` in common.ts): the pack is the context's own, and the
+actor and run are metadata that interception set where the person or
+agent came in. Sign-in intercepts a person's page with them as actor; the
+Claude Code adapter makes one child context per run with the agent and the
+run. A pack can't pass itself off as another or put words in a person's
+mouth through the call. Only the authority and the reason vary call by
+call, so only they are said.

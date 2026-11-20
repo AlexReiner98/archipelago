@@ -24,6 +24,50 @@ export interface PackRef {
   version: string;
 }
 
+/**
+ * What a provider knows about whoever called it, read from the calling
+ * context, never passed as an argument (see "What the spec asks of the
+ * runtime" in spec/README.md). Callers can't claim to be someone else.
+ */
+export interface Caller {
+  /** The pack whose context made the call. */
+  pack: PackId;
+  /**
+   * Who is acting through that context, set by interception (Cordis
+   * `ctx.intercept`) where a person or agent comes in: sign-in for a
+   * person's page, the harness adapter for a run. Absent: the pack itself.
+   */
+  actor?: Actor;
+  /** The run the call belongs to, set the same way. */
+  run?: string;
+  /**
+   * The calling pack's place in the config tree, as the path of entry
+   * indices from the root. Contributions are ordered by it: see Order.
+   */
+  position: number[];
+}
+
+/**
+ * The metadata keys interception sets on a context, so every provider
+ * reads who is acting the same way.
+ */
+export const META = { actor: "actor", run: "run" } as const;
+
+/**
+ * How every broker orders what packs contribute (stages, nodes, fills):
+ * by the contributing pack's `position` in the config tree, depth first,
+ * then by the order the pack registered them in. No ranks or priorities:
+ * to change an order, move the entry in the config tree.
+ */
+export function byPosition(a: Caller, b: Caller): number {
+  const n = Math.min(a.position.length, b.position.length);
+  for (let i = 0; i < n; i++) {
+    const d = a.position[i]! - b.position[i]!;
+    if (d !== 0) return d;
+  }
+  return a.position.length - b.position.length;
+}
+
 /** An ISO 8601 time in UTC, `2026-11-20T13:02:37.297Z`. */
 export type Time = string;
 

@@ -42,23 +42,26 @@ what makes the harness view live.
 ## The write chain
 
 ```
-action ──▶ check stages ──▶ record stages ──▶ store
-           (schema, …)      (history, …)
+action ──▶ stage ──▶ stage ──▶ … ──▶ store
+           (in config-tree order of their packs)
 ```
 
-A change enters through the action service and nowhere else, and every
-stage is an interceptor: `(change, next) => Promise<Committed>`.
+A change enters through the action pack and nowhere else. Every stage is
+the same shape, `(change, next) => Promise<Committed>`, and what it does
+depends on which side of `next` it works:
 
-- **check** stages may refuse by throwing `Refused`. The schema pack lives
-  here. Refusing is a rule saying no, not a person being asked: there are
-  no holds.
-- **record** stages wrap the store. History calls `next` and journals the
-  committed set it gets back, so it never records a change that failed.
+- **Before `next`**, a stage checks and may refuse by throwing `Refused`.
+  The schema pack works here. Refusing is a rule saying no, not a person
+  being asked: there are no holds.
+- **After `next`**, a stage sees what was applied. History calls `next`
+  and journals the committed set it gets back, so it never records a
+  change that failed, wherever it sits in the chain.
 - No stage rewrites facts. If a stage wants a different change, it refuses
   and says what would pass, and the caller sends that.
-- Within a phase, stages run by `rank`, then pack id, so the same packs
-  always chain the same way.
-- A stage is added with `stage(def)` and goes when its pack unloads.
+- Stages chain in the config-tree order of their packs, the first
+  outermost. There are no ranks: to reorder, move the entry.
+- A stage is added with `stage(fn)` as the calling pack's, and goes when
+  the pack unloads.
 
 The store applies the set atomically: all facts or none. A retraction whose
 value isn't the field's current value fails the whole set with

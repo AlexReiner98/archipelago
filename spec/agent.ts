@@ -57,9 +57,8 @@ export type Utterance = { say: string } | { refuse: string; code?: string };
  * that reads the map has its pack inject `graph.read`; it is handed nothing.
  */
 export interface NodeDef {
-  /** `pack/name`, stable across reloads, so a run's record keeps pointing at it. */
-  id: string;
-  pack: PackId;
+  /** Unique within the pack, stable across reloads. */
+  name: string;
   kind: string;
   title: string;
   /** The places it listens at. */
@@ -70,10 +69,21 @@ export interface NodeDef {
 }
 
 /** A node without its code. The harness view's tree is these. */
-export type NodeInfo = Omit<NodeDef, "speak">;
+export interface NodeInfo extends Omit<NodeDef, "speak"> {
+  /** `pack/name`: what exchange events and verdicts point at. */
+  id: string;
+  /** The pack that registered it, from its context. */
+  pack: PackId;
+}
 
+/**
+ * The adapter calls `agent.run` from a context intercepted for the run
+ * (`META.actor` the agent, `META.run` the run id), one child context per
+ * run, so every call in it is the run's without saying so.
+ */
 export interface RunStart {
   run: RunId;
+  /** The agent, as its context says. */
   agent: Actor;
   /** Which harness: `claude-code`. */
   harness: string;
@@ -94,7 +104,10 @@ export interface RunInfo extends RunStart {
 
 /** What the map says back at a moment. */
 export interface Answer {
-  /** Everything said, in node order, for the adapter to hand to the agent. */
+  /**
+   * Everything said, for the adapter to hand to the agent, in config-tree
+   * order of the nodes' packs, then the order each pack registered them.
+   */
   said: { node: string; text: string }[];
   /** The first refusal from a node, if any; the adapter stops the step. */
   refused?: { node: string; text: string; code?: string };
@@ -114,7 +127,7 @@ export interface Act {
   ok?: boolean;
 }
 
-/** `agent.node`: add a node. */
+/** `agent.node`: add a node, as the calling pack's. */
 export interface AgentNode {
   node(def: NodeDef): Dispose;
 }
