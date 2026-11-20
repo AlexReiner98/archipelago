@@ -5,7 +5,9 @@
  * 20 Nov 2026): the ones an adapter can both reach and speak at. Edition 2
  * adds `skill:` and `memory:` (Alex, 20 Nov 2026), where the map speaks
  * through the files it writes. Edition 3 (Alex, 20 Nov 2026) adds `compact`
- * and the person's acts, `decision` and `notice`.
+ * and the person's acts, `decision` and `notice`. Edition 4 (Alex, 20 Nov
+ * 2026) adds a node's `repeat` and a moment's `again`: the same words are
+ * said once per context.
  */
 import type { Actor, Capability, Dispose, Id, Json, PackId, Term, Time } from "./common.ts";
 
@@ -68,6 +70,8 @@ export interface Moment {
   time: Time;
   /** What is happening there: the prompt's text, the tool's input, the reply. */
   input?: Json;
+  /** Edition 4: the agent asked to hear the place: say even what this context already heard. */
+  again?: boolean;
 }
 
 /** What a node answers at a moment. Nothing: it stays quiet. */
@@ -86,6 +90,13 @@ export interface NodeDef {
   at: Place[];
   /** The map item it was made from, when it was made from one. */
   source?: Id;
+  /**
+   * Edition 4. `once` (the default): the same words from this node are said
+   * once per context, and again only after a `compact` or when the moment
+   * asks `again`. `every`: said every time its place is reached. A refusal is
+   * never held back.
+   */
+  repeat?: "once" | "every";
   speak(moment: Moment, run: RunInfo): Utterance | null | Promise<Utterance | null>;
 }
 

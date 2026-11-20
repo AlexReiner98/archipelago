@@ -80,6 +80,18 @@ reachable from the run's adapter (`RunStart.reaches`). A node that reads the
 map has its pack inject `graph.read`; `speak` is handed nothing but the
 moment and the run.
 
+## Said once per context
+
+Edition 4 (Alex, 20 Nov 2026). Words already in the agent's context add
+nothing said again, and cost the same each time. So by default a node's
+**same words** are said once per context: the agent pack holds back a say
+whose node and text it already said in the run since the last `compact`.
+After a compaction they are said again, marked re-said. A node whose words
+must be fresh every time sets `repeat: "every"`. A refusal is never held
+back, and words that differ (a node that tells what changed) are new words.
+A moment with `again: true` (the agent asked to hear the place) says
+everything, heard or not.
+
 ## Nodes
 
 A node is anything said at a place: an instruction, a reflex, a rule, a

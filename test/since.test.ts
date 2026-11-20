@@ -10,6 +10,7 @@ import exchange from "../packs/exchange/index.ts";
 import graph from "../packs/graph/index.ts";
 import words from "../packs/words/index.ts";
 import since, { tell } from "../packs/since/index.ts";
+import { askText } from "../packs/grow/index.ts";
 
 const BASE = "mem:/packs/";
 const probe: Pack = { id: "probe", inject: ["agent.run", "agent.tree", "action.invoke"], apply() {} };
@@ -30,7 +31,7 @@ async function setup() {
     as(actor, run).get<ActionInvoke>("action.invoke").invoke({ action: "words.add", input: { title, at: ["tool:Nothing"], words: title }, authority: { of: "human", basis: "test" }, reason: `add ${title}` });
   const agentRun = () => as(AGENT, "r1").get<AgentRun>("agent.run");
   const prompt = async () => (await agentRun().reach({ run: "r1", places: ["prompt"], time: new Date().toISOString(), input: "go on" })).said.map((s) => s.text);
-  return { loader, errors, add, agentRun, prompt, tree: () => as(AGENT).get<AgentTree>("agent.tree") };
+  return { loader, errors, add, agentRun, prompt, as, tree: () => as(AGENT).get<AgentTree>("agent.tree") };
 }
 
 test("at a prompt, the run hears what a person changed on the map since it last heard, and only that", async () => {
@@ -55,6 +56,37 @@ test("at a prompt, the run hears what a person changed on the map since it last 
   } finally {
     await s.loader.apply([]);
   }
+});
+
+test("its wording is a node item on the map, said by this node only, and words.set rewords it", async () => {
+  const s = await setup();
+  try {
+    const heard = s.tree().nodes().filter((n) => n.title === "Since you last heard");
+    assert.equal(heard.length, 1, "the words pack doesn't say the voice item itself");
+    assert.equal(heard[0]!.id, "since/heard");
+    assert.ok(heard[0]!.source, "the node points at its wording on the map");
+    await s.agentRun().begin({ run: "r1", agent: AGENT, harness: "test", reaches: ["prompt"] });
+    await new Promise((r) => setTimeout(r, 5));
+    await s.add(ALEX, "A change");
+    const reword = await s.as(ALEX).get<ActionInvoke>("action.invoke").invoke({
+      action: "words.set",
+      input: { node: heard[0]!.source!, words: "While you were away:\n{changes}" },
+      authority: { of: "human", basis: "test" },
+      reason: "reword",
+    });
+    assert.ok(reword.ok);
+    const said = await s.prompt();
+    assert.match(said[0]!, /^While you were away:\n- added a node "A change"/);
+    assert.deepEqual(s.errors, []);
+  } finally {
+    await s.loader.apply([]);
+  }
+});
+
+test("grow's question fills its wording, and keeps the seqs on its first line whatever the wording", () => {
+  const misses = [{ seq: 4, places: ["tool:Bash"], words: "boom", text: "boom" }];
+  assert.match(askText(misses), /^Before you finish: a miss in this run that nothing on the map covers \(#4\)\./);
+  assert.equal(askText(misses, "Fix {list} please"), "(#4) Fix - #4 at tool:Bash: boom please");
 });
 
 test("what it tells is brief: the last few, and how many came before", () => {

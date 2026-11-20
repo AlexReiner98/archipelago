@@ -73,8 +73,9 @@ const agent: Pack = {
     const treeWatchers = new Set<() => void>();
     const runs = new Map<RunId, RunInfo>();
     /**
-     * Per run, the nodes said since its last `compact`, and those said
-     * before it: a node of the second set said again is a re-saying.
+     * Per run, what was said since its last `compact` (a node and its words),
+     * and what was said before it. The same words again in one context are
+     * held back (edition 4); said again after a compact, they are re-said.
      */
     const sayings = new Map<RunId, { now: Set<string>; before: Set<string> }>();
     let seq = 0;
@@ -176,9 +177,12 @@ const agent: Pack = {
           const u = reply.value as Utterance | null | undefined;
           if (!u) continue;
           if ("say" in u) {
+            // The same words from the same node, once per context (edition 4).
+            const key = `${r.info.id}\n${u.say}`;
+            if (said.now.has(key) && !moment.again && r.def.repeat !== "every") continue;
             answer.said.push({ node: r.info.id, text: u.say });
-            const resaid = said.before.has(r.info.id) && !said.now.has(r.info.id);
-            said.now.add(r.info.id);
+            const resaid = said.before.has(key) && !said.now.has(key);
+            said.now.add(key);
             await record({ ...base, direction: "to_agent", kind: "say", text: u.say, ...(resaid ? { detail: { resaid: true } } : {}) });
           } else if (refusable(place)) {
             if (!answer.refused) answer.refused = { node: r.info.id, text: u.refuse, ...(u.code ? { code: u.code } : {}) };

@@ -20,11 +20,11 @@
  *
  * Injects exchange.read, agent.tree, agent.node, action.register and graph.read.
  */
-import type { ActionContext, ActionRegister } from "../../spec/action.ts";
+import type { ActionContext, ActionInvoke, ActionList, ActionRegister } from "../../spec/action.ts";
 import type { AgentNode, AgentTree, NodeInfo, RunId } from "../../spec/agent.ts";
 import { PLACES } from "../../spec/agent.ts";
 import type { Fact } from "../../spec/changeset.ts";
-import type { Json } from "../../spec/common.ts";
+import type { Id, Json } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead } from "../../spec/exchange.ts";
 import type { GraphRead } from "../../spec/graph.ts";
@@ -53,17 +53,32 @@ export interface TrialInput {
   run?: RunId;
 }
 
-/** The question, with the seqs it asks about on its first line. */
-export function askText(misses: Miss[]): string {
-  const seqs = misses.map((m) => `#${m.seq}`).join(", ");
+/**
+ * The question's wording, the first time: a node item on the map (its
+ * `voice` is grow/ask), so `words.set` rewords it. The code fills in
+ * {count} ("a miss", "3 misses"), {seqs} ("#4, #9": every ask must name
+ * them, as the next ask reads them back), {each} ("it", "each") and {list}
+ * (a line per miss).
+ */
+export const ASK_WORDS = [
+  "Before you finish: {count} in this run that nothing on the map covers ({seqs}). Write a trial node for {each}, so the next run hears it where it happened.",
+  "{list}",
+  `Write it with the archipelago MCP tool \`act\`: action "${TRIAL}", input { "seq": the miss's number, "place": one of its places exactly as listed, the narrowest that would have prevented it (its file: place when it has one; a tool: place is said before every call of that tool), "misses": the words of the miss it should prevent (at a tool: place, they decide which misses it covers, so use the miss's own words), "words": what to say there next time, leading with what fixed it }. If the miss teaches nothing (a typo, a one-off), say so in one line instead. If you have no such tool, say so in one line and finish.`,
+].join("\n");
+
+const fill = (template: string, vars: Record<string, string>) => template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? vars[k]! : m));
+
+/** The question about these misses, in the wording given (default ASK_WORDS). */
+export function askText(misses: Miss[], words = ASK_WORDS): string {
   const one = misses.length === 1;
-  const lines = [
-    `Before you finish: ${one ? "a miss" : `${misses.length} misses`} in this run that nothing on the map covers (${seqs}). Write a trial node for ${one ? "it" : "each"}, so the next run hears it where it happened.`,
+  const list = [
     ...misses.slice(0, LISTED).map((m) => `- #${m.seq} at ${m.places.join(", ")}: ${m.words}${m.doing ? ` (doing: ${m.doing})` : ""}`),
     ...(misses.length > LISTED ? [`- and ${misses.length - LISTED} more; write for the ones worth it.`] : []),
-    `Write it with the archipelago MCP tool \`act\`: action "${TRIAL}", input { "seq": the miss's number, "place": one of its places exactly as listed, the narrowest that would have prevented it (its file: place when it has one; a tool: place is said before every call of that tool), "misses": the words of the miss it should prevent (at a tool: place, they decide which misses it covers, so use the miss's own words), "words": what to say there next time, leading with what fixed it }. If the miss teaches nothing (a typo, a one-off), say so in one line instead. If you have no such tool, say so in one line and finish.`,
-  ];
-  return lines.join("\n");
+  ].join("\n");
+  const seqs = misses.map((m) => `#${m.seq}`).join(", ");
+  const text = fill(words, { count: one ? "a miss" : `${misses.length} misses`, seqs, each: one ? "it" : "each", list });
+  // The next ask reads the seqs back from its first line: a wording that doesn't put them there still does.
+  return words.split("\n")[0]!.includes("{seqs}") ? text : `(${seqs}) ${text}`;
 }
 
 async function eventsOf(read: ExchangeRead, run: RunId): Promise<ExchangeEvent[]> {
@@ -102,23 +117,40 @@ const refuse = (code: string, message: string) => new Refused({ code, message, b
 
 const grow: Pack = {
   id: "grow",
-  inject: ["exchange.read", "agent.tree", "agent.node", "action.register", "graph.read"],
-  apply(ctx: Context) {
+  inject: ["exchange.read", "agent.tree", "agent.node", "action.register", "action.list", "action.invoke", "graph.read"],
+  async apply(ctx: Context) {
     const read = ctx.get<ExchangeRead>("exchange.read");
     const tree = ctx.get<AgentTree>("agent.tree");
     const graph = ctx.get<GraphRead>("graph.read");
+    const TITLE = "A miss nothing covers asks for a trial node";
+
+    // Its wording is on the map, when a pack declares words.voice; else the default here.
+    let source: Id | undefined;
+    if (ctx.get<ActionList>("action.list").list().some((a) => a.name === "words.voice")) {
+      const out = await ctx.get<ActionInvoke>("action.invoke").invoke<{ node: Id }>({
+        action: "words.voice",
+        input: { voice: ASKER, title: TITLE, kind: "reflex", at: ["reply_end"], words: ASK_WORDS },
+        authority: { of: "agent", basis: "the grow pack's question, worded on the map" },
+        reason: "Put the grow question's wording on the map",
+      });
+      if (out.ok) source = out.output.node;
+    }
 
     ctx.get<AgentNode>("agent.node").node({
       name: "ask",
       kind: "reflex",
-      title: "A miss nothing covers asks for a trial node",
+      title: TITLE,
       at: ["reply_end"],
+      ...(source ? { source } : {}),
       async speak(moment, run) {
         const events = await eventsOf(read, moment.run);
         const asked = askedIn(events, ASKER);
         const nodes = await withMisses(graph, tree.nodes());
         const open = missesOf(events, run.cwd ?? cwdOf(events)).filter((m) => !asked.has(m.seq) && !covered(m, nodes, ASKER));
-        return open.length ? { refuse: askText(open), code: ASK } : null;
+        if (!open.length) return null;
+        const [item] = source ? await graph.get([source]) : [null];
+        const words = item && item.fields.status !== "retired" && typeof item.fields.words === "string" && item.fields.words.trim() ? item.fields.words : ASK_WORDS;
+        return { refuse: askText(open, words), code: ASK };
       },
     });
 

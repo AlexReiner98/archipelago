@@ -28,3 +28,8 @@ code `ask` and the act it denies (the held-back reply), so a `reply_end`
 node isn't judged failed by a question.
 
 Not here yet: promoting or retiring a trial by its record.
+
+The question's wording is on the map: a `node` item whose `voice` is
+`grow/ask`, made through `words.voice` the first time. The code fills in
+`{count}`, `{seqs}`, `{each}` and `{list}`; `words.set` rewords the rest. The
+seqs always land on the first line, where the next ask reads them back.

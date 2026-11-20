@@ -7,7 +7,9 @@
  * An item `node` has: `title`, `kind` (instruction, reflex, rule, …), `at`
  * (a list of places), `words`, and `refuse` (true: the words are a
  * refusal), `when` (said only when the moment's input holds that text: a
- * reflex's condition), and `status`: absent for a kept node, `trial` for one on trial
+ * reflex's condition), `repeat` (`every`: said each time, not once per
+ * context), `voice` (the wording of a code-made node, which says it: this
+ * pack registers nothing for it; `words.voice` makes it), and `status`: absent for a kept node, `trial` for one on trial
  * (its words are said marked as a trial), `retired` for one no longer said.
  * `held` (a reason): held as written, so `words.set` and `words.retire`
  * refuse, saying why (the written pack's rule, packs/written).
@@ -61,7 +63,12 @@ export function holds(when: Json | undefined, input: Json | undefined): boolean 
   return (typeof input === "string" ? input : JSON.stringify(input)).includes(when);
 }
 
-const shape = (i: Item) => JSON.stringify([i.fields.title, i.fields.kind, i.fields.at, i.fields.status === "retired"]);
+const shape = (i: Item) => JSON.stringify([i.fields.title, i.fields.kind, i.fields.at, i.fields.status === "retired", i.fields.repeat]);
+
+/** A template's `{name}` filled from `vars`; a name it isn't given stays as it is. */
+export function fill(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? vars[k]! : m));
+}
 
 const words: Pack<WordsConfig> = {
   id: "words",
@@ -80,6 +87,8 @@ const words: Pack<WordsConfig> = {
         registered.delete(id);
       }
       if (!item || item.type !== TYPE || item.fields.status === "retired") return;
+      // A voice item is the wording of a code-made node (words.voice): that node says it, not this pack.
+      if (typeof item.fields.voice === "string" && item.fields.voice) return;
       const at = Array.isArray(item.fields.at) ? (item.fields.at as string[]) : [];
       const dispose = agent.node({
         name: id,
@@ -87,6 +96,7 @@ const words: Pack<WordsConfig> = {
         title: String(item.fields.title ?? id),
         at,
         source: id,
+        ...(item.fields.repeat === "every" ? { repeat: "every" as const } : {}),
         async speak(moment) {
           const [now] = await graph.get([id]);
           const text = typeof now?.fields.words === "string" ? now.fields.words.trim() : "";
@@ -141,6 +151,40 @@ const words: Pack<WordsConfig> = {
         facts.push(["+", input.node, "status", "retired"]);
         call.write(facts);
         return { node: input.node };
+      },
+    });
+
+    register.register({
+      name: "words.voice",
+      title: "The map item a code-made node takes its wording from",
+      doc: "A node whose code decides what to say about (grow/ask, since/heard) takes its wording from a node item with voice: its id. Made the first time with the given words, found after that, so words.set rewords it.",
+      input: {
+        type: "object",
+        properties: {
+          voice: { type: "string", description: "The node's id: pack/name." },
+          title: { type: "string" },
+          kind: { type: "string" },
+          at: { type: "array", items: { type: "string" } },
+          words: { type: "string", description: "The first wording; {name} marks what the code fills in." },
+        },
+        required: ["voice", "title", "at", "words"],
+      },
+      async run(input: NodeSeed & { voice: string }, call: ActionContext) {
+        for (let p = await graph.of(TYPE, { limit: LIMIT_MAX }); ; p = await graph.of(TYPE, { limit: LIMIT_MAX, after: p.next })) {
+          const had = p.items.find((i) => i.fields.voice === input.voice && i.fields.status !== "retired");
+          if (had) return { node: had.id };
+          if (!p.next) break;
+        }
+        const id = `n_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+        call.write([
+          ["+", id, "type", TYPE],
+          ["+", id, "title", input.title],
+          ["+", id, "kind", input.kind ?? "reflex"],
+          ["+", id, "at", input.at as Json],
+          ["+", id, "words", input.words],
+          ["+", id, "voice", input.voice],
+        ]);
+        return { node: id };
       },
     });
 

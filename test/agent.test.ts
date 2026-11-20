@@ -21,6 +21,7 @@ interface NodeSpec {
   say?: string;
   refuse?: string;
   throws?: string;
+  repeat?: "once" | "every";
 }
 
 /** A pack that registers the nodes it is configured with. */
@@ -35,6 +36,7 @@ const nodes: Pack<{ nodes: NodeSpec[] }> = {
         kind: n.kind,
         title: n.name,
         at: n.at,
+        ...(n.repeat ? { repeat: n.repeat } : {}),
         speak: () => {
           if (n.throws) throw new Error(n.throws);
           return n.say ? { say: n.say } : n.refuse ? { refuse: n.refuse } : null;
@@ -156,9 +158,32 @@ test("after a compact, a node said again is a re-saying; the first saying and a 
   assert.deepEqual(says.map((e) => [e.node, (e.detail as { resaid?: boolean } | undefined)?.resaid ?? false]), [
     ["nodes/brief", false],
     ["nodes/brief", true],
-    ["nodes/brief", false],
     ["nodes/bash", false],
   ]);
+  assert.deepEqual(errors, []);
+});
+
+test("a node's same words are said once per context, unless it repeats every time or the moment asks again; refusals always", async () => {
+  const { loader, errors, as } = setup();
+  await loader.apply(
+    tree({
+      id: "a",
+      nodes: [
+        say("once", ["tool:Bash"], "Prefer Read."),
+        { ...say("every", ["tool:Bash"], "Careful."), repeat: "every" },
+        refuse("no", ["tool:Bash"], "Not that."),
+      ],
+    }),
+  );
+  const { run } = as();
+  await run.begin(start);
+  const first = await run.reach(moment(["tool:Bash"]));
+  const second = await run.reach(moment(["tool:Bash"]));
+  const asked = await run.reach({ ...moment(["tool:Bash"]), again: true });
+  assert.deepEqual(first.said.map((s) => s.node), ["nodes/once", "nodes/every"]);
+  assert.deepEqual(second.said.map((s) => s.node), ["nodes/every"]);
+  assert.deepEqual(asked.said.map((s) => s.node), ["nodes/once", "nodes/every"]);
+  assert.ok(first.refused && second.refused && asked.refused, "a refusal is never held back");
   assert.deepEqual(errors, []);
 });
 

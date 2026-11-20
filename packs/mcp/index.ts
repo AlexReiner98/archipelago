@@ -364,7 +364,8 @@ const mcp: Pack<McpConfig> = {
           const place = args.place;
           if (typeof place !== "string" || !knownPlace(place)) return no(`Not a place: ${String(place)}. Use file:<path>, tool:<name>, or another place of the agent spec.`);
           if (!run) return no(NO_RUN);
-          const answer = await run.agent.reach({ run: run.run, places: [place], time: new Date().toISOString() });
+          // The agent asked: say everything there, heard in this context or not.
+          const answer = await run.agent.reach({ run: run.run, places: [place], time: new Date().toISOString(), again: true });
           const said = answer.said.map((s) => s.text).join("\n\n");
           if (answer.refused) return no(said ? `${answer.refused.text}\n\n${said}` : answer.refused.text);
           return { text: said || "Nothing is said here." };

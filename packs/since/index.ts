@@ -10,6 +10,7 @@
  * (they are read back from `graph.since` when the pack loads). When the pack
  * hasn't seen the run hear yet (a restart), it counts from the run's start.
  */
+import type { ActionInvoke, ActionList } from "../../spec/action.ts";
 import type { AgentNode, RunId } from "../../spec/agent.ts";
 import type { Committed } from "../../spec/changeset.ts";
 import type { Id, Json, Time } from "../../spec/common.ts";
@@ -44,8 +45,17 @@ const short = (s: string, n = 80) => {
   return one.length > n ? `${one.slice(0, n - 1)}…` : one;
 };
 
-/** The lines that tell what the people's change sets did, given the titles of what they touched. */
-export function tell(sets: Committed[], titles: Map<Id, string>, max: number): string {
+/**
+ * The wording the first time: a node item on the map (its `voice` is
+ * since/heard), so `words.set` rewords it. The code fills in {changes}, a
+ * line per change set.
+ */
+export const HEARD_WORDS = "Since you last heard, a person changed the map:\n{changes}";
+
+const fill = (template: string, vars: Record<string, string>) => template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? vars[k]! : m));
+
+/** The lines that tell what the people's change sets did, given the titles of what they touched, in the wording given. */
+export function tell(sets: Committed[], titles: Map<Id, string>, max: number, words = HEARD_WORDS): string {
   const lines = sets.slice(-max).map((c) => {
     const named = [...new Set(c.facts.map((f) => f[1]))].map((id) => titles.get(id)).filter((t): t is string => !!t);
     const what = named.length ? named.slice(0, 3).map((t) => `"${short(t, 60)}"`).join(", ") + (named.length > 3 ? ` and ${named.length - 3} more` : "") : "the map";
@@ -53,14 +63,26 @@ export function tell(sets: Committed[], titles: Map<Id, string>, max: number): s
     return `- ${verbOf(c.header.action)} ${what}${why}`;
   });
   const more = sets.length > max ? `\n(and ${sets.length - max} earlier)` : "";
-  return `Since you last heard, a person changed the map:\n${lines.join("\n")}${more}`;
+  return fill(words, { changes: `${lines.join("\n")}${more}` });
 }
 
 const since: Pack<SinceConfig> = {
   id: "since",
-  inject: ["graph.read", "graph.watch", "agent.node"],
+  inject: ["graph.read", "graph.watch", "agent.node", "action.list", "action.invoke"],
   async apply(ctx: Context, config: SinceConfig = {}) {
     const graph = ctx.get<GraphRead>("graph.read");
+    const TITLE = "Since you last heard";
+    // Its wording is on the map, when a pack declares words.voice; else the default here.
+    let source: Id | undefined;
+    if (ctx.get<ActionList>("action.list").list().some((a) => a.name === "words.voice")) {
+      const out = await ctx.get<ActionInvoke>("action.invoke").invoke<{ node: Id }>({
+        action: "words.voice",
+        input: { voice: "since/heard", title: TITLE, kind: "reflex", at: ["prompt"], words: HEARD_WORDS },
+        authority: { of: "agent", basis: "the since pack's wording, on the map" },
+        reason: "Put the since-you-last-heard wording on the map",
+      });
+      if (out.ok) source = out.output.node;
+    }
     const keep = config.keep ?? 200;
     const max = config.lines ?? 8;
     const sets: Committed[] = [];
@@ -82,8 +104,9 @@ const since: Pack<SinceConfig> = {
     ctx.get<AgentNode>("agent.node").node({
       name: "heard",
       kind: "reflex",
-      title: "Since you last heard",
+      title: TITLE,
       at: ["prompt"],
+      ...(source ? { source } : {}),
       async speak(moment, run) {
         const from = heard.get(run.run) ?? run.started;
         heard.set(run.run, moment.time);
@@ -96,7 +119,9 @@ const since: Pack<SinceConfig> = {
           const t = it?.fields.title as Json | undefined;
           if (it && typeof t === "string") titles.set(it.id, t);
         });
-        return { say: tell(news, titles, max) };
+        const [voice] = source ? await graph.get([source]) : [null];
+        const words = voice && voice.fields.status !== "retired" && typeof voice.fields.words === "string" && voice.fields.words.trim() ? voice.fields.words : HEARD_WORDS;
+        return { say: tell(news, titles, max, words) };
       },
     });
   },

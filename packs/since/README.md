@@ -20,3 +20,7 @@ start.
 
 The node is a reflex like any other: the harness view shows it, and the
 verdicts judge it.
+
+Its wording is on the map: a `node` item whose `voice` is `since/heard`,
+made through `words.voice` the first time (the words pack says nothing for
+it). `{changes}` marks where the lines go; `words.set` rewords the rest.

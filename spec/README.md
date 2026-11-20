@@ -23,7 +23,8 @@ Decided with Alex: panels are Preact, the graph is one WebGL2 scene
 surface, and the spec owns the six places of edition 1 and edition 2's
 `skill:` and `memory:`, where the map speaks through the files it writes.
 Edition 3 adds the place `compact` and the person's acts, `decision` and
-`notice` ([agent](agent.md)).
+`notice` ([agent](agent.md)). Edition 4 says a node's same words once per
+context (`repeat`, `again`).
 
 ## Packs ask for capabilities
 
