@@ -2,6 +2,7 @@
  * The app, server side: `npm run serve`. One process runs
  * - the dev server for the page (runtime/serve.ts, port 5180), and
  * - a Node runtime with the server's packs, hot-reloaded: graph, action,
+ *   types and the bases (work, question, record, actor, links, items),
  *   exchange, agent, verdict, words, loaded, written, grow, the Claude Code adapter (5181) and
  *   the bridge (5182) the page reaches them through.
  *
@@ -81,6 +82,14 @@ export const SEED = [
 const tree: Entry[] = [
   { id: "graph", pack: "packs/graph/index.ts", config: { db: join(values.data, "graph.sqlite") } },
   { id: "action", pack: "packs/action/index.ts" },
+  { id: "types", pack: "packs/types/index.ts" },
+  { id: "work", pack: "packs/work/index.ts" },
+  { id: "question", pack: "packs/question/index.ts" },
+  { id: "record", pack: "packs/record/index.ts" },
+  { id: "actor", pack: "packs/actor/index.ts" },
+  { id: "links", pack: "packs/links/index.ts" },
+  { id: "items", pack: "packs/items/index.ts" },
+  { id: "schema", pack: "packs/schema/index.ts", config: { db: join(values.data, "schema.sqlite") } },
   { id: "history", pack: "packs/history/index.ts", config: { db: join(values.data, "history.sqlite") } },
   { id: "exchange", pack: "packs/exchange/index.ts", config: { journal: join(values.data, "exchange.jsonl") } },
   { id: "agent", pack: "packs/agent/index.ts" },

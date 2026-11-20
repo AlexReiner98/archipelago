@@ -10,6 +10,7 @@ import * as graph from "./graph.ts";
 import * as here from "./here.ts";
 import * as scene from "./scene.ts";
 import * as slot from "./slot.ts";
+import * as types from "./types.ts";
 
 export interface Capabilities
   extends action.Capabilities,
@@ -18,7 +19,8 @@ export interface Capabilities
     graph.Capabilities,
     here.Capabilities,
     scene.Capabilities,
-    slot.Capabilities {}
+    slot.Capabilities,
+    types.Capabilities {}
 
 export type CapabilityKey = keyof Capabilities;
 
@@ -30,4 +32,5 @@ export const capabilities: Capability[] = [
   ...slot.capabilities,
   ...scene.capabilities,
   ...here.capabilities,
+  ...types.capabilities,
 ];
