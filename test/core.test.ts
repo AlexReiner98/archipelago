@@ -207,3 +207,27 @@ test("unloading a parent unloads the packs it plugged in", async () => {
   assert.deepEqual([...world], []);
   assert.equal(rt.fibers.size, 0);
 });
+
+test("a provider leaves even when a consumer's teardown hangs; the hang is reported", async () => {
+  const rt = new Runtime();
+  rt.teardownLimit = 50;
+  const errors: string[] = [];
+  rt.onError = (f, e) => errors.push(`${f.pack.id}: ${(e as Error).message}`);
+  const provider = rt.root.plugin(listProvider());
+  const stuck = rt.root.plugin({
+    id: "stuck",
+    inject: ["demo.list"],
+    apply(ctx) {
+      ctx.effect(() => () => new Promise(() => {})); // an undo that never ends
+    },
+  });
+  await rt.settle();
+  assert.equal(stuck.state, "active");
+  const started = Date.now();
+  await provider.dispose();
+  assert.equal(provider.state, "inactive");
+  assert.ok(Date.now() - started < 1000, "removal did not wait forever");
+  await rt.settle();
+  assert.equal(stuck.state, "inactive", "the consumer is waiting again");
+  assert.ok(errors.some((e) => e.includes("an undo took over 50ms")));
+});

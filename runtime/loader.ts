@@ -40,8 +40,15 @@ export interface LoaderOptions {
 export interface EntryStatus {
   id: string;
   pack?: string;
-  state: State | "group" | "failed";
+  /**
+   * `off`: disabled in the tree. `waiting`: on, but a capability it injects
+   * isn't provided (see `missing`). `failed`: its import or apply threw.
+   * Otherwise its fiber's state.
+   */
+  state: State | "off" | "waiting" | "group";
   position: number[];
+  /** What a waiting entry waits for. */
+  missing?: string[];
   error?: string;
 }
 
@@ -221,13 +228,25 @@ export class Loader {
         }
         return a.path.length - b.path.length;
       })
-      .map((n) => {
+      .map((n): EntryStatus => {
         const error = n.error ?? n.fiber?.error;
+        const f = n.fiber;
+        const missing = f && f.state === "inactive" && !n.disabled ? f.missing() : [];
+        const state: EntryStatus["state"] = !n.url
+          ? "group"
+          : !f
+            ? "failed"
+            : n.disabled && f.state === "inactive"
+              ? "off"
+              : missing.length
+                ? "waiting"
+                : f.state;
         return {
           id: n.entry.id,
-          pack: n.fiber?.pack.id,
-          state: !n.url ? "group" : n.fiber ? n.fiber.state : "failed",
+          pack: f?.pack.id,
+          state,
           position: n.path,
+          ...(missing.length ? { missing } : {}),
           ...(error ? { error: String((error as Error).message ?? error) } : {}),
         };
       });

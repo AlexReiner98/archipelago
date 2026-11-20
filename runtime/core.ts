@@ -72,6 +72,21 @@ function isPromise(v: unknown): v is Promise<unknown> {
   return !!v && typeof (v as Promise<unknown>).then === "function";
 }
 
+/**
+ * Whether `p` settles within `ms`. A teardown that hangs must not hold up
+ * the rest: the runtime reports it and carries on.
+ */
+async function within(p: unknown, ms: number): Promise<boolean> {
+  if (!isPromise(p)) return true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<false>((ok) => (timer = setTimeout(() => ok(false), ms)));
+  try {
+    return await Promise.race([p.then(() => true as const), late]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Runs inverses last first, waiting for each that is async. */
 async function runAll(inverses: Undo[]): Promise<void> {
   for (let i = inverses.length - 1; i >= 0; i--) await inverses[i]!();
@@ -309,6 +324,11 @@ export class Fiber {
     return this.state === "loading" || this.state === "active" || this === this.runtime.rootFiber;
   }
 
+  /** The injected keys no active pack provides now: what it waits for. */
+  missing(): string[] {
+    return this.inject.filter((key) => !this.runtime.resolve(key, this));
+  }
+
   /** The keys whose binding this fiber installed. */
   provided(): string[] {
     return this.runtime.providedBy(this);
@@ -390,8 +410,17 @@ export class Fiber {
   private async unload(): Promise<void> {
     // L-Leave: it stopped providing when it became `unloading`. Its
     // dependents see that now and leave first, while its bindings stand.
+    // Removal is never refused, only ordered: a dependent whose teardown
+    // hangs past the runtime's limit is reported and left behind.
     const dependents = this.runtime.notify(this.provided()).filter((f) => f !== this);
-    await Promise.all(dependents.map((f) => f.settled()));
+    const limit = this.runtime.teardownLimit;
+    await Promise.all(
+      dependents.map(async (f) => {
+        if (!(await within(f.settled(), limit))) {
+          this.runtime.report(f, new Error(`${f.pack.id}: teardown took over ${limit}ms; ${this.pack.id} unloads without it`));
+        }
+      }),
+    );
     await this.flush();
     this.committed = null;
     if (this.target === null) {
@@ -410,7 +439,9 @@ export class Fiber {
     this.disposables.clear();
     for (let i = all.length - 1; i >= 0; i--) {
       try {
-        await all[i]!();
+        if (!(await within(all[i]!(), this.runtime.teardownLimit))) {
+          this.runtime.report(this, new Error(`${this.pack.id}: an undo took over ${this.runtime.teardownLimit}ms; skipped`));
+        }
       } catch (e) {
         this.runtime.report(this, e);
       }
@@ -456,6 +487,8 @@ export class Runtime {
   onError: (fiber: Fiber, error: unknown) => void = (fiber, error) => {
     console.error(`[${fiber.pack.id}]`, error);
   };
+  /** How long one undo, or a dependent's whole teardown, may take (ms). */
+  teardownLimit = 5000;
   private bindings = new Map<string, Binding[]>();
   private ids = 0;
 

@@ -28,7 +28,10 @@ export default {
 ```
 
 Everything a pack registers goes when it unloads. A key nothing provides
-leaves the pack inactive; when the provider comes back, so does the pack.
+leaves the pack waiting; when the provider comes back, so does the pack.
+A provider can be removed at any time: its consumers tear down first, then
+it does. A teardown that hangs past `runtime.teardownLimit` (5 s) is
+reported and skipped, never waited on forever.
 
 ## A provider
 
@@ -59,6 +62,8 @@ await loader.apply([
 
 A new url rebuilds an entry, a new config reloads it, `disabled` unloads it,
 `intercept` changes in place, and a move only changes order.
+`loader.status()` gives each entry's state: `off` (disabled), `waiting`
+(with the capabilities it is `missing`), `active`, `failed` and so on.
 
 ## Running it
 

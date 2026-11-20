@@ -69,7 +69,7 @@ test("the config tree loads, disables, reconfigures and unloads entries", async 
 
   await loader.edit((t) => (t[0]!.disabled = true, t));
   assert.deepEqual(all(rt), ["b"]);
-  assert.equal(loader.status()[0]!.state, "inactive");
+  assert.equal(loader.status()[0]!.state, "off");
 
   await loader.edit((t) => (delete t[0]!.disabled, (t[2]!.config = { words: ["b2", "b3"] }), t));
   assert.deepEqual(all(rt), ["a", "b2", "b3"]);
@@ -174,4 +174,23 @@ test("a module that fails to import is reported and the rest still load", async 
     ],
   );
   assert.deepEqual(rt.keys(), ["demo.words"]);
+});
+
+test("status says off for a disabled entry, and waiting with what it misses", async () => {
+  const { loader } = setup({ "words.ts": words, "speaker.ts": speaker });
+  await loader.apply([
+    { id: "a", pack: "speaker.ts", config: { words: ["a"] } },
+    { id: "b", pack: "speaker.ts", config: { words: ["b"] }, disabled: true },
+  ]);
+  const state = () => loader.status().map(({ id, state, missing }) => ({ id, state, missing }));
+  assert.deepEqual(state(), [
+    { id: "a", state: "waiting", missing: ["demo.words"] },
+    { id: "b", state: "off", missing: undefined },
+  ]);
+  await loader.edit((t) => [{ id: "words", pack: "words.ts" }, ...t]);
+  assert.deepEqual(state(), [
+    { id: "words", state: "active", missing: undefined },
+    { id: "a", state: "active", missing: undefined },
+    { id: "b", state: "off", missing: undefined },
+  ]);
 });
