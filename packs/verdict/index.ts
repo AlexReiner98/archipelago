@@ -1,6 +1,8 @@
 /**
  * The verdict pack: whether each node worked, per run, from the exchange.
- * Injects exchange.read, exchange.watch and agent.tree; provides its own
+ * Injects exchange.read, exchange.watch, agent.tree, and graph.read and
+ * graph.watch for each node's `misses` (on the map item it came from, the
+ * words of the miss it should prevent: see judge.ts); provides its own
  * `verdict.read`, the live read the harness view calls. Judging is in
  * judge.ts, apart from the runtime.
  *
@@ -8,9 +10,10 @@
  * each change to the tree, and judges a run again only when that run (or
  * the tree) changed.
  */
-import type { AgentTree, RunId } from "../../spec/agent.ts";
+import type { AgentTree, NodeInfo, RunId } from "../../spec/agent.ts";
 import type { Dispose, Page, PageRequest } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead, ExchangeWatch } from "../../spec/exchange.ts";
+import type { GraphRead, GraphWatch } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { judgeRun, listeningOf, records, type Listening, type NodeRecord, type RunVerdict } from "./judge.ts";
@@ -36,6 +39,21 @@ export interface VerdictRead {
   watch(on: (change: VerdictChange) => void): Dispose;
 }
 
+/**
+ * Each node with the words of the miss it should prevent: the `misses`
+ * field of the map item it was made from (its `source`), when it has one.
+ */
+async function withMisses(graph: GraphRead, nodes: NodeInfo[]): Promise<(NodeInfo & { misses?: string })[]> {
+  const sources = [...new Set(nodes.flatMap((n) => (n.source ? [n.source] : [])))];
+  const misses = new Map<string, string>();
+  for (let i = 0; i < sources.length; i += LIMIT_MAX) {
+    for (const item of await graph.get(sources.slice(i, i + LIMIT_MAX))) {
+      if (item && typeof item.fields.misses === "string" && item.fields.misses.trim()) misses.set(item.id, item.fields.misses);
+    }
+  }
+  return nodes.map((n) => (n.source && misses.has(n.source) ? { ...n, misses: misses.get(n.source)! } : n));
+}
+
 function pageOf<T>(list: T[], page?: PageRequest): Page<T> {
   const start = page?.after ? Number(page.after) : 0;
   const end = start + Math.max(1, Math.min(page?.limit ?? 100, LIMIT_MAX));
@@ -45,11 +63,12 @@ function pageOf<T>(list: T[], page?: PageRequest): Page<T> {
 
 const verdict: Pack = {
   id: "verdict",
-  inject: ["exchange.read", "exchange.watch", "agent.tree"],
+  inject: ["exchange.read", "exchange.watch", "agent.tree", "graph.read", "graph.watch"],
   async apply(ctx: Context) {
     const read = ctx.get<ExchangeRead>("exchange.read");
     const live = ctx.get<ExchangeWatch>("exchange.watch");
     const tree = ctx.get<AgentTree>("agent.tree");
+    const graph = ctx.get<GraphRead>("graph.read");
 
     /** Events per run by seq, so an event seen twice (read back and watched) counts once. */
     const events = new Map<RunId, Map<number, ExchangeEvent>>();
@@ -57,7 +76,7 @@ const verdict: Pack = {
     const order: RunId[] = [];
     const judged = new Map<RunId, RunVerdict[]>();
     const watchers = new Set<(c: VerdictChange) => void>();
-    let listening: Listening = listeningOf(tree.nodes());
+    let listening: Listening = listeningOf(await withMisses(graph, tree.nodes()));
 
     const notify = (change: VerdictChange) => {
       for (const on of [...watchers]) {
@@ -94,11 +113,20 @@ const verdict: Pack = {
     live.watch({}, (e) => {
       if (add(e)) notify({ run: e.run });
     });
-    tree.watch(() => {
-      listening = listeningOf(tree.nodes());
-      judged.clear();
-      notify({});
-    });
+    /** Reads where the nodes listen and what they prevent again, then judges every run again. */
+    let relisten = Promise.resolve();
+    const listen = () => {
+      relisten = relisten
+        .then(async () => {
+          listening = listeningOf(await withMisses(graph, tree.nodes()));
+          judged.clear();
+          notify({});
+        })
+        .catch((err) => ctx.runtime.report(ctx.fiber, err));
+    };
+    tree.watch(listen);
+    // A node's misses can change without the tree changing.
+    ctx.get<GraphWatch>("graph.watch").watch({ fields: ["misses"] }, listen);
     const past: RunId[] = [];
     for (let page = await read.runs({ limit: LIMIT_MAX }); ; ) {
       past.push(...page.items.map((i) => i.run));

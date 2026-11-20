@@ -1,7 +1,8 @@
 # verdict
 
 Whether each node worked, per run, judged from the [exchange](../../spec/exchange.md).
-Injects `exchange.read`, `exchange.watch` and `agent.tree`; provides its own
+Injects `exchange.read`, `exchange.watch`, `agent.tree`, and `graph.read`
+and `graph.watch` for each node's `misses`; provides its own
 `verdict.read`, the live read the harness view calls.
 
 ## The verdict
@@ -14,11 +15,23 @@ Per run, a node is judged from the first time it was said (or refused) there:
 | **held** | a miss came before, and none after; or it refused, and nothing went wrong after |
 | **quiet** | no miss and no refusal in the run: nothing to judge |
 
-A node's **miss** is something going wrong where it listens: a refusal by
-another node, or an act with `ok: false`, at a place matching one of the
-node's `at`. An act also stands at the files its input names (`file_path`,
-`path`, `notebook_path`), so a node said at `file:packs/*/page/*.js` is
-failed by a failed edit of such a file. Paths are made relative to the
+A node's **miss** is something going wrong that it covers: a refusal by
+another node, or an act with `ok: false`. An act stands at its place and at
+the files its input names (`file_path`, `path`, `notebook_path`), so a node
+said at `file:packs/*/page/*.js` is failed by a failed edit of such a file.
+
+A node **covers** a miss when it would plausibly have prevented it: it
+listens at one of the miss's places, and either as narrowly as the miss
+allows (a `file:` pattern matching the miss's file; `file:**` names every
+file and doesn't count), or its `misses` name the miss's words (at least
+half of its own words, leaving out common ones like *error* or *failed*,
+are in the miss's). A broad place alone covers nothing: a node at
+`tool:Bash` without such words isn't every failed Bash call's. A node's
+`misses` are the field of the map item it was made from (its `source`), as
+`grow.trial` writes it. The grow and verdict packs decide coverage the same
+way (`covers`, in both, kept in step by a test).
+
+ Paths are made relative to the
 run's `cwd` (from its `begin`), with `/` for separators, since Claude Code
 gives them absolute. A node's own refusals are its saying, and so is the
 denied call a refusal causes (an act whose output names the node as

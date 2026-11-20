@@ -15,7 +15,8 @@ import claudeCode from "../packs/claude-code/index.ts";
 import exchange from "../packs/exchange/index.ts";
 import graph from "../packs/graph/index.ts";
 import grow, { ASKER, askText } from "../packs/grow/index.ts";
-import { askedIn, covered, missesOf } from "../packs/grow/miss.ts";
+import { askedIn, covered, covers as growCovers, missesOf } from "../packs/grow/miss.ts";
+import { covers as verdictCovers } from "../packs/verdict/judge.ts";
 import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
 import words, { TRIAL_MARK } from "../packs/words/index.ts";
 
@@ -84,16 +85,17 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
     const hook = (session: string, event: string, more: object = {}) => post("/hook", { hook_event_name: event, session_id: session, cwd: dir, ...more });
     const file = join(dir, "packs", "x.ts");
 
-    // Run 1: an Edit fails where nothing listens; a Bash failure is covered by the bash node.
+    // Run 1: an Edit fails where nothing listens; a Bash call fails where only a broad node listens,
+    // which covers nothing: its words don't say it is that miss.
     await hook("s1", "SessionStart", { source: "startup" });
     await hook("s1", "PreToolUse", { tool_name: "Edit", tool_input: { file_path: file, old_string: "a" }, tool_use_id: "t1" });
     await hook("s1", "PostToolUseFailure", { tool_name: "Edit", tool_input: { file_path: file, old_string: "a" }, error: "String to replace not found in file.", tool_use_id: "t1" });
-    await hook("s1", "PostToolUseFailure", { tool_name: "Bash", tool_input: { command: "false" }, error: "exit 1", tool_use_id: "t2" });
+    await hook("s1", "PostToolUseFailure", { tool_name: "Bash", tool_input: { command: "npm run lint" }, error: 'npm ERR! Missing script: "lint"', tool_use_id: "t2" });
     const ask = await hook("s1", "Stop", { last_assistant_message: "Done." });
     assert.equal(ask.decision, "block", "the ask keeps the agent going");
-    const seq = Number(/#(\d+)/.exec(ask.reason)![1]);
+    const [seq, bashSeq] = [...ask.reason.split("\n")[0].matchAll(/#(\d+)/g)].map((m: RegExpMatchArray) => Number(m[1]));
     assert.match(ask.reason, /at tool:Edit, file:packs\/x\.ts: String to replace not found/);
-    assert.doesNotMatch(ask.reason, /tool:Bash/, "a covered miss isn't asked about");
+    assert.match(ask.reason, new RegExp(`#${bashSeq} at tool:Bash: npm ERR! Missing script`), "a broad node at tool:Bash doesn't cover every Bash failure");
 
     // Asked once: the next stop goes through.
     assert.deepEqual(await hook("s1", "Stop", { last_assistant_message: "Done, again." }), {});
@@ -116,6 +118,12 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
     });
     assert.ok(!wrote.isError, wrote.content[0].text);
     const node = JSON.parse(wrote.content[0].text).output.node as string;
+    const bashTrial = await call("t6", {
+      action: "grow.trial",
+      reason: "the lint script is missing",
+      input: { seq: bashSeq, place: "tool:Bash", misses: "npm missing script lint", words: "There is no lint script: run npm run check." },
+    });
+    assert.ok(!bashTrial.isError, bashTrial.content[0].text);
 
     const p = loader.fiber("probe")!.ctx;
     const [item] = await p.get<GraphRead>("graph.read").get([node]);
@@ -133,6 +141,19 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
     const near = await hook("s2", "PreToolUse", { tool_name: "Edit", tool_input: { file_path: join(dir, "packs", "y.ts") }, tool_use_id: "u2" });
     assert.deepEqual(near, {});
 
+    // A Bash miss the trial node's misses name is covered; another Bash miss is still asked about.
+    const heard = await hook("s2", "PreToolUse", { tool_name: "Bash", tool_input: { command: "npm run lint" }, tool_use_id: "u4" });
+    assert.match(heard.hookSpecificOutput.additionalContext, /There is no lint script/);
+    await hook("s2", "PostToolUseFailure", { tool_name: "Bash", tool_input: { command: "npm run lint" }, error: 'npm ERR! Missing script: "lint"', tool_use_id: "u4" });
+    await hook("s2", "PostToolUseFailure", { tool_name: "Bash", tool_input: { command: "git push" }, error: "rejected: non-fast-forward", tool_use_id: "u5" });
+    const ask2 = await hook("s2", "Stop", { last_assistant_message: "Done." });
+    const asked2 = ask2.reason.split("\n").filter((l: string) => l.startsWith("- #"));
+    assert.equal(asked2.length, 1, ask2.reason);
+    assert.match(asked2[0], /non-fast-forward/);
+    const verdicts2 = await p.get<VerdictRead>("verdict.read").run("s2");
+    const bashNode = p.get<AgentTree>("agent.tree").nodes().find((n) => n.at[0] === "tool:Bash" && n.pack === "words")!;
+    assert.deepEqual(verdicts2.find((x) => x.node === bashNode.id)?.failed_by.length, 1, "the trial node is failed by the miss it names, not by every Bash failure");
+
     // Retired by a person, it is no longer said.
     const out = await p.get<ActionInvoke>("action.invoke").invoke({ action: "words.retire", input: { node }, authority: { of: "human", basis: "test" }, reason: "retire" });
     assert.ok(out.ok);
@@ -142,4 +163,26 @@ test("a miss nothing covers is asked about once; the agent writes a trial node t
     await loader.apply([]);
     await rm(dir, { recursive: true, force: true });
   }
+});
+
+test("grow and verdict decide coverage the same way", () => {
+  const cases: [string[], string | undefined, string[], string][] = [
+    [["tool:Bash"], undefined, ["tool:Bash"], "exit 1"],
+    [["tool:Bash"], "npm missing script lint", ["tool:Bash"], 'npm ERR! Missing script: "lint"'],
+    [["tool:Bash"], "git push rejected", ["tool:Bash"], 'npm ERR! Missing script: "lint"'],
+    [["tool:*"], "port already in use", ["tool:Bash"], "EADDRINUSE: address already in use :5181"],
+    [["file:packs/**"], undefined, ["tool:Edit", "file:packs/a.ts"], "String to replace not found in file."],
+    [["file:**"], undefined, ["tool:Edit", "file:packs/a.ts"], "String to replace not found in file."],
+    [["tool:Edit"], undefined, ["tool:Edit", "file:packs/a.ts"], "String to replace not found in file."],
+    [["tool:Edit"], "string to replace not found", ["tool:Edit", "file:packs/a.ts"], "String to replace not found in file."],
+    [["reply_end"], "stopped before checking", ["reply_end"], "Run npm run check before you stop."],
+    [["file:.env"], undefined, ["file:.env"], "Not .env."],
+  ];
+  const got = cases.map(([at, misses, places, words]) => {
+    const node = { at, ...(misses ? { misses } : {}) };
+    const g = growCovers(node, places, words);
+    assert.equal(g, verdictCovers(node, places, words), JSON.stringify([at, misses, places, words]));
+    return g;
+  });
+  assert.deepEqual(got, [false, true, false, true, true, false, false, true, false, true]);
 });

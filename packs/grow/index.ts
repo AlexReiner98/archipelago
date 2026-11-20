@@ -14,15 +14,20 @@
  *   pack says a trial node marked as one.
  *
  * Promoting or retiring a trial by its record is the next step, not here.
- * Injects exchange.read, agent.tree, agent.node and action.register.
+ * Coverage is the verdict pack's: a node covers a miss when it listens
+ * there as narrowly as the miss allows, or its `misses` (read from the map
+ * item it came from) name the miss's words (miss.ts).
+ *
+ * Injects exchange.read, agent.tree, agent.node, action.register and graph.read.
  */
 import type { ActionContext, ActionRegister } from "../../spec/action.ts";
-import type { AgentNode, AgentTree, RunId } from "../../spec/agent.ts";
+import type { AgentNode, AgentTree, NodeInfo, RunId } from "../../spec/agent.ts";
 import { PLACES } from "../../spec/agent.ts";
 import type { Fact } from "../../spec/changeset.ts";
 import type { Json } from "../../spec/common.ts";
 import { Refused } from "../../spec/common.ts";
 import type { ExchangeEvent, ExchangeRead } from "../../spec/exchange.ts";
+import type { GraphRead } from "../../spec/graph.ts";
 import { LIMIT_MAX } from "../../spec/graph.ts";
 import type { Context, Pack } from "../../runtime/core.ts";
 import { ASK, askedIn, covered, exactPlace, missesOf, type Miss } from "./miss.ts";
@@ -56,7 +61,7 @@ export function askText(misses: Miss[]): string {
     `Before you finish: ${one ? "a miss" : `${misses.length} misses`} in this run that nothing on the map covers (${seqs}). Write a trial node for ${one ? "it" : "each"}, so the next run hears it where it happened.`,
     ...misses.slice(0, LISTED).map((m) => `- #${m.seq} at ${m.places.join(", ")}: ${m.words}${m.doing ? ` (doing: ${m.doing})` : ""}`),
     ...(misses.length > LISTED ? [`- and ${misses.length - LISTED} more; write for the ones worth it.`] : []),
-    `Write it with the archipelago MCP tool \`act\`: action "${TRIAL}", input { "seq": the miss's number, "place": one of its places exactly as listed, the narrowest that would have prevented it (its file: place when it has one; a tool: place is said before every call of that tool),"misses": the words of the miss it should prevent, "words": what to say there next time, leading with what fixed it }. If the miss teaches nothing (a typo, a one-off), say so in one line instead. If you have no such tool, say so in one line and finish.`,
+    `Write it with the archipelago MCP tool \`act\`: action "${TRIAL}", input { "seq": the miss's number, "place": one of its places exactly as listed, the narrowest that would have prevented it (its file: place when it has one; a tool: place is said before every call of that tool), "misses": the words of the miss it should prevent (at a tool: place, they decide which misses it covers, so use the miss's own words), "words": what to say there next time, leading with what fixed it }. If the miss teaches nothing (a typo, a one-off), say so in one line instead. If you have no such tool, say so in one line and finish.`,
   ];
   return lines.join("\n");
 }
@@ -74,14 +79,30 @@ const cwdOf = (events: ExchangeEvent[]): string | undefined => {
   return d && typeof d === "object" && !Array.isArray(d) && typeof d.cwd === "string" ? d.cwd : undefined;
 };
 
+/**
+ * Each node with the words of the miss it should prevent: the `misses`
+ * field of the map item it was made from (its `source`), when it has one.
+ */
+async function withMisses(graph: GraphRead, nodes: NodeInfo[]): Promise<(NodeInfo & { misses?: string })[]> {
+  const sources = [...new Set(nodes.flatMap((n) => (n.source ? [n.source] : [])))];
+  const misses = new Map<string, string>();
+  for (let i = 0; i < sources.length; i += LIMIT_MAX) {
+    for (const item of await graph.get(sources.slice(i, i + LIMIT_MAX))) {
+      if (item && typeof item.fields.misses === "string" && item.fields.misses.trim()) misses.set(item.id, item.fields.misses);
+    }
+  }
+  return nodes.map((n) => (n.source && misses.has(n.source) ? { ...n, misses: misses.get(n.source)! } : n));
+}
+
 const refuse = (code: string, message: string) => new Refused({ code, message, by: { pack: "grow" } });
 
 const grow: Pack = {
   id: "grow",
-  inject: ["exchange.read", "agent.tree", "agent.node", "action.register"],
+  inject: ["exchange.read", "agent.tree", "agent.node", "action.register", "graph.read"],
   apply(ctx: Context) {
     const read = ctx.get<ExchangeRead>("exchange.read");
     const tree = ctx.get<AgentTree>("agent.tree");
+    const graph = ctx.get<GraphRead>("graph.read");
 
     ctx.get<AgentNode>("agent.node").node({
       name: "ask",
@@ -91,7 +112,7 @@ const grow: Pack = {
       async speak(moment, run) {
         const events = await eventsOf(read, moment.run);
         const asked = askedIn(events, ASKER);
-        const nodes = tree.nodes();
+        const nodes = await withMisses(graph, tree.nodes());
         const open = missesOf(events, run.cwd ?? cwdOf(events)).filter((m) => !asked.has(m.seq) && !covered(m, nodes, ASKER));
         return open.length ? { refuse: askText(open), code: ASK } : null;
       },

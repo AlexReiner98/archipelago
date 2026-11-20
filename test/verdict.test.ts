@@ -6,8 +6,9 @@ import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader, type Entry } from "../runtime/loader.ts";
 import agent from "../packs/agent/index.ts";
 import exchange from "../packs/exchange/index.ts";
+import graph from "../packs/graph/index.ts";
 import verdict, { type VerdictRead } from "../packs/verdict/index.ts";
-import { judgeRun, listeningOf, placeMatches, records } from "../packs/verdict/judge.ts";
+import { covers, judgeRun, listeningOf, namesMiss, placeMatches, records } from "../packs/verdict/judge.ts";
 
 const BASE = "mem:/packs/";
 const T = (s: number) => `2026-11-20T14:00:${String(s).padStart(2, "0")}.000Z`;
@@ -19,15 +20,17 @@ function ev(run: string, seq: number, e: Partial<ExchangeEvent>): ExchangeEvent 
 }
 const said = (run: string, seq: number, node: string, place: string) => ev(run, seq, { kind: "say", node, place, text: `${node} speaks` });
 const refusedBy = (run: string, seq: number, node: string, place: string) => ev(run, seq, { kind: "refuse", node, place, text: "no" });
-const failedAct = (run: string, seq: number, place: string, input?: Record<string, string>) =>
-  ev(run, seq, { kind: "act", direction: "from_agent", place, act: { kind: "tool", by: "agent", ok: false, ...(input ? { input } : {}) } });
+/** What a failed call answers by default: the schema's refusal, which a/schema's misses name. */
+const SCHEMA_REFUSED = "Refused by the schema: a task needs a status.";
+const failedAct = (run: string, seq: number, place: string, input?: Record<string, string>, output: string = SCHEMA_REFUSED) =>
+  ev(run, seq, { kind: "act", direction: "from_agent", place, act: { kind: "tool", by: "agent", ok: false, output, ...(input ? { input } : {}) } });
 const okAct = (run: string, seq: number, place: string) =>
   ev(run, seq, { kind: "act", direction: "from_agent", place, act: { kind: "tool", by: "agent", ok: true } });
 
 const listening = listeningOf([
   { id: "a/trap", at: ["file:packs/*/page/*.js"] },
-  { id: "a/schema", at: ["tool:change"] },
-  { id: "a/rule", at: ["tool:Bash"] },
+  { id: "a/schema", at: ["tool:change"], misses: "The schema refused a task without a status" },
+  { id: "a/rule", at: ["tool:Bash"], misses: "Bash curl to the map instead of the change tool" },
 ]);
 
 test("places match like the agent pack's", () => {
@@ -71,7 +74,7 @@ test("a failed edit of a file the node is said for is its miss", () => {
 test("another node's refusal is a miss; the node's own refusals are its saying", () => {
   const own = judgeRun("r", [refusedBy("r", 1, "a/rule", "tool:Bash"), refusedBy("r", 2, "a/rule", "tool:Bash")], listening);
   assert.deepEqual(own.map((x) => [x.verdict, x.said]), [["held", 2]]);
-  const other = judgeRun("r", [said("r", 1, "a/schema", "tool:change"), refusedBy("r", 2, "b/check", "tool:change")], listening);
+  const other = judgeRun("r", [said("r", 1, "a/schema", "tool:change"), ev("r", 2, { kind: "refuse", node: "b/check", place: "tool:change", text: "A task needs a status (schema)." })], listening);
   assert.equal(other.find((x) => x.node === "a/schema")!.verdict, "failed");
 });
 
@@ -81,8 +84,40 @@ test("an exchange miss (a node threw) judges nothing", () => {
 });
 
 test("a node no longer in the tree is judged at the places it was said", () => {
-  const v = judgeRun("r", [said("r", 1, "gone/x", "tool:Write"), failedAct("r", 2, "tool:Write")], listening);
+  const v = judgeRun("r", [said("r", 1, "gone/x", "file:a.ts"), failedAct("r", 2, "tool:Write", { file_path: "a.ts" })], listening);
   assert.equal(v[0]!.verdict, "failed");
+});
+
+test("a node covers a miss only when it would plausibly have prevented it", () => {
+  const bash = ["tool:Bash"];
+  const testFails = "npm test: 3 failing, exit code 1";
+  // A broad place alone covers nothing: a tool:Bash node isn't every Bash failure's.
+  assert.equal(covers({ at: ["tool:Bash"] }, bash, testFails), false);
+  assert.equal(covers({ at: ["tool:*"] }, bash, testFails), false);
+  // Its misses naming the miss's words do.
+  assert.equal(covers({ at: ["tool:Bash"], misses: "npm test failing" }, bash, testFails), true);
+  assert.equal(covers({ at: ["tool:Bash"], misses: "git push rejected by the remote" }, bash, testFails), false);
+  // Words without the place don't.
+  assert.equal(covers({ at: ["tool:Edit"], misses: "npm test failing" }, bash, testFails), false);
+  // A file: pattern matching the miss's file is as narrow as the miss allows; file:** is not.
+  const edit = ["tool:Edit", "file:packs/grow/miss.ts"];
+  assert.equal(covers({ at: ["file:packs/grow/*.ts"] }, edit, "String to replace not found in file."), true);
+  assert.equal(covers({ at: ["file:**"] }, edit, "String to replace not found in file."), false);
+  assert.equal(covers({ at: ["tool:Edit"] }, edit, "String to replace not found in file."), false);
+  assert.equal(covers({ at: ["tool:Edit"], misses: "Edit: string to replace not found" }, edit, "String to replace not found in file."), true);
+  // Common words don't count: half of the node's own words must be there.
+  assert.equal(namesMiss("the tool failed with an error", "Error: the tool failed"), false);
+  assert.equal(namesMiss("port 5181 already in use", "listen EADDRINUSE: address already in use 127.0.0.1:5181"), true);
+});
+
+test("a broad node isn't failed by every failed call at its place", () => {
+  const nodes = listeningOf([{ id: "w/read", at: ["tool:Bash"] }, { id: "w/port", at: ["tool:Bash"], misses: "the server's port 5181 is already in use" }]);
+  const v = judgeRun(
+    "b",
+    [said("b", 1, "w/read", "tool:Bash"), said("b", 2, "w/port", "tool:Bash"), failedAct("b", 3, "tool:Bash", { command: "npm run serve" }, "Error: listen EADDRINUSE: address already in use 127.0.0.1:5181")],
+    nodes,
+  );
+  assert.deepEqual(v.map((x) => [x.node, x.verdict]), [["w/read", "quiet"], ["w/port", "failed"]]);
 });
 
 test("records add up runs, sayings and verdicts, with the last time said", () => {
@@ -128,7 +163,7 @@ test("a blocked call is held: the denied act it caused is not its miss", () => {
   // A call that fails at its place later, not the one it denied, still fails it.
   const again = judgeRun(
     "s",
-    [begin("s", 1), refusedHere("s", 2, "a/rule", "tool:Bash"), deniedAct("s", 3, "a/rule", "Bash", { command: "x" }), failedAct("s", 4, "tool:Bash")],
+    [begin("s", 1), refusedHere("s", 2, "a/rule", "tool:Bash"), deniedAct("s", 3, "a/rule", "Bash", { command: "x" }), failedAct("s", 4, "tool:Bash", undefined, "curl: the map refused the change")],
     listening,
   );
   assert.deepEqual(again.map((x) => [x.verdict, x.failed_by]), [["failed", [4]]]);
@@ -136,7 +171,7 @@ test("a blocked call is held: the denied act it caused is not its miss", () => {
   const other = judgeRun(
     "s",
     [begin("s", 1), said("s", 2, "b/hint", "tool:Bash"), refusedHere("s", 3, "a/rule", "tool:Bash"), deniedAct("s", 4, "a/rule", "Bash", { command: "x" })],
-    listeningOf([{ id: "b/hint", at: ["tool:Bash"] }, { id: "a/rule", at: ["tool:Bash"] }]),
+    listeningOf([{ id: "b/hint", at: ["tool:Bash"], misses: "Bash writes to the map instead of the change tool" }, { id: "a/rule", at: ["tool:Bash"] }]),
   );
   assert.equal(other.find((x) => x.node === "b/hint")!.verdict, "failed");
 });
@@ -197,7 +232,7 @@ function setup() {
   const rt = new Runtime();
   const errors: unknown[] = [];
   rt.onError = (_f, e) => errors.push(e);
-  const modules: Record<string, Pack> = { "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "verdict.ts": verdict, "probe.ts": probe, "view.ts": view };
+  const modules: Record<string, Pack> = { "graph.ts": graph, "agent.ts": agent, "exchange.ts": exchange, "nodes.ts": nodes, "verdict.ts": verdict, "probe.ts": probe, "view.ts": view };
   const loader = new Loader(rt, {
     base: BASE,
     import: async (url) => {
@@ -215,6 +250,7 @@ function setup() {
 }
 
 const entries = (withVerdict = true): Entry[] => [
+  { id: "graph", pack: "graph.ts" },
   { id: "exchange", pack: "exchange.ts" },
   { id: "agent", pack: "agent.ts" },
   {

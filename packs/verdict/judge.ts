@@ -10,9 +10,14 @@
  *   nothing went wrong after (a refusal is the node working);
  * - quiet: no miss and no refusal, nothing to judge.
  *
- * A node's miss is something going wrong where it listens: a refusal by
+ * A node's miss is something going wrong that it covers: a refusal by
  * another node, or an act that didn't work (`ok: false`), at a place that
- * matches one of the node's `at`. An act also stands at the files its input
+ * matches one of the node's `at`, where the node would plausibly have
+ * prevented it (`covers`): it listens there as narrowly as the miss allows
+ * (a file: pattern matching the miss's file), or its `misses` (the words of
+ * the miss it should prevent) name the miss's words. A node at tool:Bash
+ * with no such words isn't failed by every failed Bash call. The grow pack
+ * decides coverage the same way. An act also stands at the files its input
  * names (`file:<path>`), so a node said for a file is judged by a failed
  * edit of that file. Claude Code names files by absolute path, so a path is
  * made relative to the run's cwd (from its `begin`) before it is a place.
@@ -54,6 +59,48 @@ export function placeMatches(pattern: Place, place: Place): boolean {
   return new RegExp(`^${re}$`).test(place.slice(fam.length));
 }
 
+/** Words too common to say which miss a node is about. */
+const COMMON = new Set(
+  "the and for not but with that this then than was were are has have had its into from out off one all any can cannot could should would will you your when what which who how why there here use used using get got make made call called file files tool tools error errors failed fails fail failure because before after again only also just".split(" "),
+);
+
+/** The words that say what a text is about: lower case, three letters or more, the common ones left out. */
+export function wordsOf(text: string | undefined): Set<string> {
+  const out = new Set<string>();
+  for (const w of (text ?? "").toLowerCase().split(/[^a-z0-9_]+/)) if (w.length >= 3 && !COMMON.has(w)) out.add(w);
+  return out;
+}
+
+/** Whether a node's `misses` name a miss's words: at least half of its words are in them. */
+export function namesMiss(misses: string | undefined, words: string): boolean {
+  const want = [...wordsOf(misses)];
+  if (!want.length) return false;
+  const have = wordsOf(words);
+  return want.filter((w) => have.has(w)).length >= Math.max(1, Math.ceil(want.length / 2));
+}
+
+/** A file: pattern that names some files, not all of them (`file:**`, `file:*`). */
+const narrowFile = (pattern: Place) => pattern.startsWith("file:") && /[^*/]/.test(pattern.slice(5));
+
+/** Where a node listens, and the words of the miss it should prevent, if it says. */
+export interface Listener {
+  at: Place[];
+  misses?: string;
+}
+
+/**
+ * Whether a node would plausibly have prevented a miss: it listens at one
+ * of the miss's places, and either it does so as narrowly as the miss
+ * allows (a file: pattern matching the miss's file, not every file), or its
+ * `misses` name the miss's words. A broad place alone (tool:Bash, said
+ * before every Bash call) covers nothing: the words must say which miss.
+ */
+export function covers(node: Listener, places: Place[], words: string): boolean {
+  if (!places.some((p) => node.at.some((a) => placeMatches(a, p)))) return false;
+  if (node.at.some((a) => narrowFile(a) && places.some((p) => p.startsWith("file:") && placeMatches(a, p)))) return true;
+  return namesMiss(node.misses, words);
+}
+
 export type Verdict = "held" | "failed" | "quiet";
 
 /** How one run went for one node. */
@@ -87,11 +134,11 @@ export interface NodeRecord {
   places: Record<string, number>;
 }
 
-/** Where a node listens. A node no longer loaded is judged at the places it was said. */
-export type Listening = Map<string, Place[]>;
+/** Where each node listens and what it should prevent. A node no longer loaded is judged at the places it was said. */
+export type Listening = Map<string, Listener>;
 
-export function listeningOf(nodes: Pick<NodeInfo, "id" | "at">[]): Listening {
-  return new Map(nodes.map((n) => [n.id, n.at]));
+export function listeningOf(nodes: (Pick<NodeInfo, "id" | "at"> & { misses?: string })[]): Listening {
+  return new Map(nodes.map((n) => [n.id, { at: n.at, ...(n.misses ? { misses: n.misses } : {}) }]));
 }
 
 const PATH_KEYS = ["file_path", "path", "notebook_path"];
@@ -141,6 +188,16 @@ export function missPlaces(e: ExchangeEvent, cwd?: string): Place[] | undefined 
   return undefined;
 }
 
+const text = (v: Json | undefined): string => (typeof v === "string" ? v : v === undefined || v === null ? "" : JSON.stringify(v));
+
+/** A miss's words: the refusal's, or what the failed act answered. */
+export function missWords(e: ExchangeEvent): string {
+  if (e.kind === "refuse") return e.text ?? "";
+  const out = e.act?.output;
+  if (out && typeof out === "object" && !Array.isArray(out) && typeof out.text === "string") return out.text;
+  return text(out);
+}
+
 /** The node whose refusal denied this act, when it was a denied call. */
 function deniedBy(e: ExchangeEvent): string | undefined {
   const out = e.kind === "act" ? e.act?.output : undefined;
@@ -157,12 +214,12 @@ export function cwdOf(events: ExchangeEvent[]): string | undefined {
 
 const isSaying = (e: ExchangeEvent) => (e.kind === "say" || e.kind === "refuse") && !!e.node;
 
-/** Whether a miss event is one of this node's: at a place it listens at, and not its own. */
-function isMissOf(e: ExchangeEvent, node: string, at: Place[], cwd?: string): boolean {
+/** Whether a miss event is one of this node's: one it covers, and not its own. */
+function isMissOf(e: ExchangeEvent, node: string, listener: Listener, cwd?: string): boolean {
   if (e.node === node || deniedBy(e) === node) return false;
   const places = missPlaces(e, cwd);
   if (!places) return false;
-  return places.some((p) => at.some((a) => placeMatches(a, p)));
+  return covers(listener, places, missWords(e));
 }
 
 /** One run's verdicts, one per node said in it, in the order each was first said. */
@@ -179,8 +236,8 @@ export function judgeRun(run: RunId, events: ExchangeEvent[], listening: Listeni
   const out: RunVerdict[] = [];
   for (const [node, said] of sayings) {
     const first = said[0]!;
-    const at = listening.get(node) ?? [...new Set(said.map((s) => s.place).filter((p): p is Place => !!p))];
-    const misses = sorted.filter((e) => isMissOf(e, node, at, cwd));
+    const listener = listening.get(node) ?? { at: [...new Set(said.map((s) => s.place).filter((p): p is Place => !!p))] };
+    const misses = sorted.filter((e) => isMissOf(e, node, listener, cwd));
     const refused = said.some((s) => s.kind === "refuse");
     const before = misses.filter((m) => m.seq < first.seq).length;
     const afterList = misses.filter((m) => m.seq > first.seq);
