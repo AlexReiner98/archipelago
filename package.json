@@ -1,0 +1,12 @@
+{
+  "name": "archipelago-next",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "check": "tsc -p ."
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}

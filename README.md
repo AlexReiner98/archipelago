@@ -10,7 +10,7 @@ packs, around a shared map of the work.
   dependencies.
 - **The contracts are the product.** Any pack can be replaced. The interfaces
   packs talk through (`agent`, `graph`, `slot`, `here`) are versioned and owned
-  by the spec.
+  by the spec, in [spec/](spec/README.md).
 - **No gates.** Every change applies at once, and anything can be undone.
 - **The map teaches the harness.** Everything the map says to an agent, and
   what the agent does in return, is recorded and judged. What works is kept

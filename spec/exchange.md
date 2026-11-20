@@ -1,0 +1,39 @@
+# exchange 0.1.0
+
+One event for each thing that passes between the map and an agent. It's
+what the harness view streams live and what the verdict pack judges a run
+by. Types: [exchange.ts](exchange.ts).
+
+## The event
+
+| Field | |
+|---|---|
+| `run`, `seq` | which run, and its order in that run (from 1, no gaps) |
+| `time` | when |
+| `place` | where in the run (see [agent](agent.md)) |
+| `direction` | `to_agent` (the map spoke) or `from_agent` (the agent did) |
+| `kind` | `begin`, `end`, `say`, `refuse`, `act`, `miss` |
+| `node` | the node that spoke |
+| `pack` | the pack the node or action belongs to |
+| `text` | what was said, the refusal's words, or the error |
+| `act` | for `act`: kind, by, input, output, ok |
+
+`miss` is a fault in the exchange itself (a node threw, or refused where it
+couldn't), so it's told apart from the agent getting something wrong, which
+is an `act` with `ok: false`.
+
+## The service
+
+- `append(event)`: the agent service records each event. It's the only
+  caller.
+- `runs(page)`, `events(run, page)`: the record, bounded like every read.
+- `said(node, page)`: a node's events across runs, for the node's page.
+- `watch(filter, on)`: live, by run, node, pack or kind. Returns a
+  disposer.
+
+## Where the events live
+
+The exchange pack decides how it stores events. They're a record of what
+passed, not items on the map, so they don't go through actions or the
+journal. What the verdict pack concludes from them (a verdict per run and
+node) is written to the graph through an action like any other change.

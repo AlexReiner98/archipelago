@@ -1,0 +1,64 @@
+# graph 0.1.0
+
+The graph pack stores items and links and is the truth. This is what every
+other pack sees of it. Types: [graph.ts](graph.ts).
+
+## Items and links
+
+An item is `{ id, type, fields }`. A link is an item with `from` and `to`.
+The graph knows no types: which types exist, their fields and their
+statuses are the schema pack's, enforced in the write chain.
+
+## Reads are bounded
+
+| Read | Bound |
+|---|---|
+| `get(ids)` | the ids given, at most `LIMIT_MAX` |
+| `of(type, page)` | a page |
+| `links(id, {type, dir}, page)` | a page |
+| `since(page)` | a page of committed change sets |
+| `now()` | a cursor |
+
+A page is at most `LIMIT_MAX` (500). No read returns the whole graph. A
+query language, search or views are packs built on these.
+
+## Watch
+
+`watch(filter, on)` calls `on` with every committed change set that
+touches the filter, in commit order, once it is applied. With `after` it
+catches up from that cursor first, so a watcher that drops can resume
+without missing anything. It returns the disposer that stops it. This is
+what makes the harness view live.
+
+## The write chain
+
+```
+action ──▶ check stages ──▶ record stages ──▶ store
+           (schema, …)      (history, …)
+```
+
+A change enters through the action service and nowhere else, and every
+stage is an interceptor: `(change, next) => Promise<Committed>`.
+
+- **check** stages may refuse by throwing `Refused`. The schema pack lives
+  here. Refusing is a rule saying no, not a person being asked: there are
+  no holds.
+- **record** stages wrap the store. History calls `next` and journals the
+  committed set it gets back, so it never records a change that failed.
+- No stage rewrites facts. If a stage wants a different change, it refuses
+  and says what would pass, and the caller sends that.
+- Within a phase, stages run by `rank`, then pack id, so the same packs
+  always chain the same way.
+- A stage is added with `stage(def)` and goes when its pack unloads.
+
+The store applies the set atomically: all facts or none. A retraction whose
+value isn't the field's current value fails the whole set with
+`graph.conflict`.
+
+## Why `commit` is on the service
+
+The write end has to be reachable for the action service, which is a pack
+like any other. The contract says only the action service calls it; the
+graph doesn't enforce that, since there is no sandbox. A pack that writes
+around actions breaks the contract the same way one that ignores its types
+does.
