@@ -36,7 +36,7 @@ report to:
 
 | | Live | Dev |
 |---|---|---|
-| Runs | a fixed commit, from its own git worktree (`../archipelago-next-live`, or `ARCHIPELAGO_LIVE`) | this checkout |
+| Runs | a fixed commit, from its own git worktree (`../archipelago-live`, or `ARCHIPELAGO_LIVE`) | this checkout |
 | Hot reload | off | on |
 | Page, adapter, bridge | 5180, 5181, 5182 | 5280, 5281, 5282 |
 | Data | `<worktree>/app/.data/`, the real one | `app/.data/` here, copied from live on demand |
