@@ -3,7 +3,7 @@
  * Injects exchange.read, exchange.watch, agent.tree, and graph.read and
  * graph.watch for each node's `misses` (on the map item it came from, the
  * words of the miss it should prevent: see judge.ts); provides its own
- * `verdict.read`, the live read the harness view calls. Judging is in
+ * `verdict.read`, the live read the Agents view calls. Judging is in
  * judge.ts, apart from the runtime.
  *
  * It reads the whole record back when it loads, follows each new event and

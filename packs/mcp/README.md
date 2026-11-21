@@ -32,7 +32,7 @@ any other: a `node` item of kind `tool_text` at the tool's place
 (`tool:mcp__archipelago__get`), made through `words.add` the first time the
 pack loads with the words pack there, and found again after that. The tool
 list says its words now, so `words.set` refines a description and the
-harness view shows and judges it; the words pack also says it where the
+Agents view shows and judges it; the words pack also says it where the
 agent is about to call the tool. Retired, or with no words pack, the
 defaults in [index.ts](index.ts) are said. `act`'s description adds the
 actions declared now.

@@ -1,6 +1,7 @@
 # harness
 
-The harness view: the hub to watch every agent at once, and every run,
+The Agents view (the pack's id, its page keys and its fills keep the name
+`harness`; the view was called Harness until 21 Nov 2026): the hub to watch every agent at once, and every run,
 live or replayed, and every profile. What the map says to an agent is a
 tree of places and nodes. It lands on every live run: each agent has a tree
 of its own, holding the nodes its profile lets it hear, under its name in
@@ -14,7 +15,7 @@ background, picking none, folds it.
 
 | Fill | Region | Shows |
 |---|---|---|
-| Harness (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline |
+| Agents (`harness/view`) | `center` | The bar; live, a tree per agent; one run or all, the tree and the timeline |
 | Node (`harness/node`, "Node") | `left` | Its words, standing, places, pack, kind, record, and its verdict per run |
 | Run (`harness/run`, "Run") | `right` | The run's profiles, then one line per event, → to the agent, ← from it; the wider side, as an opened line needs the room. Live: every live run's events, interleaved. All runs: the runs, or a profile's |
 

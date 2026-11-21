@@ -1,5 +1,5 @@
 /**
- * The harness view's part for the keep pack (packs/keep): each trial node's
+ * The Agents view's part for the keep pack (packs/keep): each trial node's
  * record, standing and checks, read through the action `keep.review`, and
  * the buttons that keep or retire one (`keep.apply`, as the person at the
  * page). Without the keep pack there is nothing to show, and nothing is.
@@ -77,7 +77,7 @@ export function keepParts({ actions, invoke, graphLive, onVerdicts, pick }: Deps
       let timer: ReturnType<typeof setTimeout> | undefined;
       const load = () =>
         void invoke
-          .invoke({ action: REVIEW, input: {}, authority: { of: "human", basis: "read in the harness view" }, reason: "Show each trial node's standing" })
+          .invoke({ action: REVIEW, input: {}, authority: { of: "human", basis: "read in the Agents view" }, reason: "Show each trial node's standing" })
           .then((out) => !gone && out.ok && setR(out.output as unknown as Review));
       const later = () => {
         clearTimeout(timer);
@@ -138,9 +138,9 @@ export function keepParts({ actions, invoke, graphLive, onVerdicts, pick }: Deps
       setStatus("…");
       const out = await invoke.invoke({
         action: APPLY,
-        input: { node: r.item, state, why: state === "promote" ? "Kept in the harness view" : "Retired in the harness view" },
-        authority: { of: "human", basis: state === "promote" ? "kept in the harness view" : "retired in the harness view" },
-        reason: `${state === "promote" ? "Kept" : "Retired"} ${r.title} in the harness view`,
+        input: { node: r.item, state, why: state === "promote" ? "Kept in the Agents view" : "Retired in the Agents view" },
+        authority: { of: "human", basis: state === "promote" ? "kept in the Agents view" : "retired in the Agents view" },
+        reason: `${state === "promote" ? "Kept" : "Retired"} ${r.title} in the Agents view`,
       });
       setStatus(out.ok ? "" : `refused: ${out.refused.message}`);
     };

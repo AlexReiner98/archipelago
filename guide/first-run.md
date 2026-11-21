@@ -17,7 +17,7 @@ and the bridge between them run on 5280, 5281 and 5282. The map is kept in
 ## Look around
 
 - The view picker at the top switches views: **Field** (the map, home),
-  **Harness** (what is said to agents), **Packs** and this **Guide**.
+  **Agents** (what is said to agents), **Packs** and this **Guide**.
 - Ctrl+K (⌘K) opens the find line from any view: type a view's name or an
   item's, and Enter goes to it.
 - Nothing is locked. Every change is an action, and `history.undo` takes
@@ -33,7 +33,7 @@ claude --settings packs/claude-code/settings.json --mcp-config packs/claude-code
 
 The session's hooks report each prompt, tool call and answer to the
 adapter, and its MCP server gives the agent the map's tools. Open
-**Harness**: the run appears live, with what the map said and where.
+**Agents**: the run appears live, with what the map said and where.
 [packs/claude-code/README.md](../packs/claude-code/README.md) has the
 details, and how to report every session.
 

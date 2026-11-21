@@ -18,7 +18,7 @@
  *
  * Each tool's description is a node: a `tool_text` node item at the tool's
  * place (`tool:mcp__archipelago__get`), made through `words.add` when there
- * is none, so the harness view shows it, the verdicts judge it and
+ * is none, so the Agents view shows it, the verdicts judge it and
  * `words.set` refines it. The list says its words now; without the words
  * pack, the defaults here.
  *

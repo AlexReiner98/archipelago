@@ -1,5 +1,5 @@
 /**
- * The harness view's hooks over its capabilities: each read kept live,
+ * The Agents view's hooks over its capabilities: each read kept live,
  * shared by the three fills. Every read is bounded (a page and a cursor,
  * or ids given).
  */

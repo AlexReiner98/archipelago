@@ -18,7 +18,7 @@ export const SEED = [
     title: "Says the run is recorded",
     kind: "instruction",
     at: ["session_start"],
-    words: "This run is recorded on the exchange: every say, refusal and act shows live in the harness view.",
+    words: "This run is recorded on the exchange: every say, refusal and act shows live in the Agents view.",
   },
   {
     title: "No secrets",

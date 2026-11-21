@@ -1,5 +1,5 @@
 /**
- * The harness view's run pane (the right region): the run looked at, one line per event, in
+ * The Agents view's run pane (the right region): the run looked at, one line per event, in
  * one column. → the map to the agent, ← the agent to the map. The event at
  * the playhead is picked; those after it are faint until the run plays to
  * them. A click opens a line in place (expand.ts) and moves the playhead

@@ -3,7 +3,7 @@
 Whether each node worked, per run, judged from the [exchange](../../spec/exchange.md).
 Injects `exchange.read`, `exchange.watch`, `agent.tree`, and `graph.read`
 and `graph.watch` for each node's `misses`; provides its own
-`verdict.read`, the live read the harness view calls.
+`verdict.read`, the live read the Agents view calls.
 
 ## The verdict
 

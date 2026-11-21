@@ -20,7 +20,7 @@ regions and nothing in them. Any pack that fills `root` can take its place.
   title shuts it to one line, and a click on that line opens it again.
   The folded fills are the page key `frame.folded` (fill keys,
   `pack/name`); a side is a rail when every fill it shows is folded. The
-  page starts with the config's `folded`, so the harness view lands with
+  page starts with the config's `folded`, so the Agents view lands with
   its node and run panes folded, and any pack opens one by taking
   its fill out of the list.
 - **Center:** one fill at a time, the one `here.view` names, else the first.

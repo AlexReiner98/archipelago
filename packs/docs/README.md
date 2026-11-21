@@ -38,8 +38,8 @@ are any.
 - **Counts that open, live where they can be:** views (each opens its
   tab), parts of views, items of its kinds on the map (each kind opens the
   Map on it, through `find.query`), kinds of link, actions, nodes for
-  agents (opens the Harness view), what it did in the newest run (opens the
-  run in the Harness, through `here.run`), and how many packs use it.
+  agents (opens the Agents view), what it did in the newest run (opens the
+  run in the Agents view, through `here.run`), and how many packs use it.
 - **Lists:** needs attention (waiting or failed) first, only when there
   are any; then features; then the foundation, the packs that provide
   one of the spec's interfaces. Each by name. A pack added from outside

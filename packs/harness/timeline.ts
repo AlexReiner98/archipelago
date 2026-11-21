@@ -1,5 +1,5 @@
 /**
- * The harness view's timeline: one tick per event of the run, in order,
+ * The Agents view's timeline: one tick per event of the run, in order,
  * coloured by what it was (replay.ts's `tickOf`), with the playhead on it.
  * A click or a drag on the strip moves the playhead; ⏮ goes to the start,
  * ▶ plays the run a step at a time, and "live" follows its end again.

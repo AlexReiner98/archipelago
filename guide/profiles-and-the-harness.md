@@ -19,7 +19,7 @@ come from packs such as [git](../packs/git/README.md) and
 [verdict](../packs/verdict/README.md) pack judges whether each node said
 in it worked.
 
-## The Harness view
+## The Agents view
 
 One view of every run, live or replayed: the tree of places and nodes,
 lit by the run looked at, its events beside it, and the node picked on the
