@@ -13,7 +13,7 @@ import { HUES } from "../spec/style.ts";
 import { colourOf, colours, keepLast, liveRuns, LIVE_MOST } from "../packs/harness/live.ts";
 import { foldForNode, groupsOf } from "../packs/harness/hooks.ts";
 import { DECIDED, dotsBox, nameOf, anglesOf, boughsOf, branchAt, cut, leavesOf, lightOf, packHues, pointAt, radial, ROOT, route, spotOf, STYLE, treeOf } from "../packs/harness/layout.ts";
-import { fitKey } from "../packs/harness/canvas.ts";
+import { fitKey, shouldFit } from "../packs/harness/canvas.ts";
 import { crowded, quadsOverlap, type Quad } from "../packs/harness/labels.ts";
 import { holdsOf, indexAt, nodeOf, playhead, stateAt, tickOf } from "../packs/harness/replay.ts";
 import { placementOf, placementText } from "../packs/harness/agents.ts";
@@ -538,4 +538,13 @@ test("quadsOverlap: turned outlines, not boxes; crowded: a wire name that hits a
   assert.ok(!quadsOverlap(diag(0), diag(3)));
   const names = [box(0, 0, 10, 4), box(5, 0, 10, 4), box(30, 0, 10, 4)];
   assert.deepEqual(crowded(names, [box(32, 1, 2, 2)]), [false, true, true], "the second hits the first, kept; the third hits a dot");
+});
+
+test("shouldFit: the big tree fits once and then only when asked; a preview keeps fitting unless moved by hand", () => {
+  const at = (o: Partial<{ small: boolean; fitted: boolean; manual: boolean; asked: boolean }>) => shouldFit({ small: false, fitted: false, manual: false, asked: false, ...o });
+  assert.equal(at({}), true, "the first time");
+  assert.equal(at({ fitted: true }), false, "the map changed: the camera stays");
+  assert.equal(at({ fitted: true, asked: true }), true, "a double-click");
+  assert.equal(at({ small: true, fitted: true }), true, "a preview follows its tree");
+  assert.equal(at({ small: true, fitted: true, manual: true }), false);
 });

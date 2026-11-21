@@ -56,7 +56,10 @@ find line has words, only what it finds and what lies near it.
   it points to, its tip on that particle's edge ("A depends_on B" points at
   B). A link long enough on screen, whose ends are big enough to be
   titled, or lit, has its type's name along its middle, over no title and
-  no other name.
+  no other name. A name grows and shrinks with the zoom (`link_name_size`
+  times the zoom, between `link_name_least_px` and `link_name_most_px`),
+  and fades in and out over `link_name_fade_ms` as it gains or loses its
+  room, never popping.
 - **The legend is the filter, and holds the dials** ([legend.ts](legend.ts),
   [panel.ts](panel.ts)). Closed, one line: the count and two tabs.
   `filter` opens each type (with its colour), each of a type's statuses

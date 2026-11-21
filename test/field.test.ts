@@ -254,3 +254,19 @@ test("link names: none over a title or each other, the lit first, upright", asyn
   assert.deepEqual([tx, ty], [90, 0]);
   assert.equal(wireName("depends_on"), "depends on");
 });
+
+test("link names grow with the zoom between a least and a most, and fade in and out instead of popping", async () => {
+  const { wireSize, easeWires } = await import("../packs/field/wires.ts");
+  assert.equal(wireSize(9, 1, 6, 22), 9);
+  assert.equal(wireSize(9, 2, 6, 22), 18, "twice the zoom, twice the size");
+  assert.equal(wireSize(9, 4, 6, 22), 22, "stops growing at the most");
+  assert.equal(wireSize(9, 0.5, 6, 22), 0, "too small to read: not drawn");
+  const fades = new Map();
+  assert.equal(easeWires(fades, [{ e: 1, x: 5, y: 5, angle: 0 }], 0.5), true);
+  assert.equal(fades.get(1).a, 0.5, "fading in");
+  easeWires(fades, [{ e: 1, x: 9, y: 5, angle: 0 }], 1);
+  assert.deepEqual(fades.get(1), { a: 1, x: 9, y: 5, angle: 0 }, "in, and where it is placed now");
+  assert.equal(easeWires(fades, [], 0.5), true, "lost its room: fading out");
+  easeWires(fades, [], 1);
+  assert.equal(fades.has(1), false, "gone once faded out");
+});

@@ -8,6 +8,9 @@
  *   in order (the lit first, then the longest on screen), and one that
  *   would overlap a title, the view's clear boxes or another name is left
  *   out, as titles are.
+ * - A name grows and shrinks with the zoom (`wireSize`): too small to read,
+ *   it isn't drawn; it stops growing at a most. One left out fades away and
+ *   one placed fades in (`easeWires`), so names never pop.
  */
 
 /** The arrowhead: its tip, then its two back corners. */
@@ -72,3 +75,38 @@ export function placeWires(wants: WireWant[], at: { width: number; height: numbe
 
 /** A link type as words: depends_on → depends on. */
 export const wireName = (type: string) => type.replace(/_/g, " ");
+
+/** A link name's size on screen at zoom `k`: its size in the map times the zoom, at most `most`; 0 when below `least`, too small to read. */
+export function wireSize(size: number, k: number, least: number, most: number): number {
+  const px = size * k;
+  return px < least ? 0 : Math.min(most, px);
+}
+
+/** A name's fade: how strong it is now, and where it was last drawn. */
+export interface WireFade {
+  a: number;
+  x: number;
+  y: number;
+  angle: number;
+}
+
+/**
+ * Each name's fade, a step on: those placed now ease in to 1 (and move to
+ * where they are placed), the rest ease out to 0 and are dropped there.
+ * `k` is how far a step goes (0..1). True while any still moves.
+ */
+export function easeWires(fades: Map<number, WireFade>, placed: WirePlaced[], k: number): boolean {
+  const now = new Map(placed.map((w) => [w.e, w]));
+  let moving = false;
+  for (const w of placed) if (!fades.has(w.e)) fades.set(w.e, { a: 0, x: w.x, y: w.y, angle: w.angle });
+  for (const [e, f] of fades) {
+    const w = now.get(e);
+    if (w) (f.x = w.x), (f.y = w.y), (f.angle = w.angle);
+    const want = w ? 1 : 0;
+    f.a += (want - f.a) * k;
+    if (Math.abs(f.a - want) < 0.01) f.a = want;
+    if (f.a !== want) moving = true;
+    if (!w && f.a === 0) fades.delete(e);
+  }
+  return moving;
+}

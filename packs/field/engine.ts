@@ -171,7 +171,8 @@ export function field(canvas: HTMLCanvasElement, S0: Settings, hooks: Hooks): Fi
         return [r.left - at.left - 4, r.top - at.top - 4, r.right - at.left + 4, r.bottom - at.top + 4] as [number, number, number, number];
       });
       paint(c, g, cam, S, light, colours, pick, s, match, clear);
-      dirty = easing || following;
+      // A link name still fading keeps the view painting.
+      dirty = easing || following || light.wiresMoving;
     }
     raf = requestAnimationFrame(tick);
   };

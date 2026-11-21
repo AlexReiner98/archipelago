@@ -16,9 +16,10 @@
  * - Small (one agent's tree among many, trees.ts): names show only on what
  *   is lit, said or picked.
  *
- * Drag to move, wheel to zoom, double-click to fit. The camera fits itself
- * only while it hasn't been moved by hand, and only when the tree's shape
- * changes (`fitKey`), not each time it is read again. A click picks a node,
+ * Drag to move, wheel to zoom, double-click to fit. The camera fits once,
+ * when first laid out, and then only on a double-click (`shouldFit`): the
+ * map changing under it never moves it. A small preview keeps fitting its
+ * tree as it changes (`fitKey`). A click picks a node,
  */
 import { h } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
@@ -244,6 +245,16 @@ export function fitKey(count: number, b: Placed["box"]): string {
   return `${count}|${[b.x, b.y, b.width, b.height].map((n) => Math.round(n)).join(",")}`;
 }
 
+/**
+ * Whether the camera fits now: when asked (a double-click), always; a
+ * small preview, unless moved by hand; any other, only its first time.
+ */
+export function shouldFit(s: { small: boolean; fitted: boolean; manual: boolean; asked: boolean }): boolean {
+  if (s.asked) return true;
+  if (s.manual) return false;
+  return s.small || !s.fitted;
+}
+
 export interface CanvasProps {
   tree: Tree;
   placed: Placed;
@@ -272,18 +283,23 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const [fits, refit] = useState(0);
   const now = useRef({ tree, placed, k: view.k });
   now.current = { tree, placed, k: view.k };
-  // Small, names mostly hidden: fit the dots, so the tree fills its cell.
   // Fit the dots, not the names: a long name never shrinks or shifts the picture.
   const bounds = dotsBox(placed, small ? 40 : 60);
-  // Once the camera is moved by hand it stays where it is put; a double-click fits again and gives it back.
+  // The camera fits once, when the canvas is first laid out, and then only when asked (a double-click):
+  // the map changing under it never moves it. A small preview, never steered, keeps fitting its tree.
   const manual = useRef(false);
+  const fitted = useRef(false);
+  const ask = useRef(false);
   const shape = fitKey(tree.order.length, bounds);
 
   useEffect(() => {
-    const W = box.current?.clientWidth || 900;
-    const H = box.current?.clientHeight || 700;
+    const W = box.current?.clientWidth ?? 0;
+    const H = box.current?.clientHeight ?? 0;
+    if (!W || !H) return;
+    if (!shouldFit({ small: !!small, fitted: fitted.current, manual: manual.current, asked: ask.current })) return;
+    ask.current = false;
+    fitted.current = true;
     const k = Math.min(3, Math.max(0.1, Math.min(W / bounds.width, H / bounds.height)));
-    if (manual.current) return;
     setView({ k, x: bounds.x - (W / k - bounds.width) / 2, y: bounds.y - (H / k - bounds.height) / 2 });
   }, [shape, fits, small]);
   // Fit again when the canvas changes size: it is first measured before the page has laid it out.
@@ -370,7 +386,7 @@ export const Canvas = ({ tree, placed, hues, statuses, rings, heard, held, count
   const statusOf = (n?: NodeInfo) => (n?.source ? statuses.get(n.source) : undefined);
   const rest = tree.order.filter((t) => t.parent);
   return html`
-    <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => ((manual.current = false), refit((n) => n + 1))} title="Click a node to pick it; drag to move; wheel to zoom; double-click to fit">
+    <div class=${`rx-canvas${panning ? " panning" : ""}${small ? " rx-small" : ""}`} ref=${box} onWheel=${onWheel} onPointerDown=${onDown} onDblClick=${() => ((manual.current = false), (ask.current = true), refit((n) => n + 1))} title="Click a node to pick it; drag to move; wheel to zoom; double-click to fit">
       <svg ref=${svg}><g transform=${`scale(${view.k}) translate(${-view.x} ${-view.y})`}>
         <g>
           ${rest.map((t) => {

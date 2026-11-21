@@ -126,10 +126,10 @@ Names are whole, never cut, and never show a path: a path is said as
 whose it is, after a dot (`nameOf`, `placeName`): its project's folder,
 and the file when it isn't the usual CLAUDE.md or MEMORY.md, so
 "project memory · archipelago-next", "auto memory · Aperture". The whole
-title is in the tooltip. The camera fits the
-dots, not the names, so a long name never shrinks the picture; it fits
-again only when the tree's shape changes (`fitKey`), and never once you
-have moved it by hand, until a double-click.
+title is in the tooltip. The camera fits the dots, not the names, so a long name never shrinks the
+picture. The big tree fits once, when first laid out, and then only on a
+double-click: the map changing under it never moves it (`shouldFit`). A
+small preview keeps fitting its tree as it changes (`fitKey`).
 
 The names on the wires (a bough's, along its branch) grow and shrink with
 the zoom, and give way ([labels.ts](labels.ts)): after each draw, one that

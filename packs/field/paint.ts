@@ -10,7 +10,7 @@ import { neighbours, type G, type Grid, type Settings } from "./graph.ts";
 import { place, type Want } from "./labels.ts";
 import { FAINT, FOUND } from "./filter.ts";
 import { CIRCLE, edge, fill, outline, reach } from "./shapes.ts";
-import { arrow, placeWires, wireName, type WireWant } from "./wires.ts";
+import { arrow, easeWires, placeWires, wireName, wireSize, type WireFade, type WireWant } from "./wires.ts";
 
 /** The drawing's own dials. */
 export const DRAW: Dial[] = [
@@ -27,6 +27,10 @@ export const DRAW: Dial[] = [
   { key: "arrow_from_px", label: "arrows from", min: 0, max: 200, step: 2, value: 24, then: "paint", doc: "A link shorter than this on screen, in px, has no arrowhead." },
   { key: "link_names", label: "link names", min: 0, max: 1, step: 1, value: 1, choices: ["no", "yes"], then: "paint", doc: "A link long enough on screen has its type's name along its middle: a lit one, or one whose ends are both big enough to be titled ('titles from')." },
   { key: "link_name_from_px", label: "link names from", min: 20, max: 400, step: 5, value: 90, then: "paint", doc: "A link shorter than this on screen, in px, is not named." },
+  { key: "link_name_size", label: "link name size", min: 1, max: 40, step: 0.5, value: 9, then: "paint", doc: "A link name's size in the map: on screen it is this times the zoom, so it grows and shrinks with the view." },
+  { key: "link_name_least_px", label: "link names least", min: 2, max: 20, step: 0.5, value: 6, then: "paint", doc: "A link name smaller than this on screen, in px, isn't drawn." },
+  { key: "link_name_most_px", label: "link names most", min: 6, max: 60, step: 1, value: 22, then: "paint", doc: "A link name stops growing at this size on screen, in px." },
+  { key: "link_name_fade_ms", label: "link names fade", min: 0, max: 1000, step: 10, value: 220, then: "paint", doc: "How long a link name takes to fade in or out when it gains or loses its room, in ms." },
   { key: "link_name_most", label: "link names at most", min: 0, max: 200, step: 5, value: 40, then: "paint", doc: "At most this many link names at once: the lit first, then the longest." },
   { key: "label_px", label: "titles from", min: 2, max: 40, step: 0.5, value: 9, then: "paint", doc: "A particle's title shows once its radius reaches this on screen, in px." },
   { key: "label_hubs", label: "always name hubs", min: 0, max: 100, step: 1, value: 15, then: "paint", doc: "The this-many most linked items are named at any zoom, so the picture reads before you zoom in." },
@@ -80,6 +84,17 @@ export class Light {
   shine = new Float32Array(0);
   shining = new Set<number>();
   focus = -1;
+  /** Each link name's fade, by link: names fade in and out, never pop (wires.ts). */
+  wires = new Map<number, WireFade>();
+  /** True while a link name is still fading: the view keeps painting. */
+  wiresMoving = false;
+  private wiresAt = 0;
+  /** A step of the link names' fade. */
+  easeWires(placed: Parameters<typeof easeWires>[1], ms: number): void {
+    const now = performance.now(), dt = this.wiresAt ? Math.min(100, now - this.wiresAt) : 16;
+    this.wiresAt = now;
+    this.wiresMoving = easeWires(this.wires, placed, ms > 0 ? 1 - Math.exp(-dt / ms) : 1);
+  }
   /** The ids named last frame: they are placed first, so names hold still while the map settles. */
   named = new Set<string>();
   private leftAt = 0;
@@ -370,11 +385,13 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
   c.textAlign = "left";
 
   // Link names, along their middles, over nothing named: the lit first, then the longest on screen.
-  if (!S.link_names || S.link_name_most! <= 0) return;
-  c.font = "9px ui-sans-serif, system-ui, sans-serif";
+  // They grow and shrink with the zoom, and fade in and out as they gain or lose their room.
+  const namePx = S.link_names && S.link_name_most! > 0 ? wireSize(S.link_name_size!, cam.k, S.link_name_least_px!, S.link_name_most_px!) : 0;
+  if (!namePx && !light.wires.size) return void (light.wiresMoving = false);
+  c.font = `${(namePx || S.link_name_least_px!).toFixed(1)}px ui-sans-serif, system-ui, sans-serif`;
   const sx = (i: number) => g.x[i]! * cam.k + cam.tx, sy = (i: number) => g.y[i]! * cam.k + cam.ty;
   const wires: WireWant[] = [];
-  for (let e = 0; e < g.m; e++) {
+  for (let e = 0; namePx && e < g.m; e++) {
     const a = g.a[e]!, b = g.b[e]!;
     if (match && !(full(a) && full(b))) continue;
     const on = shine[a]! > 0.5 && shine[b]! > 0.5;
@@ -382,21 +399,23 @@ export function paint(c: CanvasRenderingContext2D, g: G, cam: Cam, S: Settings, 
     if (!inView(a, 0) && !inView(b, 0)) continue;
     // Not lit: named only at the zoom where both ends' titles show, so the whole map is not buried in link names.
     if (!on && Math.min(g.r[a]!, g.r[b]!) * cam.k < S.label_px!) continue;
-    wires.push({ e, x1: sx(a), y1: sy(a), x2: sx(b), y2: sy(b), w: c.measureText(wireName(g.linkKinds[g.kind[e]!]!)).width + 4, h: 11, lit: on });
+    wires.push({ e, x1: sx(a), y1: sy(a), x2: sx(b), y2: sy(b), w: c.measureText(wireName(g.linkKinds[g.kind[e]!]!)).width + 4, h: namePx + 2, lit: on });
   }
   const taken = [...clear, ...placed.map((p) => p.box as [number, number, number, number])];
   // The particles' own room at each end, so a name sits clear of both.
-  const named = placeWires(wires, { width, height, from: S.link_name_from_px!, most: S.link_name_most!, ends: 12, taken });
+  const named = namePx ? placeWires(wires, { width, height, from: S.link_name_from_px!, most: S.link_name_most!, ends: 12, taken }) : [];
+  light.easeWires(named, S.link_name_fade_ms!);
   c.textAlign = "center";
   c.lineWidth = S.label_halo!;
-  for (const w of named) {
-    const a = g.a[w.e]!, b = g.b[w.e]!;
-    c.globalAlpha = Math.max(faint, Math.min(shine[a]!, shine[b]!)) * 0.9;
+  for (const [e, w] of light.wires) {
+    if (e >= g.m) continue;
+    const a = g.a[e]!, b = g.b[e]!;
+    c.globalAlpha = Math.max(faint, Math.min(shine[a]!, shine[b]!)) * 0.9 * w.a;
     c.fillStyle = ink.muted;
     c.save();
     c.translate(w.x, w.y);
     c.rotate(w.angle);
-    const t = wireName(g.linkKinds[g.kind[w.e]!]!);
+    const t = wireName(g.linkKinds[g.kind[e]!]!);
     if (S.label_halo! > 0) c.strokeText(t, 0, 0);
     c.fillText(t, 0, 0);
     c.restore();
