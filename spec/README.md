@@ -2,38 +2,39 @@
 
 The interfaces packs talk through. Any pack can be replaced; these can't
 be changed silently. Each contract is a TypeScript module (the types) and a
-short doc. This is **edition 1, in draft**, while its owner shapes it.
+short doc.
+
+<!-- contracts: written by scripts/contracts.ts from the spec -->
+This is **edition 7**. A capability that came after edition 1 shows the edition it came in.
 
 | Contract | Capabilities | What it is |
 |---|---|---|
-| [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` | Bounded reads, live watch, the write chain |
-| [action](action.md) | `action.register` `action.list` `action.invoke` | The one way anyone changes anything |
-| [agent](agent.md) | `agent.node` `agent.tree` `agent.run` | Say, refuse, act. Places, nodes, runs |
-| [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event per say, refusal and act |
-| [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | UI composition: places in the UI that packs fill |
-| [frame](frame.md) | (regions) | The page's six regions; a frame is a pack |
-| [loader](loader.md) | `loader.tree` | The config tree: read, watch, edit |
-| [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | Large graphs: one WebGL2 surface, filled with layers |
-| [here](here.md) | `here.declare` `here.read` `here.set` | Shared ephemeral state: what is being looked at |
-| [types](types.md) | `types.define` `types.read` | Bases, flavours that add fields, and kinds of link |
-| [profile](profile.md) | `profile.read` | Which runs a node is for |
-| [changeset](changeset.md) | (a format) | A change in full: header and facts `[op, id, field, value]` |
-| [style](style.md) | (tokens) | The look views share: colours, type, space and marks |
+| [graph](graph.md) | `graph.read` `graph.watch` `graph.stage` `graph.commit` | The graph pack stores items and links and is the truth. |
+| [action](action.md) | `action.register` `action.list` `action.invoke` | Every change goes through a declared action, whether a person or an agent makes it. |
+| [agent](agent.md) | `agent.node` `agent.tree` `agent.run` `agent.facts` (5) `agent.gate` (5) | Everything the map says to an agent and everything the agent does passes through one service. |
+| [exchange](exchange.md) | `exchange.append` `exchange.read` `exchange.watch` | One event for each thing that passes between the map and an agent. |
+| [slot](slot.md) | `slot.declare` `slot.fill` `slot.read` | How the UI is put together out of packs. |
+| [scene](scene.md) | `layout.region` `scene.layer` `scene.view` | How large graphs are drawn. |
+| [here](here.md) | `here.declare` `here.read` `here.set` | What is being looked at, now. |
+| [types](types.md) | `types.define` `types.read` | What kinds of item and link the map holds. |
+| [profile](profile.md) | `profile.read` (5) | Not every node fits every run. |
+| [loader](loader.md) | `loader.tree` (7) | The config tree as a capability. |
+| [changeset](changeset.md) | (a format) | A change, written in full. |
+| [frame](frame.md) | (a format) | The page around the canvas. |
+| [style](style.md) | (a format) | The look every view shares. |
+
+<!-- /contracts -->
 
 [common.ts](common.ts) holds the shared words; [index.ts](index.ts) puts
 every capability's key and type in one map for a runtime to declare.
 
-Decided: panels are Preact, the graph is one WebGL2 scene
+Decided with Alex: panels are Preact, the graph is one WebGL2 scene
 surface, and the spec owns the six places of edition 1 and edition 2's
 `skill:` and `memory:`, where the map speaks through the files it writes.
 Edition 3 adds the place `compact` and the person's acts, `decision` and
 `notice` ([agent](agent.md)). Edition 4 says a node's same words once per
 context (`repeat`, `again`). Edition 5 adds a run's facts and gates
 ([agent](agent.md)), and the read side of profiles ([profile](profile.md)).
-Edition 6 adds the style tokens every view draws with ([style](style.md)).
-Edition 7 adds the page's six regions, a fill's `when`, the broker's
-`arrange`, the shared `Slot` and `here.view` ([frame](frame.md)), and
-`loader.tree`, the config tree as a capability ([loader](loader.md)).
 
 ## Packs ask for capabilities
 
@@ -103,8 +104,8 @@ The spec has editions: 1, 2, 3… Packs don't declare versions of anything.
 - Each capability says the edition it arrived in (`since`) and, if
   retired, the edition and what replaces it. The list is the spec's
   history.
-- Until edition 1 is accepted, its capabilities can still be edited:
-  nothing has been built on them yet.
+- Edition 1 is accepted (Alex, 20 Nov 2026): its capabilities' meanings
+  are fixed.
 
 Cordis links by key alone and leaves versioning open (§6.6). It names two
 problems: drift (a key's interface changing under a consumer) and
