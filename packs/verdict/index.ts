@@ -67,6 +67,7 @@ function pageOf<T>(list: T[], page?: PageRequest): Page<T> {
 
 const verdict: Pack = {
   id: "verdict",
+  about: "Judges, for each agent session, whether each thing the map said helped.",
   inject: ["exchange.read", "exchange.watch", "agent.tree", "graph.read", "graph.watch"],
   async apply(ctx: Context) {
     const read = ctx.get<ExchangeRead>("exchange.read");

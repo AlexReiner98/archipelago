@@ -11,6 +11,7 @@ import { css } from "./tokens.ts";
 
 const style: Pack = {
   id: "style",
+  about: "The look every view shares: colours, type and marks.",
   apply(ctx: Context) {
     ctx.effect(() => {
       const el = document.createElement("style");

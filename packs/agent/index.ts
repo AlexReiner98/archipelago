@@ -112,6 +112,7 @@ interface Registered {
 
 const agent: Pack = {
   id: "agent",
+  about: "Hears what the map says to an agent at each moment of its work, and what the agent does.",
   inject: ["exchange.append"],
   apply(ctx: Context) {
     const exchange = ctx.get<ExchangeAppend>("exchange.append");

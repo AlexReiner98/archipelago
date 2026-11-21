@@ -103,6 +103,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 
 const map: Pack = {
   id: "map",
+  about: "The Map view: items and their links, drawn for a search.",
   inject: ["find.index", "here.read", "here.set", "slot.declare", "slot.fill", "slot.read"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");

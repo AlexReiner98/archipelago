@@ -20,6 +20,7 @@ export const QUESTION: BaseDef = {
 
 const question: Pack = {
   id: "question",
+  about: "Questions: what is still to be decided, and what was.",
   inject: ["types.define"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").base(QUESTION);

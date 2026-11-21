@@ -83,6 +83,7 @@ const key = (remote: string) => remote.toLowerCase();
 
 const git: Pack<GitConfig> = {
   id: "git",
+  about: "Notes which git repository each agent session works in.",
   inject: ["agent.facts", "graph.read", "graph.watch", "types.define", "action.register", "action.invoke"],
   async apply(ctx: Context, config: GitConfig = {}) {
     const run = config.git ?? realGit;

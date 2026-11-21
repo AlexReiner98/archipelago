@@ -31,6 +31,7 @@ const RELEASE = "schema.release";
 
 const schema: Pack<SchemaConfig> = {
   id: "schema",
+  about: "Checks every change against the kinds of item, and holds back what doesn't fit.",
   inject: ["graph.stage", "graph.read", "types.read", "action.register"],
   async apply(ctx: Context, config: SchemaConfig = {}) {
     if (config.db) {

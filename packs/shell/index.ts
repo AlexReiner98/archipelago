@@ -31,6 +31,7 @@ html, body { margin:0; height:100%; background:var(--bg); color:var(--fg); font:
 
 const shell: Pack = {
   id: "shell",
+  about: "The page's frame: its header and the tabs between views.",
   inject: ["slot.declare", "slot.fill", "slot.read"],
   apply(ctx: Context) {
     const read = ctx.get<SlotRead>("slot.read");

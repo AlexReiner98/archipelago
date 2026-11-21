@@ -32,6 +32,7 @@ export function brief(docs: PackDoc[]): string {
 
 const tool: Pack = {
   id: "docs-tool",
+  about: "Lets agents read what every running pack is for and what it adds.",
   inject: [HOST, KEY],
   apply(ctx: Context) {
     const docs = ctx.get<DocsRead>(KEY);

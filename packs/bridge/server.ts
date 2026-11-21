@@ -69,6 +69,7 @@ function body(req: IncomingMessage): Promise<any> {
 
 const bridge: Pack<BridgeConfig> = {
   id: "bridge",
+  about: "Connects the page in your browser to the server.",
   inject: KEYS,
   async apply(ctx: Context, config: BridgeConfig = {}) {
     const as = config.actor ? ctx.intercept({ [META.actor]: config.actor }) : ctx;

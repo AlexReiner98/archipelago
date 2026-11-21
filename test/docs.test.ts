@@ -1,33 +1,32 @@
 import assert from "node:assert/strict";
+import { readdir, readFile } from "node:fs/promises";
 import { test } from "node:test";
 import type { ActionInfo, ActionList } from "../spec/action.ts";
 import type { AgentTree, NodeInfo } from "../spec/agent.ts";
 import type { SlotRead } from "../spec/slot.ts";
+import type { TypesRead } from "../spec/types.ts";
 import { Runtime, type Pack } from "../runtime/core.ts";
 import { Loader } from "../runtime/loader.ts";
 import docs, { KEY, type DocsRead } from "../packs/docs/index.ts";
 import tool, { brief } from "../packs/docs/tool.ts";
-import { addsOf, groupOf, grouped, matches, merged, stateWords, usedBy } from "../packs/docs/cards.ts";
-import { aboutOf, keyDoc, reference, shownConfig, type PackDoc } from "../packs/docs/read.ts";
-import type { TypesRead } from "../spec/types.ts";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { countsOf, listsOf, matches, merged, stateWords, usedBy } from "../packs/docs/cards.ts";
+import { keyDoc, reference, shownConfig, type PackDoc } from "../packs/docs/read.ts";
 import type { McpHost, ToolDef } from "../packs/mcp/host.ts";
 
 /** The registries a server has, as stubs: what the docs pack reads. */
 function registries(actions: ActionInfo[], nodes: NodeInfo[]) {
   const on = new Set<() => void>();
+  const watch = (f: () => void) => (on.add(f), () => void on.delete(f));
   const pack: Pack = {
     id: "action",
     apply(ctx) {
-      ctx.provide<ActionList>("action.list", () => ({ list: () => actions, watch: (f) => (on.add(f), () => void on.delete(f)) }));
-      ctx.provide<AgentTree>("agent.tree", () => ({ nodes: () => nodes, watch: (f) => (on.add(f), () => void on.delete(f)) }));
+      ctx.provide<ActionList>("action.list", () => ({ list: () => actions, watch }));
+      ctx.provide<AgentTree>("agent.tree", () => ({ nodes: () => nodes, watch }));
       const all = {
         types: [{ name: "node", base: "record", doc: "Words said to agents", statuses: {} as any, fields: {}, trial: false, pack: "words" }],
         links: [{ name: "says_at", pack: "words" }],
       };
-      ctx.provide<TypesRead>("types.read", () => ({ all: () => all, get: () => undefined, watch: (f) => (on.add(f), () => void on.delete(f)) }));
+      ctx.provide<TypesRead>("types.read", () => ({ all: () => all, get: () => undefined, watch }));
     },
   };
   return { pack, changed: () => [...on].forEach((f) => f()) };
@@ -36,6 +35,7 @@ function registries(actions: ActionInfo[], nodes: NodeInfo[]) {
 const graph: Pack = { id: "graph", apply: (ctx) => void ctx.provide("graph.read", () => ({})) };
 const words: Pack = {
   id: "words",
+  about: "Notes to agents whose wording lives on the map.",
   inject: ["graph.read"],
   apply(ctx) {
     ctx.provide("words.own", () => ({}));
@@ -45,12 +45,7 @@ const words: Pack = {
 const lonely: Pack = { id: "lonely", inject: ["nothing.here"], apply() {} };
 
 const ACTIONS: ActionInfo[] = [
-  {
-    name: "words.set",
-    title: "Set a node's words",
-    pack: "words",
-    input: { type: "object", properties: { node: { type: "string", description: "Its id" }, kind: { enum: ["a", "b"] }, at: { type: "array", items: { type: "string" } } }, required: ["node"] },
-  },
+  { name: "words.set", title: "Set a node's words", pack: "words", input: { type: "object", properties: { node: { type: "string" } }, required: ["node"] } },
   { name: "graph.x", title: "Elsewhere", pack: "graph", input: { type: "object" } },
 ];
 const NODES: NodeInfo[] = [
@@ -59,12 +54,7 @@ const NODES: NodeInfo[] = [
   { id: "loaded/c", pack: "loaded", name: "c", kind: "skill", title: "C", at: ["skill:x"] },
 ];
 
-const README = "# words\n\nAgent nodes whose words are on the map. Each graph item of type `node` is one.\n";
-
 async function boot(extra: Pack[] = []) {
-  const dir = await mkdtemp(join(tmpdir(), "docs-"));
-  await mkdir(join(dir, "words"));
-  await writeFile(join(dir, "words", "README.md"), README);
   const rt = new Runtime();
   rt.onError = () => {};
   const reg = registries(ACTIONS, NODES);
@@ -75,39 +65,40 @@ async function boot(extra: Pack[] = []) {
     { id: "graph", pack: "graph" },
     { id: "words", pack: "words", config: { seed: [1], apiToken: "s3cret", onListen: () => {} } },
     { id: "lonely", pack: "lonely" },
-    { id: "docs", pack: "docs", config: { every: 20, packs: dir } },
+    { id: "docs", pack: "docs", config: { every: 20 } },
     ...extra.map((p) => ({ id: p.id, pack: p.id })),
   ]);
   return { rt, loader, reg, read: rt.root.get<DocsRead>(KEY) };
 }
 
 test("docs.read: every loaded pack, in tree order, read from the packs themselves", async () => {
-  const { loader, read } = await boot();
+  const { rt, loader, read } = await boot();
   const all = await read.packs();
   assert.deepEqual(all.map((d) => d.id), ["action", "graph", "words", "lonely", "docs"]);
   const w = all.find((d) => d.id === "words")!;
   assert.equal(w.side, "server");
   assert.equal(w.state, "active");
+  // What it says it is for, from the pack itself; none when it says nothing.
+  assert.equal(w.about, "Notes to agents whose wording lives on the map.");
+  assert.equal(all.find((d) => d.id === "graph")!.about, undefined);
   // Provides, a child's included; injects, with the spec contract each key is in.
   assert.deepEqual(w.provides.map((k) => k.key), ["words.own", "words.part"]);
   assert.deepEqual(w.inject, [{ key: "graph.read", contract: "graph", since: 1, doc: keyDoc("graph.read").doc }]);
   assert.deepEqual(w.parts, ["words-part"]);
-  // Its own actions only, with their inputs; places counted from its nodes.
+  // Its own actions, the kinds of item it defines, places counted from its nodes.
   assert.deepEqual(w.actions.map((a) => a.name), ["words.set"]);
+  assert.deepEqual(w.types, [{ name: "node", base: "record", doc: "Words said to agents" }, { name: "says_at", base: "link" }]);
   assert.deepEqual(w.places, [{ place: "tool:Bash", nodes: 2 }, { place: "reply_end", nodes: 1 }]);
   // Config: functions named, secrets hidden.
   assert.deepEqual(w.config, { seed: [1], apiToken: "•••", onListen: "ƒ" });
-  // What implements the spec, and what waits.
   assert.deepEqual(all.find((d) => d.id === "action")!.provides.map((k) => k.contract), ["action", "agent", "types"]);
   const l = all.find((d) => d.id === "lonely")!;
   assert.equal(l.state, "waiting");
   assert.deepEqual(l.missing, ["nothing.here"]);
-  assert.equal(all.find((d) => d.id === "docs")!.provides[0]!.key, KEY);
-  // What it is for, from its README; the kinds of item it defines.
-  assert.equal(w.about, "Agent nodes whose words are on the map.");
-  assert.equal(all.find((d) => d.id === "graph")!.about, undefined);
-  assert.deepEqual(w.types, [{ name: "node", base: "record", doc: "Words said to agents" }, { name: "says_at", base: "link" }]);
-  assert.deepEqual(await read.about(["words", "graph", "../x"]), { words: "Agent nodes whose words are on the map." });
+  // Built in: loaded from under this repository's root, as the loader says where from.
+  assert.equal(w.builtIn, false);
+  assert.equal(reference(rt, { side: "server", root: "mem:/" }).find((d) => d.id === "words")!.builtIn, true);
+  assert.equal(reference(rt, { side: "server", root: "mem:/w" }).find((d) => d.id === "graph")!.builtIn, false);
   await loader.apply([]);
 });
 
@@ -154,7 +145,7 @@ test("the packs tool: agents read the same reference", async () => {
   assert.ok(packs);
   const list = (await packs.call({}, undefined)).text;
   assert.equal(list, brief(await read.packs()));
-  assert.match(list, /^words \(active\) Agent nodes whose words are on the map\.; provides words\.own, words\.part; actions words\.set; speaks at 2 places$/m);
+  assert.match(list, /^words \(active\) Notes to agents whose wording lives on the map\.; provides words\.own, words\.part; actions words\.set; speaks at 2 places$/m);
   assert.match(list, /^lonely \(waiting\); waits for nothing\.here$/m);
   const one = JSON.parse((await packs.call({ pack: "words" }, undefined)).text);
   assert.equal(one.actions[0].name, "words.set");
@@ -162,20 +153,27 @@ test("the packs tool: agents read the same reference", async () => {
   await loader.apply([]);
 });
 
-test("aboutOf: a README's first sentence, in plain words, wiring cut", () => {
-  assert.equal(aboutOf("# x\n\nThe one way anyone changes anything. Provides `action.register`.\n"), "The one way anyone changes anything.");
-  assert.equal(aboutOf("# x\n\nPage side. The map as the page holds it, and [find](f.md).\n"), "The map as the page holds it, and find.");
-  assert.equal(aboutOf("# x\n\nThe types broker ([spec/types.md](../../spec/types.md)): provides\n`types.define`.\n"), "The types broker.");
-  assert.equal(aboutOf("# x\n\nOne of the map's bases: see [work](../work/README.md).\n"), "One of the map's bases.");
-  assert.equal(aboutOf("# agent\n\nProvides `agent.node` and `agent.tree`.\n"), undefined);
-  assert.equal(aboutOf("# only a title\n"), undefined);
+test("every pack in this repository says what it is for, in one sentence", async () => {
+  const root = new URL("../packs/", import.meta.url);
+  const missing: string[] = [];
+  let packs = 0;
+  for (const dir of await readdir(root)) {
+    for (const file of await readdir(new URL(`${dir}/`, root)).catch(() => [] as string[])) {
+      if (!file.endsWith(".ts")) continue;
+      const src = await readFile(new URL(`${dir}/${file}`, root), "utf8");
+      // A pack object: its id at the top level of an object literal, two spaces in.
+      for (const m of src.matchAll(/^ {2}id: "([a-z-]+)",\n(?! {2}about: "[A-Z][^"\n]*\.",\n)/gm)) missing.push(`${dir}/${file} (${m[1]})`);
+      packs += [...src.matchAll(/^ {2}id: "[a-z-]+",\n {2}about: /gm)].length;
+    }
+  }
+  assert.deepEqual(missing, []);
+  assert.ok(packs >= 40);
 });
 
 const doc = (over: Partial<PackDoc>): PackDoc => ({ id: "p", side: "server", state: "active", position: [0], inject: [], provides: [], actions: [], places: [], ...over });
-
 const key = (k: string) => ({ key: k });
 
-test("cards: what a pack adds, each thing opening where it is; its state in words", () => {
+test("cards: what a pack adds, as counts that open where each thing is", () => {
   const map = doc({ id: "map", slots: { declares: [{ name: "map.bar", merge: "many" }], fills: [{ slot: "shell.main", name: "view", title: "Map" }] } });
   const find = doc({ id: "find", slots: { declares: [], fills: [{ slot: "map.bar", name: "find", title: "Find" }, { slot: "root", name: "x" }] } });
   const p = doc({
@@ -186,47 +184,34 @@ test("cards: what a pack adds, each thing opening where it is; its state in word
   });
   const user = doc({ id: "user", inject: [key("p.read")] });
   const all = [map, find, p, user];
-  assert.deepEqual(addsOf(p, all), {
-    views: [],
-    parts: [],
-    kinds: [{ title: "work", query: "type:work" }, { title: "branch (a kind of work)", query: "type:branch" }, { title: "part_of (link)" }],
-    actions: ["Make an item"],
-    says: 3,
-    usedBy: ["user"],
-  });
-  assert.deepEqual(addsOf(map, all).views, [{ title: "Map", view: "map" }]);
+  assert.deepEqual(countsOf(p, all), [
+    { key: "kinds", label: "3 kinds of item", items: [{ title: "work", query: "type:work" }, { title: "branch (a kind of work)", query: "type:branch" }, { title: "part_of (link)" }] },
+    { key: "actions", label: "1 action", items: [{ title: "Make an item" }] },
+    { key: "says", label: "3 things said to agents", view: "reflex" },
+    { key: "used", label: "used by 1 pack", items: [{ title: "user" }] },
+  ]);
+  assert.deepEqual(countsOf(map, all), [{ key: "views", label: "1 view", items: [{ title: "Map", view: "map" }] }]);
   // A part opens the view it is in: the pack that declared its slot.
-  assert.deepEqual(addsOf(find, all).parts, [{ title: "Find", view: "map" }]);
+  assert.deepEqual(countsOf(find, all), [{ key: "parts", label: "1 part of a view", items: [{ title: "Find", view: "map" }] }]);
   assert.deepEqual(usedBy(user, all), []);
-  assert.equal(stateWords(p), undefined);
-  assert.equal(stateWords(doc({ state: "waiting", missing: ["graph.read"] })), "Waiting for another pack to load.");
-  assert.equal(stateWords(doc({ state: "off" })), "Turned off.");
+  assert.deepEqual(countsOf(user, all), []);
   assert.ok(matches(p, "make item"));
   assert.ok(matches(p, "branch"));
   assert.ok(!matches(p, "tool:bash"));
 });
 
-test("groups: problems, views, agents, kinds, core, other, by what each pack adds", () => {
-  const all = [
-    doc({ id: "w", state: "waiting" }),
-    doc({ id: "map", slots: { declares: [], fills: [{ slot: "shell.main", name: "view", title: "Map" }] } }),
-    doc({ id: "words", places: [{ place: "prompt", nodes: 1 }], types: [{ name: "node", base: "record" }] }),
-    doc({ id: "mcp", inject: [key("mcp.host")] }),
-    doc({ id: "work", types: [{ name: "work" }] }),
-    doc({ id: "graph", provides: [key("graph.read")] }),
-    doc({ id: "user", inject: [key("graph.read")] }),
-  ];
-  assert.deepEqual(all.map((d) => groupOf(d, all)), ["trouble", "views", "agents", "agents", "kinds", "core", "other"]);
-  assert.deepEqual(grouped(all).map((g) => [g.group.title, g.docs.map((d) => d.id)]), [
+test("lists: problems first and only when there are any, then built in, then added; states in words", () => {
+  const all = [doc({ id: "a", builtIn: true }), doc({ id: "w", state: "waiting", builtIn: true }), doc({ id: "x", builtIn: false }), doc({ id: "b" })];
+  assert.deepEqual(listsOf(all).map((l) => [l.title, l.docs.map((d) => d.id)]), [
     ["Needs attention", ["w"]],
-    ["Views", ["map"]],
-    ["Talks to agents", ["words", "mcp"]],
-    ["Kinds of item", ["work"]],
-    ["Core", ["graph"]],
-    ["Other", ["user"]],
+    ["Built in", ["a", "b"]],
+    ["Added", ["x"]],
   ]);
-  // Filtered, a pack keeps the group it has among all.
-  assert.deepEqual(grouped([all[5]!], all).map((g) => g.group.id), ["core"]);
+  assert.deepEqual(listsOf([doc({ builtIn: true })]).map((l) => l.title), ["Built in"]);
+  assert.equal(stateWords(doc({})), undefined);
+  assert.equal(stateWords(doc({ state: "waiting" })), "Waiting for another pack to load.");
+  assert.equal(stateWords(doc({ state: "off" })), "Turned off.");
+  assert.equal(stateWords(doc({ state: "failed", error: "boom" })), "Failed to start: boom");
 });
 
 test("merged: a pack with a server half and a page half is one card", () => {
@@ -238,9 +223,8 @@ test("merged: a pack with a server half and a page half is one card", () => {
   ];
   const all = merged(server, page);
   assert.deepEqual(all.map((d) => d.id), ["docs", "bridge", "graph", "shell"]);
-  assert.deepEqual(addsOf(all[0]!).views, [{ title: "Packs", view: "docs" }]);
+  assert.deepEqual(countsOf(all[0]!)[0]!.items, [{ title: "Packs", view: "docs" }]);
   assert.equal(all[0]!.about, "What each pack is for.");
   assert.deepEqual(all[1]!.provides.map((k) => k.key), ["graph.read"]);
-  assert.equal(stateWords(all[3]!), "Failed to start: boom");
   assert.equal(JSON.stringify(shownConfig({ deep: { password: 1, x: undefined } })), '{"deep":{"password":"•••"}}');
 });

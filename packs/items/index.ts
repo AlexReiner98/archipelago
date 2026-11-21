@@ -51,6 +51,7 @@ const isLink = (t: TypeInfo | LinkInfo | undefined): t is LinkInfo => !!t && !("
 
 const items: Pack = {
   id: "items",
+  about: "Makes, changes and links items on the map.",
   inject: ["action.register", "graph.read", "types.read"],
   apply(ctx: Context) {
     const register = ctx.get<ActionRegister>("action.register");

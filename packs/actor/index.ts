@@ -15,6 +15,7 @@ export const ACTOR: BaseDef = {
 
 const actor: Pack = {
   id: "actor",
+  about: "Actors: the people and agents who work on the map.",
   inject: ["types.define"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").base(ACTOR);

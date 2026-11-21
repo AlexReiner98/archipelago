@@ -15,6 +15,7 @@ export const LINKS: LinkDef[] = [
 
 const links: Pack = {
   id: "links",
+  about: "The kinds of link between items: part of, depends on, waits on, bears on, about.",
   inject: ["types.define"],
   apply(ctx: Context) {
     const define = ctx.get<TypesDefine>("types.define");

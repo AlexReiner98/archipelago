@@ -22,6 +22,7 @@ export const NAME = /^[a-z0-9][a-z0-9_-]{0,39}$/;
 
 const archive: Pack<ArchiveConfig> = {
   id: "archive",
+  about: "Keeps old maps readable, and never changes them.",
   inject: [MAPS],
   async apply(ctx: Context, config: ArchiveConfig = {}) {
     if (!config.dir) return;

@@ -1,36 +1,51 @@
 # docs
 
 What each running pack is for and what it adds, read from the packs
-themselves, never typed. The reference behind it holds what each loaded
-pack injects and provides (with the spec contract and edition of each key),
-the actions it declared and their inputs, the places its nodes speak at, the
-slots it declares and fills, and its config. When a pack changes, so does
-its reference.
+themselves, never typed apart from them. The reference behind it holds
+what each loaded pack injects and provides (with the spec contract and
+edition of each key), the actions it declared and their inputs, the kinds
+of item it defines, the places its nodes speak at, the slots it declares
+and fills, its config, its `about`, and whether it is built in.
 
 | File | Runs | What it is |
 |---|---|---|
-| [read.ts](read.ts) | both | `reference(runtime, sources)`: one entry per loaded pack, from the runtime's fibers, `action.list`, `agent.tree`, `slot.read` and the spec's capability lists |
-| [index.ts](index.ts) | server | The pack `docs`: provides `docs.read` (`packs()`, `watch(on)`). Injects `action.list`, `agent.tree` |
+| [read.ts](read.ts) | both | `reference(runtime, sources)`: one entry per loaded pack, from the runtime's fibers, `action.list`, `types.read`, `agent.tree`, `slot.read` and the spec's capability lists |
+| [index.ts](index.ts) | server | The pack `docs`: provides `docs.read` (`packs()`, `watch(on)`). Injects `action.list`, `agent.tree`, `types.read` |
 | [tool.ts](tool.ts) | server | The pack `docs-tool`: the MCP tool `packs` (`mcp.host`), so agents read the same reference. No input: a line per pack; `pack`: its whole entry |
-| [view.ts](view.ts) | page | The pack `docs`: the read-only Packs view (`#docs`), one card per pack (a pack with a server and a page half is one card): what it is for and what it adds, in plain words, no wiring. In groups: needs attention, views, talks to agents, kinds of item, core, other. Each thing a card names opens: a view its tab, a kind of item the Map on it (`find.query`), what it says the Reflex tree |
-| [cards.ts](cards.ts) | page | What a card shows: what a pack adds, its group, which packs use it, its state in words, the filter |
+| [view.ts](view.ts) | page | The pack `docs`: the read-only Packs view (`#docs`) |
+| [cards.ts](cards.ts) | page | What a card shows: its counts, the lists, a state in words, the filter |
 
-- **A card is composable.** Its title line is the slot `docs.card.head` and
-  its body `docs.card`, both `many`; each fill gets `{ pack }`, the pack's
-  entry, and `all`, every pack's. This pack fills the body: what it is
-  for, then what it adds (views, kinds of item, what agents can do with
-  it, how much it says to agents, how many packs use it).
-  An on/off switch is another pack's fill in the head.
-- **What it is for** is the first sentence of the pack's README, wiring
-  cut (`aboutOf`). A README that opens with what it provides shows none:
-  that is drift for the docs checks to find.
-- **The wiring is read, not shown.** A pack's group and "used by" come
-  from what it injects and provides, said in plain words.
+## The Packs view
+
+Shaped like other apps' plugin lists (VS Code, Chrome, Obsidian, Home
+Assistant, WordPress): a card is the line the pack declares and counts of
+what it adds; details are a click away and problems show only when there
+are any.
+
+- **What it is for** is the pack's own `about` (`Pack` in
+  [runtime/core.ts](../../runtime/core.ts)), one plain sentence for a
+  person. A test holds every pack in this repository to it.
+- **Counts that open:** views (each opens its tab), parts of views,
+  kinds of item (each opens the Map on it, through `find.query`),
+  actions, things said to agents (opens the Reflex tree), and how many
+  packs use it.
+- **Lists:** needs attention (waiting or failed) first, then built in
+  (loaded from this repository: the fiber's `source` is under its root),
+  then added from elsewhere.
+- A pack with a server half and a page half (the bridge, docs) is one
+  card.
+- **A card is composable.** Its title line is the slot `docs.card.head`
+  and its body `docs.card`, both `many`; each fill gets `{ pack, all }`.
+  This pack fills the body. An on/off switch is another pack's fill in
+  the head.
+
+## How it reads
+
 - **It only looks.** It reads the runtime it runs in (its fibers: a pack's
-  `inject`, what it `provided()`, its state, config and child packs), and
-  invokes no action. A fiber's state has no event, so `watch` also looks
-  for a change every second (`config.every`).
-- **Config is shown as it is**, except functions (`ƒ`) and fields whose name
-  says secret (`token`, `password`, `auth`, ...: `•••`).
+  `about`, `inject`, what it `provided()`, its state, config, `source`
+  and child packs), and invokes no action. A fiber's state has no event,
+  so `watch` also looks for a change every second (`config.every`).
+- **Config is shown as it is** to agents, except functions (`ƒ`) and
+  fields whose name says secret (`token`, `password`, `auth`, ...: `•••`).
 - `docs.read` is the pack's own key, like `verdict.read`; the bridge serves
   it.

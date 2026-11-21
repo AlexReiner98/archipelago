@@ -23,6 +23,7 @@ export const BRANCH: FlavourDef = {
 
 const branch: Pack = {
   id: "branch",
+  about: "Work done on a git branch, as a kind of work item.",
   inject: ["types.define"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").flavour(BRANCH);

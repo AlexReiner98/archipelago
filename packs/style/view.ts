@@ -45,6 +45,7 @@ const STYLE = sheet(`
 
 const styleView: Pack = {
   id: "style-view",
+  about: "The Style view: the colours, type and marks every view uses.",
   inject: ["slot.fill"],
   apply(ctx: Context) {
     const Half = ({ scheme }: { scheme: "light" | "dark" }) => html`

@@ -71,6 +71,7 @@ export function shown(def: FieldDef | undefined, v: Json): string {
 
 const item: Pack = {
   id: "item",
+  about: "The page for one item: its fields and its links.",
   inject: ["find.index", "here.read", "here.set", "slot.fill"],
   apply(ctx: Context) {
     const index = ctx.get<FindIndex>("find.index");

@@ -122,6 +122,7 @@ export interface McpConfig {
 
 const mcp: Pack<McpConfig> = {
   id: "mcp",
+  about: "The tools an agent uses to read and change the map.",
   inject: [HOST, "graph.read", "graph.watch", "types.read", "action.register", "action.list", "action.invoke", "exchange.read"],
   async apply(ctx: Context, config: McpConfig = {}) {
     const host = ctx.get<McpHost>(HOST);

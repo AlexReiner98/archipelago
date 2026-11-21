@@ -162,6 +162,7 @@ const clock = (t?: string) => (t ? new Date(t).toLocaleTimeString([], { hour: "2
 
 const harness: Pack = {
   id: "harness",
+  about: "The Harness view: what an agent was told, what it did, and whether each thing told helped.",
   inject: [
     "slot.fill",
     "here.read",

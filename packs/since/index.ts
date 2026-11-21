@@ -68,6 +68,7 @@ export function tell(sets: Committed[], titles: Map<Id, string>, max: number, wo
 
 const since: Pack<SinceConfig> = {
   id: "since",
+  about: "Tells an agent what changed on the map since it last heard.",
   inject: ["graph.read", "graph.watch", "agent.node", "action.list", "action.invoke"],
   async apply(ctx: Context, config: SinceConfig = {}) {
     const graph = ctx.get<GraphRead>("graph.read");

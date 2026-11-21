@@ -57,6 +57,7 @@ const STYLE = sheet(`
 
 const find: Pack = {
   id: "find",
+  about: "The search line: finds items by words, kind, status and links.",
   inject: ["graph.read", "graph.watch", "types.read", "here.declare", "here.read", "here.set", "slot.fill"],
   async apply(ctx: Context) {
     const graph = ctx.get<GraphRead>("graph.read");

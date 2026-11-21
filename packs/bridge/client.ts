@@ -22,6 +22,7 @@ interface Watch {
 
 const client: Pack<BridgeClientConfig> = {
   id: "bridge",
+  about: "Connects the page in your browser to the server.",
   async apply(ctx: Context, config: BridgeClientConfig = {}) {
     const url = config.url ?? "http://127.0.0.1:5182/";
     const post = async (path: string, msg: unknown) => {

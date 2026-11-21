@@ -23,6 +23,7 @@ export const WORK: BaseDef = {
 
 const work: Pack = {
   id: "work",
+  about: "Work items: tasks and steps, with their status.",
   inject: ["types.define"],
   apply(ctx: Context) {
     ctx.get<TypesDefine>("types.define").base(WORK);

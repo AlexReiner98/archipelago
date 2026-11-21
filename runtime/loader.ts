@@ -184,7 +184,7 @@ export class Loader {
 
   private instantiate(node: Node, pack: Pack): Fiber {
     const ctx: Context = this.runtime.root.intercept(node.meta);
-    const fiber = ctx.plugin(pack, node.entry.config, { position: () => node.path, disabled: node.disabled });
+    const fiber = ctx.plugin(pack, node.entry.config, { position: () => node.path, disabled: node.disabled, source: node.url });
     return fiber;
   }
 

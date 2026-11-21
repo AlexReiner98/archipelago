@@ -22,6 +22,7 @@ export interface RendererConfig {
 
 const renderer: Pack<RendererConfig> = {
   id: "renderer",
+  about: "Draws the page's views.",
   apply(ctx: Context, config: RendererConfig = {}) {
     const slots = new Map<string, { def: SlotDef; pack: string }>();
     const fills: { def: FillDef<any>; caller: Caller; n: number }[] = [];

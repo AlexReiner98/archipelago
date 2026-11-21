@@ -2,7 +2,8 @@
  * The reference, read from a running runtime: one entry per loaded pack,
  * with what it injects and provides (and the spec contract each key is in),
  * the actions it declared, the places its nodes speak at, the slots it
- * declares and fills, and its config. Nothing here is typed by hand: every
+ * declares and fills, its config, what it says it is for (`about`) and
+ * whether it was loaded from this repository. Nothing here is typed by hand: every
  * field comes from the fibers, the registries and the spec's own lists.
  *
  * Isomorphic and pure over what it is handed, so the server pack, the page
@@ -56,15 +57,15 @@ export const KEY = "docs.read";
 /** `docs.read`: the docs pack's own key, like `verdict.read`. */
 export interface DocsRead {
   packs(): Promise<PackDoc[]>;
-  /** What each of these packs is for, from its README (for packs read elsewhere: the page's). */
-  about(ids: string[]): Promise<Record<string, string>>;
   watch(on: () => void): Dispose;
 }
 
 export interface PackDoc {
   id: string;
-  /** What it is for: the first sentence of its README, in plain words. */
+  /** What it is for, in one plain sentence: the pack declares it (`about`). */
   about?: string;
+  /** Loaded from this repository, not added from elsewhere. */
+  builtIn?: boolean;
   /** The kinds of item and link it defines. */
   types?: { name: string; base?: string; doc?: string }[];
   /** Which runtime it runs in. */
@@ -91,33 +92,8 @@ export interface Sources {
   nodes?: NodeInfo[];
   slots?: SlotRead;
   types?: { types: { name: string; base: string; doc?: string; pack: string }[]; links: { name: string; doc?: string; pack: string }[] };
-  /** What each pack is for, by id. */
-  about?: Record<string, string>;
-}
-
-/**
- * What a pack is for, from its README: the first sentence of the first
- * paragraph, as plain words. Links keep their text, code marks go, and
- * what is wiring (what it provides, the spec it points at) is cut.
- */
-export function aboutOf(markdown: string): string | undefined {
-  const para = markdown
-    .replace(/\r/g, "")
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .find((p) => p && !p.startsWith("#") && !p.startsWith("|") && !p.startsWith("```"));
-  if (!para) return undefined;
-  let s = para
-    .replace(/\s+/g, " ")
-    .replace(/\s*\([^()]*\]\([^()]*\)[^()]*\)/g, "") // a parenthesis that only points somewhere
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/`/g, "")
-    .replace(/^(page side|server side)[.:]\s*/i, "");
-  s = (s.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? s).trim();
-  s = s.replace(/[:;,]?\s*(it )?(provides|injects|see)\b.*$/i, "").replace(/[:;,]\s*$/, "");
-  if (!s || /^provides\b/i.test(s)) return undefined;
-  s = s[0]!.toUpperCase() + s.slice(1);
-  return /[.!?]$/.test(s) ? s : `${s}.`;
+  /** This repository's root URL: a pack loaded from under it is built in. */
+  root?: string;
 }
 
 const BY_KEY = new Map<string, KeyDoc>();
@@ -187,10 +163,12 @@ export function reference(runtime: Runtime, src: Sources): PackDoc[] {
           ...src.types.links.filter((l) => ids.has(l.pack)).map((l) => ({ name: l.name, base: "link", ...(l.doc ? { doc: l.doc } : {}) })),
         ]
       : [];
-    const about = src.about?.[f.pack.id];
+    const about = f.pack.about;
+    const builtIn = src.root && f.source ? f.source.startsWith(src.root) : undefined;
     const doc: PackDoc = {
       id: f.pack.id,
       ...(about ? { about } : {}),
+      ...(builtIn !== undefined ? { builtIn } : {}),
       ...(types.length ? { types } : {}),
       side: src.side,
       state,

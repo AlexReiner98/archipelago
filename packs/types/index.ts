@@ -19,6 +19,7 @@ const refuse = (code: string, message: string): never => {
 
 const types: Pack = {
   id: "types",
+  about: "Keeps the kinds of item and link the map can hold.",
   apply(ctx: Context) {
     const defs = new Map<string, { d: Def; caller: Caller; n: number }>();
     const watchers = new Set<() => void>();
