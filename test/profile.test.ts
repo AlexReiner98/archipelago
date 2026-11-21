@@ -57,6 +57,24 @@ test("a run is in the profiles its facts name through uses links, or said; parts
   assert.deepEqual(ids({ repo: "r_studio", profiles_drop: "csharp" }), ["studio:match"]);
 });
 
+test("a run nothing places is in the fallback profile and what it is part of; a placed run isn't; a dropped or off fallback isn't a fallback", () => {
+  const m = modelOf(
+    prof({ id: "public" }),
+    prof({ id: "arch", fallback: true, parts: ["public"] }),
+    prof({ id: "studio", places: ["r_studio"], parts: ["public"] }),
+  );
+  const ids = (facts: Record<string, string | string[]>) => runProfiles(m, facts).map((p) => `${p.id}:${p.by}`);
+  assert.deepEqual(ids({ cwd: "C:/somewhere" }), ["arch:match", "public:part"], "nothing placed it: the fallback");
+  assert.deepEqual(ids({ repo: "r_studio" }), ["studio:match", "public:part"], "placed: the fallback doesn't add itself");
+  assert.deepEqual(ids({ cwd: "C:/somewhere", profiles_drop: "arch" }), [], "dropped: no fallback, fail open");
+  const off = modelOf(prof({ id: "arch", fallback: true, state: "off" }));
+  assert.deepEqual(runProfiles(off, {}).map((p) => p.id), [], "an off profile is no fallback");
+  // A run that only the fallback places hears what it holds, and not a node another profile holds.
+  const held = modelOf(prof({ id: "arch", fallback: true, state: "on", holds: ["n_ui"] }), prof({ id: "studio", state: "on", places: ["r_studio"], holds: ["n_rhino"] }));
+  assert.deepEqual(hearing(held, {}, node("words/n_rhino", ["tool:Bash"], "n_rhino")), { hears: false, why: "For studio; this run is in arch." });
+  assert.deepEqual(hearing(held, {}, node("words/n_ui", ["tool:Bash"], "n_ui")), { hears: true });
+});
+
 test("hearing: a node in no profile, or a run in no profile, hears; an exclusion wins; a shadow only records", () => {
   const m = modelOf(prof({ id: "studio", title: "Studio", places: ["r_ap"], holds: ["n_rhino"] }), prof({ id: "arch", title: "Archipelago", places: ["r_arch"], members: "at:file:packs/**", drops: ["n_pills"] }), prof({ id: "biz", title: "Business", state: "shadow", holds: ["n_art"] }));
   const rhino = node("words/n_rhino", ["skill:rhinocommon"], "n_rhino");

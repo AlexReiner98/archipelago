@@ -10,7 +10,7 @@ UI rules are kept, but said only in the runs they fit. Provides
 
 | | |
 |---|---|
-| `profile` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members` |
+| `profile` | A base: `shadow` (the first: only records), `on` (holds), closed `off`. Fields `match`, `members`, `fallback` |
 | `in_profile` | A node item → the profile that holds it |
 | `out_of_profile` | A node item → a profile it is taken out of |
 | `uses` | An item → a profile: runs with that item in their facts (a repo, a hub) are in it |
@@ -30,6 +30,9 @@ Decided (20 Nov 2026, all five):
   profile itself (the `run` tool's `profiles`). `profiles_drop` takes one out.
 - A node in no profile is heard by every run, and a run in no profile hears
   every node (fail open).
+- A profile with `fallback: true` is the workspace's default: a run that no
+  profile places is in it, and in what it is part of. A run something else
+  places isn't, and dropping it (`profiles_drop`) leaves the run failing open.
 - A run hears a node held by a profile it is in; an exclusion in one of its
   profiles wins.
 - A profile in `shadow` holds nothing: the gate's hold is a trial, recorded

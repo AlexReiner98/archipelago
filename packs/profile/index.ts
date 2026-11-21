@@ -43,6 +43,7 @@ export const PROFILE: BaseDef = {
   fields: {
     match: { kind: "text", doc: "A find-line over a run's facts (remote:github.com/a/*): an extra way in, besides uses links." },
     members: { kind: "text", doc: "A find-line over nodes (at:file:packs/**, at:skill:rhino*, kind:, words): what it holds besides its links." },
+    fallback: { kind: "boolean", doc: "A run no profile matches is in this one: the workspace's default." },
   },
 };
 
@@ -93,6 +94,7 @@ const profile: Pack = {
           state: (STATES.has(status) ? status : "shadow") as Profile["state"],
           ...(typeof it.fields.match === "string" && it.fields.match ? { match: it.fields.match } : {}),
           ...(typeof it.fields.members === "string" && it.fields.members ? { members: it.fields.members } : {}),
+          ...(it.fields.fallback === true ? { fallback: true } : {}),
           parts: parts.map((l) => l.to),
           places: places.map((l) => l.from),
           holds: holds.map((l) => l.from),

@@ -26,6 +26,8 @@ export interface Profile {
   match?: string;
   /** A find-line over nodes: what it holds besides its links. */
   members?: string;
+  /** A run that no profile matches is in this one (the workspace's default). */
+  fallback?: boolean;
   /** What it is part of. */
   parts: Id[];
   /** Items whose runs are in it (`uses`). */
@@ -119,6 +121,12 @@ export function runProfiles(model: Model, facts: Facts): (ProfileInfo & { state:
     if (!live(p)) continue;
     if (said.has(p.id) || p.places.some((x) => said.has(x)) || matchFacts(p.match, facts)) {
       out.set(p.id, { id: p.id, title: p.title, by: "match", holding: p.state === "on", state: p.state });
+    }
+  }
+  // A run nothing places is in the workspace's fallback profiles, if it has any; else in none (fail open).
+  if (!out.size) {
+    for (const p of model.profiles.values()) {
+      if (live(p) && p.fallback) out.set(p.id, { id: p.id, title: p.title, by: "match", holding: p.state === "on", state: p.state });
     }
   }
   const queue = [...out.keys()];
