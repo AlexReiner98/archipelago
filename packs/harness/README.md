@@ -61,8 +61,9 @@ with every name; the others are small previews in a column beside it, in
 the order of their colours so each keeps its place, and a click on one
 brings it into focus. The switch is smooth: the one clicked grows into
 the big place while the old one shrinks into the column (a view
-transition, each tree and line named by its colour slot; `switch_s`
-seconds, at once under reduced motion). Focus starts on the last active agent and stays
+transition of the tree drawings only, each named by its colour slot;
+headers and lines change in place; `switch_s` seconds, at once under
+reduced motion). Focus starts on the last active agent and stays
 where it is put while that agent is live. Trees go to the agent in focus,
 the six last active, and up to six more that act while watched; every
 other live agent is one line under the previews (its colour, name and
