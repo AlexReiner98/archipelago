@@ -45,14 +45,17 @@ are any.
   and its wiring last, folded.
 - **Composable.** A card's title line is the slot `docs.card.head`, its
   body `docs.card`, a pack's page `docs.page`, all `many`; each fill gets
-  `{ pack, all }`. This pack fills the body and the page. An on/off switch
-  is another pack's fill in the head.
+  `{ pack, all }`. This pack fills the body and the page. The on/off switch
+  is the [switch pack](../switch/README.md)'s fill in the head.
+- **Entries.** Each card holds its entries in each runtime's config tree
+  (`entries`: id, side, off), read from `loader.tree`'s status by position,
+  so a switch knows what to turn.
 
 ## How it reads
 
 - **It only looks.** It reads the runtime it runs in (its fibers: a pack's
   `about`, `inject`, what it `provided()`, its state, config, `source`
-  and child packs), and invokes no action. A fiber's state has no event,
+  and child packs, and `loader.tree`'s status), and invokes no action. A fiber's state has no event,
   so `watch` also looks for a change every second (`config.every`); a
   change on the map or the exchange is told at most that often.
 - **Reads are bounded:** one page of at most 100 items per kind (past it,
